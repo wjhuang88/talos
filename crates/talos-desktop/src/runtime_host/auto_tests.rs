@@ -7,6 +7,7 @@ use talos_runtime::{DecisionRequestLimits, Message, ProviderResult, Receiver};
 struct AssessmentProvider {
     conversation: MockProvider,
     assessments: AtomicUsize,
+    validated: AtomicUsize,
     allow: bool,
 }
 
@@ -28,26 +29,35 @@ impl LanguageModel for AssessmentProvider {
         let Message::System { content, .. } = &messages[0] else {
             panic!("review system instruction expected");
         };
-        assert!(content.contains("permission risk assessor"));
+        assert!(content.contains("transitive effects"));
         let Message::User { content } = &messages[1] else {
             panic!("review payload expected");
         };
         let payload: serde_json::Value =
-            serde_json::from_str(content.split_once('\n').expect("review JSON delimiter").1)
-                .expect("valid assessment payload");
+            serde_json::from_str(content).expect("valid assessment payload");
+        assert_eq!(payload["schema"], "ordinary-invocation/v1");
+        assert_eq!(
+            payload["tool"],
+            if cfg!(windows) { "powershell" } else { "bash" }
+        );
+        assert_eq!(payload["input"]["command"], "pwd");
+        assert_eq!(payload["user_intent"], "Inspect the working directory.");
+        assert!(payload["configuration"].is_object());
+        assert!(
+            payload["directory_identity"]
+                .as_str()
+                .is_some_and(|v| !v.is_empty())
+        );
         let digest = payload["request_digest"]
             .as_str()
             .expect("request-bound digest");
-        assert!(!digest.is_empty());
+        assert!(digest.starts_with("sha256:"));
+        self.validated.fetch_add(1, Ordering::SeqCst);
         let response = serde_json::json!({
-            "schema_version": 1,
+            "schema": "ordinary-invocation/v1",
             "request_digest": digest,
             "decision": if self.allow { "allow_once" } else { "human_required" },
-            "effect": if self.allow { "read_only" } else { "unknown" },
-            "reason_code": if self.allow { "bounded_read_only_command" } else { "uncertain" },
-            "confidence": if self.allow { "high" } else { "low" },
-            "effect_summary": "Inspect the current directory.",
-            "decision_points": ["Should this inspection run now?"]
+            "confidence": if self.allow { "high" } else { "low" }
         });
         MockProvider::new()
             .with_response(response.to_string())
@@ -128,6 +138,7 @@ async fn exercise_auto(enabled: bool, allow: bool) {
             .with_tool_call(shell, serde_json::json!({"command": "pwd"}))
             .with_response("Inspection request finished."),
         assessments: AtomicUsize::new(0),
+        validated: AtomicUsize::new(0),
         allow,
     });
     let configured = provider.clone();
@@ -245,13 +256,18 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     }
     if enabled && !allow {
         assert!(
-            explanations[0].contains("Should this inspection run now?"),
+            explanations[0].contains("human approval is required"),
             "explanations={explanations:?}, reports={reports:?}"
         );
     }
     assert_eq!(
         provider.assessments.load(Ordering::SeqCst),
         usize::from(enabled)
+    );
+    assert_eq!(
+        provider.validated.load(Ordering::SeqCst),
+        usize::from(enabled),
+        "review evidence assertions must run, even when panic containment falls back"
     );
     if enabled {
         assert_eq!(

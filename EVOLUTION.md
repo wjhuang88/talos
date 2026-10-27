@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-27 - Validate feature-gated consumers after changing shared review protocols
+
+- Trigger: I308 #783 CI failed two Desktop Auto fixtures on Linux and Windows after the full default-workspace preflight passed.
+- Symptom: The provider fixture asserted the old classifier prompt/schema before the real host could consume ordinary-invocation/v1 approval.
+- Root cause: Default workspace tests do not build the Desktop binary, which requires desktop-ui; the changed shared protocol had an additional feature-gated consumer.
+- Fix: Adapt the actual Desktop provider fixture to the new bound payload and response, preserving host approval/result assertions and adding an externally checked assertion-reached counter so panic containment cannot disguise an invalid fixture.
+- Prevention: Map shared protocol changes to feature-gated consumers and run their explicit feature tests locally; default workspace success is not all-feature evidence.
+- Promoted to rule/check: Existing explicit Desktop CI jobs remain mandatory; runtime_host::auto_tests validates the ordinary schema and checks completed evidence assertions outside the assessor boundary.
+
 ## 2026-10-27 - Use logical time for offline cancellation fixtures
 
 - Trigger: CI3463 Windows failed before the I293 stand-in tool started; approval exceeded its 10ms budget.

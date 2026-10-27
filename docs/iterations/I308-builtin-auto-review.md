@@ -2,17 +2,28 @@
 
 ## Current delivery checkpoint — 2026-10-27
 
-I308/T8 remain Active / Partial. Ordinary Shell/Exec/HTTP routing, bound whole-invocation
-assessment and final identity checks are implemented locally through `0da56314d`;
-this branch has not yet been published or merged. Real Unix tests cover command file
-creation and HTTP proxy/redirect effects, policy refusal, failure/stale outcomes,
-Auto-control disablement, external/replacement registration and command replay.
-Full Agent tests pass 509/509; cargo-xwin test-target checking is compile evidence only.
-The full standard preflight passed at earlier implementation baseline `258fd55d4`;
-subsequent test changes have focused/full Agent and Clippy evidence below, not a new
-whole-workspace preflight result. Native Windows execution, complete operation/profile
-reconciliation, final exact-head review/CI and merge remain outstanding. The original
-acceptance and remaining handoff queue are unchanged.
+I308/T8 remain Active / Partial. Ordinary Shell/Exec/HTTP stage #783 is published
+at `2995668544cab41d1ded59780dfb4dfa9634d285`, based on main `85ac39b48`.
+Its full standard locked preflight passed, and independent exact-head static
+permission/security/API review approved; the reviewer ran no tests and shared the
+session/GitHub identity, not a separate natural-person identity. Remote run
+40474043084 exposed two stale Desktop Auto fixtures on both Linux and Windows:
+they expected the legacy classifier prompt/schema, while production Shell now uses
+ordinary-invocation/v1. A local test correction validates the new bound payload,
+emits its exact response schema and checks an external assertion-reached counter;
+the focused Auto tests passed 3/3, complete local desktop-ui tests passed 112/112,
+and all-target feature Clippy passed with warnings denied. Fresh workspace/governance
+and remote gates remain pending. The earlier preflight
+omits the optional desktop-ui feature and does not prove that combination passes.
+
+Real Unix tests cover command file creation and HTTP proxy/redirect effects,
+policy refusal, failure/stale outcomes, Auto-control disablement,
+external/replacement registration and command replay. Full Agent tests pass
+509/509; cargo-xwin test-target checking is compile evidence only. Native Windows
+execution, complete operation/profile reconciliation and final CI/merge remain
+outstanding. Default save_url/fetch_url/WebSearch ordinary Auto acceptance remains
+open; guarded search cannot downgrade. The original acceptance and remaining
+handoff queue are unchanged.
 
 ### Earlier merged-stage checkpoint — 2026-10-26
 
@@ -53,8 +64,8 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration) |
-| Last Updated | 2026-10-26 |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration); #783 (ordinary Shell/Exec/HTTP, Review) |
+| Last Updated | 2026-10-27 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
 This governance candidate proposes claim and activation atomically in #765. Both are ineffective
@@ -1232,3 +1243,20 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   original Auto acceptance require implementation or an explicit maintainer scope decision.
   Both governance validators passed with zero warnings for this documentation stage; source
   has not changed since the preceding validated test commit.
+
+### Desktop protocol-consumer repair — 2026-10-27
+
+PR #783 first exact-head CI run 40474043084 failed the two enabled Auto Desktop
+fixtures on both Linux and Windows at their legacy prompt assertion. The fixture
+now validates the actual ordinary-invocation/v1 JSON, frozen input and user intent,
+configuration presence, directory identity presence and digest shape, then echoes
+the digest with the supported response schema. Existing real Host approval/result,
+workspace execution and configured-model report checks remain. A validated counter
+asserted outside the assessor ensures caught assertion panics cannot pass fallback
+coverage. This is test adaptation, not a change to product permission behavior.
+Local pinned locked focused Auto tests pass 3/3 and full desktop-ui tests pass
+112/112; desktop-ui all-target Clippy passes with warnings denied. Logs are root
+`target/recovery/invocation-desktop-{auto,all,clippy}-fix.log`. Independent bounded
+static review approved the test delta without running tests. The fixture checks
+configuration presence and digest shape/echo, not independent full hash recomputation.
+Native Windows and final exact-head gates remain pending. T8 remains Partial.
