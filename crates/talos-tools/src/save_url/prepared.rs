@@ -66,12 +66,15 @@ impl PreparedSave {
         let proof = admission
             .downcast::<AdmittedInvocation>()
             .map_err(|_| "missing exact save admission")?;
-        let request = PermissionRequest::new(
+        let mut request = PermissionRequest::new(
             "save_url",
             self.provenance.clone(),
             &self.profile,
             &self.input,
         );
+        if self.images.is_none() {
+            request = request.with_transitive_effects();
+        }
         let authorizations = proof
             .consume_for_prepared(&request, &self.identity)
             .map_err(|_| "save admission does not match prepared plan")?;
@@ -168,6 +171,19 @@ fn admitted_path(
 impl PreparedNormalToolInvocation for PreparedSave {
     fn plan_identity(&self) -> Option<&PreparedPlanIdentity> {
         Some(&self.identity)
+    }
+    fn invocation_review_configuration(&self) -> Option<Value> {
+        self.images.is_none().then(|| serde_json::json!({
+            "stage": "capture_existing_file_and_download_without_writes",
+            "backend": "reqwest",
+            "redirect_limit": 5,
+            "timeout_secs": DEFAULT_TIMEOUT_SECS,
+            "maximum_download_bytes": self.tool.max_body_bytes.min(talos_core::tool::MAX_FILE_MUTATION_REVIEW_BYTES),
+            "maximum_existing_file_bytes": talos_core::tool::MAX_FILE_MUTATION_REVIEW_BYTES,
+            "proxy": "reqwest inherited system proxy configuration",
+            "destination_isolation": false,
+            "subsequent_write": "requires fresh complete-image mutation admission; no write authority inherited",
+        }))
     }
     fn permission_profile(&self) -> &[ToolPermissionFacet] {
         &self.profile

@@ -1424,3 +1424,35 @@ still pending. This local stage does not complete T8 or waive save/search accept
   content-check/rename race remains disclosed. This is local implementation,
   not full Auto acceptance, full preflight, Windows evidence or merged delivery.
   T8 and the complete handoff queue remain incomplete.
+
+
+### Save URL staged Auto implementation — 2026-10-27
+
+- Registered built-in recoverable saves now supply stage-owned invocation review
+  configuration for the read/download stage. The shared ordinary classifier can
+  approve that exact prepared plan once; a new plan separately reviews complete
+  UTF-8 replacement images through existing retained file-mutation review.
+  Download admission has transitive policy semantics (proxy/redirect effects),
+  while the final Read/Write stage inherits no network authority.
+- Added default-None descriptive configuration to the prepared invocation trait;
+  it carries no authority. Command, mutation and invocation evidence are mutually
+  exclusive. Registered instance ownership gates model review. External or
+  replacement instances retain manual approval with matching transitive proofs.
+  Dedicated prepared-network dispatch remains prior and cannot downgrade.
+- `save_url_auto.rs` exercises 16 production Agent/subprocess proxy scenarios:
+  allow, uncertain/error/stale at download and mutation, explicit Deny/human,
+  external/replacement rejection, manual external/replacement approval, concurrent
+  destination modification, nonrecoverable save fallback and binary fallback.
+  Assertions cover zero connections before rejected capture, retained originals
+  after rejected writes, exactly one redirected download, and zero stored grants.
+- Local locked checks pass: Save URL 21/21, Agent library 510/510, Core library
+  122/122, Agent library/tests Clippy with `-D warnings`. Logs are ephemeral local
+  `/private/tmp/i308-save-auto-{agent,agent-full,core,clippy}.log`.
+  Independent read-only security/API review approved the executable working delta,
+  including manual external compatibility; it did not independently run tests.
+- This is a local implementation stage, not merged delivery. Full standard
+  preflight, native Windows/exact-head CI and final stable-commit review remain
+  outstanding. The existing content-check/rename race remains disclosed. Recovery
+  restore, default/nonrecoverable saves and binary mutations gain no Auto approval
+  from this route. T8 full G/search/profile acceptance and all later original
+  handoff tasks remain incomplete.

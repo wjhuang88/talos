@@ -148,7 +148,7 @@ impl AutoPermissionResolver {
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
         let ordinary = matches!(
             request.tool_name.as_str(),
-            "bash" | "powershell" | "exec" | "http_request" | "fetch_url"
+            "bash" | "powershell" | "exec" | "http_request" | "fetch_url" | "save_url"
         );
         let schema = if ordinary { ORDINARY_SCHEMA } else { SCHEMA };
         let directory = evidence.working_directory();
@@ -157,9 +157,11 @@ impl AutoPermissionResolver {
             && evidence
                 .configuration()
                 .is_some_and(|value| bounded_json(value).is_some() && !sensitive_json(value, 0))
-            && (matches!(request.tool_name.as_str(), "http_request" | "fetch_url")
-                || directory.is_some_and(|path| path.is_absolute() && path.to_str().is_some())
-                    && directory_before.is_some());
+            && (matches!(
+                request.tool_name.as_str(),
+                "http_request" | "fetch_url" | "save_url"
+            ) || directory.is_some_and(|path| path.is_absolute() && path.to_str().is_some())
+                && directory_before.is_some());
         self.sync_reset();
         let started = Instant::now();
         let epoch = self.control.reset_epoch();

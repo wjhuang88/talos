@@ -771,8 +771,13 @@ Registered recoverable saves first admit Network and Read to capture the origina
 and download without writing. A fresh Read/Write approval then covers the retained
 replacement; it does not download again. Complete UTF-8 before/after images are
 available to the file review pipeline; binary images retain human approval.
-This stage does not yet enable Save URL model Auto approval. Relative destinations
-use the permission workspace, and changed targets or contents are refused.
+For registered built-in recoverable saves, Auto can review the download stage
+and then separately review complete text replacement images. Explicit Deny and
+human-only rules remain authoritative; uncertain, binary, sensitive or incomplete
+evidence requires the normal approval fallback. Saves without `retain_backup`
+and recovery restoration do not gain model Auto approval through this route.
+Relative destinations use the permission workspace, and changed targets or
+contents are refused.
 Use the returned `recovery_id` with the same `destination` to restore; supply a
 `url` string for schema compatibility, but restoration ignores it and requires
 only Read and Write. Recovery is available in the same tool instance for 15 minutes,

@@ -132,6 +132,14 @@ pub trait PreparedNormalToolInvocation: Send {
         None
     }
 
+    /// Returns implementation-owned review configuration for this exact stage.
+    /// This is descriptive evidence, never authority. Dispatch must verify the
+    /// registered built-in instance and bind admission to this stage's identity.
+    /// Returning None preserves the existing prepared authorization route.
+    fn invocation_review_configuration(&self) -> Option<serde_json::Value> {
+        None
+    }
+
     /// The complete set of effects to admit as one invocation.
     fn permission_profile(&self) -> &[ToolPermissionFacet];
 

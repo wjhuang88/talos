@@ -4,6 +4,7 @@ mod ordinary_auto;
 mod ordinary_http_auto;
 mod read_auto;
 mod sandbox_command_binding;
+mod save_url_auto;
 mod todo_auto;
 mod write_auto;
 use std::path::PathBuf;

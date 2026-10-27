@@ -81,7 +81,8 @@ impl AutoPermissionResolver {
             && self.control.is_enabled()
             && !self.circuit_open()
             && self.command_context_current(&request)
-            && ((request.tool_name == "edit" && description.after.is_some())
+            && ((matches!(request.tool_name.as_str(), "edit" | "save_url")
+                && description.after.is_some())
                 || (request.tool_name == "delete" && description.after.is_none()))
             && evidence
                 .input()

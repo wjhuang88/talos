@@ -14,7 +14,10 @@ fn admit(
         PermissionMode::Interactive,
         InteractionCapability::Available,
     );
-    let request = PermissionRequest::native("save_url", operation.permission_profile(), input);
+    let mut request = PermissionRequest::native("save_url", operation.permission_profile(), input);
+    if operation.invocation_review_configuration().is_some() {
+        request = request.with_transitive_effects();
+    }
     let pending = match state
         .begin_invocation(&request, &context)
         .expect("evaluation")
