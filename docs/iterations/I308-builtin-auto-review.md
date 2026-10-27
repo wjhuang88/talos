@@ -39,7 +39,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration) |
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
