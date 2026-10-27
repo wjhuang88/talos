@@ -70,14 +70,19 @@ impl AutoPermissionResolver {
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
         if matches!(
             request.tool_name.as_str(),
-            "delay" | "schedule" | "cancel_scheduled_task"
+            "delay"
+                | "schedule"
+                | "cancel_scheduled_task"
+                | "bash"
+                | "powershell"
+                | "exec"
+                | "http_request"
         ) {
             return self
                 .resolve_action_review(request, evidence, remaining, allowed, intent)
                 .await;
         }
-        // Preserve the existing shell/exec classifier until its effectful successor
-        // has execution evidence; this branch is not a tool-name trust assertion.
+        // Other native families retain their existing specialized review path.
         if request.tool_name != "write" {
             return self
                 .resolve_with_execution_context(

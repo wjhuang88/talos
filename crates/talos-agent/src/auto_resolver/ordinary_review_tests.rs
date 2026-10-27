@@ -59,30 +59,6 @@ impl ApprovalResolver for Deny {
     }
 }
 
-struct ReviewAdapter(AutoPermissionResolver);
-#[async_trait]
-impl ApprovalResolver for ReviewAdapter {
-    async fn resolve(
-        &self,
-        _: PermissionApprovalRequest,
-        _: Duration,
-    ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        Ok(ApprovalChoice::Deny)
-    }
-    async fn resolve_builtin_invocation(
-        &self,
-        request: PermissionApprovalRequest,
-        evidence: BuiltinInvocationReviewEvidence<'_>,
-        remaining: Duration,
-        allowed: bool,
-        intent: Option<&str>,
-    ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        self.0
-            .resolve_action_review(request, evidence, remaining, allowed, intent)
-            .await
-    }
-}
-
 #[tokio::test]
 async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
     for scenario in [
@@ -119,7 +95,7 @@ async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
                 PermissionMode::Interactive,
                 InteractionCapability::Available,
             ),
-            Some(Arc::new(ReviewAdapter(resolver))),
+            Some(Arc::new(resolver)),
         );
         let input = serde_json::json!({"command": "program"});
         let facets = [ToolPermissionFacet::with_resource(
@@ -155,15 +131,12 @@ async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
             .await;
         assert_eq!(
             result.is_ok(),
-            scenario == "allow",
+            matches!(scenario, "allow" | "unresolved_directories"),
             "{scenario}: {result:?}"
         );
         assert_eq!(
             calls.load(Ordering::SeqCst),
-            usize::from(!matches!(
-                scenario,
-                "missing_configuration" | "unresolved_directories"
-            ))
+            usize::from(!matches!(scenario, "missing_configuration"))
         );
         assert_eq!(state.grant_count().expect("grants"), 0);
     }

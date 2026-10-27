@@ -920,6 +920,7 @@ impl Agent {
                         Vec::new()
                     })
                 } else if matches!(call.name.as_str(), "bash" | "powershell")
+                    && !registry.is_builtin_instance(&call.name)
                     && working_directory.is_some()
                 {
                     let working_directory = working_directory.as_deref().expect("checked above");
