@@ -1353,3 +1353,23 @@ still pending. This local stage does not complete T8 or waive save/search accept
 - Fetch full standard locked preflight passed (exit 0), Tools 983/983 and both external Runtime SDK consumers; root log `target/recovery/ordinary-fetch-preflight.log`, same low-debug/incremental-disabled serial command and shared target as the preceding ordinary stage. Independent static permission/security/API review approved original implementation `0eb2a70c5` against `cb6e20878`, without builds. Rebased onto merged parent `da280c8a7`; `git diff 1dcdf885d HEAD` showed only one owner-document separator change, with all executable sources, lockfile and scripts identical. The conflict retained both parent evidence and Fetch notes. Remote exact-head/native Windows and final review remain pending; T8 remains Partial.
 
 - Fetch stable candidate published as PR #784 at `6e01c5690`; exact-head CI and native Windows evidence are pending. No T8 completion is claimed.
+
+
+### Save URL implementation checkpoint — 2026-10-27
+
+- Local implementation commit `7590b1df09555d5c0a452ffc6f3fff331a6cca08`
+  checks each received response chunk before adding it to the retained download.
+  Over-limit responses stop before destination creation or writing. This bounds
+  retained body length; it does not claim a bound on reqwest internal allocations
+  or bytes already received by the transport. Existing download/write permission
+  behavior is unchanged; Save URL model Auto admission and overwrite recovery
+  remain unimplemented.
+- Save URL tests moved to `crates/talos-tools/src/save_url/tests.rs`.
+  Locked Tools tests with `network,file-write` passed 10/10, including exact limit,
+  no Content-Length, and oversized unfinished response rejection before EOF.
+  An initial `network`-only command selected zero Save URL tests because this tool
+  also requires `file-write`; it is not counted as validation.
+- Development branch `feat/i308-save-auto` is stacked locally on Fetch candidate
+  `3202c6af0`; the shared HTTP fixture repair there resolves the pre-existing
+  unused-read-amount Clippy failures on main. This checkpoint is not publication,
+  full preflight, independent security approval, Windows evidence or T8 completion.
