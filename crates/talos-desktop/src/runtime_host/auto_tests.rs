@@ -256,7 +256,7 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     }
     if enabled && !allow {
         assert!(
-            explanations[0].contains("human approval is required"),
+            explanations[0].contains("Model assessment requires your decision"),
             "explanations={explanations:?}, reports={reports:?}"
         );
     }

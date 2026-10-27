@@ -698,6 +698,20 @@ fn human_review_explanation(
     configured_ask: bool,
     locale: &str,
 ) -> String {
+    human_review_details(
+        response.effect_summary.as_deref(),
+        &response.decision_points,
+        configured_ask,
+        locale,
+    )
+}
+
+fn human_review_details(
+    effect_summary: Option<&str>,
+    decision_points: &[String],
+    configured_ask: bool,
+    locale: &str,
+) -> String {
     let language = locale.split('-').next().unwrap_or(locale);
     let safe = |text: &str, limit| {
         !text.trim().is_empty()
@@ -723,11 +737,7 @@ fn human_review_explanation(
         _ => "Model assessment requires your decision; it does not grant execution permission."
             .to_owned(),
     };
-    if let Some(summary) = response
-        .effect_summary
-        .as_deref()
-        .filter(|text| safe(text, 512))
-    {
+    if let Some(summary) = effect_summary.filter(|text| safe(text, 512)) {
         explanation.push_str(match language {
             "zh" => "\n模型报告的影响：",
             "ja" => "\nモデルが報告した影響：",
@@ -735,8 +745,7 @@ fn human_review_explanation(
         });
         explanation.push_str(summary);
     }
-    let points: Vec<_> = response
-        .decision_points
+    let points: Vec<_> = decision_points
         .iter()
         .filter(|text| safe(text, 256))
         .take(3)
@@ -814,6 +823,17 @@ pub trait AutoPermissionAssessor: Send + Sync {
         _remaining: Duration,
     ) -> Result<String, String> {
         Err("ordinary invocation assessment unsupported".into())
+    }
+
+    /// Reviews an ordinary invocation with a presentation-only locale hint.
+    /// The hint does not enter the invocation digest or grant authority.
+    async fn assess_ordinary_invocation_with_locale(
+        &self,
+        request: OrdinaryInvocationAssessmentRequest,
+        _locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_ordinary_invocation(request, remaining).await
     }
 
     /// Reviews one session-local action. Existing assessors remain unsupported.
@@ -968,7 +988,17 @@ impl AutoPermissionAssessor for ProviderAutoPermissionAssessor {
         request: OrdinaryInvocationAssessmentRequest,
         remaining: Duration,
     ) -> Result<String, String> {
-        self.assess_ordinary_payload(request, remaining).await
+        self.assess_ordinary_payload(request, None, remaining).await
+    }
+
+    async fn assess_ordinary_invocation_with_locale(
+        &self,
+        request: OrdinaryInvocationAssessmentRequest,
+        locale: &str,
+        remaining: Duration,
+    ) -> Result<String, String> {
+        self.assess_ordinary_payload(request, Some(locale), remaining)
+            .await
     }
 
     async fn assess_builtin_action(
@@ -2093,6 +2123,26 @@ impl AutoPermissionResolver {
         current.evidence = evidence;
     }
 
+    fn assessment_locale(&self, user_intent: Option<&str>) -> ConversationLocale {
+        let session_binding = self.lease.locale_session_binding();
+        {
+            match self.locale.lock() {
+                Ok(mut current) => {
+                    if let Some((session_id, revision)) = session_binding {
+                        if current.bind_session(&session_id, revision) {
+                            current.for_assessment(user_intent)
+                        } else {
+                            current.fallback.clone()
+                        }
+                    } else {
+                        current.fallback.clone()
+                    }
+                }
+                Err(_) => ConversationLocale::configured(),
+            }
+        }
+    }
+
     fn failure_locale(&self) -> ConversationLocale {
         self.locale
             .lock()
@@ -2332,23 +2382,7 @@ impl AutoPermissionResolver {
         }
         self.sync_reset();
         let failure_locale = self.failure_locale();
-        let session_binding = self.lease.locale_session_binding();
-        let locale = {
-            match self.locale.lock() {
-                Ok(mut current) => {
-                    if let Some((session_id, revision)) = session_binding {
-                        if current.bind_session(&session_id, revision) {
-                            current.for_assessment(user_intent)
-                        } else {
-                            current.fallback.clone()
-                        }
-                    } else {
-                        current.fallback.clone()
-                    }
-                }
-                Err(_) => ConversationLocale::configured(),
-            }
-        };
+        let locale = self.assessment_locale(user_intent);
         // ADR-081 permits advisory shell assessment for configured Ask, but never
         // lets the assessor discharge that human checkpoint.
         if !auto_assessment_allowed && !matches!(request.tool_name.as_str(), "bash" | "powershell")

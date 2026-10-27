@@ -3,18 +3,20 @@
 ## Current delivery checkpoint — 2026-10-27
 
 I308/T8 remain Active / Partial. Ordinary Shell/Exec/HTTP stage #783 is published
-at `2995668544cab41d1ded59780dfb4dfa9634d285`, based on main `85ac39b48`.
-Its full standard locked preflight passed, and independent exact-head static
-permission/security/API review approved; the reviewer ran no tests and shared the
-session/GitHub identity, not a separate natural-person identity. Remote run
-40474043084 exposed two stale Desktop Auto fixtures on both Linux and Windows:
-they expected the legacy classifier prompt/schema, while production Shell now uses
-ordinary-invocation/v1. A local test correction validates the new bound payload,
-emits its exact response schema and checks an external assertion-reached counter;
-the focused Auto tests passed 3/3, complete local desktop-ui tests passed 112/112,
-and all-target feature Clippy passed with warnings denied. Fresh workspace/governance
-and remote gates remain pending. The earlier preflight
-omits the optional desktop-ui feature and does not prove that combination passes.
+at `58661ec72558f26fe92ca0451db09ac95a298809`, based on main `85ac39b48`.
+The full standard locked preflight and independent static permission/security/API
+review passed at that head. Remote run 40475830775 passed both explicit Desktop
+feature jobs, but its workspace job exposed an additional real REPL locale
+regression. The ordinary review branch did not carry the established session
+locale or render model-reported decision points; the fixture also recognized only
+the legacy assessor protocol. The local repair restores presentation-only locale
+hints through a backward-compatible assessor default method, reuses the existing
+safe explanation renderer, and accepts model explanation only after current
+context/schema/digest verification. Locale remains outside authorization identity.
+Real REPL and TUI acceptance pass for zh/en/ja, resume/rotation and manual Deny;
+Agent library tests pass 509/509. Fresh full workspace, Desktop, independent
+review and exact-head remote gates are required before merge. The default
+workspace preflight omits optional desktop-ui and does not replace those checks.
 
 Real Unix tests cover command file creation and HTTP proxy/redirect effects,
 policy refusal, failure/stale outcomes, Auto-control disablement,
@@ -1260,3 +1262,32 @@ Local pinned locked focused Auto tests pass 3/3 and full desktop-ui tests pass
 static review approved the test delta without running tests. The fixture checks
 configuration presence and digest shape/echo, not independent full hash recomputation.
 Native Windows and final exact-head gates remain pending. T8 remains Partial.
+
+### 2026-10-27 ordinary review locale repair
+
+- Remote failure: run 40475830775, workspace job 122093962825, timed out waiting
+  for the real REPL's Chinese decision point. The ordinary provider request used
+  pure JSON; the old fixture treated it as a conversation. Product inspection
+  also found lost session locale and fixed English fallback, so fixture-only
+  changes would not repair the behavior.
+- Implementation: additive default `assess_ordinary_invocation_with_locale`
+  preserves existing assessor implementations. Provider adds a bounded locale
+  outside the hashed request; isolated review still has exactly two messages.
+  Optional ordinary response summary/decision points use the legacy safe-text
+  filters and renderer only after schema/digest/current-context validation.
+  Missing or invalid responses use localized content-free failure copy. Existing
+  scheduler protocol and fallback behavior are retained.
+- Real REPL and TUI scripts now decode ordinary JSON while retaining legacy
+  envelopes; they verify request identity/configuration and preserve all original
+  locale/history isolation/resume/rotation/manual-denial assertions. The optional
+  token-measurement utility accepts both captured encodings without claiming new
+  measurement results.
+- Local Agent library tests pass 509/509, including a response-presentation
+  regression proving stale/digest-mismatched explanation is not shown. Logs:
+  `target/recovery/ordinary-locale-{agent-final,repl,tui}.log` in the root worktree.
+- Full explicit-feature Desktop tests pass 112/112 and the standard locked release
+  preflight passes, including both Runtime SDK consumers. Logs:
+  `target/recovery/ordinary-locale-{desktop,preflight}.log` in the root worktree.
+  Independent bounded static security/API review approved the locale source and
+  fixture delta. Native Windows and fresh exact-head remote evidence remain pending;
+  this is not T8 completion.

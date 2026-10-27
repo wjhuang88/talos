@@ -1514,3 +1514,19 @@ visible; distinguish passed assertions from independently emitted evidence.
   HTTP field names. It confused a representation choice with missing credentials.
 - Prevention/check: The shared registration fixture now compares names and values
   separately; retain strict credential-value and empty-GET-body assertions.
+
+## 2026-10-27 - Preserve presentation behavior across Auto protocol changes
+
+- Trigger: #783 workspace CI failed real REPL locale acceptance after Desktop
+  fixtures had already been migrated to ordinary invocation review.
+- Root cause: protocol routing changed without preserving the old branch's
+  session-language and actionable human-decision presentation. An additional
+  external acceptance fixture still recognized only the old protocol.
+- Repair: restore the existing locale detector and sanitized explanation renderer
+  for ordinary review; keep locale separate from authorization identity and
+  reject stale/unbound presentation. Migrate real REPL/TUI fixtures while keeping
+  their original user-visible language, resume and manual-Deny assertions.
+- Check: passing unit/default-workspace tests do not prove optional Desktop or
+  real REPL/TUI acceptance. Audit all consumers of a replaced protocol before
+  publishing the next stable stage; fixture changes alone cannot close a lost
+  product behavior. Local acceptance passes; fresh remote gates remain required.

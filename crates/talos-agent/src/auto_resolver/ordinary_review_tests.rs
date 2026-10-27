@@ -45,13 +45,27 @@ impl AutoPermissionAssessor for Assessor {
             "request_digest": if self.scenario == "digest" { "wrong" } else { &request.action.request_digest },
             "decision": if self.scenario == "uncertain" { "human_required" } else { "allow_once" },
             "confidence": "high",
+            "effect_summary": "expected uncertain explanation",
+            "decision_points": ["Check the program's effects before continuing"],
         }).to_string())
     }
 }
 
-struct Deny;
+struct Deny(Arc<Mutex<Vec<String>>>);
 #[async_trait]
 impl ApprovalResolver for Deny {
+    async fn resolve_with_explanation(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: Duration,
+        explanation: &str,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.0
+            .lock()
+            .expect("explanations")
+            .push(explanation.to_owned());
+        self.resolve(request, remaining).await
+    }
     async fn resolve(
         &self,
         _: PermissionApprovalRequest,
@@ -80,6 +94,7 @@ async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
         ));
         let calls = Arc::new(AtomicUsize::new(0));
         let reached = Arc::new(AtomicUsize::new(0));
+        let explanations = Arc::new(Mutex::new(Vec::new()));
         let resolver = AutoPermissionResolver::new(
             Arc::new(Assessor {
                 scenario,
@@ -87,7 +102,7 @@ async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
                 reached: reached.clone(),
                 state: state.clone(),
             }),
-            Arc::new(Deny),
+            Arc::new(Deny(explanations.clone())),
             ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
                 .expect("lease"),
             Duration::from_millis(20),
@@ -148,5 +163,13 @@ async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
             "{scenario}: assessor preconditions did not complete"
         );
         assert_eq!(state.grant_count().expect("grants"), 0);
+        let explanations = explanations.lock().expect("explanations");
+        assert_eq!(
+            explanations
+                .iter()
+                .any(|text| text.contains("expected uncertain explanation")),
+            scenario == "uncertain",
+            "only a current, digest-bound response may contribute presentation: {scenario}"
+        );
     }
 }

@@ -27,12 +27,16 @@ def main():
         assert len(messages) == 2
         system, user = (message["content"] for message in messages)
         assert guidance in system, "locale instruction changed; update measurement boundary"
-        prefix, raw = user.split("\n", 1)
+        if user.lstrip().startswith("{"):
+            prefix, raw = "", user
+        else:
+            envelope, raw = user.split("\n", 1)
+            prefix = envelope + "\n"
         payload = json.loads(raw)
         serialize = lambda value: json.dumps(value, ensure_ascii=False, separators=(",", ":"))
         assert serialize(payload) == raw, "preserve the production serialization exactly"
         locale = payload.pop("locale")
-        without_hint = prefix + "\n" + serialize(payload)
+        without_hint = prefix + serialize(payload)
         without_guidance = system.replace(guidance, "", 1)
         for name in ["cl100k_base", "o200k_base"]:
             encoding = tiktoken.get_encoding(name)
