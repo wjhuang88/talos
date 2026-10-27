@@ -1095,3 +1095,13 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
   fixture passed; log: `/private/tmp/i308-runtime-registration-preflight-authorized.log`.
   This supersedes the pending result above, preserves the sandbox failure, and
   does not establish remote CI, merge, or full T8 completion.
+
+### Rebased registration candidate — 2026-10-27
+
+- Registration candidate rebased onto main `326e05751ad5d5bead11c7bc7789a82bae265526`; implementation head before this evidence update is `f5d724896`. PR #773 still points to the previous head until local convergence.
+- Post-rebase standard locked preflight failed with exit 101 at CLI test linking: `ld: write() failed, errno=28 (No space left on device)`. This is not a passing post-rebase gate and does not establish a product regression. Log: `/private/tmp/i308-rebased-ci-preflight.log`.
+- With no Cargo/compiler process active, removed only rebuildable executable files from the previously authorized root `target/debug/examples` directory (33 files, 3,394,336,464 logical bytes); dependency libraries were retained. Available disk rose from 219 MiB to 2.6 GiB.
+- Standard locked preflight is being retried with unchanged source, incremental compilation disabled, dev/test debug information disabled and serial tests. Log: `/private/tmp/i308-rebased-ci-preflight-retry.log`. Result remains outstanding until the process exits.
+- Full T8 and the original handoff remain incomplete. Ordinary invocation authorization remains a maintainer decision; Desktop Todo factory registration and the remaining operation/profile/platform matrix are not implemented by this checkpoint.
+
+- During retry, reclaimed 96 executable files older than six hours under authorized root `target/debug/deps` (2,485,667,936 logical bytes), excluding shared libraries and current compilation outputs. Available space recovered to 3.0 GiB; workspace tests are now executing. No source or Git data was removed.
