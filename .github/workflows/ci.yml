@@ -206,12 +206,31 @@ jobs:
 
   windows-rust:
     name: Windows Rust workspace
+    needs: [classify-changes, windows-workspace, windows-desktop]
+    if: always() && (needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require both native Windows validation jobs
+        env:
+          WORKSPACE_RESULT: ${{ needs.windows-workspace.result }}
+          DESKTOP_RESULT: ${{ needs.windows-desktop.result }}
+        run: |
+          test "$WORKSPACE_RESULT" = success
+          test "$DESKTOP_RESULT" = success
+
+  windows-workspace:
+    name: Windows workspace validation
     needs: classify-changes
     if: always() && (needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false')
     runs-on: windows-latest
-    # Cold validation can take 27 minutes; allow bounded cache post-job cleanup too.
+    # Desktop validation runs independently; this job retains all workspace gates.
     # Individual validation steps retain their own timeout limits.
     timeout-minutes: 45
+
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_INCREMENTAL: "0"
 
     steps:
       - uses: actions/checkout@v4
@@ -257,20 +276,6 @@ jobs:
 
       - name: Clippy workspace
         run: cargo clippy --workspace --locked -- -D warnings
-
-      - name: Desktop explicit feature validation
-        timeout-minutes: 20
-        shell: pwsh
-        env:
-          CARGO_PROFILE_DEV_DEBUG: '0'
-          CARGO_INCREMENTAL: '0'
-        run: |
-          Remove-Item Env:RXCB_EXPORT -ErrorAction SilentlyContinue
-          Remove-Item Env:RING_PREGENERATE_ASM -ErrorAction SilentlyContinue
-          cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo test -p talos-desktop --features desktop-ui --locked
-          exit $LASTEXITCODE
 
       - name: Structured Git executable and path identity guard tests
         # Independent evidence must still run after a Desktop failure.
@@ -516,6 +521,45 @@ jobs:
 
       - name: Rebuilt CLI mock smoke
         run: cargo run -p talos-cli --locked -- --mock --print --no-init --no-context "windows shell portability smoke"
+
+
+  windows-desktop:
+    name: Windows Desktop explicit feature
+    needs: classify-changes
+    if: always() && (needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false')
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-desktop
+
+      - name: Desktop explicit feature validation
+        timeout-minutes: 20
+        shell: pwsh
+        env:
+          CARGO_PROFILE_DEV_DEBUG: '0'
+          CARGO_INCREMENTAL: '0'
+        run: |
+          Remove-Item Env:RXCB_EXPORT -ErrorAction SilentlyContinue
+          Remove-Item Env:RING_PREGENERATE_ASM -ErrorAction SilentlyContinue
+          cargo clippy -p talos-desktop --features desktop-ui --all-targets --locked -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test -p talos-desktop --features desktop-ui --locked
+          exit $LASTEXITCODE
 
   linux-desktop:
     name: Linux Desktop explicit feature
