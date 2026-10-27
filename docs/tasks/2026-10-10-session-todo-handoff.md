@@ -24,8 +24,8 @@ executed those three Runtime tests. Agent/Runtime tests with shared composition
 passed Windows cargo-xwin check (log: `/private/tmp/i308-git-auto-xwin.log`).
 Both governance validators, format and CI classifier 15/15 passed. Independent
 static review approved exact `e14c76164` against previously reviewed `706ef86b2`;
-it did not independently execute tests. Native CI, publication and merge remain
-outstanding. Save #785 final-head CI 40525328345 is running, not merged. T8 and
+it did not independently execute tests. Pull ownership is published as stacked
+PR #786; native CI and merge remain outstanding. Save #785 final-head CI 40525328345 is running, not merged. T8 and
 all later tasks remain incomplete; original queue and acceptance are unchanged.
 
 ## Active resume checkpoint — 2026-10-27 cache/worktree cleanup
