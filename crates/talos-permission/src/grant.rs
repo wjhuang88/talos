@@ -287,7 +287,7 @@ pub(crate) fn compile_proposal(
     let facets = compile_facets(request, workspace_root, true)?;
     let fingerprint = fingerprint_request(request, &facets);
     let preview = GrantPreview {
-        notes: if crate::native_pull_command::requested(request.facets()) {
+        notes: if request.invocation_local() {
             request
                 .facets()
                 .iter()
@@ -299,7 +299,7 @@ pub(crate) fn compile_proposal(
         // The existing Ask carrier includes both proposal slots. Even its
         // Session slot advertises only Once for native command authority;
         // committing it is downgraded to an invocation without storing a grant.
-        scope: if crate::native_pull_command::requested(request.facets()) {
+        scope: if request.invocation_local() {
             GrantScope::Once
         } else {
             scope
@@ -621,6 +621,9 @@ fn fingerprint_request(
         hash_optional_resource(&mut hasher, facet.normalized_resource.as_ref());
     }
     hash_json(&mut hasher, request.input());
+    if request.transitive_effects() {
+        hasher.update(b"\0transitive-effects/v1\0");
+    }
     if let Some(manifest) = request.network_manifest() {
         hasher.update([1]);
         hasher.update(manifest.invocation_id().as_bytes());

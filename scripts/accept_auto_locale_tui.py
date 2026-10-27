@@ -22,7 +22,7 @@ import termios
 import threading
 import time
 
-from accept_auto_locale import Fixture, HISTORIES, POINTS, completion_marker
+from accept_auto_locale import Fixture, HISTORIES, POINTS, completion_marker, review_payload
 
 
 class Tui:
@@ -138,7 +138,7 @@ def review(client, server, expected):
     request = server.reviews.get(timeout=2)
     assert server.reviews.empty(), "one assessment per approval"
     assert len(request["messages"]) == 2
-    payload = json.loads(request["messages"][-1]["content"].split("\n", 1)[1])
+    payload = review_payload(request["messages"][-1]["content"])
     assert payload["locale"] == expected, payload
     content = json.dumps(request["messages"], ensure_ascii=False)
     assert all(history not in content for history in HISTORIES.values())

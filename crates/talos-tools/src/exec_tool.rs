@@ -576,6 +576,41 @@ impl ExecTool {
 
 #[async_trait]
 impl AgentTool for ExecTool {
+    fn execution_working_directory(&self) -> Option<PathBuf> {
+        Some(self.workspace_root.clone())
+    }
+
+    fn invocation_execution_directories(&self, input: &Value) -> Option<Vec<PathBuf>> {
+        let parsed = self.parse_input(input.clone()).ok()?;
+        if !parsed.steps.is_empty() {
+            parsed
+                .steps
+                .iter()
+                .map(|step| self.resolve_cwd(step.cwd.as_deref()).ok())
+                .collect()
+        } else if !parsed.pipes.is_empty() {
+            parsed
+                .pipes
+                .iter()
+                .flat_map(|pipe| &pipe.steps)
+                .map(|step| self.resolve_cwd(step.cwd.as_deref()).ok())
+                .collect()
+        } else {
+            Some(vec![self.resolve_cwd(parsed.cwd.as_deref()).ok()?])
+        }
+    }
+
+    fn invocation_review_configuration(&self) -> Option<Value> {
+        Some(serde_json::json!({
+            "backend": "direct-argv",
+            "workspace_root": self.workspace_root.to_str()?,
+            "default_timeout_ms": self.timeout.as_millis(),
+            "maximum_timeout_secs": MAX_TIMEOUT_SECS,
+            "maximum_stream_bytes": self.max_stream_bytes,
+            "environment": "inherited with validated per-step overrides",
+        }))
+    }
+
     fn name(&self) -> &str {
         "exec"
     }
@@ -1063,6 +1098,65 @@ mod tests {
     fn tool_with_temp_workspace() -> (ExecTool, TempDir) {
         let temp = TempDir::new().expect("tempdir");
         (ExecTool::new(temp.path().to_path_buf()), temp)
+    }
+
+    #[test]
+    fn invocation_directories_follow_actual_single_step_and_pipe_resolution() {
+        let (tool, temp) = tool_with_temp_workspace();
+        std::fs::create_dir(temp.path().join("nested")).expect("nested");
+        let root = tool.resolve_cwd(None).expect("root");
+        let nested = tool.resolve_cwd(Some("nested")).expect("nested");
+        for input in [
+            serde_json::json!({"command":"echo", "cwd":"nested"}),
+            serde_json::json!({"steps":[{"command":"echo", "cwd":"nested"}]}),
+        ] {
+            assert_eq!(
+                tool.invocation_execution_directories(&input),
+                Some(vec![nested.clone()])
+            );
+        }
+        for input in [
+            serde_json::json!({"steps":[{"command":"echo"},{"command":"echo", "cwd":"nested"}]}),
+            serde_json::json!({"pipes":[{"steps":[{"command":"echo"},{"command":"echo", "cwd":"nested"}]}]}),
+        ] {
+            assert_eq!(
+                tool.invocation_execution_directories(&input),
+                Some(vec![root.clone(), nested.clone()])
+            );
+        }
+        for cwd in ["missing", "../outside"] {
+            assert!(
+                tool.invocation_execution_directories(
+                    &serde_json::json!({"command":"echo", "cwd":cwd})
+                )
+                .is_none()
+            );
+        }
+        assert!(
+            tool.invocation_execution_directories(&serde_json::json!({}))
+                .is_none()
+        );
+        assert_eq!(
+            tool.with_max_stream_bytes(123)
+                .invocation_review_configuration()
+                .expect("config")["maximum_stream_bytes"],
+            123
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn sequential_steps_can_create_a_later_execution_directory() {
+        let (tool, temp) = tool_with_temp_workspace();
+        let input = serde_json::json!({"steps":[
+            {"command":"mkdir", "args":["nested"]},
+            {"command":"pwd", "cwd":"nested"}
+        ]});
+        assert!(tool.invocation_execution_directories(&input).is_none());
+        let result = tool.execute(input).await;
+        assert!(!result.is_error, "{}", result.content);
+        assert!(temp.path().join("nested").is_dir());
+        assert!(result.content.contains("nested"));
     }
 
     #[test]

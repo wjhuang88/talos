@@ -1,3 +1,16 @@
+## T8 ordinary invocation candidate — 2026-10-27
+
+PR #783 remains open, based on main `85ac39b48`. Search/ordinary authorization
+coexistence amendment #782 is merged; the maintainer confirmation is recorded.
+The next CI run must validate local locale and Windows fixture corrections:
+ordinary review again preserves session locale and bounded human decision points;
+Windows directory replacement is asserted blocked by cap-std's retained handle,
+while Unix replacement continues to require refusal. Locale implementation commit:
+`7ca0c631e`. The I308 owner records local runtime, full preflight and cross-compile
+evidence and the required fresh exact-head gates. No T8 completion or waiver of
+T2/T3 → T4 → T5 → T1 → T6 is implied. Fetch/network continuation is separately
+preserved in the implementation worktree stash, not claimed delivered.
+
 ## T8 active implementation — 2026-10-26
 
 Foundation #769 is now merged as `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`,
