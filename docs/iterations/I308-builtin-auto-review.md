@@ -1111,3 +1111,13 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - 2026-10-27: maintainer explicitly accepted the ordinary Shell/Exec/HTTP whole-invocation authorization proposal. ADR-064 records this scope decision; earlier pending-decision checkpoints are historical. Implementation and its full acceptance remain outstanding; search is excluded under I293/ADR-090.
 
 - Third post-rebase standard locked preflight passed (exit 0) with `release preflight: passed`, including workspace checks, Clippy, tests/doctests and both external Runtime SDK consumers. Log: `/private/tmp/i308-rebased-ci-preflight-retry2.log`. This supersedes the pending retry result, preserves both earlier failures and establishes local validation only; exact-head remote CI and merge CAS remain outstanding.
+
+### Desktop Todo registration continuation — 2026-10-27
+
+- Follow-up branch `feat/i308-desktop-todo-registration` starts at reviewed PR #773 candidate `1ccb97942`; the submitted parent head remains unchanged while CI 40440474869 runs.
+- Added a factory-only RuntimeBuilder session Todo registration method and switched Desktop composition to it. Caller `.tool()` remains untrusted, including caller-supplied instances from the same public Todo factory. Registration-order tests check both override directions. This does not enable ordinary command/HTTP Auto or complete the profile matrix.
+- Focused locked shared-composition registration tests are running; full validation, native platform execution and independent review remain outstanding. README documents the new additive builder method.
+
+- Focused registration suite passed 4/4 (`cargo test --locked -p talos-runtime --features shared-composition --lib tests::builtin_registration`); log `/private/tmp/i308-desktop-todo-registration-tests.log`. This verifies factory/override identity and cleanup registration, not Desktop production dispatch or full T8 acceptance.
+
+- Focused locked Runtime shared-composition library/test Clippy passed with warnings denied; log `/private/tmp/i308-desktop-todo-clippy.log`. Independent review and full/Desktop/native acceptance remain outstanding.
