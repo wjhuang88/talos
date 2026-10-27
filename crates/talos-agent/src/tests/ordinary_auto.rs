@@ -31,6 +31,7 @@ struct Assessor {
     calls: Arc<AtomicUsize>,
     reached: Arc<AtomicUsize>,
     state: Arc<talos_permission::PermissionSessionState>,
+    control: AutoPermissionControl,
 }
 
 #[async_trait]
@@ -63,6 +64,7 @@ impl AutoPermissionAssessor for Assessor {
         }
         self.reached.fetch_add(1, Ordering::SeqCst);
         match self.scenario {
+            "cancel" => self.control.set_enabled(false),
             "error" => return Err("unavailable".into()),
             "stale" => self.state.rebind_session().expect("rebind"),
             "panic" => panic!("fixture assessor panic"),
@@ -92,6 +94,7 @@ async fn real_shell_and_exec_auto_control_effects() {
             "panic",
             "timeout",
             "digest",
+            "cancel",
         ] {
             let root = tempfile::tempdir().expect("workspace");
             let mut registry = ToolRegistry::new();
@@ -115,18 +118,20 @@ async fn real_shell_and_exec_auto_control_effects() {
             let state = Arc::new(talos_permission::PermissionSessionState::new(engine));
             let calls = Arc::new(AtomicUsize::new(0));
             let reached = Arc::new(AtomicUsize::new(0));
+            let control = AutoPermissionControl::new(true);
             let resolver = AutoPermissionResolver::new(
                 Arc::new(Assessor {
                     scenario,
                     calls: calls.clone(),
                     reached: reached.clone(),
                     state: state.clone(),
+                    control: control.clone(),
                 }),
                 Arc::new(AutoDenyFallback),
                 ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
                     .expect("lease"),
                 std::time::Duration::from_secs(2),
-                AutoPermissionControl::new(true),
+                control,
             );
             let input = if tool_name == SHELL_NAME {
                 serde_json::json!({"command":SHELL_COMMAND})

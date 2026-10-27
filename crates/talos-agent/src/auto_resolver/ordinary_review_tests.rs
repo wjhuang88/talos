@@ -6,6 +6,7 @@ use talos_permission::{PermissionContext, PermissionEngine, PermissionSessionSta
 struct Assessor {
     scenario: &'static str,
     calls: Arc<AtomicUsize>,
+    reached: Arc<AtomicUsize>,
     state: Arc<PermissionSessionState>,
 }
 
@@ -31,6 +32,7 @@ impl AutoPermissionAssessor for Assessor {
             .map(|byte| format!("{byte:02x}"))
             .collect();
         assert_eq!(request.action.request_digest, format!("sha256:{hash}"));
+        self.reached.fetch_add(1, Ordering::SeqCst);
         match self.scenario {
             "stale" => self.state.rebind_session().expect("rebind"),
             "error" => return Err("unavailable".into()),
@@ -77,10 +79,12 @@ async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
             PermissionEngine::with_workspace_root(root.path().into()),
         ));
         let calls = Arc::new(AtomicUsize::new(0));
+        let reached = Arc::new(AtomicUsize::new(0));
         let resolver = AutoPermissionResolver::new(
             Arc::new(Assessor {
                 scenario,
                 calls: calls.clone(),
+                reached: reached.clone(),
                 state: state.clone(),
             }),
             Arc::new(Deny),
@@ -137,6 +141,11 @@ async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
         assert_eq!(
             calls.load(Ordering::SeqCst),
             usize::from(!matches!(scenario, "missing_configuration"))
+        );
+        assert_eq!(
+            reached.load(Ordering::SeqCst),
+            usize::from(scenario != "missing_configuration"),
+            "{scenario}: assessor preconditions did not complete"
         );
         assert_eq!(state.grant_count().expect("grants"), 0);
     }

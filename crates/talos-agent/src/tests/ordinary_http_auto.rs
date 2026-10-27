@@ -10,6 +10,7 @@ const URL: &str = "http://93.184.216.34/start";
 struct Assessor {
     scenario: String,
     calls: Arc<AtomicUsize>,
+    reached: Arc<AtomicUsize>,
     state: Arc<talos_permission::PermissionSessionState>,
 }
 #[async_trait]
@@ -38,6 +39,7 @@ impl AutoPermissionAssessor for Assessor {
             request.configuration["tool_configuration"]["destination_isolation"],
             false
         );
+        self.reached.fetch_add(1, Ordering::SeqCst);
         match self.scenario.as_str() {
             "error" => return Err("unavailable".into()),
             "stale" => self.state.rebind_session().expect("rebind"),
@@ -94,10 +96,12 @@ async fn child(scenario: String) {
     let expected_calls = usize::from(!matches!(scenario.as_str(), "deny" | "human"));
     let state = Arc::new(talos_permission::PermissionSessionState::new(engine));
     let calls = Arc::new(AtomicUsize::new(0));
+    let reached = Arc::new(AtomicUsize::new(0));
     let resolver = AutoPermissionResolver::new(
         Arc::new(Assessor {
             scenario,
             calls: calls.clone(),
+            reached: reached.clone(),
             state: state.clone(),
         }),
         Arc::new(AutoDenyFallback),
@@ -150,6 +154,7 @@ async fn child(scenario: String) {
         .await
         .expect("run");
     assert_eq!(calls.load(Ordering::SeqCst), expected_calls);
+    assert_eq!(reached.load(Ordering::SeqCst), expected_calls);
     assert_eq!(results.load(Ordering::SeqCst), 1);
     assert_eq!(state.grant_count().expect("grants"), 0);
 }
