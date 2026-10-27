@@ -254,18 +254,25 @@ pub(crate) fn execution_directory_identity(path: &Path) -> Option<String> {
         hasher.update(metadata.dev().to_le_bytes());
         hasher.update(metadata.ino().to_le_bytes());
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
     {
-        // Windows does not expose a stable file-id in std.  Include metadata
-        // that changes on replacement as a conservative fallback.
-        hasher.update(metadata.len().to_le_bytes());
-        hasher.update([metadata.file_type().is_dir() as u8]);
-        if let Ok(modified) = metadata.modified()
-            && let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH)
-        {
-            hasher.update(duration.as_nanos().to_le_bytes());
-        }
+        use cap_fs_ext::MetadataExt;
+        // Obtain identity from an opened directory, not its size or timestamps.
+        // cap-fs-ext exposes a 64-bit index; this does not cover ReFS's full
+        // 128-bit identity or retain a handle against later index reuse.
+        let (device, index) = std::panic::catch_unwind(|| {
+            let directory =
+                cap_std::fs::Dir::open_ambient_dir(&canonical, cap_std::ambient_authority())
+                    .ok()?;
+            let metadata = directory.dir_metadata().ok()?;
+            metadata.is_dir().then(|| (metadata.dev(), metadata.ino()))
+        })
+        .ok()??;
+        hasher.update(device.to_le_bytes());
+        hasher.update(index.to_le_bytes());
     }
+    #[cfg(not(any(unix, windows)))]
+    return None;
     let digest = hasher.finalize();
     Some(format!(
         "sha256:{}",
