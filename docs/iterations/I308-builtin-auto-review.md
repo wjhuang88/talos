@@ -1351,3 +1351,5 @@ still pending. This local stage does not complete T8 or waive save/search accept
 - This closes the Shell/Exec/ordinary HTTP stage only. Fetch follow-up remains local; Save URL/search and complete operation/profile acceptance remain incomplete. T8 and the full handoff remain Partial.
 
 - Fetch full standard locked preflight passed (exit 0), Tools 983/983 and both external Runtime SDK consumers; root log `target/recovery/ordinary-fetch-preflight.log`, same low-debug/incremental-disabled serial command and shared target as the preceding ordinary stage. Independent static permission/security/API review approved original implementation `0eb2a70c5` against `cb6e20878`, without builds. Rebased onto merged parent `da280c8a7`; `git diff 1dcdf885d HEAD` showed only one owner-document separator change, with all executable sources, lockfile and scripts identical. The conflict retained both parent evidence and Fetch notes. Remote exact-head/native Windows and final review remain pending; T8 remains Partial.
+
+- Fetch stable candidate published as PR #784 at `6e01c5690`; exact-head CI and native Windows evidence are pending. No T8 completion is claimed.
