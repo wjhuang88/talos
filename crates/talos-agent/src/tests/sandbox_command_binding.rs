@@ -1,5 +1,70 @@
 use super::*;
 
+#[cfg(unix)]
+#[tokio::test]
+async fn real_exec_preserves_sequentially_created_working_directory() {
+    let root = tempfile::tempdir().expect("workspace");
+    let tool = talos_tools::ExecTool::new(root.path().to_owned());
+    let input = serde_json::json!({"steps":[
+        {"command":"mkdir", "args":["nested"]},
+        {"command":"pwd", "cwd":"nested"}
+    ]});
+    assert!(tool.invocation_execution_directories(&input).is_none());
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(tool));
+    let mut engine = PermissionEngine::empty();
+    engine.set_workspace_root(root.path().to_owned());
+    engine.add_rule(talos_permission::PermissionRule::new(
+        "exec",
+        None,
+        PermissionDecision::Allow,
+    ));
+    let state = Arc::new(talos_permission::PermissionSessionState::new(engine));
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(vec![])),
+        registry,
+        None,
+        None,
+        root.path().to_owned(),
+        Arc::new(HookRegistry::new()),
+    )
+    .with_permission_pipeline(
+        state,
+        talos_permission::PermissionContext::new(
+            talos_permission::PermissionMode::Interactive,
+            talos_permission::InteractionCapability::Available,
+        ),
+        None,
+    );
+    let (results, _) = agent
+        .execute_tools_with_presentation(
+            &HookContext::new(TurnId::new(), root.path().to_owned()),
+            &[ToolCall {
+                id: "dynamic-directory".into(),
+                name: "exec".into(),
+                input,
+            }],
+            None,
+            &ToolPresentationPolicy::default(),
+            &std::collections::HashSet::from(["exec".into()]),
+            &crate::transient_text::PrivateTokens::default(),
+        )
+        .await
+        .expect("dispatch");
+    assert!(!results[0].is_error, "{}", results[0].content);
+    let nested = root.path().join("nested");
+    assert!(nested.is_dir());
+    assert!(
+        results[0].content.contains(
+            nested
+                .canonicalize()
+                .expect("created directory")
+                .to_str()
+                .expect("UTF-8 path")
+        )
+    );
+}
+
 struct SandboxMutation {
     scenario: &'static str,
     root: PathBuf,
