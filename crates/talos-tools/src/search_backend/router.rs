@@ -1,7 +1,8 @@
 //! Dormant Talos-owned SearchRouter core.
 //!
 //! This private module implements first-valid-success routing over explicit `SearchBackend`
-//! instances. It is not wired into `WebSearchTool`, the tool registry, or any product default.
+//! instances and one-shot prepared candidates. It is not wired into `WebSearchTool`, the tool
+//! registry, or any product default.
 
 use std::future::{Future, poll_fn};
 use std::pin::Pin;
@@ -14,6 +15,7 @@ use thiserror::Error;
 use tokio::sync::oneshot;
 use tokio::time::{Instant, sleep, sleep_until};
 
+use super::composition::RunningSearchComposition;
 use super::{
     SearchBackend, SearchBackendError, SearchBackendId, SearchBackendRequest, SearchBackendResult,
 };
@@ -22,6 +24,11 @@ const MAX_FIELD_BYTES: usize = 16_384;
 
 type CandidateFuture<'a> =
     Pin<Box<dyn Future<Output = Result<Vec<SearchBackendResult>, SearchBackendError>> + Send + 'a>>;
+
+struct RouterCandidate<'a> {
+    id: SearchBackendId,
+    future: CandidateFuture<'a>,
+}
 
 /// Explicit private routing bounds. No production defaults are selected by this stage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,7 +99,7 @@ pub(crate) enum SearchRouterError {
     Cancelled,
 }
 
-/// Private router over one explicit ordered candidate set.
+/// Private router over one explicit ordered reusable candidate set.
 ///
 /// The lifetime is intentional: existing compatibility adapters borrow `WebSearchTool`. The
 /// router owns an `Arc` to each adapter for one invocation without requiring those adapters to be
@@ -134,11 +141,7 @@ impl<'a> SearchRouter<'a> {
         Ok(Self { candidates, policy })
     }
 
-    /// Routes one already-eligible request without spawning detached work.
-    ///
-    /// The enclosing deadline is shared by all candidates and admission work. Closing the
-    /// cancellation sender is treated as cancellation. Dropping this future drops all owned
-    /// candidate futures; transport-specific spawned work remains a separate integration gate.
+    /// Routes one already-eligible reusable-backend request without spawning detached work.
     pub(crate) async fn search(
         &self,
         request: SearchBackendRequest,
@@ -146,158 +149,205 @@ impl<'a> SearchRouter<'a> {
         cancellation: &mut oneshot::Receiver<()>,
     ) -> Result<SearchRouterSuccess, SearchRouterError> {
         let requested = request.max_results as usize;
-        if requested == 0 || requested > self.policy.max_examined_results {
-            return Err(SearchRouterError::InvalidRequest);
-        }
+        let candidates = self
+            .candidates
+            .iter()
+            .cloned()
+            .map(|backend| {
+                let id = backend.id();
+                let candidate_request = request.clone();
+                RouterCandidate {
+                    id,
+                    future: Box::pin(async move { backend.search(candidate_request).await }),
+                }
+            })
+            .collect();
+        route_candidates(self.policy, candidates, requested, deadline, cancellation).await
+    }
+}
 
+/// Routes one already-running prepared composition using its frozen result bound and the exact
+/// deadline of its shared transport budget. No caller can replace the query, count or deadline.
+pub(crate) async fn search_prepared(
+    composition: RunningSearchComposition,
+    policy: SearchRouterPolicy,
+    cancellation: &mut oneshot::Receiver<()>,
+) -> Result<SearchRouterSuccess, SearchRouterError> {
+    let requested = composition.requested_results();
+    let deadline = composition.deadline();
+    let candidates = composition
+        .into_candidates()
+        .into_iter()
+        .map(|candidate| {
+            let id = candidate.id();
+            RouterCandidate {
+                id,
+                future: Box::pin(async move {
+                    candidate
+                        .execute()
+                        .await
+                        .map_err(|error| error.into_backend_error())
+                }),
+            }
+        })
+        .collect();
+    route_candidates(policy, candidates, requested, deadline, cancellation).await
+}
+
+/// Shared first-valid-success scheduler for reusable and one-shot prepared candidates.
+/// Closing the cancellation sender is cancellation; dropping this future drops all owned futures.
+async fn route_candidates<'a>(
+    policy: SearchRouterPolicy,
+    candidates: Vec<RouterCandidate<'a>>,
+    requested: usize,
+    deadline: Instant,
+    cancellation: &mut oneshot::Receiver<()>,
+) -> Result<SearchRouterSuccess, SearchRouterError> {
+    if requested == 0 || requested > policy.max_examined_results {
+        return Err(SearchRouterError::InvalidRequest);
+    }
+
+    if let Some(error) = control(deadline, cancellation) {
+        return Err(error);
+    }
+
+    let mut remaining = candidates.into_iter();
+    let mut active: Vec<(SearchBackendId, CandidateFuture<'a>)> = Vec::new();
+    let mut failures = Vec::new();
+    let mut launch_next = true;
+    let hedge = sleep(policy.hedge_delay);
+    tokio::pin!(hedge);
+
+    loop {
         if let Some(error) = control(deadline, cancellation) {
             return Err(error);
         }
 
-        let mut remaining = self.candidates.iter().cloned();
-        let mut active: Vec<(SearchBackendId, CandidateFuture<'a>)> = Vec::new();
-        let mut failures = Vec::new();
-        let mut launch_next = true;
-        let hedge = sleep(self.policy.hedge_delay);
-        tokio::pin!(hedge);
-
-        loop {
-            if let Some(error) = control(deadline, cancellation) {
-                return Err(error);
+        if (launch_next || active.is_empty()) && active.len() < policy.max_in_flight {
+            launch_next = false;
+            if let Some(candidate) = remaining.next() {
+                active.push((candidate.id, candidate.future));
+                hedge.as_mut().reset(Instant::now() + policy.hedge_delay);
+            } else if active.is_empty() {
+                return if failures.is_empty() {
+                    Err(SearchRouterError::NoEligible)
+                } else {
+                    Err(SearchRouterError::Exhausted(failures))
+                };
             }
+        }
 
-            if (launch_next || active.is_empty()) && active.len() < self.policy.max_in_flight {
-                launch_next = false;
-                if let Some(backend) = remaining.next() {
-                    let backend_id = backend.id();
-                    let candidate_request = request.clone();
-                    active.push((
-                        backend_id,
-                        Box::pin(async move { backend.search(candidate_request).await }),
-                    ));
-                    hedge
-                        .as_mut()
-                        .reset(Instant::now() + self.policy.hedge_delay);
-                } else if active.is_empty() {
-                    return if failures.is_empty() {
-                        Err(SearchRouterError::NoEligible)
-                    } else {
-                        Err(SearchRouterError::Exhausted(failures))
-                    };
-                }
-            }
-
-            tokio::select! {
-                biased;
-                _ = &mut *cancellation => return Err(SearchRouterError::Cancelled),
-                _ = sleep_until(deadline) => return Err(SearchRouterError::Deadline),
-                (index, outcome) = poll_fn(|cx| {
-                    for (index, (_, future)) in active.iter_mut().enumerate() {
-                        if let Poll::Ready(outcome) = future.as_mut().poll(cx) {
-                            return Poll::Ready((index, outcome));
-                        }
+        tokio::select! {
+            biased;
+            _ = &mut *cancellation => return Err(SearchRouterError::Cancelled),
+            _ = sleep_until(deadline) => return Err(SearchRouterError::Deadline),
+            (index, outcome) = poll_fn(|cx| {
+                for (index, (_, future)) in active.iter_mut().enumerate() {
+                    if let Poll::Ready(outcome) = future.as_mut().poll(cx) {
+                        return Poll::Ready((index, outcome));
                     }
-                    Poll::Pending
-                }), if !active.is_empty() => {
-                    let (backend, completed) = active.remove(index);
-                    drop(completed);
-                    match outcome {
-                        Err(error) => failures.push(SearchRouterFailure {
-                            backend,
-                            kind: SearchRouterFailureKind::Backend(error),
-                        }),
-                        Ok(results) => match self.admit(
-                            backend,
-                            results,
-                            requested,
-                            deadline,
-                            cancellation,
-                        ) {
-                            Ok(results) => {
-                                if let Some(error) = control(deadline, cancellation) {
-                                    return Err(error);
-                                }
-                                return Ok(SearchRouterSuccess { backend, results });
+                }
+                Poll::Pending
+            }), if !active.is_empty() => {
+                let (backend, completed) = active.remove(index);
+                drop(completed);
+                match outcome {
+                    Err(error) => failures.push(SearchRouterFailure {
+                        backend,
+                        kind: SearchRouterFailureKind::Backend(error),
+                    }),
+                    Ok(results) => match admit(
+                        policy,
+                        backend,
+                        results,
+                        requested,
+                        deadline,
+                        cancellation,
+                    ) {
+                        Ok(results) => {
+                            if let Some(error) = control(deadline, cancellation) {
+                                return Err(error);
                             }
-                            Err(AdmissionError::NoResults) => failures.push(SearchRouterFailure {
-                                backend,
-                                kind: SearchRouterFailureKind::NoResults,
-                            }),
-                            Err(AdmissionError::InvalidResults) => failures.push(SearchRouterFailure {
-                                backend,
-                                kind: SearchRouterFailureKind::InvalidResults,
-                            }),
-                            Err(AdmissionError::Control(error)) => return Err(error),
-                        },
-                    }
-                    if remaining.len() > 0 {
-                        launch_next = true;
-                    }
+                            return Ok(SearchRouterSuccess { backend, results });
+                        }
+                        Err(AdmissionError::NoResults) => failures.push(SearchRouterFailure {
+                            backend,
+                            kind: SearchRouterFailureKind::NoResults,
+                        }),
+                        Err(AdmissionError::InvalidResults) => failures.push(SearchRouterFailure {
+                            backend,
+                            kind: SearchRouterFailureKind::InvalidResults,
+                        }),
+                        Err(AdmissionError::Control(error)) => return Err(error),
+                    },
                 }
-                _ = &mut hedge,
-                    if active.len() < self.policy.max_in_flight && remaining.len() > 0 =>
-                {
+                if remaining.len() > 0 {
                     launch_next = true;
                 }
+            }
+            _ = &mut hedge,
+                if active.len() < policy.max_in_flight && remaining.len() > 0 =>
+            {
+                launch_next = true;
+            }
+        }
+    }
+}
+
+fn admit(
+    policy: SearchRouterPolicy,
+    backend: SearchBackendId,
+    results: Vec<SearchBackendResult>,
+    requested: usize,
+    deadline: Instant,
+    cancellation: &mut oneshot::Receiver<()>,
+) -> Result<Vec<SearchBackendResult>, AdmissionError> {
+    if let Some(error) = control(deadline, cancellation) {
+        return Err(AdmissionError::Control(error));
+    }
+    if results.is_empty() {
+        return Err(AdmissionError::NoResults);
+    }
+    if results.len() > policy.max_examined_results
+        || results.iter().any(|result| {
+            result.backend != backend
+                || result.title.len() > MAX_FIELD_BYTES
+                || result.snippet.len() > MAX_FIELD_BYTES
+                || result.url.len() > policy.max_url_bytes
+        })
+    {
+        return Err(AdmissionError::InvalidResults);
+    }
+
+    let mut admitted = Vec::new();
+    for result in results {
+        if let Some(error) = control(deadline, cancellation) {
+            return Err(AdmissionError::Control(error));
+        }
+        let valid = std::panic::catch_unwind(|| {
+            Url::parse(&result.url).is_ok_and(|url| {
+                matches!(url.scheme(), "http" | "https")
+                    && url.host_str().is_some()
+                    && url.username().is_empty()
+                    && url.password().is_none()
+            })
+        })
+        .map_err(|_| AdmissionError::InvalidResults)?;
+        if let Some(error) = control(deadline, cancellation) {
+            return Err(AdmissionError::Control(error));
+        }
+        if valid {
+            admitted.push(result);
+            if admitted.len() == requested {
+                break;
             }
         }
     }
 
-    fn admit(
-        &self,
-        backend: SearchBackendId,
-        results: Vec<SearchBackendResult>,
-        requested: usize,
-        deadline: Instant,
-        cancellation: &mut oneshot::Receiver<()>,
-    ) -> Result<Vec<SearchBackendResult>, AdmissionError> {
-        if let Some(error) = control(deadline, cancellation) {
-            return Err(AdmissionError::Control(error));
-        }
-        if results.is_empty() {
-            return Err(AdmissionError::NoResults);
-        }
-        if results.len() > self.policy.max_examined_results
-            || results.iter().any(|result| {
-                result.backend != backend
-                    || result.title.len() > MAX_FIELD_BYTES
-                    || result.snippet.len() > MAX_FIELD_BYTES
-                    || result.url.len() > self.policy.max_url_bytes
-            })
-        {
-            return Err(AdmissionError::InvalidResults);
-        }
-
-        let mut admitted = Vec::new();
-        for result in results {
-            if let Some(error) = control(deadline, cancellation) {
-                return Err(AdmissionError::Control(error));
-            }
-            let valid = std::panic::catch_unwind(|| {
-                Url::parse(&result.url).is_ok_and(|url| {
-                    matches!(url.scheme(), "http" | "https")
-                        && url.host_str().is_some()
-                        && url.username().is_empty()
-                        && url.password().is_none()
-                })
-            })
-            .map_err(|_| AdmissionError::InvalidResults)?;
-            if let Some(error) = control(deadline, cancellation) {
-                return Err(AdmissionError::Control(error));
-            }
-            if valid {
-                admitted.push(result);
-                if admitted.len() == requested {
-                    break;
-                }
-            }
-        }
-
-        if admitted.is_empty() {
-            Err(AdmissionError::InvalidResults)
-        } else {
-            Ok(admitted)
-        }
+    if admitted.is_empty() {
+        Err(AdmissionError::InvalidResults)
+    } else {
+        Ok(admitted)
     }
 }
 
@@ -321,5 +371,7 @@ fn control(
     }
 }
 
+#[cfg(test)]
+mod prepared_tests;
 #[cfg(test)]
 mod tests;
