@@ -13,9 +13,13 @@ scenarios cover model allow/human/error/stale, Deny/mandatory-human, external an
 replacement refusal plus their explicit manual compatibility. The focused test
 and full Agent library suite (511/511) pass. Assessor assertion-reached counters
 prevent caught panics from masquerading as refusal evidence. Independent static
-review approved the working executable delta; Agent library/test Clippy passed. Full standard preflight is running at
-`/private/tmp/i308-git-auto-preflight.log`; platform and publication gates remain
-outstanding. The implementation is committed; owner checkpoint changes remain local. T8 and all later tasks remain
+review approved the working executable delta; Agent library/test Clippy passed. Full standard preflight
+failed three Runtime Pull integration tests: those fixtures registered caller-owned tools
+but expected builtin Auto trust. The follow-up switches them to production shared
+composition and explicitly enables that feature in the Windows focused CI command.
+Focused rerun passed 3/3 at `/private/tmp/i308-git-auto-runtime.log`; both governance validators passed. Fresh full preflight,
+platform and publication gates remain outstanding. The implementation and initial
+owner checkpoint are committed but not pushed; fixture/CI corrections are the next staged commit. T8 and all later tasks remain
 incomplete. The original queue and acceptance are unchanged.
 
 ## Active resume checkpoint — 2026-10-27 cache/worktree cleanup

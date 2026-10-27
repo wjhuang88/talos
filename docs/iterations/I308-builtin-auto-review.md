@@ -1508,6 +1508,10 @@ human/error/stale, explicit Deny/mandatory-human and unregistered/replacement
 instances cannot silently execute. Explicit manual external/replacement approval
 still succeeds. Focused tests and full Agent library 511/511 pass; independent
 static security/API review approved the working delta without running tests.
-Agent library/test Clippy passed. Full standard preflight is running; final
-commit review, Windows checks and publication remain pending. This narrows a real registration trust gap; it does not add model
+Agent library/test Clippy passed. Full standard preflight failed three Runtime
+Pull integration tests because caller `.tool(...)` registration no longer inherits
+builtin Auto trust. The fixtures now select production `.shared_tools()` registration;
+the focused Windows CI command explicitly enables `shared-composition` so this
+feature-gated suite cannot silently disappear there. Focused rerun passed 3/3; both governance validators passed. Fresh full
+preflight, final commit review, Windows checks and publication remain pending. This narrows a real registration trust gap; it does not add model
 Auto support to Add/Commit/Push/Checkout or complete profile/search/G acceptance.

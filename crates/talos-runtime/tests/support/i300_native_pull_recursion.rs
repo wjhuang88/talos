@@ -104,7 +104,7 @@ async fn runtime_auto_pull_updates_initialized_submodule() {
             allowed: true,
             assessor_failure: false,
         }))
-        .tool(Arc::new(talos_tools::git::GitPullTool::new(work.clone())))
+        .shared_tools()
         .approval_handler(Arc::new(Human {
             final_approvals: approvals.clone(),
             allow_final: false,
