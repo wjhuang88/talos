@@ -63,7 +63,7 @@ impl SearchCompositionConfiguration {
             .direct
             .prepare_with_manifest(&manifest, query, max_results)?;
         let facets = direct.permission_profile().to_vec();
-        let mut candidates = vec![PreparedSearchCandidate::Direct(direct)];
+        let mut candidates = vec![PreparedSearchCandidate::Direct(Box::new(direct))];
 
         if let Some(configuration) = &self.searxng {
             let prepared = configuration.prepare_with_manifest(&manifest, query, max_results)?;
@@ -192,7 +192,7 @@ impl RunningSearchComposition {
 }
 
 enum PreparedSearchCandidate {
-    Direct(PreparedCompatibilityPlan),
+    Direct(Box<PreparedCompatibilityPlan>),
     SearXng(PreparedSearXng),
 }
 
@@ -228,7 +228,7 @@ impl RunningSearchCandidate {
         self,
     ) -> Result<Vec<SearchBackendResult>, SearchCandidateExecutionError> {
         match self.candidate {
-            PreparedSearchCandidate::Direct(plan) => plan
+            PreparedSearchCandidate::Direct(plan) => (*plan)
                 .execute(self.authority, self.budget)
                 .await
                 .map(|rows| rows.into_results())
