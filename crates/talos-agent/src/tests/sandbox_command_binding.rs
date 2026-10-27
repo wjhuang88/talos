@@ -135,6 +135,126 @@ impl HookHandler for FinalContextMutation {
 
 struct ContextBoundProcess(PathBuf, Arc<std::sync::atomic::AtomicUsize>);
 
+struct ContextBoundShell(ContextBoundProcess);
+
+#[async_trait]
+impl AgentTool for ContextBoundShell {
+    fn name(&self) -> &str {
+        "bash"
+    }
+    fn description(&self) -> &str {
+        self.0.description()
+    }
+    fn parameters(&self) -> Value {
+        self.0.parameters()
+    }
+    fn execution_working_directory(&self) -> Option<PathBuf> {
+        self.0.execution_working_directory()
+    }
+    fn invocation_review_configuration(&self) -> Option<Value> {
+        self.0.invocation_review_configuration()
+    }
+    async fn execute(&self, input: Value) -> ToolExecutionResult {
+        self.0.execute(input).await
+    }
+}
+
+struct MutatingFallback(SandboxMutation);
+
+#[async_trait]
+impl SandboxFallbackHandler for MutatingFallback {
+    async fn request_fallback(&self, _: SandboxFallbackContext) -> SandboxFallbackDecision {
+        self.0
+            .on_event(
+                &HookContext::new(TurnId::new(), self.0.root.clone()),
+                &mut HookEvent::BeforeBashSandboxExec {
+                    command: "echo approved",
+                },
+            )
+            .await;
+        SandboxFallbackDecision::ApproveOnce
+    }
+}
+
+#[tokio::test]
+async fn sandbox_fallback_approval_cannot_change_execution_context() {
+    for scenario in [
+        "unchanged",
+        "directory",
+        "policy",
+        "mode",
+        "restriction",
+        "session",
+        "configuration",
+    ] {
+        let parent = tempfile::tempdir().expect("parent");
+        let root = parent.path().join("workspace");
+        std::fs::create_dir(&root).expect("root");
+        let mut engine = PermissionEngine::empty();
+        engine.add_rule(talos_permission::PermissionRule::new(
+            "bash",
+            None,
+            PermissionDecision::Allow,
+        ));
+        let state = Arc::new(talos_permission::PermissionSessionState::new(engine));
+        let configuration = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(ContextBoundShell(ContextBoundProcess(
+            root.clone(),
+            configuration.clone(),
+        ))));
+        let agent = Agent::with_security_and_sandbox_fallback(
+            Arc::new(MockModel::new(vec![])),
+            registry,
+            None,
+            Some(Box::new(MockSandbox::unavailable())),
+            root.clone(),
+            SandboxFallbackPolicy::Ask,
+            Some(Arc::new(MutatingFallback(SandboxMutation {
+                scenario,
+                root: root.clone(),
+                state: state.clone(),
+                configuration: Some(configuration),
+            }))),
+        )
+        .with_permission_pipeline(
+            state,
+            talos_permission::PermissionContext::new(
+                talos_permission::PermissionMode::Interactive,
+                talos_permission::InteractionCapability::Available,
+            ),
+            None,
+        );
+        let call = ToolCall {
+            id: "fallback-bound".into(),
+            name: "bash".into(),
+            input: serde_json::json!({"command":"echo approved"}),
+        };
+        let (results, _) = agent
+            .execute_tools_with_presentation(
+                &HookContext::new(TurnId::new(), root.clone()),
+                &[call],
+                None,
+                &ToolPresentationPolicy::default(),
+                &std::collections::HashSet::from(["bash".into()]),
+                &crate::transient_text::PrivateTokens::default(),
+            )
+            .await
+            .expect("execution");
+        assert_eq!(
+            results[0].is_error,
+            scenario != "unchanged",
+            "{scenario}: {}",
+            results[0].content
+        );
+        assert_eq!(
+            root.join("executed").exists(),
+            scenario == "unchanged",
+            "{scenario}"
+        );
+    }
+}
+
 #[async_trait]
 impl AgentTool for ContextBoundProcess {
     fn name(&self) -> &str {

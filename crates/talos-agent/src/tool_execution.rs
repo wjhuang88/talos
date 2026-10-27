@@ -34,6 +34,7 @@ struct InvocationExecutionContext {
     directories: Vec<(std::path::PathBuf, String)>,
     directories_resolved: bool,
     sandbox_available: Option<bool>,
+    sandbox_fallback: Option<(SandboxFallbackPolicy, bool)>,
 }
 
 impl InvocationExecutionContext {
@@ -46,7 +47,13 @@ impl InvocationExecutionContext {
                 "available": available,
                 "allow_network": false,
                 "extra_read_paths": [],
-                "unavailable_route": "separate configured fallback policy; tool configuration applies",
+                "fallback_policy": self.sandbox_fallback.map(|(policy, _)| match policy {
+                    SandboxFallbackPolicy::Deny => "deny",
+                    SandboxFallbackPolicy::Ask => "separate-once-approval",
+                    SandboxFallbackPolicy::AllowUnsandboxed => "unsandboxed-after-permission",
+                }),
+                "fallback_handler_available": self.sandbox_fallback.map(|(_, available)| available),
+                "fallback_configuration": self.configuration,
             })),
         })
     }
@@ -89,6 +96,12 @@ impl InvocationExecutionContext {
             directories,
             directories_resolved,
             sandbox_available,
+            sandbox_fallback: sandbox_available.map(|_| {
+                (
+                    agent.sandbox_fallback_policy,
+                    agent.sandbox_fallback_handler.is_some(),
+                )
+            }),
         })
     }
 
