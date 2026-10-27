@@ -1,6 +1,6 @@
 # PROVIDER-008: Complete Wire-Protocol Family Coverage And Protocol Mode Configuration
 
-**Status**: Refinement / Unclaimed (child A claim/activation proposed in #747)
+**Status**: Refinement / Unclaimed (child A implementation merged; acceptance remains Review)
 **Type**: Provider / Config / Model-Catalog Epic (child Stories decompose at claim time)
 **Parent Epic**: None
 **Source Issue**: [#724](https://github.com/wjhuang88/talos/issues/724)
@@ -8,7 +8,7 @@
 
 Children:
 
-- [PROVIDER-008-A](PROVIDER-008-A-openai-responses-protocol.md) / [#748](https://github.com/wjhuang88/talos/issues/748): protocol architecture (enum/factory dispatch/model-level protocol/catalog signals) + OpenAI Responses adapter (ADR-093); I306 / governance claim #747 proposed, ineffective until merge.
+- [PROVIDER-008-A](PROVIDER-008-A-openai-responses-protocol.md) / [#748](https://github.com/wjhuang88/talos/issues/748): protocol architecture (enum/factory dispatch/model-level protocol/catalog signals) + OpenAI Responses adapter (ADR-093); I306 / effective governance claim #747; code #749 and catalog #775 merged; Review / Claimed.
 - PROVIDER-008-B: Google Gemini `generateContent` (AI Studio + Vertex auth boundary decision) — unclaimed.
 - PROVIDER-008-C: Azure OpenAI transport conventions + per-model shape routing — unclaimed.
 - PROVIDER-008-D: Amazon Bedrock Converse + SigV4 credential decision — unclaimed.
@@ -20,15 +20,15 @@ Children:
 | Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | Parent epic remains unclaimed; child A (#748) is separately proposed in #747. |
+| Work Slice | Parent epic remains unclaimed; child A (#748) is separately claimed by effective #747. |
 | Claimed At | Not applicable |
 | Source Issue | #724 |
 | Governance Claim PR | Not applicable |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | Not started |
-| Last Updated | 2026-10-22 |
-| Handoff / Release Condition | Child Stories are independently claimed. #747 proposes only PROVIDER-008-A/#748; B/C/D stay unclaimed. |
+| Last Updated | 2026-10-28 |
+| Handoff / Release Condition | Child Stories are independently claimed. #747 activates only PROVIDER-008-A/#748; B/C/D stay unclaimed. |
 
 ## Identity / Goal / Value
 
@@ -132,3 +132,14 @@ PROVIDER-008-A / I306, proposes ADR-093 acceptance, and claims only protocol arc
 Responses. The parent stays Refinement / Unclaimed and siblings B/C/D stay unclaimed. #747 has no
 effect until its finalized exact head reaches main; implementation must start from that merge or
 later.
+
+
+## Child A Merged Checkpoint — 2026-10-28
+
+Child A / #748 / I306 is Review / Claimed after code #749 (`60e27eb6`) and catalog #775
+(`6af8654c`) merged with exact-head eight-job CI, technical review and CAS. Its owner retains
+Completion Commit: Pending. Distinct model-endpoint routing remains unimplemented (56 catalog rows
+withheld) and must be resolved through implementation or an explicit accepted scope decision before
+child acceptance closes. This residual tracking does not satisfy the multi-protocol-host requirement.
+B/C/D remain unclaimed; parent #724 stays open and is not Complete. Earlier proposal-only checkpoints
+are historical; no sibling implementation or release is claimed.
