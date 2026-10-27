@@ -240,7 +240,7 @@ fn looks_like_english(text: &str) -> bool {
 /// A symlink can be swapped while an approval request is in flight.  Comparing
 /// this token before execution prevents approving one directory and executing
 /// in a replacement object at the same path.
-fn execution_directory_identity(path: &Path) -> Option<String> {
+pub(crate) fn execution_directory_identity(path: &Path) -> Option<String> {
     let canonical = path.canonicalize().ok()?;
     let metadata = std::fs::metadata(&canonical).ok()?;
     if !metadata.is_dir() {

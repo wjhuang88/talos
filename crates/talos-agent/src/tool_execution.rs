@@ -1169,6 +1169,19 @@ impl Agent {
             }
         };
 
+        let directory_identity =
+            crate::auto_resolver::execution_directory_identity(&self.workspace_root);
+        let permission_state = self
+            .permission_pipeline
+            .as_ref()
+            .map(|pipeline| pipeline.state());
+        let permission_snapshot = permission_state
+            .as_ref()
+            .map(|state| state.state_snapshot().ok());
+        if directory_identity.is_none() || permission_snapshot == Some(None) {
+            return ToolExecutionResult::error("sandbox execution identity unavailable");
+        }
+
         let command = match self
             .run_hook(
                 hook_ctx,
@@ -1177,12 +1190,29 @@ impl Agent {
             .await
         {
             Ok(HookOutcome::Continue(HookEvent::BeforeBashSandboxExec { command })) => {
+                if input.get("command").and_then(serde_json::Value::as_str) != Some(command) {
+                    return ToolExecutionResult::error(
+                        "sandbox hook changed the admitted command; submit a new tool call",
+                    );
+                }
                 command.to_string()
             }
             Ok(HookOutcome::Skip(_)) => return ToolExecutionResult::success(String::new()),
             Ok(_) => command,
             Err(_) => return ToolExecutionResult::error("hook denied bash execution".to_owned()),
         };
+
+        if crate::auto_resolver::execution_directory_identity(&self.workspace_root)
+            != directory_identity
+            || permission_state
+                .as_ref()
+                .map(|state| state.state_snapshot().ok())
+                != permission_snapshot
+        {
+            return ToolExecutionResult::error(
+                "sandbox execution context changed during hook; submit a new tool call",
+            );
+        }
 
         let config = SandboxConfig {
             workspace_root: self.workspace_root.clone(),
