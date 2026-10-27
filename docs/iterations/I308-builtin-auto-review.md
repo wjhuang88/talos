@@ -2,30 +2,27 @@
 
 ## Current delivery checkpoint — 2026-10-27
 
-I308/T8 remain Active / Partial. Ordinary Shell/Exec/HTTP stage #783 is published
-at `58661ec72558f26fe92ca0451db09ac95a298809`, based on main `85ac39b48`.
-The full standard locked preflight and independent static permission/security/API
-review passed at that head. Remote run 40475830775 passed both explicit Desktop
-feature jobs, but its workspace job exposed an additional real REPL locale
-regression. The ordinary review branch did not carry the established session
-locale or render model-reported decision points; the fixture also recognized only
-the legacy assessor protocol. The local repair restores presentation-only locale
-hints through a backward-compatible assessor default method, reuses the existing
-safe explanation renderer, and accepts model explanation only after current
-context/schema/digest verification. Locale remains outside authorization identity.
-Real REPL and TUI acceptance pass for zh/en/ja, resume/rotation and manual Deny;
-Agent library tests pass 509/509. Fresh full workspace, Desktop, independent
-review and exact-head remote gates are required before merge. The default
-workspace preflight omits optional desktop-ui and does not replace those checks.
+I308/T8 remain Active / Partial. Ordinary Shell/Exec/HTTP #783 merged as
+`da280c8a77b25798e59df37f3bdc2bf2fafce1c9`. Fetch #784 merged as
+`d6f1e6a56c3d337168b587feb92add36223007c4` after all eight jobs passed in
+exact-head CI 40504783551, independent static permission/security/API approval,
+both governance validators and merge-time CAS. The review receipt is
+https://github.com/wjhuang88/talos/pull/784#issuecomment-6443350514.
 
-Real Unix tests cover command file creation and HTTP proxy/redirect effects,
-policy refusal, failure/stale outcomes, Auto-control disablement,
-external/replacement registration and command replay. Full Agent tests pass
-509/509; cargo-xwin test-target checking is compile evidence only. Native Windows
-execution, complete operation/profile reconciliation and final CI/merge remain
-outstanding. Default save_url/fetch_url/WebSearch ordinary Auto acceptance remains
-open; guarded search cannot downgrade. The original acceptance and remaining
-handoff queue are unchanged.
+Recoverable Save Auto is implemented locally at
+`085903952` (rebased from `0013e63fe36646feba5175eebf32e96d1a83205b`): the retained-download capture and
+subsequent complete-text mutation receive separate invocation-local assessments.
+Unregistered/replacement instances retain manual authorization without builtin
+model evidence. Binary, sensitive, incomplete and default non-recoverable writes
+retain fallback. Tests passed: Save 21/21, Agent 510/510, Core 122/122;
+Agent test Clippy and independent static permission/security/API review passed.
+The reviewer did not independently execute tests. After earlier ENOSPC failures,
+authorized cache cleanup and worktree relocation, full standard preflight passed
+for candidate `bafc87af7`, including workspace tests and the external SDK fixture.
+Windows test cross-compilation via cargo xwin passed. Native Windows execution, Save stage
+CI/merge in #785, complete operation/profile reconciliation and final H/G
+acceptance remain outstanding. Guarded search cannot downgrade. The original
+acceptance and remaining handoff queue are unchanged.
 
 ### Earlier merged-stage checkpoint — 2026-10-26
 
@@ -66,7 +63,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, Review) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, open) |
 | Last Updated | 2026-10-27 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -364,15 +361,16 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 |---|---|
 | `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for all listed operations, with actual results and zero model assessments/grants. Image attachment reaches only the next provider request after an allowed read. Complete profile/platform coverage remains outstanding. MCP omits `read_image`. |
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
-| `http_request` | Ordinary whole-invocation Auto implemented locally; actual proxy/redirect AllowOnce and refusal/stale/external/replacement effects tested. Final native Windows, review/CI/merge remain outstanding. |
-| `fetch_url` | Local ordinary whole-invocation Auto implementation reuses the HTTP route, configuration/final-context binding and all eight real proxy/redirect scenarios; final local/platform/remote gates remain pending. Configuration distinguishes constructor redirects from timeout-override defaults and output truncation from full response buffering. |
-| `save_url`, `web_search` | Default production instances are not prepared-network tools and do not receive ordinary model AllowOnce. Existing deterministic policy/human paths remain; actual production fallback tests and remaining Auto acceptance are outstanding. I293 guarded compatibility/SearXNG instances are separately protected and cannot downgrade. Ordinary HTTP evidence does not cover this row. |
+| `http_request` | Ordinary whole-invocation Auto merged in #783, with actual proxy/redirect AllowOnce and refusal/stale/external/replacement effects tested and exact-head platform CI. Full profile acceptance remains open. |
+| `fetch_url` | Ordinary whole-invocation Auto merged in #784 after full local preflight, review and exact-head platform CI. Reuses HTTP configuration/final-context binding and eight real proxy/redirect scenarios; full profile acceptance remains open. Configuration distinguishes constructor redirects from timeout-override defaults and output truncation from full response buffering. |
+| `save_url` | Local recoverable capture and complete-text mutation Auto implemented at `085903952`; 16 production Agent scenarios cover model outcomes, policy, registration ownership, input changes and binary/default fallback. Full standard preflight and cargo-xwin passed; native CI/publication/merge remain pending. |
+| `web_search` | ADR-090 excludes ordinary whole-invocation Auto for WebSearch, including compatibility/default search. Existing legacy instances retain deterministic policy/human paths; guarded instances require their dedicated prepared-network route and cannot downgrade. Concrete production fallback/profile evidence remains outstanding; the synthetic network carrier fixture alone does not prove WebSearch acceptance. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
-| `bash` (Unix) / `powershell` (Windows), `exec` | Local whole-invocation Auto implementation and actual Unix allow/refusal/cancel/stale/registration/replay tests pass. Windows fixtures compile via cargo xwin; native Windows and full profile/final gates remain outstanding. |
+| `bash` (Unix) / `powershell` (Windows), `exec` | Whole-invocation Auto merged in #783 with actual Unix allow/refusal/cancel/stale/registration/replay tests and exact-head Windows workspace CI. Per-entry-point reachability/final acceptance still requires reconciliation; cross-compilation alone is never native evidence. |
 | `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Session-scoped Internal facets retain default deterministic Allow, not model approval. Local real-Agent tests cover all nine operations under default Allow and explicit Internal Deny, actual SQLite effects, unchanged other-session data, zero assessor calls and zero grants. MCP does not add Todo; complete profile/platform evidence remains outstanding. |
 | `status` | MCP-only read tool; concrete built-in ownership checked. |
-| `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory registers actual instances as built-ins; caller-supplied instances remain external. A local action-review implementation now admits exact scheduling/cancellation invocations, pending validation and independent review below. `list_scheduled_tasks` retains Read policy. This stage is not merged acceptance. |
+| `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Scheduler registration and action review merged in #772. Product-owned instances are built-ins; caller-supplied instances remain external. Exact scheduling/cancellation review does not approve future tool effects. `list_scheduled_tasks` retains Read policy. Complete profile/final acceptance remains open. |
 
 Inventory work found and repaired a production gap: Print/Inline/RPC/TUI previously
 constructed scheduler tools locally but passed them through generic external registration.
@@ -1353,3 +1351,143 @@ still pending. This local stage does not complete T8 or waive save/search accept
 - Fetch full standard locked preflight passed (exit 0), Tools 983/983 and both external Runtime SDK consumers; root log `target/recovery/ordinary-fetch-preflight.log`, same low-debug/incremental-disabled serial command and shared target as the preceding ordinary stage. Independent static permission/security/API review approved original implementation `0eb2a70c5` against `cb6e20878`, without builds. Rebased onto merged parent `da280c8a7`; `git diff 1dcdf885d HEAD` showed only one owner-document separator change, with all executable sources, lockfile and scripts identical. The conflict retained both parent evidence and Fetch notes. Remote exact-head/native Windows and final review remain pending; T8 remains Partial.
 
 - Fetch stable candidate published as PR #784 at `6e01c5690`; exact-head CI and native Windows evidence are pending. No T8 completion is claimed.
+
+
+### Save URL implementation checkpoint — 2026-10-27
+
+- Local implementation commit `7590b1df09555d5c0a452ffc6f3fff331a6cca08`
+  checks each received response chunk before adding it to the retained download.
+  Over-limit responses stop before destination creation or writing. This bounds
+  retained body length; it does not claim a bound on reqwest internal allocations
+  or bytes already received by the transport. Existing download/write permission
+  behavior is unchanged; Save URL model Auto admission and overwrite recovery
+  remain unimplemented.
+- Save URL tests moved to `crates/talos-tools/src/save_url/tests.rs`.
+  Locked Tools tests with `network,file-write` passed 10/10, including exact limit,
+  no Content-Length, and oversized unfinished response rejection before EOF.
+  An initial `network`-only command selected zero Save URL tests because this tool
+  also requires `file-write`; it is not counted as validation.
+- Development branch `feat/i308-save-auto` is stacked locally on Fetch candidate
+  `3202c6af0`; the shared HTTP fixture repair there resolves the pre-existing
+  unused-read-amount Clippy failures on main. This checkpoint is not publication,
+  full preflight, independent security approval, Windows evidence or T8 completion.
+
+
+### Save URL recovery implementation checkpoint — 2026-10-27
+
+- Local implementation commit `56c5a3ce9` adds optional `retain_backup` and
+  `recovery_id` JSON arguments without changing public `SaveUrlInput` fields.
+  Recoverable overwrites capture an existing regular file before download and
+  reuse the existing bounded recovery store and atomic replacement. Restore
+  requires Read+Write, performs no request, and consumes its receipt once.
+  Limits remain 2 MiB per image, 64 records/16 MiB and 15 minutes per tool instance.
+- Locked Tools `network,file-write` tests passed: 516 library tests plus enabled
+  integration/doc tests; 15 Save URL tests include original restoration,
+  wrong-instance/path/replay refusal, changed-content refusal, deterministic
+  modification during download and over-limit download preserving original data.
+  The proxy fixture is bounded by five seconds and joined by each download test.
+  Clippy for the same library/tests passed with `-D warnings`; the isolated
+  `--no-default-features --features file-write` check passed.
+- Independent same-session read-only Agent static permission/security/API review
+  approved the local delta, without independently running tests. The shared
+  primitive checks content then renames atomically; it is not atomic CAS against
+  external writers or retained inode identity. README states this limitation.
+- This is local recovery implementation only. Save URL Auto admission, complete
+  before/after model evidence and remaining G acceptance are not implemented by
+  this commit. Full standard preflight, exact-head Windows/CI, publication and
+  merge approval are still required. T8 and the handoff remain Partial.
+
+
+### Save URL retained replacement checkpoint — 2026-10-27
+
+- Local commit `a3ae723a1` implements a read/network-admitted capture followed by
+  a fresh Read/Write-admitted replacement. Stage one retains complete bounded
+  original/downloaded images without writing; stage two never downloads again.
+  UTF-8 images supply existing private mutation evidence; binary images retain
+  the generic approval path. Save URL model Auto eligibility is not enabled yet.
+- Exact prepared proofs bind both stages independently. Relative destinations use
+  normalized admitted path tokens, not ambient process cwd; stage two must match
+  the captured target and existing recovery content checks. The initial local
+  implementation incorrectly used process cwd; independent review caught this
+  before commit. Added workspace-relative and pre-download link-retarget tests.
+- Locked no-default `network,file-write` Tools tests pass: 483 library tests plus
+  enabled integration/doc tests; 21 Save URL tests pass. Matching library/test
+  Clippy passes with `-D warnings`. Logs: `/private/tmp/i308-save-staged-tools.log`
+  and `/private/tmp/i308-save-staged-clippy.log` (local ephemeral evidence).
+  The first focused attempt failed because a proof fixture used an invalid URL;
+  the next failed because retargeting invalidates proof before capture, earlier
+  than its assertion expected. Both corrected fixtures pass in the final run.
+- Independent same-session read-only Agent static security/API review approved
+  the corrected working executable delta; it did not run tests. Existing final
+  content-check/rename race remains disclosed. This is local implementation,
+  not full Auto acceptance, full preflight, Windows evidence or merged delivery.
+  T8 and the complete handoff queue remain incomplete.
+
+
+### Save URL staged Auto implementation — 2026-10-27
+
+- Registered built-in recoverable saves now supply stage-owned invocation review
+  configuration for the read/download stage. The shared ordinary classifier can
+  approve that exact prepared plan once; a new plan separately reviews complete
+  UTF-8 replacement images through existing retained file-mutation review.
+  Download admission has transitive policy semantics (proxy/redirect effects),
+  while the final Read/Write stage inherits no network authority.
+- Added default-None descriptive configuration to the prepared invocation trait;
+  it carries no authority. Command, mutation and invocation evidence are mutually
+  exclusive. Registered instance ownership gates model review. External or
+  replacement instances retain manual approval with matching transitive proofs.
+  Dedicated prepared-network dispatch remains prior and cannot downgrade.
+- `save_url_auto.rs` exercises 16 production Agent/subprocess proxy scenarios:
+  allow, uncertain/error/stale at download and mutation, explicit Deny/human,
+  external/replacement rejection, manual external/replacement approval, concurrent
+  destination modification, nonrecoverable save fallback and binary fallback.
+  Assertions cover zero connections before rejected capture, retained originals
+  after rejected writes, exactly one redirected download, and zero stored grants.
+- Local locked checks pass: Save URL 21/21, Agent library 510/510, Core library
+  122/122, Agent library/tests Clippy with `-D warnings`. Logs are ephemeral local
+  `/private/tmp/i308-save-auto-{agent,agent-full,core,clippy}.log`.
+  Independent read-only security/API review approved the executable working delta,
+  including manual external compatibility; it did not independently run tests.
+- This is a local implementation stage, not merged delivery. Full standard
+  preflight, native Windows/exact-head CI and final stable-commit review remain
+  outstanding. The existing content-check/rename race remains disclosed. Recovery
+  restore, default/nonrecoverable saves and binary mutations gain no Auto approval
+  from this route. T8 full G/search/profile acceptance and all later original
+  handoff tasks remain incomplete.
+
+### Rebased full Save candidate review — 2026-10-27
+
+Candidate `bafc87af73cbd7ce9ce34d53fea0987d9148d6a8` is based on Fetch
+merge `d6f1e6a56c3d337168b587feb92add36223007c4`. Independent read-only
+Agent security/API review approved the complete aggregate delta: bounded download,
+instance-bound bounded recovery, exact admitted path capture, separate fresh
+write plan, complete UTF-8 mutation evidence, positive builtin ownership and
+unregistered manual compatibility. No new dependency/unsafe or required trait
+method/public input fields. Reviewer did not run tests. It is a separate Agent,
+not a separate natural person. Existing endpoint non-isolation, underlying chunk
+allocation and content-check/rename race limits remain explicitly disclosed.
+
+The prior unsandboxed run passed workspace tests (Tools997/997), then SDK
+compilation and a concurrent xwin check failed ENOSPC; neither complete gate passed.
+After authorized `cargo clean`, the active worktree moved outside target to
+`/private/tmp/talos-i308-save-active`. Fresh full standard preflight runs with
+debug symbols and incremental caching disabled to limit artifact size and passed,
+including all workspace tests and the external Runtime SDK fixture (log:
+`/private/tmp/i308-save-rebased-preflight.log`). Serial xwin passed (log:
+`/private/tmp/i308-save-rebased-xwin.log`). Save publication/CI/merge and full T8 acceptance
+remain outstanding. Historical pre-rebase SHAs above remain valid provenance,
+not current-head validation claims.
+
+### Remaining acceptance reconciliation after Save — working checklist
+
+This is an execution checklist against the unchanged numbered acceptance, not a
+reduced completion definition. Existing passing suites must be matched to actual
+production composition before closing each row.
+
+| Acceptance | Evidence to inspect / remaining concrete work |
+|---|---|
+| 1, operation/profile inventory | CLI `registry_builtin_tests`, Runtime `composition` equivalence, Desktop contributions/optional feature assemblies and MCP-only status. Record each conditional registration and concrete disposition; registration identity alone does not prove Auto dispatch. |
+| 2–4, actual admission | Existing Agent write/edit/read/Todo/scheduler/ordinary HTTP/command fixtures; add missing real registered Git operation and protected/legacy WebSearch disposition evidence. Preserve no-model reads, atomic facets, refusal/cancel/stale/replay checks. |
+| 5, higher-risk recovery | Reconcile `edit_auto`, mutation pipeline/recovery tests and Save recovery: special/config/security paths, destructive operation, partial failure, cancellation and stale target. Record unsupported native rename/batch inventory rather than inventing tools or rollback guarantees. |
+| 6, host reachability | Inspect CLI/Runtime/Desktop/MCP actual resolver installation and visible decisions, beyond registry equality; match applicable feature/native Windows evidence to these paths. |
+| 7, delivery gates | Save preflight/SDK/xwin, stable stage publication, exact-head native CI/review/CAS; then full H/G owner and user-doc reconciliation with implementation SHAs before Complete. |

@@ -892,7 +892,12 @@ impl Agent {
                     };
                     let evidence = operation.prepared_command_evidence();
                     let mutation = operation.prepared_file_mutation_evidence();
-                    if evidence.is_some() && mutation.is_some() {
+                    let configuration = operation.invocation_review_configuration();
+                    if usize::from(evidence.is_some())
+                        + usize::from(mutation.is_some())
+                        + usize::from(configuration.is_some())
+                        > 1
+                    {
                         return Ok((
                             ToolExecutionResult::error("ambiguous prepared review evidence"),
                             Vec::new(),
@@ -905,6 +910,17 @@ impl Agent {
                                 user_intent,
                                 plan,
                                 mutation,
+                                registry.is_builtin_instance(&call.name),
+                            )
+                            .await
+                    } else if let Some(configuration) = configuration.as_ref() {
+                        pipeline
+                            .authorize_registered_prepared_invocation(
+                                authorization_request,
+                                user_intent,
+                                plan,
+                                tool.description(),
+                                configuration,
                                 registry.is_builtin_instance(&call.name),
                             )
                             .await

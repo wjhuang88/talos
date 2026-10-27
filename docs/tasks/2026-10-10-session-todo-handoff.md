@@ -1,3 +1,58 @@
+## Active resume checkpoint — 2026-10-27 cache/worktree cleanup
+
+Active branch: `feat/i308-save-auto`; worktree:
+`/private/tmp/talos-i308-save-active` (moved out of `target` before `cargo clean`).
+Rebased candidate `bafc87af7` is based on merged Fetch `d6f1e6a56`;
+Save Auto implementation is now `085903952`. Executable source, lockfile and
+scripts match the pre-rebase candidate. Three clean merged worktrees were removed
+and six missing-path registrations pruned; branches/commits were preserved.
+Root and Save `cargo clean` removed about 33.8 GiB; free space was 33 GiB.
+
+Previous unsandboxed run passed all workspace tests, including Tools997/997,
+then failed SDK-consumer compilation with ENOSPC. Concurrent xwin also failed
+ENOSPC. Neither constitutes complete preflight/Windows success. Fresh full
+standard preflight passed with `CARGO_PROFILE_DEV_DEBUG=0`,
+`CARGO_PROFILE_TEST_DEBUG=0`, `CARGO_INCREMENTAL=0`; log:
+`/private/tmp/i308-save-rebased-preflight.log`. This includes the full workspace
+tests and the external Runtime SDK fixture. Serial Windows xwin passed;
+log: `/private/tmp/i308-save-rebased-xwin.log`.
+Full candidate independent Agent security/API review approved `bafc87af7`
+against `d6f1e6a56`; final documentation head `3690204a6` was also approved.
+The reviewer did not independently run tests. Save PR #785 is open; native CI
+and merge remain pending. T8 is Partial and the entire later queue remains outstanding.
+
+<!-- Latest stage checkpoint: 2026-10-27 -->
+Fetch #784 merged as `d6f1e6a56c3d337168b587feb92add36223007c4` after
+all-eight-success exact-head CI 40504783551, independent security/API review,
+both governance validators and merge CAS. Save implementation `0013e63fe`
+remains local: full preflight retry is running after disk-full compilation failure
+and authorized rebuildable-cache cleanup. T8 and all later original tasks remain
+incomplete; see I308 owner for current evidence and preserved acceptance.
+
+> Local checkpoint 2026-10-27: `0013e63fe36646feba5175eebf32e96d1a83205b`
+> implements staged Save URL Auto review for registered recoverable text saves.
+> Sixteen production Agent/proxy scenarios pass, including manual external-tool
+> compatibility; Agent510/Core122/Save21 and Agent warnings-denied Clippy pass.
+> Both governance validators pass. Standard workspace preflight is running;
+> native Windows/exact-head CI, final review and merge remain outstanding.
+> Default saves, restoration and binary writes gain no Auto approval from this
+> route. T8 full acceptance and T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
+
+> Local checkpoint 2026-10-27: `a3ae723a1` adds retained Save URL download
+> capture and separately admitted recoverable replacement, using approval-bound
+> paths and complete text mutation evidence. Save21 / feature-selected Tools483
+> plus integration tests and warnings-denied Clippy pass. Save Auto admission
+> remains unimplemented; full preflight, Windows/CI and merge remain outstanding.
+> The original T8 acceptance and subsequent task queue are unchanged.
+
+> Local checkpoint 2026-10-27: Save URL bounded streaming and optional overwrite
+> recovery are implemented at `7590b1df0` / `56c5a3ce9` on
+> `feat/i308-save-auto`, stacked on Fetch PR #784. Tools network+file-write tests
+> and focused recovery tests pass; independent static review approved the recovery
+> delta. Save URL Auto admission and complete mutation evidence remain unimplemented.
+> These local commits are not merged delivery evidence. #784 exact-head CI remains
+> pending; T8 and the original remaining queue are unchanged / incomplete.
+
 ## T8 ordinary invocation stage merged — 2026-10-27
 
 PR #783 merged as `da280c8a77b25798e59df37f3bdc2bf2fafce1c9` after exact-head CI 40482737690 passed all eight checks, local full locked preflight, both governance validators, independent permission/security/API review and final CAS. Ordinary Shell/Exec/HTTP now use the accepted whole-invocation Auto boundary; accepted search coexistence #782 is also merged. Fetch URL follow-up is locally implemented and under full validation; Save URL/search and remaining complete profile/operation acceptance stay outstanding. T8 remains Partial. T2/T3 → T4 → T5 → T1 → T6 remain incomplete and unchanged.

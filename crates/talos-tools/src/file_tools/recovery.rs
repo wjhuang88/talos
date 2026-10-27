@@ -28,7 +28,7 @@ enum ExpectedState {
 }
 
 #[derive(Default)]
-pub(super) struct FileRecoveryStore {
+pub(crate) struct FileRecoveryStore {
     records: Mutex<HashMap<String, Backup>>,
     write_lock: Mutex<()>,
 }
@@ -43,7 +43,7 @@ impl FileRecoveryStore {
         Ok(records)
     }
 
-    pub(super) fn replace(
+    pub(crate) fn replace(
         &self,
         path: &Path,
         original: &[u8],
@@ -146,7 +146,7 @@ impl FileRecoveryStore {
         Ok(id)
     }
 
-    pub(super) fn restore(
+    pub(crate) fn restore(
         &self,
         path: &Path,
         id: &str,
@@ -189,7 +189,7 @@ impl FileRecoveryStore {
 }
 
 /// Reads only a bounded regular file through the same checked handle.
-pub(super) fn read_bounded_regular_file(
+pub(crate) fn read_bounded_regular_file(
     path: &Path,
 ) -> Result<(Vec<u8>, Permissions), FileToolError> {
     let file = open_backup_file(path)?;

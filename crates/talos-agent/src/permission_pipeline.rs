@@ -123,6 +123,7 @@ impl BuiltinNetworkReviewEvidence<'_> {
 
 enum InvocationReviewSource<'a> {
     Network(&'a ToolNetworkManifest, bool),
+    UnregisteredPreparedInvocation,
     Builtin(&'a str, Option<&'a serde_json::Value>),
     FileMutation(&'a talos_core::tool::PreparedFileMutationEvidence),
 }
@@ -623,6 +624,30 @@ impl PermissionPipeline {
         }
     }
 
+    pub(crate) async fn authorize_registered_prepared_invocation(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        description: &str,
+        configuration: &serde_json::Value,
+        builtin: bool,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        self.authorize_inner(
+            authorization,
+            user_intent,
+            None,
+            Some((plan, None)),
+            Some(if builtin {
+                InvocationReviewSource::Builtin(description, Some(configuration))
+            } else {
+                InvocationReviewSource::UnregisteredPreparedInvocation
+            }),
+        )
+        .await?
+        .into_prepared()
+    }
+
     pub(crate) async fn authorize_registered_invocation(
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
@@ -653,6 +678,10 @@ impl PermissionPipeline {
         )>,
         review_source: Option<InvocationReviewSource<'_>>,
     ) -> Result<PermissionAdmission, PermissionPipelineError> {
+        let unregistered_prepared = matches!(
+            review_source,
+            Some(InvocationReviewSource::UnregisteredPreparedInvocation)
+        );
         let (network_context, builtin_description, file_mutation) = match review_source {
             Some(InvocationReviewSource::Network(manifest, builtin)) => {
                 (Some((manifest, builtin)), None, None)
@@ -661,7 +690,9 @@ impl PermissionPipeline {
                 (None, Some((description, configuration)), None)
             }
             Some(InvocationReviewSource::FileMutation(evidence)) => (None, None, Some(evidence)),
-            None => (None, None, None),
+            None | Some(InvocationReviewSource::UnregisteredPreparedInvocation) => {
+                (None, None, None)
+            }
         };
         let network_manifest = network_context.map(|(manifest, _)| manifest);
         let PermissionAuthorizationRequest {
@@ -680,10 +711,10 @@ impl PermissionPipeline {
             .state_snapshot()
             .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
         let mut request = PermissionRequest::new(tool_name, provenance.clone(), profile, input);
-        if builtin_description.is_some()
+        if (builtin_description.is_some() || unregistered_prepared)
             && matches!(
                 tool_name,
-                "bash" | "powershell" | "exec" | "http_request" | "fetch_url"
+                "bash" | "powershell" | "exec" | "http_request" | "fetch_url" | "save_url"
             )
         {
             request = request.with_transitive_effects();

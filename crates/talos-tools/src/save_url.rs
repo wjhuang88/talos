@@ -55,6 +55,7 @@ pub struct SaveUrlInput {
 pub struct SaveUrlTool {
     client: reqwest::Client,
     max_body_bytes: usize,
+    recovery: std::sync::Arc<crate::file_tools::FileRecoveryStore>,
 }
 
 impl SaveUrlTool {
@@ -68,7 +69,48 @@ impl SaveUrlTool {
         Self {
             client,
             max_body_bytes: DEFAULT_MAX_BODY_BYTES,
+            recovery: Default::default(),
         }
+    }
+}
+
+impl SaveUrlTool {
+    async fn download(&self, url: &str, limit: usize) -> Result<Vec<u8>, String> {
+        // Validate URL.
+        let parsed_url = match reqwest::Url::parse(url) {
+            Ok(url) => url,
+            Err(e) => return Err(format!("invalid URL: {e}")),
+        };
+
+        let scheme = parsed_url.scheme();
+        if scheme != "http" && scheme != "https" {
+            return Err(format!("unsupported URL scheme '{scheme}'"));
+        }
+
+        // SSRF guard.
+        let host = match parsed_url.host_str() {
+            Some(h) => h.to_string(),
+            None => return Err("URL has no host".to_string()),
+        };
+
+        if let Err(e) = check_ssrf(&host).await {
+            return Err(format!("SSRF guard blocked: {e}"));
+        }
+
+        // Download.
+        let response = match self.client.get(url).send().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                return Err(SaveUrlError::DownloadFailed(e.to_string()).to_string());
+            }
+        };
+
+        let status = response.status();
+        if !status.is_success() {
+            return Err(format!("server returned status {status}"));
+        }
+
+        read_bounded_body(response, limit).await
     }
 }
 
@@ -106,6 +148,14 @@ async fn check_ssrf(host: &str) -> Result<(), String> {
 
 #[async_trait]
 impl AgentTool for SaveUrlTool {
+    fn prepare_normalized_with_provenance(
+        &self,
+        input: &Value,
+        provenance: talos_core::tool::ToolProvenance,
+    ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String> {
+        prepared::prepare(self, input, provenance)
+    }
+
     fn name(&self) -> &str {
         "save_url"
     }
@@ -113,11 +163,22 @@ impl AgentTool for SaveUrlTool {
     fn description(&self) -> &str {
         "Download a URL and save it to a file. Saves raw bytes to the specified destination path. \
          SSRF-protected (private IPs blocked). Size limited to 10 MB. Requires network and \
-         file-write permission."
+         file-write permission. Optional retain_backup enables recoverable overwrites of existing \
+         regular files up to 2 MiB and requires Read. Restore with recovery_id and destination \
+         in this tool instance within 15 minutes; url is ignored for restoration."
     }
 
     fn parameters(&self) -> Value {
-        talos_core::tool_parameters!(SaveUrlInput)
+        let mut schema = talos_core::tool_parameters!(SaveUrlInput);
+        schema["properties"]["retain_backup"] = serde_json::json!({
+            "type": "boolean",
+            "description": "Opt in to a recoverable overwrite of an existing regular file. Before/after images must fit 2 MiB. Backup expires after 15 minutes in this tool instance."
+        });
+        schema["properties"]["recovery_id"] = serde_json::json!({
+            "type": "string",
+            "description": "Restore a previous recoverable overwrite of destination without downloading. URL is ignored. Requires read and write permission."
+        });
+        schema
     }
 
     fn is_read_only(&self) -> bool {
@@ -134,7 +195,16 @@ impl AgentTool for SaveUrlTool {
 
     fn permission_profile(&self, input: &Value) -> Vec<ToolPermissionFacet> {
         let mut profile = Vec::new();
-        if let Some(url) = input.get("url").and_then(Value::as_str)
+        if input.get("recovery_id").is_some() {
+            profile.push(ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                input
+                    .get("destination")
+                    .and_then(Value::as_str)
+                    .unwrap_or(""),
+                ToolResourceKind::Path,
+            ));
+        } else if let Some(url) = input.get("url").and_then(Value::as_str)
             && let Ok(parsed) = reqwest::Url::parse(url)
             && let Some(host) = parsed.host_str()
         {
@@ -145,6 +215,19 @@ impl AgentTool for SaveUrlTool {
             ));
         } else {
             profile.push(ToolPermissionFacet::new(ToolNature::Network));
+        }
+
+        if input.get("retain_backup").and_then(Value::as_bool) == Some(true)
+            && input.get("recovery_id").is_none()
+        {
+            profile.push(ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                input
+                    .get("destination")
+                    .and_then(Value::as_str)
+                    .unwrap_or(""),
+                ToolResourceKind::Path,
+            ));
         }
 
         if let Some(destination) = input.get("destination").and_then(Value::as_str) {
@@ -165,6 +248,19 @@ impl AgentTool for SaveUrlTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
+        let retain_backup = match input.get("retain_backup") {
+            None | Some(Value::Bool(false)) => false,
+            Some(Value::Bool(true)) => true,
+            _ => return ToolResult::error("retain_backup must be a boolean"),
+        };
+        let recovery_id = match input.get("recovery_id") {
+            None => None,
+            Some(Value::String(id)) if !id.is_empty() => Some(id.clone()),
+            _ => return ToolResult::error("recovery_id must be a nonempty string"),
+        };
+        if retain_backup && recovery_id.is_some() {
+            return ToolResult::error("retain_backup and recovery_id cannot be combined");
+        }
         let parsed: SaveUrlInput = match serde_json::from_value(input) {
             Ok(v) => v,
             Err(e) => {
@@ -178,53 +274,54 @@ impl AgentTool for SaveUrlTool {
             );
         }
 
-        // Validate URL.
-        let parsed_url = match reqwest::Url::parse(&parsed.url) {
-            Ok(url) => url,
-            Err(e) => return ToolResult::error(format!("invalid URL: {e}")),
-        };
-
-        let scheme = parsed_url.scheme();
-        if scheme != "http" && scheme != "https" {
-            return ToolResult::error(format!("unsupported URL scheme '{scheme}'"));
+        if let Some(id) = recovery_id {
+            let path = match std::fs::canonicalize(&parsed.destination) {
+                Ok(path) => path,
+                Err(error) => return ToolResult::error(error.to_string()),
+            };
+            return match self.recovery.restore(&path, &id, None) {
+                Ok(()) => ToolResult::success(format!("restored {}", parsed.destination)),
+                Err(error) => ToolResult::error(error.to_string()),
+            };
         }
 
-        // SSRF guard.
-        let host = match parsed_url.host_str() {
-            Some(h) => h.to_string(),
-            None => return ToolResult::error("URL has no host".to_string()),
+        let captured = if retain_backup {
+            let path = match std::fs::canonicalize(&parsed.destination) {
+                Ok(path) => path,
+                Err(error) => return ToolResult::error(error.to_string()),
+            };
+            let before = match crate::file_tools::read_bounded_regular_file(&path) {
+                Ok((bytes, _)) => bytes,
+                Err(error) => return ToolResult::error(error.to_string()),
+            };
+            Some((path, before))
+        } else {
+            None
         };
 
-        if let Err(e) = check_ssrf(&host).await {
-            return ToolResult::error(format!("SSRF guard blocked: {e}"));
-        }
+        let limit = if retain_backup {
+            self.max_body_bytes
+                .min(talos_core::tool::MAX_FILE_MUTATION_REVIEW_BYTES)
+        } else {
+            self.max_body_bytes
+        };
+        let body_bytes = match self.download(&parsed.url, limit).await {
+            Ok(bytes) => bytes,
+            Err(error) => return ToolResult::error(error),
+        };
 
-        // Download.
-        let response = match self.client.get(parsed.url.as_str()).send().await {
-            Ok(resp) => resp,
-            Err(e) => {
-                return ToolResult::error(SaveUrlError::DownloadFailed(e.to_string()).to_string());
+        if let Some((path, before)) = captured {
+            if std::fs::canonicalize(&parsed.destination).ok().as_ref() != Some(&path) {
+                return ToolResult::error("destination identity changed during download");
             }
-        };
-
-        let status = response.status();
-        if !status.is_success() {
-            return ToolResult::error(format!("server returned status {status}"));
-        }
-
-        let body_bytes = match response.bytes().await {
-            Ok(b) => b,
-            Err(e) => {
-                return ToolResult::error(format!("failed to read response body: {e}"));
-            }
-        };
-
-        if body_bytes.len() > self.max_body_bytes {
-            return ToolResult::error(format!(
-                "response too large ({} bytes, max {})",
-                body_bytes.len(),
-                self.max_body_bytes
-            ));
+            return match self.recovery.replace(&path, &before, &body_bytes, None) {
+                Ok(id) => ToolResult::success(format!(
+                    "saved {} bytes to {}; recovery_id: {id}",
+                    body_bytes.len(),
+                    parsed.destination
+                )),
+                Err(error) => ToolResult::error(error.to_string()),
+            };
         }
 
         // Write to file.
@@ -247,71 +344,28 @@ impl AgentTool for SaveUrlTool {
     }
 }
 
+async fn read_bounded_body(
+    mut response: reqwest::Response,
+    limit: usize,
+) -> Result<Vec<u8>, String> {
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|error| error.to_string())? {
+        if chunk.len() > limit.saturating_sub(body.len()) {
+            return Err(format!("response too large (max {limit} bytes)"));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests;
 
-    #[test]
-    fn test_tool_name() {
-        let tool = SaveUrlTool::new();
-        assert_eq!(tool.name(), "save_url");
-    }
+#[cfg(test)]
+mod recovery_tests;
 
-    #[test]
-    fn test_tool_not_read_only() {
-        let tool = SaveUrlTool::new();
-        assert!(!tool.is_read_only());
-    }
-
-    #[test]
-    fn test_tool_nature_is_write() {
-        let tool = SaveUrlTool::new();
-        assert!(matches!(tool.nature(), ToolNature::Write));
-    }
-
-    #[test]
-    fn test_permission_profile_includes_network_and_write_facets() {
-        let tool = SaveUrlTool::new();
-        let profile = tool.permission_profile(&serde_json::json!({
-            "url": "https://Example.com/archive.zip",
-            "destination": "downloads/archive.zip"
-        }));
-
-        assert_eq!(profile.len(), 2);
-        assert_eq!(profile[0].nature, ToolNature::Network);
-        assert_eq!(profile[0].resource.as_deref(), Some("example.com"));
-        assert_eq!(profile[0].resource_kind, Some(ToolResourceKind::Domain));
-        assert_eq!(profile[1].nature, ToolNature::Write);
-        assert_eq!(
-            profile[1].resource.as_deref(),
-            Some("downloads/archive.zip")
-        );
-        assert_eq!(profile[1].resource_kind, Some(ToolResourceKind::Path));
-    }
-
-    #[test]
-    fn test_tool_summary_fields() {
-        let tool = SaveUrlTool::new();
-        assert_eq!(tool.summary_fields(), &["url", "destination"]);
-    }
-
-    #[test]
-    fn test_tool_emits_parameters_schema() {
-        let tool = SaveUrlTool::new();
-        let schema = tool.parameters();
-        assert!(schema.is_object());
-        assert!(schema.get("properties").is_some());
-    }
-
-    #[test]
-    fn test_deserialize_input() {
-        let json = r#"{"url": "https://example.com/file.zip", "destination": "/tmp/file.zip"}"#;
-        let input: SaveUrlInput = serde_json::from_str(json).expect("operation should succeed");
-        assert_eq!(input.url, "https://example.com/file.zip");
-        assert_eq!(input.destination, "/tmp/file.zip");
-    }
-}
+mod prepared;
