@@ -13,14 +13,20 @@ scenarios cover model allow/human/error/stale, Deny/mandatory-human, external an
 replacement refusal plus their explicit manual compatibility. The focused test
 and full Agent library suite (511/511) pass. Assessor assertion-reached counters
 prevent caught panics from masquerading as refusal evidence. Independent static
-review approved the working executable delta; Agent library/test Clippy passed. Full standard preflight
-failed three Runtime Pull integration tests: those fixtures registered caller-owned tools
-but expected builtin Auto trust. The follow-up switches them to production shared
-composition and explicitly enables that feature in the Windows focused CI command.
-Focused rerun passed 3/3 at `/private/tmp/i308-git-auto-runtime.log`; both governance validators passed. Fresh full preflight,
-platform and publication gates remain outstanding. The implementation and initial
-owner checkpoint are committed but not pushed; fixture/CI corrections are the next staged commit. T8 and all later tasks remain
-incomplete. The original queue and acceptance are unchanged.
+review approved the executable delta. Initial full preflight exposed three Runtime
+fixtures that registered caller-owned tools but expected builtin Auto trust. Commit
+`e14c76164289ece98111d8725b263e57fd033359` switches them to production
+shared composition and explicitly enables its feature in Windows focused CI.
+Focused Runtime tests passed 3/3; fresh full standard preflight passed, including
+all workspace tests and external Runtime SDK execution (log:
+`/private/tmp/i308-git-auto-preflight-retry.log`). The workspace run actually
+executed those three Runtime tests. Agent/Runtime tests with shared composition
+passed Windows cargo-xwin check (log: `/private/tmp/i308-git-auto-xwin.log`).
+Both governance validators, format and CI classifier 15/15 passed. Independent
+static review approved exact `e14c76164` against previously reviewed `706ef86b2`;
+it did not independently execute tests. Native CI, publication and merge remain
+outstanding. Save #785 final-head CI 40525328345 is running, not merged. T8 and
+all later tasks remain incomplete; original queue and acceptance are unchanged.
 
 ## Active resume checkpoint — 2026-10-27 cache/worktree cleanup
 

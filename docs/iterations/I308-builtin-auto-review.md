@@ -24,6 +24,16 @@ CI/merge in #785, complete operation/profile reconciliation and final H/G
 acceptance remain outstanding. Guarded search cannot downgrade. The original
 acceptance and remaining handoff queue are unchanged.
 
+Pull ownership follow-up implementation `115b302ad` and production Runtime fixture
+correction `e14c76164289ece98111d8725b263e57fd033359` are locally validated.
+Full standard preflight passed, including workspace execution of the three real
+Runtime Pull tests and external SDK consumer. Explicit shared-composition Runtime
+focused tests passed 3/3; Agent/Runtime Windows tests passed cargo-xwin check.
+Both governance validators and independent exact-head static security/API review
+passed. Logs: `/private/tmp/i308-git-auto-preflight-retry.log` and
+`/private/tmp/i308-git-auto-xwin.log`. The reviewer did not run tests. Publication,
+native CI and merge remain pending; no full T8 completion is claimed.
+
 ### Earlier merged-stage checkpoint — 2026-10-26
 
 Foundation #769 merged as `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`.
@@ -1512,6 +1522,8 @@ Agent library/test Clippy passed. Full standard preflight failed three Runtime
 Pull integration tests because caller `.tool(...)` registration no longer inherits
 builtin Auto trust. The fixtures now select production `.shared_tools()` registration;
 the focused Windows CI command explicitly enables `shared-composition` so this
-feature-gated suite cannot silently disappear there. Focused rerun passed 3/3; both governance validators passed. Fresh full
-preflight, final commit review, Windows checks and publication remain pending. This narrows a real registration trust gap; it does not add model
+feature-gated suite cannot silently disappear there. Focused rerun passed 3/3; both
+governance validators passed. Fresh full preflight and Agent/Runtime Windows test
+cross-check passed; independent static review approved exact `e14c76164`. Native
+CI, publication and merge remain pending. This narrows a real registration trust gap; it does not add model
 Auto support to Add/Commit/Push/Checkout or complete profile/search/G acceptance.
