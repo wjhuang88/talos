@@ -1,3 +1,18 @@
+## Active resume checkpoint — 2026-10-27 concrete search disposition
+
+Active branch is `feat/i308-profile-dispositions` in
+`/private/tmp/talos-i308-save-active`, based on Pull stage `435fc46c9`.
+The concrete legacy WebSearch test initially failed because it incorrectly
+expected human fallback. Actual production admission refuses its missing typed
+network resource before either model or human review, even with explicit Allow.
+The corrected six-scenario test passes and records this unavailable behavior;
+it does not implement search or prove backend success. I293 retains search
+ownership, and ordinary HTTP Auto cannot substitute. Full stage gates remain
+pending. T8 and T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
+
+Requested `cargo clean` removed another 10.4 GiB before this focused rebuild;
+only root and active worktrees remain, neither disposable. No source was removed.
+
 ## Active resume checkpoint — 2026-10-27 real Pull Auto ownership
 
 Active worktree `/private/tmp/talos-i308-save-active` now uses branch

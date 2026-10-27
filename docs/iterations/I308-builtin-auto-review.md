@@ -34,6 +34,16 @@ passed. Logs: `/private/tmp/i308-git-auto-preflight-retry.log` and
 `/private/tmp/i308-git-auto-xwin.log`. The reviewer did not run tests. Publication,
 native CI and merge in stacked PR #786 remain pending; no full T8 completion is claimed.
 
+Concrete legacy WebSearch disposition is now checked locally in six production
+Agent registration scenarios (Auto, disabled Auto, Deny, mandatory-human,
+policy Allow and headless). All refuse before execution: its current legacy
+profile has no safe typed network resource. Neither model assessment nor human
+resolution runs, including under explicit Allow. This is an unavailable search
+path, not successful manual/search backend coverage. I293 owns the protected
+search implementation; I308 must not route it through ordinary HTTP Auto.
+Focused locked test passed (1 test / 6 scenarios), log
+`/private/tmp/i308-search-disposition.log`; full stage validation is pending.
+
 ### Earlier merged-stage checkpoint — 2026-10-26
 
 Foundation #769 merged as `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`.
@@ -374,7 +384,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | `http_request` | Ordinary whole-invocation Auto merged in #783, with actual proxy/redirect AllowOnce and refusal/stale/external/replacement effects tested and exact-head platform CI. Full profile acceptance remains open. |
 | `fetch_url` | Ordinary whole-invocation Auto merged in #784 after full local preflight, review and exact-head platform CI. Reuses HTTP configuration/final-context binding and eight real proxy/redirect scenarios; full profile acceptance remains open. Configuration distinguishes constructor redirects from timeout-override defaults and output truncation from full response buffering. |
 | `save_url` | Local recoverable capture and complete-text mutation Auto implemented at `085903952`; 16 production Agent scenarios cover model outcomes, policy, registration ownership, input changes and binary/default fallback. Full standard preflight and cargo-xwin passed; native CI/publication/merge remain pending. |
-| `web_search` | ADR-090 excludes ordinary whole-invocation Auto for WebSearch, including compatibility/default search. Existing legacy instances retain deterministic policy/human paths; guarded instances require their dedicated prepared-network route and cannot downgrade. Concrete production fallback/profile evidence remains outstanding; the synthetic network carrier fixture alone does not prove WebSearch acceptance. |
+| `web_search` | ADR-090 excludes ordinary whole-invocation Auto, including compatibility/default search. Concrete production legacy registration currently refuses before model/human review because its profile has no safe typed network resource, including with explicit policy Allow. Six real-Agent disposition scenarios pass locally; this is unavailable behavior, not a working search path. Guarded instances require their dedicated prepared-network route and cannot downgrade. I293 backend/transport activation remains separately owned; synthetic carrier fixtures do not prove search backend success. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
 | `bash` (Unix) / `powershell` (Windows), `exec` | Whole-invocation Auto merged in #783 with actual Unix allow/refusal/cancel/stale/registration/replay tests and exact-head Windows workspace CI. Per-entry-point reachability/final acceptance still requires reconciliation; cross-compilation alone is never native evidence. |
