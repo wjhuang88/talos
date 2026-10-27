@@ -1,3 +1,10 @@
+> Local checkpoint 2026-10-27: `a3ae723a1` adds retained Save URL download
+> capture and separately admitted recoverable replacement, using approval-bound
+> paths and complete text mutation evidence. Save21 / feature-selected Tools483
+> plus integration tests and warnings-denied Clippy pass. Save Auto admission
+> remains unimplemented; full preflight, Windows/CI and merge remain outstanding.
+> The original T8 acceptance and subsequent task queue are unchanged.
+
 > Local checkpoint 2026-10-27: Save URL bounded streaming and optional overwrite
 > recovery are implemented at `7590b1df0` / `56c5a3ce9` on
 > `feat/i308-save-auto`, stacked on Fetch PR #784. Tools network+file-write tests

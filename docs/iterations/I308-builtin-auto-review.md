@@ -1398,3 +1398,29 @@ still pending. This local stage does not complete T8 or waive save/search accept
   before/after model evidence and remaining G acceptance are not implemented by
   this commit. Full standard preflight, exact-head Windows/CI, publication and
   merge approval are still required. T8 and the handoff remain Partial.
+
+
+### Save URL retained replacement checkpoint — 2026-10-27
+
+- Local commit `a3ae723a1` implements a read/network-admitted capture followed by
+  a fresh Read/Write-admitted replacement. Stage one retains complete bounded
+  original/downloaded images without writing; stage two never downloads again.
+  UTF-8 images supply existing private mutation evidence; binary images retain
+  the generic approval path. Save URL model Auto eligibility is not enabled yet.
+- Exact prepared proofs bind both stages independently. Relative destinations use
+  normalized admitted path tokens, not ambient process cwd; stage two must match
+  the captured target and existing recovery content checks. The initial local
+  implementation incorrectly used process cwd; independent review caught this
+  before commit. Added workspace-relative and pre-download link-retarget tests.
+- Locked no-default `network,file-write` Tools tests pass: 483 library tests plus
+  enabled integration/doc tests; 21 Save URL tests pass. Matching library/test
+  Clippy passes with `-D warnings`. Logs: `/private/tmp/i308-save-staged-tools.log`
+  and `/private/tmp/i308-save-staged-clippy.log` (local ephemeral evidence).
+  The first focused attempt failed because a proof fixture used an invalid URL;
+  the next failed because retargeting invalidates proof before capture, earlier
+  than its assertion expected. Both corrected fixtures pass in the final run.
+- Independent same-session read-only Agent static security/API review approved
+  the corrected working executable delta; it did not run tests. Existing final
+  content-check/rename race remains disclosed. This is local implementation,
+  not full Auto acceptance, full preflight, Windows evidence or merged delivery.
+  T8 and the complete handoff queue remain incomplete.
