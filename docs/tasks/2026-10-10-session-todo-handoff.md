@@ -17,8 +17,9 @@ standard preflight passed with `CARGO_PROFILE_DEV_DEBUG=0`,
 tests and the external Runtime SDK fixture. Serial Windows xwin passed;
 log: `/private/tmp/i308-save-rebased-xwin.log`.
 Full candidate independent Agent security/API review approved `bafc87af7`
-against `d6f1e6a56`; the reviewer did not independently run tests. Save is not pushed
-or merged, T8 is Partial, and the entire later handoff queue remains outstanding.
+against `d6f1e6a56`; final documentation head `3690204a6` was also approved.
+The reviewer did not independently run tests. Save PR #785 is open; native CI
+and merge remain pending. T8 is Partial and the entire later queue remains outstanding.
 
 <!-- Latest stage checkpoint: 2026-10-27 -->
 Fetch #784 merged as `d6f1e6a56c3d337168b587feb92add36223007c4` after

@@ -20,7 +20,7 @@ The reviewer did not independently execute tests. After earlier ENOSPC failures,
 authorized cache cleanup and worktree relocation, full standard preflight passed
 for candidate `bafc87af7`, including workspace tests and the external SDK fixture.
 Windows test cross-compilation via cargo xwin passed. Native Windows execution, Save stage
-publication/CI/merge, complete operation/profile reconciliation and final H/G
+CI/merge in #785, complete operation/profile reconciliation and final H/G
 acceptance remain outstanding. Guarded search cannot downgrade. The original
 acceptance and remaining handoff queue are unchanged.
 
@@ -63,7 +63,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, open) |
 | Last Updated | 2026-10-27 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
