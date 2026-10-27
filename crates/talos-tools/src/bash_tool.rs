@@ -391,6 +391,16 @@ impl BashTool {
 
 #[async_trait]
 impl AgentTool for BashTool {
+    fn invocation_review_configuration(&self) -> Option<Value> {
+        Some(serde_json::json!({
+            "backend": if cfg!(windows) { "powershell.exe" } else { "sh -c" },
+            "working_directory": self.working_dir.to_str()?,
+            "constructor_directory_identity": self.working_dir_identity,
+            "default_timeout_ms": self.timeout.as_millis(),
+            "environment": "inherited",
+        }))
+    }
+
     fn execution_working_directory(&self) -> Option<PathBuf> {
         Some(self.working_dir.clone())
     }

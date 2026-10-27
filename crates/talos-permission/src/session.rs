@@ -688,6 +688,7 @@ impl PermissionSessionState {
             profile: request.facets().to_vec(),
             input: request.input().clone(),
             authority_reset: state.authority_reset,
+            transitive_effects: request.transitive_effects(),
         }))
     }
 }
@@ -721,7 +722,7 @@ fn approve_session_locked(
     context: &PermissionContext,
     source: GrantSource,
 ) -> Result<PendingInvocation, GrantError> {
-    if crate::native_pull_command::requested(request.facets()) {
+    if request.invocation_local() {
         // Command authority is always invocation-local, including when a host
         // chooses its generic "always approve" response. Its preview says Once.
         return approve_once_locked(state, proposal, request, context);
@@ -941,7 +942,7 @@ fn evaluate_locked(
     }
     let (facets, _) = compiled_identity(request, state.engine.workspace_root())?;
     if let Some(grant) = state.grants.iter().find(|grant| {
-        !crate::native_pull_command::requested(request.facets())
+        !request.invocation_local()
             && grant_matches(
                 grant,
                 request.tool_name(),
@@ -1015,6 +1016,7 @@ struct NetworkAuthority {
     profile: Vec<ToolPermissionFacet>,
     input: serde_json::Value,
     authority_reset: u64,
+    transitive_effects: bool,
 }
 
 impl ToolNetworkAuthority for NetworkAuthority {
@@ -1038,13 +1040,16 @@ impl ToolNetworkAuthority for NetworkAuthority {
         {
             return Err(ToolNetworkAuthorizationError::Invalidated);
         }
-        let request = PermissionRequest::new(
+        let mut request = PermissionRequest::new(
             &self.pending.tool_name,
             self.pending.provenance.clone(),
             &self.profile,
             &self.input,
         )
         .with_network_manifest(&self.manifest);
+        if self.transitive_effects {
+            request = request.with_transitive_effects();
+        }
         let decision = state
             .engine
             .evaluate_request(&request, &self.pending.context)
@@ -1083,6 +1088,55 @@ mod tests {
     use talos_core::tool::{
         ToolAuthorizationScope, ToolNature, ToolPermissionFacet, ToolProvenance, ToolResourceKind,
     };
+
+    #[test]
+    fn retained_network_authority_rechecks_transitive_policy() {
+        let endpoint =
+            ToolNetworkEndpoint::new("https", "example.com", 443, "GET", "/").expect("endpoint");
+        let manifest = ToolNetworkManifest::new(
+            ToolNetworkScope::new_configuration(vec![endpoint.clone()], None, vec![], 0)
+                .expect("scope"),
+        );
+        let facets = [ToolPermissionFacet::with_resource(
+            ToolNature::Network,
+            "example.com",
+            ToolResourceKind::Domain,
+        )];
+        let input = json!({"url": "https://example.com/"});
+        let request = PermissionRequest::native("http_request", &facets, &input)
+            .with_network_manifest(&manifest)
+            .with_transitive_effects();
+        let state = Arc::new(PermissionSessionState::new(PermissionEngine::new()));
+        let proposal = state
+            .propose(&request, &context(), GrantScope::Once)
+            .expect("proposal");
+        let pending = state
+            .approve_once(proposal, &request, &context())
+            .expect("approve");
+        let authority = state
+            .admit_network(pending, &request, &context())
+            .expect("authority");
+        authority
+            .check(manifest.invocation_id(), &endpoint)
+            .expect("initial check");
+        // White-box mutation deliberately leaves generations untouched: this
+        // isolates request reconstruction from the separately tested revision fence.
+        state
+            .lock_state()
+            .expect("state")
+            .engine
+            .add_rule(crate::PermissionRule::new_nature(
+                ToolNature::Write,
+                Some("unknown/**".into()),
+                None,
+                PermissionDecision::Deny("unknown transitive write".into()),
+            ));
+        assert!(
+            authority
+                .check(manifest.invocation_id(), &endpoint)
+                .is_err()
+        );
+    }
 
     fn context() -> PermissionContext {
         PermissionContext::new(

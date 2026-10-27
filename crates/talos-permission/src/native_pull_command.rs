@@ -16,6 +16,31 @@ pub(crate) fn requested(facets: &[ToolPermissionFacet]) -> bool {
 }
 
 impl PermissionEngine {
+    pub(crate) fn ordinary_transitive_effect_restriction(
+        &self,
+    ) -> Option<(PermissionDecision, PermissionDecisionSource)> {
+        for (rule, metadata) in self.rules.iter().zip(&self.rule_metadata) {
+            if rule.nature == Some(ToolNature::Internal)
+                || metadata.source != PermissionRuleSource::Explicit
+                || rule.decision != PermissionDecision::Ask
+            {
+                continue;
+            }
+            if rule.resource.is_some() || rule.path_pattern.is_some() {
+                return Some((
+                    PermissionDecision::Deny(
+                        "Invocation authority cannot enforce an active scoped human checkpoint on transitive effects".into(),
+                    ),
+                    PermissionDecisionSource::Rule {
+                        rule_id: metadata.id,
+                        rule_source: metadata.source,
+                    },
+                ));
+            }
+        }
+        self.transitive_effect_restriction()
+    }
+
     pub(crate) fn native_pull_command_restriction(
         &self,
         tool_name: &str,
@@ -28,6 +53,12 @@ impl PermissionEngine {
         {
             return None;
         }
+        self.transitive_effect_restriction()
+    }
+
+    pub(crate) fn transitive_effect_restriction(
+        &self,
+    ) -> Option<(PermissionDecision, PermissionDecisionSource)> {
         let mut human_checkpoint = None;
         for (rule, metadata) in self.rules.iter().zip(&self.rule_metadata) {
             // Helpers are arbitrary programs. Without OS confinement, do not
@@ -44,7 +75,7 @@ impl PermissionEngine {
                 PermissionDecision::Deny(_) => {
                     return Some((
                         PermissionDecision::Deny(
-                            "Native Pull command authority cannot enforce an active restriction on transitive effects".into(),
+                            "Invocation authority cannot enforce an active restriction on transitive effects".into(),
                         ),
                         source,
                     ));

@@ -203,6 +203,7 @@ pub(crate) fn extract_links(html: &str, base_url: &str) -> Vec<String> {
 pub struct HttpRequestTool {
     client: reqwest::Client,
     max_body_bytes: usize,
+    redirect_limit: usize,
 }
 
 impl HttpRequestTool {
@@ -227,6 +228,7 @@ impl HttpRequestTool {
         Self {
             client,
             max_body_bytes,
+            redirect_limit,
         }
     }
 
@@ -360,6 +362,17 @@ pub(crate) async fn check_ssrf_host(host: &str) -> Result<(), String> {
 
 #[async_trait]
 impl AgentTool for HttpRequestTool {
+    fn invocation_review_configuration(&self) -> Option<Value> {
+        Some(serde_json::json!({
+            "backend": "reqwest",
+            "redirect_limit": self.redirect_limit,
+            "maximum_body_bytes": self.max_body_bytes,
+            "default_timeout_secs": DEFAULT_TIMEOUT_SECS,
+            "proxy": "reqwest inherited system proxy configuration",
+            "destination_isolation": false,
+        }))
+    }
+
     fn name(&self) -> &str {
         "http_request"
     }

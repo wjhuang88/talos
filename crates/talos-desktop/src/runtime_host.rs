@@ -1192,14 +1192,7 @@ impl RuntimeHost {
                                 builder = builder.hook_registry(Arc::new(hooks));
                             }
                             if let Some((sessions_dir, session_id)) = &work_source {
-                                for contribution in
-                                    talos_session::todo_tool_contributions_for_sessions_dir(
-                                        sessions_dir,
-                                        *session_id,
-                                    )
-                                {
-                                    builder = builder.tool(contribution.tool().clone());
-                                }
+                                builder = builder.session_todo_tools(sessions_dir, *session_id);
                             }
                             if let Some(session) = &durable_session {
                                 let mut hooks = talos_runtime::RuntimeHookRegistry::new();

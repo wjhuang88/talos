@@ -2,15 +2,16 @@
 
 Carrier: a generated-data Draft PR stacked on code PR #749; not independently activatable.
 
-Source: https://models.dev/api.json, fetched 2026-10-26. This is catalog evidence, not a live endpoint
+Current source: archived [2026-10-27 snapshot](../../scripts/fixtures/provider008a-models-20261027/README.md)
+from https://models.dev/api.json. Earlier dated checkpoints below describe superseded inputs. This is catalog evidence, not a live endpoint
 probe or a claim that vendor-specific authentication/transports have been implemented.
 
-- Snapshot SHA-256: `e8819dc5eceb8dfeea7212725b1f1dc933ec34e74b661100f830c8979283a159`.
-- Snapshot bytes: 5,944,295; 232 upstream providers.
+- Snapshot SHA-256: `4e97268dc7621205179df996f68a2c17a32284997d291cb8c6a29c43ffc33c74`.
+- Snapshot bytes: 5,955,477; 232 upstream providers.
 - Preserved packaged models: 6,474, with the same IDs, providers, limits, pricing, capabilities,
   release dates and variants. Provider metadata and API roots are byte-for-byte unchanged.
-- Added model protocol keys: 3,859 Chat, 38 Anthropic Messages, 119 Responses (4,016 total).
-- Withheld: 911 models absent upstream, 1,350 unsupported/unknown SDK transports, 56 model-specific
+- Added model protocol keys: 3,853 Chat, 38 Anthropic Messages, 119 Responses (4,010 total).
+- Withheld: 918 models absent upstream, 1,349 unsupported/unknown SDK transports, 56 model-specific
   endpoint overrides and 141 records whose provider API root changed upstream.
 
 The projection matches only exact `(provider, model)` identities already in the package. It uses the
@@ -164,7 +165,8 @@ uses the exact `@ai-sdk/openai` default; these are data signals, not name-based 
 ## Projection Integrity
 
 - Old catalog bytes SHA-256: `aa173e5361159000dd22a6a6bfa8b8cfa08e42e37961b736393763db5c8d02ed`.
-- New catalog bytes SHA-256: `b742393abbb56a8fd65230d7b0865b2d1deda31f65bf77c70def571e5889d0aa`.
+- Current catalog bytes SHA-256: `d339625ab3d55ca47da57f526bd18d9a0e884329d474feefae52ff6fbd8ce1f3`.
+- Historical 2026-10-26 projection bytes SHA-256: `b742393abbb56a8fd65230d7b0865b2d1deda31f65bf77c70def571e5889d0aa`.
 - Semantic SHA-256 after removing model protocol keys: `acc90a95ff8f87fbf131788548066575d02cd8e1ccb8f3545a9c62e01712947d`.
 
 The semantic digest serializes parsed TOML with Python JSON `sort_keys=True` and compact separators;
@@ -255,3 +257,72 @@ Distinct model endpoint routing remains unimplemented and withheld; it is not de
 protocol metadata. Keep Draft until current-head validation and remaining owner acceptance/residual
 disposition. Merge #749 first, then retarget/reconcile #775 onto main and revalidate. No completion,
 default activation through this unmerged PR, or release is claimed.
+
+
+## Source Recovery And Exhaustive Reprojection — 2026-10-27
+
+Independent exact-head review of data head `3aeee187` approved its structural integrity, fixed-blob
+identity, all 6,474 models and non-protocol semantics, but returned REQUEST CHANGES on source
+reproducibility: the original 2026-10-26 api.json was missing. Its hash alone could not establish that
+all admitted/withheld rows met the stated rules. Earlier source/count statements remain historical;
+no independent reconstruction of the missing old input is claimed.
+
+A fresh 2026-10-27 download differs from the old hash, so it is archived under its own date/hash at
+`scripts/fixtures/provider008a-models-20261027/api.json.gz` with the upstream MIT notice. It preserves
+all original JSON bytes after decompression. `python3 scripts/audit_provider008a_projection.py`
+works offline, checks the raw-source SHA256, verifies the original non-protocol semantic digest and
+exhaustively compares each packaged protocol key to its source admission. Standard release preflight
+runs this audit before Cargo validation; runtime and normal builds remain unchanged and offline.
+
+Reprojection withdraws exactly six Chat hints: aiand/deepseek-ai/deepseek-v4-flash,
+aiand/moonshotai/kimi-k2.7-code, aiand/zai-org/glm-5.2,
+chutes/Qwen/Qwen3-235B-A22B-Thinking-2507-TEE, chutes/Qwen/Qwen3-32B-TEE, and
+kilo/arcee-ai/trinity-large-thinking. They are now absent from upstream; their packaged models stay.
+All 119 Responses rows in the signal ledger remain identical. Current counts are **4,010 admitted**
+(3,853 Chat / 38 Messages / 119 Responses), **918 absent / 1,349 unsupported transports / 56 distinct
+model endpoints / 141 provider-root drift** withheld. Categories are exclusive: absent, unsupported
+transport, provider-root drift, distinct model endpoint, then shape admission. No unsupported shape
+rows occur. Original old projection counts remain only in dated historical checkpoints.
+
+All non-protocol catalog fields and provider metadata are unchanged. Current catalog SHA256 is
+`d339625ab3d55ca47da57f526bd18d9a0e884329d474feefae52ff6fbd8ce1f3`. The frozen count test changes
+only the Chat expected count. Source-archive/audit files intentionally expand this PR's former
+three-file boundary to make complete input-to-output review possible.
+
+### Validation And Recovery Record
+
+Before environment maintenance, the new-source five-package core/config/provider/CLI/TUI run passed
+**1,803 tests across 51 groups**, zero failed/ignored/filtered, exit 0. Independent read-only Agent
+review separately recomputed every model from the archived JSON without using the submitted audit
+function, found zero differences, verified all 119 Responses ledger rows and the upstream MIT blob,
+and returned working-source APPROVE. Source reproduction, gzip/raw hashes, full non-protocol digest,
+format and whitespace checks passed.
+
+The first complete local preflight passed static checks, governance, audit, workspace check and strict
+workspace Clippy, then failed test compilation with colliding StableCrateId values for talos_config.
+The local project build outputs were cleaned and a serial preflight started; its final verdict/log
+was lost during automated environment maintenance. It is excluded as acceptance evidence. The prior
+inherited MCP 26 passed / 21 failed record remains, and no green local full workspace claim is made.
+Published source objects survived: the restored gzip/raw/catalog hashes exactly match the reviewed
+new-source bytes above. Restored source requires final exact-head review and fresh CI; CI3480 on
+`3aeee187` is successful but predates this source archive stage. Keep Draft, code-first sequencing
+and all remaining owner/residual gates; no completion or release is claimed.
+
+
+### Current Agent Baseline Integration — 2026-10-27
+
+Merge-time inspection found main advanced to `da280c8a77b25798e59df37f3bdc2bf2fafce1c9`, with
+I308 invocation authorization/recovery changes. The combined data stage now includes code candidate
+`1388874ddff8c70de3ae651f0153cc39003a18d8`, complete code tree
+`4143c85625d4507c4c2069055f8aba4cd45eebc3`, equivalent to local `e020107b`. Independent read-only
+Agent source review approves the baseline integration: Responses/provider/config and CLI scenario
+sources stay identical to previously approved `17a3e64a`, and inherited I308 security code matches
+main exactly. Actual current-base runtime checks and fresh CI remain separate required evidence.
+
+The restored archive, audit script, updated snapshot test and catalog exactly match the independently
+reviewed source-recovery stage. Data relative to code is limited to the catalog, snapshot tests,
+ledger, offline audit, source gzip/README/MIT notice and preflight audit entry. This is an intentional
+eight-file provenance/data boundary. No different model endpoint or unsupported transport is admitted.
+Final validation and exact published-head review are recorded in the PR; code-first merge, retarget
+onto main and merge-time CAS sequencing remain required. Status stays Active/Claimed, with no
+completion or release claim.

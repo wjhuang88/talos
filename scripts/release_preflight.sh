@@ -32,6 +32,7 @@ echo "release preflight: Talos version ${workspace_version}"
 bash ./scripts/validate_collaboration_claims.sh .
 python3 ./scripts/validate_text_boundary.py .
 python3 ./scripts/test_ci_change_classifier.py
+python3 ./scripts/audit_provider008a_projection.py
 cargo fmt --all -- --check
 cargo check --locked --workspace
 cargo clippy --locked --workspace -- -D warnings

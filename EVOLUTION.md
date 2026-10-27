@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-27 - Validate feature-gated consumers after changing shared review protocols
+
+- Trigger: I308 #783 CI failed two Desktop Auto fixtures on Linux and Windows after the full default-workspace preflight passed.
+- Symptom: The provider fixture asserted the old classifier prompt/schema before the real host could consume ordinary-invocation/v1 approval.
+- Root cause: Default workspace tests do not build the Desktop binary, which requires desktop-ui; the changed shared protocol had an additional feature-gated consumer.
+- Fix: Adapt the actual Desktop provider fixture to the new bound payload and response, preserving host approval/result assertions and adding an externally checked assertion-reached counter so panic containment cannot disguise an invalid fixture.
+- Prevention: Map shared protocol changes to feature-gated consumers and run their explicit feature tests locally; default workspace success is not all-feature evidence.
+- Promoted to rule/check: Existing explicit Desktop CI jobs remain mandatory; runtime_host::auto_tests validates the ordinary schema and checks completed evidence assertions outside the assessor boundary.
+
 ## 2026-10-27 - Use logical time for offline cancellation fixtures
 
 - Trigger: CI3463 Windows failed before the I293 stand-in tool started; approval exceeded its 10ms budget.
@@ -1557,3 +1566,32 @@ visible; distinguish passed assertions from independently emitted evidence.
 - Fix: Implement the actual image trait entry and retain tool_protocol when merging configuration; verify real CLI read_image and configured Compat/Strict tool rounds.
 - Prevention: Separate durable attachments from request-local tool images, and dispatch configuration through the real binary. A TTL guard alone does not satisfy no automatic image repost.
 - Promoted to rule/check: responses_tool_image_is_sent_once_through_real_agent, responses_compat_tool_round_through_real_agent, responses_strict_tool_round_through_real_agent and tool_image_is_never_automatically_reposted_after_503.
+
+## 2026-10-27 - Preserve presentation behavior across Auto protocol changes
+
+- Trigger: #783 workspace CI failed real REPL locale acceptance after Desktop
+  fixtures had already been migrated to ordinary invocation review.
+- Root cause: protocol routing changed without preserving the old branch's
+  session-language and actionable human-decision presentation. An additional
+  external acceptance fixture still recognized only the old protocol.
+- Repair: restore the existing locale detector and sanitized explanation renderer
+  for ordinary review; keep locale separate from authorization identity and
+  reject stale/unbound presentation. Migrate real REPL/TUI fixtures while keeping
+  their original user-visible language, resume and manual-Deny assertions.
+- Check: passing unit/default-workspace tests do not prove optional Desktop or
+  real REPL/TUI acceptance. Audit all consumers of a replaced protocol before
+  publishing the next stable stage; fixture changes alone cannot close a lost
+  product behavior. Local acceptance passes; fresh remote gates remain required.
+
+
+## 2026-10-27 - Validate retained-handle platform semantics
+
+- Trigger: native Windows CI rejected rename in three directory freshness tests.
+- Cause: Unix replacement assumptions were copied to Windows without checking
+  cap-std's intentional no-FILE_SHARE_DELETE handle contract. Compile-only xwin
+  checks cannot detect native filesystem behavior.
+- Repair/check: preserve the upstream invariant; assert blocked replacement and
+  unchanged execution on Windows, replacement detection/refusal on Unix, and
+  successful rename after releasing the Windows identity handle. Assert hook
+  completion outside panic containment. Keep native Windows CI as required
+  runtime evidence, separate from cross-compilation.

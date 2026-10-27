@@ -5363,7 +5363,6 @@ image_input = true
 [[models]]
 id = "deepseek-ai/deepseek-v4-flash"
 provider = "aiand"
-protocol = "openai-chat"
 context_limit = 1048576
 output_limit = 384000
 release_date = "2026-04-24"
@@ -5415,7 +5414,6 @@ image_input = true
 [[models]]
 id = "moonshotai/kimi-k2.7-code"
 provider = "aiand"
-protocol = "openai-chat"
 context_limit = 262144
 output_limit = 262144
 release_date = "2026-06-12"
@@ -5506,7 +5504,6 @@ image_input = true
 [[models]]
 id = "zai-org/glm-5.2"
 provider = "aiand"
-protocol = "openai-chat"
 context_limit = 1048576
 output_limit = 131072
 release_date = "2026-06-13"
@@ -16198,7 +16195,6 @@ reasoning = true
 [[models]]
 id = "Qwen/Qwen3-235B-A22B-Thinking-2507-TEE"
 provider = "chutes"
-protocol = "openai-chat"
 context_limit = 262144
 output_limit = 262144
 release_date = "2025-07"
@@ -16216,7 +16212,6 @@ reasoning = true
 [[models]]
 id = "Qwen/Qwen3-32B-TEE"
 provider = "chutes"
-protocol = "openai-chat"
 context_limit = 40960
 output_limit = 40960
 release_date = "2025-04"
@@ -42930,7 +42925,6 @@ image_input = true
 [[models]]
 id = "arcee-ai/trinity-large-thinking"
 provider = "kilo"
-protocol = "openai-chat"
 context_limit = 262144
 output_limit = 80000
 release_date = "2026-04-01"

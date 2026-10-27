@@ -26,6 +26,11 @@ HISTORIES = {
 }
 
 
+def review_payload(content):
+    """Decode the real ordinary protocol or the retained legacy review envelope."""
+    return json.loads(content if content.lstrip().startswith("{") else content.split("\n", 1)[1])
+
+
 class Fixture(http.server.BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
@@ -33,16 +38,30 @@ class Fixture(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         messages = body["messages"]
-        if "permission risk assessor" in messages[0].get("content", ""):
-            payload = json.loads(messages[-1]["content"].split("\n", 1)[1])
+        system = messages[0].get("content", "")
+        ordinary = '"schema":"ordinary-invocation/v1"' in system
+        if ordinary or "permission risk assessor" in system:
+            payload = review_payload(messages[-1]["content"])
+            if ordinary:
+                assert payload["schema"] == "ordinary-invocation/v1"
+                assert payload["tool"] == "bash"
+                assert payload["input"] == {"command": "pwd"}
+                assert payload["user_intent"] == "LOCALE_PROBE"
+                assert isinstance(payload["configuration"], dict)
+                assert payload["directory_identity"]
+                assert payload["request_digest"].startswith("sha256:")
             self.server.reviews.put(body)
             point = POINTS[payload["locale"].split("-")[0]]
-            text = json.dumps({
-                "schema_version": 1, "request_digest": payload["request_digest"],
-                "decision": "human_required", "effect": "unknown",
-                "reason_code": "uncertain", "confidence": "low",
+            response = {
+                "request_digest": payload["request_digest"],
+                "decision": "human_required", "confidence": "low",
                 "effect_summary": point, "decision_points": [point],
-            }, ensure_ascii=False)
+            }
+            if ordinary:
+                response["schema"] = payload["schema"]
+            else:
+                response.update(schema_version=1, effect="unknown", reason_code="uncertain")
+            text = json.dumps(response, ensure_ascii=False)
             delta, finish = {"content": text}, "stop"
         elif messages[-1].get("role") == "user" and messages[-1].get("content") == "LOCALE_PROBE":
             delta = {"tool_calls": [{
@@ -142,7 +161,7 @@ def review(client, server, language, history):
     request = server.reviews.get(timeout=2)
     assert server.reviews.empty(), "one assessment per approval"
     content = request["messages"][-1]["content"]
-    payload = json.loads(content.split("\n", 1)[1])
+    payload = review_payload(content)
     assert payload["locale"] == language, payload
     serialized = json.dumps(request["messages"], ensure_ascii=False)
     assert all(value not in serialized for value in HISTORIES.values()), "history must not be replayed to assessor"

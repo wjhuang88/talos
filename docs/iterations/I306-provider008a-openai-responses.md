@@ -408,3 +408,20 @@ and visible text directly without printing encrypted payloads. This working-sour
 not final-head CI/merge approval. The source correction is published as one stable stage after
 complete tree verification; new head and relevant data baseline require fresh CI/review. Neither
 I306 nor #748 is Complete, and no release is claimed.
+
+
+### Current Main Integration Checkpoint — 2026-10-27
+
+Code head `17a3e64a` completed CI3479 / run40455281573 with all eight jobs successful,
+including full macOS preflight, native Windows workspace/Desktop and Linux Desktop. Its independent
+exact-head Agent technical review APPROVE closed the three original blockers. Data head `3aeee187`
+also completed CI3480, but a separate data review required archived source input. The source recovery
+stage is retained in the data PR ledger and does not relabel prior source evidence.
+
+Merge-time inspection found main advanced to `da280c8a77b25798e59df37f3bdc2bf2fafce1c9`, including
+I308 invocation authorization/recovery changes affecting actual Agent tool execution. Integrate that
+already-reviewed main before the next stable candidate rather than infer current-base behavior from
+CI3479. Preserve main's permission/security implementation without authoring changes in that scope.
+The only textual merge conflict was appended EVOLUTION lessons; both sides are retained. Actor,
+claim and Work Slice are unchanged. Fresh exact-head CI and independent relevant-base review apply.
+No completion, sibling implementation, release or success of interrupted local validation is claimed.

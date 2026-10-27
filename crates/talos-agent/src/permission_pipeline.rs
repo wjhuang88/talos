@@ -123,7 +123,7 @@ impl BuiltinNetworkReviewEvidence<'_> {
 
 enum InvocationReviewSource<'a> {
     Network(&'a ToolNetworkManifest, bool),
-    Builtin(&'a str),
+    Builtin(&'a str, Option<&'a serde_json::Value>),
     FileMutation(&'a talos_core::tool::PreparedFileMutationEvidence),
 }
 
@@ -155,9 +155,14 @@ pub struct BuiltinInvocationReviewEvidence<'a> {
     profile: &'a [ToolPermissionFacet],
     description: &'a str,
     working_directory: Option<&'a std::path::Path>,
+    configuration: Option<&'a serde_json::Value>,
 }
 
 impl BuiltinInvocationReviewEvidence<'_> {
+    /// Frozen implementation configuration; absent evidence cannot enable broad review.
+    pub fn configuration(&self) -> Option<&serde_json::Value> {
+        self.configuration
+    }
     /// Exact normalized execution arguments, never presentation projections.
     pub fn input(&self) -> &serde_json::Value {
         self.input
@@ -624,13 +629,14 @@ impl PermissionPipeline {
         user_intent: Option<&str>,
         working_directory: Option<&std::path::Path>,
         description: &str,
+        configuration: Option<&serde_json::Value>,
     ) -> Result<Vec<ToolExecutionAuthorization>, PermissionPipelineError> {
         self.authorize_inner(
             authorization,
             user_intent,
             working_directory,
             None,
-            Some(InvocationReviewSource::Builtin(description)),
+            Some(InvocationReviewSource::Builtin(description, configuration)),
         )
         .await?
         .into_paths()
@@ -651,7 +657,9 @@ impl PermissionPipeline {
             Some(InvocationReviewSource::Network(manifest, builtin)) => {
                 (Some((manifest, builtin)), None, None)
             }
-            Some(InvocationReviewSource::Builtin(description)) => (None, Some(description), None),
+            Some(InvocationReviewSource::Builtin(description, configuration)) => {
+                (None, Some((description, configuration)), None)
+            }
             Some(InvocationReviewSource::FileMutation(evidence)) => (None, None, Some(evidence)),
             None => (None, None, None),
         };
@@ -672,6 +680,11 @@ impl PermissionPipeline {
             .state_snapshot()
             .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
         let mut request = PermissionRequest::new(tool_name, provenance.clone(), profile, input);
+        if builtin_description.is_some()
+            && matches!(tool_name, "bash" | "powershell" | "exec" | "http_request")
+        {
+            request = request.with_transitive_effects();
+        }
         if let Some(manifest) = network_manifest {
             request = request.with_network_manifest(manifest);
         }
@@ -763,7 +776,7 @@ impl PermissionPipeline {
                         user_intent,
                     ))
                     .catch_unwind()
-                } else if let Some(description) = builtin_description {
+                } else if let Some((description, configuration)) = builtin_description {
                     std::panic::AssertUnwindSafe(resolver.resolve_builtin_invocation(
                         approval,
                         BuiltinInvocationReviewEvidence {
@@ -771,6 +784,7 @@ impl PermissionPipeline {
                             profile,
                             description,
                             working_directory,
+                            configuration,
                         },
                         remaining,
                         auto_assessment_allowed,

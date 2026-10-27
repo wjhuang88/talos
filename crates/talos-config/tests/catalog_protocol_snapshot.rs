@@ -77,7 +77,7 @@ fn frozen_projection_counts_and_existing_provider_root_are_preserved() {
     let models = data["models"].as_array().expect("models");
     assert_eq!(models.len(), 6474);
     for (protocol, count) in [
-        ("openai-chat", 3859),
+        ("openai-chat", 3853),
         ("anthropic-messages", 38),
         ("openai-responses", 119),
     ] {

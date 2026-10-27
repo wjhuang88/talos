@@ -320,6 +320,20 @@ their existing fail-closed behavior for unresolved `Ask` decisions; enabling `au
 not silently grant those surfaces model authority. Disabling auto always returns an interactive
 surface to human approval and a headless surface to denial.
 
+Product-owned `bash`/`powershell`, `exec` and ordinary `http_request` requests can
+receive one-use Auto approval of the complete invocation and its transitive effects.
+Review binds the exact arguments, current intent, implementation configuration and
+starting directory identity where applicable. Commands may run other programs,
+change files and access the network; HTTP may follow redirects and inherited proxies.
+This approval does not isolate every affected path or destination or provide rollback.
+An Exec step may create a later step's directory; unresolved initial directories are
+explicitly disclosed for review. Explicit Deny, mandatory-human rules and incompatible
+fine-grained restrictions still take precedence. Uncertain, sensitive, oversized or
+stale requests fall back to human approval (or denial without an interactive resolver).
+External tools do not gain this route through matching names. WebSearch and tools
+requiring prepared-network authority retain their separate admission and cannot
+fall back to ordinary HTTP approval.
+
 Product-owned new-file `write` requests now send the exact bounded contents and current
 user intent to a separate tool-free Auto review. The existing direct-workspace-child,
 text-file and atomic-create capability restrictions remain. The complete review payload
@@ -1025,6 +1039,10 @@ linking Talos CLI or TUI crates. The initial pre-1.0 facade exposes `RuntimeBuil
 `RuntimeHandle` for provider/tool injection, typed event streaming, interruption, shutdown, and
 explicit request previews. Embedders can also provide approval handlers and customize or append the
 runtime system prompt through `RuntimeBuilder`.
+
+`RuntimeBuilder::session_todo_tools(sessions_dir, session_id)` constructs the native Todo group
+for an explicit session while retaining its built-in identity. It grants no permissions;
+registering a replacement through `.tool()` never transfers built-in identity to that replacement.
 
 Runtime shutdown is bounded and shareable. `RuntimeHandle::shutdown_controller()` returns a
 cloneable shutdown-only controller; `ShutdownOptions` selects `FinishCurrent` or `Interrupt` under
