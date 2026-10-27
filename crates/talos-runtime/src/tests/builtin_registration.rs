@@ -67,33 +67,6 @@ fn repeated_shared_registration_keeps_builtin_winners() {
 }
 
 #[test]
-fn session_todo_factory_preserves_identity_without_promoting_caller_instances() {
-    let directory = tempfile::tempdir().expect("sessions");
-    let session_id = uuid::Uuid::new_v4();
-    let caller =
-        talos_session::todo_tool_contributions_for_sessions_dir(directory.path(), session_id)
-            .remove(0)
-            .tool()
-            .clone();
-    let name = caller.name().to_owned();
-    for caller_last in [false, true] {
-        let builder = if caller_last {
-            RuntimeBuilder::new()
-                .session_todo_tools(directory.path(), session_id)
-                .tool(caller.clone())
-        } else {
-            RuntimeBuilder::new()
-                .tool(caller.clone())
-                .session_todo_tools(directory.path(), session_id)
-        };
-        let (registry, _) = register_runtime_tools(builder.tools).expect("registration");
-        assert_eq!(registry.is_builtin_instance(&name), !caller_last);
-        assert!(registry.is_builtin_instance("todo_query"));
-        assert!(registry.is_builtin_instance("todo_update"));
-    }
-}
-
-#[test]
 fn overridden_caller_owners_are_retained_and_deduplicated() {
     let first = Arc::new(Owner);
     let second = Arc::new(Owner);

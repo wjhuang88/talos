@@ -2047,6 +2047,7 @@ pub async fn collect_until_turn_completed(
 mod tests {
     mod builtin_registration;
     mod network_invocation;
+    mod session_todo;
     mod skill_disclosure;
     use std::sync::Mutex as StdMutex;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
