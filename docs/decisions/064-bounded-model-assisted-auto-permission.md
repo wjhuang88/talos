@@ -363,3 +363,7 @@ Existing registration APIs and struct literals remain source compatible. Product
 composition opts into the new API only for product-owned implementations/wrappers;
 external registrations retain their prior behavior. This note does not claim complete
 I308 coverage or relax the higher-risk recovery requirements.
+
+## 2026-10-27 Maintainer Amendment: Ordinary Native Invocation
+
+The maintainer explicitly accepted the complete boundary and delivery criteria in [I308 ordinary native invocation authorization](../proposals/i308-native-invocation-authorization.md). Suitable implementation-owned ordinary Shell/Exec/HTTP Ask requests may receive model AllowOnce for the frozen invocation and its ordinary transitive effects, without claiming exhaustive per-path or per-destination confinement. Explicit Deny, mandatory-human policy and incompatible finer-grained restrictions remain authoritative; the proposal requires the compatibility guard before deterministic Allow and model/human Ask. Preserve identity/freshness binding, one-use admission, supervision and truthful partial-failure reports. I293/ADR-090-owned search and protected prepared-network operations cannot downgrade to this route. Acceptance authorizes implementation only: production behavior, tests, platform evidence, independent review and merge remain outstanding.

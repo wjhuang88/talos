@@ -1,7 +1,8 @@
 # I308 ordinary native invocation Auto authorization
 
-Status: Proposed; maintainer decision pending. No implementation authority or
-runtime behavior is established by this document.
+Status: Accepted by the maintainer on 2026-10-27 in this handoff session.
+This authorizes implementation of the exact scope below; runtime behavior remains
+unimplemented until the acceptance evidence is established.
 
 Owner: [I308](../iterations/I308-builtin-auto-review.md), PERM-007-H / handoff T8.
 

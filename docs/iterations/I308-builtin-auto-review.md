@@ -1105,3 +1105,7 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - Full T8 and the original handoff remain incomplete. Ordinary invocation authorization remains a maintainer decision; Desktop Todo factory registration and the remaining operation/profile/platform matrix are not implemented by this checkpoint.
 
 - During retry, reclaimed 96 executable files older than six hours under authorized root `target/debug/deps` (2,485,667,936 logical bytes), excluding shared libraries and current compilation outputs. Available space recovered to 3.0 GiB; workspace tests are now executing. No source or Git data was removed.
+
+- Correction: the retry exited 101 because the age-based executable cleanup removed a still-required cached `talos_config` test binary after Cargo had scheduled it. The earlier assertion that old outputs were safe during an active build was incorrect. This was an agent cleanup error, not a product test failure. Do not remove artifacts during any Cargo run; the next full retry must rebuild missing outputs. Code review APPROVE covers base `326e05751` to `f5d724896`, with no independent builds; final documentation, CI and CAS remain pending.
+
+- 2026-10-27: maintainer explicitly accepted the ordinary Shell/Exec/HTTP whole-invocation authorization proposal. ADR-064 records this scope decision; earlier pending-decision checkpoints are historical. Implementation and its full acceptance remain outstanding; search is excluded under I293/ADR-090.
