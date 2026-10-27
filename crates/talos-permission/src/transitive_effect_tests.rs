@@ -129,7 +129,7 @@ fn unknown_effect_denies_precede_deterministic_allow() {
 }
 
 #[test]
-fn explicit_unknown_effect_ask_remains_human_only() {
+fn explicit_unknown_effect_scoped_ask_is_terminal() {
     let mut engine = PermissionEngine::empty();
     engine.add_rule(PermissionRule::new_nature(
         ToolNature::Execute,
@@ -147,7 +147,7 @@ fn explicit_unknown_effect_ask_remains_human_only() {
     let facets = [ToolPermissionFacet::new(ToolNature::Execute)];
     let request = PermissionRequest::native("exec", &facets, &input).with_transitive_effects();
     let report = engine.evaluate_request(&request, &PermissionContext::compatibility());
-    assert_eq!(report.outcome(), PermissionOutcome::Ask);
+    assert_eq!(report.outcome(), PermissionOutcome::Deny);
     assert!(matches!(
         report.facets()[0].source(),
         PermissionDecisionSource::Rule {
@@ -196,4 +196,78 @@ fn broad_approval_is_once_only_and_cannot_be_reused_without_effect_binding() {
             PermissionInvocation::Ask { .. }
         ));
     }
+}
+
+#[test]
+fn scoped_human_checkpoints_cannot_be_waived_for_ordinary_transitive_effects() {
+    let input = serde_json::json!({"command": "program"});
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Execute,
+        "program",
+        ToolResourceKind::Command,
+    )];
+    let request = PermissionRequest::native("exec", &facets, &input).with_transitive_effects();
+    for rule in [
+        PermissionRule::new_nature(
+            ToolNature::Write,
+            Some("hidden/**".into()),
+            None,
+            PermissionDecision::Ask,
+        ),
+        PermissionRule::new("write", Some("hidden/**".into()), PermissionDecision::Ask),
+    ] {
+        let mut engine = PermissionEngine::new();
+        engine.add_rule(rule);
+        let state = PermissionSessionState::new(engine);
+        assert!(matches!(
+            state
+                .begin_invocation(&request, &PermissionContext::compatibility())
+                .expect("evaluate"),
+            PermissionInvocation::Deny(_)
+        ));
+        assert!(
+            state
+                .propose(
+                    &request,
+                    &PermissionContext::compatibility(),
+                    GrantScope::Once
+                )
+                .is_err()
+        );
+    }
+}
+
+#[test]
+fn unscoped_human_checkpoint_remains_approvable_once() {
+    let input = serde_json::json!({"command": "program"});
+    let facets = [ToolPermissionFacet::with_resource(
+        ToolNature::Execute,
+        "program",
+        ToolResourceKind::Command,
+    )];
+    let request = PermissionRequest::native("exec", &facets, &input).with_transitive_effects();
+    let context = PermissionContext::compatibility();
+    let mut engine = PermissionEngine::new();
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Execute,
+        None,
+        None,
+        PermissionDecision::Ask,
+    ));
+    let state = PermissionSessionState::new(engine);
+    let PermissionInvocation::Ask { once, .. } = state
+        .begin_invocation(&request, &context)
+        .expect("evaluate")
+    else {
+        panic!("human checkpoint");
+    };
+    let pending = state
+        .approve_once(*once, &request, &context)
+        .expect("human approval");
+    state
+        .try_admit_invocation(pending, &request, &context)
+        .expect("admit")
+        .consume_for(&request)
+        .expect("consume once");
+    assert_eq!(state.grant_count().expect("grants"), 0);
 }

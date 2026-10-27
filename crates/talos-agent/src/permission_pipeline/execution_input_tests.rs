@@ -371,7 +371,6 @@ async fn ordinary_invocation_restrictions_precede_deterministic_allow() {
                 None,
                 PermissionDecision::Allow,
             ));
-            let human_only = matches!(restriction, PermissionDecision::Ask);
             engine.add_rule(PermissionRule::new_nature(
                 ToolNature::Write,
                 Some("undisclosed-output/**".into()),
@@ -411,11 +410,7 @@ async fn ordinary_invocation_restrictions_precede_deterministic_allow() {
                 )
                 .await;
             assert!(
-                if human_only {
-                    matches!(result, Err(PermissionPipelineError::ResolverUnavailable))
-                } else {
-                    matches!(result, Err(PermissionPipelineError::Denied(_)))
-                },
+                matches!(result, Err(PermissionPipelineError::Denied(_))),
                 "{tool}: {result:?}"
             );
             assert_eq!(state.grant_count().expect("grants"), 0);

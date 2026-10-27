@@ -354,7 +354,7 @@ impl PermissionEngine {
         let mut reports = Vec::with_capacity(facets.len());
         let transitive_restriction = request
             .transitive_effects()
-            .then(|| self.transitive_effect_restriction())
+            .then(|| self.ordinary_transitive_effect_restriction())
             .flatten();
 
         for (facet_index, facet) in facets.iter().enumerate() {
