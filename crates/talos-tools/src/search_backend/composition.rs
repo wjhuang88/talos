@@ -10,14 +10,20 @@ use talos_core::tool::{
     ToolNetworkAuthority, ToolNetworkManifest, ToolNetworkScope, ToolPermissionFacet,
 };
 use thiserror::Error;
+use tokio::time::Instant;
 
 use super::transport::compatibility::{
     CompatibilityError,
+    chain::CompatibilityChainError,
     plan::{CompatibilityPlanError, DirectCompatibilityConfiguration, PreparedCompatibilityPlan},
     searxng::{PreparedSearXng, SearXngConfiguration, SearXngError},
+    shared_budget_deadline,
 };
 use super::transport::{TransportBudget, TransportError, TransportLimits};
-use super::{SearchBackendId, SearchBackendResult};
+use super::{
+    SearchBackendError, SearchBackendId, SearchBackendResult, bing_parser::BingParseError,
+    ddg_parser::DdgParseError,
+};
 
 /// Stable query-independent configuration for the dormant public-search candidate set.
 pub(crate) struct SearchCompositionConfiguration {
@@ -79,6 +85,7 @@ impl SearchCompositionConfiguration {
             facets,
             candidates,
             limits,
+            max_results,
         })
     }
 }
@@ -120,6 +127,7 @@ pub(crate) struct PreparedSearchComposition {
     facets: Vec<ToolPermissionFacet>,
     candidates: Vec<PreparedSearchCandidate>,
     limits: TransportLimits,
+    max_results: u32,
 }
 
 impl std::fmt::Debug for PreparedSearchComposition {
@@ -153,13 +161,18 @@ impl PreparedSearchComposition {
                 budget: budget.clone(),
             })
             .collect();
-        RunningSearchComposition { budget, candidates }
+        RunningSearchComposition {
+            budget,
+            candidates,
+            max_results: self.max_results,
+        }
     }
 }
 
 pub(crate) struct RunningSearchComposition {
     budget: Arc<TransportBudget>,
     candidates: Vec<RunningSearchCandidate>,
+    max_results: u32,
 }
 
 impl std::fmt::Debug for RunningSearchComposition {
@@ -180,6 +193,16 @@ impl std::fmt::Debug for RunningSearchComposition {
 impl RunningSearchComposition {
     pub(crate) fn candidates(&self) -> &[RunningSearchCandidate] {
         &self.candidates
+    }
+
+    /// Exact monotonic deadline owned by the already-running shared transport budget.
+    pub(crate) fn deadline(&self) -> Instant {
+        shared_budget_deadline(&self.budget)
+    }
+
+    /// Frozen result count shared by every candidate; Router receives no replacement request.
+    pub(crate) fn requested_results(&self) -> usize {
+        self.max_results as usize
     }
 
     pub(crate) fn into_candidates(self) -> Vec<RunningSearchCandidate> {
@@ -256,6 +279,90 @@ pub(crate) enum SearchCandidateExecutionError {
     SearXng(SearXngError),
 }
 
+impl SearchCandidateExecutionError {
+    /// Collapse controlled transport/parser details into the existing private backend taxonomy.
+    /// Router deadline/cancellation still win as enclosing control outcomes.
+    pub(crate) fn into_backend_error(self) -> SearchBackendError {
+        match self {
+            Self::Compatibility(error) => compatibility_plan_backend_error(error),
+            Self::SearXng(error) => searxng_backend_error(error),
+        }
+    }
+}
+
+fn transport_backend_error(error: TransportError) -> SearchBackendError {
+    match error {
+        TransportError::Dns | TransportError::ConnectionRefused => SearchBackendError::Unreachable,
+        TransportError::Deadline => SearchBackendError::Timeout,
+        TransportError::ResponseEncoding => SearchBackendError::Parse,
+        TransportError::InvalidRequest
+        | TransportError::Unauthorized
+        | TransportError::UnsupportedProxy
+        | TransportError::Address
+        | TransportError::Redirect
+        | TransportError::RequestLimit
+        | TransportError::ResponseLimit
+        | TransportError::Request => {
+            SearchBackendError::RequestFailed("controlled search transport failed".into())
+        }
+    }
+}
+
+fn compatibility_backend_error(error: CompatibilityError) -> SearchBackendError {
+    match error {
+        CompatibilityError::Transport(error) => transport_backend_error(error),
+        CompatibilityError::Ddg(error) => match error {
+            DdgParseError::Empty => SearchBackendError::NoResults,
+            DdgParseError::Encoding | DdgParseError::Limit | DdgParseError::Parse => {
+                SearchBackendError::Parse
+            }
+            DdgParseError::Status | DdgParseError::Challenge => SearchBackendError::RequestFailed(
+                "duckduckgo compatibility source unavailable".into(),
+            ),
+        },
+        CompatibilityError::Bing(error) => match error {
+            BingParseError::Empty => SearchBackendError::NoResults,
+            BingParseError::RateLimited => SearchBackendError::RateLimited,
+            BingParseError::Encoding | BingParseError::Limit | BingParseError::Parse => {
+                SearchBackendError::Parse
+            }
+            BingParseError::Status | BingParseError::Challenge => {
+                SearchBackendError::RequestFailed("bing compatibility source unavailable".into())
+            }
+        },
+        // Admission failures are already inside the controlled candidate boundary. Preserve a
+        // conservative semantic failure rather than guessing a backend availability condition.
+        CompatibilityError::Admission(_) => SearchBackendError::Parse,
+    }
+}
+
+fn compatibility_plan_backend_error(error: CompatibilityPlanError) -> SearchBackendError {
+    match error {
+        CompatibilityPlanError::Transport(error) => transport_backend_error(error),
+        CompatibilityPlanError::Chain(CompatibilityChainError::Terminal { error, .. }) => {
+            compatibility_backend_error(error)
+        }
+        CompatibilityPlanError::Chain(CompatibilityChainError::Exhausted(errors)) => {
+            let mapped = errors.map(compatibility_backend_error);
+            let first = mapped[0].clone();
+            if mapped.iter().all(|error| error == &first) {
+                first
+            } else {
+                SearchBackendError::RequestFailed("compatibility sources exhausted".into())
+            }
+        }
+    }
+}
+
+fn searxng_backend_error(error: SearXngError) -> SearchBackendError {
+    match error {
+        SearXngError::Transport(error) => transport_backend_error(error),
+        SearXngError::Admission(error) => compatibility_backend_error(error),
+        SearXngError::Status => SearchBackendError::RequestFailed("searxng status failure".into()),
+        SearXngError::Parse | SearXngError::Limit => SearchBackendError::Parse,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,7 +413,7 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_shares_one_budget_across_all_prepared_candidates() {
+    fn dispatch_shares_one_budget_deadline_and_requested_count() {
         let searxng = SearXngConfiguration::new("https://search.example/").expect("searxng");
         let configuration = SearchCompositionConfiguration::new(Some(searxng)).expect("config");
         let prepared = configuration
@@ -318,6 +425,8 @@ mod tests {
         assert_eq!(running.candidates().len(), 2);
         assert_eq!(running.candidates()[0].id(), SearchBackendId::DuckDuckGo);
         assert_eq!(running.candidates()[1].id(), SearchBackendId::SearXng);
+        assert_eq!(running.requested_results(), 2);
+        assert_eq!(running.deadline(), shared_budget_deadline(running.budget()));
         for candidate in running.candidates() {
             assert!(Arc::ptr_eq(running.budget(), candidate.budget()));
         }
@@ -334,5 +443,25 @@ mod tests {
         let running = prepared.start(Arc::new(RejectAuthority));
         assert_eq!(running.candidates().len(), 1);
         assert_eq!(running.candidates()[0].id(), SearchBackendId::DuckDuckGo);
+    }
+
+    #[test]
+    fn execution_errors_map_without_guessing_router_control() {
+        assert_eq!(
+            SearchCandidateExecutionError::SearXng(SearXngError::Transport(
+                TransportError::Deadline
+            ))
+            .into_backend_error(),
+            SearchBackendError::Timeout
+        );
+        assert_eq!(
+            SearchCandidateExecutionError::SearXng(SearXngError::Transport(TransportError::Dns))
+                .into_backend_error(),
+            SearchBackendError::Unreachable
+        );
+        assert_eq!(
+            SearchCandidateExecutionError::SearXng(SearXngError::Parse).into_backend_error(),
+            SearchBackendError::Parse
+        );
     }
 }

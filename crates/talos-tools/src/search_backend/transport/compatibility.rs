@@ -17,14 +17,21 @@ pub(in crate::search_backend) mod searxng;
 use crate::search_backend::{SearchBackendId, bing_parser, ddg_parser, instant_answer};
 use talos_core::tool::ToolNetworkScope;
 use thiserror::Error;
+use tokio::time::Instant;
 
 use admission::{AdmissionError, AdmittedCompatibilityResults};
 
 use super::{
     BodyFormat, Method, PreparedTransportRequest, SearchTransport, ToolNetworkEndpoint,
-    ToolNetworkManifest, TransportError, TransportResponse, Url, encode_form_with_limit,
-    request_endpoint,
+    ToolNetworkManifest, TransportBudget, TransportError, TransportResponse, Url,
+    encode_form_with_limit, request_endpoint,
 };
+
+/// Exposes the exact running budget deadline to the dormant router integration.
+/// The budget remains transport-owned; callers cannot replace or extend this clock.
+pub(in crate::search_backend) fn shared_budget_deadline(budget: &TransportBudget) -> Instant {
+    budget.deadline
+}
 
 /// A shared manifest may add candidate endpoints, but it must not widen global transport policy.
 /// Private-address exceptions, proxy selection and redirect allowance apply to the whole manifest,
