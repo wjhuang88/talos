@@ -78,9 +78,21 @@ async fn child(scenario: String) {
     let results = Arc::new(AtomicUsize::new(0));
     let root = tempfile::tempdir().expect("workspace");
     let mut registry = ToolRegistry::new();
-    registry
-        .register_builtin_contributions(talos_tools::network_tool_contributions())
-        .expect("production contributions");
+    if scenario != "external" {
+        registry
+            .register_builtin_contributions(talos_tools::network_tool_contributions())
+            .expect("production contributions");
+    }
+    if matches!(scenario.as_str(), "external" | "replacement") {
+        let contributions = talos_tools::network_tool_contributions();
+        let tool = contributions
+            .iter()
+            .find(|entry| entry.name() == "http_request")
+            .expect("production HTTP")
+            .tool()
+            .clone();
+        registry.register(tool);
+    }
     let mut engine = PermissionEngine::with_workspace_root(root.path().to_owned());
     if matches!(scenario.as_str(), "deny" | "human") {
         engine.add_rule(talos_permission::PermissionRule::new(
@@ -93,7 +105,10 @@ async fn child(scenario: String) {
             },
         ));
     }
-    let expected_calls = usize::from(!matches!(scenario.as_str(), "deny" | "human"));
+    let expected_calls = usize::from(!matches!(
+        scenario.as_str(),
+        "deny" | "human" | "external" | "replacement"
+    ));
     let state = Arc::new(talos_permission::PermissionSessionState::new(engine));
     let calls = Arc::new(AtomicUsize::new(0));
     let reached = Arc::new(AtomicUsize::new(0));
@@ -190,7 +205,16 @@ async fn real_http_auto_controls_proxy_and_redirect_effects() {
         child(scenario).await;
         return;
     }
-    for scenario in ["allow", "uncertain", "error", "stale", "deny", "human"] {
+    for scenario in [
+        "allow",
+        "uncertain",
+        "error",
+        "stale",
+        "deny",
+        "human",
+        "external",
+        "replacement",
+    ] {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .expect("proxy");
