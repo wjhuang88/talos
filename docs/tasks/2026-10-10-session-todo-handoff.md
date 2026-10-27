@@ -1,3 +1,7 @@
+## T8 ordinary invocation stage merged — 2026-10-27
+
+PR #783 merged as `da280c8a77b25798e59df37f3bdc2bf2fafce1c9` after exact-head CI 40482737690 passed all eight checks, local full locked preflight, both governance validators, independent permission/security/API review and final CAS. Ordinary Shell/Exec/HTTP now use the accepted whole-invocation Auto boundary; accepted search coexistence #782 is also merged. Fetch URL follow-up is locally implemented and under full validation; Save URL/search and remaining complete profile/operation acceptance stay outstanding. T8 remains Partial. T2/T3 → T4 → T5 → T1 → T6 remain incomplete and unchanged.
+
 ## T8 ordinary invocation candidate — 2026-10-27
 
 PR #783 remains open, based on main `85ac39b48`. Search/ordinary authorization
