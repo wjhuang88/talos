@@ -1,7 +1,7 @@
 use crate::{
-    Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ModelConfig, ProviderConfig,
-    ProviderProtocol, builtin_provider_config, home_dir, model, normalize_provider_endpoint,
-    opencode,
+    Config, ConfigError, ConfigStore, ConfigUnsetOutcome, Credentials, ModelConfig,
+    ProtocolResolution, ProviderConfig, ProviderProtocol, builtin_provider_config, home_dir, model,
+    normalize_provider_endpoint, opencode, resolve_config_provider_protocol,
 };
 use std::env;
 use std::path::PathBuf;
@@ -152,10 +152,29 @@ impl Config {
         self.active_provider_config().base_url
     }
 
-    /// Returns the active provider protocol.
+    /// Returns the effective wire protocol used by provider construction.
     #[must_use]
     pub fn provider_protocol(&self) -> ProviderProtocol {
-        self.active_provider_config().protocol
+        self.resolve_provider_protocol().protocol
+    }
+
+    /// Resolves the provider wire protocol without endpoint probing or cross-protocol retry.
+    ///
+    /// Model and provider overrides, catalog evidence and confirmed defaults use the same
+    /// precedence as the runtime adapter factory.
+    #[must_use]
+    pub fn resolve_provider_protocol(&self) -> ProtocolResolution<ProviderProtocol> {
+        resolve_config_provider_protocol(self)
+    }
+
+    /// Resolves another model's protocol for selection previews without changing the active model.
+    #[must_use]
+    pub fn resolve_model_protocol(
+        &self,
+        provider: &str,
+        model: &str,
+    ) -> ProtocolResolution<ProviderProtocol> {
+        crate::protocol_resolution::resolve_model_provider_protocol(self, provider, model)
     }
 
     #[must_use]
@@ -295,25 +314,34 @@ impl Config {
     pub fn active_provider_config(&self) -> ProviderConfig {
         let mut config = builtin_provider_config(&self.provider).unwrap_or_default();
         if let Some(user_config) = self.providers.get(&self.provider) {
-            if !matches!(user_config.protocol, ProviderProtocol::OpenAIChat)
-                || builtin_provider_config(&self.provider).is_none()
-            {
+            let protocol_explicit = !user_config.protocol.is_unspecified();
+            if protocol_explicit {
                 config.protocol = user_config.protocol.clone();
             }
             if user_config.base_url.is_some() {
-                let endpoint = normalize_provider_endpoint(
-                    user_config.base_url.as_deref().unwrap_or_default(),
-                );
-                if endpoint.protocol == ProviderProtocol::AnthropicMessages
+                let raw_base_url = user_config.base_url.as_deref().unwrap_or_default();
+                let endpoint = normalize_provider_endpoint(raw_base_url);
+                if protocol_explicit {
+                    let compatible_normalization = matches!(
+                        (&user_config.protocol, &endpoint.protocol),
+                        (
+                            ProviderProtocol::AnthropicMessages,
+                            ProviderProtocol::AnthropicMessages
+                        ) | (ProviderProtocol::OpenAIChat, ProviderProtocol::OpenAIChat)
+                    );
+                    config.base_url = Some(if compatible_normalization {
+                        endpoint.base_url
+                    } else {
+                        raw_base_url.trim().trim_end_matches('/').to_string()
+                    });
+                } else if endpoint.protocol == ProviderProtocol::AnthropicMessages
+                    || config.protocol.is_unspecified()
                     || config.protocol == ProviderProtocol::OpenAIChat
                 {
                     config.protocol = endpoint.protocol;
                     config.base_url = Some(endpoint.base_url);
                 } else {
-                    config.base_url = user_config
-                        .base_url
-                        .as_deref()
-                        .map(|url| url.trim().trim_end_matches('/').to_string());
+                    config.base_url = Some(raw_base_url.trim().trim_end_matches('/').to_string());
                 }
             }
             if user_config.api_key.is_some() {
@@ -322,8 +350,12 @@ impl Config {
             if user_config.api_key_env.is_some() {
                 config.api_key_env = user_config.api_key_env.clone();
             }
+            config.tool_protocol = user_config.tool_protocol;
             config.models.extend(user_config.models.clone());
             config.timeout = user_config.timeout.clone();
+        }
+        if config.protocol.is_unspecified() {
+            config.protocol = ProviderProtocol::OpenAIChat;
         }
         config
     }
@@ -617,17 +649,10 @@ impl Config {
         self.provider = meta.provider.clone();
 
         if !self.providers.contains_key(&meta.provider) {
-            if let Some(builtin) = builtin_provider_config(&meta.provider) {
-                self.providers.insert(meta.provider.clone(), builtin);
-            } else {
-                self.providers.insert(
-                    meta.provider.clone(),
-                    ProviderConfig {
-                        protocol: ProviderProtocol::OpenAIChat,
-                        ..Default::default()
-                    },
-                );
-            }
+            self.providers.insert(
+                meta.provider.clone(),
+                new_provider_overrides(&meta.provider),
+            );
         }
 
         Ok(())
@@ -639,16 +664,10 @@ impl Config {
     /// exist in `self.providers`. The key is stored in the in-memory
     /// `api_key` field for immediate runtime use.
     pub fn set_provider_credential(&mut self, name: &str, api_key: &str) {
-        let entry = self.providers.entry(name.to_string()).or_insert_with(|| {
-            if let Some(builtin) = builtin_provider_config(name) {
-                builtin
-            } else {
-                ProviderConfig {
-                    protocol: ProviderProtocol::OpenAIChat,
-                    ..Default::default()
-                }
-            }
-        });
+        let entry = self
+            .providers
+            .entry(name.to_string())
+            .or_insert_with(|| new_provider_overrides(name));
         entry.api_key = Some(api_key.to_string());
     }
 
@@ -726,14 +745,18 @@ impl Config {
                     provider.api_key = Some(key.clone());
                 }
             } else {
-                let mut provider =
-                    builtin_provider_config(name).unwrap_or_else(|| ProviderConfig {
-                        protocol: ProviderProtocol::OpenAIChat,
-                        ..Default::default()
-                    });
+                let mut provider = new_provider_overrides(name);
                 provider.api_key = Some(key.clone());
                 self.providers.insert(name.clone(), provider);
             }
         }
     }
+}
+
+// Copying built-in connection defaults must not turn an omitted protocol into user intent.
+// The resolver can still consult built-in defaults; only an actual protocol edit is explicit.
+fn new_provider_overrides(name: &str) -> ProviderConfig {
+    let mut provider = builtin_provider_config(name).unwrap_or_default();
+    provider.protocol = ProviderProtocol::Unspecified;
+    provider
 }

@@ -1535,9 +1535,15 @@ api_key_env = "ANTHROPIC_API_KEY"
             talos_config::ProviderProtocol::AnthropicMessages
         );
 
+        config_set_dotted(&mut config, "providers.my-gw.protocol", "openai-responses")
+            .expect("Responses is configurable");
+        assert_eq!(
+            config_get_dotted(&config, "providers.my-gw.protocol").expect("protocol readable"),
+            "openai-responses"
+        );
         let err = config_set_dotted(&mut config, "providers.my-gw.protocol", "invalid")
             .expect_err("operation should fail");
-        assert!(err.to_string().contains("unknown protocol"));
+        assert!(err.to_string().to_lowercase().contains("unknown protocol"));
     }
 
     #[test]
@@ -1713,7 +1719,7 @@ api_key_env = "ANTHROPIC_API_KEY"
         let mut config = talos_config::Config::default();
         let err = config_set_dotted(&mut config, "providers.gw.protocol", "bogus")
             .expect_err("operation should fail");
-        assert!(err.to_string().contains("unknown protocol"));
+        assert!(err.to_string().to_lowercase().contains("unknown protocol"));
     }
 
     #[test]

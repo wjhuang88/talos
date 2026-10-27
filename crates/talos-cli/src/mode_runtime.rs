@@ -384,6 +384,7 @@ fn truncate_chars(value: &str, max_chars: usize) -> String {
 
 pub(crate) fn model_metadata_context_file(config: &Config) -> ContextFile {
     let (context_limit, output_limit) = config.resolve_model_limits();
+    let protocol = config.resolve_provider_protocol();
     let output_limit = output_limit
         .map(|limit| limit.to_string())
         .unwrap_or_else(|| "unknown".to_string());
@@ -393,13 +394,15 @@ pub(crate) fn model_metadata_context_file(config: &Config) -> ContextFile {
             "# Current Model\n\
              Provider: {}\n\
              Model: {}\n\
-             Provider protocol: {:?}\n\
+             Provider protocol: {}\n\
+             Protocol source: {}\n\
              Tool protocol: {:?}\n\
              Context limit: {} tokens\n\
              Output limit: {} tokens\n",
             config.provider,
             config.model,
-            config.provider_protocol(),
+            protocol.protocol,
+            protocol.source,
             config.tool_protocol(),
             context_limit,
             output_limit
@@ -552,6 +555,7 @@ mod tests {
             .expect("real provider request preview");
         preview
             .pointer("/body/reasoning_effort")
+            .or_else(|| preview.pointer("/body/reasoning/effort"))
             .and_then(serde_json::Value::as_str)
             .map(str::to_string)
     }

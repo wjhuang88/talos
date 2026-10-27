@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::process::Command;
 
+#[path = "src/protocol_signal.rs"]
+mod protocol_signal;
+
 const API_JSON_URL: &str = "https://models.dev/api.json";
 
 fn main() {
@@ -138,6 +141,18 @@ struct ApiModel {
     attachment: Option<bool>,
     #[serde(default)]
     release_date: Option<String>,
+    #[serde(default)]
+    provider: Option<ApiModelProvider>,
+}
+
+#[derive(Deserialize)]
+struct ApiModelProvider {
+    #[serde(default)]
+    npm: Option<String>,
+    #[serde(default)]
+    shape: Option<String>,
+    #[serde(default)]
+    api: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -157,6 +172,7 @@ struct ApiCost {
     #[serde(default)]
     cache_read: Option<f64>,
 }
+
 fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), String> {
     let root: BTreeMap<String, ApiProvider> =
         serde_json::from_str(json).map_err(|e| format!("parse api.json: {e}"))?;
@@ -216,10 +232,16 @@ fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), Str
                 .as_ref()
                 .and_then(|l| l.output)
                 .map(|v| v as u32);
+            let protocol = infer_model_protocol(
+                model.provider.as_ref(),
+                provider.npm.as_deref(),
+                provider.api.as_deref(),
+            );
 
             models.push(TomlModel {
                 id: model_id.clone(),
                 provider: provider_id.clone(),
+                protocol,
                 context_limit,
                 output_limit,
                 release_date: model.release_date.clone(),
@@ -286,9 +308,54 @@ fn infer_provider_protocol(
 }
 
 #[derive(Clone, Deserialize, Serialize)]
+enum TomlModelProtocol {
+    #[serde(rename = "anthropic-messages")]
+    AnthropicMessages,
+    #[serde(rename = "openai-chat")]
+    OpenAIChat,
+    #[serde(rename = "openai-responses")]
+    OpenAIResponses,
+}
+
+fn infer_model_protocol(
+    model_provider: Option<&ApiModelProvider>,
+    provider_npm: Option<&str>,
+    provider_api: Option<&str>,
+) -> Option<TomlModelProtocol> {
+    use protocol_signal::{WireProtocolHint, infer_wire_protocol};
+    // A message shape alone does not implement Azure, SigV4, Vertex or another transport.
+    infer_wire_protocol(provider_npm, None)?;
+    let npm_package = model_provider
+        .and_then(|provider| provider.npm.as_deref())
+        .or(provider_npm);
+    infer_wire_protocol(npm_package, None)?;
+    if let Some(model_api) = model_provider.and_then(|provider| provider.api.as_deref()) {
+        let parent_api = provider_api.or(match provider_npm {
+            Some("@ai-sdk/openai") => Some("https://api.openai.com/v1"),
+            Some("@ai-sdk/anthropic") => Some("https://api.anthropic.com/v1"),
+            _ => None,
+        })?;
+        if model_api.trim().trim_end_matches('/') != parent_api.trim().trim_end_matches('/') {
+            return None;
+        }
+    }
+    infer_wire_protocol(
+        npm_package,
+        model_provider.and_then(|provider| provider.shape.as_deref()),
+    )
+    .map(|hint| match hint {
+        WireProtocolHint::Chat => TomlModelProtocol::OpenAIChat,
+        WireProtocolHint::Responses => TomlModelProtocol::OpenAIResponses,
+        WireProtocolHint::Anthropic => TomlModelProtocol::AnthropicMessages,
+    })
+}
+
+#[derive(Clone, Deserialize, Serialize)]
 struct TomlModel {
     id: String,
     provider: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    protocol: Option<TomlModelProtocol>,
     #[serde(skip_serializing_if = "Option::is_none")]
     context_limit: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -378,4 +445,69 @@ fn generate_toml(
     output.push_str("# Only models with tool calling support are included.\n\n");
     output.push_str(&body);
     output
+}
+
+#[cfg(test)]
+mod protocol_admission_tests {
+    use super::*;
+
+    fn signal(npm: &str, shape: &str, api: Option<&str>) -> ApiModelProvider {
+        ApiModelProvider {
+            npm: Some(npm.into()),
+            shape: Some(shape.into()),
+            api: api.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn responses_shape_does_not_admit_unimplemented_host_transports() {
+        let model = signal("@ai-sdk/openai", "responses", None);
+        for host in [
+            "@ai-sdk/amazon-bedrock",
+            "@ai-sdk/azure",
+            "@ai-sdk/google-vertex",
+            "@vendor/unknown",
+        ] {
+            assert!(infer_model_protocol(Some(&model), Some(host), None).is_none());
+        }
+        assert!(matches!(
+            infer_model_protocol(Some(&model), Some("@ai-sdk/openai-compatible"), None),
+            Some(TomlModelProtocol::OpenAIResponses)
+        ));
+    }
+
+    #[test]
+    fn model_specific_endpoint_requires_separate_routing_support() {
+        let model = signal(
+            "@ai-sdk/openai",
+            "responses",
+            Some("https://gateway.test/other/v1"),
+        );
+        assert!(
+            infer_model_protocol(
+                Some(&model),
+                Some("@ai-sdk/openai-compatible"),
+                Some("https://gateway.test/v1")
+            )
+            .is_none()
+        );
+        assert!(matches!(
+            infer_model_protocol(
+                Some(&model),
+                Some("@ai-sdk/openai-compatible"),
+                Some("https://gateway.test/other/v1/")
+            ),
+            Some(TomlModelProtocol::OpenAIResponses)
+        ));
+    }
+
+    #[test]
+    fn unknown_model_sdk_or_shape_has_no_automatic_protocol() {
+        let unknown = signal("@ai-sdk/amazon-bedrock/mantle", "responses", None);
+        assert!(
+            infer_model_protocol(Some(&unknown), Some("@ai-sdk/openai-compatible"), None).is_none()
+        );
+        let future = signal("@ai-sdk/openai", "future", None);
+        assert!(infer_model_protocol(Some(&future), Some("@ai-sdk/openai"), None).is_none());
+    }
 }

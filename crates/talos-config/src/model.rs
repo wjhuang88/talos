@@ -105,6 +105,8 @@ fn catalog_protocol_to_config(protocol: CatalogProviderProtocol) -> crate::Provi
     match protocol {
         CatalogProviderProtocol::AnthropicMessages => crate::ProviderProtocol::AnthropicMessages,
         CatalogProviderProtocol::OpenAIChat => crate::ProviderProtocol::OpenAIChat,
+        CatalogProviderProtocol::OpenAIResponses => crate::ProviderProtocol::OpenAIResponses,
+        _ => crate::ProviderProtocol::Unspecified,
     }
 }
 
@@ -362,6 +364,17 @@ fn is_leap(year: u64) -> bool {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn responses_catalog_contract_maps_to_runtime_protocol() {
+        let entry: TomlProviderEntry =
+            toml::from_str("id = \"fixture\"\nprotocol = \"openai-responses\"\n")
+                .expect("catalog protocol mirror accepts Responses");
+        assert_eq!(
+            catalog_protocol_to_config(entry.protocol.expect("protocol")),
+            crate::ProviderProtocol::OpenAIResponses
+        );
+    }
 
     #[test]
     fn test_builtin_models_loads() {

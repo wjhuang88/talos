@@ -1154,7 +1154,7 @@ mod tests {
     }
 
     #[test]
-    fn provider_wizard_protocol_step_shows_both_choices_and_cursor_target() {
+    fn provider_wizard_protocol_step_shows_all_choices_and_cursor_target() {
         use ratatui::{buffer::Buffer, layout::Rect};
 
         let mut state = TuiState::new();
@@ -1166,13 +1166,13 @@ mod tests {
             query: "",
             max_height: u16::MAX,
         };
-        assert_eq!(component.height_hint(80), 4);
+        assert_eq!(component.height_hint(80), 5);
         assert_eq!(
             crate::scrollback::provider_wizard_cursor_position(&state.slash_menu),
             Some((2, 1))
         );
 
-        let area = Rect::new(0, 0, 80, 4);
+        let area = Rect::new(0, 0, 80, 5);
         let mut buffer = Buffer::empty(area);
         let mut frame = InlineFrame::new(area, &mut buffer);
         component.render(&mut frame, area);
@@ -1184,10 +1184,17 @@ mod tests {
         assert!(rendered.contains("openai-chat"), "{rendered:?}");
         assert!(rendered.contains("anthropic-messages"), "{rendered:?}");
 
-        state.wizard_cycle_protocol();
+        assert!(rendered.contains("openai-responses"), "{rendered:?}");
+
+        state.wizard_cycle_protocol(false);
         assert_eq!(
             crate::scrollback::provider_wizard_cursor_position(&state.slash_menu),
             Some((3, 1))
+        );
+        state.wizard_cycle_protocol(false);
+        assert_eq!(
+            crate::scrollback::provider_wizard_cursor_position(&state.slash_menu),
+            Some((4, 1))
         );
     }
 
@@ -2292,7 +2299,7 @@ mod tests {
     }
 
     #[test]
-    fn wizard_protocol_cycles_between_openai_and_anthropic() {
+    fn wizard_protocol_cycles_through_all_wire_families() {
         let mut state = TuiState::new();
         state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
         for ch in "gw".chars() {
@@ -2306,19 +2313,35 @@ mod tests {
         };
         assert_eq!(protocol, "openai-chat");
 
-        state.wizard_cycle_protocol();
+        state.wizard_cycle_protocol(false);
         let protocol = match &state.slash_menu.kind {
             Some(crate::state::PanelKind::ProviderWizard { protocol, .. }) => protocol.clone(),
             _ => panic!("expected ProviderWizard"),
         };
         assert_eq!(protocol, "anthropic-messages");
 
-        state.wizard_cycle_protocol();
+        state.wizard_cycle_protocol(false);
+        let protocol = match &state.slash_menu.kind {
+            Some(crate::state::PanelKind::ProviderWizard { protocol, .. }) => protocol.clone(),
+            _ => panic!("expected ProviderWizard"),
+        };
+        assert_eq!(protocol, "openai-responses");
+
+        state.wizard_cycle_protocol(false);
         let protocol = match &state.slash_menu.kind {
             Some(crate::state::PanelKind::ProviderWizard { protocol, .. }) => protocol.clone(),
             _ => panic!("expected ProviderWizard"),
         };
         assert_eq!(protocol, "openai-chat");
+        for expected in ["openai-responses", "anthropic-messages", "openai-chat"] {
+            state.wizard_cycle_protocol(true);
+            let Some(crate::state::PanelKind::ProviderWizard { protocol, .. }) =
+                &state.slash_menu.kind
+            else {
+                panic!("expected ProviderWizard");
+            };
+            assert_eq!(protocol, expected);
+        }
     }
 
     #[test]
@@ -2333,7 +2356,7 @@ mod tests {
         assert_eq!(state.wizard_advance(), None);
 
         // Step 2: Protocol (default openai-chat, cycle to anthropic)
-        state.wizard_cycle_protocol();
+        state.wizard_cycle_protocol(false);
         assert_eq!(state.wizard_advance(), None);
 
         // Step 3: Base URL

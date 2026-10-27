@@ -252,6 +252,12 @@ context_limit = 202752
 output_limit = 4096
 ```
 
+Talos 也支持在 provider 或模型级配置 `protocol = "openai-responses"`。官方 OpenAI 在未显式
+配置协议且支持已确认时使用 Responses；未确认的兼容网关仍使用 Chat。显式 `openai-chat`
+可用于回退，系统不会自动跨协议重试。模型选择器与目录浏览器显示生效协议及其来源。优先级、
+模型级覆盖和公共枚举的 pre-1.0 minor 版本迁移要求见
+[协议配置与迁移说明](docs/reference/PROVIDER-PROTOCOLS.md)。
+
 启动 Talos 前设置对应的环境变量：
 
 ```bash

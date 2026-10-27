@@ -159,6 +159,8 @@ repeating known mistakes.
 | 65 | Resource tests | Process-wide counters need isolated workers and owned descendant cleanup | I293 / #716 |
 | 66 | Native borrowing | Attribute value buffers need independent stable storage through native list deletion | I302 / #716 |
 | 67 | Parser compatibility | Verify the exact helper replacement set before defining entity-decoding fixtures | I293 / Instant Answer |
+| 71 | Config | Materializing connection defaults must preserve omitted protocol intent | I306 / #748 |
+| 72 | Build | Independent worktrees need independent Cargo target directories | I306 / #748 |
 
 | 67 | Permissions | 一次性授权消费也必须非阻塞；外层异步超时无法抢占同步锁等待 | I300 |
 | 68 | Agent execution | 工具可用性以实际调用结果为准，不把列表呈现差异当作不可用证据 | I300 |
@@ -585,6 +587,13 @@ repeating known mistakes.
 **Remedy**: 在生成 sandbox 配置时，使用 `std::fs::canonicalize()` 解析所有路径。
 
 **Prevention**: macOS 路径处理必须考虑符号链接，尤其是 `/tmp`、`/var`、`/etc` 等系统目录。
+
+**I306 / CI3448 follow-up (2026-10-26)**: A Responses image HTTP fixture bypassed the CLI grant
+path and stored a lexical temp path, so the unchanged TOCTOU guard correctly omitted the image on
+macOS. Canonicalize fixture paths before creating durable Image parts. The HTTP regression now
+starts from a Unix file alias on Linux too; removing canonicalization reproduces the failure.
+Keep path-drift/digest guards and image-presence/no-path-leak assertions intact. Promoted to check:
+`mock_http_accepts_adr051_multimodal_continuation_without_path_leak`.
 
 ---
 
@@ -1437,6 +1446,19 @@ visible; distinguish passed assertions from independently emitted evidence.
 - Prevention: characterize named and numeric entities, tag-cleanup order and raw sentence splitting
   against the exact helper before claiming parity.
 - Promoted to rule/check: instant_answer topic/limited-cleanup tests and the parser reference.
+
+## 2026-10-26 - Materialized provider defaults are not explicit protocol intent
+
+- Trigger: #748 continuation audited runtime routing against Config queries and connection flows.
+- Symptom: choosing/connecting an official OpenAI model could silently pin Chat, while other paths
+  resolved Responses; model overrides could also disagree with a second public resolver.
+- Root cause: built-in provider defaults were copied into user overrides and then classified as
+  explicit intent; an intermediate resolver survived after factory activation.
+- Fix: preserve protocol omission during model/credential materialization and use one resolver for
+  adapter construction, public queries and selection previews.
+- Prevention: exercise persisted configuration edits and adapter selection through the actual binary;
+  assert protocol/source after model selection and credential reload, not just pure precedence.
+- Promoted to rule/check: `responses_config` binary tests and config protocol-resolution regressions.
 ## 2026-10-12 - Keep proof consumption inside the cancellation boundary
 
 - Trigger: Independent incremental I300 permission/API review.
@@ -1514,6 +1536,36 @@ visible; distinguish passed assertions from independently emitted evidence.
   HTTP field names. It confused a representation choice with missing credentials.
 - Prevention/check: The shared registration fixture now compares names and values
   separately; retain strict credential-value and empty-GET-body assertions.
+
+## 2026-10-26 - Separate Cargo artifacts for independent worktrees
+
+- Trigger: Validating code and generated-data worktrees under the same package versions.
+- Symptom: A shared target directory produced E0463 and colliding StableCrateId errors.
+- Root cause: Path-distinct Talos workspaces reused package artifacts and dependency metadata.
+- Fix: Use each worktree's own target directory; clean affected local package artifacts and rebuild
+  the code-side SDK consumer. Keep the original failed attempt distinct from passing source evidence.
+- Prevention: Share immutable registry/download caches, rather than build outputs across worktrees.
+- Promoted to rule/check: none; recorded in the I306 build/validation invocation contract.
+
+## 2026-10-26 - End HTTP readers at semantic stream terminals
+
+- Trigger: I306 Responses stream lifecycle audit after green cross-platform CI.
+- Symptom: A terminal response could retain the provider channel until HTTP EOF/idle timeout, or
+  be followed by another transport error from trailing malformed data.
+- Root cause: The semantic parser tracked terminal state but the framing/HTTP loop kept reading.
+- Fix: Stop decoding/reading after the first terminal batch and release the HTTP response body.
+- Prevention: Exercise a real chunked HTTP response that emits a terminal but never closes.
+- Promoted to rule/check: `semantic_terminal_closes_stream_without_waiting_for_http_eof` and
+  `semantic_terminal_discards_later_records_and_closes_decoder` provider regressions.
+
+## 2026-10-27 - Exercise the configured runtime boundary in provider tests
+
+- Trigger: Independent I306 review found tool-generated images and explicit textual protocols unusable despite green CI.
+- Symptom: Direct Multimodal/stream tests and a user --attach binary case bypassed EphemeralImage dispatch; direct protocol calls bypassed the dropped configuration field.
+- Root cause: Fixtures proved nearby input paths rather than the runtime boundary named by acceptance.
+- Fix: Implement the actual image trait entry and retain tool_protocol when merging configuration; verify real CLI read_image and configured Compat/Strict tool rounds.
+- Prevention: Separate durable attachments from request-local tool images, and dispatch configuration through the real binary. A TTL guard alone does not satisfy no automatic image repost.
+- Promoted to rule/check: responses_tool_image_is_sent_once_through_real_agent, responses_compat_tool_round_through_real_agent, responses_strict_tool_round_through_real_agent and tool_image_is_never_automatically_reposted_after_503.
 
 ## 2026-10-27 - Preserve presentation behavior across Auto protocol changes
 

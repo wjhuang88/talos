@@ -10,11 +10,14 @@ pub mod variant;
 
 mod atomic_file;
 mod builtin;
+mod catalog_protocol;
 mod config;
 mod credentials;
 mod endpoint;
 mod env;
 mod error;
+mod protocol_resolution;
+mod protocol_signal;
 mod store;
 #[cfg(test)]
 mod store_finalization_tests;
@@ -30,6 +33,10 @@ pub use endpoint::{
     validate_provider_name, validate_provider_protocol,
 };
 pub use error::ConfigError;
+pub use protocol_resolution::{
+    ProtocolResolution, ProtocolResolutionSource, infer_models_dev_model_protocol,
+    resolve_config_provider_protocol, resolve_protocol,
+};
 pub use store::ConfigStore;
 pub use types::{
     AutoConfig, Config, ConfigUnsetOutcome, DashboardConfig, HookConfig, HookDeclaration,
