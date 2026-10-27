@@ -64,6 +64,12 @@ It does not activate a backend, change search
 routing, retire dependencies or claim SSRF confinement. I293 coordination and an
 explicit ADR-090 amendment documenting this coexistence precede activation.
 
+On 2026-10-27 the maintainer (the recorded responsible actor for both owners) confirmed that
+ordinary HTTP may use whole-invocation review while WebSearch, search compatibility/default
+transport and all required prepared-network tools retain their dedicated authority with no
+downgrade on failure. This supplies owner concurrence, not activation. The corresponding
+ADR-090 coexistence amendment still must merge before ordinary production activation.
+
 Reuse reviewed shared assessment/admission primitives where their contracts fit.
 Do not turn the Pull-specific proof into a generic proof by relabeling tools, or
 create an exhaustive effect-prediction framework as a prerequisite.

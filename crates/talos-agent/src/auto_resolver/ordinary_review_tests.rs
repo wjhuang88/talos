@@ -1,0 +1,175 @@
+use super::*;
+use crate::permission_pipeline::{PermissionAuthorizationRequest, PermissionPipeline};
+use std::sync::atomic::AtomicUsize;
+use talos_permission::{PermissionContext, PermissionEngine, PermissionSessionState};
+
+struct Assessor {
+    scenario: &'static str,
+    calls: Arc<AtomicUsize>,
+    reached: Arc<AtomicUsize>,
+    state: Arc<PermissionSessionState>,
+}
+
+#[async_trait]
+impl AutoPermissionAssessor for Assessor {
+    async fn assess(&self, _: AutoPermissionRequest, _: Duration) -> Result<String, String> {
+        panic!("ordinary review must not downgrade")
+    }
+    async fn assess_ordinary_invocation(
+        &self,
+        request: OrdinaryInvocationAssessmentRequest,
+        _: Duration,
+    ) -> Result<String, String> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(request.action.input["command"], "program");
+        assert_eq!(request.configuration["backend"], "test");
+        assert!(request.working_directory.is_some());
+        assert!(request.directory_identity.is_some());
+        let mut copy = request.clone();
+        copy.action.request_digest.clear();
+        let hash: String = Sha256::digest(bounded_json(&copy).expect("bounded").as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert_eq!(request.action.request_digest, format!("sha256:{hash}"));
+        self.reached.fetch_add(1, Ordering::SeqCst);
+        match self.scenario {
+            "stale" => self.state.rebind_session().expect("rebind"),
+            "error" => return Err("unavailable".into()),
+            "panic" => panic!("assessor panic"),
+            "timeout" => std::future::pending::<()>().await,
+            _ => {}
+        }
+        Ok(serde_json::json!({
+            "schema": request.action.schema,
+            "request_digest": if self.scenario == "digest" { "wrong" } else { &request.action.request_digest },
+            "decision": if self.scenario == "uncertain" { "human_required" } else { "allow_once" },
+            "confidence": "high",
+            "effect_summary": "expected uncertain explanation",
+            "decision_points": ["Check the program's effects before continuing"],
+        }).to_string())
+    }
+}
+
+struct Deny(Arc<Mutex<Vec<String>>>);
+#[async_trait]
+impl ApprovalResolver for Deny {
+    async fn resolve_with_explanation(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: Duration,
+        explanation: &str,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.0
+            .lock()
+            .expect("explanations")
+            .push(explanation.to_owned());
+        self.resolve(request, remaining).await
+    }
+    async fn resolve(
+        &self,
+        _: PermissionApprovalRequest,
+        _: Duration,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        Ok(ApprovalChoice::Deny)
+    }
+}
+
+#[tokio::test]
+async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
+    for scenario in [
+        "allow",
+        "uncertain",
+        "digest",
+        "stale",
+        "error",
+        "panic",
+        "timeout",
+        "missing_configuration",
+        "unresolved_directories",
+    ] {
+        let root = tempfile::tempdir().expect("workspace");
+        let state = Arc::new(PermissionSessionState::new(
+            PermissionEngine::with_workspace_root(root.path().into()),
+        ));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let reached = Arc::new(AtomicUsize::new(0));
+        let explanations = Arc::new(Mutex::new(Vec::new()));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(Assessor {
+                scenario,
+                calls: calls.clone(),
+                reached: reached.clone(),
+                state: state.clone(),
+            }),
+            Arc::new(Deny(explanations.clone())),
+            ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
+                .expect("lease"),
+            Duration::from_millis(20),
+            AutoPermissionControl::new(true),
+        );
+        let pipeline = PermissionPipeline::new(
+            state.clone(),
+            PermissionContext::new(
+                PermissionMode::Interactive,
+                InteractionCapability::Available,
+            ),
+            Some(Arc::new(resolver)),
+        );
+        let input = serde_json::json!({"command": "program"});
+        let facets = [ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            "program",
+            ToolResourceKind::Command,
+        )];
+        let configuration = if scenario == "unresolved_directories" {
+            serde_json::json!({"backend":"test", "execution_directories_resolved":false})
+        } else {
+            serde_json::json!({"backend": "test"})
+        };
+        let result = pipeline
+            .authorize_registered_invocation(
+                PermissionAuthorizationRequest {
+                    tool_name: "exec",
+                    provenance: ToolProvenance::Native,
+                    profile: &facets,
+                    input: &input,
+                    presentation_input: input.clone(),
+                    summary_fields: vec![],
+                    deadline: Duration::from_secs(2),
+                },
+                Some("run program"),
+                Some(root.path()),
+                "direct program",
+                if scenario == "missing_configuration" {
+                    None
+                } else {
+                    Some(&configuration)
+                },
+            )
+            .await;
+        assert_eq!(
+            result.is_ok(),
+            matches!(scenario, "allow" | "unresolved_directories"),
+            "{scenario}: {result:?}"
+        );
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            usize::from(!matches!(scenario, "missing_configuration"))
+        );
+        assert_eq!(
+            reached.load(Ordering::SeqCst),
+            usize::from(scenario != "missing_configuration"),
+            "{scenario}: assessor preconditions did not complete"
+        );
+        assert_eq!(state.grant_count().expect("grants"), 0);
+        let explanations = explanations.lock().expect("explanations");
+        assert_eq!(
+            explanations
+                .iter()
+                .any(|text| text.contains("expected uncertain explanation")),
+            scenario == "uncertain",
+            "only a current, digest-bound response may contribute presentation: {scenario}"
+        );
+    }
+}

@@ -93,6 +93,7 @@ pub struct PermissionRequest<'a> {
     facets: &'a [ToolPermissionFacet],
     input: &'a Value,
     network_manifest: Option<&'a ToolNetworkManifest>,
+    transitive_effects: bool,
 }
 
 impl<'a> PermissionRequest<'a> {
@@ -110,6 +111,7 @@ impl<'a> PermissionRequest<'a> {
             facets,
             input,
             network_manifest: None,
+            transitive_effects: false,
         }
     }
 
@@ -124,6 +126,25 @@ impl<'a> PermissionRequest<'a> {
     pub fn with_network_manifest(mut self, manifest: &'a ToolNetworkManifest) -> Self {
         self.network_manifest = Some(manifest);
         self
+    }
+
+    /// Requires invocation-local authorization of effects beyond the declared facets.
+    ///
+    /// This adds conservative policy checks; it does not grant execution authority
+    /// or establish implementation trust. Active transitive Deny and explicit
+    /// human checkpoints remain binding even when declared facets would allow.
+    #[must_use]
+    pub fn with_transitive_effects(mut self) -> Self {
+        self.transitive_effects = true;
+        self
+    }
+
+    pub(crate) const fn transitive_effects(&self) -> bool {
+        self.transitive_effects
+    }
+
+    pub(crate) fn invocation_local(&self) -> bool {
+        self.transitive_effects || crate::native_pull_command::requested(self.facets)
     }
 
     /// Returns the invocation binding, if supplied by the trusted preparation path.

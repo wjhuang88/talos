@@ -1253,6 +1253,24 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Adds internally constructed Todo tools bound to one session directory and identity.
+    ///
+    /// These tools retain built-in identity but still require normal permission admission.
+    /// Registration order follows [`Self::tool`]; caller replacements never inherit trust.
+    #[must_use]
+    pub fn session_todo_tools(
+        mut self,
+        sessions_dir: &std::path::Path,
+        session_id: uuid::Uuid,
+    ) -> Self {
+        self.tools.extend(
+            talos_session::todo_tool_contributions_for_sessions_dir(sessions_dir, session_id)
+                .into_iter()
+                .map(RuntimeToolRegistration::Builtin),
+        );
+        self
+    }
+
     /// Supplies a held directory capability for atomic new-file creation in shared tools.
     #[cfg(feature = "shared-composition")]
     #[must_use]
@@ -1933,6 +1951,17 @@ impl AgentTool for RuntimePermissionAwareTool {
         self.inner.execution_working_directory()
     }
 
+    fn invocation_execution_directories(
+        &self,
+        input: &serde_json::Value,
+    ) -> Option<Vec<std::path::PathBuf>> {
+        self.inner.invocation_execution_directories(input)
+    }
+
+    fn invocation_review_configuration(&self) -> Option<serde_json::Value> {
+        self.inner.invocation_review_configuration()
+    }
+
     fn name(&self) -> &str {
         self.inner.name()
     }
@@ -2029,6 +2058,7 @@ pub async fn collect_until_turn_completed(
 mod tests {
     mod builtin_registration;
     mod network_invocation;
+    mod session_todo;
     mod skill_disclosure;
     use std::sync::Mutex as StdMutex;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};

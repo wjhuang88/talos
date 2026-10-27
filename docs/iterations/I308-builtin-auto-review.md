@@ -1,6 +1,33 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
-## Current delivery checkpoint — 2026-10-26
+## Current delivery checkpoint — 2026-10-27
+
+I308/T8 remain Active / Partial. Ordinary Shell/Exec/HTTP stage #783 is published
+at `58661ec72558f26fe92ca0451db09ac95a298809`, based on main `85ac39b48`.
+The full standard locked preflight and independent static permission/security/API
+review passed at that head. Remote run 40475830775 passed both explicit Desktop
+feature jobs, but its workspace job exposed an additional real REPL locale
+regression. The ordinary review branch did not carry the established session
+locale or render model-reported decision points; the fixture also recognized only
+the legacy assessor protocol. The local repair restores presentation-only locale
+hints through a backward-compatible assessor default method, reuses the existing
+safe explanation renderer, and accepts model explanation only after current
+context/schema/digest verification. Locale remains outside authorization identity.
+Real REPL and TUI acceptance pass for zh/en/ja, resume/rotation and manual Deny;
+Agent library tests pass 509/509. Fresh full workspace, Desktop, independent
+review and exact-head remote gates are required before merge. The default
+workspace preflight omits optional desktop-ui and does not replace those checks.
+
+Real Unix tests cover command file creation and HTTP proxy/redirect effects,
+policy refusal, failure/stale outcomes, Auto-control disablement,
+external/replacement registration and command replay. Full Agent tests pass
+509/509; cargo-xwin test-target checking is compile evidence only. Native Windows
+execution, complete operation/profile reconciliation and final CI/merge remain
+outstanding. Default save_url/fetch_url/WebSearch ordinary Auto acceptance remains
+open; guarded search cannot downgrade. The original acceptance and remaining
+handoff queue are unchanged.
+
+### Earlier merged-stage checkpoint — 2026-10-26
 
 Foundation #769 merged as `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`.
 Exact head `ffa35973022c18f752cacad1922325e15c648379` passed all six jobs in
@@ -39,8 +66,8 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged) |
-| Last Updated | 2026-10-26 |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration); #783 (ordinary Shell/Exec/HTTP, Review) |
+| Last Updated | 2026-10-27 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
 This governance candidate proposes claim and activation atomically in #765. Both are ineffective
@@ -48,6 +75,16 @@ until the finalized exact-head record merges to main; implementation starts from
 No production implementation belongs in this governance candidate.
 
 ## Published Baseline
+
+### Coexistence Decision Checkpoint — 2026-10-27
+
+The maintainer confirmed the I293/I308 boundary as the responsible actor of both owners:
+ordinary HTTP may receive whole-invocation review; WebSearch, search compatibility/default
+transport and required prepared-network tools retain ADR-090 authority and cannot downgrade.
+The proposal and ADR-090 record that decision. This documentation stage preserves the published
+baseline and runtime acceptance. Required evidence: independent exact-head security/API review,
+both governance validators, exact-head CI and target-branch merge. Remaining implementation and
+platform/dispatch evidence stay owned here; no ordinary Auto activation or completion is claimed.
 
 ### Selected Stories
 
@@ -327,10 +364,11 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 |---|---|
 | `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for all listed operations, with actual results and zero model assessments/grants. Image attachment reaches only the next provider request after an allowed read. Complete profile/platform coverage remains outstanding. MCP omits `read_image`. |
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
-| `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
+| `http_request` | Ordinary whole-invocation Auto implemented locally; actual proxy/redirect AllowOnce and refusal/stale/external/replacement effects tested. Final native Windows, review/CI/merge remain outstanding. |
+| `save_url`, `fetch_url`, `web_search` | Default production instances are not prepared-network tools and do not receive ordinary model AllowOnce. Existing deterministic policy/human paths remain; actual production fallback tests and remaining Auto acceptance are outstanding. I293 guarded compatibility/SearXNG instances are separately protected and cannot downgrade. Ordinary HTTP evidence does not cover this row. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
-| `bash` (Unix) / `powershell` (Windows), `exec` | Existing shell/direct-command paths retained; I308 full profile/decision evidence outstanding. |
+| `bash` (Unix) / `powershell` (Windows), `exec` | Local whole-invocation Auto implementation and actual Unix allow/refusal/cancel/stale/registration/replay tests pass. Windows fixtures compile via cargo xwin; native Windows and full profile/final gates remain outstanding. |
 | `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Session-scoped Internal facets retain default deterministic Allow, not model approval. Local real-Agent tests cover all nine operations under default Allow and explicit Internal Deny, actual SQLite effects, unchanged other-session data, zero assessor calls and zero grants. MCP does not add Todo; complete profile/platform evidence remains outstanding. |
 | `status` | MCP-only read tool; concrete built-in ownership checked. |
 | `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory registers actual instances as built-ins; caller-supplied instances remain external. A local action-review implementation now admits exact scheduling/cancellation invocations, pending validation and independent review below. `list_scheduled_tasks` retains Read policy. This stage is not merged acceptance. |
@@ -1111,3 +1149,171 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - 2026-10-27: maintainer explicitly accepted the ordinary Shell/Exec/HTTP whole-invocation authorization proposal. ADR-064 records this scope decision; earlier pending-decision checkpoints are historical. Implementation and its full acceptance remain outstanding; search is excluded under I293/ADR-090.
 
 - Third post-rebase standard locked preflight passed (exit 0) with `release preflight: passed`, including workspace checks, Clippy, tests/doctests and both external Runtime SDK consumers. Log: `/private/tmp/i308-rebased-ci-preflight-retry2.log`. This supersedes the pending retry result, preserves both earlier failures and establishes local validation only; exact-head remote CI and merge CAS remain outstanding.
+
+### Desktop Todo registration continuation — 2026-10-27
+
+- Parent Runtime registration stage #773 merged as `d2ab62dc9b206777913bcd4f721e71e11d357aa7`, after exact-head CI 40440474869 passed all eight checks at `1ccb979421d4c7aaac81ddfc95a1174387c12bbb`. Independent final permission/security/API review and unchanged-base CAS are recorded in [the merge receipt](https://github.com/wjhuang88/talos/pull/773#issuecomment-6433284386). Both local governance validators passed with zero warnings. This closes only the parent registration stage; Desktop Todo and ordinary invocation implementation remain outstanding.
+
+- Follow-up branch `feat/i308-desktop-todo-registration` starts at reviewed PR #773 candidate `1ccb97942`; the submitted parent head remains unchanged while CI 40440474869 runs.
+- Added a factory-only RuntimeBuilder session Todo registration method and switched Desktop composition to it. Caller `.tool()` remains untrusted, including caller-supplied instances from the same public Todo factory. Registration-order tests check both override directions. This does not enable ordinary command/HTTP Auto or complete the profile matrix.
+- Focused locked shared-composition registration tests are running; full validation, native platform execution and independent review remain outstanding. README documents the new additive builder method.
+
+- Focused registration suite passed 4/4 (`cargo test --locked -p talos-runtime --features shared-composition --lib tests::builtin_registration`); log `/private/tmp/i308-desktop-todo-registration-tests.log`. This verifies factory/override identity and cleanup registration, not Desktop production dispatch or full T8 acceptance.
+
+- Focused locked Runtime shared-composition library/test Clippy passed with warnings denied; log `/private/tmp/i308-desktop-todo-clippy.log`. Independent review and full/Desktop/native acceptance remain outstanding.
+
+- Default-feature Runtime dispatch now has separate session Todo coverage: an allowed create persists the expected item in its bound session, explicit Internal Deny prevents creation, and another session cannot see that item. All nine factory tools are checked against same-name caller overrides in both registration orders without requiring shared-composition. Both tests passed; default-feature Runtime library/test Clippy passed with warnings denied. Logs: `/private/tmp/i308-session-todo-dispatch.log` and `/private/tmp/i308-session-todo-default-clippy.log`. This establishes deterministic policy/store behavior, not model Auto approval or native Desktop execution. Full Runtime shared-composition validation is running; stage-wide preflight, final independent review and exact-head platform CI remain outstanding.
+
+- Full locked Runtime shared-composition library suite subsequently passed 84/84; log `/private/tmp/i308-session-todo-full-runtime.log`. Stage-wide preflight and Desktop/platform gates remain outstanding.
+
+- Desktop Todo candidate `b6fb0bf29bd6d5799ba4c8475f7afa16d6036704` received independent same-session read-only permission/security/API approval against base `d2ab62dc9`; the reviewer did not independently build. The sandboxed standard preflight failed process-observation EPERM. Its authorized unchanged-source retry passed workspace checks, Clippy, tests/doctests (Tools 976/976, including the formerly blocked eight-stage Push), then failed the external SDK coding executable after disk exhaustion. Log: `/private/tmp/i308-desktop-todo-preflight-authorized.log`. This is not a successful full preflight.
+- After all Cargo/compiler processes stopped, removed only authorized root `target/debug/examples` artifacts. The first SDK retry reused the damaged executable and failed; cleaning only `talos-runtime-external-fixture` rebuilt it. Both external SDK consumer modes then passed, exit 0: `/private/tmp/i308-desktop-todo-sdk-rebuilt.log`. These component results do not replace an uninterrupted standard-preflight pass. Exact-head CI, native Desktop/platform evidence and merge remain outstanding; T8 and the whole handoff remain incomplete.
+- The next standard preflight at `d21cca9aa` also exited 101: rebuilding examples exhausted disk during CLI example linking (`errno=28`), before workspace test execution. Log: `/private/tmp/i308-desktop-todo-preflight-final.log`. With no Cargo/compiler process active, recovery uses the maintainer's existing authorization to clear only root `target/debug` and rebuild consistently with incremental/debug information disabled. Full preflight is still outstanding; independent exact-base/head content review approved `d21cca9aa` without independent builds.
+- Clean standard preflight at `423e9236d6cb256da11c6ebad8f1dd172dfa956a` subsequently passed end to end, exit 0, with `CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 RUST_TEST_THREADS=1 ./scripts/release_preflight.sh` in the authorized environment. Log: `/private/tmp/i308-desktop-todo-preflight-clean.log`; both SDK external-consumer modes passed. This closes the local preflight gap only; final-head independent review, exact-head CI, applicable native Desktop/platform evidence and merge remain outstanding.
+
+### Ordinary invocation permission foundation — 2026-10-27
+
+- Added an opt-in transitive-effects request marker. It applies incompatible Deny/explicit-human restrictions before deterministic Allow, binds the marker into the one-shot fingerprint, prevents broad authority from reusing or installing Session grants, and preserves it when retained NetworkAuthority reconstructs a request. Existing unmarked requests retain their behavior; the native Pull guard shares the restriction scan.
+- Locked permission validation passed: library 164 tests, integration suites 1/1/1/8 tests, and one doctest; warnings-denied all-target Clippy passed. Logs: `/private/tmp/i308-transitive-permission-all.log`, `/private/tmp/i308-transitive-permission-clippy.log`. Tests include 12 lifecycle invalidation combinations, narrow-grant rejection and retained-network reconstruction. Independent same-session read-only security/API review approved the revised foundation after the network reconstruction blocker was fixed; reviewer did not independently run builds.
+- This is permission infrastructure only. Ordinary Shell/Exec/HTTP production routing and model review are not connected by this change. End-to-end effects, profile/platform evidence, exact-head CI and final delivery remain outstanding; neither T8 nor the handoff is complete.
+
+### Workspace recovery checkpoint — 2026-10-27
+
+- After pause/resume, all former `/private/tmp/talos-*` worktree directories and local validation logs were absent; Git reports their registrations as prunable. The root checkout and committed foundation `dc1e91c0b3071a65047ddb304ffe8506bb441da6` remain. No cause for deletion has been established. Scanning 3,209 unreachable Git blobs found no ordinary-invocation schema or test sources. The uncommitted Shell/Exec/HTTP routing and its tests cannot currently be recovered or claimed as delivered; their reconstruction and fresh validation remain required.
+- Recovery continues in the persistent project-local `target/worktrees/i308-invocation` checkout, branch `feat/i308-invocation-recovery`. Logs are retained under root `target/recovery`; neither directory is within the authorized `target/debug` cleanup scope. Preserve this checkout before any broader target cleanup.
+- The preceding ordinary-invocation full preflight failed at linking with disk exhaustion, not a passing workspace result. Historical 504-test local results applied to now-missing sources and do not validate this recovery candidate.
+- The sandbox hook fix is being rebuilt as a bounded prerequisite: changed command, directory identity or permission-session state after `BeforeBashSandboxExec` refuses dispatch. Seven scenarios cover unchanged execution plus command/directory/policy/mode/restriction/session mutation. Current test execution: root `target/recovery/sandbox-hook-test.log`; no passing result is claimed yet. Independent review, full preflight, native Windows and final CI remain required. T8 and the handoff remain incomplete.
+- Recovery candidate validation: the seven-scenario focused hook regression passed, followed by all 501 Agent library tests (`--locked`, root `target/recovery/sandbox-hook-agent-all.log`). This closes the deterministic hook window only; the existing non-Unix metadata identity fallback is not proof of robust Windows directory replacement detection. No ordinary invocation routing, native Windows result or workspace-preflight success is claimed by this checkpoint.
+
+- Recovery branch rebased without conflicts onto origin/main `33fad1b8d`; rebased Agent library tests passed 501/501 (`target/recovery/rebased-agent-tests.log` in the root checkout). Added an opt-in implementation configuration evidence method with a default of unavailable, Shell/Exec/HTTP implementations and forwarding through CLI/Runtime wrappers. This exposes evidence only; it does not activate ordinary Auto authorization. Locked checks for Tools, Runtime and CLI passed (`target/recovery/invocation-config-check.log`). End-to-end routing, immutable admission binding, security/API review and the full acceptance matrix remain outstanding.
+
+- Connected implementation configuration evidence to registered invocation approval. Registered ordinary calls apply the transitive-effects marker before evaluation. Agent library suite passed 501/501 before the added regression; the five execution-input tests then passed, including eight tool/restriction combinations verifying Deny termination and explicit-Ask human checkpoint precedence over deterministic Allow. Logs: root `target/recovery/invocation-plumbing-tests.log` and `invocation-guard-tests.log`. The initial fixture lacked a typed command resource and was corrected. Explicit Ask currently remains human-resolvable: terminal rejection for incompatible fine restrictions is not implemented by this checkpoint. Shell dispatch still uses its legacy route; the new ordinary model-review path remains unavailable. Do not claim full broad-invocation admission or T8 completion.
+
+- Closed the ordinary scoped-Ask compatibility gap: explicit non-Internal Ask rules with a resource/path scope now produce terminal Deny for transitive-effects requests before deterministic Allow; unscoped Ask remains a human once-only checkpoint. Native Pull without the ordinary marker retains its existing contract. Locked Permission library tests passed 166/166, Agent library tests 502/502, and Permission all-target warnings-denied Clippy passed (root `target/recovery/scoped-ask-{permission-tests,agent-tests,clippy}.log`). Independent same-session read-only permission/security/API review approved `ea9060bd0` plus this bounded diff; reviewer did not build. Updated earlier scoped-Ask test expectation to the accepted contract; this supersedes the preceding checkpoint limitation. Ordinary model routing, actual execution matrix, workspace/platform gates and overall T8 remain incomplete.
+
+- Rebuilt the ordinary invocation assessor contract on the shared bounded action-review engine, with a separate schema/prompt, complete configuration/cwd/directory identity in the digest, one-use freshness fields, secret/size checks and existing deadline/panic/error fallback. A test-only adapter exercises eight admission/assessment cases including stale/digest/error/panic/timeout/missing configuration; no ordinary production route is activated by this checkpoint. Agent library tests passed 503/503 and warnings-denied library Clippy passed (root `target/recovery/ordinary-review-{tests,clippy}.log`). The assessor test proves admission behavior, not real process/HTTP effects or final dispatch freshness. Dispatch binding, search coexistence gate, actual execution matrix, independent final review and full workspace/platform gates remain required.
+
+- Desktop session Todo registration stage #779 merged as `13f4ab2052263bf8f65e46a337d4acfc2f9543df` after exact-head CI 40451455846 passed all eight checks at `4293dc8130546af891dd1cbab168dcb789aabcc8`, both governance validators passed with zero warnings, and independent final target/head review approved against `f86cb225c477b640fe504d33492d97b4e3c31bd8`. This closes the registration stage only. Recovery branch rebased onto that merge, preserving both sides of the sole owner-log conflict; no source conflict. Post-rebase validation remains outstanding. T8 and full handoff remain incomplete.
+
+- Post-rebase dispatch-context stage: configured ordinary Shell/Exec/HTTP calls now retain permission generations, configuration, declared execution directory identity and selected sandbox availability before approval. Final dispatch rejects changes after approval hooks, after asynchronous sandbox-fallback approval and after the sandbox command hook. Prepared/protected network admission remains separate; no ordinary Auto route is activated. Actual normal-pipeline fixture writes a temporary file only in the unchanged case; directory replacement, policy/mode/restriction/session and configuration changes reject without that effect. Locked Agent library tests passed 504/504; the subsequent configuration-only test extension passed both focused tests. Warnings-denied Agent library Clippy passed. Logs: root `target/recovery/dispatch-context-{tests,focused,clippy}.log`. Independent final static permission/security/API review approved the bounded diff atop `d8ffb5cfd`. Fallback-handler mutation still lacks a runtime regression; Windows directory identity retains the existing weak metadata fallback and is not reliable same-file proof. Actual per-input Exec cwd, sandbox-route review disclosure, ordinary routing, search coexistence coordination, execution acceptance matrix and full workspace/platform/remote gates remain incomplete. This supersedes only the preceding post-rebase Agent-validation gap, not full preflight or T8 completion.
+
+- Input-directory metadata stage: additive default `AgentTool::invocation_execution_directories` reports initial directories for the exact input; Exec reuses its real parser/resolver for single commands, steps and pipes, and CLI/Runtime permission wrappers forward it. Frozen review configuration includes directory identities, resolution completeness and sandbox availability/network/read-path settings; Exec reports its actual configured stream bound. Review caught a compatibility regression for steps creating a later cwd: unresolved directories now preserve the original deterministic/human path with explicit incomplete evidence instead of rejecting before execution. The ordinary assessor cannot auto-approve that incomplete evidence; dynamic-directory Auto remains unimplemented, not removed from scope. Locked Exec tests passed 23/23, Agent library tests 504/504, subsequent incomplete-evidence focused assessment test passed, CLI/Runtime check and Agent library warnings-denied Clippy passed (`target/recovery/input-directories-{tools,agent,focused,check,clippy}.log` at repository root). Unix Exec directly verified mkdir followed by a step using the new directory; this is not Agent-integrated dynamic-directory evidence. Independent static security/API review approved after the compatibility repair. Ordinary activation, complete sandbox fallback disclosure, Windows reliable identity, dynamic-directory Auto and remaining execution/platform/preflight/remote gates remain outstanding.
+
+- Sandbox-fallback evidence stage: frozen context and ordinary review configuration now include the actual Deny/Ask/AllowUnsandboxed policy, fallback-handler availability and retained tool configuration. A normal-pipeline Bash fixture with an unavailable sandbox verifies actual temporary-file effects only for unchanged fallback approval; directory/policy/mode/restriction/session/configuration changes during the asynchronous fallback handler reject despite ApproveOnce. This is a custom tool fixture, not host Shell process evidence. Locked Agent library tests passed 505/505, focused context tests 3/3 and warnings-denied Agent library Clippy passed (`target/recovery/fallback-context-{agent,tests,clippy}.log` at repository root); independent bounded static security/API review approved atop `6d3f1d46f`. This closes the previously missing fallback-handler mutation regression and fallback policy disclosure only. Ordinary production routing, real Shell/Exec/HTTP dispatch matrix, I293/ADR-090 coexistence confirmation/amendment, dynamic-directory Auto, Windows identity and full platform/preflight/remote gates remain incomplete.
+
+- Real Exec compatibility evidence: the Unix normal Agent pipeline now executes the actual built-in Exec under an explicit deterministic Allow policy, first creating `nested` then executing `pwd` with that previously nonexistent cwd. It verifies the directory effect and canonical cwd output, closing the earlier custom-fixture/direct-tool-only compatibility evidence gap. Agent dev tests enable the existing Shell feature on all hosts; the redundant Windows-only Shell/Git dev entry is removed without changing Windows feature coverage or dependency versions. Locked Agent library tests passed 506/506 and warnings-denied library/test Clippy passed (`target/recovery/real-exec-{directory,agent,clippy}.log` at repository root). This is Unix deterministic admission evidence, not model Auto, native Windows or full workspace evidence. Dynamic-directory Auto and production ordinary routing remain unimplemented. Coexistence amendment #782 has separately merged as `85ac39b48d7e58f645b1d8b3838c3c73852b0bae` after independent exact-head security/API review, successful documentation CI 40459798936 and merge CAS; this resolves the pending concurrence/amendment prerequisite only.
+
+- Ordinary production routing checkpoint: registered Shell/Exec/HTTP now enter the shared whole-invocation assessor; untrusted same-name Shell retains the legacy route and prepared-network authorization keeps priority. Dynamic future directories are disclosed with complete arguments and bound initial cwd instead of categorically refusing model assessment. The ordinary assessment regression now uses the production resolver directly, without a test adapter. Real Unix Bash and Exec execute temporary directory/file effects only after model AllowOnce; uncertainty, assessor failure and session rebinding produce no such effects (four scenarios per tool). Locked Agent tests passed 507/507 and warnings-denied library/test Clippy passed (`target/recovery/ordinary-routing-{agent,clippy}.log` at repository root). The earlier unchanged `17b723a8b` passed full standard locked preflight outside the sandbox, including both SDK consumers (`target/recovery/invocation-post-coexistence-preflight-unsandboxed.log`); its sandboxed attempt failed only at denied process observation and is not reported as a pass. That preflight does not validate this new routing diff. Independent bounded static security/API routing review approved the local stage, excluding final HTTP/Windows activation; its prompt-accuracy observation was corrected to distinguish future directories from invalid input. The local code does route HTTP and Windows already; missing validation is a merge blocker, not a claim that these routes are disabled. Reliable Windows directory identity, actual HTTP transport effects, the remaining policy/registration/platform matrix and fresh full preflight/remote gates remain outstanding; this local checkpoint is not a final activation candidate or T8 completion.
+
+- Real HTTP execution evidence: an independent test subprocess constructs the production network contributions and actual `HttpRequestTool`, explicitly discloses AdvancedNetwork, and runs the normal Agent/Auto pipeline with inherited local HTTP proxy configuration. Model AllowOnce causes an observed POST body, 302 follow-up GET and successful tool response; uncertainty, assessor failure, session rebinding, explicit Deny and mandatory-human Ask cause no accepted or queued proxy connections. Explicit policy cases make zero assessor calls. Environment changes are confined to the child process; no product SSRF bypass, injected transport API, new dependency version or unsafe code was introduced. The existing network dev feature is now enabled for standalone Agent tests. Locked Agent tests passed 508/508 (`target/recovery/ordinary-http-final-agent.log`); the initial fixture omitted AdvancedNetwork disclosure and was repaired rather than treating the unavailable tool as an authorization result. Independent review identified and prompted repair of a zero-connection assertion scheduling window; final bounded independent static security/API review approved the repaired stage, and warnings-denied library/test Clippy passed (`target/recovery/ordinary-http-final-clippy.log`). Both governance validators passed with zero warnings. Native Windows runtime, reliable Windows identity, remaining invocation policy/registration cases and fresh complete/remote gates remain outstanding.
+
+- Windows directory-token repair checkpoint: replaced size/type/mtime fallback with panic-guarded directory-handle metadata from the existing cap-std 4.0.3 and cap-fs-ext 4.0.3 dependencies; no new dependency or unsafe code. Missing/unopenable directories fail capture. A same-path replacement regression retains the original directory under another name and checks stable identity, replacement detection, missing paths and regular-file refusal. Locked Agent library tests passed 509/509, warnings-denied library/test Clippy passed, and cargo-xwin Windows test-target checking passed (root `target/recovery/ordinary-directory-{agent,clippy,xwin}.log`). The first sandboxed xwin attempt failed updating its external cache symlink; the authorized retry passed. Windows compile is not native runtime evidence. This replaces only the weak metadata fallback: handles are not yet retained across approval and the upstream index is 64-bit, so identifier reuse and full ReFS 128-bit protection remain unimplemented. Native Windows replacement evidence, final independent review, remaining invocation matrix and fresh workspace/remote gates remain outstanding; T8 remains Partial.
+
+- Retained-directory identity checkpoint: the shared private identity value now owns an Arc-backed cap-std directory handle through asynchronous review, final permission hooks and sandbox fallback checks, instead of reducing evidence immediately to a string. Equality and serialized assessment evidence still use only the token; the public assessment request remains Option<String>. Unix and Windows derive device/index from opened-handle metadata inside a panic guard, and canonical paths hash their encoded bytes. Identity code and its regression are split out of the large resolver/test modules. The regression now unlinks the renamed original while its handle stays open, verifies original metadata remains available, and distinguishes the replacement. Locked Agent tests passed 509/509, warnings-denied library/test Clippy passed, and cargo-xwin Windows test-target compilation passed (`target/recovery/retained-directory-{agent,clippy,xwin}.log` at repository root). This closes the missing handle-retention implementation only: native Windows rename/delete/share behavior remains unverified, upstream ReFS 128-bit identity remains unsupported, and freshness checks are not atomic process-cwd confinement. c393c9337 and the retained-handle successor each received independent bounded static security/API approval; the reviewer did not run tests. Remaining execution matrix and fresh workspace/remote gates remain outstanding. T8 and the full handoff are not Complete.
+
+- Real command policy/platform matrix: production Shell and Exec normal-Agent Auto tests now each exercise nine scenarios (AllowOnce, uncertain, error, stale session, explicit Deny, mandatory-human Ask, assessor panic, timeout and mismatched digest). Only AllowOnce creates the temporary directory/file; explicit policies invoke no assessor and no scenario, other cases enter their intended scenario once, and no case persists a grant. Independent review found a false-pass risk from assertions inside the panic-guarded assessor; an outer verified scenario-reached counter repairs it. Final focused Unix execution and warnings-denied library/test Clippy pass (`target/recovery/command-policy-final-{focused,clippy}.log`). Before that counter-only repair, full Agent 509/509 and cargo-xwin test-target checking passed (`target/recovery/command-policy-{agent,xwin}.log`); these are not represented as final-source full/platform proof. The fixture now also selects native Windows PowerShell and cmd.exe-backed Exec, but native Windows execution remains unverified. Independent bounded static review approved the repaired test delta without running tests. Protected-search/no-downgrade, remaining registration/atomicity/profile evidence and fresh final workspace/remote gates still require closure; T8 is Partial.
+
+- Final-baseline and test-reliability checkpoint (2026-10-27): full standard locked release preflight at implementation commit `258fd55d4` passed, including workspace checks, Clippy, tests/doc tests and both independently resolved Runtime SDK consumers (`target/recovery/invocation-258fd55d4-preflight.log` in the root checkout). Subsequent test-only changes add externally asserted scenario-reached counters to ordinary resolver and real HTTP assessment fixtures, so panic containment cannot disguise failed request-evidence assertions as expected refusal. Production Shell/Exec fixtures additionally disable Auto during assessment and verify that a returned AllowOnce does not create either the directory or file. The updated focused `cargo test --locked -p talos-agent ordinary_` passed (`target/recovery/ordinary-reliability-cancel.log`). This is cancellation of Auto authority, not proof of every caller/task cancellation path. Updated-source warnings-denied Agent library/test Clippy passed (`target/recovery/ordinary-reliability-cancel-clippy.log`); independent bounded static review approved the three-test delta without running tests. Registration/replay integration gaps, native Windows execution and final remote gates remain outstanding; the preflight result is baseline evidence and is not claimed for subsequent edits. T8 remains Partial.
+
+- Registration/replay integration checkpoint (2026-10-27): actual production Shell/Exec and HTTP fixtures now test unchecked external registration and replacement of a previously trusted registration with a distinct production instance. Neither enters ordinary-invocation assessment; denied fallback produces no fixture directory/file or HTTP proxy connection. Shell/Exec additionally repeat a successful call ID with identical and changed inputs across model continuations. Ordinary review occurs again before the final execution-ledger reservation: both reviews must satisfy independent precondition counters, the first result succeeds, and the second explicitly reports replay or identity conflict without a second execution. The initial test incorrectly assumed reservation preceded assessment and failed; the corrected fixture verifies the actual contract rather than claiming assessor deduplication. Updated focused `cargo test --locked -p talos-agent ordinary_` passes (`target/recovery/ordinary-registration-replay-all.log`). Full locked Agent library tests passed 509/509 (`target/recovery/ordinary-registration-replay-agent.log`), warnings-denied library/test Clippy passed (`target/recovery/ordinary-registration-replay-clippy.log`), and independent bounded static review approved the two-test delta without running tests. Both governance validators passed with zero warnings, and locked cargo-xwin Windows test-target checking passed (`target/recovery/ordinary-registration-replay-xwin.log`); the sandboxed first attempt could not update its external cache link, and the authorized retry passed. Native Windows execution, final documentation/evidence reconciliation and remote gates remain outstanding. T8 remains Partial.
+
+
+### Ordinary invocation API and documentation reconciliation — 2026-10-27
+
+- README now describes whole-invocation authority, inherited HTTP proxy/redirect effects,
+  dynamic-directory disclosure, explicit policy precedence and lack of transitive confinement
+  or rollback. This documents the local candidate, not a merged release.
+- Public `AgentTool` additions are defaulted: `invocation_review_configuration()` returns
+  unavailable by default, and `invocation_execution_directories(input)` defaults to the existing
+  execution working directory. Existing implementers need no new methods. Product wrappers
+  forward both methods unchanged. Input-dependent tools must use their real execution parser
+  when overriding directory evidence. Metadata never grants trusted registration or authority.
+- Custom `AutoPermissionAssessor` implementations must implement
+  `assess_ordinary_invocation` for ordinary model approval; its default reports unsupported.
+  Existing human/headless fallback remains available. The public assessment directory identity
+  remains an optional string; retained handles are private execution evidence.
+- Latest owner header and network/command inventory rows now distinguish local implementation
+  from merged stages. Full save_url/fetch_url/WebSearch production dispositions and applicable
+  host/profile evidence are not inferred from the ordinary HTTP fixture. T8 remains Partial.
+
+- Documentation review approved the bounded diff and identified a substantive inventory distinction:
+  default production `save_url`, `fetch_url` and legacy `WebSearchTool` do not opt into
+  prepared-network admission. They currently retain deterministic/human paths and have no
+  ordinary model AllowOnce implementation. Only I293 guarded compatibility/SearXNG instances
+  establish that protected contract. The corrected table does not treat these missing Auto
+  capabilities as delivered by fallback documentation. Remaining production fallback tests and
+  original Auto acceptance require implementation or an explicit maintainer scope decision.
+  Both governance validators passed with zero warnings for this documentation stage; source
+  has not changed since the preceding validated test commit.
+
+### Desktop protocol-consumer repair — 2026-10-27
+
+PR #783 first exact-head CI run 40474043084 failed the two enabled Auto Desktop
+fixtures on both Linux and Windows at their legacy prompt assertion. The fixture
+now validates the actual ordinary-invocation/v1 JSON, frozen input and user intent,
+configuration presence, directory identity presence and digest shape, then echoes
+the digest with the supported response schema. Existing real Host approval/result,
+workspace execution and configured-model report checks remain. A validated counter
+asserted outside the assessor ensures caught assertion panics cannot pass fallback
+coverage. This is test adaptation, not a change to product permission behavior.
+Local pinned locked focused Auto tests pass 3/3 and full desktop-ui tests pass
+112/112; desktop-ui all-target Clippy passes with warnings denied. Logs are root
+`target/recovery/invocation-desktop-{auto,all,clippy}-fix.log`. Independent bounded
+static review approved the test delta without running tests. The fixture checks
+configuration presence and digest shape/echo, not independent full hash recomputation.
+Native Windows and final exact-head gates remain pending. T8 remains Partial.
+
+### 2026-10-27 ordinary review locale repair
+
+- Remote failure: run 40475830775, workspace job 122093962825, timed out waiting
+  for the real REPL's Chinese decision point. The ordinary provider request used
+  pure JSON; the old fixture treated it as a conversation. Product inspection
+  also found lost session locale and fixed English fallback, so fixture-only
+  changes would not repair the behavior.
+- Implementation: additive default `assess_ordinary_invocation_with_locale`
+  preserves existing assessor implementations. Provider adds a bounded locale
+  outside the hashed request; isolated review still has exactly two messages.
+  Optional ordinary response summary/decision points use the legacy safe-text
+  filters and renderer only after schema/digest/current-context validation.
+  Missing or invalid responses use localized content-free failure copy. Existing
+  scheduler protocol and fallback behavior are retained.
+- Real REPL and TUI scripts now decode ordinary JSON while retaining legacy
+  envelopes; they verify request identity/configuration and preserve all original
+  locale/history isolation/resume/rotation/manual-denial assertions. The optional
+  token-measurement utility accepts both captured encodings without claiming new
+  measurement results.
+- Local Agent library tests pass 509/509, including a response-presentation
+  regression proving stale/digest-mismatched explanation is not shown. Logs:
+  `target/recovery/ordinary-locale-{agent-final,repl,tui}.log` in the root worktree.
+- Full explicit-feature Desktop tests pass 112/112 and the standard locked release
+  preflight passes, including both Runtime SDK consumers. Logs:
+  `target/recovery/ordinary-locale-{desktop,preflight}.log` in the root worktree.
+  Independent bounded static security/API review approved the locale source and
+  fixture delta. Native Windows and fresh exact-head remote evidence remain pending;
+  this is not T8 completion.
+
+
+### 2026-10-27 Windows retained-directory fixture repair
+
+- Native Windows run 40475830775 failed three Agent tests at attempted directory
+  rename with sharing violation (OS error 32). cap-std 4.0.3 deliberately opens
+  directories without FILE_SHARE_DELETE; its `Dir::from_std_file` contract
+  explicitly requires this to prevent races. Upstream source:
+  https://github.com/bytecodealliance/cap-std/blob/v4.0.3/cap-std/src/fs/dir.rs
+  and `cap-primitives/src/windows/fs/dir_utils.rs` at the same tag.
+- Retain production handle semantics. Unix tests still replace/unlink the original
+  and require rejection. Windows tests assert rename is blocked, original path
+  remains and no destination appears; execution stays in the unchanged directory.
+  The identity unit test also checks stable identity and successful rename after
+  releasing the handle. Hook/fallback completion flags are asserted outside panic
+  containment, so an assertion panic cannot masquerade as successful protection.
+- Locked Agent library tests pass 509/509 and cargo-xwin Windows test-target
+  compilation passes. Logs: root
+  `target/recovery/windows-directory-fixture-{agent,xwin}.log`. The first xwin
+  attempt was blocked updating its external cache; the authorized retry passed.
+  Independent bounded static security review approved; no product authorization
+  predicate, dependency, unsafe code or public API changes in this repair.
+- Final full preflight and exact-head remote/native Windows gates remain pending.
+  T8 and the whole handoff remain Partial.
+
+- Final unchanged-source standard locked preflight at `cb6e20878` passed end to end (exit 0), including Tools 983/983 and both external Runtime SDK consumer modes. Command: `CARGO_TARGET_DIR=/Users/GHuang/WorkSpace/RustProjects/talos/target CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 RUST_TEST_THREADS=1 ./scripts/release_preflight.sh`; log: root `target/recovery/ordinary-final-platform-preflight-serial.log`. Two earlier full-suite attempts failed search connection-refusal classification; focused network/workspace reproductions passed. Serial success does not establish their root cause or a fix; retain the logs and track the unresolved intermittent failure under I293. No search implementation changed. Fresh exact-head remote CI/native Windows and final review/CAS remain outstanding; T8 remains Partial.

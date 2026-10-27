@@ -26,6 +26,98 @@ use crate::{
     SandboxFallbackContext, SandboxFallbackDecision, SandboxFallbackPolicy,
 };
 
+/// Retained across asynchronous approval and final execution gates.
+#[derive(PartialEq)]
+struct InvocationExecutionContext {
+    permission: talos_permission::PermissionStateSnapshot,
+    configuration: serde_json::Value,
+    directories: Vec<(
+        std::path::PathBuf,
+        crate::auto_resolver::ExecutionDirectoryIdentity,
+    )>,
+    directories_resolved: bool,
+    sandbox_available: Option<bool>,
+    sandbox_fallback: Option<(SandboxFallbackPolicy, bool)>,
+}
+
+impl InvocationExecutionContext {
+    fn review_configuration(&self) -> serde_json::Value {
+        serde_json::json!({
+            "tool_configuration": self.configuration,
+            "execution_directories": self.directories,
+            "execution_directories_resolved": self.directories_resolved,
+            "sandbox": self.sandbox_available.map(|available| serde_json::json!({
+                "available": available,
+                "allow_network": false,
+                "extra_read_paths": [],
+                "fallback_policy": self.sandbox_fallback.map(|(policy, _)| match policy {
+                    SandboxFallbackPolicy::Deny => "deny",
+                    SandboxFallbackPolicy::Ask => "separate-once-approval",
+                    SandboxFallbackPolicy::AllowUnsandboxed => "unsandboxed-after-permission",
+                }),
+                "fallback_handler_available": self.sandbox_fallback.map(|(_, available)| available),
+                "fallback_configuration": self.configuration,
+            })),
+        })
+    }
+    fn capture(
+        agent: &Agent,
+        tool: &dyn talos_core::tool::AgentTool,
+        input: &serde_json::Value,
+    ) -> Option<Self> {
+        let permission = agent
+            .permission_pipeline
+            .as_ref()?
+            .state()
+            .state_snapshot()
+            .ok()?;
+        let configuration = tool.invocation_review_configuration()?;
+        let resolved_paths = tool.invocation_execution_directories(input);
+        let directories_resolved = resolved_paths.is_some();
+        // Existing sequential commands may create a later step's cwd. Preserve
+        // their ordinary permission path, but disclose incomplete review evidence.
+        let mut paths = resolved_paths
+            .unwrap_or_else(|| tool.execution_working_directory().into_iter().collect());
+        let sandbox_available = if tool.name() == "bash" {
+            agent.sandbox.as_ref().map(|sandbox| {
+                paths.push(agent.workspace_root.clone());
+                sandbox.is_available()
+            })
+        } else {
+            None
+        };
+        let directories = paths
+            .into_iter()
+            .map(|path| {
+                crate::auto_resolver::execution_directory_identity(&path)
+                    .map(|identity| (path, identity))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(Self {
+            permission,
+            configuration,
+            directories,
+            directories_resolved,
+            sandbox_available,
+            sandbox_fallback: sandbox_available.map(|_| {
+                (
+                    agent.sandbox_fallback_policy,
+                    agent.sandbox_fallback_handler.is_some(),
+                )
+            }),
+        })
+    }
+
+    fn matches(
+        &self,
+        agent: &Agent,
+        tool: &dyn talos_core::tool::AgentTool,
+        input: &serde_json::Value,
+    ) -> bool {
+        Self::capture(agent, tool, input).as_ref() == Some(self)
+    }
+}
+
 impl Agent {
     /// Executes a batch of tool calls, running read-only tools concurrently
     /// (up to [`MAX_CONCURRENT_READ_ONLY`]) and write tools serially.
@@ -665,6 +757,7 @@ impl Agent {
             .map(|_| tokio::time::Instant::now() + talos_core::tool::PREPARED_INVOCATION_TIMEOUT);
         let mut authorizations: Option<Vec<ToolExecutionAuthorization>> = None;
         let mut network_authority = None;
+        let mut execution_context = None;
         let permission_allowed = loop {
             if let Some(operation) = prepared.as_ref() {
                 let Some(identity) = operation.plan_identity().cloned() else {
@@ -744,6 +837,23 @@ impl Agent {
                 }
 
                 let working_directory = tool.execution_working_directory();
+                if prepared.is_none()
+                    && prepared_network.is_none()
+                    && matches!(
+                        call.name.as_str(),
+                        "bash" | "powershell" | "exec" | "http_request"
+                    )
+                    && tool.invocation_review_configuration().is_some()
+                {
+                    execution_context =
+                        InvocationExecutionContext::capture(self, tool, &call.input);
+                    if execution_context.is_none() {
+                        return Ok((
+                            ToolExecutionResult::error("invocation execution context unavailable"),
+                            Vec::new(),
+                        ));
+                    }
+                }
                 let mut presentation_input = tool.project_input(&call.input);
                 private_tokens.project_value(&mut presentation_input);
                 let authorization_request = PermissionAuthorizationRequest {
@@ -813,6 +923,7 @@ impl Agent {
                         Vec::new()
                     })
                 } else if matches!(call.name.as_str(), "bash" | "powershell")
+                    && !registry.is_builtin_instance(&call.name)
                     && working_directory.is_some()
                 {
                     let working_directory = working_directory.as_deref().expect("checked above");
@@ -824,12 +935,17 @@ impl Agent {
                         )
                         .await
                 } else if registry.is_builtin_instance(&call.name) {
+                    let review_configuration = execution_context
+                        .as_ref()
+                        .map(|context| context.review_configuration())
+                        .or_else(|| tool.invocation_review_configuration());
                     pipeline
                         .authorize_registered_invocation(
                             authorization_request,
                             user_intent,
                             working_directory.as_deref(),
                             tool.description(),
+                            review_configuration.as_ref(),
                         )
                         .await
                 } else {
@@ -959,6 +1075,20 @@ impl Agent {
             }
         };
 
+        let execution_context_matches = || {
+            execution_context
+                .as_ref()
+                .is_none_or(|context| context.matches(self, tool, &call.input))
+        };
+        if !execution_context_matches() {
+            return Ok((
+                ToolExecutionResult::error(
+                    "invocation execution context changed after approval; submit a new tool call",
+                ),
+                Vec::new(),
+            ));
+        }
+
         // Reserve the logical call only after final permission admission and
         // before crossing the actual tool execution boundary. If execution is
         // cancelled or times out after this point, retaining the reservation is
@@ -994,8 +1124,13 @@ impl Agent {
             if let Some(sb) = self.sandbox.as_deref() {
                 if sb.is_available() {
                     (
-                        self.execute_bash_in_sandbox(hook_ctx, sb, &normalized_input)
-                            .await,
+                        self.execute_bash_in_sandbox_bound(
+                            hook_ctx,
+                            sb,
+                            &normalized_input,
+                            &execution_context_matches,
+                        )
+                        .await,
                         Vec::new(),
                     )
                 } else {
@@ -1031,6 +1166,14 @@ impl Agent {
                         SandboxFallbackPolicy::Ask => false,
                     };
                     if fallback {
+                        if !execution_context_matches() {
+                            return Ok((
+                                ToolExecutionResult::error(
+                                    "invocation execution context changed during fallback; submit a new tool call",
+                                ),
+                                Vec::new(),
+                            ));
+                        }
                         let output = match background_permit.take() {
                             Some(permit) => {
                                 tool.execute_background_authorized_with_output(
@@ -1154,11 +1297,23 @@ impl Agent {
     /// Extracts the `command` field from the tool input and runs it within
     /// the sandbox environment. Returns a [`ToolExecutionResult`] with the
     /// combined stdout/stderr output.
+    #[cfg(test)]
     pub(crate) async fn execute_bash_in_sandbox(
         &self,
         hook_ctx: &HookContext,
         sandbox: &dyn SandboxProvider,
         input: &serde_json::Value,
+    ) -> ToolExecutionResult {
+        self.execute_bash_in_sandbox_bound(hook_ctx, sandbox, input, &|| true)
+            .await
+    }
+
+    async fn execute_bash_in_sandbox_bound(
+        &self,
+        hook_ctx: &HookContext,
+        sandbox: &dyn SandboxProvider,
+        input: &serde_json::Value,
+        execution_context_matches: &(dyn Fn() -> bool + Sync),
     ) -> ToolExecutionResult {
         let command = match input.get("command").and_then(serde_json::Value::as_str) {
             Some(cmd) => cmd.to_owned(),
@@ -1169,6 +1324,19 @@ impl Agent {
             }
         };
 
+        let directory_identity =
+            crate::auto_resolver::execution_directory_identity(&self.workspace_root);
+        let permission_state = self
+            .permission_pipeline
+            .as_ref()
+            .map(|pipeline| pipeline.state());
+        let permission_snapshot = permission_state
+            .as_ref()
+            .map(|state| state.state_snapshot().ok());
+        if directory_identity.is_none() || permission_snapshot == Some(None) {
+            return ToolExecutionResult::error("sandbox execution identity unavailable");
+        }
+
         let command = match self
             .run_hook(
                 hook_ctx,
@@ -1177,12 +1345,30 @@ impl Agent {
             .await
         {
             Ok(HookOutcome::Continue(HookEvent::BeforeBashSandboxExec { command })) => {
+                if input.get("command").and_then(serde_json::Value::as_str) != Some(command) {
+                    return ToolExecutionResult::error(
+                        "sandbox hook changed the admitted command; submit a new tool call",
+                    );
+                }
                 command.to_string()
             }
             Ok(HookOutcome::Skip(_)) => return ToolExecutionResult::success(String::new()),
             Ok(_) => command,
             Err(_) => return ToolExecutionResult::error("hook denied bash execution".to_owned()),
         };
+
+        if !execution_context_matches()
+            || crate::auto_resolver::execution_directory_identity(&self.workspace_root)
+                != directory_identity
+            || permission_state
+                .as_ref()
+                .map(|state| state.state_snapshot().ok())
+                != permission_snapshot
+        {
+            return ToolExecutionResult::error(
+                "sandbox execution context changed during hook; submit a new tool call",
+            );
+        }
 
         let config = SandboxConfig {
             workspace_root: self.workspace_root.clone(),
