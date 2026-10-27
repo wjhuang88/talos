@@ -149,6 +149,13 @@ impl AgentTool for ContextBoundProcess {
     fn execution_working_directory(&self) -> Option<PathBuf> {
         Some(self.0.clone())
     }
+    fn invocation_execution_directories(&self, input: &Value) -> Option<Vec<PathBuf>> {
+        if input.get("unresolved").and_then(Value::as_bool) == Some(true) {
+            None
+        } else {
+            Some(vec![self.0.clone()])
+        }
+    }
     fn invocation_review_configuration(&self) -> Option<Value> {
         Some(
             serde_json::json!({"backend":"fixture", "revision": self.1.load(std::sync::atomic::Ordering::SeqCst)}),
@@ -164,6 +171,7 @@ impl AgentTool for ContextBoundProcess {
 async fn final_permission_hook_cannot_retarget_or_invalidate_process_approval() {
     for scenario in [
         "unchanged",
+        "unresolved",
         "directory",
         "policy",
         "mode",
@@ -213,7 +221,7 @@ async fn final_permission_hook_cannot_retarget_or_invalidate_process_approval() 
         let call = ToolCall {
             id: "context-bound".into(),
             name: "exec".into(),
-            input: serde_json::json!({}),
+            input: serde_json::json!({"unresolved":scenario == "unresolved"}),
         };
         let (results, _) = agent
             .execute_tools_with_presentation(
@@ -228,13 +236,13 @@ async fn final_permission_hook_cannot_retarget_or_invalidate_process_approval() 
             .expect("execution");
         assert_eq!(
             results[0].is_error,
-            scenario != "unchanged",
+            !matches!(scenario, "unchanged" | "unresolved"),
             "{scenario}: {}",
             results[0].content
         );
         assert_eq!(
             root.join("executed").exists(),
-            scenario == "unchanged",
+            matches!(scenario, "unchanged" | "unresolved"),
             "{scenario}"
         );
     }

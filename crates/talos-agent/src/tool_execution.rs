@@ -32,11 +32,29 @@ struct InvocationExecutionContext {
     permission: talos_permission::PermissionStateSnapshot,
     configuration: serde_json::Value,
     directories: Vec<(std::path::PathBuf, String)>,
+    directories_resolved: bool,
     sandbox_available: Option<bool>,
 }
 
 impl InvocationExecutionContext {
-    fn capture(agent: &Agent, tool: &dyn talos_core::tool::AgentTool) -> Option<Self> {
+    fn review_configuration(&self) -> serde_json::Value {
+        serde_json::json!({
+            "tool_configuration": self.configuration,
+            "execution_directories": self.directories,
+            "execution_directories_resolved": self.directories_resolved,
+            "sandbox": self.sandbox_available.map(|available| serde_json::json!({
+                "available": available,
+                "allow_network": false,
+                "extra_read_paths": [],
+                "unavailable_route": "separate configured fallback policy; tool configuration applies",
+            })),
+        })
+    }
+    fn capture(
+        agent: &Agent,
+        tool: &dyn talos_core::tool::AgentTool,
+        input: &serde_json::Value,
+    ) -> Option<Self> {
         let permission = agent
             .permission_pipeline
             .as_ref()?
@@ -44,7 +62,12 @@ impl InvocationExecutionContext {
             .state_snapshot()
             .ok()?;
         let configuration = tool.invocation_review_configuration()?;
-        let mut paths: Vec<_> = tool.execution_working_directory().into_iter().collect();
+        let resolved_paths = tool.invocation_execution_directories(input);
+        let directories_resolved = resolved_paths.is_some();
+        // Existing sequential commands may create a later step's cwd. Preserve
+        // their ordinary permission path, but disclose incomplete review evidence.
+        let mut paths = resolved_paths
+            .unwrap_or_else(|| tool.execution_working_directory().into_iter().collect());
         let sandbox_available = if tool.name() == "bash" {
             agent.sandbox.as_ref().map(|sandbox| {
                 paths.push(agent.workspace_root.clone());
@@ -64,12 +87,18 @@ impl InvocationExecutionContext {
             permission,
             configuration,
             directories,
+            directories_resolved,
             sandbox_available,
         })
     }
 
-    fn matches(&self, agent: &Agent, tool: &dyn talos_core::tool::AgentTool) -> bool {
-        Self::capture(agent, tool).as_ref() == Some(self)
+    fn matches(
+        &self,
+        agent: &Agent,
+        tool: &dyn talos_core::tool::AgentTool,
+        input: &serde_json::Value,
+    ) -> bool {
+        Self::capture(agent, tool, input).as_ref() == Some(self)
     }
 }
 
@@ -800,7 +829,8 @@ impl Agent {
                     )
                     && tool.invocation_review_configuration().is_some()
                 {
-                    execution_context = InvocationExecutionContext::capture(self, tool);
+                    execution_context =
+                        InvocationExecutionContext::capture(self, tool, &call.input);
                     if execution_context.is_none() {
                         return Ok((
                             ToolExecutionResult::error("invocation execution context unavailable"),
@@ -888,13 +918,17 @@ impl Agent {
                         )
                         .await
                 } else if registry.is_builtin_instance(&call.name) {
+                    let review_configuration = execution_context
+                        .as_ref()
+                        .map(|context| context.review_configuration())
+                        .or_else(|| tool.invocation_review_configuration());
                     pipeline
                         .authorize_registered_invocation(
                             authorization_request,
                             user_intent,
                             working_directory.as_deref(),
                             tool.description(),
-                            tool.invocation_review_configuration().as_ref(),
+                            review_configuration.as_ref(),
                         )
                         .await
                 } else {
@@ -1027,7 +1061,7 @@ impl Agent {
         let execution_context_matches = || {
             execution_context
                 .as_ref()
-                .is_none_or(|context| context.matches(self, tool))
+                .is_none_or(|context| context.matches(self, tool, &call.input))
         };
         if !execution_context_matches() {
             return Ok((

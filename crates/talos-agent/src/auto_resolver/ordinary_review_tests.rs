@@ -94,6 +94,7 @@ async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
         "panic",
         "timeout",
         "missing_configuration",
+        "unresolved_directories",
     ] {
         let root = tempfile::tempdir().expect("workspace");
         let state = Arc::new(PermissionSessionState::new(
@@ -126,7 +127,11 @@ async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
             "program",
             ToolResourceKind::Command,
         )];
-        let configuration = serde_json::json!({"backend": "test"});
+        let configuration = if scenario == "unresolved_directories" {
+            serde_json::json!({"backend":"test", "execution_directories_resolved":false})
+        } else {
+            serde_json::json!({"backend": "test"})
+        };
         let result = pipeline
             .authorize_registered_invocation(
                 PermissionAuthorizationRequest {
@@ -155,7 +160,10 @@ async fn ordinary_review_binds_complete_evidence_and_fails_closed() {
         );
         assert_eq!(
             calls.load(Ordering::SeqCst),
-            usize::from(scenario != "missing_configuration")
+            usize::from(!matches!(
+                scenario,
+                "missing_configuration" | "unresolved_directories"
+            ))
         );
         assert_eq!(state.grant_count().expect("grants"), 0);
     }

@@ -1951,6 +1951,13 @@ impl AgentTool for RuntimePermissionAwareTool {
         self.inner.execution_working_directory()
     }
 
+    fn invocation_execution_directories(
+        &self,
+        input: &serde_json::Value,
+    ) -> Option<Vec<std::path::PathBuf>> {
+        self.inner.invocation_execution_directories(input)
+    }
+
     fn invocation_review_configuration(&self) -> Option<serde_json::Value> {
         self.inner.invocation_review_configuration()
     }

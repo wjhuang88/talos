@@ -269,6 +269,17 @@ pub trait AgentTool: Send + Sync {
         None
     }
 
+    /// Returns all initial execution directories selected by this exact input.
+    ///
+    /// Input-dependent process tools must override this using their execution
+    /// parser and resolver. `None` means resolution failed; an empty list means
+    /// the tool does not execute in a filesystem directory. This is review
+    /// metadata, not confinement or authority over child-process directory changes.
+    /// Wrappers must forward both the input and result unchanged.
+    fn invocation_execution_directories(&self, _input: &Value) -> Option<Vec<std::path::PathBuf>> {
+        Some(self.execution_working_directory().into_iter().collect())
+    }
+
     /// Returns implementation-owned configuration for exact invocation review.
     ///
     /// This metadata grants no trust or permission. Admission must separately verify

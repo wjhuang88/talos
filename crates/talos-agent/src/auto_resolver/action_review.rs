@@ -138,9 +138,14 @@ impl AutoPermissionResolver {
         let directory = evidence.working_directory();
         let directory_before = directory.and_then(execution_directory_identity);
         let ordinary_evidence = ordinary
-            && evidence
-                .configuration()
-                .is_some_and(|value| bounded_json(value).is_some() && !sensitive_json(value, 0))
+            && evidence.configuration().is_some_and(|value| {
+                value
+                    .get("execution_directories_resolved")
+                    .and_then(serde_json::Value::as_bool)
+                    != Some(false)
+                    && bounded_json(value).is_some()
+                    && !sensitive_json(value, 0)
+            })
             && (request.tool_name == "http_request"
                 || directory.is_some_and(|path| path.is_absolute() && path.to_str().is_some())
                     && directory_before.is_some());
