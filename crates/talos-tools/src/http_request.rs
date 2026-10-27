@@ -552,6 +552,9 @@ async fn read_bounded_body(
 mod timeout_tests;
 
 #[cfg(test)]
+mod test_support;
+
+#[cfg(test)]
 mod body_limit_tests;
 
 #[cfg(test)]

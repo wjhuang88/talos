@@ -358,7 +358,7 @@ async fn legacy_resolver_preserves_exact_input_network_fallback() {
 #[tokio::test]
 async fn ordinary_invocation_restrictions_precede_deterministic_allow() {
     use talos_permission::{PermissionDecision, PermissionRule};
-    for tool in ["exec", "http_request", "bash", "powershell"] {
+    for tool in ["exec", "http_request", "fetch_url", "bash", "powershell"] {
         for restriction in [
             PermissionDecision::Ask,
             PermissionDecision::Deny("private".into()),

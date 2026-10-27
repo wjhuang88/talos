@@ -681,7 +681,10 @@ impl PermissionPipeline {
             .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
         let mut request = PermissionRequest::new(tool_name, provenance.clone(), profile, input);
         if builtin_description.is_some()
-            && matches!(tool_name, "bash" | "powershell" | "exec" | "http_request")
+            && matches!(
+                tool_name,
+                "bash" | "powershell" | "exec" | "http_request" | "fetch_url"
+            )
         {
             request = request.with_transitive_effects();
         }

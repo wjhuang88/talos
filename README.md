@@ -320,8 +320,11 @@ their existing fail-closed behavior for unresolved `Ask` decisions; enabling `au
 not silently grant those surfaces model authority. Disabling auto always returns an interactive
 surface to human approval and a headless surface to denial.
 
-Product-owned `bash`/`powershell`, `exec` and ordinary `http_request` requests can
+Product-owned `bash`/`powershell`, `exec`, `fetch_url` and ordinary `http_request` requests can
 receive one-use Auto approval of the complete invocation and its transitive effects.
+`fetch_url` review discloses constructor and timeout-override redirect limits separately;
+its body limit truncates displayed content after buffering the complete response,
+so it is not a transfer or memory cap.
 Review binds the exact arguments, current intent, implementation configuration and
 starting directory identity where applicable. Commands may run other programs,
 change files and access the network; HTTP may follow redirects and inherited proxies.

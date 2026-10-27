@@ -19,7 +19,7 @@ fn request_timeout_is_clamped_without_rebuilding_client() {
 
 #[tokio::test]
 async fn timeout_override_preserves_disabled_redirects() {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::io::AsyncWriteExt;
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
@@ -27,8 +27,7 @@ async fn timeout_override_preserves_disabled_redirects() {
     let address = listener.local_addr().expect("address");
     let server = tokio::spawn(async move {
         let (mut stream, _) = listener.accept().await.expect("connection");
-        let mut buffer = [0; 4096];
-        stream.read(&mut buffer).await.expect("request");
+        super::test_support::read_request_headers(&mut stream).await;
         stream.write_all(b"HTTP/1.1 302 Found\r\nLocation: /redirected\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
             .await.expect("response");
     });

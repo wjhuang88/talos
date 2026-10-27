@@ -77,6 +77,7 @@ impl AutoPermissionResolver {
                 | "powershell"
                 | "exec"
                 | "http_request"
+                | "fetch_url"
         ) {
             return self
                 .resolve_action_review(request, evidence, remaining, allowed, intent)
