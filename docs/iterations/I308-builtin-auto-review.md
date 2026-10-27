@@ -1373,3 +1373,28 @@ still pending. This local stage does not complete T8 or waive save/search accept
   `3202c6af0`; the shared HTTP fixture repair there resolves the pre-existing
   unused-read-amount Clippy failures on main. This checkpoint is not publication,
   full preflight, independent security approval, Windows evidence or T8 completion.
+
+
+### Save URL recovery implementation checkpoint — 2026-10-27
+
+- Local implementation commit `56c5a3ce9` adds optional `retain_backup` and
+  `recovery_id` JSON arguments without changing public `SaveUrlInput` fields.
+  Recoverable overwrites capture an existing regular file before download and
+  reuse the existing bounded recovery store and atomic replacement. Restore
+  requires Read+Write, performs no request, and consumes its receipt once.
+  Limits remain 2 MiB per image, 64 records/16 MiB and 15 minutes per tool instance.
+- Locked Tools `network,file-write` tests passed: 516 library tests plus enabled
+  integration/doc tests; 15 Save URL tests include original restoration,
+  wrong-instance/path/replay refusal, changed-content refusal, deterministic
+  modification during download and over-limit download preserving original data.
+  The proxy fixture is bounded by five seconds and joined by each download test.
+  Clippy for the same library/tests passed with `-D warnings`; the isolated
+  `--no-default-features --features file-write` check passed.
+- Independent same-session read-only Agent static permission/security/API review
+  approved the local delta, without independently running tests. The shared
+  primitive checks content then renames atomically; it is not atomic CAS against
+  external writers or retained inode identity. README states this limitation.
+- This is local recovery implementation only. Save URL Auto admission, complete
+  before/after model evidence and remaining G acceptance are not implemented by
+  this commit. Full standard preflight, exact-head Windows/CI, publication and
+  merge approval are still required. T8 and the handoff remain Partial.

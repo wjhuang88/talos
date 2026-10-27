@@ -1,3 +1,11 @@
+> Local checkpoint 2026-10-27: Save URL bounded streaming and optional overwrite
+> recovery are implemented at `7590b1df0` / `56c5a3ce9` on
+> `feat/i308-save-auto`, stacked on Fetch PR #784. Tools network+file-write tests
+> and focused recovery tests pass; independent static review approved the recovery
+> delta. Save URL Auto admission and complete mutation evidence remain unimplemented.
+> These local commits are not merged delivery evidence. #784 exact-head CI remains
+> pending; T8 and the original remaining queue are unchanged / incomplete.
+
 ## T8 ordinary invocation stage merged — 2026-10-27
 
 PR #783 merged as `da280c8a77b25798e59df37f3bdc2bf2fafce1c9` after exact-head CI 40482737690 passed all eight checks, local full locked preflight, both governance validators, independent permission/security/API review and final CAS. Ordinary Shell/Exec/HTTP now use the accepted whole-invocation Auto boundary; accepted search coexistence #782 is also merged. Fetch URL follow-up is locally implemented and under full validation; Save URL/search and remaining complete profile/operation acceptance stay outstanding. T8 remains Partial. T2/T3 → T4 → T5 → T1 → T6 remain incomplete and unchanged.
