@@ -1,6 +1,20 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
-## Current delivery checkpoint — 2026-10-26
+## Current delivery checkpoint — 2026-10-27
+
+I308/T8 remain Active / Partial. Ordinary Shell/Exec/HTTP routing, bound whole-invocation
+assessment and final identity checks are implemented locally through `0da56314d`;
+this branch has not yet been published or merged. Real Unix tests cover command file
+creation and HTTP proxy/redirect effects, policy refusal, failure/stale outcomes,
+Auto-control disablement, external/replacement registration and command replay.
+Full Agent tests pass 509/509; cargo-xwin test-target checking is compile evidence only.
+The full standard preflight passed at earlier implementation baseline `258fd55d4`;
+subsequent test changes have focused/full Agent and Clippy evidence below, not a new
+whole-workspace preflight result. Native Windows execution, complete operation/profile
+reconciliation, final exact-head review/CI and merge remain outstanding. The original
+acceptance and remaining handoff queue are unchanged.
+
+### Earlier merged-stage checkpoint — 2026-10-26
 
 Foundation #769 merged as `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`.
 Exact head `ffa35973022c18f752cacad1922325e15c648379` passed all six jobs in
@@ -337,10 +351,11 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 |---|---|
 | `read`, `ls`, `read_image`, `document_extract`, `grep`, `glob`, `diff`, `stat`, `tree`, `find_symbol`, `find_references`, `list_symbols`, `list_imports` | Real Agent dispatch tests cover default Read Allow and explicit Read Deny for all listed operations, with actual results and zero model assessments/grants. Image attachment reaches only the next provider request after an allowed read. Complete profile/platform coverage remains outstanding. MCP omits `read_image`. |
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
-| `save_url`, `fetch_url`, `http_request`, `web_search` | Protected prepared network assessment exists; ordinary product transport Auto allowance remains unimplemented and its pending contract decision is not assumed accepted. |
+| `http_request` | Ordinary whole-invocation Auto implemented locally; actual proxy/redirect AllowOnce and refusal/stale/external/replacement effects tested. Final native Windows, review/CI/merge remain outstanding. |
+| `save_url`, `fetch_url`, `web_search` | Default production instances are not prepared-network tools and do not receive ordinary model AllowOnce. Existing deterministic policy/human paths remain; actual production fallback tests and remaining Auto acceptance are outstanding. I293 guarded compatibility/SearXNG instances are separately protected and cannot downgrade. Ordinary HTTP evidence does not cover this row. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
-| `bash` (Unix) / `powershell` (Windows), `exec` | Existing shell/direct-command paths retained; I308 full profile/decision evidence outstanding. |
+| `bash` (Unix) / `powershell` (Windows), `exec` | Local whole-invocation Auto implementation and actual Unix allow/refusal/cancel/stale/registration/replay tests pass. Windows fixtures compile via cargo xwin; native Windows and full profile/final gates remain outstanding. |
 | `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Session-scoped Internal facets retain default deterministic Allow, not model approval. Local real-Agent tests cover all nine operations under default Allow and explicit Internal Deny, actual SQLite effects, unchanged other-session data, zero assessor calls and zero grants. MCP does not add Todo; complete profile/platform evidence remains outstanding. |
 | `status` | MCP-only read tool; concrete built-in ownership checked. |
 | `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Product-owned scheduler factory registers actual instances as built-ins; caller-supplied instances remain external. A local action-review implementation now admits exact scheduling/cancellation invocations, pending validation and independent review below. `list_scheduled_tasks` retains Read policy. This stage is not merged acceptance. |
@@ -1188,3 +1203,32 @@ validation alternative, not a fix for #768 or evidence of parallel reliability.
 - Final-baseline and test-reliability checkpoint (2026-10-27): full standard locked release preflight at implementation commit `258fd55d4` passed, including workspace checks, Clippy, tests/doc tests and both independently resolved Runtime SDK consumers (`target/recovery/invocation-258fd55d4-preflight.log` in the root checkout). Subsequent test-only changes add externally asserted scenario-reached counters to ordinary resolver and real HTTP assessment fixtures, so panic containment cannot disguise failed request-evidence assertions as expected refusal. Production Shell/Exec fixtures additionally disable Auto during assessment and verify that a returned AllowOnce does not create either the directory or file. The updated focused `cargo test --locked -p talos-agent ordinary_` passed (`target/recovery/ordinary-reliability-cancel.log`). This is cancellation of Auto authority, not proof of every caller/task cancellation path. Updated-source warnings-denied Agent library/test Clippy passed (`target/recovery/ordinary-reliability-cancel-clippy.log`); independent bounded static review approved the three-test delta without running tests. Registration/replay integration gaps, native Windows execution and final remote gates remain outstanding; the preflight result is baseline evidence and is not claimed for subsequent edits. T8 remains Partial.
 
 - Registration/replay integration checkpoint (2026-10-27): actual production Shell/Exec and HTTP fixtures now test unchecked external registration and replacement of a previously trusted registration with a distinct production instance. Neither enters ordinary-invocation assessment; denied fallback produces no fixture directory/file or HTTP proxy connection. Shell/Exec additionally repeat a successful call ID with identical and changed inputs across model continuations. Ordinary review occurs again before the final execution-ledger reservation: both reviews must satisfy independent precondition counters, the first result succeeds, and the second explicitly reports replay or identity conflict without a second execution. The initial test incorrectly assumed reservation preceded assessment and failed; the corrected fixture verifies the actual contract rather than claiming assessor deduplication. Updated focused `cargo test --locked -p talos-agent ordinary_` passes (`target/recovery/ordinary-registration-replay-all.log`). Full locked Agent library tests passed 509/509 (`target/recovery/ordinary-registration-replay-agent.log`), warnings-denied library/test Clippy passed (`target/recovery/ordinary-registration-replay-clippy.log`), and independent bounded static review approved the two-test delta without running tests. Both governance validators passed with zero warnings, and locked cargo-xwin Windows test-target checking passed (`target/recovery/ordinary-registration-replay-xwin.log`); the sandboxed first attempt could not update its external cache link, and the authorized retry passed. Native Windows execution, final documentation/evidence reconciliation and remote gates remain outstanding. T8 remains Partial.
+
+
+### Ordinary invocation API and documentation reconciliation — 2026-10-27
+
+- README now describes whole-invocation authority, inherited HTTP proxy/redirect effects,
+  dynamic-directory disclosure, explicit policy precedence and lack of transitive confinement
+  or rollback. This documents the local candidate, not a merged release.
+- Public `AgentTool` additions are defaulted: `invocation_review_configuration()` returns
+  unavailable by default, and `invocation_execution_directories(input)` defaults to the existing
+  execution working directory. Existing implementers need no new methods. Product wrappers
+  forward both methods unchanged. Input-dependent tools must use their real execution parser
+  when overriding directory evidence. Metadata never grants trusted registration or authority.
+- Custom `AutoPermissionAssessor` implementations must implement
+  `assess_ordinary_invocation` for ordinary model approval; its default reports unsupported.
+  Existing human/headless fallback remains available. The public assessment directory identity
+  remains an optional string; retained handles are private execution evidence.
+- Latest owner header and network/command inventory rows now distinguish local implementation
+  from merged stages. Full save_url/fetch_url/WebSearch production dispositions and applicable
+  host/profile evidence are not inferred from the ordinary HTTP fixture. T8 remains Partial.
+
+- Documentation review approved the bounded diff and identified a substantive inventory distinction:
+  default production `save_url`, `fetch_url` and legacy `WebSearchTool` do not opt into
+  prepared-network admission. They currently retain deterministic/human paths and have no
+  ordinary model AllowOnce implementation. Only I293 guarded compatibility/SearXNG instances
+  establish that protected contract. The corrected table does not treat these missing Auto
+  capabilities as delivered by fallback documentation. Remaining production fallback tests and
+  original Auto acceptance require implementation or an explicit maintainer scope decision.
+  Both governance validators passed with zero warnings for this documentation stage; source
+  has not changed since the preceding validated test commit.
