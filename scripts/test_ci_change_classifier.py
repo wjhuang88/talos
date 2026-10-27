@@ -47,6 +47,14 @@ class ClassifierTests(unittest.TestCase):
             preflight,
         )
 
+    def test_windows_gate_requires_workspace_and_desktop(self) -> None:
+        workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text()
+        gate = workflow.split("  windows-rust:", 1)[1].split("  windows-workspace:", 1)[0]
+        self.assertIn("needs: [classify-changes, windows-workspace, windows-desktop]", gate)
+        self.assertIn('test "$WORKSPACE_RESULT" = success', gate)
+        self.assertIn('test "$DESKTOP_RESULT" = success', gate)
+        self.assertIn("if: always()", gate)
+
     def assert_reduced(self, *records: tuple[str, str]) -> None:
         self.assertFalse(MODULE.classify_name_status(payload(*records)).full_validation)
 
