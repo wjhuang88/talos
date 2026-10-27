@@ -20,7 +20,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child requirement #748 records this bounded slice. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
 | Implementation PR | #749 |
-| Last Updated | 2026-10-26 |
+| Last Updated | 2026-10-27 |
 | Handoff / Release Condition | Claim activates only when #747 reaches main with accepted ADR-093. Sibling families remain unclaimed; Complete requires existing implementation commit evidence. |
 
 ## Goal
@@ -176,3 +176,14 @@ Recorded upstream SSE capture (including parallel tools/reasoning/error paths), 
 review and the distinct-endpoint residual remain open. Existing inline mocks and non-stream SDK
 snapshots are not relabeled as captured upstream streams. Status stays Active / Claimed; no
 completion, merge or release is claimed.
+
+## Independent Review Correction Stage — 2026-10-27
+
+The three blockers from the independent bb31d012 review have working-source corrections: real
+request-local tool image continuation with no automatic repost and expiry, explicit Compat/Strict
+configuration-to-runtime preservation and shared text parsing, and parallel plus sourced SDK stream
+replay. The new CLI scenarios use read_image without --attach and exercise both textual tool modes;
+they do not substitute attachment history for a one-shot tool image. Upstream fixture hashes,
+license and acquisition limits are explicit in the fixture README. Independent WIP re-review
+approves those corrections; stable-head CI/review/publication remain pending. Details and retained
+initial failures are in I306. Status stays Active / Claimed, with no completion or release claim.

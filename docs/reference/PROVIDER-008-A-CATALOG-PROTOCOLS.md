@@ -218,3 +218,40 @@ inherited MCP git_prepared at 26 passed / 21 failed under the recorded socket/Gi
 This combined-source focused run is not a full local workspace pass. Recorded upstream SSE
 provenance, independent API review, distinct-endpoint residual disposition and #749-first merge /
 retarget sequencing remain open. Keep Draft; no completion, activation or release is claimed.
+
+
+## Independent-Review Correction Base Synchronization — 2026-10-27
+
+Code dependency #749 is now `17a3e64a00daaabc163e20e41a2799e9f79bada9`, integrated with main
+`33fad1b8db85cd6f319247a2ed25bff6bd495f94` including merged #777/#778. Its complete source tree is
+`eb4d581b2a127318ad78cbe3e25c289c90e4fffa`. Independent read-only Agent exact-head technical
+review APPROVE closes all three original bb31d012 blockers: actual one-shot tool image continuation,
+explicit Compat/Strict tool modes, and representative parallel plus sourced SDK stream replay.
+This is shared-account Agent review, not distinct-human approval. Code CI3479 is still running at
+this checkpoint; neither old green CI nor this review substitutes for its final machine verdict.
+
+The combined data candidate preserves the catalog blob `cf604fdb9a62c8a93a0bd53476a4ee7cd9e3e486`
+and snapshot-test blob `139a39337451b0cf32b81ec208d2d6164f7486e5` exactly. Relative to the code
+candidate only the same three files differ; only this ledger adds new data-specific prose. All
+6,474 models, 4,016 optional signals, withheld counts, provider roots, pricing, limits and capabilities
+remain unchanged from the previously reviewed projection.
+
+Combined-source pinned locked validation passed **41 tests across four groups**: 4 catalog snapshot,
+4 actual CLI Agent, 5 HTTP and 28 transport/semantic/property. Zero failed/ignored/filtered; all
+processes recorded exit 0. Includes one-shot read_image without --attach, both explicit text modes,
+MaxTokens preservation, 503 no-repost, upstream persisted reasoning/error fixtures, parallel calls
+and semantic-terminal HTTP release. Formatting and diff checks passed. The same physical checkout
+switched branches only after code validation finished and reused its own target; no independent
+worktrees shared artifacts.
+
+The code source separately passed 1,799 core/config/provider/CLI/TUI tests, strict checks and both
+external runtime SDK modes. Its complete local standard preflight still stops at inherited MCP
+26 passed / 21 failed; this focused data run is not a full local workspace pass. Earlier TUI failures,
+CI3463 timing failure and cancelled retries remain historical evidence without inferred root-cause
+closure. The integrated #778 clock fixture fix passed its own eight-job CI3470 before merge; the
+new code/data heads each require fresh unfiltered CI.
+
+Distinct model endpoint routing remains unimplemented and withheld; it is not delivered through
+protocol metadata. Keep Draft until current-head validation and remaining owner acceptance/residual
+disposition. Merge #749 first, then retarget/reconcile #775 onto main and revalidate. No completion,
+default activation through this unmerged PR, or release is claimed.

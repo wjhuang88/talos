@@ -3,7 +3,8 @@
 pub(in crate::search_backend) mod invocation;
 use super::{
     CompatibilityError, Method, PreparedTransportRequest, SearchTransport, TransportError,
-    TransportResponse, Url, admission, request_endpoint,
+    TransportResponse, Url, admission, manifest_extends_scope_without_policy_widening,
+    request_endpoint,
 };
 use crate::search_backend::{
     SearchBackendId, SearchBackendResult,
@@ -50,12 +51,31 @@ impl SearXngConfiguration {
         Ok(Self { url, scope })
     }
 
+    pub(in crate::search_backend) fn scope(&self) -> &ToolNetworkScope {
+        &self.scope
+    }
+
     pub(in crate::search_backend) fn prepare(
         &self,
         query: &str,
         max_results: u32,
     ) -> Result<PreparedSearXng, TransportError> {
+        let manifest = ToolNetworkManifest::new(self.scope.clone());
+        self.prepare_with_manifest(&manifest, query, max_results)
+    }
+
+    /// Freeze this candidate against an invocation manifest owned by a future combined plan.
+    /// Endpoints may be a superset, but global proxy/private/redirect policy may not widen.
+    pub(in crate::search_backend) fn prepare_with_manifest(
+        &self,
+        manifest: &ToolNetworkManifest,
+        query: &str,
+        max_results: u32,
+    ) -> Result<PreparedSearXng, TransportError> {
         if query.trim().is_empty() || query.len() > 4096 || !(1..=20).contains(&max_results) {
+            return Err(TransportError::InvalidRequest);
+        }
+        if !manifest_extends_scope_without_policy_widening(manifest, &self.scope) {
             return Err(TransportError::InvalidRequest);
         }
         // Match the existing adapter's byte encoding, including %20 rather than '+'.
@@ -77,20 +97,32 @@ impl SearXngConfiguration {
         }
         let mut url = self.url.clone();
         url.set_query(Some(&encoded));
-        let manifest = ToolNetworkManifest::new(self.scope.clone());
-        let request = PreparedTransportRequest::json_bytes(&manifest, url, Method::GET, None)?;
-        let facets = vec![ToolPermissionFacet::with_resource(
-            ToolNature::Network,
-            self.scope.endpoints()[0].host(),
-            ToolResourceKind::Domain,
-        )];
+        let request = PreparedTransportRequest::json_bytes(manifest, url, Method::GET, None)?;
+        let facets = facets(manifest);
         Ok(PreparedSearXng {
-            manifest,
+            manifest: manifest.clone(),
             request,
             facets,
             max_results,
         })
     }
+}
+
+fn facets(manifest: &ToolNetworkManifest) -> Vec<ToolPermissionFacet> {
+    let mut hosts: Vec<_> = manifest
+        .scope()
+        .endpoints()
+        .iter()
+        .map(|endpoint| endpoint.host())
+        .collect();
+    hosts.sort_unstable();
+    hosts.dedup();
+    hosts
+        .into_iter()
+        .map(|host| {
+            ToolPermissionFacet::with_resource(ToolNature::Network, host, ToolResourceKind::Domain)
+        })
+        .collect()
 }
 
 pub(in crate::search_backend) struct PreparedSearXng {

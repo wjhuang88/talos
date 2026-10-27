@@ -20,7 +20,7 @@
 | Implementation PR | #749 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child #748 records the bounded implementation requirement. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
-| Last Updated | 2026-10-26 |
+| Last Updated | 2026-10-27 |
 | Handoff / Release Condition | Activates only when #747 merges with accepted ADR-093. Complete only with existing implementation commit evidence; siblings B-D remain separate. |
 
 ## Published Baseline
@@ -348,3 +348,63 @@ post-2789 diff changes only Search's `search_backend.rs` and `web_search.rs`, ou
 A Git merge-tree check is clean. The validation baseline remains 2789 plus this candidate; no
 validation of an integrated 7ca67d9e tree is inferred. Repeat merge-time CAS and fresh exact-head CI
 before merge.
+
+## Independent Review Corrections — 2026-10-27
+
+Independent read-only Agent review of remote bb31d012 requested changes for missing true
+EphemeralImage dispatch, rejected explicit textual tool modes, and missing recorded/parallel streams.
+The existing --attach binary test was user-history image replay, not ADR-051 tool image continuation.
+The stable local correction stage starts from that head and integrates main 33fad1b8 (including
+merged fixture/CI maintenance #778/#777 and independently owned I308/Search work); main work is
+retained without taking over those scopes.
+
+- Responses now implements the actual ephemeral trait method, shares image bounds/expiry encoding,
+  applies a deadline over dispatch and stalled error-body reads, and disables automatic reposting
+  of the image-bearing request under ADR-051. A real CLI read_image → read → final round requires
+  exactly one image only in the second request. Separate 503 no-repost and error-body expiry tests
+  exercise the request-local carrier rather than durable attachments. Existing Chat/Anthropic
+  resource-format branches retain their behavior; their retry behavior is not modified here.
+- Compat/TalosStrict use the existing text projection/parser and browser invocation evidence path.
+  A previously dropped ProviderConfig.tool_protocol is now retained in the merged runtime view.
+  Both explicit modes complete actual CLI read-tool rounds with textual result replay and no native
+  tool schema. Native remains the automatic capability choice; unresolved Auto still fails.
+- A clearly labeled synthetic fixed SSE stresses two interleaved Unicode calls completed in reverse
+  order. Vercel AI SDK persisted reasoning/tool/text/usage and error streams are additionally copied
+  byte-for-byte from e59b6e017aece6cc45c4ee7d94af88829621ed8d, with full hashes and retained license
+  notice in tests/fixtures/README.md. The harness follows upstream JSONL framing and separates four
+  completed turns. This is sourced SDK recording evidence, not a Talos live endpoint call.
+
+Independent WIP re-review approves these implementation corrections and fixture provenance; the
+original three blockers are resolved at working-source level. It is not final-head CI/approval or
+human authorization. The original single-call/attachment-only gaps, first factory capability
+expectation failure and binary text-mode failures before fixing configuration merge remain
+historical failures. No assertion or permission guard was removed to conceal them.
+
+Locked verification and final publication mapping are recorded below after source freeze. Keep
+Active/Claimed and Draft until fresh complete CI and exact-head review. Distinct model endpoints
+remain withheld under the documented residual; Gemini/Azure/Bedrock and MODEL-014 remain separate.
+
+### Corrected Candidate Frozen Validation
+
+Pinned Rust 1.99.0, locked dependencies, four build jobs, zero debug info and incremental disabled.
+Final five-package core/config/provider/CLI/TUI run: **1,799 passed across 50 result groups**, zero
+failed/ignored/filtered, exit 0. Includes all four actual CLI Agent scenarios, both text modes,
+503 no-repost, Responses expiry, interleaved synthetic stream and two sourced SDK replay cases.
+The textual stream regression also checks max_output_tokens remains MaxTokens in either text mode.
+Strict HTTP-target and CLI-Agent-target Clippy passed after correcting diagnostic unwraps in the
+new test code; format/diff checks passed. Complete external runtime SDK validation passed both
+independently resolved default and coding modes with locked dependencies.
+
+Frozen standard release_preflight passed static/installer checks, both governance validators,
+format, workspace check and strict workspace Clippy, then stopped at inherited MCP git_prepared
+with **26 passed / 21 failed**, exit 101, under the recorded socket creation/native Git binding
+conditions. This is not a green local workspace/preflight claim. Earlier failed factory capability
+expectation and first two explicit-text binary rounds are preserved as convergence failures; the
+latter diagnosed the real merged-config field omission rather than an adapter parser failure.
+
+Independent read-only working-source review now APPROVE for all three original blockers, including
+upstream fixture hashes/provenance/license. The additional recorded tests assert aggregated summary
+and visible text directly without printing encrypted payloads. This working-source conclusion is
+not final-head CI/merge approval. The source correction is published as one stable stage after
+complete tree verification; new head and relevant data baseline require fresh CI/review. Neither
+I306 nor #748 is Complete, and no release is claimed.

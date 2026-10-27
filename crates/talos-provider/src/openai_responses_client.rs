@@ -132,19 +132,37 @@ impl OpenAIResponsesClient {
         tools: &[ToolDefinition],
         progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
     ) -> ProviderResult<mpsc::Receiver<ResponsesStreamOutput>> {
+        self.stream_with_images(messages, tools, progress_tx, Vec::new())
+            .await
+    }
+
+    pub(crate) async fn stream_with_images(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+        images: Vec<talos_core::provider::EphemeralImage>,
+    ) -> ProviderResult<mpsc::Receiver<ResponsesStreamOutput>> {
         let replay = self
             .reasoning
             .as_ref()
             .is_none_or(|reasoning| reasoning.replay);
         let messages = replay_safe_messages(&self.provider_key, &self.model, replay, messages);
-        let body = build_request_body(
+        let mut body = build_request_body(
             &self.model,
             &messages,
             tools,
             self.reasoning.as_ref(),
             self.output_limit,
         );
-        let response = self.send_request(&body, progress_tx).await?;
+        let deadline = crate::image_io::append_responses_ephemeral_images(&mut body, images)?;
+        let response = match deadline {
+            Some(_) => {
+                self.send_request_with_deadline(&body, progress_tx, deadline)
+                    .await?
+            }
+            None => self.send_request(&body, progress_tx).await?,
+        };
         let (tx, rx) = mpsc::channel(32);
         tokio::spawn(crate::openai_responses_transport::parse_response_stream(
             response,
@@ -160,11 +178,55 @@ impl OpenAIResponsesClient {
         body: &Value,
         progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
     ) -> ProviderResult<reqwest::Response> {
-        let max_attempts = self.timeout_config.max_attempts;
+        self.send_request_with_deadline(body, progress_tx, None)
+            .await
+    }
+
+    async fn send_request_with_deadline(
+        &self,
+        body: &Value,
+        progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+        deadline: Option<std::time::Instant>,
+    ) -> ProviderResult<reqwest::Response> {
+        let request = self.send_request_before_deadline(body, progress_tx, deadline);
+        match deadline {
+            Some(expires) => tokio::time::timeout_at(expires.into(), request)
+                .await
+                .map_err(|_| {
+                    ProviderError::InvalidResponse("ephemeral image expired during request".into())
+                })?,
+            None => request.await,
+        }
+    }
+
+    async fn send_request_before_deadline(
+        &self,
+        body: &Value,
+        progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+        deadline: Option<std::time::Instant>,
+    ) -> ProviderResult<reqwest::Response> {
+        let max_attempts = if deadline.is_some() {
+            0
+        } else {
+            self.timeout_config.max_attempts
+        };
+        // ADR-051: an ephemeral image may not be replayed by automatic retries.
+        let retry_decision = |error: &ProviderError, attempt| {
+            if deadline.is_some() {
+                RetryDecision::DoNotRetry
+            } else {
+                self.retry_decision(error, attempt)
+            }
+        };
         let dispatch_timeout = Duration::from_secs(self.timeout_config.dispatch_timeout_secs);
         let mut attempt = 0u32;
 
         loop {
+            if deadline.is_some_and(|expires| std::time::Instant::now() >= expires) {
+                return Err(ProviderError::InvalidResponse(
+                    "ephemeral image expired before dispatch".into(),
+                ));
+            }
             emit_progress(
                 progress_tx,
                 if attempt == 0 {
@@ -195,7 +257,7 @@ impl OpenAIResponsesClient {
                         "request dispatch timeout: no response headers within {}s",
                         self.timeout_config.dispatch_timeout_secs
                     ));
-                    match self.retry_decision(&error, attempt) {
+                    match retry_decision(&error, attempt) {
                         RetryDecision::Retry {
                             attempt: next_attempt,
                             delay_ms,
@@ -232,7 +294,7 @@ impl OpenAIResponsesClient {
                     let status = response.status();
                     let body = response.text().await.unwrap_or_default();
                     let error = responses_status_to_error(status, body);
-                    match self.retry_decision(&error, attempt) {
+                    match retry_decision(&error, attempt) {
                         RetryDecision::Retry {
                             attempt: next_attempt,
                             delay_ms,
@@ -254,7 +316,7 @@ impl OpenAIResponsesClient {
                 }
                 Err(error) => {
                     let error = ProviderError::NetworkError(error.to_string());
-                    match self.retry_decision(&error, attempt) {
+                    match retry_decision(&error, attempt) {
                         RetryDecision::Retry {
                             attempt: next_attempt,
                             delay_ms,

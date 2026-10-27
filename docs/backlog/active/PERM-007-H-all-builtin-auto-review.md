@@ -12,10 +12,13 @@
 ## Current Execution — 2026-10-26
 
 Activation #765 is merged at `8f0ce2340`. [I308](../../iterations/I308-builtin-auto-review.md)
-records local implementation and validation; full H/G acceptance remains incomplete.
-Exact-input creation review and opt-in bounded edit/delete backup/recovery are
-implemented locally. Default HTTP/WebSearch, ordinary effectful exec and higher-risk
-edit/delete Auto admission remain unimplemented; recovery alone does not satisfy G.
+records implementation and validation; full H/G acceptance remains incomplete.
+#769 merged exact-input creation review; #770 merged supported text edit/delete
+model review, Auto admission and opt-in bounded recovery. #771 merged policy/read
+tests. #772 (`881a27b890e5310055380e6e3f5b0da78f9fdd3c`) merged scheduler
+action review and native operation/recovery evidence after all-six-success CI
+40296390604 and independent review. Default HTTP/WebSearch, ordinary effectful
+exec and remaining profile/recovery acceptance are still incomplete.
 The selection-proposal paragraphs below preserve the published baseline and are historical.
 
 ## Outcome

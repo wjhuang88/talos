@@ -73,6 +73,14 @@ reasoning remains opaque, is isolated by provider/model identity and is excluded
 request previews. Built-in Responses tools, server-side state, Gemini, Azure and Bedrock are outside
 PROVIDER-008-A.
 
+Tool protocol remains a separate selection: explicit `compat` and `talos-strict` use text tool
+instructions/results and the shared text parser over the Responses wire, while `native` sends
+function schemas. Provider-level `tool_protocol` is retained when merging user configuration.
+Tool-generated images (`read_image` or browser captures) use request-local `input_image` parts only
+in the immediate next request. The shared image resource limits and earliest expiry apply; a
+request containing these images is dispatched once and is not automatically retried. Durable user
+attachments retain their existing history behavior.
+
 ## Public API Migration
 
 `ProviderProtocol` and its shared `CatalogProviderProtocol` mirror gain `OpenAIResponses` and become

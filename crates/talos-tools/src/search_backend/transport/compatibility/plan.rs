@@ -13,6 +13,7 @@ use super::{
     CompatibilityError, TransportError,
     admission::AdmittedCompatibilityResults,
     chain::{CompatibilityChainError, ORDER, PreparedCompatibilityChain},
+    manifest_extends_scope_without_policy_widening,
 };
 use crate::search_backend::transport::{SearchTransport, SystemSearchDns, TransportBudget};
 
@@ -38,16 +39,34 @@ impl DirectCompatibilityConfiguration {
         Ok(Self { scope })
     }
 
+    pub(in crate::search_backend) fn scope(&self) -> &ToolNetworkScope {
+        &self.scope
+    }
+
     pub(in crate::search_backend) fn prepare(
         &self,
         query: &str,
         max_results: u32,
     ) -> Result<PreparedCompatibilityPlan, CompatibilityError> {
         let manifest = ToolNetworkManifest::new(self.scope.clone());
-        let chain = PreparedCompatibilityChain::prepare(&manifest, query, max_results)?;
-        let facets = facets(&manifest);
+        self.prepare_with_manifest(&manifest, query, max_results)
+    }
+
+    /// Freeze this candidate against an invocation manifest owned by a future combined plan.
+    /// Endpoints may be a superset, but global proxy/private/redirect policy may not widen.
+    pub(in crate::search_backend) fn prepare_with_manifest(
+        &self,
+        manifest: &ToolNetworkManifest,
+        query: &str,
+        max_results: u32,
+    ) -> Result<PreparedCompatibilityPlan, CompatibilityError> {
+        if !manifest_extends_scope_without_policy_widening(manifest, &self.scope) {
+            return Err(TransportError::InvalidRequest.into());
+        }
+        let chain = PreparedCompatibilityChain::prepare(manifest, query, max_results)?;
+        let facets = facets(manifest);
         Ok(PreparedCompatibilityPlan {
-            manifest,
+            manifest: manifest.clone(),
             chain,
             facets,
             #[cfg(test)]
@@ -126,3 +145,92 @@ impl PreparedCompatibilityPlan {
 
 #[cfg(test)]
 pub(super) mod tests;
+
+#[cfg(test)]
+mod shared_manifest_tests {
+    use super::*;
+    use crate::search_backend::transport::compatibility::searxng::SearXngConfiguration;
+    use std::net::IpAddr;
+    use talos_core::tool::ToolNetworkEndpoint;
+
+    fn endpoints(
+        direct: &DirectCompatibilityConfiguration,
+        searxng: &SearXngConfiguration,
+    ) -> Vec<ToolNetworkEndpoint> {
+        let mut endpoints = direct.scope().endpoints().to_vec();
+        endpoints.extend_from_slice(searxng.scope().endpoints());
+        endpoints
+    }
+
+    fn shared_manifest(
+        direct: &DirectCompatibilityConfiguration,
+        searxng: &SearXngConfiguration,
+    ) -> ToolNetworkManifest {
+        ToolNetworkManifest::new(
+            ToolNetworkScope::new_configuration(endpoints(direct, searxng), None, vec![], 0)
+                .expect("shared scope"),
+        )
+    }
+
+    #[test]
+    fn public_candidates_can_freeze_against_one_shared_invocation_manifest() {
+        let direct = DirectCompatibilityConfiguration::new().expect("direct");
+        let searxng = SearXngConfiguration::new("https://search.example/prefix/").expect("searxng");
+        let manifest = shared_manifest(&direct, &searxng);
+
+        let direct_plan = direct
+            .prepare_with_manifest(&manifest, "private query", 2)
+            .expect("direct plan");
+        let searxng_plan = searxng
+            .prepare_with_manifest(&manifest, "private query", 2)
+            .expect("searxng plan");
+
+        assert_eq!(direct_plan.manifest(), &manifest);
+        assert_eq!(searxng_plan.manifest(), &manifest);
+        assert_eq!(
+            direct_plan.manifest().invocation_id(),
+            searxng_plan.manifest().invocation_id()
+        );
+        assert_eq!(
+            direct_plan.permission_profile(),
+            searxng_plan.permission_profile()
+        );
+        assert_eq!(manifest.scope().endpoints().len(), 5);
+        assert_eq!(direct_plan.permission_profile().len(), 5);
+        assert!(!format!("{manifest:?}").contains("private query"));
+    }
+
+    #[test]
+    fn shared_manifest_cannot_widen_global_network_policy() {
+        let direct = DirectCompatibilityConfiguration::new().expect("direct");
+        let searxng = SearXngConfiguration::new("https://search.example/").expect("searxng");
+        let proxy =
+            ToolNetworkEndpoint::new("http", "proxy.example", 8080, "CONNECT", "/").expect("proxy");
+        let private: IpAddr = "127.0.0.1".parse().expect("private ip");
+        for (proxy, private_addresses, redirect_limit) in [
+            (Some(proxy), vec![], 0),
+            (None, vec![private], 0),
+            (None, vec![], 1),
+        ] {
+            let manifest = ToolNetworkManifest::new(
+                ToolNetworkScope::new_configuration(
+                    endpoints(&direct, &searxng),
+                    proxy,
+                    private_addresses,
+                    redirect_limit,
+                )
+                .expect("scope"),
+            );
+            assert!(matches!(
+                direct.prepare_with_manifest(&manifest, "q", 1),
+                Err(CompatibilityError::Transport(
+                    TransportError::InvalidRequest
+                ))
+            ));
+            assert!(matches!(
+                searxng.prepare_with_manifest(&manifest, "q", 1),
+                Err(TransportError::InvalidRequest)
+            ));
+        }
+    }
+}

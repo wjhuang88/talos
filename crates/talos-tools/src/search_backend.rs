@@ -48,12 +48,28 @@ pub(crate) struct SearchBackendResult {
 }
 
 /// Typed failure at the compatibility boundary.
+///
+/// This taxonomy records only evidence the adapter can establish directly. Generic retry,
+/// backoff and breaker policy remains NET-001 ownership; caller cancellation/deadline remain
+/// SearchRouter control outcomes rather than guessed backend failures.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub(crate) enum SearchBackendError {
     #[error("backend is not configured")]
     NotConfigured,
-    #[error("invalid backend response: {0}")]
-    InvalidResponse(String),
+    #[error("backend is unreachable")]
+    Unreachable,
+    #[error("backend request timed out")]
+    Timeout,
+    #[error("backend rate limited the request")]
+    RateLimited,
+    #[error("backend returned HTTP status {0}")]
+    HttpStatus(u16),
+    #[error("backend authentication failed")]
+    Auth,
+    #[error("backend response could not be parsed")]
+    Parse,
+    #[error("backend returned no results")]
+    NoResults,
     #[error("backend request failed: {0}")]
     RequestFailed(String),
 }
@@ -71,6 +87,7 @@ pub(crate) trait SearchBackend: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn normalized_fixture_preserves_backend_identity_and_bounds_shape() {
         let request = SearchBackendRequest {
@@ -99,15 +116,28 @@ mod tests {
         );
         assert_eq!(results[0].url, "https://rust-lang.org");
     }
+
     #[test]
-    fn typed_failures_distinguish_configuration_and_response() {
-        assert_ne!(
+    fn typed_failures_keep_selection_relevant_classes_distinct() {
+        let classes = [
             SearchBackendError::NotConfigured,
-            SearchBackendError::InvalidResponse("".into())
-        );
+            SearchBackendError::Unreachable,
+            SearchBackendError::Timeout,
+            SearchBackendError::RateLimited,
+            SearchBackendError::HttpStatus(503),
+            SearchBackendError::Auth,
+            SearchBackendError::Parse,
+            SearchBackendError::NoResults,
+            SearchBackendError::RequestFailed("opaque".into()),
+        ];
+        for (index, left) in classes.iter().enumerate() {
+            for right in classes.iter().skip(index + 1) {
+                assert_ne!(left, right);
+            }
+        }
         assert_eq!(
-            SearchBackendError::RequestFailed("timeout".into()).to_string(),
-            "backend request failed: timeout"
+            SearchBackendError::RequestFailed("opaque".into()).to_string(),
+            "backend request failed: opaque"
         );
     }
 }

@@ -350,6 +350,7 @@ impl Config {
             if user_config.api_key_env.is_some() {
                 config.api_key_env = user_config.api_key_env.clone();
             }
+            config.tool_protocol = user_config.tool_protocol;
             config.models.extend(user_config.models.clone());
             config.timeout = user_config.timeout.clone();
         }
