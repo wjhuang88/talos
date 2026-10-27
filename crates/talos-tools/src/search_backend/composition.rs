@@ -11,15 +11,13 @@ use talos_core::tool::{
 };
 use thiserror::Error;
 
-use super::{SearchBackendId, SearchBackendResult};
-use super::transport::{TransportBudget, TransportError, TransportLimits};
 use super::transport::compatibility::{
     CompatibilityError,
-    plan::{
-        CompatibilityPlanError, DirectCompatibilityConfiguration, PreparedCompatibilityPlan,
-    },
+    plan::{CompatibilityPlanError, DirectCompatibilityConfiguration, PreparedCompatibilityPlan},
     searxng::{PreparedSearXng, SearXngConfiguration, SearXngError},
 };
+use super::transport::{TransportBudget, TransportError, TransportLimits};
+use super::{SearchBackendId, SearchBackendResult};
 
 /// Stable query-independent configuration for the dormant public-search candidate set.
 pub(crate) struct SearchCompositionConfiguration {
@@ -39,7 +37,10 @@ impl SearchCompositionConfiguration {
     /// Credential discovery and production selection are intentionally outside this stage.
     pub(crate) fn new(searxng: Option<SearXngConfiguration>) -> Result<Self, TransportError> {
         let direct = DirectCompatibilityConfiguration::new()?;
-        let scope = combined_scope(direct.scope(), searxng.as_ref().map(SearXngConfiguration::scope))?;
+        let scope = combined_scope(
+            direct.scope(),
+            searxng.as_ref().map(SearXngConfiguration::scope),
+        )?;
         Ok(Self {
             direct,
             searxng,
@@ -259,9 +260,7 @@ pub(crate) enum SearchCandidateExecutionError {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use talos_core::tool::{
-        ToolNetworkAuthorizationError, ToolNetworkEndpoint,
-    };
+    use talos_core::tool::{ToolNetworkAuthorizationError, ToolNetworkEndpoint};
     use uuid::Uuid;
 
     struct RejectAuthority;
@@ -284,8 +283,12 @@ mod tests {
     fn combined_configuration_identity_is_stable_across_queries() {
         let searxng = SearXngConfiguration::new("https://search.example/prefix/").expect("searxng");
         let configuration = SearchCompositionConfiguration::new(Some(searxng)).expect("config");
-        let first = configuration.prepare("first private query", 2, limits()).expect("first");
-        let second = configuration.prepare("second private query", 2, limits()).expect("second");
+        let first = configuration
+            .prepare("first private query", 2, limits())
+            .expect("first");
+        let second = configuration
+            .prepare("second private query", 2, limits())
+            .expect("second");
 
         assert_eq!(first.manifest().scope(), configuration.scope());
         assert_eq!(second.manifest().scope(), configuration.scope());
@@ -293,7 +296,10 @@ mod tests {
             first.manifest().scope().configuration_id(),
             second.manifest().scope().configuration_id()
         );
-        assert_ne!(first.manifest().invocation_id(), second.manifest().invocation_id());
+        assert_ne!(
+            first.manifest().invocation_id(),
+            second.manifest().invocation_id()
+        );
         assert_eq!(first.permission_profile(), second.permission_profile());
         assert_eq!(first.permission_profile().len(), 5);
         assert!(!format!("{first:?}").contains("first private query"));
@@ -303,7 +309,9 @@ mod tests {
     fn dispatch_shares_one_budget_across_all_prepared_candidates() {
         let searxng = SearXngConfiguration::new("https://search.example/").expect("searxng");
         let configuration = SearchCompositionConfiguration::new(Some(searxng)).expect("config");
-        let prepared = configuration.prepare("private query", 2, limits()).expect("prepared");
+        let prepared = configuration
+            .prepare("private query", 2, limits())
+            .expect("prepared");
         let manifest_id = prepared.manifest().invocation_id();
         let running = prepared.start(Arc::new(RejectAuthority));
 
@@ -319,7 +327,9 @@ mod tests {
     #[test]
     fn direct_only_configuration_keeps_one_candidate_and_combined_scope() {
         let configuration = SearchCompositionConfiguration::new(None).expect("config");
-        let prepared = configuration.prepare("private query", 2, limits()).expect("prepared");
+        let prepared = configuration
+            .prepare("private query", 2, limits())
+            .expect("prepared");
         assert_eq!(prepared.manifest().scope().endpoints().len(), 4);
         let running = prepared.start(Arc::new(RejectAuthority));
         assert_eq!(running.candidates().len(), 1);
