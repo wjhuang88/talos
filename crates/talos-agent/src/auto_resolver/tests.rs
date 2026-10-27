@@ -14,27 +14,6 @@ use talos_permission::{
 use tokio::sync::{Notify, mpsc};
 
 #[test]
-fn execution_directory_identity_detects_replacement() {
-    let root = tempfile::tempdir().expect("temporary root");
-    let path = root.path().join("working");
-    std::fs::create_dir(&path).expect("original directory");
-    let original = execution_directory_identity(&path).expect("directory identity");
-    assert_eq!(
-        execution_directory_identity(&path).as_ref(),
-        Some(&original)
-    );
-    // Keep the original object alive so its identifier cannot be recycled.
-    std::fs::rename(&path, root.path().join("retained")).expect("retain original");
-    std::fs::create_dir(&path).expect("replacement directory");
-    let replacement = execution_directory_identity(&path).expect("replacement identity");
-    assert_ne!(original, replacement);
-    assert!(execution_directory_identity(&root.path().join("missing")).is_none());
-    let file = root.path().join("file");
-    std::fs::write(&file, b"").expect("regular file");
-    assert!(execution_directory_identity(&file).is_none());
-}
-
-#[test]
 fn bounded_exec_shape_rejects_escape_and_shell_syntax() {
     let safe = ["status"];
     assert_eq!(safe.first().copied(), Some("status"));

@@ -192,7 +192,9 @@ impl AutoPermissionResolver {
                         action,
                         configuration: configuration.clone(),
                         working_directory: directory.and_then(Path::to_str).map(str::to_owned),
-                        directory_identity: directory_before.clone(),
+                        directory_identity: directory_before
+                            .as_ref()
+                            .map(|identity| identity.token().to_owned()),
                     })
                 } else {
                     AssessmentPayload::Action(action)

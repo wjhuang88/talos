@@ -31,7 +31,10 @@ use crate::{
 struct InvocationExecutionContext {
     permission: talos_permission::PermissionStateSnapshot,
     configuration: serde_json::Value,
-    directories: Vec<(std::path::PathBuf, String)>,
+    directories: Vec<(
+        std::path::PathBuf,
+        crate::auto_resolver::ExecutionDirectoryIdentity,
+    )>,
     directories_resolved: bool,
     sandbox_available: Option<bool>,
     sandbox_fallback: Option<(SandboxFallbackPolicy, bool)>,
