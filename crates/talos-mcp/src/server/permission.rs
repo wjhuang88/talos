@@ -20,14 +20,15 @@ pub struct McpPermissionGate {
     pipeline: PermissionPipeline,
     hook_registry: Arc<HookRegistry>,
     deadline: Duration,
+    user_intent: Option<String>,
 }
 
 impl McpPermissionGate {
     /// Creates a permission gate backed by Talos permission and hook systems.
     #[must_use]
     pub fn new(permission_engine: Arc<PermissionEngine>, hook_registry: Arc<HookRegistry>) -> Self {
-        Self {
-            pipeline: PermissionPipeline::new(
+        Self::with_pipeline(
+            PermissionPipeline::new(
                 Arc::new(PermissionSessionState::new((*permission_engine).clone())),
                 PermissionContext::new(
                     PermissionMode::Headless,
@@ -36,8 +37,33 @@ impl McpPermissionGate {
                 None,
             ),
             hook_registry,
+        )
+    }
+
+    /// Uses an explicitly configured, session-owned permission pipeline.
+    ///
+    /// Embedders supply the effective policy, context and optional resolver. This
+    /// does not load CLI configuration or make tool names evidence of native ownership.
+    /// [`Self::new`] retains its headless, no-resolver default.
+    #[must_use]
+    pub fn with_pipeline(pipeline: PermissionPipeline, hook_registry: Arc<HookRegistry>) -> Self {
+        Self {
+            pipeline,
+            hook_registry,
             deadline: Duration::from_secs(30),
+            user_intent: None,
         }
+    }
+
+    /// Binds this gate to an embedder's current user turn for automatic review.
+    ///
+    /// Construct a new gate for each turn. Never derive this value from remote
+    /// tool arguments, and do not reuse the gate for unrelated user requests.
+    /// Without explicit intent, effectful command Auto review remains unavailable.
+    #[must_use]
+    pub fn with_user_intent(mut self, user_intent: String) -> Self {
+        self.user_intent = Some(user_intent);
+        self
     }
 
     /// Overrides the total budget shared by MCP permission hooks and admission.
@@ -125,7 +151,7 @@ impl McpPermissionGate {
             hook_context,
             request,
             profile,
-            (plan, None),
+            (plan, None, false),
             deadline_at,
         )
         .await
@@ -139,6 +165,7 @@ impl McpPermissionGate {
         prepared: (
             &talos_core::tool::PreparedPlanIdentity,
             Option<&talos_core::tool::PreparedCommandEvidence>,
+            bool,
         ),
         deadline_at: tokio::time::Instant,
     ) -> Result<talos_permission::AdmittedInvocation, McpError> {
@@ -165,6 +192,7 @@ impl McpPermissionGate {
         prepared: Option<(
             &talos_core::tool::PreparedPlanIdentity,
             Option<&talos_core::tool::PreparedCommandEvidence>,
+            bool,
         )>,
         prepared_deadline_at: Option<tokio::time::Instant>,
     ) -> Result<McpAdmission, McpError> {
@@ -195,8 +223,13 @@ impl McpPermissionGate {
             .unwrap_or_else(|| serde_json::json!({}));
         let authorization_request = PermissionAuthorizationRequest {
             tool_name: request.name.as_str(),
-            provenance: talos_core::tool::ToolProvenance::McpRemote {
-                server: "standalone-mcp".to_owned(),
+            provenance: if prepared.is_some_and(|(_, _, registered_builtin)| registered_builtin) {
+                // Only registry-verified builtins reach this private evidence route.
+                talos_core::tool::ToolProvenance::Native
+            } else {
+                talos_core::tool::ToolProvenance::McpRemote {
+                    server: "standalone-mcp".to_owned(),
+                }
             },
             profile,
             input: &input,
@@ -204,9 +237,14 @@ impl McpPermissionGate {
             summary_fields: Vec::new(),
             deadline: deadline_at.saturating_duration_since(tokio::time::Instant::now()),
         };
-        let authorization = if let Some((plan, evidence)) = prepared {
+        let authorization = if let Some((plan, evidence, _)) = prepared {
             self.pipeline
-                .authorize_prepared_plan_with_evidence(authorization_request, None, plan, evidence)
+                .authorize_prepared_plan_with_evidence(
+                    authorization_request,
+                    self.user_intent.as_deref(),
+                    plan,
+                    evidence,
+                )
                 .await
                 .map(|admission| McpAdmission::Prepared(Box::new(admission)))
         } else {

@@ -1,5 +1,59 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Local MCP injected command Auto stage — 2026-10-28
+
+The MCP gate now accepts an explicitly injected permission pipeline and current-turn
+embedder intent; the default constructor remains Headless without a resolver. Registry
+factory identity determines native prepared provenance consistently at preparation and
+admission. Matching names and external replacement instances cannot carry command Auto
+evidence. A new real rmcp client/server test runs the production Auto resolver and Git Add,
+asserts the staged blob, and denies final commands through human fallback so success cannot
+masquerade as model approval. Configuration discovery is separately host-approved. Negative
+cases cover same-name replacement, absent intent, Headless context, explicit Ask and Deny;
+all refuse model assessment and leave the index absent. A separate injected ordinary approval
+test proves actual file write/denial, not file Auto.
+
+Locked `git_prepared` (48/48) and `server_handshake` (3/3) pass with low-debug,
+nonincremental settings (`/private/tmp/i308-mcp-hosted-native-tests.log`). The first test
+attempts exposed missing interactive fixture context, separately approved discovery and
+inconsistent prepared provenance; all were corrected without weakening the Auto resolver.
+The earlier host preflight (session 80805) exited 0, including external Runtime SDK fixtures,
+but compiled MCP before these edits, so it does not certify this candidate. Fresh Clippy,
+independent permission/security/API review, final coherent preflight, exact-head CI (including
+Windows), merge and completion evidence remain required. MCP file/network/ordinary invocation
+Auto routing and the remaining I308 acceptance are still unfinished; this is not I308 closure.
+
+## Sender-binding rebuild verification — 2026-10-28
+
+Implementation correction is local commit
+`6696d880c9cbb36d7d3d300d46d9410244a56045`. After the maintainer explicitly
+authorized cleaning this active worktree's regenerable target, `cargo clean
+--locked` removed 54,761 files (27.1 GiB). Both worktrees and their sources were
+preserved; the main worktree has no target directory. Free space is now about
+24 GiB after rebuilding. Earlier disk-exhaustion checkpoints below are historical.
+
+With `CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0`,
+locked all-feature sender-binding tests pass 3/3
+(`/private/tmp/i308-sender-binding-rebuild.log`). Full all-feature Tools library
+tests first reported 1009 passed / 1 failed under sandbox process-observation
+EPERM (`/private/tmp/i308-sender-binding-tools-full.log`). The unchanged authorized
+host retry exits 0 with 1010/1010 passing
+(`/private/tmp/i308-sender-binding-tools-host.log`). Warnings-denied all-feature
+Tools lib/tests Clippy passed before cleanup
+(`/private/tmp/i308-sender-binding-clippy.log`). Format, whitespace and both
+governance validators pass. Standard host `release_preflight.sh` is running with
+the same low-debug/nonincremental settings plus `RUST_TEST_THREADS=1`; inspect
+`/private/tmp/i308-sender-binding-preflight-host.log` for its terminal outcome.
+No complete preflight result is claimed yet.
+
+Fresh fetch leaves main at `4bf3488b2f4344b054754851b588686126c436f4`.
+#797 remains open at old head `1993432dccd3571abac7849a32c5b4640007f622`.
+Its CI `40659215369` passed offline dependency parity; Linux Desktop validation
+was still running, and Windows workspace remains failed. New-source native
+Windows execution, exact-head independent review/CI and merge CAS remain required.
+MCP default disposition is not model Auto reachability; all remaining I308
+acceptance and MODEL-014 → T4 → T5 → T1 → T6 remain unfinished.
+
 ## Local CLI decision visibility follow-up — 2026-10-28
 
 Git stage #797 is published at
