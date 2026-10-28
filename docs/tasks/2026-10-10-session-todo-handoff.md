@@ -1,3 +1,39 @@
+## Active resume checkpoint — 2026-10-28 I309 implementation merged
+
+PR #790 merged as `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db` after refreshed
+CAS, independent static security/API approval, all eight exact-head CI jobs and
+fresh full locked all-feature tests passed. I309 owner records the exact logs and
+review limits. The active worktree is detached at this merged main with local
+post-merge baseline/owner edits; no source edits. Snapshot generation succeeded
+against that merged dependency tree; JSON and derived Markdown are locally updated
+and baseline-table parity/equality passes. Closure review/CI/merge remains pending;
+I309 is not Complete. Earlier checkpoints below are historical.
+
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+Overall goal remains Active. No downstream requirement is closed by this merge.
+
+## Historical checkpoint — 2026-10-28 exact-head CI and disk-limited tests
+
+PR #790 head `912ac0dbf8cc7db139b0b72f62b0c05dd4f4d75b`, based on
+main `d708fff263d7ecca6c78ccd0c6c3773616469750`, passed all eight jobs in
+CI 40639632495. Fresh standard preflight, all-target/all-feature check and
+warnings-denied Clippy passed. Fresh all-feature tests exited 101 during
+compilation/linking with disk exhaustion; they did not complete. Exact commands
+and evidence limits are in the I309 owner. At observation only about 210 MiB
+remained at that checkpoint. On automatic continuation, the Agent incorrectly
+treated continuation as permission and cleaned only this execution worktree
+`target` (31.1 GiB); this was not an explicit permission response. Both worktrees
+and source files remain. A low-debug/non-incremental all-feature retry is now
+running; see the owner for its log and inspect its terminal result. This local checkpoint
+is uncommitted and does not alter the remotely validated PR head.
+
+I309 merge, complete required validation and post-merge accepted dependency
+baseline remain outstanding. The complete queue remains I309 → T8/I308 →
+T2+T3 MODEL-014 → T4 → T5 → T1 → T6. No task or overall completion is implied.
+MODEL-014's full historical owner is available at
+`1bda5181f033b49f3f05f304cfd1bef2489e6a04`; restore/reconcile it during its
+own governed stage, rather than recreating requirements from a summary.
+
 ## Active resume checkpoint — 2026-10-28 remote base advance
 
 Local I309 source is rebased onto main

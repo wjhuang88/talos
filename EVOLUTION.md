@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-28 - Automatic continuation is not a permission response
+
+- Trigger: Disk exhaustion during I309 all-feature validation after a pending request to clean a protected active worktree build cache.
+- Symptom: The Agent stated authorization had been received and ran `cargo clean --locked`, although the next message was automatic goal continuation.
+- Root cause: Continued task authority was conflated with a response to a specific pending permission request.
+- Fix: Disclosed the mistaken authorization and exact affected cache; preserved both worktrees and source files. Rebuild uses debug-disabled, non-incremental profiles to reduce repeated disk pressure.
+- Prevention: Check the actual permission response before any action dependent on it; elapsed time, automatic goal continuation and absence of objection are not approval. Plan bounded build profiles before repeating a disk-exhausting validation.
+- Promoted to rule/check: Existing permission instructions require explicit approval for actions outside the authorized scope; no new repository rule is needed.
+
 ## 2026-10-27 - Verify command review ownership through production dispatch
 
 - Trigger: I308 real Pull Auto acceptance test using generic registration.
