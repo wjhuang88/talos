@@ -17,6 +17,9 @@ focused test passes (1 executed); root cause remains unproven. Do not use
 preceding-head CI or this focused result as complete local preflight certification.
 An earlier host preflight failed a TUI highlighting assertion; focused reproduction
 passed, but the cause is unproven. Sandbox runs separately hit Push observation EPERM.
+The original connection fixture module passes 4/4 in isolation, and serial all-feature
+Tools tests pass 1010/1010 (`/private/tmp/i308-tools-serial.log`, exit 0). This is
+serial local evidence only; parallel reliability and the scheduling cause remain unknown.
 
 Next: diagnose the search test failure, review/commit the coherent follow-up, obtain fresh
 exact-head CI/review and merge-time CAS for #797, then continue remaining I308
