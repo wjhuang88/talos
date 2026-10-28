@@ -11,12 +11,12 @@ use talos_core::tool::{
 use tokio::sync::oneshot;
 use tokio::time::Instant;
 
+use super::SearchBackendId;
 use super::composition::{
     PreparedSearchComposition, SearchCompositionConfiguration, SearchCompositionPreparationError,
 };
 use super::router::{SearchRouterError, SearchRouterPolicy, SearchRouterSuccess, search_prepared};
 use super::transport::TransportLimits;
-use super::SearchBackendId;
 
 /// One frozen router invocation prepared before permission admission.
 ///
