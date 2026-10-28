@@ -1,5 +1,24 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Local retained Add checkpoint — 2026-10-28
+
+Implementation `cda61015c` retains Add's exact executable, cwd, literal argv and
+environment before assessment and executes that retained command after matching
+revalidation. A real Git fixture refuses path, environment, cwd, executable or
+missing-command substitutions before staging; existing selective-staging behavior
+is preserved. This is command-retention groundwork, not Add model Auto admission.
+Commit/Push/Checkout Auto and the full original H/G acceptance remain unfinished.
+
+Git-feature Tools library tests passed 337/337 in approved host execution:
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked -p talos-tools --no-default-features --features git --lib`
+(`/private/tmp/i308-retained-add-git-full-host-tests.log`). The sandbox run passed
+336/337, failing only the existing Push process-observation assertion with EPERM;
+no assertion was skipped or weakened. Git-feature library/tests Clippy with
+`-D warnings` passed (`/private/tmp/i308-retained-add-git-clippy.log`), and
+format/diff checks passed. Full preflight, independent security/API review,
+Windows evidence, remote CI and merge are outstanding for this local stage.
+T8 remains Active / Partial; T2/T3 → T4 → T5 → T1 → T6 remain unchanged.
+
 ## Current delivery checkpoint — 2026-10-28
 
 Pull #786 merged as `652749f42b7dac0d1ab9a665a4c54e6e48576312`; all eight
