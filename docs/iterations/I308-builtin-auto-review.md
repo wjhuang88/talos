@@ -1975,3 +1975,19 @@ fixture module passed 4/4 in isolation, and a serial all-feature Tools run passe
 A temporary dynamic-port/held-socket experiment was reverted and is not evidence.
 This establishes serial local stability only; parallel preflight reliability and the
 underlying scheduling cause remain unknown. No production search code was changed.
+
+Ordinary HTTP policy regression follow-up (2026-10-28): the production Agent
+proxy/redirect fixture now checks `http_request` and `fetch_url` with a broad
+deterministic Allow followed by an explicit domain-scoped Deny or Ask for an
+undisclosed destination. All four cases terminate without assessor calls, accepted
+or queued proxy connections, or installed grants. This verifies the existing
+transitive-policy guard before deterministic Allow; no production code changed.
+The focused HTTP matrix and all 513 locked all-feature Agent library tests pass;
+all-target all-feature warnings-denied Agent Clippy passes. The unchanged parallel
+Tools library suite also passes 1010/1010 on this attempt; earlier preflight failure
+causes remain unknown, so this is not full preflight certification. MCP Git tests
+pass 49/49, MCP Clippy and both governance validators pass. The preceding candidate
+`3fffc458f212350ac0a70ba0d3671772fd377efa` was published to #797 and its own CI
+run `40705827501` is live; none of that CI certifies this later test follow-up.
+Ordinary MCP invocation routing, remaining profile/recovery/platform acceptance,
+final review/merge gates and the downstream queue remain incomplete.
