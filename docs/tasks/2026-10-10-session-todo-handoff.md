@@ -3,11 +3,11 @@
 PR #790 merged as `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db` after refreshed
 CAS, independent static security/API approval, all eight exact-head CI jobs and
 fresh full locked all-feature tests passed. I309 owner records the exact logs and
-review limits. The active worktree is detached at this merged main with local
+review limits. The active worktree uses `docs/i309-merged-baseline-closure` based on merged main with
 post-merge baseline/owner edits; no source edits. Snapshot generation succeeded
 against that merged dependency tree; JSON and derived Markdown are locally updated
 and baseline-table parity/equality passes. Closure review/CI/merge remains pending;
-I309 is not Complete. Earlier checkpoints below are historical.
+I309 is Review, not Complete. Earlier checkpoints below are historical.
 
 Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
 Overall goal remains Active. No downstream requirement is closed by this merge.

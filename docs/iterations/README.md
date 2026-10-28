@@ -1,8 +1,9 @@
-## Completed gix upgrade stage — 2026-10-28
+## Merged gix upgrade stage — 2026-10-28
 
-[I309](I309-gix-090-upgrade.md) is Complete / Closed through #790, implementation
+[I309](I309-gix-090-upgrade.md) is Review / Claimed after #790, implementation
 merged as `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db`. Its owner records the accepted
-post-merge dependency snapshot and validation limits. I308 remains independently Active/Partial.
+post-merge dependency snapshot candidate and validation limits. Baseline closure review/CI/merge
+remain pending. I308 remains independently Active/Partial.
 
 ## Active T8 implementation — 2026-10-28
 

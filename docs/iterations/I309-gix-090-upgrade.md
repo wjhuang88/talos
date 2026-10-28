@@ -1,6 +1,6 @@
 # Iteration I309: Upgrade gix To Latest Stable 0.90.0
 
-> Document status: Complete / Closed
+> Document status: Review (implementation merged; baseline closure candidate pending review/CI/merge)
 > Published plan date: 2026-10-26
 > Planned objective: upgrade gix 0.87.1 to the latest observed stable, non-yanked 0.90.0 while preserving existing Git behavior and permission boundaries.
 > Baseline rule: preserve this target; append execution facts rather than rewriting acceptance.
@@ -115,13 +115,12 @@ the dedicated baseline-table Unix/PowerShell parity and equality check passed.
 The full dependency audit test suite passed (`/private/tmp/i309-baseline-tests.log`).
 Security/deprecation signals remain unknown; local-only collection queried no
 registry and does not automatically accept dependencies. Closure review/CI/merge
-of these baseline documents remains open; the implementation and baseline snapshot
-themselves are merged and recorded.
+of these baseline documents remains open; only the implementation is merged.
 
 **Completion Commit:** `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db`
 Earlier pending-test/review/merge checkpoints below are historical.
 
-### Current exact-head checkpoint — 2026-10-28
+### Historical exact-head checkpoint — 2026-10-28
 
 Candidate PR #790 head `912ac0dbf8cc7db139b0b72f62b0c05dd4f4d75b`
 is based on main `d708fff263d7ecca6c78ccd0c6c3773616469750`.
