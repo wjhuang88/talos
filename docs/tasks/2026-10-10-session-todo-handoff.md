@@ -7,10 +7,10 @@ static review approved this exact candidate; receipt is posted on PR #790.
 PR #790 still has remote head `3c5a3276c`; all eight gates in CI 40624815706
 passed, including native Windows. These certify the previous head only. Fresh
 standard preflight passed exit 0, including both external Runtime SDK modes, in
-`/private/tmp/i309-main32-preflight.log`. Current-base all-feature check and
+`/private/tmp/i309-main32-preflight.log`; a later retry reproduced the process
+observation permission failure. Current-base all-feature check and
 warnings-denied Clippy passed. The all-feature test suite reached 1003/1004
-Tools tests but failed because `ps` process observation returned EPERM; the
-standard preflight retry reproduced it. Earlier unsandboxed full-suite evidence
+Tools tests but failed because `ps` process observation returned EPERM. Earlier unsandboxed full-suite evidence
 passed the same test, but current-base all-feature success is not established.
 Both governance validators passed. Final evidence reconciliation, publication,
 exact-head CI, merge and accepted dependency-baseline advancement remain pending.
