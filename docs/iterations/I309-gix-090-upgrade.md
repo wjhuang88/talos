@@ -1,6 +1,6 @@
 # Iteration I309: Upgrade gix To Latest Stable 0.90.0
 
-> Document status: Active (proposed in #774; ineffective until merge)
+> Document status: Active (claim #774 effective at 2789b97bfe807f486778f3b44c7053e2a0e6e13d)
 > Published plan date: 2026-10-26
 > Planned objective: upgrade gix 0.87.1 to the latest observed stable, non-yanked 0.90.0 while preserving existing Git behavior and permission boundaries.
 > Baseline rule: preserve this target; append execution facts rather than rewriting acceptance.
@@ -23,8 +23,9 @@
 | Last Updated | 2026-10-26 |
 | Handoff / Release Condition | Verified upgrade and existing implementation commit evidence; no release authorized. |
 
-Claim and activation are ineffective until the finalized governance-only record merges to main.
-No dependency or source implementation belongs in this candidate.
+Claim and activation became effective when governance-only #774 merged at
+`2789b97bfe807f486778f3b44c7053e2a0e6e13d`. Implementation follows that record;
+the published governance candidate itself contained no dependency/source implementation.
 
 ## Selection Inventory And Disposition
 
@@ -124,3 +125,13 @@ restore 0.87.1 without altering T7/T8 policy. Do not conceal a failed validation
 - Queried upstream RustSec advisory-db at `3279c99911354c400e1d41e47c7d60e39258b147`, comparing all 56 new name/version lock entries against package advisory records. The 14 matching records all have a declared patched lower bound satisfied by the resolved version: faster-hex 0.10.1 (RUSTSEC-2026-0306); gix-attributes 0.37.1 (2024-0359); gix-date 0.18.1 (2025-0140); gix-fs 0.24.1 (2024-0350); gix-index 0.58.0 (2024-0348/0352); gix-path 0.14.1 (2024-0355/0367/0371); gix-ref 0.69.1 (2024-0351); gix-transport 0.62.0 (2023-0064, 2024-0335); gix-worktree 0.59.0 (2024-0349/0353). In particular, the upgrade's faster-hex 0.10.0→0.10.1 removes an x86/x86_64 AVX2 out-of-bounds read covered by the first advisory. Source: https://rustsec.org/advisories/RUSTSEC-2026-0306.html .
 - Evidence: `/private/tmp/i309-changed-package-advisories.json` contains versions, full advisory headers and upstream database commit. This is a bounded manual changed-package comparison, not cargo-audit or an assertion about the full unchanged workspace graph; cargo-audit is not installed. No known matching unpatched advisory was identified for the changed entries in that database snapshot. Unknown vulnerabilities and full-graph audit coverage remain unknown.
 - Independent same-session read-only dependency/security/API inspection found no demonstrated migration blocker, but did not approve delivery or execute builds. `sha1dc 0.1.5` is pure Rust (`build = false`, no production dependencies/native bindings), with dependency-owned unsafe SIMD loads/stores and CPU target dispatch. Pure Rust does not mean unsafe-free. No Talos-authored unsafe was added; ADR-007 is not evidence approving this dependency's internals. Source inspection is not a proof of SIMD soundness; final feature/native closure and platform testing remain required.
+
+### Rebased validation repair — 2026-10-28
+
+- Rebased implementation onto main `9d38a7365c494ade99a484bdd158476f850f4428`; upgrade commits are `6b9ec521a` and `990e01cd4`. This is not merged upgrade evidence.
+- The earlier statement that both Clippy repairs were implemented locally was not durable: the rebased tree contained the merged HTTP header-read fix, but its CLI approval event was still unboxed. Current all-feature Clippy reproduced `large_enum_variant` (at least 360-byte enum); log `/private/tmp/i309-current-all-feature-clippy.log`. The CLI variant is now boxed at the channel boundary and unboxed when queued, preserving the original request/responder. Formatting and diff whitespace checks pass; full all-feature Clippy retry remains running, not passed.
+- The pinned 1.99.0 WASM target is installed. Real Rust language guest compilation has started with Homebrew LLVM's WASM-capable Clang/llvm-ar; real packaged bundles and full all-feature test acceptance remain outstanding.
+- Maintainer-requested `cargo clean` removed 19,327 files / 10.8 GiB before this retry; no worktree/source was removed. Only root and the active I309 worktree remain. Old validation logs are preserved, but old-base results do not certify this candidate.
+- Dependency audit regression tests and both project/Collaboration Claim validators passed (exit 0): `/private/tmp/i309-current-audit-tests.log`, `/private/tmp/i309-current-governance.log`, `/private/tmp/i309-current-claims.log`.
+- Both real language guests compiled and packaged successfully into `/private/tmp/i309-real-language-bundles` (not installed/activated): Rust SHA-256 `e681c7cc74e676a6b081df63a6233f56496ea6ae432757d2ccdd8f6894bde6e1`; Python `040bd1ab7c8fa07b0743b5bcf16293797b220570212a0691a95a65e0d204a1b6`. The first Rust packaging attempt failed because the task-specific parent directory did not exist; creating it and retrying succeeded. Bundle creation is a test prerequisite, not full all-feature test acceptance.
+- The Clippy retry progressed past the CLI variant but failed at `field_reassign_with_default` in the existing config protocol test helper. Changed only helper construction to a struct initializer; assertions/provider semantics are unchanged. This is a validation prerequisite, not a provider feature change. Formatting and whitespace checks pass. Full all-feature tests with the real bundle root are running (log `/private/tmp/i309-current-all-feature-test.log`); final Clippy is queued behind Cargo's build lock (log `/private/tmp/i309-current-all-feature-clippy-final.log`). Neither is reported passed.
