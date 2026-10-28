@@ -92,6 +92,22 @@ pub(crate) fn builtin_model_endpoint(
     )
 }
 
+// A wire rollback must keep the selected vendor's default root even when the host did not persist
+// that root explicitly. Otherwise an adapter's hard-coded official endpoint could receive a
+// gateway credential. Limit this fallback to the exact reviewed model endpoint records.
+pub(crate) fn builtin_model_provider_root(provider: &str, model_id: &str) -> Option<String> {
+    let entry = PROTOCOL_DATASET
+        .models
+        .iter()
+        .find(|entry| entry.provider == provider && entry.id == model_id)?;
+    entry.api_base_url.as_ref()?;
+    entry_protocol(entry)?;
+    model::builtin_providers()
+        .into_iter()
+        .find(|entry| entry.id == provider)?
+        .api_base_url
+}
+
 fn infer_model_endpoint(
     catalog: &[ModelProtocolEntry],
     provider: &str,

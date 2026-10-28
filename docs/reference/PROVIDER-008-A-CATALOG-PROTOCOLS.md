@@ -1,8 +1,8 @@
 # PROVIDER-008-A: Protocol-Only Catalog Projection
 
-Carrier: data PR #775 merged to main as `6af8654c6ee6e422d4d3f4e5dad171c78604cafd`,
-after code #749 merged as `60e27eb6653b3a8fef638a2b9a7294a036b78db0`. Earlier stacked/Draft
-checkpoints below are historical. Child A remains Review / Claimed pending acceptance disposition.
+Carrier: endpoint data candidate on code PR #792 (`f43cd990`), with code-first merge required.
+The prior protocol-only data PR #775 merged as `6af8654c`. Historical stacked/Draft checkpoints
+remain below. This new data candidate is not independently activated; child A remains Review / Claimed.
 
 Current source: archived [2026-10-27 snapshot](../../scripts/fixtures/provider008a-models-20261027/README.md)
 from https://models.dev/api.json. Earlier dated checkpoints below describe superseded inputs. This is catalog evidence, not a live endpoint
@@ -12,16 +12,17 @@ probe or a claim that vendor-specific authentication/transports have been implem
 - Snapshot bytes: 5,955,477; 232 upstream providers.
 - Preserved packaged models: 6,474, with the same IDs, providers, limits, pricing, capabilities,
   release dates and variants. Provider metadata and API roots are byte-for-byte unchanged.
-- Added model protocol keys: 3,853 Chat, 38 Anthropic Messages, 119 Responses (4,010 total).
-- Withheld: 918 models absent upstream, 1,349 unsupported/unknown SDK transports, 56 model-specific
-  endpoint overrides and 141 records whose provider API root changed upstream.
+- Current candidate protocol keys: 3,857 Chat, 65 Anthropic Messages, 133 Responses (4,055 total).
+- Added reviewed model endpoint records: 45 (14 Responses / 27 Messages / 4 Chat).
+- Withheld: 918 absent, 1,353 unsupported transports (including four WSS/Realtimes), seven
+  unreviewed model endpoints (Copilot Messages), and 141 provider-root drift records.
 
 The projection matches only exact `(provider, model)` identities already in the package. It uses the
 shared `protocol_signal.rs` map: explicit `responses`/`completions` shape first, otherwise exact
 supported SDK package defaults. Host and model SDKs must belong to the three already implemented
 wire families. Azure, Bedrock, Vertex and unknown transports are not admitted just because an item
-says `shape=responses`. Model endpoint overrides differing from the provider root are withheld until
-routing support exists. Upstream provider-root drift is also withheld in this protocol-only stage;
+says `shape=responses`. Different model endpoints require an exact reviewed provider/root/wire pair;
+unreviewed destinations remain withheld. Upstream provider-root drift is also withheld in this stage;
 no old endpoint is silently reinterpreted using a newer root's protocol evidence.
 
 At runtime, overriding a built-in provider's endpoint to a different root suppresses that built-in
@@ -33,8 +34,8 @@ preserved.
 Normal builds remain offline. Full `BUILD_MODELS=1` refreshes use the same shared map and admission
 checks but may separately update broader upstream metadata; those changes are not included here.
 The one-time protocol projection was checked by parsing both datasets and removing the optional
-model `protocol` fields: every remaining model field and every provider record matched the old
-package. Generation/routing tests exercise transport refusal, endpoint refusal, explicit overrides
+model `protocol` and `api_base_url` routing fields: every remaining model field and every provider
+record matched the old package. Generation/routing tests exercise transport refusal, endpoint refusal, explicit overrides
 and packaged catalog selection. No recorded network model responses or vendor credentials were used.
 
 ## Responses Signal Ledger
@@ -370,3 +371,124 @@ The Story/I306 owner now records Review / Claimed, Completion Commit: Pending. D
 routing remains unimplemented; 56 records remain withheld. Parent tracking is not implementation or
 an acceptance waiver. Owner acceptance requires implementation or an explicit accepted scope decision
 before completion; #724/#748 remain open. No sibling implementation, tag or release is claimed.
+
+
+### Reviewed HTTP Endpoint Projection Candidate — 2026-10-28
+
+Runtime code carrier #792 is exact `f43cd9900f03d2d52afe90fbca6f8a90944a7826`, equivalent to
+local `600ef88b`, tree `abc8535011355cc5679a451628bce43a897bb623`, base `e03a2984`.
+This data candidate is stacked on that runtime and is not independently active. Code must merge
+first. Existing code #749 and protocol-only data #775 remain merged evidence, not this stage's CI.
+
+The same archived 2026-10-27 input is reused without a new models.dev download. Forty-five previously
+withheld model records gain both `protocol` and `api_base_url`; the old 4,010 hints remain unchanged.
+Total: 3,857 Chat / 65 Messages / 133 Responses = 4,055. All 6,474 model identities and every price,
+limit, capability, variant and provider record remain unchanged. Removing only the two model routing
+keys gives the original semantic digest `acc90a95ff8f87fbf131788548066575d02cd8e1ccb8f3545a9c62e01712947d`.
+Catalog raw SHA256: `cd06869b3e9136ee67f311450be0130cecf5ae495268241329f2b16f9ba03f70`.
+The source/gzip/MIT notice are byte-identical to #775. The input README updates audit usage only.
+
+The generator now admits a distinct endpoint only when its already-inferred wire and exact
+provider/root pair are in the primary-source review below. It does not infer a family from a
+provider name. Unknown pairs retain neither protocol nor endpoint metadata; the runtime cannot
+change a credential destination using an unreviewed future source row. The independent Python audit
+checks every protocol/endpoint, the frozen source hash and every non-routing field offline.
+
+| Provider | Newly admitted | Model root (adapter completes final path) | Primary contract checked 2026-10-28 |
+|---|---:|---|---|
+| neon | 14 Responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` | [Neon AI Gateway](https://neon.com/blog/llms-belong-in-your-backend): branch bearer token and separate native Responses dialect path. Explicit config uses `api_key_env = "NEON_AI_GATEWAY_TOKEN"`; the base-URL environment variable is not a credential. |
+| ofox | 10 Messages | `https://api.ofox.ai/anthropic/v1` | [Ofox Messages API](https://ofox.ai/docs/api/anthropic/messages): final `/messages`, `x-api-key`, `anthropic-version: 2023-06-01`. |
+| zenmux | 17 Messages | `https://zenmux.ai/api/anthropic/v1` | [Zenmux quickstart](https://zenmux.ai/docs/zh/guide/quickstart): final `/messages` and the same native API-key/version headers. |
+| freemodel | 4 Chat | `https://api.freemodel.dev/v1` | [Official FreeModel frontend](https://freemodel.dev/): OpenAI SDK example selects this root; one account key covers its model network. This reviewed origin differs from the retained provider root `https://cc.freemodel.dev/v1`. |
+
+FreeModel's public frontend is rendered from [asset index-CDUNPcwU.js](https://freemodel.dev/assets/index-CDUNPcwU.js),
+SHA256 `cf29a3b73e749023ce65e7d513bcec5d6b2b3d20102345f01e799669854e354d`.
+The review used root/SDK/key-role descriptions, not a live model request or a real API credential.
+This artifact is external vendor frontend code, not a runtime dependency or copied repository asset.
+
+Seven Copilot Messages records remain **unreviewed_model_endpoint**. Their SDK/URL metadata alone
+has not established compatibility with Talos' native API-key request. The official Microsoft client
+uses [CAPI/authentication services](https://github.com/microsoft/vscode/blob/main/extensions/copilot/src/platform/endpoint/node/copilotChatEndpoint.ts)
+and [CAPI integration](https://github.com/microsoft/vscode/blob/main/extensions/copilot/src/platform/endpoint/common/capiClient.ts).
+The referenced official `@vscode/copilot-api` 0.5.2 package supplies integration headers; its published
+[tarball](https://registry.npmjs.org/@vscode/copilot-api/-/copilot-api-0.5.2.tgz) SHA256 is
+`7a817c4d468abb7811964af047de00aeee13e70ac97e1f698d3b774d1580d6a4`.
+Admission decision/inference: until the required vendor authentication/transport contract is
+implemented or independently confirmed, do not newly activate these seven endpoints. This is not
+proof that the vendor endpoint itself is unavailable, and no OAuth/token-exchange wrapper is added.
+Four Alibaba/Alibaba-CN WSS records are unsupported Realtime transports, an existing explicit non-goal;
+they are not reinterpreted as HTTP Chat because an SDK/shape label resembles Chat.
+Withheld totals: 918 absent / 1,353 unsupported transports / 7 unreviewed endpoints / 141 root drift.
+
+Runtime acceptance drives the actual compressed catalog, not injected model endpoint overrides:
+`neon_packaged_model_endpoint_drives_a_real_agent_round` supplies only the provider branch root and
+API-token environment variables, then completes image + native read tool/result over
+`/openai/v1/responses`. It asserts the actual bearer token source, model, stateless body and result.
+`neon_catalog_responses_rollback_restores_the_matching_provider_root` uses that same catalog/provider
+root and proves explicit Chat returns to `/v1/chat/completions`. Actual factory snapshots cover
+Freemodel's reviewed origin change and Ofox/Zenmux Messages paths; negative cases prove replaced
+roots, custom unique-model protocol inheritance without vendor URL relocation, wire rollback and
+Copilot non-activation. A separate regression covers an omitted provider URL: changing the wire
+must retain this model's original vendor root, not send its credential to an adapter's hard-coded
+OpenAI/Anthropic default. Data activation therefore includes a small runtime safeguard for exact
+reviewed endpoint records; explicit URLs, custom gateways and older records without endpoint metadata
+retain precedence/behavior. The fallback still expands and validates environment roots. Neon CLI
+rollback is tested both with and without an explicitly saved provider URL.
+A first snapshot attempt used a nonexistent older Sonnet model ID; that
+fixture failure (exit 101) is retained, then corrected to the actual frozen `claude-sonnet-4.5` ID.
+No test was ignored or weakened. Final exact candidate results and independent object/source review
+are recorded in the data PR; no old code CI is substituted for this data head.
+
+Status remains Review / Claimed, Completion Commit: Pending. The seven unreviewed vendor endpoints
+remain an acceptance residual; recording them under #724 is neither implementation nor a scope
+waiver. B/C/D and active probing remain outside this claim. No completion or release is claimed.
+
+#### New endpoint rows (the previous 119 Responses ledger rows remain historical baseline)
+
+| Provider | Model | Wire | API root |
+|---|---|---|---|
+| freemodel | `gpt-5.3-codex` | openai-chat | `https://api.freemodel.dev/v1` |
+| freemodel | `gpt-5.4` | openai-chat | `https://api.freemodel.dev/v1` |
+| freemodel | `gpt-5.4-mini` | openai-chat | `https://api.freemodel.dev/v1` |
+| freemodel | `gpt-5.5` | openai-chat | `https://api.freemodel.dev/v1` |
+| neon | `gpt-5` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-1` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-2` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-3-codex` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-4` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-4-mini` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-4-nano` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-5` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-5-pro` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-6-luna` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-6-sol` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-6-terra` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-mini` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| neon | `gpt-5-nano` | openai-responses | `${NEON_AI_GATEWAY_BASE_URL}/openai/v1` |
+| ofox | `anthropic/claude-fable-5` | anthropic-messages | `https://api.ofox.ai/anthropic/v1` |
+| ofox | `anthropic/claude-haiku-4.5` | anthropic-messages | `https://api.ofox.ai/anthropic/v1` |
+| ofox | `anthropic/claude-opus-4.5` | anthropic-messages | `https://api.ofox.ai/anthropic/v1` |
+| ofox | `anthropic/claude-opus-4.6` | anthropic-messages | `https://api.ofox.ai/anthropic/v1` |
+| ofox | `anthropic/claude-opus-4.7` | anthropic-messages | `https://api.ofox.ai/anthropic/v1` |
+| ofox | `anthropic/claude-opus-4.8` | anthropic-messages | `https://api.ofox.ai/anthropic/v1` |
+| ofox | `anthropic/claude-opus-5` | anthropic-messages | `https://api.ofox.ai/anthropic/v1` |
+| ofox | `anthropic/claude-sonnet-4.5` | anthropic-messages | `https://api.ofox.ai/anthropic/v1` |
+| ofox | `anthropic/claude-sonnet-4.6` | anthropic-messages | `https://api.ofox.ai/anthropic/v1` |
+| ofox | `anthropic/claude-sonnet-5` | anthropic-messages | `https://api.ofox.ai/anthropic/v1` |
+| zenmux | `anthropic/claude-fable-5` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `anthropic/claude-haiku-4.5` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `anthropic/claude-opus-4.1` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `anthropic/claude-opus-4.5` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `anthropic/claude-opus-4.6` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `anthropic/claude-opus-4.7` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `anthropic/claude-opus-4.8` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `anthropic/claude-sonnet-4.5` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `anthropic/claude-sonnet-4.6` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `anthropic/claude-sonnet-5` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `minimax/minimax-m2` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `minimax/minimax-m2.1` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `minimax/minimax-m2.5` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `minimax/minimax-m2.5-lightning` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `minimax/minimax-m2.7` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `minimax/minimax-m2.7-highspeed` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+| zenmux | `minimax/minimax-m3` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |

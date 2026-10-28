@@ -500,3 +500,28 @@ and only generated target artifacts were cleaned. The complete affected-package 
 these flags change build artifacts, not test selection or assertions. No unfinished run is a pass.
 Status stays Review / Claimed, Completion Commit: Pending; data and final acceptance remain open.
 No sibling implementation, scope waiver or release is claimed.
+
+
+## Reviewed Endpoint Data Candidate — 2026-10-28
+
+Code carrier #792 (`f43cd990`) and the separately reviewed endpoint data stage continue the same
+#747 claim. The frozen 2026-10-27 source admits 45 supported, vendor-reviewed HTTP endpoint pairs:
+Neon 14 Responses, Ofox 10 Messages, Zenmux 17 Messages and Freemodel 4 Chat. The data candidate adds
+only paired model `protocol` / `api_base_url` metadata and validates original non-routing identity,
+prices, limits, capabilities, variants and provider records with the original semantic digest.
+Total candidate hints are 4,055 (3,857 Chat / 65 Messages / 133 Responses).
+
+The data activation stage also keeps a reviewed model's original vendor root on wire rollback when
+no provider URL was persisted; it cannot leak that provider credential to an unrelated adapter default.
+This exact-model safeguard does not change custom gateways or older records without API metadata.
+
+Primary vendor root/authentication evidence, exact destination tuples, all 45 rows, hashes and actual
+compressed-catalog-to-binary tests are recorded in
+[the endpoint ledger](../reference/PROVIDER-008-A-CATALOG-PROTOCOLS.md#reviewed-http-endpoint-projection-candidate--2026-10-28).
+Code-first merge and fresh exact-head data validation/review/CAS remain required; candidate data is
+not represented as activated before merge. Seven Copilot Messages endpoints remain unreviewed for
+vendor authentication/transport compatibility. Four WSS endpoints are the already-excluded Realtime
+family, not HTTP Chat. Neither distinction is a scope waiver or implementation claim.
+Keep Review / Claimed with Completion Commit: Pending until the remaining acceptance residual is
+resolved through implementation/confirmation or an explicit accepted scope decision. #724/#748 stay
+open; no sibling implementation or release is claimed.

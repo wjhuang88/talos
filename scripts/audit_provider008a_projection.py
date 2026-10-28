@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline, exhaustive audit of I306's frozen protocol-only catalog projection.
+"""Offline, exhaustive audit of I306's frozen protocol-and-endpoint catalog projection.
 
 Python 3.11+ standard library only. This maintenance audit neither fetches nor changes data.
 The independent admission calculation intentionally checks every packaged model against the
@@ -10,6 +10,9 @@ import collections
 import gzip
 import hashlib
 import json
+import ipaddress
+import re
+from urllib.parse import urlsplit
 from pathlib import Path
 import tomllib
 
@@ -23,10 +26,36 @@ SDK = {
     "@ai-sdk/openai-compatible": "openai-chat",
     "@ai-sdk/anthropic": "anthropic-messages",
 }
-DEFAULT_ROOT = {
-    "@ai-sdk/openai": "https://api.openai.com/v1",
-    "@ai-sdk/anthropic": "https://api.anthropic.com/v1",
+
+# Credential-destination admission is frozen alongside the source. These exact tuples require
+# primary vendor evidence; unsupported/unverified vendor wrappers are not inferred from SDK names.
+REVIEWED_ENDPOINTS = {
+    ("neon", "${NEON_AI_GATEWAY_BASE_URL}/v1", "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"): "openai-responses",
+    ("ofox", "https://api.ofox.ai/v1", "https://api.ofox.ai/anthropic/v1"): "anthropic-messages",
+    ("zenmux", "https://zenmux.ai/api/v1", "https://zenmux.ai/api/anthropic/v1"): "anthropic-messages",
+    ("freemodel", "https://cc.freemodel.dev/v1", "https://api.freemodel.dev/v1"): "openai-chat",
 }
+
+
+def http_endpoint(value):
+    value = (value or "").strip()
+    template = re.fullmatch(r"\$\{[A-Za-z0-9_]+\}(/[^$]*)?", value)
+    if template:
+        value = "https://catalog-template.invalid" + (template.group(1) or "")
+    if any(c.isspace() or ord(c) < 32 for c in value):
+        return False
+    try:
+        parsed = urlsplit(value)
+        parsed.port  # reject malformed ports, independently of the Rust URL parser
+        if not parsed.hostname or parsed.username is not None or parsed.password is not None or parsed.query or parsed.fragment:
+            return False
+        if parsed.scheme == "https":
+            return True
+        if parsed.scheme != "http":
+            return False
+        return parsed.hostname == "localhost" or ipaddress.ip_address(parsed.hostname).is_loopback
+    except ValueError:
+        return False
 
 
 def normalized(value):
@@ -51,16 +80,31 @@ def expected(model, packaged_providers, source):
     packaged_root = packaged_providers[model["provider"]].get("api_base_url")
     if normalized(host.get("api")) != normalized(packaged_root):
         return None, "provider_root_drift"
-    if override.get("api") is not None:
-        parent_root = host.get("api") or DEFAULT_ROOT.get(host_sdk)
-        if parent_root is None or normalized(override["api"]) != normalized(parent_root):
-            return None, "distinct_model_endpoint"
     shape = override.get("shape")
     protocol = SDK[model_sdk] if shape is None else {
         "responses": "openai-responses",
         "completions": "openai-chat",
     }.get(shape.strip())
-    return protocol, protocol or "unsupported_shape"
+    if protocol is None:
+        return None, "unsupported_shape"
+    if override.get("api") is not None:
+        parent_root = host.get("api")
+        if not http_endpoint(override["api"]) or not http_endpoint(parent_root):
+            return None, "unsupported_transport"
+        if normalized(override["api"]) != normalized(parent_root):
+            reviewed = REVIEWED_ENDPOINTS.get((model["provider"], normalized(parent_root), normalized(override["api"])))
+            if reviewed != protocol:
+                return None, "unreviewed_model_endpoint"
+    return protocol, protocol
+
+
+def expected_endpoint(model, source, protocol):
+    if protocol is None:
+        return None
+    host = source[model["provider"]]
+    override = host["models"][model["id"]].get("provider") or {}
+    api = override.get("api")
+    return normalized(api) if api is not None and normalized(api) != normalized(host.get("api")) else None
 
 
 def main():
@@ -71,24 +115,27 @@ def main():
     source = json.loads(raw)
     catalog = tomllib.loads((ROOT / "crates/talos-config/src/models.toml").read_text(encoding="utf-8"))
     providers = {provider["id"]: provider for provider in catalog["providers"]}
+    endpoint_count = sum(model.get("api_base_url") is not None for model in catalog["models"])
     counts = collections.Counter()
     mismatches = []
     for model in catalog["models"]:
         protocol, reason = expected(model, providers, source)
         counts[reason] += 1
-        if model.get("protocol") != protocol:
-            mismatches.append((model["provider"], model["id"], model.get("protocol"), protocol))
+        endpoint = expected_endpoint(model, source, protocol)
+        if model.get("protocol") != protocol or model.get("api_base_url") != endpoint:
+            mismatches.append((model["provider"], model["id"], model.get("protocol"), protocol, model.get("api_base_url"), endpoint))
     # Preserve the entire original package, including provider records and all model metadata.
     for model in catalog["models"]:
         model.pop("protocol", None)
+        model.pop("api_base_url", None)
     semantic = hashlib.sha256(json.dumps(catalog, sort_keys=True,
                                          separators=(",", ":")).encode()).hexdigest()
     if semantic != SEMANTIC_SHA256:
         raise SystemExit(f"non-protocol catalog changed: {semantic}")
     print(json.dumps({"source_sha256": digest, "source_bytes": len(raw),
                       "source_providers": len(source), "models": len(catalog["models"]),
-                      "non_protocol_sha256": semantic,
-                      "counts": dict(sorted(counts.items())), "mismatches": mismatches}, indent=2))
+                      "non_routing_sha256": semantic,
+                      "endpoint_records": endpoint_count, "counts": dict(sorted(counts.items())), "mismatches": mismatches}, indent=2))
     if mismatches:
         raise SystemExit("catalog protocol projection differs from frozen source")
 
