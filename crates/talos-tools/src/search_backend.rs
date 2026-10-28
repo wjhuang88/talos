@@ -19,6 +19,8 @@ mod transport;
 mod composition;
 // Dormant owned bridge from prepared composition into the core network invocation carrier.
 mod prepared_invocation;
+// Dormant prepared-only AgentTool seam; no WebSearchTool/registry/default activation.
+mod router_tool;
 // Dormant Talos-owned routing core; no WebSearchTool/registry/default activation.
 mod router;
 // Dormant response parsing prerequisite; activation still requires ADR-090 parity/D gates.
