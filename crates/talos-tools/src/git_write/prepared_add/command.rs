@@ -12,6 +12,25 @@ pub(super) struct FrozenCommand {
 }
 
 impl FrozenCommand {
+    pub(super) fn checkout(
+        program: &Path,
+        workdir: &Path,
+        input: &GitCheckoutInput,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, GitToolError> {
+        let branch = if input.branch == "-" && !input.create {
+            "@{-1}"
+        } else {
+            &input.branch
+        };
+        let mut arguments = vec!["--no-pager", "--literal-pathspecs", "checkout"];
+        if input.create {
+            arguments.push("-b");
+        }
+        arguments.extend([branch, "--"]);
+        Self::new(program, workdir, arguments, environment)
+    }
+
     /// Retain commit message and mode without exposing them in review output.
     pub(super) fn commit(
         program: &Path,

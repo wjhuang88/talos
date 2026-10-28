@@ -253,6 +253,7 @@ pub(super) struct AddPlan {
     native_pull_command: Option<command::FrozenCommand>,
     native_add_command: Option<command::FrozenCommand>,
     native_commit_command: Option<command::FrozenCommand>,
+    native_checkout_command: Option<command::FrozenCommand>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     workspace_review_root: PathBuf,
@@ -693,6 +694,15 @@ impl AddPlan {
             )?),
             _ => None,
         };
+        let native_checkout_command = match &operation {
+            Operation::Checkout(input) => Some(command::FrozenCommand::checkout(
+                &program,
+                &repository.workdir,
+                input,
+                &environment,
+            )?),
+            _ => None,
+        };
         Ok(Self {
             phase: Phase::SenderConfiguration,
             command_budget: std::sync::Mutex::new(CommandBudget::default()),
@@ -740,6 +750,7 @@ impl AddPlan {
             native_pull_command,
             native_add_command,
             native_commit_command,
+            native_checkout_command,
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             workspace_review_root: workspace
@@ -3911,6 +3922,18 @@ impl AddPlan {
                 ));
             }
             retained.command()
+        } else if matches!(self.operation, Operation::Checkout(_)) {
+            let retained = self.native_checkout_command.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput(
+                    "Native Checkout command missing; no command started".into(),
+                )
+            })?;
+            if retained != &expected_command {
+                return Err(GitToolError::InvalidInput(
+                    "Native Checkout command changed after preparation; request a fresh authorization".into(),
+                ));
+            }
+            retained.command()
         } else {
             expected_command.command()
         };
@@ -4269,6 +4292,19 @@ impl AddPlan {
                 return Err(GitToolError::InvalidInput(
                     "Native Add command changed after preparation; request a fresh authorization"
                         .into(),
+                ));
+            }
+        }
+        if let Operation::Checkout(input) = &self.operation {
+            let expected = command::FrozenCommand::checkout(
+                &self.program,
+                &self.repository.workdir,
+                input,
+                &self.environment,
+            )?;
+            if self.native_checkout_command.as_ref() != Some(&expected) {
+                return Err(GitToolError::InvalidInput(
+                    "Native Checkout command changed after preparation; request a fresh authorization".into(),
                 ));
             }
         }
