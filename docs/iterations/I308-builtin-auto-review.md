@@ -2,6 +2,29 @@
 
 ## Local operation-specific Git Auto checkpoint — 2026-10-28
 
+Git stage delivery state: Review (local candidate; remote gates pending).
+Iteration delivery remains Active / Partial; this stage does not close I308.
+
+Implementation is committed locally as
+`a1490da3479f6da752c98d2ccca8cefeed4b17b5`; it is not pushed or merged.
+Independent static permission/security/API review approved that exact implementation
+against `4bf3488b2f4344b054754851b588686126c436f4`, without running tests.
+Approved-host Windows Tools all-feature cross-check passed
+(`/private/tmp/i308-git-command-xwin-host.log`); this is compilation evidence,
+not native Windows execution. The unchanged focused Push eight-stage test also
+passed in a subsequent sandbox run, without establishing why earlier workspace
+runs received EPERM from process observation. Final approved-host standard
+preflight with default debug/incremental settings failed at workspace test linking
+with ENOSPC (exit 101; `/private/tmp/i308-git-command-final-preflight-host.log`).
+After explicitly authorized deletion of only this worktree's regenerable
+`target/debug/incremental` cache, the standard script passed completely (exit 0) with
+`CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0
+RUST_TEST_THREADS=1` in approved host execution
+(`/private/tmp/i308-git-command-final-preflight-host-lowdebug.log`), including
+workspace tests and both external Runtime SDK consumer modes. This certifies the
+unchanged executable implementation; the owner evidence update requires its own
+governance checks. No remote gate or native Windows execution is claimed.
+
 The four-operation Agent matrix now also covers same-name external registration
 and replacement of a trusted builtin instance: both invoke zero assessors and
 produce no Git mutation (`/private/tmp/i308-git-instance-trust.log`). Its denied
@@ -24,20 +47,19 @@ Runtime integration warnings-denied Clippy passes after replacing two fixture
 (`/private/tmp/i308-git-auto-governance.log`,
 `/private/tmp/i308-git-auto-claims.log`). Fresh fetch and GitHub main-ref query
 both confirm `4bf3488b2f4344b054754851b588686126c436f4`.
-This is local host evidence, not Windows runtime or merged delivery. The running
-standard preflight began before these fixture/documentation changes and cannot
-certify the final tree without subsequent applicable validation.
+This is local host evidence, not Windows runtime or merged delivery. The earlier
+overlapping preflight is superseded by the final low-debug run recorded above.
 
-The current uncommitted continuation produces separate versioned Add, Commit,
+The current locally committed continuation produces separate versioned Add, Commit,
 Checkout and Push review evidence only at their final retained-command frontier.
 The closed capability compiler checks each tool/capability pair and downgrades
 approval to Once. Unknown transitive effects remain explicitly disclosed;
 active Deny and incompatible scoped human checkpoints are checked before Allow.
 This does not extend Pull authorization merely by relabeling its proof.
 
-Real registered Agent dispatch passes four operations across seven scenarios
+Real registered Agent dispatch passes four operations across nine scenarios
 (Allow, human-required, unsupported model `deny` output, assessor error, session expiry, policy Deny,
-scoped Ask), with actual index/commit/branch/receiver-ref assertions and zero
+scoped Ask, external registration, trusted-instance replacement), with actual index/commit/branch/receiver-ref assertions and zero
 persistent grants. Policy restrictions prevent model assessment. The fixture
 denies command-review fallback so it cannot mask failed Auto approval. Existing
 Pull's ten-scenario matrix also passes. Log:
@@ -56,9 +78,9 @@ transitive-effects marker. The marker was removed: operation capability guards
 already enforce the restriction, including manually registered Git instances.
 Full Agent rerun then passed. No new permission-pipeline marker remains.
 Fetched main remains `4bf3488b2f4344b054754851b588686126c436f4`.
-Remaining: final expanded-tree checks, architecture/user documentation, external
-runtime/profile and native Windows evidence, full locked preflight, independent
-permission/security/API review, exact-head CI/CAS/merge and remaining original
+Remaining: final owner-evidence checks, production/profile reconciliation and native
+Windows evidence, final exact-head permission/security/API review,
+exact-head CI/CAS/merge and remaining original
 I308 acceptance. This is local implementation evidence, not merged delivery.
 I308/T8 and the full handoff remain Active / Partial; MODEL-014 → T4 → T5 → T1 →
 T6 retain their complete scope.
@@ -1661,6 +1683,18 @@ production composition before closing each row.
 | 5, higher-risk recovery | Reconcile `edit_auto`, mutation pipeline/recovery tests and Save recovery: special/config/security paths, destructive operation, partial failure, cancellation and stale target. Record unsupported native rename/batch inventory rather than inventing tools or rollback guarantees. |
 | 6, host reachability | Inspect CLI/Runtime/Desktop/MCP actual resolver installation and visible decisions, beyond registry equality; match applicable feature/native Windows evidence to these paths. |
 | 7, delivery gates | Save preflight/SDK/xwin, stable stage publication, exact-head native CI/review/CAS; then full H/G owner and user-doc reconciliation with implementation SHAs before Complete. |
+
+Current production-entrypoint inspection (2026-10-28): standalone
+`run_mcp_server` constructs `McpPermissionGate::new` with a default engine.
+That gate uses Headless/Unavailable interaction and no resolver; it labels calls
+as `McpRemote { server: "standalone-mcp" }` even for its hosted native registry.
+This proves a fail-closed standalone disposition, not model Auto reachability.
+Acceptance 6 remains open: reconcile intended hosted-native behavior and add
+real gate/handler evidence before claiming MCP coverage. RuntimeBuilder Git
+integration and Desktop ordinary-shell Auto tests do not cover this entrypoint.
+Likewise CLI `format_auto_review_report` currently formats `prepared_command`
+AllowOnce through its generic completion fallback; operation-specific visible
+decision/rationale coverage must still be verified under acceptance 6.
 
 ### Real Pull Auto ownership follow-up — 2026-10-27
 
