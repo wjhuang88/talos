@@ -1,10 +1,11 @@
-## Proposed gix upgrade stage — 2026-10-26
+## Merged gix upgrade stage — 2026-10-28
 
-[I309](I309-gix-090-upgrade.md) proposes the maintainer-requested gix 0.87.1 → 0.90.0 upgrade.
-It proposes Active/Claimed in #774, ineffective until the finalized atomic record merges. No dependency has
-changed; I308 remains independently Active/Partial. See I309 for inventory and validation scope.
+[I309](I309-gix-090-upgrade.md) is Review / Claimed after #790, implementation
+merged as `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db`. Its owner records the accepted
+post-merge dependency snapshot candidate and validation limits. Baseline closure review/CI/merge
+remain pending. I308 remains independently Active/Partial.
 
-## Active T8 implementation — 2026-10-26
+## Active T8 implementation — 2026-10-28
 
 [I308](I308-builtin-auto-review.md) is Active after #765 merged at `8f0ce2340`.
 Stages #769–#772 are merged; full H/G Auto behavior remains incomplete.

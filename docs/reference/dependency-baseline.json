@@ -1,9 +1,75 @@
 {
   "schema": "talos.dependency-baseline/v1",
-  "source_commit": "76f0a41b89dfbe20effe3e4a1c8909a3148a4ad9",
-  "accepted_at": "2026-09-07T13:35:16Z",
-  "validation_evidence": "PR #501; CI 34125593411; independent review 5571420442; merge 76f0a41b",
+  "source_commit": "8b8c43e684bfd7c6bf326ea9cffd192b2cc480db",
+  "accepted_at": "2026-10-28T06:31:00Z",
+  "validation_evidence": "PR #790 exact-head CI 40639632495; full locked all-feature tests; release preflight; independent static security/API review",
   "dependencies": [
+    {
+      "name": "proptest",
+      "source": "git+https://github.com/proptest-rs/proptest?rev=3dca198a8fef1b32e3a66f1e1897c955b4dc5b5b",
+      "manifest_requirements": [
+        "^1.10.0"
+      ],
+      "kind": "dev",
+      "target": null,
+      "used_by": [
+        "talos-provider"
+      ],
+      "resolved_versions": [],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
+      "name": "gpui_platform",
+      "source": "git+https://github.com/zed-industries/zed?rev=ac5af8b9e1ea3f7922fbabefe409c05b8766135c",
+      "manifest_requirements": [
+        "*"
+      ],
+      "kind": null,
+      "target": null,
+      "used_by": [
+        "talos-desktop"
+      ],
+      "resolved_versions": [],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
+      "name": "gpui",
+      "source": "git+https://github.com/zed-industries/zed?rev=ac5af8b9e1ea3f7922fbabefe409c05b8766135c",
+      "manifest_requirements": [
+        "*"
+      ],
+      "kind": null,
+      "target": null,
+      "used_by": [
+        "talos-desktop"
+      ],
+      "resolved_versions": [],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
     {
       "name": "anyhow",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -66,6 +132,7 @@
         "talos-agent",
         "talos-cli",
         "talos-core",
+        "talos-desktop",
         "talos-evolution",
         "talos-mcp",
         "talos-plugin",
@@ -185,6 +252,32 @@
       }
     },
     {
+      "name": "cap-fs-ext",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_requirements": [
+        "^4.0.3"
+      ],
+      "kind": null,
+      "target": null,
+      "used_by": [
+        "talos-agent",
+        "talos-desktop",
+        "talos-runtime"
+      ],
+      "resolved_versions": [
+        "4.0.3"
+      ],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
       "name": "cap-std",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "manifest_requirements": [
@@ -193,6 +286,9 @@
       "kind": null,
       "target": null,
       "used_by": [
+        "talos-agent",
+        "talos-desktop",
+        "talos-runtime",
         "talos-tools"
       ],
       "resolved_versions": [
@@ -391,7 +487,7 @@
       "name": "gix",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "manifest_requirements": [
-        "^0.87.1"
+        "^0.90.0"
       ],
       "kind": null,
       "target": null,
@@ -400,7 +496,7 @@
         "talos-tui"
       ],
       "resolved_versions": [
-        "0.87.1"
+        "0.90.0"
       ],
       "accepted_version": null,
       "latest_stable": null,
@@ -609,10 +705,34 @@
       }
     },
     {
+      "name": "jsonschema",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_requirements": [
+        "^0.58.6"
+      ],
+      "kind": "dev",
+      "target": null,
+      "used_by": [
+        "talos-tools"
+      ],
+      "resolved_versions": [
+        "0.58.6"
+      ],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
       "name": "libc",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "manifest_requirements": [
-        "^1.0.0-alpha.3"
+        "^0.2"
       ],
       "kind": null,
       "target": "cfg(unix)",
@@ -621,7 +741,7 @@
         "talos-tools"
       ],
       "resolved_versions": [
-        "1.0.0-alpha.3"
+        "0.2.186"
       ],
       "accepted_version": null,
       "latest_stable": null,
@@ -882,6 +1002,30 @@
       }
     },
     {
+      "name": "same-file",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_requirements": [
+        "=1.0.6"
+      ],
+      "kind": null,
+      "target": "cfg(windows)",
+      "used_by": [
+        "talos-tools"
+      ],
+      "resolved_versions": [
+        "1.0.6"
+      ],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
       "name": "schemars",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "manifest_requirements": [
@@ -975,6 +1119,7 @@
         "talos-conversation",
         "talos-core",
         "talos-dashboard",
+        "talos-desktop",
         "talos-evolution",
         "talos-exploration",
         "talos-mcp",
@@ -1013,6 +1158,30 @@
       "used_by": [
         "talos-agent",
         "talos-plugin",
+        "talos-text"
+      ],
+      "resolved_versions": [
+        "1.0.151"
+      ],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
+      "name": "serde_json",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_requirements": [
+        "^1"
+      ],
+      "kind": null,
+      "target": null,
+      "used_by": [
         "talos-text"
       ],
       "resolved_versions": [
@@ -1098,6 +1267,30 @@
       "name": "sha2",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "manifest_requirements": [
+        "^0.10"
+      ],
+      "kind": null,
+      "target": null,
+      "used_by": [
+        "talos-plugin"
+      ],
+      "resolved_versions": [
+        "0.10.9"
+      ],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
+      "name": "sha2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_requirements": [
         "^0.11"
       ],
       "kind": null,
@@ -1105,10 +1298,12 @@
       "used_by": [
         "talos-agent",
         "talos-cli",
+        "talos-desktop",
         "talos-exploration",
         "talos-memory",
         "talos-permission",
         "talos-provider",
+        "talos-runtime",
         "talos-session",
         "talos-tools"
       ],
@@ -1311,7 +1506,8 @@
       "used_by": [
         "talos-agent",
         "talos-cli",
-        "talos-provider"
+        "talos-provider",
+        "talos-runtime"
       ],
       "resolved_versions": [
         "0.7.19"
@@ -1362,6 +1558,7 @@
         "talos-agent",
         "talos-core",
         "talos-dashboard",
+        "talos-desktop",
         "talos-evolution",
         "talos-runtime",
         "talos-sandbox",
@@ -1395,6 +1592,7 @@
         "talos-conversation",
         "talos-core",
         "talos-dashboard",
+        "talos-desktop",
         "talos-mcp",
         "talos-rpc",
         "talos-runtime",
@@ -1647,6 +1845,30 @@
       }
     },
     {
+      "name": "unicode-segmentation",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_requirements": [
+        "^1.13.3"
+      ],
+      "kind": null,
+      "target": null,
+      "used_by": [
+        "talos-desktop"
+      ],
+      "resolved_versions": [
+        "1.13.3"
+      ],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
       "name": "unicode-width",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "manifest_requirements": [
@@ -1659,6 +1881,54 @@
       ],
       "resolved_versions": [
         "0.2.2"
+      ],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
+      "name": "url",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_requirements": [
+        "^2.5.8"
+      ],
+      "kind": "build",
+      "target": null,
+      "used_by": [
+        "talos-config"
+      ],
+      "resolved_versions": [
+        "2.5.8"
+      ],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
+      "name": "url",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_requirements": [
+        "^2.5.8"
+      ],
+      "kind": null,
+      "target": null,
+      "used_by": [
+        "talos-config"
+      ],
+      "resolved_versions": [
+        "2.5.8"
       ],
       "accepted_version": null,
       "latest_stable": null,
@@ -1708,11 +1978,13 @@
         "talos-conversation",
         "talos-core",
         "talos-dashboard",
+        "talos-desktop",
         "talos-evolution",
         "talos-exploration",
         "talos-memory",
         "talos-permission",
         "talos-provider",
+        "talos-runtime",
         "talos-session",
         "talos-tools"
       ],
@@ -1763,10 +2035,35 @@
       "kind": null,
       "target": null,
       "used_by": [
-        "talos-plugin"
+        "talos-plugin",
+        "talos-text"
       ],
       "resolved_versions": [
         "48.0.1"
+      ],
+      "accepted_version": null,
+      "latest_stable": null,
+      "classification": [
+        "registry-unavailable"
+      ],
+      "signals": {
+        "deprecated": "unknown",
+        "security": "unknown"
+      }
+    },
+    {
+      "name": "windows-sys",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "manifest_requirements": [
+        "^0.61.2"
+      ],
+      "kind": "dev",
+      "target": "cfg(windows)",
+      "used_by": [
+        "talos-tools"
+      ],
+      "resolved_versions": [
+        "0.61.2"
       ],
       "accepted_version": null,
       "latest_stable": null,

@@ -1,6 +1,6 @@
 # Iteration I309: Upgrade gix To Latest Stable 0.90.0
 
-> Document status: Active (claim #774 effective at 2789b97bfe807f486778f3b44c7053e2a0e6e13d)
+> Document status: Review (implementation merged; baseline closure candidate pending review/CI/merge)
 > Published plan date: 2026-10-26
 > Planned objective: upgrade gix 0.87.1 to the latest observed stable, non-yanked 0.90.0 while preserving existing Git behavior and permission boundaries.
 > Baseline rule: preserve this target; append execution facts rather than rewriting acceptance.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #774 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer explicitly requested latest gix upgrade; claim requires exact-head review, applicable CI, both validators and merge-time CAS. |
-| Implementation PR | #790 (open; exact-head CI pending) |
+| Implementation PR | #790 (merged as `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db`) |
 | Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Verified upgrade and existing implementation commit evidence; no release authorized. |
 
@@ -94,6 +94,72 @@ and necessary source migrations separately reviewable/revertible; revert the upg
 restore 0.87.1 without altering T7/T8 policy. Do not conceal a failed validation by narrowing scope.
 
 ## Evidence And Execution
+
+### Merged implementation checkpoint — 2026-10-28
+
+PR #790 merged as `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db` after refreshed
+CAS against main `d708fff263d7ecca6c78ccd0c6c3773616469750`, all eight exact-head
+CI jobs passed, and independent static security/API approval was published at
+https://github.com/wjhuang88/talos/pull/790#issuecomment-6462196936.
+The reviewer did not independently run tests or advisory queries.
+
+The fresh full `cargo test --workspace --all-features --locked` completed exit 0
+(session 13965), with real language bundles, low-debug/non-incremental profiles
+and approved host execution. Log: `/private/tmp/i309-912-all-feature-test-host.log`.
+Both governance validators passed again with zero warnings. The final validation
+receipt is https://github.com/wjhuang88/talos/pull/790#issuecomment-6462358172.
+
+Post-merge snapshot generation used that exact merged dependency tree, source SHA
+and timestamp `2026-10-28T06:31:00Z`. JSON and Markdown baseline updates are local;
+the dedicated baseline-table Unix/PowerShell parity and equality check passed.
+The full dependency audit test suite passed (`/private/tmp/i309-baseline-tests.log`).
+Security/deprecation signals remain unknown; local-only collection queried no
+registry and does not automatically accept dependencies. Closure review/CI/merge
+of these baseline documents remains open; only the implementation is merged.
+
+**Completion Commit:** `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db`
+Earlier pending-test/review/merge checkpoints below are historical.
+
+### Historical exact-head checkpoint — 2026-10-28
+
+Candidate PR #790 head `912ac0dbf8cc7db139b0b72f62b0c05dd4f4d75b`
+is based on main `d708fff263d7ecca6c78ccd0c6c3773616469750`.
+Exact-head CI [40639632495](https://github.com/wjhuang88/talos/actions/runs/40639632495)
+completed successfully in all eight jobs, including native Windows workspace
+and explicit Desktop checks. Earlier cancelled runs certify no current head.
+
+Author-run standard `./scripts/release_preflight.sh` passed at this head
+(session 79030; output was not redirected to a durable log), including both
+external Runtime SDK modes. Both governance validators passed (sessions
+9375 and 18929). Fresh `cargo check --workspace --all-targets --all-features
+--locked` and `cargo clippy --workspace --all-targets --all-features --locked
+-- -D warnings` passed; logs are `/private/tmp/i309-912-all-feature-check.log`
+and `/private/tmp/i309-912-all-feature-clippy.log`.
+
+`TALOS_LANGUAGE_BUNDLE_ROOT=/private/tmp/i309-real-language-bundles cargo test
+--workspace --all-features --locked` exited 101 during compilation/linking:
+`No space left on device (os error 28)`. Log:
+`/private/tmp/i309-912-all-feature-test.log`. This is not a passing all-feature
+test run. Earlier e53-base tests do not certify this rebased head. No target
+cleanup or worktree removal was performed before that failure was recorded.
+On the subsequent automatic continuation, the executing Agent incorrectly
+treated continuation as approval for its pending cleanup request and ran
+`cargo clean --locked` in this worktree, removing 88,148 files / 31.1 GiB.
+This was not an explicit user permission response. Source files, root checkout
+and both registered worktrees were retained. A retry with
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0`
+and the same real language bundles is running, log
+`/private/tmp/i309-912-all-feature-test-low-debug.log`. Required all-feature
+test acceptance remains outstanding until its terminal result is inspected.
+
+Independent static reviewer `/root/i309_exact_review` returned APPROVE for
+this exact head/base: range-diff is patch-equivalent and the fixture formatting
+preserves the literal environment placeholder. The reviewer did not run tests;
+this separate Agent shares the session identity and is not an independent
+natural person. Historical advisory evidence remains not independently
+reproduced. Review receipt publication, remaining validation, merge CAS,
+implementation merge and accepted dependency-baseline advancement remain
+outstanding. I309 is Active, not Complete.
 
 ### Historical validation checkpoint — 2026-10-28 prior remote candidate
 
