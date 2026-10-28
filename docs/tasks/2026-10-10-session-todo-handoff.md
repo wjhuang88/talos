@@ -1,18 +1,19 @@
 ## Active resume checkpoint — 2026-10-28 remote base advance
 
-Local I309 candidate `54250a3d4ff4761d40d889881b5bf68e4cadfbd1` is rebased onto
-main `32b5579bcdb9b14e27e7a2b24b7a6a1c9c0aa7d9` (I293 PR #788). Range-diff
-confirms the first nine patches are unchanged; the tenth reconciles owner/handoff
-records. Independent static review approved this exact candidate without running
-builds or tests.
+Local I309 candidate `2efacb8afe7376485ac98f0d955333482503bdb3` is rebased onto
+main `32b5579bcdb9b14e27e7a2b24b7a6a1c9c0aa7d9` (I293 PR #788). Independent
+static review approved this exact candidate; receipt is posted on PR #790.
 
 PR #790 still has remote head `3c5a3276c`; all eight gates in CI 40624815706
 passed, including native Windows. These certify the previous head only. Fresh
-standard preflight is live in session 90543, logging to
-`/private/tmp/i309-main32-preflight.log`; post-clean compilation is progressing.
-Both governance validators and diff checks passed in session 19452. Current-base
-all-feature validation, final evidence commit/review, publication, exact-head CI,
-merge and accepted dependency-baseline advancement remain pending.
+standard preflight passed exit 0, including both external Runtime SDK modes, in
+`/private/tmp/i309-main32-preflight.log`. Current-base all-feature check and
+warnings-denied Clippy passed. The all-feature test suite reached 1003/1004
+Tools tests but failed because `ps` process observation returned EPERM; the
+standard preflight retry reproduced it. Earlier unsandboxed full-suite evidence
+passed the same test, but current-base all-feature success is not established.
+Both governance validators passed. Final evidence reconciliation, publication,
+exact-head CI, merge and accepted dependency-baseline advancement remain pending.
 
 Requested `cargo clean --locked` removed 26,276 files / 15.0 GiB. Only root and
 active `/private/tmp/talos-i308-save-active` worktrees remain; neither is stale,
