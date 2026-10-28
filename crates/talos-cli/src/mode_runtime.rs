@@ -547,7 +547,8 @@ mod tests {
     }
 
     fn provider_reasoning_effort(config: &Config) -> Option<String> {
-        let provider = crate::provider_setup::build_provider(config, "sk-test-session", false);
+        let provider = crate::provider_setup::build_provider(config, "sk-test-session", false)
+            .expect("provider");
         let preview = provider
             .request_preview(&[talos_core::message::Message::User {
                 content: "session reconstruction probe".to_string(),

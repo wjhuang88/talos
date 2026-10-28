@@ -24,6 +24,8 @@ struct ModelProtocolEntry {
     provider: String,
     #[serde(default)]
     protocol: Option<ProviderProtocol>,
+    #[serde(default)]
+    api_base_url: Option<String>,
 }
 
 static PROTOCOL_DATASET: LazyLock<ProtocolDataset> = LazyLock::new(|| {
@@ -54,7 +56,10 @@ pub(crate) fn builtin_model_protocol(
             "anthropic" => Some("https://api.anthropic.com/v1"),
             _ => None,
         });
-        if !expected.is_some_and(|expected| endpoint_root(configured) == endpoint_root(expected)) {
+        if !expected.is_some_and(|expected| {
+            endpoint_root(&crate::substitute_env_vars(configured))
+                == endpoint_root(&crate::substitute_env_vars(expected))
+        }) {
             return None;
         }
     }
@@ -64,6 +69,50 @@ pub(crate) fn builtin_model_protocol(
         model_id,
         builtin.is_some(),
     )
+}
+
+/// Endpoint evidence is provider-scoped: a unique model name on a custom gateway never authorizes
+/// sending that gateway's credentials to the catalog vendor. Keep the endpoint paired to its wire.
+pub(crate) fn builtin_model_endpoint(
+    provider: &str,
+    model_id: &str,
+    configured_endpoint: Option<&str>,
+    protocol: &ProviderProtocol,
+) -> Option<String> {
+    let builtin = model::builtin_providers()
+        .into_iter()
+        .find(|entry| entry.id == provider)?;
+    infer_model_endpoint(
+        &PROTOCOL_DATASET.models,
+        provider,
+        model_id,
+        builtin.api_base_url.as_deref(),
+        configured_endpoint,
+        protocol,
+    )
+}
+
+fn infer_model_endpoint(
+    catalog: &[ModelProtocolEntry],
+    provider: &str,
+    model_id: &str,
+    builtin_root: Option<&str>,
+    configured_endpoint: Option<&str>,
+    protocol: &ProviderProtocol,
+) -> Option<String> {
+    let expected = builtin_root?;
+    if let Some(configured) = configured_endpoint
+        && endpoint_root(&crate::substitute_env_vars(configured))
+            != endpoint_root(&crate::substitute_env_vars(expected))
+    {
+        return None;
+    }
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.provider == provider && entry.id == model_id)?;
+    (entry_protocol(entry).as_ref() == Some(protocol))
+        .then(|| entry.api_base_url.clone())
+        .flatten()
 }
 
 fn endpoint_root(url: &str) -> &str {
@@ -76,6 +125,17 @@ fn endpoint_root(url: &str) -> &str {
     root
 }
 
+fn entry_protocol(entry: &ModelProtocolEntry) -> Option<ProviderProtocol> {
+    if entry
+        .api_base_url
+        .as_deref()
+        .is_some_and(|api| !crate::protocol_signal::is_http_model_endpoint(api))
+    {
+        return None;
+    }
+    entry.protocol.clone()
+}
+
 fn infer_model_protocol(
     catalog: &[ModelProtocolEntry],
     provider: &str,
@@ -86,7 +146,7 @@ fn infer_model_protocol(
         return catalog
             .iter()
             .find(|entry| entry.provider == provider && entry.id == model_id)
-            .and_then(|entry| entry.protocol.clone());
+            .and_then(entry_protocol);
     }
 
     let exact: Vec<_> = catalog
@@ -94,7 +154,7 @@ fn infer_model_protocol(
         .filter(|entry| entry.id == model_id)
         .collect();
     match exact.as_slice() {
-        [entry] => return entry.protocol.clone(),
+        [entry] => return entry_protocol(entry),
         [] => {}
         _ => return None,
     }
@@ -108,7 +168,7 @@ fn infer_model_protocol(
             .filter(|entry| entry.id == normalized)
             .collect();
         (matches.len() == 1)
-            .then(|| matches[0].protocol.clone())
+            .then(|| entry_protocol(matches[0]))
             .flatten()
     })
 }
@@ -122,6 +182,7 @@ mod tests {
             id: id.into(),
             provider: provider.into(),
             protocol,
+            api_base_url: None,
         }
     }
 
@@ -198,6 +259,51 @@ mod tests {
         assert_eq!(
             infer_model_protocol(&catalog, "custom", "missing", false),
             None
+        );
+    }
+    #[test]
+    fn catalog_endpoint_requires_exact_owner_root_and_selected_wire() {
+        let mut routed = entry("vendor", "model", Some(ProviderProtocol::OpenAIResponses));
+        routed.api_base_url = Some("https://wire.vendor.test/openai/v1".into());
+        let catalog = [routed];
+        let root = Some("https://vendor.test/v1");
+        let responses = ProviderProtocol::OpenAIResponses;
+        assert_eq!(
+            infer_model_endpoint(&catalog, "vendor", "model", root, root, &responses).as_deref(),
+            Some("https://wire.vendor.test/openai/v1")
+        );
+        // Reviewed built-in metadata can select a distinct origin; unique custom model matching
+        // is not connection authority. Nor can replacing a built-in gateway move its credentials.
+        assert!(
+            infer_model_endpoint(&catalog, "custom", "model", None, root, &responses).is_none()
+        );
+        assert!(
+            infer_model_endpoint(
+                &catalog,
+                "vendor",
+                "model",
+                root,
+                Some("https://custom.test/v1"),
+                &responses
+            )
+            .is_none()
+        );
+        assert!(
+            infer_model_endpoint(
+                &catalog,
+                "vendor",
+                "model",
+                root,
+                root,
+                &ProviderProtocol::OpenAIChat
+            )
+            .is_none()
+        );
+        assert!(
+            infer_model_endpoint(&catalog, "vendor", "missing", root, root, &responses).is_none()
+        );
+        assert!(
+            infer_model_endpoint(&catalog, "vendor", "model", None, None, &responses).is_none()
         );
     }
 }

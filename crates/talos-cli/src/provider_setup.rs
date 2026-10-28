@@ -49,7 +49,7 @@ pub(crate) fn build_provider(
     config: &Config,
     api_key: &str,
     mock: bool,
-) -> Arc<dyn talos_core::provider::LanguageModel> {
+) -> anyhow::Result<Arc<dyn talos_core::provider::LanguageModel>> {
     let (runtime_config, resolution) =
         crate::model_lifecycle::materialize_runtime_model_config(config);
     if let Some(diagnostic) = resolution.diagnostic.as_deref() {
@@ -66,8 +66,8 @@ pub(crate) fn build_provider(
         use talos_provider::mock::MockProvider;
         let api_key = api_key.to_string();
         let debug_config = config.clone();
-        return Arc::new(
-            MockProvider::new().with_request_debug_builder(move |messages| {
+        return Ok(Arc::new(MockProvider::new().with_request_debug_builder(
+            move |messages| {
                 match talos_provider::openai_responses::factory::build_configured_provider(
                     &debug_config,
                     &api_key,
@@ -89,12 +89,12 @@ pub(crate) fn build_provider(
                     })
                     .to_string(),
                 }
-            }),
-        );
+            },
+        )));
     }
 
     talos_provider::openai_responses::factory::build_configured_provider(config, api_key)
-        .unwrap_or_else(|error| panic!("failed to build configured provider: {error}"))
+        .map_err(anyhow::Error::from)
 }
 
 #[cfg(test)]
@@ -112,7 +112,7 @@ mod tests {
     }
 
     fn reasoning_effort_from_real_request(config: &Config) -> Option<String> {
-        let provider = build_provider(config, "sk-test-materialization", false);
+        let provider = build_provider(config, "sk-test-materialization", false).expect("provider");
         let preview = provider
             .request_preview(&[Message::User {
                 content: "runtime materialization probe".to_string(),

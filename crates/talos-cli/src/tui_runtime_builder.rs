@@ -169,7 +169,7 @@ impl TuiRuntimeBuilder {
             }
             Err(error) => return Err(anyhow!(error.to_string())),
         };
-        let provider = build_provider(&runtime_config, &api_key, self.mock);
+        let provider = build_provider(&runtime_config, &api_key, self.mock)?;
 
         let mcp_runtime = McpSessionRuntime::start(&runtime_config.mcp, self.hooks.clone())
             .await

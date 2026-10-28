@@ -92,6 +92,28 @@ follow ADR-075. MODEL-011 (active probe) and MODEL-014 (capability inference, br
 separate scopes; overlap was re-verified during the #747 claim preflight and remains excluded from
 I306.
 
+### 8. Model endpoint routing (2026-10-28)
+
+A protocol signal alone does not implement a different model endpoint. Runtime model connection
+resolution is separate from wire resolution: explicit model `base_url` > eligible packaged model
+endpoint > the existing provider/adapter connection. An explicitly replaced provider root disables
+packaged endpoint routing; model-level explicit configuration remains authoritative.
+
+Packaged endpoint selection requires exact built-in provider/model identity, the unchanged catalog
+provider root, a supported HTTP transport and a matching effective protocol. Explicit wire rollback
+does not reuse the endpoint for another wire. Custom-provider unique-name matching inherits no vendor
+endpoint: it must never relocate gateway credentials merely because a model name matches.
+
+Catalog model endpoints are reviewed credential destinations, like built-in provider roots; a
+cross-origin change must be visible in the separately reviewed catalog diff and provenance ledger.
+Only committed, offline data participates in routing, not freshly fetched model metadata. Environment
+roots (e.g. Neon) are resolved before dispatch; missing variables or unsupported explicit model
+transports are errors. WebSocket/Realtimes, vendor auth wrappers and unsupported SDK transports
+remain excluded, even if an upstream shape says `completions` or `responses`.
+
+This adds optional `ModelConfig.base_url` and an effective endpoint/provenance query. It does not
+change retry policy, endpoint probing, credentials, or admit new packaged rows without data review.
+
 ## Consequences
 
 Confirmed-support users default to a new request path — a visible behavior change that must be

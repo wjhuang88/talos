@@ -97,33 +97,34 @@ pub fn validate_provider_protocol(protocol: &str) -> Result<ProviderProtocol, St
 
 /// Validates a custom provider base URL (MODEL-008-A/I147).
 ///
-/// HTTPS is always allowed. HTTP is allowed only for loopback addresses
+/// Valid HTTPS roots are allowed. HTTP is allowed only for loopback addresses
 /// (`127.0.0.1`, `::1`, `localhost`). Returns the normalized endpoint.
 pub fn validate_provider_base_url(url: &str) -> Result<NormalizedProviderEndpoint, String> {
     let trimmed = url.trim();
     if trimmed.is_empty() {
         return Err("Base URL cannot be empty.".to_string());
     }
-    let lower = trimmed.to_ascii_lowercase();
-    if lower.starts_with("https://") {
-        return Ok(normalize_provider_endpoint(trimmed));
+    if crate::protocol_signal::is_http_endpoint(trimmed) {
+        Ok(normalize_provider_endpoint(trimmed))
+    } else {
+        Err("Base URL requires HTTPS (or HTTP loopback), a valid host/port, and no userinfo, query or fragment.".to_string())
     }
-    if lower.starts_with("http://") {
-        let after_scheme = lower.strip_prefix("http://").unwrap_or("");
-        let host_part = after_scheme.split('/').next().unwrap_or(after_scheme);
-        let host = if let Some(rest) = host_part.strip_prefix('[') {
-            rest.split(']').next().unwrap_or("")
-        } else {
-            host_part.split(':').next().unwrap_or(host_part)
-        };
-        if host == "127.0.0.1" || host == "::1" || host == "localhost" {
-            return Ok(normalize_provider_endpoint(trimmed));
-        }
-        return Err(
-            "HTTP is only allowed for loopback addresses (127.0.0.1, ::1, localhost).".to_string(),
-        );
+}
+
+/// Validates an explicit model API root, including a whole-root environment placeholder.
+///
+/// The expanded URL is validated again at runtime. This permits storing `${ROOT}/v1` without
+/// persisting environment contents; it does not authorize an unresolved or non-HTTP connection.
+///
+/// # Errors
+///
+/// Rejects malformed roots, unsupported transports and non-loopback HTTP destinations.
+pub fn validate_model_base_url(endpoint: &str) -> Result<(), String> {
+    if crate::protocol_signal::is_http_model_endpoint(endpoint) {
+        Ok(())
+    } else {
+        Err("Model base URL requires HTTPS (or HTTP loopback), no userinfo/query/fragment, or a whole-root ${ENV_VAR} template.".into())
     }
-    Err("Base URL must start with https:// (or http:// for loopback).".to_string())
 }
 
 #[cfg(test)]
@@ -256,5 +257,24 @@ mod tests {
     fn validate_provider_base_url_rejects_non_url() {
         assert!(validate_provider_base_url("not-a-url").is_err());
         assert!(validate_provider_base_url("ftp://example.com").is_err());
+    }
+    #[test]
+    fn endpoint_authority_cannot_disguise_remote_http_as_loopback() {
+        for endpoint in [
+            "http://localhost:80@remote.test/v1",
+            "http://[::1]@remote.test/v1",
+            "http://localhost.attacker.test/v1",
+            "http://localhost:bad/v1",
+            "https://key@remote.test/v1",
+            "https://remote.test/v1?token=value",
+            "https://remote.test/v1#fragment",
+            "https://",
+            "https://remote.test/\npath",
+        ] {
+            assert!(validate_provider_base_url(endpoint).is_err(), "{endpoint}");
+            assert!(validate_model_base_url(endpoint).is_err(), "{endpoint}");
+        }
+        assert!(validate_model_base_url("${ROOT}/openai/v1").is_ok());
+        assert!(validate_model_base_url("${ROOT}@remote.test/v1").is_err());
     }
 }

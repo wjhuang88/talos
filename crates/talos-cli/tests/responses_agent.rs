@@ -6,6 +6,10 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 fn read_request(socket: &mut TcpStream) -> serde_json::Value {
+    read_request_at(socket, "/responses")
+}
+
+fn read_request_at(socket: &mut TcpStream, path: &str) -> serde_json::Value {
     socket.set_nonblocking(false).expect("blocking socket");
     socket
         .set_read_timeout(Some(Duration::from_secs(5)))
@@ -19,7 +23,10 @@ fn read_request(socket: &mut TcpStream) -> serde_json::Value {
         assert!(bytes.len() < 4 * 1024 * 1024, "bounded request");
         if let Some(end) = bytes.windows(4).position(|part| part == b"\r\n\r\n") {
             let headers = String::from_utf8_lossy(&bytes[..end]);
-            assert!(headers.starts_with("POST /responses HTTP/1.1"), "{headers}");
+            assert!(
+                headers.starts_with(&format!("POST {path} HTTP/1.1")),
+                "{headers}"
+            );
             let length = headers
                 .lines()
                 .find_map(|line| {
@@ -50,7 +57,7 @@ fn responses_image_and_native_read_complete_through_real_agent() {
     listener.set_nonblocking(true).expect("bounded accept");
     let address = listener.local_addr().expect("endpoint address");
     std::fs::write(config_dir.join("config.toml"), format!(
-        "provider = \"fixture\"\nmodel = \"test-model\"\n[providers.fixture]\nprotocol = \"openai-chat\"\nbase_url = \"http://{address}\"\napi_key = \"test-key\"\n[providers.fixture.models.test-model]\nprotocol = \"openai-responses\"\nimage_input = true\n"
+        "provider = \"fixture\"\nmodel = \"test-model\"\n[providers.fixture]\nprotocol = \"openai-chat\"\nbase_url = \"http://127.0.0.1:9/provider\"\napi_key = \"test-key\"\n[providers.fixture.models.test-model]\nbase_url = \"${{TALOS_MODEL_ENDPOINT_TEST}}/model-wire\"\nprotocol = \"openai-responses\"\nimage_input = true\n"
     )).expect("config");
     let server = std::thread::spawn(move || {
         let deadline = Instant::now() + Duration::from_secs(25);
@@ -69,7 +76,7 @@ fn responses_image_and_native_read_complete_through_real_agent() {
                     Err(error) => panic!("accept: {error}"),
                 }
             };
-            requests.push(read_request(&mut socket));
+            requests.push(read_request_at(&mut socket, "/model-wire/responses"));
             let mut events = vec![serde_json::json!({"type": "response.created"})];
             if requests.len() == 1 {
                 let item = serde_json::json!({
@@ -100,6 +107,7 @@ fn responses_image_and_native_read_complete_through_real_agent() {
         .arg(&image_path)
         .arg("Read note.txt and describe the image")
         .current_dir(temp.path())
+        .env("TALOS_MODEL_ENDPOINT_TEST", format!("http://{address}"))
         .env("HOME", temp.path())
         .env("USERPROFILE", temp.path())
         .env("NO_PROXY", "127.0.0.1,localhost")

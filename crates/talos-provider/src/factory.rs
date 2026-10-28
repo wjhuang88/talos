@@ -37,7 +37,10 @@ pub fn build_configured_provider(
     let reasoning = model_config.and_then(|model| model.reasoning);
     let output_limit = Some(effective_output_limit(config));
     let timeout = provider_config.timeout;
-    let base_url = config.base_url();
+    let endpoint = config
+        .resolve_provider_endpoint()
+        .map_err(|error| ProviderError::InvalidResponse(error.to_string()))?;
+    let base_url = endpoint.base_url;
     let resolution = resolve_config_provider_protocol(config);
 
     tracing::debug!(
@@ -45,6 +48,7 @@ pub fn build_configured_provider(
         model = %config.model,
         effective_protocol = ?resolution.protocol,
         protocol_source = ?resolution.source,
+        endpoint_source = ?endpoint.source,
         "resolved provider wire protocol"
     );
 
@@ -162,5 +166,66 @@ mod tests {
         let preview = provider.request_preview(&[]).expect("request preview");
         assert!(preview["body"].get("messages").is_some());
         assert!(preview["body"].get("input").is_none());
+    }
+    #[test]
+    fn model_endpoint_reaches_each_real_adapter_and_never_changes_wire() {
+        for (protocol, suffix) in [
+            (ProviderProtocol::OpenAIResponses, "/responses"),
+            (ProviderProtocol::OpenAIChat, "/chat/completions"),
+            (ProviderProtocol::AnthropicMessages, "/messages"),
+        ] {
+            let config = Config {
+                provider: "fixture".into(),
+                model: "model".into(),
+                providers: std::collections::HashMap::from([(
+                    "fixture".into(),
+                    talos_config::ProviderConfig {
+                        base_url: Some("https://provider.test/v1".into()),
+                        models: std::collections::HashMap::from([(
+                            "model".into(),
+                            talos_config::ModelConfig {
+                                base_url: Some("https://model.test/wire/v1".into()),
+                                protocol: Some(protocol),
+                                ..Default::default()
+                            },
+                        )]),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            };
+            let preview = build_configured_provider(&config, "test-key")
+                .expect("model adapter")
+                .request_preview(&[])
+                .expect("preview");
+            assert_eq!(
+                preview["url"],
+                format!("https://model.test/wire/v1{suffix}")
+            );
+        }
+    }
+
+    #[test]
+    fn unsupported_model_transport_is_rejected_without_building_a_fallback_adapter() {
+        let config = Config {
+            provider: "openai".into(),
+            model: "o3".into(),
+            providers: std::collections::HashMap::from([(
+                "openai".into(),
+                talos_config::ProviderConfig {
+                    models: std::collections::HashMap::from([(
+                        "o3".into(),
+                        talos_config::ModelConfig {
+                            base_url: Some("wss://model.test/realtime".into()),
+                            protocol: Some(ProviderProtocol::OpenAIResponses),
+                            ..Default::default()
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        assert!(build_configured_provider(&config, "test-key").is_err());
     }
 }

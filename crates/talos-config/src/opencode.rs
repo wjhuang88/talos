@@ -90,6 +90,7 @@ pub fn import_opencode_providers(
 
         for (model_name, model) in op.models {
             let model_config = ModelConfig {
+                base_url: None,
                 context_limit: model.limit.context,
                 output_limit: model.limit.output,
                 protocol: None,

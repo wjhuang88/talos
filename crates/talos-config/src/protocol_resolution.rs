@@ -121,12 +121,22 @@ pub(crate) fn resolve_model_provider_protocol(
     provider: &str,
     model: &str,
 ) -> ProtocolResolution<ProviderProtocol> {
-    let endpoint = config
-        .providers
-        .get(provider)
-        .and_then(|entry| entry.base_url.as_deref());
+    let endpoint = configured_model_endpoint(config, provider, model);
     let catalog_model = builtin_model_protocol(provider, model, endpoint);
     resolve_model_protocol_with_catalog_signal(config, provider, model, catalog_model)
+}
+
+fn configured_model_endpoint<'a>(
+    config: &'a Config,
+    provider: &str,
+    model: &str,
+) -> Option<&'a str> {
+    let entry = config.providers.get(provider)?;
+    entry
+        .models
+        .get(model)
+        .and_then(|model| model.base_url.as_deref())
+        .or(entry.base_url.as_deref())
 }
 
 #[cfg(test)]
@@ -157,8 +167,8 @@ fn resolve_model_protocol_with_catalog_signal(
         .map(|provider| provider.protocol.clone())
         .filter(|protocol| !protocol.is_unspecified());
 
-    let endpoint_signal = user_provider
-        .and_then(|provider| provider.base_url.as_deref())
+    let endpoint = configured_model_endpoint(config, provider, model);
+    let endpoint_signal = endpoint
         .map(normalize_provider_endpoint)
         .and_then(|endpoint| {
             (endpoint.protocol == ProviderProtocol::AnthropicMessages)
@@ -166,8 +176,7 @@ fn resolve_model_protocol_with_catalog_signal(
         });
 
     let confirmed_provider_default = if provider == "openai" {
-        let official_endpoint = user_provider
-            .and_then(|provider| provider.base_url.as_deref())
+        let official_endpoint = endpoint
             .is_none_or(|url| url.trim().trim_end_matches('/') == "https://api.openai.com/v1");
         if official_endpoint {
             Some(ProviderProtocol::OpenAIResponses)

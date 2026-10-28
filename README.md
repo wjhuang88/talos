@@ -461,6 +461,10 @@ The model picker and catalog browser show the effective protocol and its source.
 [wire-protocol configuration and migration](docs/reference/PROVIDER-PROTOCOLS.md) for precedence,
 model overrides and the required pre-1.0 minor public-enum migration.
 
+For a model hosted at a different HTTP API root, set
+`providers.<provider>.models.<model>.base_url` alongside its explicit `protocol`.
+The model connection overrides the provider root; HTTPS and loopback HTTP are supported.
+
 Set the matching environment variable before starting Talos:
 
 ```bash

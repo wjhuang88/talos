@@ -88,6 +88,8 @@ repeating known mistakes.
 
 ## Lesson Index
 
+- [Parse URL authority and propagate connection errors](#2026-10-28---parse-url-authority-and-propagate-connection-errors) — I306.
+
 - [Research stalled designs and report implementation honestly](#2026-10-23---research-stalled-designs-and-report-implementation-honestly) — I300.
 
 - [Use the established Windows cross-compilation route](#2026-10-19---use-the-established-windows-cross-compilation-route) — I300.
@@ -1604,3 +1606,13 @@ visible; distinguish passed assertions from independently emitted evidence.
   successful rename after releasing the Windows identity handle. Assert hook
   completion outside panic containment. Keep native Windows CI as required
   runtime evidence, separate from cross-compilation.
+
+
+## 2026-10-28 - Parse URL authority and propagate connection errors
+
+- Trigger: Independent review of I306 model-endpoint routing.
+- Symptom: `http://localhost:80@remote.test` passed a string-prefix loopback check; a factory endpoint error could then panic the CLI rather than fail model preparation safely.
+- Root cause: Authority was split as text instead of parsed as a URL, while callers still assumed infallible provider construction after adding fallible configuration resolution.
+- Fix: Reuse the locked Rust URL parser across catalog/runtime validation, reject userinfo and unsupported destinations, and propagate provider construction errors through every CLI/TUI entry point.
+- Prevention: Test hostile authority syntax, manual invalid configuration through the real binary, environment-template persistence, and failed model activation without changing config/session/generation.
+- Promoted to rule/check: `endpoint_authority_cannot_disguise_remote_http_as_loopback`, `invalid_manual_model_endpoint_returns_an_error_without_panicking`, and the extended `p1fix3_handle_session_model_failure_no_rebuild` regression.

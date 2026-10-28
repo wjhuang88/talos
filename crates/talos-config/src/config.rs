@@ -143,7 +143,9 @@ impl Config {
         ))
     }
 
-    /// Returns the optional base URL override.
+    /// Returns the provider-level base URL override.
+    ///
+    /// Use [`Self::resolve_provider_endpoint`] for the effective model-specific connection.
     ///
     /// `None` means "use the provider's hard-coded default endpoint".
     /// `Some(url)` is sent verbatim to the provider's HTTP client via
@@ -388,6 +390,7 @@ impl Config {
             ));
         }
 
+        self.resolve_provider_endpoint()?;
         let provider = self.active_provider_config();
         if self.providers.contains_key(&self.provider)
             && provider.api_key.is_none()

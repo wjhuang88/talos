@@ -228,3 +228,44 @@ no tag or release is authorized by this checkpoint.
 Earlier local full-preflight MCP 26 passed / 21 failed and lost/interrupted validation records remain
 historical failures; green native CI does not turn them into local successes. The original 2026-10-26
 catalog input remains unavailable; the distinct archived 2026-10-27 source is the reviewed data evidence.
+
+
+## HTTP Model Endpoint Correction Stage — 2026-10-28
+
+The maintainer requested continued implementation of the remaining routing residual under the same
+effective #747 / #748 / I306 Work Slice and Responsible Actor. This stage starts from main
+`e03a2984267eacbd4f65d0085be1d028a8c420ed`, preserving inherited I308/I293 work. It adds explicit
+`ModelConfig.base_url`, CLI get/set and effective endpoint/source resolution in the shared adapter
+factory. Model connection overrides provider connection. Catalog endpoints require an exact built-in
+provider/model, the unchanged catalog provider root and a matching effective wire; custom-provider
+unique model matching never authorizes moving its credentials to the catalog vendor endpoint.
+An explicit different wire suppresses the catalog wire's connection. Protocol inference is suppressed
+when a model supplies an unconfirmed connection, just as for a replaced provider root.
+
+The generator preserves supported HTTP model roots with their protocol. HTTPS or loopback HTTP is
+validated by the existing locked `url` 2.5.8 parser (one additional talos-config dependency edge, no
+crate/version change). Userinfo, query/fragment, malformed roots and remote cleartext HTTP are denied.
+Environment templates remain literal at generation/config persistence and are validated after actual
+runtime expansion. Missing environment variables fail before an HTTP request is built. Provider
+construction errors propagate through CLI/RPC/TUI rather than panicking; failed TUI preparation must
+preserve the old config, session and runtime generation. Desktop already returns construction errors.
+
+The frozen source's 56 endpoint-different records comprise 52 supported HTTP candidates (14 Responses,
+34 Messages, 4 Chat), including four Freemodel cross-origin defaults; four Alibaba records are WSS
+Realtime transports, an existing explicit non-goal, not HTTP Chat endpoints. Endpoint and credential
+destination metadata requires a separately reviewed data projection. This code stage does not change
+`models.toml`, activate those rows, or claim runtime SDK authentication wrappers. The subsequent data
+stage must prove compressed packaged catalog -> resolver -> actual adapter/binary routing, including
+Neon environment roots, Freemodel origin changes, replaced-root suppression, custom-name non-relocation
+and explicit wire rollback. Explicit model-URL tests alone do not close that automatic-catalog gate.
+
+Independent WIP review found two blockers (userinfo loopback bypass and CLI construction panic);
+source corrections and regression coverage were read-only re-reviewed without a new blocking finding.
+Final exact-head object review, unfiltered affected checks, standard preflight and fresh CI remain
+separate gates recorded in the carrier PR. One local CLI link attempt failed with an object-file
+section-header offset beyond EOF, exit 101; no source root cause is asserted. Its log is retained,
+and only generated target artifacts were cleaned. The complete affected-package rerun uses fixed
+`CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0`;
+these flags change build artifacts, not test selection or assertions. No unfinished run is a pass.
+Status stays Review / Claimed, Completion Commit: Pending; data and final acceptance remain open.
+No sibling implementation, scope waiver or release is claimed.
