@@ -1,3 +1,25 @@
+## Active resume checkpoint — 2026-10-28 Pull Windows fixture correction
+
+Save #785 is merged at `f0d484b255bf766eafb1573bd0870ef38ae8de77` after
+all-eight-success exact-head CI 40525328345. Pull #786 remains open at
+`435fc46c95ddaf3ffe58244304bcbaf4337c4b8f`: CI 40530302518 passed Unix
+and Desktop gates but failed Windows because the new fixture expected LF while
+Git checked out CRLF. Local commit `9ac376e15` fixes source and clone repository
+`core.autocrlf=false`; the real Pull test passes all ten scenarios locally.
+Native Windows confirmation and publication of this correction remain pending.
+
+The profile stage's sandboxed preflight failed one process-observation test
+(Tools 996 passed / 1 failed); this is not a complete pass. A fresh standard
+preflight outside the sandbox is running, log
+`/private/tmp/i308-profile-preflight-unsandboxed.log`. Remote main fetched at
+`9d38a7365`; rebase must wait until validation terminates.
+
+Correction to prior session summaries: I309 activation is merged, but the gix
+upgrade is **not delivered**. Current manifests/lock still use 0.87.1; local
+`feat/i309-gix-090` contains implementation and partial validation only. Finish
+its remaining gates and merge after the current stage. T8 and the original
+T2/T3 → T4 → T5 → T1 → T6 queue remain incomplete.
+
 ## Active resume checkpoint — 2026-10-27 concrete search disposition
 
 Active branch is `feat/i308-profile-dispositions` in
