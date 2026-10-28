@@ -1933,3 +1933,12 @@ cross-session receipt ownership/privacy/storage cleanup remain unverified. Indep
 static test review approved immutable `55cc0e3cead7e6d9f21038d524a122d327747fb1`.
 Exact-head CI observed during this work is for preceding `c32a49088`; it cannot validate
 this commit. Updated candidate CI, full I308 gates and all later queue tasks remain open.
+
+Save explicit-policy disposition follow-up: the real MCP fixture adds Headless, explicit
+Network Deny and explicit Write Deny. All three refuse before model assessment or download
+and preserve the destination. In particular, an explicit Write Deny on Save's declared
+transitive effects rejects the whole operation at capture admission; it does not permit an
+earlier network phase and rely on a later rollback. Nine locked MCP scenarios pass
+(`/private/tmp/i308-mcp-save-policy.log`); focused warnings-denied test Clippy is recorded
+separately after completion. This is host test evidence only, not native Windows CI or
+full profile inventory.

@@ -17,8 +17,8 @@ use talos_core::ApprovalChoice;
 use talos_core::tool::ToolRegistry;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_permission::{
-    InteractionCapability, PermissionContext, PermissionEngine, PermissionMode,
-    PermissionSessionState,
+    InteractionCapability, PermissionContext, PermissionDecision, PermissionEngine, PermissionMode,
+    PermissionRule, PermissionSessionState,
 };
 use talos_plugin::HookRegistry;
 
@@ -96,9 +96,23 @@ async fn child(scenario: String) {
     std::fs::write(&path, "original").expect("fixture");
     let calls = Arc::new(AtomicUsize::new(0));
     let verified = Arc::new(AtomicUsize::new(0));
-    let state = Arc::new(PermissionSessionState::new(
-        PermissionEngine::with_workspace_root(root.path().into()),
-    ));
+    let mut engine = PermissionEngine::with_workspace_root(root.path().into());
+    if scenario == "policy_network_deny" {
+        engine.add_rule(PermissionRule::new_nature(
+            talos_core::tool::ToolNature::Network,
+            None,
+            None,
+            PermissionDecision::Deny("explicit network denial".into()),
+        ));
+    } else if scenario == "policy_write_deny" {
+        engine.add_rule(PermissionRule::new_nature(
+            talos_core::tool::ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Deny("explicit write denial".into()),
+        ));
+    }
+    let state = Arc::new(PermissionSessionState::new(engine));
     let allow_restore = Arc::new(AtomicBool::new(false));
     let approvals = Arc::new(AtomicUsize::new(0));
     let resolver = AutoPermissionResolver::new(
@@ -118,8 +132,16 @@ async fn child(scenario: String) {
     let pipeline = PermissionPipeline::new(
         state,
         PermissionContext::new(
-            PermissionMode::Interactive,
-            InteractionCapability::Available,
+            if scenario == "headless" {
+                PermissionMode::Headless
+            } else {
+                PermissionMode::Interactive
+            },
+            if scenario == "headless" {
+                InteractionCapability::Unavailable
+            } else {
+                InteractionCapability::Available
+            },
         ),
         Some(Arc::new(resolver)),
     );
@@ -145,7 +167,11 @@ async fn child(scenario: String) {
     let client = ().serve(client_io).await.expect("client");
     let result = client.peer().call_tool(rmcp::model::CallToolRequestParams::new("save_url").with_arguments(json!({"url":"http://93.184.216.34/fixture","destination":path,"retain_backup":true}).as_object().expect("args").clone())).await;
     let expected = match scenario.as_str() {
-        "replacement" | "missing_intent" => 0,
+        "replacement"
+        | "missing_intent"
+        | "policy_network_deny"
+        | "policy_write_deny"
+        | "headless" => 0,
         "capture_deny" => 1,
         _ => 2,
     };
@@ -246,6 +272,9 @@ async fn save_download_and_write_require_separate_native_auto_admissions() {
         "replacement",
         "missing_intent",
         "changed",
+        "policy_network_deny",
+        "policy_write_deny",
+        "headless",
     ] {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
