@@ -45,6 +45,65 @@ fn build_registry() -> ToolRegistry {
 }
 
 #[tokio::test]
+async fn standalone_native_files_default_to_read_allow_and_write_headless_deny() {
+    use rmcp::model::CallToolRequestParams;
+    use talos_tools::ordinary_file_tool_contributions;
+
+    let root = tempfile::tempdir().expect("workspace");
+    let path = root.path().join("document.txt");
+    std::fs::write(&path, "original MCP content").expect("initial file");
+    let mut registry = ToolRegistry::new();
+    registry
+        .register_builtin_contributions(ordinary_file_tool_contributions(root.path().to_path_buf()))
+        .expect("native file registration");
+    let handler = TalosMcpHandler::new(
+        Arc::new(registry),
+        Arc::new(McpPermissionGate::new(
+            Arc::new(PermissionEngine::new()),
+            Arc::new(HookRegistry::new()),
+        )),
+    );
+    let (client_io, server_io) = tokio::io::duplex(1024 * 64);
+    let server_task = tokio::spawn(async move {
+        let running = handler.serve(server_io).await.expect("server starts");
+        let _ = running.waiting().await;
+    });
+    let client = ().serve(client_io).await.expect("client starts");
+    let arguments = |value: serde_json::Value| value.as_object().expect("arguments").clone();
+    let read = client
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("read")
+                .with_arguments(arguments(serde_json::json!({"path": path}))),
+        )
+        .await
+        .expect("default read admitted");
+    assert_ne!(read.is_error, Some(true));
+    assert!(
+        serde_json::to_string(&read)
+            .expect("response")
+            .contains("original MCP content")
+    );
+    let destination = root.path().join("new-file.txt");
+    client
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("write").with_arguments(arguments(
+                serde_json::json!({"path": destination, "content": "must not be created"}),
+            )),
+        )
+        .await
+        .expect_err("native ownership does not install a model or human resolver");
+    assert!(!destination.exists(), "denied write must not create a file");
+    assert_eq!(
+        std::fs::read_to_string(&path).expect("unchanged file"),
+        "original MCP content"
+    );
+    let _ = client.cancel().await;
+    server_task.await.expect("server stopped");
+}
+
+#[tokio::test]
 async fn server_handshake_lists_tools() {
     let server_registry = Arc::new(build_registry());
     let gate = Arc::new(McpPermissionGate::new(
