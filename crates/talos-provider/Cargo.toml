@@ -25,6 +25,10 @@ tracing = "0.1"
 uuid = { version = "1.26.0", features = ["v4"] }
 
 [dev-dependencies]
+# Exercise authenticated native-wire image/tool rounds through the real Agent and read tool.
+talos-agent = { version = "0.10.1", path = "../talos-agent" }
+talos-permission = { version = "0.10.1", path = "../talos-permission" }
+talos-tools = { version = "0.10.1", path = "../talos-tools", default-features = false, features = ["file-read"] }
 # Reuse the exact proptest source already pinned in Cargo.lock by the Desktop dependency graph.
 proptest = { version = "1.10.0", git = "https://github.com/proptest-rs/proptest", rev = "3dca198a8fef1b32e3a66f1e1897c955b4dc5b5b" }
 image = { version = "0.25", default-features = false, features = ["png"] }

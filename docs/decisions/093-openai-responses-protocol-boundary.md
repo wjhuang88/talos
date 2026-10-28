@@ -114,6 +114,44 @@ remain excluded, even if an upstream shape says `completions` or `responses`.
 This adds optional `ModelConfig.base_url` and an effective endpoint/provenance query. It does not
 change retry policy, endpoint probing, credentials, or admit new packaged rows without data review.
 
+### 9. Public Copilot static HTTP authentication (2026-10-28)
+
+The remaining public Copilot model endpoints can reuse the three existing native HTTP wire adapters
+with a destination-specific static Bearer header contract. This is a bounded implementation of the
+I306 connection residual, not admission of the excluded SDK/OAuth/vendor-token wrappers in section 8.
+No account discovery, token exchange, refresh, browser login, enterprise routing or external runtime
+is introduced. Existing `api_key` / `api_key_env` lookup supplies the caller's raw Copilot-compatible
+credential; default `GITHUB_TOKEN` lookup is preserved. Users can explicitly select
+`api_key_env = "COPILOT_GITHUB_TOKEN"` without a new config field.
+
+Only the exact `https://api.githubcopilot.com:443` authority and known native routes qualify:
+Chat `/chat/completions`, Responses `/responses`, Messages `/v1/messages`. If no URL was persisted,
+the exact selected `github-copilot` provider uses its packaged provider default; it must never send
+that credential to a generic adapter's OpenAI/Anthropic default. This does not infer a wire from the
+provider name or inherit a vendor URL for a custom gateway. Bare or `/v1` API roots
+are resolved to the selected wire's native root; a full endpoint for another wire is rejected.
+Userinfo, query/fragment, other ports and unsupported paths are refused. Replaced gateways and
+custom-provider unique-model matching cannot inherit Copilot authentication or relocate credentials.
+The selected Copilot client refuses redirects, sends `Authorization: Bearer` (never `x-api-key` for
+Messages), keeps `anthropic-version: 2023-06-01` for Messages, and adds truthful `talos` attribution,
+a random process-stable interaction ID, and the reviewed API version. Previews completely mask
+Copilot credentials. No retry crosses wire families or changes the selected credential destination.
+
+Primary evidence: GitHub's [AWF auth matrix](https://github.com/github/gh-aw-firewall/blob/492391885dc25aeae354afeb4d19b0659c3fbabf/docs/auth-matrix.md)
+and its [static auth implementation](https://github.com/github/gh-aw-firewall/blob/492391885dc25aeae354afeb4d19b0659c3fbabf/containers/api-proxy/providers/copilot-auth.js)
+plus [Copilot adapter](https://github.com/github/gh-aw-firewall/blob/492391885dc25aeae354afeb4d19b0659c3fbabf/containers/api-proxy/providers/copilot.js).
+Microsoft's published `@vscode/copilot-api` 0.5.2 independently defines the three native routes,
+including direct `ChatMessages` dispatch, and `X-GitHub-Api-Version: 2026-08-01`.
+Its tarball SHA256 remains `7a817c4d468abb7811964af047de00aeee13e70ac97e1f698d3b774d1580d6a4`.
+Only the HTTP contract is used; no SDK code or dependency is imported.
+
+This evidence does not guarantee any caller's subscription, token scopes, integration quota or model
+allowlist. The service retains those authorization decisions. Talos identifies itself, never as
+VS Code, the Copilot CLI or AWF; SDK Mission Control integration-ID examples are not treated as a
+raw Messages model-allowlist guarantee. No live vendor success or universal token compatibility is
+claimed. Seven packaged rows remain withheld until a separate, reviewed data stage follows exact
+runtime validation. The archived model source and all non-routing model/provider fields stay fixed.
+
 ## Consequences
 
 Confirmed-support users default to a new request path — a visible behavior change that must be

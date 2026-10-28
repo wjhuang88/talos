@@ -465,6 +465,26 @@ For a model hosted at a different HTTP API root, set
 `providers.<provider>.models.<model>.base_url` alongside its explicit `protocol`.
 The model connection overrides the provider root; HTTPS and loopback HTTP are supported.
 
+For public GitHub Copilot, use a Copilot-authorized static token (not an Anthropic API key).
+The packaged `GITHUB_TOKEN` lookup remains available; an explicit credential source and Messages
+override can be configured as follows:
+
+```toml
+provider = "github-copilot"
+model = "claude-sonnet-4.6"
+
+[providers.github-copilot]
+api_key_env = "COPILOT_GITHUB_TOKEN"
+
+[providers.github-copilot.models."claude-sonnet-4.6"]
+protocol = "anthropic-messages"
+```
+
+The public Copilot connection uses Bearer authentication and truthful Talos attribution. Talos does
+not perform OAuth login, token exchange/refresh or enterprise endpoint discovery; subscription,
+token scopes and model/integration access remain service-side decisions. See the
+[Copilot credential contract](docs/reference/PROVIDER-PROTOCOLS.md#public-github-copilot-static-credentials).
+
 Set the matching environment variable before starting Talos:
 
 ```bash

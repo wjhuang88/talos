@@ -11,6 +11,10 @@ use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
 
 use crate::{AnthropicProvider, OpenAIResponsesProvider, openai::OpenAIProvider};
 
+#[cfg(test)]
+#[path = "factory_copilot_tests.rs"]
+mod copilot_tests;
+
 /// Exact output-token limit shared by provider construction and request admission.
 ///
 /// Models without an explicit configured limit receive the same conservative fallback used by the
@@ -32,6 +36,19 @@ pub fn build_configured_provider(
     config: &Config,
     api_key: &str,
 ) -> ProviderResult<Arc<dyn LanguageModel>> {
+    build_with_connection(config, api_key, crate::copilot::connection)
+}
+
+// The production entry point always supplies the origin-checked Copilot connection builder.
+// Keeping this composition private also lets tests route its real headers through a local server.
+fn build_with_connection(
+    config: &Config,
+    api_key: &str,
+    connect: impl FnOnce(
+        Option<&str>,
+        &ProviderProtocol,
+    ) -> ProviderResult<Option<crate::copilot::CopilotConnection>>,
+) -> ProviderResult<Arc<dyn LanguageModel>> {
     let provider_config = config.active_provider_config();
     let model_config = provider_config.models.get(&config.model).cloned();
     let reasoning = model_config.and_then(|model| model.reasoning);
@@ -40,8 +57,30 @@ pub fn build_configured_provider(
     let endpoint = config
         .resolve_provider_endpoint()
         .map_err(|error| ProviderError::InvalidResponse(error.to_string()))?;
-    let base_url = endpoint.base_url;
+    let mut base_url = endpoint.base_url;
+    // A manually configured Copilot model can omit its URL. Its credential must stay at the
+    // selected packaged provider's root, never at the generic wire adapter's official vendor.
+    // This selects a reviewed provider default, not a wire family or a custom model's vendor.
+    if base_url.is_none() && config.provider == "github-copilot" {
+        base_url = Some(
+            talos_config::model::builtin_providers()
+                .into_iter()
+                .find(|provider| provider.id == config.provider)
+                .and_then(|provider| provider.api_base_url)
+                .ok_or_else(|| {
+                    ProviderError::InvalidResponse(
+                        "Copilot provider default is unavailable; configure its endpoint".into(),
+                    )
+                })?,
+        );
+    }
     let resolution = resolve_config_provider_protocol(config);
+    // Preserve the original full wire path and explicit model URL precedence for validation.
+    let original_endpoint = config.configured_endpoint_url();
+    let copilot = connect(original_endpoint.as_deref().or(base_url.as_deref()), &resolution.protocol)?;
+    if let Some(connection) = &copilot {
+        base_url = Some(connection.base_url.clone());
+    }
 
     tracing::debug!(
         provider = %config.provider,
@@ -66,6 +105,10 @@ pub fn build_configured_provider(
                 };
                 provider = provider.with_base_url(endpoint);
             }
+            if let Some(connection) = copilot {
+                provider =
+                    provider.with_copilot_client(connection.client, connection.preview_headers);
+            }
             provider = provider
                 .with_reasoning(reasoning, output_limit)
                 .with_timeout_config(timeout);
@@ -75,6 +118,10 @@ pub fn build_configured_provider(
             let mut provider = OpenAIProvider::new(api_key, &config.model);
             if let Some(base_url) = base_url {
                 provider = provider.with_base_url(base_url);
+            }
+            if let Some(connection) = copilot {
+                provider =
+                    provider.with_copilot_client(connection.client, connection.preview_headers);
             }
             provider = provider
                 .with_reasoning(reasoning, output_limit)
@@ -86,6 +133,10 @@ pub fn build_configured_provider(
                 .with_provider_key(&config.provider);
             if let Some(base_url) = base_url {
                 provider = provider.with_base_url(base_url);
+            }
+            if let Some(connection) = copilot {
+                provider =
+                    provider.with_copilot_client(connection.client, connection.preview_headers);
             }
             provider = provider
                 .with_reasoning(reasoning, output_limit)

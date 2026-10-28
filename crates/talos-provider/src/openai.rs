@@ -40,6 +40,7 @@ pub struct OpenAIProvider {
     model: String,
     pub(crate) base_url: String,
     client: Client,
+    copilot_headers: serde_json::Map<String, Value>,
     reasoning: Option<ReasoningOptions>,
     output_limit: Option<u32>,
     timeout_config: ProviderTimeoutConfig,
@@ -94,10 +95,21 @@ impl OpenAIProvider {
             model: model.into(),
             base_url: OPENAI_API_URL.into(),
             client: Client::new(),
+            copilot_headers: serde_json::Map::new(),
             reasoning: None,
             output_limit: None,
             timeout_config: ProviderTimeoutConfig::default(),
         }
+    }
+
+    pub(crate) fn with_copilot_client(
+        mut self,
+        client: Client,
+        headers: serde_json::Map<String, Value>,
+    ) -> Self {
+        self.client = client;
+        self.copilot_headers = headers;
+        self
     }
 
     /// Set a custom base URL (the OpenAI-compatible gateway root).
@@ -223,7 +235,7 @@ impl OpenAIProvider {
             let request_fut = self
                 .client
                 .post(self.endpoint_url())
-                .header("Authorization", format!("Bearer {}", self.api_key))
+                .bearer_auth(&self.api_key)
                 .header("Content-Type", "application/json")
                 .json(&body)
                 .send();
@@ -291,6 +303,7 @@ impl OpenAIProvider {
                 Ok(resp) => {
                     let status = resp.status();
                     let body_text = resp.text().await.unwrap_or_default();
+                    let body_text = if !self.copilot_headers.is_empty() { crate::copilot::redact_credential(body_text, &self.api_key) } else { body_text };
                     let error = status_to_error(status, body_text);
                     match classify_retry_with_backoff(
                         &error,
@@ -636,7 +649,7 @@ impl LanguageModel for OpenAIProvider {
             self.reasoning.as_ref(),
             self.output_limit,
         );
-        Some(json!({
+        let mut preview = json!({
             "method": "POST",
             "url": self.endpoint_url(),
             "headers": {
@@ -644,7 +657,14 @@ impl LanguageModel for OpenAIProvider {
                 "Content-Type": "application/json",
             },
             "body": body,
-        }))
+        });
+        if let Some(headers) = preview["headers"].as_object_mut() {
+            if !self.copilot_headers.is_empty() {
+                headers.insert("Authorization".into(), json!("Bearer ***"));
+            }
+            headers.extend(self.copilot_headers.clone());
+        }
+        Some(preview)
     }
 }
 

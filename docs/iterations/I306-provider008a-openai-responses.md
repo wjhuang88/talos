@@ -569,3 +569,37 @@ Realtime family. Neither parent tracking nor withheld data constitutes an accept
 Status stays Review / Claimed; Completion Commit: Pending. #724/#748 remain open until the remaining
 acceptance residual is resolved by implementation/confirmation or an explicit accepted scope decision.
 No sibling implementation, tag or release is claimed.
+
+
+## Public Copilot Static HTTP Follow-up — 2026-10-28
+
+Continue the same effective #747 Work Slice to resolve the seven public Copilot connection residuals.
+New pinned primary evidence confirms a static Bearer/native HTTP path; ADR-093 section 9 bounds the
+implementation to the public origin and existing three wire adapters. SDK/OAuth/token exchange or
+refresh, enterprise routing and sibling protocol implementations remain excluded. No new claim or
+iteration is activated.
+
+The runtime stage must prove actual factory-selected HTTP headers/body for Messages, Chat rollback
+and Responses, complete credential masking, origin/path refusal, no redirect or cross-wire replay,
+authentication errors and bounded native Agent image/tool round behavior. Model catalog activation is
+a separately reviewed data stage using the unchanged archived source. At this checkpoint the seven
+rows are still withheld and 4,055 hints / 45 endpoint records remain the baseline. Review / Claimed;
+Completion Commit: Pending. No implementation merge, completion, live vendor probe or release is
+claimed for this follow-up before its validation and review gates finish.
+
+### Recovery checkpoint — 2026-10-28
+
+A workspace restore reverted local HEAD to 8b8c43e and removed later local Git objects,
+the Rust toolchain and temporary logs. Previously observed implementation 67c6a6e passed
+unfiltered config/provider/CLI/TUI tests and independent read-only source review; standard
+preflight passed check/Clippy/governance then failed MCP git_prepared (26 passed, 21 failed,
+Git binding and OS1 socket failures). PATH reordering on the existing test executable reproduced
+those counts. These historical results do not certify the restored tree.
+
+Recovery reinstates sensitive Bearer builders, exact-token refusal-body masking and original
+endpoint validation with model precedence/template expansion, plus real-startup CLI and factory
+regressions. Reconstructed tests require fresh validation and exact-object review. The previous
+local commits bcafbdb/a46e273 and their evidence remain unavailable as objects; no remote PR was
+published for this follow-up. Seven catalog rows remain withheld; Completion Commit: Pending.
+The maintainer's goal is closure of parent #724: finish A, then separately claim/implement/validate
+Gemini B, Azure C and Bedrock D before parent acceptance. No sibling claim is yet effective.

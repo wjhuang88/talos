@@ -27,6 +27,7 @@ pub(crate) struct OpenAIResponsesClient {
     model: String,
     base_url: String,
     client: Client,
+    copilot_headers: serde_json::Map<String, Value>,
     reasoning: Option<ReasoningOptions>,
     output_limit: Option<u32>,
     timeout_config: ProviderTimeoutConfig,
@@ -40,10 +41,21 @@ impl OpenAIResponsesClient {
             model: model.into(),
             base_url: OPENAI_RESPONSES_API_URL.into(),
             client: Client::new(),
+            copilot_headers: serde_json::Map::new(),
             reasoning: None,
             output_limit: None,
             timeout_config: ProviderTimeoutConfig::default(),
         }
+    }
+
+    pub(crate) fn with_copilot_client(
+        mut self,
+        client: Client,
+        headers: serde_json::Map<String, Value>,
+    ) -> Self {
+        self.client = client;
+        self.copilot_headers = headers;
+        self
     }
 
     /// Stamp the config provider identity used by ADR-034 reasoning replay checks.
@@ -115,7 +127,7 @@ impl OpenAIResponsesClient {
                 }
             }
         }
-        json!({
+        let mut preview = json!({
             "method": "POST",
             "url": self.endpoint_url(),
             "headers": {
@@ -123,7 +135,14 @@ impl OpenAIResponsesClient {
                 "Content-Type": "application/json",
             },
             "body": body,
-        })
+        });
+        if let Some(headers) = preview["headers"].as_object_mut() {
+            if !self.copilot_headers.is_empty() {
+                headers.insert("Authorization".into(), json!("Bearer ***"));
+            }
+            headers.extend(self.copilot_headers.clone());
+        }
+        preview
     }
 
     pub(crate) async fn stream(
@@ -245,7 +264,7 @@ impl OpenAIResponsesClient {
             let request = self
                 .client
                 .post(self.endpoint_url())
-                .header("Authorization", format!("Bearer {}", self.api_key))
+                .bearer_auth(&self.api_key)
                 .header("Content-Type", "application/json")
                 .json(body)
                 .send();
@@ -293,6 +312,7 @@ impl OpenAIResponsesClient {
                 Ok(response) => {
                     let status = response.status();
                     let body = response.text().await.unwrap_or_default();
+                    let body = if !self.copilot_headers.is_empty() { crate::copilot::redact_credential(body, &self.api_key) } else { body };
                     let error = responses_status_to_error(status, body);
                     match retry_decision(&error, attempt) {
                         RetryDecision::Retry {

@@ -262,6 +262,24 @@ Talos 也支持在 provider 或模型级配置 `protocol = "openai-responses"`�
 `providers.<provider>.models.<model>.base_url` 与显式 `protocol`。模型级地址优先于 provider 地址；
 支持 HTTPS 与本机 loopback HTTP。
 
+公开 GitHub Copilot 端点需要有 Copilot 推理权限的静态令牌，而非 Anthropic API key。
+打包的 `GITHUB_TOKEN` 查找保持兼容；也可显式指定凭证来源和模型级 Messages 协议：
+
+```toml
+provider = "github-copilot"
+model = "claude-sonnet-4.6"
+
+[providers.github-copilot]
+api_key_env = "COPILOT_GITHUB_TOKEN"
+
+[providers.github-copilot.models."claude-sonnet-4.6"]
+protocol = "anthropic-messages"
+```
+
+公开 Copilot 连接使用 Bearer 鉴权和真实的 Talos 归属标识。Talos 不执行 OAuth 登录、令牌交换、
+刷新或企业端点发现；套餐、令牌权限及模型/集成访问权仍由服务端决定。详见
+[Copilot 凭证约定](docs/reference/PROVIDER-PROTOCOLS.md#public-github-copilot-static-credentials)。
+
 启动 Talos 前设置对应的环境变量：
 
 ```bash
