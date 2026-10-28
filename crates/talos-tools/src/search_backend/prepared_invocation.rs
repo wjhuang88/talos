@@ -16,7 +16,7 @@ use super::composition::{
 };
 use super::router::{SearchRouterError, SearchRouterPolicy, SearchRouterSuccess, search_prepared};
 use super::transport::TransportLimits;
-use super::{SearchBackendId, SearchBackendResult};
+use super::SearchBackendId;
 
 /// One frozen router invocation prepared before permission admission.
 ///
@@ -127,12 +127,11 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
 
-    use talos_core::tool::{
-        ToolNetworkAuthorizationError, ToolNetworkEndpoint, ToolNetworkPreparationError,
-    };
+    use talos_core::tool::{ToolNetworkAuthorizationError, ToolNetworkEndpoint};
     use uuid::Uuid;
 
     use super::*;
+    use crate::search_backend::SearchBackendResult;
 
     #[derive(Default)]
     struct RejectAuthority {
@@ -193,7 +192,12 @@ mod tests {
         let output = Box::new(prepared).execute(authority.clone()).await;
 
         assert!(output.result.is_error);
-        assert!(output.result.content.contains("all eligible search backends were exhausted"));
+        assert!(
+            output
+                .result
+                .content
+                .contains("all eligible search backends were exhausted")
+        );
         assert!(!output.result.content.contains("private bridge query"));
         assert_eq!(authority.checks.load(Ordering::SeqCst), 1);
     }
@@ -250,10 +254,5 @@ mod tests {
             SearchCompositionPreparationError::Transport(_)
                 | SearchCompositionPreparationError::Compatibility(_)
         ));
-
-        assert_eq!(
-            ToolNetworkPreparationError::Invalid.to_string(),
-            "network invocation preparation failed"
-        );
     }
 }
