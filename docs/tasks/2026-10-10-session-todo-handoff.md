@@ -1,4 +1,17 @@
-## Active resume checkpoint — 2026-10-28 MCP command Auto local regression passes
+## Active resume checkpoint — 2026-10-28 MCP retained mutation candidate
+
+Queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+I309 is closed; full I308 and the goal remain Active / Partial.
+Local MCP dispatch now additionally forwards trusted retained edit/delete complete-image
+mutation evidence. Real rmcp allow/refusal/replacement/concurrent-change scenarios pass;
+Agent public API exact-plan regression passes. Full MCP all-features tests passed before
+the final assertion-counter test refinement. I308 owner records precise logs and limits.
+Save configuration/capture, network and ordinary MCP Auto dispatch remain outstanding.
+No fresh final preflight, independent review, exact-head native CI or merge is claimed.
+PR #797 remains on old 1993432dc with failing Windows Git tests; diagnose and validate
+local fixes before publishing the next coherent stage. Preserve both valid worktrees.
+
+## Historical checkpoint — 2026-10-28 MCP command Auto local regression passes
 
 Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
 I309 is closed; I308 and the full goal remain Active / Partial. Local MCP changes

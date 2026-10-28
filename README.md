@@ -326,8 +326,10 @@ Git command review additionally requires `with_user_intent` from the current use
 gate for that turn, and production builtin registration. Configuration discovery still requires
 host approval; missing intent, Headless context and explicit Ask/Deny cannot acquire model
 authorization. Same-name external replacements cannot supply native Auto command evidence.
-This MCP route currently covers retained Git command evidence; it does not provide file,
-network or ordinary invocation Auto review. Disabling auto returns interactive surfaces to
+This MCP route covers retained Git command evidence and complete-image retained edit/delete
+mutation review. Replaced registrations cannot supply mutation evidence, and a changed target
+refuses execution after review. Save capture/configuration, network and ordinary invocation
+Auto routing remain unavailable through this MCP route. Disabling auto returns interactive surfaces to
 human approval and headless surfaces to denial.
 
 Product-owned `bash`/`powershell`, `exec`, `fetch_url` and ordinary `http_request` requests can

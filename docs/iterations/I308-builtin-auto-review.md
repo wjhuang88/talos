@@ -1850,3 +1850,32 @@ governance validators passed. Fresh full preflight and Agent/Runtime Windows tes
 cross-check passed; independent static review approved exact `e14c76164`. Native
 CI, publication and merge remain pending. This narrows a real registration trust gap; it does not add model
 Auto support to Add/Commit/Push/Checkout or complete profile/search/G acceptance.
+
+
+### Hosted-native MCP retained mutation stage — 2026-10-28
+
+The local candidate forwards complete-image prepared edit/delete evidence only for
+registry-verified builtin instances, with consistent Native preparation/admission
+provenance. Ambiguous command/mutation/configuration evidence fails closed.
+The additive trusted-embedder `authorize_prepared_file_mutation` API requires the
+caller to establish builtin ownership; it does not infer trust from names or payloads.
+Existing plan-binding regression now exercises this public API for allow, deny and
+mismatched-plan cases; the untrusted internal path remains explicitly tested.
+
+Real duplex rmcp tests exercise retained edit and delete with AllowOnce, model refusal,
+same-name external replacement and a concurrent target update. Only AllowOnce changes
+the expected target; concurrent contents are preserved. External assertion-completion
+counters prevent contained assessor panics from masquerading as expected refusal.
+The final focused test and Agent API regression pass. Full MCP all-features tests
+passed before the assertion-counter-only test refinement; warnings-denied MCP Clippy
+passed before the Agent regression/test refinement. Logs:
+`/private/tmp/i308-mcp-all-after-mutation.log`,
+`/private/tmp/i308-mcp-mutation-verified.log`,
+`/private/tmp/i308-public-mutation-api-test.log`.
+
+This is local implementation, not merged delivery or complete recovery evidence.
+Save capture/configuration, prepared network and ordinary invocation Auto dispatch
+through MCP remain outstanding, as do full acceptance, coherent final preflight,
+independent exact-head security/API review, Windows CI and merge CAS. PR #797 still
+publishes the older 1993432dc candidate with failing Windows Git tests; local host
+success does not certify native Windows behavior. I308/T8 and the full goal remain Partial.

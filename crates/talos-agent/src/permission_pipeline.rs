@@ -569,6 +569,23 @@ impl PermissionPipeline {
         .into_prepared()
     }
 
+    /// Admits a retained mutation with complete producer-owned before/after evidence.
+    ///
+    /// The caller must verify the producer is the registered builtin instance;
+    /// names, provenance labels and remote payloads do not establish ownership.
+    /// The evidence must belong to this exact prepared plan. Callers without
+    /// trusted evidence must use ordinary prepared admission instead.
+    pub async fn authorize_prepared_file_mutation(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        evidence: &talos_core::tool::PreparedFileMutationEvidence,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        self.authorize_registered_file_mutation(authorization, user_intent, plan, evidence, true)
+            .await
+    }
+
     pub(crate) async fn authorize_registered_file_mutation(
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
