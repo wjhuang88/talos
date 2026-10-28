@@ -140,11 +140,7 @@ mod tests {
         assert!(object.requires_network_invocation());
         assert!(!object.requires_original_invocation());
         assert_eq!(object.parameters(), talos_core::tool_parameters!(WebSearchInput));
-        assert!(
-            object.permission_profile(&input("q"))[0]
-                .resource
-                .is_none()
-        );
+        assert!(object.permission_profile(&input("q"))[0].resource.is_none());
         assert_eq!(format!("{tool:?}"), "GuardedSearchRouterTool(<redacted>)");
     }
 
