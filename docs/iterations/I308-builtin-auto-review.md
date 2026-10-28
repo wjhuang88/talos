@@ -9,30 +9,34 @@ exact-head CI 40504783551, independent static permission/security/API approval,
 both governance validators and merge-time CAS. The review receipt is
 https://github.com/wjhuang88/talos/pull/784#issuecomment-6443350514.
 
-Recoverable Save Auto is implemented locally at
-`085903952` (rebased from `0013e63fe36646feba5175eebf32e96d1a83205b`): the retained-download capture and
-subsequent complete-text mutation receive separate invocation-local assessments.
-Unregistered/replacement instances retain manual authorization without builtin
-model evidence. Binary, sensitive, incomplete and default non-recoverable writes
-retain fallback. Tests passed: Save 21/21, Agent 510/510, Core 122/122;
-Agent test Clippy and independent static permission/security/API review passed.
-The reviewer did not independently execute tests. After earlier ENOSPC failures,
-authorized cache cleanup and worktree relocation, full standard preflight passed
-for candidate `bafc87af7`, including workspace tests and the external SDK fixture.
-Windows test cross-compilation via cargo xwin passed. Native Windows execution, Save stage
-CI/merge in #785, complete operation/profile reconciliation and final H/G
-acceptance remain outstanding. Guarded search cannot downgrade. The original
-acceptance and remaining handoff queue are unchanged.
+Recoverable Save Auto #785 merged as
+`f0d484b255bf766eafb1573bd0870ef38ae8de77` after exact-head CI
+40525328345 passed all eight checks, full locked preflight/SDK, Windows xwin,
+independent static permission/security/API review and merge CAS. This closes
+only the Save stage; the original complete acceptance below is unchanged.
 
-Pull ownership follow-up implementation `115b302ad` and production Runtime fixture
-correction `e14c76164289ece98111d8725b263e57fd033359` are locally validated.
-Full standard preflight passed, including workspace execution of the three real
-Runtime Pull tests and external SDK consumer. Explicit shared-composition Runtime
-focused tests passed 3/3; Agent/Runtime Windows tests passed cargo-xwin check.
-Both governance validators and independent exact-head static security/API review
-passed. Logs: `/private/tmp/i308-git-auto-preflight-retry.log` and
-`/private/tmp/i308-git-auto-xwin.log`. The reviewer did not run tests. Publication,
-native CI and merge in stacked PR #786 remain pending; no full T8 completion is claimed.
+Pull ownership PR #786 now targets main at candidate
+`cee25226e3ab24564d8076c22f3ffdf1de5fd3e0`, based on
+`9d38a7365c494ade99a484bdd158476f850f4428`. The rebased five patches
+preserve builtin instance ownership and production shared Runtime composition.
+Windows CI 40530302518 failed a strict content assertion because host Git
+converted LF to CRLF. The candidate explicitly disables autocrlf in source and
+clone fixtures; production semantics and strict effect assertions are unchanged.
+Fresh full locked standard preflight passed, including workspace tests and
+external Runtime SDK execution (log:
+`/private/tmp/i308-pull-rebased-preflight.log`). Independent static security/API
+review approved this exact head/base without independently running tests.
+Native exact-head CI and merge CAS remain required; no Pull merge is claimed.
+
+Concrete legacy WebSearch disposition is now checked locally in six production
+Agent registration scenarios (Auto, disabled Auto, Deny, mandatory-human,
+policy Allow and headless). All refuse before execution: its current legacy
+profile has no safe typed network resource. Neither model assessment nor human
+resolution runs, including under explicit Allow. This is an unavailable search
+path, not successful manual/search backend coverage. I293 owns the protected
+search implementation; I308 must not route it through ordinary HTTP Auto.
+Focused locked test passed (1 test / 6 scenarios), log
+`/private/tmp/i308-profile-rebased-search.log` after replay onto the current main-based Pull candidate; full stage validation is pending.
 
 ### Earlier merged-stage checkpoint — 2026-10-26
 
@@ -373,8 +377,8 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | `write`, `edit`, `delete` | Exact-content atomic creation is merged in #769; complete-image review and opt-in real recovery for string/anchored edit and text deletion are merged in #770. Binary/NUL and secret-like content retain human fallback. Expanded special-path/policy tests are published in #771; full G acceptance remains incomplete. |
 | `http_request` | Ordinary whole-invocation Auto merged in #783, with actual proxy/redirect AllowOnce and refusal/stale/external/replacement effects tested and exact-head platform CI. Full profile acceptance remains open. |
 | `fetch_url` | Ordinary whole-invocation Auto merged in #784 after full local preflight, review and exact-head platform CI. Reuses HTTP configuration/final-context binding and eight real proxy/redirect scenarios; full profile acceptance remains open. Configuration distinguishes constructor redirects from timeout-override defaults and output truncation from full response buffering. |
-| `save_url` | Local recoverable capture and complete-text mutation Auto implemented at `085903952`; 16 production Agent scenarios cover model outcomes, policy, registration ownership, input changes and binary/default fallback. Full standard preflight and cargo-xwin passed; native CI/publication/merge remain pending. |
-| `web_search` | ADR-090 excludes ordinary whole-invocation Auto for WebSearch, including compatibility/default search. Existing legacy instances retain deterministic policy/human paths; guarded instances require their dedicated prepared-network route and cannot downgrade. Concrete production fallback/profile evidence remains outstanding; the synthetic network carrier fixture alone does not prove WebSearch acceptance. |
+| `save_url` | Recoverable capture and complete-text mutation Auto merged in #785 at `f0d484b255bf766eafb1573bd0870ef38ae8de77`; 16 production Agent scenarios cover model outcomes, policy, registration ownership, input changes and binary/default fallback. Full standard preflight, cargo-xwin, independent review and all-eight-success exact-head CI 40525328345 passed. Complete profile/G acceptance remains open. |
+| `web_search` | ADR-090 excludes ordinary whole-invocation Auto, including compatibility/default search. Concrete production legacy registration currently refuses before model/human review because its profile has no safe typed network resource, including with explicit policy Allow. Six real-Agent disposition scenarios pass locally; this is unavailable behavior, not a working search path. Guarded instances require their dedicated prepared-network route and cannot downgrade. I293 backend/transport activation remains separately owned; synthetic carrier fixtures do not prove search backend success. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
 | `bash` (Unix) / `powershell` (Windows), `exec` | Whole-invocation Auto merged in #783 with actual Unix allow/refusal/cancel/stale/registration/replay tests and exact-head Windows workspace CI. Per-entry-point reachability/final acceptance still requires reconciliation; cross-compilation alone is never native evidence. |

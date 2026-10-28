@@ -1,3 +1,57 @@
+## Active resume checkpoint — 2026-10-28 rebased Pull and profile follow-up
+
+Save #785 merged as `f0d484b255bf766eafb1573bd0870ef38ae8de77`.
+Pull #786 now targets main with exact candidate
+`cee25226e3ab24564d8076c22f3ffdf1de5fd3e0`; full locked preflight passed,
+including workspace tests and external Runtime SDK execution. Independent
+static security/API review approved that head against main `9d38a7365`.
+Native CI and merge CAS remain required. Windows CRLF fixture repair is included;
+no production behavior was altered by that repair.
+
+Active local branch `feat/i308-profile-rebased` in
+`/private/tmp/talos-i308-save-active` replays the search disposition test and
+handoff corrections onto the new Pull candidate, excluding the duplicate CRLF
+repair. The concrete search test passed again (six scenarios). Full profile-stage
+gates remain outstanding. Current gix is still 0.87.1; the separate 0.90 upgrade
+branch is not delivered. T8 and T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
+
+## Active resume checkpoint — 2026-10-28 Pull Windows fixture correction
+
+Save #785 is merged at `f0d484b255bf766eafb1573bd0870ef38ae8de77` after
+all-eight-success exact-head CI 40525328345. Pull #786 remains open at
+`435fc46c95ddaf3ffe58244304bcbaf4337c4b8f`: CI 40530302518 passed Unix
+and Desktop gates but failed Windows because the new fixture expected LF while
+Git checked out CRLF. Local commit `9ac376e15` fixes source and clone repository
+`core.autocrlf=false`; the real Pull test passes all ten scenarios locally.
+Native Windows confirmation and publication of this correction remain pending.
+
+The profile stage's sandboxed preflight failed one process-observation test
+(Tools 996 passed / 1 failed); this is not a complete pass. A fresh standard
+preflight outside the sandbox is running, log
+`/private/tmp/i308-profile-preflight-unsandboxed.log`. Remote main fetched at
+`9d38a7365`; rebase must wait until validation terminates.
+
+Correction to prior session summaries: I309 activation is merged, but the gix
+upgrade is **not delivered**. Current manifests/lock still use 0.87.1; local
+`feat/i309-gix-090` contains implementation and partial validation only. Finish
+its remaining gates and merge after the current stage. T8 and the original
+T2/T3 → T4 → T5 → T1 → T6 queue remain incomplete.
+
+## Active resume checkpoint — 2026-10-27 concrete search disposition
+
+Active branch is `feat/i308-profile-dispositions` in
+`/private/tmp/talos-i308-save-active`, based on Pull stage `435fc46c9`.
+The concrete legacy WebSearch test initially failed because it incorrectly
+expected human fallback. Actual production admission refuses its missing typed
+network resource before either model or human review, even with explicit Allow.
+The corrected six-scenario test passes and records this unavailable behavior;
+it does not implement search or prove backend success. I293 retains search
+ownership, and ordinary HTTP Auto cannot substitute. Full stage gates remain
+pending. T8 and T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
+
+Requested `cargo clean` removed another 10.4 GiB before this focused rebuild;
+only root and active worktrees remain, neither disposable. No source was removed.
+
 ## Active resume checkpoint — 2026-10-27 real Pull Auto ownership
 
 Active worktree `/private/tmp/talos-i308-save-active` now uses branch
