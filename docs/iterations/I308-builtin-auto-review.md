@@ -1902,3 +1902,10 @@ network/ordinary MCP routes. Recovery execution through MCP, recovery-storage in
 on refusal, concurrent Save changes, native Windows, coherent standard preflight,
 publication/exact-head CI/review/CAS/merge and full acceptance remain outstanding.
 I308/T8 remains Partial; no completion evidence is claimed.
+
+Save stale-target follow-up: the real MCP test now mutates the destination during
+complete-image assessment before returning AllowOnce. Execution refuses and preserves
+`concurrent update`, with two completed assessments and exactly one prior authorized
+download. The six-scenario focused test passes
+(`/private/tmp/i308-mcp-save-concurrent.log`). This supersedes the concurrent Save
+regression gap above; recovery execution/storage and platform/remote gates remain open.

@@ -62,6 +62,9 @@ impl AutoPermissionAssessor for Assessor {
         self.calls.fetch_add(1, Ordering::SeqCst);
         assert_eq!(request.mutation.before, "original");
         assert_eq!(request.mutation.after.as_deref(), Some("downloaded"));
+        if self.scenario == "changed" {
+            std::fs::write(&request.mutation.path, "concurrent update").expect("concurrent writer");
+        }
         self.verified.fetch_add(1, Ordering::SeqCst);
         Ok(json!({"schema":request.schema,"request_digest":request.request_digest,"decision":if self.scenario == "write_deny" {"human_required"} else {"allow_once"},"confidence":"high"}).to_string())
     }
@@ -155,6 +158,8 @@ async fn child(scenario: String) {
         std::fs::read_to_string(path).expect("contents"),
         if scenario == "allow" {
             "downloaded"
+        } else if scenario == "changed" {
+            "concurrent update"
         } else {
             "original"
         }
@@ -174,6 +179,7 @@ async fn save_download_and_write_require_separate_native_auto_admissions() {
         "write_deny",
         "replacement",
         "missing_intent",
+        "changed",
     ] {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
@@ -228,7 +234,7 @@ async fn save_download_and_write_require_separate_native_auto_admissions() {
         // Child is terminal; no outstanding request can start after this observation.
         assert_eq!(
             connections.load(Ordering::SeqCst),
-            usize::from(matches!(scenario, "allow" | "write_deny")),
+            usize::from(matches!(scenario, "allow" | "write_deny" | "changed")),
             "{scenario}"
         );
         proxy.abort();
