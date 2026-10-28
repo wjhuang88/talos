@@ -267,11 +267,18 @@ impl ServerHandler for TalosMcpHandler {
             name: request.name.to_string(),
             arguments: input.as_object().cloned(),
         };
+        let registered_builtin = self
+            .tool_registry
+            .is_builtin_instance(request.name.as_ref());
         let prepared = tool
             .prepare_normalized_with_provenance(
                 &input,
-                talos_core::tool::ToolProvenance::McpRemote {
-                    server: "standalone-mcp".into(),
+                if registered_builtin {
+                    talos_core::tool::ToolProvenance::Native
+                } else {
+                    talos_core::tool::ToolProvenance::McpRemote {
+                        server: "standalone-mcp".into(),
+                    }
                 },
             )
             .map_err(|error| McpError::new(ErrorCode::INVALID_PARAMS, error, None))?;
@@ -313,9 +320,12 @@ impl ServerHandler for TalosMcpHandler {
                                 return Err(McpError::new(ErrorCode::INTERNAL_ERROR, "prepared stage limit or reused identity; authorization profile budget may be exhausted", None));
                             }
                             let profile = operation.permission_profile().to_vec();
-                            let evidence = operation.prepared_command_evidence();
+                            // A matching name or caller-provided provenance cannot
+                            // establish ownership of automatic-review evidence.
+                            let evidence = operation.prepared_command_evidence()
+                                .filter(|_| registered_builtin);
                             let admission = self.permission_gate
-                                .authorize_prepared_command_until(&hook_context, &talos_request, &profile, (&plan, evidence.as_ref()), prepared_permission_deadline_at).await?;
+                                .authorize_prepared_command_until(&hook_context, &talos_request, &profile, (&plan, evidence.as_ref(), registered_builtin), prepared_permission_deadline_at).await?;
                             if context.ct.is_cancelled() || tokio::time::Instant::now() >= prepared_invocation_deadline_at {
                                 return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
                                     "prepared invocation cancelled or expired; effects may be incomplete", None));

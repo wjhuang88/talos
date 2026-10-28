@@ -317,11 +317,18 @@ request's remaining budget. Provider transport/idle limits, cancellation, output
 final permission validation still apply. Other models retain their existing bounded-decision
 request shape; GLM-specific parameters are not sent to them.
 
-Auto assistance is available only when the active surface supplies an interactive approval
-resolver (Goal and interactive CLI/TUI). Headless CLI, embedded Runtime and standalone MCP keep
-their existing fail-closed behavior for unresolved `Ask` decisions; enabling `auto` in config does
-not silently grant those surfaces model authority. Disabling auto always returns an interactive
-surface to human approval and a headless surface to denial.
+Auto assistance requires an explicitly supplied interactive permission context and resolver
+(Goal and interactive CLI/TUI supply these). Default headless CLI, embedded Runtime and
+standalone MCP compositions keep their fail-closed behavior for unresolved `Ask` decisions;
+enabling `auto` in config does not silently grant those surfaces model authority. MCP embedders
+can supply a session-owned pipeline using `McpPermissionGate::with_pipeline`. Retained native
+Git command review additionally requires `with_user_intent` from the current user turn, a fresh
+gate for that turn, and production builtin registration. Configuration discovery still requires
+host approval; missing intent, Headless context and explicit Ask/Deny cannot acquire model
+authorization. Same-name external replacements cannot supply native Auto command evidence.
+This MCP route currently covers retained Git command evidence; it does not provide file,
+network or ordinary invocation Auto review. Disabling auto returns interactive surfaces to
+human approval and headless surfaces to denial.
 
 Product-owned `bash`/`powershell`, `exec`, `fetch_url` and ordinary `http_request` requests can
 receive one-use Auto approval of the complete invocation and its transitive effects.

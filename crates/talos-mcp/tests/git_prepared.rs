@@ -15,6 +15,188 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 mod checkout;
 
 #[tokio::test]
+async fn injected_auto_reviews_only_registry_owned_git_commands_with_user_intent() {
+    use async_trait::async_trait;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use talos_agent::auto_resolver::{
+        AutoPermissionAssessor, AutoPermissionControl, AutoPermissionRequest,
+        AutoPermissionResolver, ManagedWorkspaceLease, PreparedCommandAssessmentRequest,
+    };
+    use talos_agent::permission_pipeline::{
+        ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest, PermissionPipeline,
+    };
+    use talos_core::ApprovalChoice;
+    use talos_permission::{
+        InteractionCapability, PermissionContext, PermissionMode, PermissionSessionState,
+    };
+
+    struct Assessor(Arc<AtomicUsize>);
+    #[async_trait]
+    impl AutoPermissionAssessor for Assessor {
+        async fn assess(&self, _: AutoPermissionRequest, _: Duration) -> Result<String, String> {
+            panic!("effectful command must not enter read-only assessment")
+        }
+        async fn assess_prepared_command(
+            &self,
+            request: PreparedCommandAssessmentRequest,
+            _: Duration,
+        ) -> Result<String, String> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            assert_eq!(request.tool, "git_add");
+            assert_eq!(request.command.operation, "git:add-command/v1");
+            assert_eq!(request.user_intent, "stage selected.txt in this repository");
+            Ok(
+                json!({"schema": request.schema, "request_digest": request.request_digest,
+                "decision": "allow_once", "confidence": "high",
+                "acknowledged_effects": request.command.effects,
+                "accepts_unconfined_effects": true})
+                .to_string(),
+            )
+        }
+    }
+    // Configuration discovery remains an explicit host approval. Never allow
+    // the final command through fallback, so success proves model admission.
+    struct DiscoveryThenDeny;
+    #[async_trait]
+    impl ApprovalResolver for DiscoveryThenDeny {
+        async fn resolve(
+            &self,
+            request: PermissionApprovalRequest,
+            _: Duration,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            Ok(
+                if request
+                    .preview
+                    .facets()
+                    .iter()
+                    .any(|facet| facet.normalized_scope == "git:add-command")
+                {
+                    ApprovalChoice::Deny
+                } else {
+                    ApprovalChoice::ApproveOnce
+                },
+            )
+        }
+    }
+
+    for (builtin, intent, headless, policy) in [
+        (true, true, false, None),
+        (false, true, false, None),
+        (true, false, false, None),
+        (true, true, true, None),
+        (true, true, false, Some(PermissionDecision::Ask)),
+        (
+            true,
+            true,
+            false,
+            Some(PermissionDecision::Deny("explicit denial".into())),
+        ),
+    ] {
+        let allowed = builtin && intent && !headless && policy.is_none();
+        let root = tempfile::tempdir().expect("workspace");
+        let git = |args: &[&str]| {
+            std::process::Command::new("git")
+                .args(args)
+                .current_dir(root.path())
+                .output()
+                .expect("git fixture")
+        };
+        assert!(git(&["init"]).status.success());
+        std::fs::write(root.path().join("selected.txt"), "selected\n").expect("fixture");
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut engine = PermissionEngine::with_workspace_root(root.path().into());
+        if let Some(decision) = policy {
+            engine.add_rule(PermissionRule::new_nature(
+                ToolNature::Execute,
+                Some("git:add-command".into()),
+                None,
+                decision,
+            ));
+        }
+        let state = Arc::new(PermissionSessionState::new(engine));
+        let resolver = AutoPermissionResolver::new(
+            Arc::new(Assessor(calls.clone())),
+            Arc::new(DiscoveryThenDeny),
+            ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
+                .expect("lease"),
+            Duration::from_secs(5),
+            AutoPermissionControl::new(true),
+        );
+        let pipeline = PermissionPipeline::new(
+            state,
+            PermissionContext::new(
+                if headless {
+                    PermissionMode::Headless
+                } else {
+                    PermissionMode::Interactive
+                },
+                InteractionCapability::Available,
+            ),
+            Some(Arc::new(resolver)),
+        );
+        let mut gate = McpPermissionGate::with_pipeline(pipeline, Arc::new(HookRegistry::new()));
+        if intent {
+            gate = gate.with_user_intent("stage selected.txt in this repository".into());
+        }
+        let mut registry = ToolRegistry::new();
+        registry
+            .register_builtin_contributions(talos_tools::git_mutation_tool_contributions(
+                root.path().into(),
+            ))
+            .expect("native contributions");
+        if !builtin {
+            // Replacing even with the same implementation revokes factory identity.
+            registry.register(Arc::new(talos_tools::git::GitAddTool::new(
+                root.path().into(),
+            )));
+        }
+        let handler = TalosMcpHandler::new(Arc::new(registry), Arc::new(gate));
+        let (client_io, server_io) = tokio::io::duplex(65536);
+        let task = tokio::spawn(async move {
+            handler
+                .serve(server_io)
+                .await
+                .expect("handshake")
+                .waiting()
+                .await
+                .expect("shutdown");
+        });
+        let client = ().serve(client_io).await.expect("client");
+        let result = client
+            .peer()
+            .call_tool(
+                rmcp::model::CallToolRequestParams::new("git_add").with_arguments(
+                    json!({"paths": ["selected.txt"]})
+                        .as_object()
+                        .expect("args")
+                        .clone(),
+                ),
+            )
+            .await;
+        if allowed {
+            let result = result.expect("Auto admission");
+            assert_ne!(result.is_error, Some(true), "{result:?}");
+            assert!(
+                calls.load(Ordering::SeqCst) > 0,
+                "real Auto assessor reached"
+            );
+            let staged = git(&["show", ":selected.txt"]);
+            assert!(staged.status.success());
+            assert_eq!(staged.stdout, b"selected\n");
+        } else {
+            assert!(
+                result.is_err(),
+                "untrusted or intentless call must fail closed"
+            );
+            assert_eq!(calls.load(Ordering::SeqCst), 0);
+            assert!(!root.path().join(".git/index").exists());
+        }
+        let _ = client.cancel().await;
+        task.await.expect("joined");
+    }
+}
+
+#[tokio::test]
 async fn real_git_transport_write_denial_and_replay_preserve_index() {
     tokio::time::timeout(Duration::from_secs(30), async {
         for allow_write in [false, true] {

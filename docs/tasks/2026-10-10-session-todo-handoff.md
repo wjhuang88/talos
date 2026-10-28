@@ -1,4 +1,41 @@
-## Active resume checkpoint — 2026-10-28 I308 Windows correction pending
+## Active resume checkpoint — 2026-10-28 MCP command Auto local regression passes
+
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+I309 is closed; I308 and the full goal remain Active / Partial. Local MCP changes
+add explicit pipeline/current-user-turn intent injection, verified builtin command evidence
+and consistent prepared provenance. Real Git Add Auto succeeds; same-name replacement,
+absent intent, Headless, explicit Ask/Deny fail closed. Locked Git prepared tests pass 48/48
+and handshake tests 3/3 (`/private/tmp/i308-mcp-hosted-native-tests.log`). Ordinary file
+approval injection is verified separately and does not establish file Auto.
+
+Preflight session 80805 is terminal exit 0, but predates compilation of the new MCP code;
+do not reuse it as final candidate certification. Current work remains local/unpublished;
+fresh review, full coherent checks, Windows CI and CAS merge remain necessary. MCP non-command
+Auto routing, all other I308 acceptance and all later queue items remain outstanding.
+See I308 owner for exact evidence and historical CI failure. Preserve both worktrees.
+
+## Historical checkpoint — 2026-10-28 I308 rebuild verified; preflight running
+
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+I309 is closed; I308 and the overall goal remain Active / Partial.
+Local sender-binding correction `6696d880c9cbb36d7d3d300d46d9410244a56045`
+passes the three all-feature focused tests and all 1010 Tools library tests in
+authorized host execution. The sandbox full suite's only failure was EPERM from
+process observation; retain that limitation separately. The maintainer explicitly
+authorized active-worktree target cleanup (27.1 GiB removed); both worktrees and
+sources remain, main has no target, and about 24 GiB is now free.
+
+Standard host preflight is running (session 80805), log
+`/private/tmp/i308-sender-binding-preflight-host.log`; poll that handle instead of
+restarting. Both governance validators and format/diff checks pass. Fresh fetch
+still shows main `4bf3488b2f4344b054754851b588686126c436f4`.
+#797 still publishes old head `1993432dccd3571abac7849a32c5b4640007f622`:
+Windows failed, offline dependency parity passed, Linux Desktop still running at
+inspection. New native Windows CI/review and CAS remain mandatory before merge.
+The unpublished CLI/MCP followups and correction share the current I308 slice;
+MCP model Auto reachability and the remaining acceptance are still open.
+
+## Historical checkpoint — 2026-10-28 I308 Windows correction pending
 
 I309 remains closed; the complete queue remains I309 → T8/I308 → T2+T3
 MODEL-014 → T4 → T5 → T1 → T6. I308 is Active / Partial.
