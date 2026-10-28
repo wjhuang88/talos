@@ -367,3 +367,24 @@ I308 coverage or relax the higher-risk recovery requirements.
 ## 2026-10-27 Maintainer Amendment: Ordinary Native Invocation
 
 The maintainer explicitly accepted the complete boundary and delivery criteria in [I308 ordinary native invocation authorization](../proposals/i308-native-invocation-authorization.md). Suitable implementation-owned ordinary Shell/Exec/HTTP Ask requests may receive model AllowOnce for the frozen invocation and its ordinary transitive effects, without claiming exhaustive per-path or per-destination confinement. Explicit Deny, mandatory-human policy and incompatible finer-grained restrictions remain authoritative; the proposal requires the compatibility guard before deterministic Allow and model/human Ask. Preserve identity/freshness binding, one-use admission, supervision and truthful partial-failure reports. I293/ADR-090-owned search and protected prepared-network operations cannot downgrade to this route. Acceptance authorizes implementation only: production behavior, tests, platform evidence, independent review and merge remain outstanding.
+
+### I308 operation-specific native Git implementation contract — 2026-10-28
+
+The remaining I308 Git scope uses separate closed capabilities and versioned
+descriptions for Add, Commit, Checkout and Push. Each producer retains executable,
+cwd, argv and environment and emits evidence only at its final mutation frontier;
+Push freezes after receiver discovery and platform-specific program binding.
+Tool, capability, operation and plan identity must agree. Known repository paths,
+configured program categories and sanitized remote hosts are review facts, never
+an exhaustive confinement boundary. All six prepared-command effect classes are
+disclosed because configured programs may produce arbitrary transitive effects.
+
+The existing prepared-command assessment/admission primitives are reused without
+changing public exhaustive enums or granting Pull authority to another operation.
+The four new capabilities are invocation-only and reject incompatible scoped Ask
+and Deny before deterministic Allow or model/human approval. Unscoped explicit
+human checkpoints remain human. Pull retains its existing separate scoped-Ask
+contract. Registered builtin identity is required for model assessment; ordinary
+same-name registration does not inherit it. This contract records the local
+implementation, not delivery: full preflight, independent security/API review,
+native platform and entrypoint evidence, exact-head CI and merge remain gates.

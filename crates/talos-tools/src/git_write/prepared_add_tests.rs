@@ -232,3 +232,5 @@ fn integration_git(root: &Path, args: &[&str]) -> String {
         .trim()
         .to_owned()
 }
+
+include!("prepared_add_tests/command_evidence.rs");

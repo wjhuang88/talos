@@ -748,8 +748,12 @@ install does not need a manual catalog initialization step: Talos does not creat
 `BUILD_MODELS=1`; the legacy `--import-models` flag is kept as a no-op compatibility notice.
 
 Talos uses gix 0.90.0 for local repository inspection and uses prepared, permission-gated
-Add/Commit, Checkout, Push and Pull operations for Git changes. Pull authorizes one frozen
-whole command and its transitive effects; it does not promise per-path or endpoint confinement.
+Add/Commit, Checkout, Push and Pull operations for Git changes. With Auto assistance enabled,
+each built-in operation has separate command review evidence and can receive one-invocation
+approval. Review binds the retained executable, arguments, working directory and environment;
+changed evidence requires fresh authorization. Approval authorizes the whole command and its
+disclosed transitive effects, including configured hooks and helpers; it does not promise per-path
+or endpoint confinement. Uncertain or unavailable model assessment falls back to human approval.
 Explicit Deny and human-only policy remain binding. Conflicts and failures may leave partial Git
 effects; Talos does not automatically reset or repair them. Direct mutation calls without a
 prepared authorization plan are refused.
