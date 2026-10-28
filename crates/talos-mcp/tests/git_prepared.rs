@@ -197,6 +197,253 @@ async fn injected_auto_reviews_only_registry_owned_git_commands_with_user_intent
 }
 
 #[tokio::test]
+async fn registered_mcp_git_add_commit_checkout_and_push_execute_after_bound_auto_review() {
+    use async_trait::async_trait;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use talos_agent::auto_resolver::{
+        AutoPermissionAssessor, AutoPermissionControl, AutoPermissionRequest,
+        AutoPermissionResolver, ManagedWorkspaceLease, PreparedCommandAssessmentRequest,
+    };
+    use talos_agent::permission_pipeline::{
+        ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest, PermissionPipeline,
+    };
+    use talos_core::ApprovalChoice;
+    use talos_permission::{
+        InteractionCapability, PermissionContext, PermissionMode, PermissionSessionState,
+    };
+
+    struct Assessor {
+        calls: Arc<AtomicUsize>,
+        tool: &'static str,
+        operation: &'static str,
+        intent: &'static str,
+    }
+    #[async_trait]
+    impl AutoPermissionAssessor for Assessor {
+        async fn assess(&self, _: AutoPermissionRequest, _: Duration) -> Result<String, String> {
+            panic!("Git mutation must use operation-bound review")
+        }
+        async fn assess_prepared_command(
+            &self,
+            request: PreparedCommandAssessmentRequest,
+            _: Duration,
+        ) -> Result<String, String> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            assert_eq!(request.tool, self.tool);
+            assert_eq!(request.command.operation, self.operation);
+            assert_eq!(request.user_intent, self.intent);
+            Ok(json!({
+                "schema": request.schema,
+                "request_digest": request.request_digest,
+                "decision": "allow_once",
+                "confidence": "high",
+                "acknowledged_effects": request.command.effects,
+                "accepts_unconfined_effects": true
+            })
+            .to_string())
+        }
+    }
+    struct ApproveDiscoveryDenyCommand(&'static str);
+    #[async_trait]
+    impl ApprovalResolver for ApproveDiscoveryDenyCommand {
+        async fn resolve(
+            &self,
+            request: PermissionApprovalRequest,
+            _: Duration,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            Ok(
+                if request
+                    .preview
+                    .facets()
+                    .iter()
+                    .any(|facet| facet.normalized_scope.contains(self.0))
+                {
+                    ApprovalChoice::Deny
+                } else {
+                    ApprovalChoice::ApproveOnce
+                },
+            )
+        }
+    }
+
+    tokio::time::timeout(Duration::from_secs(120), async {
+        for (name, operation, scope, intent) in [
+            (
+                "git_add",
+                "git:add-command/v1",
+                "git:add-command",
+                "stage selected file in this repository",
+            ),
+            (
+                "git_commit",
+                "git:commit-command/v1",
+                "git:commit-command",
+                "commit staged change in this repository",
+            ),
+            (
+                "git_checkout",
+                "git:checkout-command/v1",
+                "git:checkout-command",
+                "switch this repository to the target branch",
+            ),
+            (
+                "git_push",
+                "git:push-command/v1",
+                "git:push-command",
+                "push this branch to the configured receiver",
+            ),
+        ] {
+            let temp = tempfile::tempdir().expect("fixture");
+            let repository = temp.path().join("work");
+            std::fs::create_dir(&repository).expect("repository");
+            let git = |args: &[&str]| {
+                let output = std::process::Command::new("git")
+                    .args(args)
+                    .current_dir(&repository)
+                    .output()
+                    .expect("fixture git");
+                assert!(
+                    output.status.success(),
+                    "{args:?}: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                output.stdout
+            };
+            git(&["init", "--template=", "--initial-branch=main"]);
+            git(&["config", "user.name", "Fixture"]);
+            git(&["config", "user.email", "fixture@example.invalid"]);
+            git(&["config", "commit.gpgSign", "false"]);
+            git(&["config", "maintenance.auto", "false"]);
+            std::fs::write(repository.join("tracked.txt"), "initial\n").expect("tracked");
+            git(&["add", "tracked.txt"]);
+            git(&["commit", "-m", "initial"]);
+
+            let input = match name {
+                "git_add" => {
+                    std::fs::write(repository.join("selected.txt"), "selected\n")
+                        .expect("selected");
+                    json!({"paths": ["selected.txt"]})
+                }
+                "git_commit" => {
+                    std::fs::write(repository.join("selected.txt"), "committed\n")
+                        .expect("selected");
+                    git(&["add", "selected.txt"]);
+                    json!({"message": "operation-bound MCP commit"})
+                }
+                "git_checkout" => {
+                    git(&["branch", "target"]);
+                    json!({"branch": "target"})
+                }
+                "git_push" => {
+                    let receiver = temp.path().join("receiver.git");
+                    let output = std::process::Command::new("git")
+                        .args(["init", "--bare", receiver.to_str().expect("receiver")])
+                        .current_dir(temp.path())
+                        .output()
+                        .expect("bare receiver");
+                    assert!(output.status.success(), "{:?}", output);
+                    git(&[
+                        "remote",
+                        "add",
+                        "origin",
+                        receiver.to_str().expect("receiver"),
+                    ]);
+                    json!({"branch": "main"})
+                }
+                _ => unreachable!(),
+            };
+
+            let state = Arc::new(PermissionSessionState::new(
+                PermissionEngine::with_workspace_root(repository.clone()),
+            ));
+            let calls = Arc::new(AtomicUsize::new(0));
+            let resolver = AutoPermissionResolver::new(
+                Arc::new(Assessor {
+                    calls: calls.clone(),
+                    tool: name,
+                    operation,
+                    intent,
+                }),
+                Arc::new(ApproveDiscoveryDenyCommand(scope)),
+                ManagedWorkspaceLease::for_permission_session(&repository, state.clone())
+                    .expect("lease"),
+                Duration::from_secs(10),
+                AutoPermissionControl::new(true),
+            );
+            let pipeline = PermissionPipeline::new(
+                state,
+                PermissionContext::new(
+                    PermissionMode::Interactive,
+                    InteractionCapability::Available,
+                ),
+                Some(Arc::new(resolver)),
+            );
+            let gate = McpPermissionGate::with_pipeline(pipeline, Arc::new(HookRegistry::new()))
+                .with_user_intent(intent.into());
+            let mut registry = ToolRegistry::new();
+            registry
+                .register_builtin_contributions(talos_tools::git_mutation_tool_contributions(
+                    repository.clone(),
+                ))
+                .expect("native Git registration");
+            assert!(registry.is_builtin_instance(name));
+            let handler = TalosMcpHandler::new(Arc::new(registry), Arc::new(gate));
+            let (client_io, server_io) = tokio::io::duplex(65536);
+            let server = tokio::spawn(async move {
+                let running = handler.serve(server_io).await.expect("server");
+                let _ = running.waiting().await;
+            });
+            let client = ().serve(client_io).await.expect("client");
+            let args = input.as_object().expect("arguments").clone();
+            let result = client
+                .peer()
+                .call_tool(rmcp::model::CallToolRequestParams::new(name).with_arguments(args))
+                .await
+                .expect("transport");
+            assert_ne!(result.is_error, Some(true), "{name}: {result:?}");
+            assert!(
+                calls.load(Ordering::SeqCst) > 0,
+                "{name}: Auto assessor not reached"
+            );
+            match name {
+                "git_add" => assert_eq!(git(&["show", ":selected.txt"]), b"selected\n"),
+                "git_commit" => assert_eq!(
+                    String::from_utf8(git(&["log", "-1", "--format=%s"]))
+                        .expect("subject")
+                        .trim(),
+                    "operation-bound MCP commit",
+                ),
+                "git_checkout" => assert_eq!(
+                    String::from_utf8(git(&["branch", "--show-current"]))
+                        .expect("branch")
+                        .trim(),
+                    "target",
+                ),
+                "git_push" => {
+                    let remote = temp.path().join("receiver.git");
+                    let output = std::process::Command::new("git")
+                        .args([
+                            "--git-dir",
+                            remote.to_str().expect("receiver"),
+                            "rev-parse",
+                            "refs/heads/main",
+                        ])
+                        .output()
+                        .expect("remote ref");
+                    assert!(output.status.success(), "{:?}", output);
+                    assert_eq!(output.stdout, git(&["rev-parse", "HEAD"]));
+                }
+                _ => unreachable!(),
+            }
+            let _ = client.cancel().await;
+            server.await.expect("server joined");
+        }
+    })
+    .await
+    .expect("Git MCP test deadline");
+}
+
+#[tokio::test]
 async fn real_git_transport_write_denial_and_replay_preserve_index() {
     tokio::time::timeout(Duration::from_secs(30), async {
         for allow_write in [false, true] {

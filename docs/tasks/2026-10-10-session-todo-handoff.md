@@ -1,19 +1,33 @@
-## Active resume checkpoint — 2026-10-28 MCP retained mutation candidate
+## Active resume checkpoint — 2026-10-28 MCP Git host coverage
 
 Queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
 I309 is closed; full I308 and the goal remain Active / Partial.
-Local MCP dispatch now additionally forwards trusted retained edit/delete complete-image
-mutation evidence. Real rmcp allow/refusal/replacement/concurrent-change scenarios pass;
-Agent public API exact-plan regression passes. Full MCP all-features tests passed before
-the final assertion-counter test refinement. I308 owner records precise logs and limits.
-Save configuration/capture, network and ordinary MCP Auto dispatch remain outstanding.
-No fresh final preflight, independent review, exact-head native CI or merge is claimed.
-PR #797 remains on old 1993432dc with failing Windows Git tests; diagnose and validate
-local fixes before publishing the next coherent stage. Preserve both valid worktrees.
+PR #797 publishes `8e62c4e207917a88325037d967ef14d402dc9191` against
+`4bf3488b2f4344b054754851b588686126c436f4`. Exact-head CI run `40684972778`
+is terminal SUCCESS for all eight jobs, including native Windows workspace and
+Linux/Windows Desktop. This is stage evidence, not full-I308 completion or merge.
+
+The local follow-up adds real registered MCP Add/Commit/Checkout/Push success-path
+evidence, with operation-bound Auto assessment and command fallback denied.
+All 49 Git prepared integration tests and focused warnings-denied Clippy pass.
+The owner records test/review limits. Standard host preflight session 35964 is terminal exit 101, log
+`/private/tmp/i308-mcp-git-four-ops-preflight-host-final.log`: Tools 1009/1010
+passed; a search connection-refusal budget assertion failed. The same all-feature
+focused test passes (1 executed); root cause remains unproven. Do not use
+preceding-head CI or this focused result as complete local preflight certification.
+An earlier host preflight failed a TUI highlighting assertion; focused reproduction
+passed, but the cause is unproven. Sandbox runs separately hit Push observation EPERM.
+
+Next: diagnose the search test failure, review/commit the coherent follow-up, obtain fresh
+exact-head CI/review and merge-time CAS for #797, then continue remaining I308
+host/profile/recovery and ordinary MCP Auto acceptance. All downstream tasks remain
+unimplemented or incomplete as specified by their owners. Preserve both worktrees.
+Earlier checkpoints below are historical.
 
 ## Historical checkpoint — 2026-10-28 MCP command Auto local regression passes
 
 Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
 I309 is closed; I308 and the full goal remain Active / Partial. Local MCP changes
 add explicit pipeline/current-user-turn intent injection, verified builtin command evidence
 and consistent prepared provenance. Real Git Add Auto succeeds; same-name replacement,
