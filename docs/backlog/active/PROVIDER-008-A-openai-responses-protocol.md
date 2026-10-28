@@ -19,7 +19,7 @@
 | Governance Claim PR | #747 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child requirement #748 records this bounded slice. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
-| Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime) |
+| Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime), #793 (reviewed endpoint data) |
 | Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Claim activates only when #747 reaches main with accepted ADR-093. Sibling families remain unclaimed; Complete requires existing implementation commit evidence. |
 
@@ -306,3 +306,35 @@ included. Final combined-tree test, standard preflight, independent object revie
 CI evidence are recorded in the data PR. Earlier failed local checks remain retained evidence.
 Status stays Review / Claimed, Completion Commit: Pending; seven unreviewed Copilot endpoints remain
 an acceptance residual. #724/#748 stay open, with no completion or release claim.
+
+
+### Reviewed Endpoint Data Merged — 2026-10-28
+
+Runtime #792 merged as `e53c61c7f0344308a5c5535bb1521fefebbacc70`; separately reviewed
+endpoint data #793 merged as `8e3171534367ec242e02fdc1a90e012d533f8e96`.
+The data merge preserves exact implementation head `9bbdc51c84bfb501748d66af3609f47cd6c2e77f`,
+tree `dcce9b23073a798d6de33a45f413c88c11f3bf95`, with the actual merged runtime as its other parent.
+CI3527 / run40633668603 passed all eight jobs on that data head, including native Windows workspace,
+macOS standard release preflight, language plugins, offline dependency audit, all three Desktop
+platforms and governance. The independent read-only Agent approved the exact object and independently
+checked admission/source/non-routing evidence. Single-maintainer authorization and live CAS passed;
+shared-account Agent technical review is not distinct-human approval.
+
+The final combined-tree local config/provider/CLI/TUI run passed 1,694 tests in 46 groups, with zero
+failed, ignored or filtered cases. Standard local preflight passed its non-test gates and both
+governance validators with zero warnings, then retained the inherited MCP git_prepared result of
+26 passed / 21 failed (19 Git-binary binding failures and two OS1 socket failures). An earlier local
+link failure and stale diagnostic were also disclosed; no full local preflight pass is claimed.
+After independent log verification, an environment restore lost those temporary scratch logs.
+Observed results remain recorded in #793; native CI is the durable exact-head platform evidence.
+The restored workspace was fetched from the exact head and its offline audit rerun successfully:
+6,474 model records, 45 reviewed endpoint pairs, zero mismatches, unchanged source/non-routing hashes.
+No new upstream download or broader model regeneration occurred.
+
+The 45 reviewed HTTP pairs are now merged (Neon 14 Responses, Ofox 10 Messages, Zenmux 17 Messages,
+Freemodel four Chat); total hints remain 4,055. Seven Copilot Messages endpoints still require vendor
+authentication/transport confirmation or implementation. Four WSS rows remain the existing excluded
+Realtime family. Neither parent tracking nor withheld data constitutes an acceptance waiver.
+Status stays Review / Claimed; Completion Commit: Pending. #724/#748 remain open until the remaining
+acceptance residual is resolved by implementation/confirmation or an explicit accepted scope decision.
+No sibling implementation, tag or release is claimed.
