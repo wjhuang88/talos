@@ -1,5 +1,21 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Local retained Checkout checkpoint — 2026-10-28
+
+Checkout now retains its exact executable, cwd, argv and environment, rejects
+changed branch/create/environment/cwd/program or missing retained command before
+mutation, and executes the retained invocation after equality checks. Real Git
+regression verifies unchanged HEAD and clean status in all six refusal cases.
+Focused regression passed; full Git-feature Tools tests passed 339/339 in
+approved host execution (`/private/tmp/i308-retained-checkout-full-host.log`),
+and warnings-denied library/test Clippy passed
+(`/private/tmp/i308-retained-checkout-clippy.log`). The sandbox full run passed
+338/339 and failed the existing Push process-observation fixture with EPERM;
+the host rerun preserves that assertion and passes. No Auto admission, full
+workspace/platform validation, final security/API review or merged delivery is
+claimed. Push command retention and operation-specific Add/Commit/Push/Checkout
+assessment/admission remain outstanding, together with original full acceptance.
+
 ## Local retained Add checkpoint — 2026-10-28
 
 Rebased onto baseline closure merge `958a391316c82181853d1df176687361b14ff82b`:
