@@ -170,6 +170,11 @@ impl SearchHealthState {
         self.entries.len()
     }
 
+    pub(crate) fn is_empty(&mut self, now: Instant) -> bool {
+        self.purge_expired(now);
+        self.entries.is_empty()
+    }
+
     fn purge_expired(&mut self, now: Instant) {
         self.entries
             .retain(|entry| !entry.observation.is_expired(now));
@@ -280,7 +285,7 @@ mod tests {
                 .observation(SearchBackendId::DuckDuckGo, now + Duration::from_secs(5))
                 .is_none()
         );
-        assert_eq!(state.len(now + Duration::from_secs(5)), 0);
+        assert!(state.is_empty(now + Duration::from_secs(5)));
     }
 
     #[test]
