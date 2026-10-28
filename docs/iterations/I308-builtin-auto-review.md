@@ -20,6 +20,21 @@ This follow-up has not been published. Full stage checks, review and publication
 pending. MCP hosted-native model reachability, complete profile/recovery/platform
 coverage and all later handoff tasks remain unfinished; I308 stays Active / Partial.
 
+### Standalone MCP fail-closed disposition regression — 2026-10-28
+
+Added a real MCP client/server integration test using the production file-tool
+contribution factory and permission gate. With the default standalone headless
+composition, native `read` returns the existing file contents, while `write` to a
+new path is rejected, creates no file and leaves the original unchanged. Locked
+handshake integration suite passed 2/2
+(`cargo test --locked -p talos-mcp --test server_handshake`,
+`/private/tmp/i308-mcp-native-default.log`). This proves the default profile's
+read-Allow/write-deny disposition; it does not establish model Auto reachability.
+ADR-064 requires an embedder to inject a resolver and effective policy, and CLI
+configuration is not implicitly loaded by MCP. MCP hosted-native Auto remains open.
+The focused compile consumed disk; available space was about 671 MiB afterward, so
+the full preflight was not run. This local test has not received final review or CI.
+
 ## Local operation-specific Git Auto checkpoint — 2026-10-28
 
 Git stage delivery state: Review (local candidate; remote gates pending).
