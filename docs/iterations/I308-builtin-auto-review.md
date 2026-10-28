@@ -1909,3 +1909,13 @@ complete-image assessment before returning AllowOnce. Execution refuses and pres
 download. The six-scenario focused test passes
 (`/private/tmp/i308-mcp-save-concurrent.log`). This supersedes the concurrent Save
 regression gap above; recovery execution/storage and platform/remote gates remain open.
+
+Stable Save/MCP candidate validation: standard `./scripts/release_preflight.sh`
+with locked commands passed on the host, including both external Runtime SDK modes
+(`/private/tmp/i308-save-config-preflight-host.log`). The initial sandbox run
+(`/private/tmp/i308-save-config-preflight.log`) failed one Tools Push process-observation
+test with EPERM (1009 passed / 1 failed); the unchanged host retry passed.
+The Save concurrent regression and focused warnings-denied Clippy also pass. Both
+governance validators pass with zero warnings. Fresh fetch retains target main
+`4bf3488b2f4344b054754851b588686126c436f4`. This is local stage validation,
+not new-head native Windows CI, merge authorization or whole-I308 completion.
