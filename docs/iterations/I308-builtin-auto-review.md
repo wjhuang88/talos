@@ -1,5 +1,68 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Local operation-specific Git Auto checkpoint — 2026-10-28
+
+The four-operation Agent matrix now also covers same-name external registration
+and replacement of a trusted builtin instance: both invoke zero assessors and
+produce no Git mutation (`/private/tmp/i308-git-instance-trust.log`). Its denied
+command fallback checks structured capability scope rather than relying only on
+explanation text. The shared five-operation resolver matrix also rejects assessor
+timeout and oversized output (`/private/tmp/i308-git-resolver-bounds.log`).
+Standard preflight completed successfully, including both external SDK modes
+(`/private/tmp/i308-git-command-preflight.log`), but that run overlapped subsequent
+fixture changes; final frozen-tree validation is still required.
+
+Runtime shared-composition integration now exercises Add, Commit, Checkout and
+Push through RuntimeBuilder, provider Auto review, admission and real local Git.
+Each operation checks AllowOnce against human-required with command fallback
+denied, including actual index, commit, branch and receiver-ref effects. The
+complete integration file passes 4/4, preserving existing Pull policy, recursion
+and cancellation coverage (`/private/tmp/i308-git-runtime-integration.log`).
+Runtime integration warnings-denied Clippy passes after replacing two fixture
+`unwrap()` calls with contextual `expect()` calls
+(`/private/tmp/i308-git-runtime-clippy.log`). Both governance validators pass
+(`/private/tmp/i308-git-auto-governance.log`,
+`/private/tmp/i308-git-auto-claims.log`). Fresh fetch and GitHub main-ref query
+both confirm `4bf3488b2f4344b054754851b588686126c436f4`.
+This is local host evidence, not Windows runtime or merged delivery. The running
+standard preflight began before these fixture/documentation changes and cannot
+certify the final tree without subsequent applicable validation.
+
+The current uncommitted continuation produces separate versioned Add, Commit,
+Checkout and Push review evidence only at their final retained-command frontier.
+The closed capability compiler checks each tool/capability pair and downgrades
+approval to Once. Unknown transitive effects remain explicitly disclosed;
+active Deny and incompatible scoped human checkpoints are checked before Allow.
+This does not extend Pull authorization merely by relabeling its proof.
+
+Real registered Agent dispatch passes four operations across seven scenarios
+(Allow, human-required, unsupported model `deny` output, assessor error, session expiry, policy Deny,
+scoped Ask), with actual index/commit/branch/receiver-ref assertions and zero
+persistent grants. Policy restrictions prevent model assessment. The fixture
+denies command-review fallback so it cannot mask failed Auto approval. Existing
+Pull's ten-scenario matrix also passes. Log:
+`/private/tmp/i308-git-real-auto-policy-matrix.log`.
+
+Agent library tests passed 513/513 before the final added negative scenarios;
+the expanded resolver operation-mismatch matrix subsequently passed. Permission
+library tests passed 167/167. Git-feature Tools passed 341/341 in approved host
+execution (`/private/tmp/i308-git-command-tools-full-host.log`); sandbox execution
+passed 340 and failed the unchanged process-observation assertion with EPERM.
+Agent/Permission library/test warnings-denied Clippy passed before the final
+policy fixture expansion (`/private/tmp/i308-git-agent-permission-clippy.log`).
+
+Initial actual Agent testing found a request-fingerprint mismatch from a redundant
+transitive-effects marker. The marker was removed: operation capability guards
+already enforce the restriction, including manually registered Git instances.
+Full Agent rerun then passed. No new permission-pipeline marker remains.
+Fetched main remains `4bf3488b2f4344b054754851b588686126c436f4`.
+Remaining: final expanded-tree checks, architecture/user documentation, external
+runtime/profile and native Windows evidence, full locked preflight, independent
+permission/security/API review, exact-head CI/CAS/merge and remaining original
+I308 acceptance. This is local implementation evidence, not merged delivery.
+I308/T8 and the full handoff remain Active / Partial; MODEL-014 → T4 → T5 → T1 →
+T6 retain their complete scope.
+
 ## Local retained Push checkpoint — 2026-10-28
 
 Implementation `dc78bab16` retains Push's executable, cwd, argv and environment

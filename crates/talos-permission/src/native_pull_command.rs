@@ -1,4 +1,4 @@
-//! Invocation-only native Pull authority and conservative policy compatibility.
+//! Invocation-only native Git command capabilities and conservative policy compatibility.
 //!
 //! Known paths are evidence, not confinement. An active restriction on an
 //! undiscovered transitive effect cannot be satisfied by checking known paths.
@@ -9,10 +9,21 @@ use crate::{PermissionDecision, PermissionDecisionSource, PermissionEngine, Perm
 
 pub(crate) const CAPABILITY: &str = "git:pull-command";
 
+pub(crate) fn command_tool(capability: &str) -> Option<&'static str> {
+    match capability {
+        CAPABILITY => Some("git_pull"),
+        "git:add-command" => Some("git_add"),
+        "git:commit-command" => Some("git_commit"),
+        "git:checkout-command" => Some("git_checkout"),
+        "git:push-command" => Some("git_push"),
+        _ => None,
+    }
+}
+
 pub(crate) fn requested(facets: &[ToolPermissionFacet]) -> bool {
     facets
         .iter()
-        .any(|facet| facet.resource.as_deref().map(str::trim) == Some(CAPABILITY))
+        .any(|facet| facet.resource.as_deref().and_then(command_tool).is_some())
 }
 
 impl PermissionEngine {
@@ -46,14 +57,17 @@ impl PermissionEngine {
         tool_name: &str,
         facet: &ToolPermissionFacet,
     ) -> Option<(PermissionDecision, PermissionDecisionSource)> {
-        if tool_name != "git_pull"
+        if facet.resource.as_deref().and_then(command_tool) != Some(tool_name)
             || facet.nature != ToolNature::Execute
             || facet.resource_kind != Some(ToolResourceKind::Remote)
-            || facet.resource.as_deref() != Some(CAPABILITY)
         {
             return None;
         }
-        self.transitive_effect_restriction()
+        if tool_name == "git_pull" {
+            self.transitive_effect_restriction()
+        } else {
+            self.ordinary_transitive_effect_restriction()
+        }
     }
 
     pub(crate) fn transitive_effect_restriction(
