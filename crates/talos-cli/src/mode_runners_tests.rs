@@ -155,6 +155,7 @@ async fn handle_connect_with_credential_preserves_unrelated_provider_fields() {
                 models: std::collections::HashMap::from([(
                     "llama-3".to_string(),
                     talos_config::ModelConfig {
+                        base_url: None,
                         context_limit: Some(999_000),
                         output_limit: None,
                         protocol: None,
@@ -1467,104 +1468,148 @@ async fn p1fix3_handle_session_model_failure_no_rebuild() {
         old_provider: String,
         old_session_id: uuid::Uuid,
         watched_session_id: uuid::Uuid,
+        generation_before: u64,
+        generation_after: u64,
+        persisted_unchanged: bool,
     }
 
     let _lock = HOME_ENV_MUTEX.lock().await;
-    let result = with_isolated_home(|| async {
-        let workspace = tempfile::tempdir().expect("operation should succeed");
-        let mut config = Config {
-            model: "original-model".to_string(),
-            provider: "original-gw".to_string(),
-            ..Default::default()
-        };
-        config.providers.insert(
-            "original-gw".to_string(),
-            ProviderConfig {
-                protocol: ProviderProtocol::OpenAIChat,
-                base_url: Some("https://mock.example.com/v1".to_string()),
-                api_key: Some("orig-key".to_string()),
+    for invalid_endpoint in [false, true] {
+        let result = with_isolated_home(|| async {
+            let workspace = tempfile::tempdir().expect("operation should succeed");
+            let mut config = Config {
+                model: "original-model".to_string(),
+                provider: "original-gw".to_string(),
                 ..Default::default()
-            },
-        );
+            };
+            config.providers.insert(
+                "original-gw".to_string(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::OpenAIChat,
+                    base_url: Some("https://mock.example.com/v1".to_string()),
+                    api_key: Some("orig-key".to_string()),
+                    ..Default::default()
+                },
+            );
 
-        let (ui_tx, _ui_rx) = mpsc::unbounded_channel::<UiOutput>();
-        let hooks = Arc::new(HookRegistry::new());
-        let session_manager =
-            talos_session::SessionManager::with_dir(workspace.path().join("sessions"));
-        let session = session_manager
-            .create_session("p1fix3-fail", "test-ws")
-            .expect("operation should succeed");
-        let original_session_id = session.id;
-        let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
-        let (sq_tx, _sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
-        let (sq_tx_watch_tx, _sq_rx_watch) = tokio::sync::watch::channel(sq_tx.clone());
-        let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel::<(
-            talos_session::Session,
-            mpsc::UnboundedReceiver<talos_core::session::SessionEvent>,
-        )>();
-        let transition = Arc::new(tokio::sync::Mutex::new(
-            SessionTransition::new(sq_tx, session.clone()).expect("operation should succeed"),
-        ));
-        let approval_handler = Arc::new(TuiApprovalHandler::new(
-            ui_tx.clone(),
-            workspace.path().to_path_buf(),
-        ));
-        let runtime_builder = TuiRuntimeBuilder::new(
-            hooks,
-            workspace.path().to_path_buf(),
-            session_manager.clone(),
-            approval_handler,
-            Vec::new(),
-            false,
-            true,
-        );
+            config
+                .providers
+                .get_mut("original-gw")
+                .expect("provider")
+                .models
+                .insert(
+                    "invalid-endpoint-model".into(),
+                    talos_config::ModelConfig {
+                        base_url: Some("wss://model.test/realtime".into()),
+                        protocol: Some(ProviderProtocol::OpenAIResponses),
+                        ..Default::default()
+                    },
+                );
+            config.save().expect("persist old config");
+            let persisted_before =
+                std::fs::read(Config::default_path()).expect("old persisted config");
+            let (ui_tx, _ui_rx) = mpsc::unbounded_channel::<UiOutput>();
+            let hooks = Arc::new(HookRegistry::new());
+            let session_manager =
+                talos_session::SessionManager::with_dir(workspace.path().join("sessions"));
+            let session = session_manager
+                .create_session("p1fix3-fail", "test-ws")
+                .expect("operation should succeed");
+            let original_session_id = session.id;
+            let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
+            let (sq_tx, _sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
+            let (sq_tx_watch_tx, _sq_rx_watch) = tokio::sync::watch::channel(sq_tx.clone());
+            let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel::<(
+                talos_session::Session,
+                mpsc::UnboundedReceiver<talos_core::session::SessionEvent>,
+            )>();
+            let transition = Arc::new(tokio::sync::Mutex::new(
+                SessionTransition::new(sq_tx, session.clone()).expect("operation should succeed"),
+            ));
+            let approval_handler = Arc::new(TuiApprovalHandler::new(
+                ui_tx.clone(),
+                workspace.path().to_path_buf(),
+            ));
+            let runtime_builder = TuiRuntimeBuilder::new(
+                hooks,
+                workspace.path().to_path_buf(),
+                session_manager.clone(),
+                approval_handler,
+                Vec::new(),
+                false,
+                false,
+            );
 
-        let model_result = handle_session_model(
-            &transition,
-            &ui_tx,
-            &config,
-            &runtime_builder,
-            &session_watch_tx,
-            &sq_tx_watch_tx,
-            &bridge_tx,
-            &session_watch_rx,
-            "nonexistent-model".to_string(),
-            Some("nonexistent-provider".to_string()),
-        )
+            let generation_before = transition.lock().await.active_generation();
+            let model_result = handle_session_model(
+                &transition,
+                &ui_tx,
+                &config,
+                &runtime_builder,
+                &session_watch_tx,
+                &sq_tx_watch_tx,
+                &bridge_tx,
+                &session_watch_rx,
+                if invalid_endpoint {
+                    "invalid-endpoint-model"
+                } else {
+                    "nonexistent-model"
+                }
+                .to_string(),
+                Some(
+                    if invalid_endpoint {
+                        "original-gw"
+                    } else {
+                        "nonexistent-provider"
+                    }
+                    .to_string(),
+                ),
+            )
+            .await;
+
+            let is_none = model_result.is_none();
+            let bridge_no_update = bridge_rx.try_recv().is_err();
+            let watched_session_id = session_watch_rx.borrow().id;
+
+            FailResult {
+                is_none,
+                bridge_no_update,
+                old_model: config.model.clone(),
+                old_provider: config.provider.clone(),
+                old_session_id: original_session_id,
+                watched_session_id,
+                generation_before,
+                generation_after: transition.lock().await.active_generation(),
+                persisted_unchanged: std::fs::read(Config::default_path())
+                    .expect("persisted config")
+                    == persisted_before,
+            }
+        })
         .await;
 
-        let is_none = model_result.is_none();
-        let bridge_no_update = bridge_rx.try_recv().is_err();
-        let watched_session_id = session_watch_rx.borrow().id;
-
-        FailResult {
-            is_none,
-            bridge_no_update,
-            old_model: config.model.clone(),
-            old_provider: config.provider.clone(),
-            old_session_id: original_session_id,
-            watched_session_id,
-        }
-    })
-    .await;
-
-    assert!(
-        result.is_none,
-        "activation of unknown model must return None"
-    );
-    assert!(
-        result.bridge_no_update,
-        "bridge_rx_update_tx must NOT receive any update on failure"
-    );
-    assert_eq!(
-        result.old_model, "original-model",
-        "old config must be unchanged"
-    );
-    assert_eq!(result.old_provider, "original-gw");
-    assert_eq!(
-        result.watched_session_id, result.old_session_id,
-        "session watch must still point to the old session"
-    );
+        assert!(result.is_none, "failed model activation must return None");
+        assert!(
+            result.bridge_no_update,
+            "bridge_rx_update_tx must NOT receive any update on failure"
+        );
+        assert_eq!(
+            result.old_model, "original-model",
+            "old config must be unchanged"
+        );
+        assert_eq!(result.old_provider, "original-gw");
+        assert_eq!(
+            result.watched_session_id, result.old_session_id,
+            "session watch must still point to the old session"
+        );
+        assert_eq!(
+            result.generation_before, result.generation_after,
+            "failed prepare must preserve runtime generation"
+        );
+        assert!(
+            result.persisted_unchanged,
+            "failed prepare must preserve persisted config"
+        );
+    }
 }
 
 #[tokio::test]

@@ -67,6 +67,12 @@ impl std::fmt::Display for ProviderProtocol {
 /// Per-model runtime limits and capability overrides.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ModelConfig {
+    /// Explicit model-specific API root; takes precedence over provider and catalog endpoints.
+    ///
+    /// This is a connection override, not protocol evidence. Set `protocol` explicitly when
+    /// connecting a model to a non-catalog endpoint.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
     /// Maximum provider input context accepted by this model.
     #[serde(default)]
     pub context_limit: Option<u32>,

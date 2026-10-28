@@ -802,6 +802,12 @@ pub(crate) fn config_get_dotted(config: &Config, key: &str) -> Result<String> {
             .and_then(|m| m.protocol.as_ref())
             .map(ToString::to_string)
             .ok_or_else(|| anyhow::anyhow!("not found")),
+        ["providers", name, "models", model @ .., "base_url"] if !model.is_empty() => config
+            .providers
+            .get(*name)
+            .and_then(|p| p.models.get(&model.join(".")))
+            .and_then(|m| m.base_url.clone())
+            .ok_or_else(|| anyhow::anyhow!("not found")),
         ["providers", name, "base_url"] => Ok(config
             .providers
             .get(*name)
@@ -878,6 +884,23 @@ pub(crate) fn config_set_dotted(config: &mut Config, key: &str, value: &str) -> 
                 .entry(model.join("."))
                 .or_default()
                 .protocol = Some(protocol);
+            Ok(())
+        }
+        ["providers", name, "models", model @ .., "base_url"] if !model.is_empty() => {
+            let endpoint = if value.is_empty() {
+                None
+            } else {
+                talos_config::validate_model_base_url(value).map_err(anyhow::Error::msg)?;
+                Some(value.trim().to_string())
+            };
+            config
+                .providers
+                .entry((*name).to_string())
+                .or_default()
+                .models
+                .entry(model.join("."))
+                .or_default()
+                .base_url = endpoint;
             Ok(())
         }
         ["providers", name, "api_key_env"] => {

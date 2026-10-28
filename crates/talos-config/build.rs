@@ -241,6 +241,11 @@ fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), Str
             models.push(TomlModel {
                 id: model_id.clone(),
                 provider: provider_id.clone(),
+                api_base_url: infer_model_api_base_url(
+                    model.provider.as_ref(),
+                    provider.npm.as_deref(),
+                    provider.api.as_deref(),
+                ),
                 protocol,
                 context_limit,
                 output_limit,
@@ -329,13 +334,14 @@ fn infer_model_protocol(
         .and_then(|provider| provider.npm.as_deref())
         .or(provider_npm);
     infer_wire_protocol(npm_package, None)?;
-    if let Some(model_api) = model_provider.and_then(|provider| provider.api.as_deref()) {
-        let parent_api = provider_api.or(match provider_npm {
-            Some("@ai-sdk/openai") => Some("https://api.openai.com/v1"),
-            Some("@ai-sdk/anthropic") => Some("https://api.anthropic.com/v1"),
-            _ => None,
-        })?;
-        if model_api.trim().trim_end_matches('/') != parent_api.trim().trim_end_matches('/') {
+    // URL overrides must be implemented HTTP transports, not Realtime/WebSocket endpoints.
+    if let Some(api) = model_provider.and_then(|provider| provider.api.as_deref()) {
+        // Runtime catalog routing requires a bindable, unchanged provider root. Do not emit a
+        // wire hint that would leave its paired model endpoint unusable and fall back elsewhere.
+        let parent = provider_api?;
+        if !protocol_signal::is_http_model_endpoint(api)
+            || !protocol_signal::is_http_model_endpoint(parent)
+        {
             return None;
         }
     }
@@ -350,12 +356,28 @@ fn infer_model_protocol(
     })
 }
 
+fn infer_model_api_base_url(
+    model_provider: Option<&ApiModelProvider>,
+    provider_npm: Option<&str>,
+    provider_api: Option<&str>,
+) -> Option<String> {
+    infer_model_protocol(model_provider, provider_npm, provider_api)?;
+    let api = model_provider?.api.as_deref()?;
+    let parent = provider_api?;
+    if api.trim().trim_end_matches('/') == parent.trim().trim_end_matches('/') {
+        return None;
+    }
+    Some(api.trim().trim_end_matches('/').to_string())
+}
+
 #[derive(Clone, Deserialize, Serialize)]
 struct TomlModel {
     id: String,
     provider: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     protocol: Option<TomlModelProtocol>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    api_base_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     context_limit: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -477,19 +499,28 @@ mod protocol_admission_tests {
     }
 
     #[test]
-    fn model_specific_endpoint_requires_separate_routing_support() {
+    fn model_specific_http_endpoint_is_preserved_with_its_protocol() {
         let model = signal(
             "@ai-sdk/openai",
             "responses",
             Some("https://gateway.test/other/v1"),
         );
-        assert!(
+        assert!(matches!(
             infer_model_protocol(
                 Some(&model),
                 Some("@ai-sdk/openai-compatible"),
                 Some("https://gateway.test/v1")
+            ),
+            Some(TomlModelProtocol::OpenAIResponses)
+        ));
+        assert_eq!(
+            infer_model_api_base_url(
+                Some(&model),
+                Some("@ai-sdk/openai-compatible"),
+                Some("https://gateway.test/v1")
             )
-            .is_none()
+            .as_deref(),
+            Some("https://gateway.test/other/v1")
         );
         assert!(matches!(
             infer_model_protocol(
@@ -499,6 +530,69 @@ mod protocol_admission_tests {
             ),
             Some(TomlModelProtocol::OpenAIResponses)
         ));
+    }
+
+    #[test]
+    fn model_endpoint_transport_is_not_implied_by_sdk_shape() {
+        for api in [
+            "wss://gateway.test/realtime",
+            "ws://gateway.test/realtime",
+            "ftp://gateway.test",
+            "http://remote.test/v1",
+            "http://localhost:80@remote.test/v1",
+            "http://[::1]@remote.test/v1",
+        ] {
+            let model = signal("@ai-sdk/openai-compatible", "completions", Some(api));
+            assert!(
+                infer_model_protocol(
+                    Some(&model),
+                    Some("@ai-sdk/openai-compatible"),
+                    Some("https://gateway.test/v1")
+                )
+                .is_none()
+            );
+            assert!(
+                infer_model_api_base_url(
+                    Some(&model),
+                    Some("@ai-sdk/openai-compatible"),
+                    Some("https://gateway.test/v1")
+                )
+                .is_none()
+            );
+        }
+        let model = signal(
+            "@ai-sdk/openai",
+            "responses",
+            Some("${GATEWAY_ROOT}/openai/v1"),
+        );
+        assert_eq!(
+            infer_model_api_base_url(
+                Some(&model),
+                Some("@ai-sdk/openai-compatible"),
+                Some("${GATEWAY_ROOT}/v1")
+            )
+            .as_deref(),
+            Some("${GATEWAY_ROOT}/openai/v1")
+        );
+    }
+
+    #[test]
+    fn model_endpoint_without_a_bindable_provider_root_has_no_wire_hint() {
+        let model = signal(
+            "@ai-sdk/openai",
+            "responses",
+            Some("https://model.test/openai/v1"),
+        );
+        for root in [None, Some("wss://provider.test/realtime")] {
+            assert!(
+                infer_model_protocol(Some(&model), Some("@ai-sdk/openai-compatible"), root)
+                    .is_none()
+            );
+            assert!(
+                infer_model_api_base_url(Some(&model), Some("@ai-sdk/openai-compatible"), root)
+                    .is_none()
+            );
+        }
     }
 
     #[test]

@@ -108,7 +108,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         .map_err(|_| anyhow!("approval lock poisoned"))?
         .session_state();
     let (terminal_approval, terminal_approval_rx) = terminal_approval_channel();
-    let provider = build_provider(&config, &api_key, cli.mock);
+    let provider = build_provider(&config, &api_key, cli.mock)?;
     let fallback = terminal_approval.clone();
     let auto_control = AutoPermissionControl::new(config.auto.enabled);
     let resolver: Arc<dyn talos_agent::permission_pipeline::ApprovalResolver> =

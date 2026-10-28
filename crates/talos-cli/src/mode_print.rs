@@ -96,7 +96,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
                 .with_response("fixture tool call complete"),
         ) as Arc<dyn talos_core::provider::LanguageModel>
     } else {
-        build_provider(&config, &api_key, cli.mock)
+        build_provider(&config, &api_key, cli.mock)?
     };
 
     let permission_engine =

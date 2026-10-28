@@ -81,6 +81,42 @@ in the immediate next request. The shared image resource limits and earliest exp
 request containing these images is dispatched once and is not automatically retried. Durable user
 attachments retain their existing history behavior.
 
+## Model-Specific Endpoints
+
+`providers.<provider>.models.<model>.base_url` sets an explicit model API root. It wins over the
+provider connection and is independent from `protocol`. For an unconfirmed endpoint, select the
+wire explicitly; a new model URL is not evidence that the official OpenAI Responses default applies.
+
+```toml
+[providers.gateway]
+base_url = "https://gateway.example/v1"
+api_key_env = "GATEWAY_API_KEY"
+
+[providers.gateway.models.example-model]
+protocol = "openai-responses"
+base_url = "https://gateway.example/openai/v1"
+```
+
+The CLI supports `config set/get providers.gateway.models.example-model.base_url`; setting an empty
+value removes the override. Model endpoints allow HTTPS or HTTP loopback, and `${ENV_VAR}` roots
+must resolve before adapter construction. Unsupported transports fail before a request; Realtime
+WebSocket support is not implemented by the Chat/Responses HTTP adapters.
+
+Packaged model endpoint metadata is a reviewed connection default, paired with its protocol.
+It applies only to the exact built-in provider/model, while the configured provider root still
+matches that provider's catalog root and the effective protocol matches the model's catalog wire.
+Selecting an explicitly different wire (including Chat rollback) suppresses that wire's endpoint.
+Replacing the provider root also suppresses catalog routing. A custom provider may still inherit
+protocol by a unique model match, but never inherits the catalog vendor's URL or credential destination.
+A separately reviewed data projection is required to activate new packaged endpoint records; adding
+routing code does not change the committed catalog. Cross-origin packaged defaults require the
+same source/credential-destination review as provider defaults; no live models.dev input changes
+connections during a conversation.
+
+`Config::resolve_provider_endpoint()` returns the effective API root and connection source;
+provider construction records the source without logging the endpoint or credentials.
+`Config::base_url()` remains the provider-level compatibility accessor.
+
 ## Public API Migration
 
 `ProviderProtocol` and its shared `CatalogProviderProtocol` mirror gain `OpenAIResponses` and become
@@ -91,3 +127,6 @@ protocol as runtime construction; `resolve_provider_protocol()` also reports its
 
 Implementation and acceptance tracking: [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md)
 and [I306](../iterations/I306-provider008a-openai-responses.md).
+
+`ModelConfig` gains optional `base_url`; downstream explicit struct literals should use
+`base_url: None` or `..Default::default()` in the same pre-1.0 minor migration.

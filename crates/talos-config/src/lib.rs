@@ -14,6 +14,7 @@ mod catalog_protocol;
 mod config;
 mod credentials;
 mod endpoint;
+mod endpoint_resolution;
 mod env;
 mod error;
 mod protocol_resolution;
@@ -29,9 +30,10 @@ mod types;
 pub use config::{ContextLimitResolution, ContextLimitSource};
 pub use credentials::Credentials;
 pub use endpoint::{
-    NormalizedProviderEndpoint, normalize_provider_endpoint, validate_provider_base_url,
-    validate_provider_name, validate_provider_protocol,
+    NormalizedProviderEndpoint, normalize_provider_endpoint, validate_model_base_url,
+    validate_provider_base_url, validate_provider_name, validate_provider_protocol,
 };
+pub use endpoint_resolution::{EndpointResolutionSource, ProviderEndpointResolution};
 pub use error::ConfigError;
 pub use protocol_resolution::{
     ProtocolResolution, ProtocolResolutionSource, infer_models_dev_model_protocol,

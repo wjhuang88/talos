@@ -179,7 +179,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     let permission_engine =
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone());
     let mut agent = Agent::with_security_and_hooks(
-        build_provider(&config, &api_key, cli.mock),
+        build_provider(&config, &api_key, cli.mock)?,
         registry,
         None,
         None,

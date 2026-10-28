@@ -258,6 +258,10 @@ Talos 也支持在 provider 或模型级配置 `protocol = "openai-responses"`�
 模型级覆盖和公共枚举的 pre-1.0 minor 版本迁移要求见
 [协议配置与迁移说明](docs/reference/PROVIDER-PROTOCOLS.md)。
 
+模型使用不同 HTTP API 根地址时，可同时设置
+`providers.<provider>.models.<model>.base_url` 与显式 `protocol`。模型级地址优先于 provider 地址；
+支持 HTTPS 与本机 loopback HTTP。
+
 启动 Talos 前设置对应的环境变量：
 
 ```bash
