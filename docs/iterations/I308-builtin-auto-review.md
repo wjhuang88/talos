@@ -35,6 +35,46 @@ configuration is not implicitly loaded by MCP. MCP hosted-native Auto remains op
 The focused compile consumed disk; available space was about 671 MiB afterward, so
 the full preflight was not run. This local test has not received final review or CI.
 
+### Git-stage Windows CI finding — 2026-10-28
+
+Exact-head run `40659215369` at `1993432dccd3571abac7849a32c5b4640007f622`
+has a failed Windows workspace job `122717780697`; the main workspace job was
+still running at inspection. Windows format/check/Clippy passed, but structured
+Git guard tests and workspace tests failed. Tools reports 923 passed / 40 failed;
+MCP Checkout and Runtime Checkout also fail. Multiple failures report retained
+Add/Commit/Checkout command drift after preparation. Job log:
+`/private/tmp/i308-git-windows-job.log`. Sender-program discovery/rebinding after
+initial command capture is the current investigation lead, not a proven complete
+root cause. Do not merge this candidate or claim native Windows coverage. No live
+workflow was restarted. The local MCP disposition test above does not fix this.
+
+Inspection confirmed that `FrozenCommand` captured the entry Git executable before
+the separately admitted sender-program frontier, while Commit and Checkout can
+rebind to Git for Windows' internal `git.exe`; Add did not take that path. The
+local correction validates the old command before binding, then changes only its
+retained executable path at that exact admission boundary. Arguments, workdir and
+environment remain frozen and revalidation still rejects changes. A regression
+exercises Add/Commit/Checkout frozen-field checks after binding. This is a focused
+source-level hypothesis and regression, not confirmed Windows runtime evidence.
+
+Low-debug locked focused validation was attempted twice. The first invocation
+omitted the `git` feature and therefore selected zero sender tests; it compiled
+but is not test evidence. The correct `--all-features --lib sender_program_binding`
+invocation failed while linking `talos-tools` with `ld: write() failed, errno=28`
+at about 215 MiB free. The test did not execute. No target cleanup was performed;
+another active worktree's target remains untouched. Re-run focused tests and native
+Windows CI when disk capacity permits, then obtain fresh exact-head review and CI.
+
+Subsequent low-debug `cargo check --locked -p talos-tools --all-features --tests`
+passed (`/private/tmp/i308-sender-binding-check.log`), including the new regression's
+compilation. This does not execute tests. Independent local Agent design review
+found no blocking permission/security finding: old invocation validation precedes
+exact admitted executable capture, only program changes, and subsequent identity
+checks remain. The reviewer ran no builds/tests and explicitly did not approve a
+committed final head. Both governance validators passed with zero warnings after
+the owner/handoff checkpoint. Native Windows and repair runtime validation remain
+required. Latest fetched main remains `4bf3488b2f4344b054754851b588686126c436f4`.
+
 ## Local operation-specific Git Auto checkpoint — 2026-10-28
 
 Git stage delivery state: Review (local candidate; remote gates pending).

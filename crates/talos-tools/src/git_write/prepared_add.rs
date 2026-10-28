@@ -855,6 +855,19 @@ impl AddPlan {
             } else {
                 bound.canonical.clone()
             };
+            // revalidate() above checked the original frozen invocation. Only
+            // this separately admitted executable may change at this frontier;
+            // never recapture arguments, cwd or environment from mutable state.
+            for command in [
+                &mut self.native_add_command,
+                &mut self.native_commit_command,
+                &mut self.native_checkout_command,
+            ]
+            .into_iter()
+            .flatten()
+            {
+                command.bind_sender_program(&invocation);
+            }
             let old_path = std::mem::replace(&mut self.program, invocation);
             let old_entry = std::mem::replace(&mut self.program_entry, bound.program);
             self.sender_entry_program = Some((old_path, old_entry));
