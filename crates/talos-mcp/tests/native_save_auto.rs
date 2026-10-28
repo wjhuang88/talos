@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use rmcp::ServiceExt;
 use serde_json::json;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 use talos_agent::auto_resolver::{
     AutoPermissionAssessor, AutoPermissionControl, AutoPermissionRequest, AutoPermissionResolver,
@@ -69,15 +69,25 @@ impl AutoPermissionAssessor for Assessor {
         Ok(json!({"schema":request.schema,"request_digest":request.request_digest,"decision":if self.scenario == "write_deny" {"human_required"} else {"allow_once"},"confidence":"high"}).to_string())
     }
 }
-struct Deny;
+struct ManualRestore {
+    allow: Arc<AtomicBool>,
+    approvals: Arc<AtomicUsize>,
+}
 #[async_trait]
-impl ApprovalResolver for Deny {
+impl ApprovalResolver for ManualRestore {
     async fn resolve(
         &self,
-        _: PermissionApprovalRequest,
+        request: PermissionApprovalRequest,
         _: Duration,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        Ok(ApprovalChoice::Deny)
+        if self.allow.load(Ordering::SeqCst) {
+            assert_eq!(request.tool_name, "save_url");
+            assert!(request.arguments.get("recovery_id").is_some());
+            self.approvals.fetch_add(1, Ordering::SeqCst);
+            Ok(ApprovalChoice::ApproveOnce)
+        } else {
+            Ok(ApprovalChoice::Deny)
+        }
     }
 }
 async fn child(scenario: String) {
@@ -89,13 +99,18 @@ async fn child(scenario: String) {
     let state = Arc::new(PermissionSessionState::new(
         PermissionEngine::with_workspace_root(root.path().into()),
     ));
+    let allow_restore = Arc::new(AtomicBool::new(false));
+    let approvals = Arc::new(AtomicUsize::new(0));
     let resolver = AutoPermissionResolver::new(
         Arc::new(Assessor {
             calls: calls.clone(),
             verified: verified.clone(),
             scenario: scenario.clone(),
         }),
-        Arc::new(Deny),
+        Arc::new(ManualRestore {
+            allow: allow_restore.clone(),
+            approvals: approvals.clone(),
+        }),
         ManagedWorkspaceLease::for_permission_session(root.path(), state.clone()).expect("lease"),
         Duration::from_secs(5),
         AutoPermissionControl::new(true),
@@ -140,13 +155,18 @@ async fn child(scenario: String) {
         expected,
         "assessor assertions completed"
     );
+    let mut recovery_id = None;
     if scenario == "allow" {
         let result = result.expect("admitted");
         assert_ne!(result.is_error, Some(true), "{result:?}");
-        assert!(
-            serde_json::to_string(&result)
-                .expect("result")
-                .contains("recovery_id")
+        let value = serde_json::to_value(&result).expect("result");
+        let text = value["content"][0]["text"].as_str().expect("text");
+        recovery_id = Some(
+            text.split("recovery_id: ")
+                .nth(1)
+                .expect("receipt")
+                .trim()
+                .to_owned(),
         );
     } else {
         assert!(
@@ -155,7 +175,7 @@ async fn child(scenario: String) {
         );
     }
     assert_eq!(
-        std::fs::read_to_string(path).expect("contents"),
+        std::fs::read_to_string(&path).expect("contents"),
         if scenario == "allow" {
             "downloaded"
         } else if scenario == "changed" {
@@ -164,6 +184,52 @@ async fn child(scenario: String) {
             "original"
         }
     );
+    if let Some(id) = recovery_id {
+        let restore = || {
+            rmcp::model::CallToolRequestParams::new("save_url").with_arguments(
+                json!({"url":"ignored","destination":path,"recovery_id":id})
+                    .as_object()
+                    .expect("restore args")
+                    .clone(),
+            )
+        };
+        let denied = client.peer().call_tool(restore()).await;
+        assert!(denied.as_ref().map_or(true, |r| r.is_error == Some(true)));
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("denied restore"),
+            "downloaded"
+        );
+        allow_restore.store(true, Ordering::SeqCst);
+        let restored = client
+            .peer()
+            .call_tool(restore())
+            .await
+            .expect("manual restore");
+        assert_ne!(restored.is_error, Some(true), "{restored:?}");
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("restored"),
+            "original"
+        );
+        let reused = client
+            .peer()
+            .call_tool(restore())
+            .await
+            .expect("reused receipt");
+        assert_eq!(reused.is_error, Some(true));
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("one-use restore"),
+            "original"
+        );
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            expected,
+            "restore must not use model Auto"
+        );
+        assert!(
+            approvals.load(Ordering::SeqCst) >= 1,
+            "explicit manual approval required"
+        );
+    }
     let _ = client.cancel().await;
     server.await.expect("joined");
 }
