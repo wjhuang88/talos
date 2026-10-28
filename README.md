@@ -305,6 +305,9 @@ timing; bounded-response failures include byte counters, while invalid JSON incl
 line/column, never the raw review, prompt, command or provider error. The provider's 4096-token
 generation limit is separate from the local review's 16 KiB combined text/reasoning byte budget.
 Failures still require human approval; diagnostics do not authorize execution.
+CLI/TUI success notices explicitly say when the model allowed a request once and
+identify assessed Git commands, file mutations, network requests or other tool
+invocations without displaying review payloads or provider identifiers.
 
 GLM-5.3 Auto reviews explicitly request `thinking.type = enabled` and `reasoning_effort = low`:
 this model cannot disable thinking. This request-local setting does not change conversation

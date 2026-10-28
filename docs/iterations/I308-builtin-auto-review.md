@@ -1,5 +1,25 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Local CLI decision visibility follow-up — 2026-10-28
+
+Git stage #797 is published at
+`1993432dccd3571abac7849a32c5b4640007f622`, based on
+`4bf3488b2f4344b054754851b588686126c436f4`. Independent final-head static
+permission/security/API review approved with shared-identity limits; the receipt
+is posted on the PR. Exact-head CI `40659215369` is running, not passed or merged.
+The preceding local-only checkpoint below describes its pre-publication state.
+
+The next local branch makes CLI/TUI effectful AllowOnce notices explicitly say
+that the model allowed the request once, with a safe Git/file/network/invocation
+category rather than generic completion. Regression covers those categories and
+unknown future reasons without exposing provider identity or request digest.
+Locked focused CLI tests pass 8/8
+(`/private/tmp/i308-visible-auto-cli-tests.log`); warnings-denied CLI/test Clippy
+passed (`/private/tmp/i308-visible-auto-cli-clippy.log`).
+This follow-up has not been published. Full stage checks, review and publication remain
+pending. MCP hosted-native model reachability, complete profile/recovery/platform
+coverage and all later handoff tasks remain unfinished; I308 stays Active / Partial.
+
 ## Local operation-specific Git Auto checkpoint — 2026-10-28
 
 Git stage delivery state: Review (local candidate; remote gates pending).
