@@ -18,13 +18,29 @@ pub enum EndpointResolutionSource {
 /// Effective API root and its provenance. Credentials remain owned by the selected provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderEndpointResolution {
-    /// API root consumed by the selected adapter; `None` retains its hard-coded default.
+    /// API root consumed by the selected adapter; `None` retains the factory's provider/adapter default.
     pub base_url: Option<String>,
     /// Why this connection was selected.
     pub source: EndpointResolutionSource,
 }
 
 impl Config {
+    /// Returns the explicit model-or-provider URL before adapter path normalization.
+    ///
+    /// Model URLs take precedence. Environment templates are expanded with the same rules as
+    /// effective endpoint resolution. This preserves a full wire path for destination-specific
+    /// validation; callers must still use [`Self::resolve_provider_endpoint`] for checked routing.
+    #[must_use]
+    pub fn configured_endpoint_url(&self) -> Option<String> {
+        let provider = self.providers.get(&self.provider)?;
+        provider
+            .models
+            .get(&self.model)
+            .and_then(|model| model.base_url.as_deref())
+            .or(provider.base_url.as_deref())
+            .map(crate::substitute_env_vars)
+    }
+
     /// Resolves the active model's connection without changing protocol or retrying a request.
     ///
     /// Explicit model endpoints win. Catalog endpoints require an exact built-in provider/model,

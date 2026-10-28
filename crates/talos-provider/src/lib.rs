@@ -13,6 +13,7 @@
 //! concrete provider structs as pre-1.0 adapters and prefer the `talos-core` provider traits for
 //! long-lived integration code.
 
+mod copilot;
 mod image_io;
 pub mod mock;
 pub mod openai;
@@ -133,6 +134,8 @@ pub struct AnthropicProvider {
     model: String,
     base_url: String,
     client: Client,
+    copilot_headers: serde_json::Map<String, Value>,
+    copilot_auth: bool,
     reasoning: Option<ReasoningOptions>,
     output_limit: Option<u32>,
     timeout_config: ProviderTimeoutConfig,
@@ -151,6 +154,8 @@ impl AnthropicProvider {
             model: model.into(),
             base_url: ANTHROPIC_API_URL.into(),
             client: Client::new(),
+            copilot_headers: serde_json::Map::new(),
+            copilot_auth: false,
             reasoning: None,
             output_limit: None,
             timeout_config: ProviderTimeoutConfig::default(),
@@ -160,6 +165,17 @@ impl AnthropicProvider {
     /// Set a custom base URL (useful for testing or enterprise proxies).
     pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
         self.base_url = base_url.into();
+        self
+    }
+
+    pub(crate) fn with_copilot_client(
+        mut self,
+        client: Client,
+        headers: serde_json::Map<String, Value>,
+    ) -> Self {
+        self.client = client;
+        self.copilot_headers = headers;
+        self.copilot_auth = true;
         self
     }
 
@@ -261,10 +277,13 @@ impl AnthropicProvider {
                     }
                 },
             );
-            let request_fut = self
-                .client
-                .post(&self.base_url)
-                .header("x-api-key", &self.api_key)
+            let request = self.client.post(&self.base_url);
+            let request = if !self.copilot_auth {
+                request.header("x-api-key", &self.api_key)
+            } else {
+                request.bearer_auth(&self.api_key)
+            };
+            let request_fut = request
                 .header("anthropic-version", ANTHROPIC_VERSION)
                 .header("content-type", "application/json")
                 .json(&body)
@@ -333,6 +352,11 @@ impl AnthropicProvider {
                 Ok(resp) => {
                     let status = resp.status();
                     let body_text = resp.text().await.unwrap_or_default();
+                    let body_text = if self.copilot_auth {
+                        crate::copilot::redact_credential(body_text, &self.api_key)
+                    } else {
+                        body_text
+                    };
                     let error = status_to_error(status, body_text);
                     match classify_retry_with_backoff(
                         &error,
@@ -696,7 +720,7 @@ impl LanguageModel for AnthropicProvider {
             self.reasoning.as_ref(),
             self.output_limit,
         );
-        Some(json!({
+        let mut preview = json!({
             "method": "POST",
             "url": &self.base_url,
             "headers": {
@@ -705,7 +729,15 @@ impl LanguageModel for AnthropicProvider {
                 "content-type": "application/json",
             },
             "body": body,
-        }))
+        });
+        if let Some(headers) = preview["headers"].as_object_mut() {
+            if self.copilot_auth {
+                headers.remove("x-api-key");
+                headers.insert("Authorization".into(), json!("Bearer ***"));
+            }
+            headers.extend(self.copilot_headers.clone());
+        }
+        Some(preview)
     }
 }
 
