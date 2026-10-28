@@ -7,13 +7,15 @@ environment placeholder. Current-base locked all-target/all-feature check,
 warnings-denied Clippy and full all-feature workspace tests passed; the tests
 passed in approved host execution, including the process-observation test that
 previously failed under sandbox EPERM. Logs are recorded in the I309 owner.
-Both governance validators passed. Standard preflight remains live in session
-44123, log `/private/tmp/i309-e53-preflight-host.log`.
+Both governance validators passed. Standard preflight passed exit 0, including
+both external Runtime SDK modes, log `/private/tmp/i309-e53-preflight-host.log`.
+Independent static review approved exact candidate `79f56c1ee` against main e53;
+the reviewer did not run tests.
 
 PR #790's last published head is `a9d5623c7`; older head `3c5a3276c` passed all
 eight gates in CI 40624815706, including native Windows. Those results and earlier
 static approvals do not certify the latest rebased candidate. Final evidence
-reconciliation, exact-head review, publication, CI, merge and accepted
+reconciliation, publication, CI, merge and accepted
 dependency-baseline advancement remain pending.
 
 Requested `cargo clean --locked` removed 26,276 files / 15.0 GiB. Only root and

@@ -182,7 +182,7 @@ are historical. The current candidate checkpoint below supersedes this record.
 
 - Rebased cleanly onto main `e53c61c7f0344308a5c5535bb1521fefebbacc70` after #792 merged. The source range is unchanged apart from a bounded validation repair: removed the redundant `format!` from the newly merged Responses Agent fixture and preserved its literal `${TALOS_MODEL_ENDPOINT_TEST}` placeholder. This repairs warnings-denied Clippy without changing production behavior.
 - Locked all-target/all-feature check and warnings-denied Clippy passed (`/private/tmp/i309-e53-all-feature-check.log`, `/private/tmp/i309-e53-all-feature-clippy-retry.log`). Full locked all-feature workspace tests passed exit 0 in the approved host execution (`/private/tmp/i309-e53-all-feature-test-host.log`), including the process-observation test that failed with sandbox EPERM. No test was skipped or weakened. Both governance validators passed (`/private/tmp/i309-e53-governance.log`, `/private/tmp/i309-e53-claims.log`).
-- Current-base standard preflight is running in session 44123 (`/private/tmp/i309-e53-preflight-host.log`). Final candidate review, publication, exact-head CI, merge CAS and accepted-baseline advancement remain outstanding.
+- Current-base standard preflight passed exit 0, including both external Runtime SDK modes (`/private/tmp/i309-e53-preflight-host.log`, session 44123). Independent static security/API/dependency and documentation review approved exact candidate `79f56c1ee2bddc3ab8e8687f3dcbf72606eed987` against main `e53c61c7f0344308a5c5535bb1521fefebbacc70`; the reviewer did not run tests. Publication, exact-head CI, merge CAS and accepted-baseline advancement remain outstanding.
 
 ### Historical validation checkpoint — 2026-10-28
 
