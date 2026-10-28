@@ -235,3 +235,49 @@ fn invalid_manual_model_endpoint_returns_an_error_without_panicking() {
         assert!(!error.contains("endpoint-test-secret"), "{error}");
     }
 }
+
+#[test]
+fn neon_catalog_responses_rollback_restores_the_matching_provider_root() {
+    let home = tempfile::tempdir().expect("home");
+    let dir = home.path().join(".talos");
+    std::fs::create_dir_all(&dir).expect("config directory");
+    let path = dir.join("config.toml");
+    let base = "provider = \"neon\"\nmodel = \"gpt-5-2\"\n[providers.neon]\nbase_url = \"${NEON_AI_GATEWAY_BASE_URL}/v1\"\napi_key_env = \"NEON_AI_GATEWAY_TOKEN\"\n";
+    for persisted_provider_root in [true, false] {
+        let base = if persisted_provider_root {
+            base.to_string()
+        } else {
+            base.replace("base_url = \"${NEON_AI_GATEWAY_BASE_URL}/v1\"\n", "")
+        };
+        for (explicit, expected) in [
+            (false, "https://neon-branch.test/openai/v1/responses"),
+            (true, "https://neon-branch.test/v1/chat/completions"),
+        ] {
+            let config = if explicit {
+                format!("{base}protocol = \"openai-chat\"\n")
+            } else {
+                base.clone()
+            };
+            std::fs::write(&path, config).expect("config");
+            let output = Command::new(env!("CARGO_BIN_EXE_talos"))
+                .env("HOME", home.path())
+                .env("USERPROFILE", home.path())
+                .env("NEON_AI_GATEWAY_BASE_URL", "https://neon-branch.test")
+                .env("NEON_AI_GATEWAY_TOKEN", "endpoint-test-secret")
+                .args(["--mock", "--print", "/mock-request hello"])
+                .output()
+                .expect("CLI preview");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let preview = String::from_utf8_lossy(&output.stdout);
+            assert!(preview.contains(expected), "{preview}");
+            assert!(!preview.contains("endpoint-test-secret"), "{preview}");
+            if explicit {
+                assert!(!preview.contains("/openai/v1/responses"), "{preview}");
+            }
+        }
+    }
+}

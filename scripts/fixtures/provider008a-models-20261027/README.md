@@ -11,7 +11,7 @@ Gzip uses mtime 0. This catalog contains public model metadata, not live endpoin
 
 Run `python3 scripts/audit_provider008a_projection.py` (Python 3.11+) from an offline checkout.
 It verifies the frozen hash, independently computes every packaged model's admission and compares
-all protocol keys and the preserved non-protocol semantic digest. Standard release preflight
+all protocol/endpoint keys and the preserved non-routing semantic digest. Standard release preflight
 runs this audit; normal Rust builds do not decompress, fetch or execute this maintenance input.
 The production generator/runtime share `protocol_signal.rs`; this audit explicitly reproduces the
 accepted SDK/shape and endpoint rules for an exhaustive cross-check of this fixed dataset.
@@ -20,3 +20,9 @@ The 2026-10-26 input hash recorded in earlier ledger checkpoints could not be re
 download had different bytes and is deliberately archived as a new input. Reprojection withdraws
 six Chat hints for models now absent upstream; model records themselves and all non-protocol data
 are preserved. Historical old snapshot/hash/counts are retained as history, not newly verified facts.
+
+
+The 2026-10-28 endpoint stage reuses these exact archived bytes. It adds reviewed model routing
+metadata (protocol + API root), preserving all other fields. The audit removes only those two
+routing keys before comparing the original semantic digest; upstream archive/license bytes and
+provider records remain unchanged. Admission evidence is in the catalog protocol ledger.

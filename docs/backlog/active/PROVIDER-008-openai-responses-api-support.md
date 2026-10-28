@@ -143,3 +143,13 @@ withheld) and must be resolved through implementation or an explicit accepted sc
 child acceptance closes. This residual tracking does not satisfy the multi-protocol-host requirement.
 B/C/D remain unclaimed; parent #724 stays open and is not Complete. Earlier proposal-only checkpoints
 are historical; no sibling implementation or release is claimed.
+
+
+## HTTP Endpoint Stage — 2026-10-28
+
+Child A's #792 runtime and separate data activation stage cover 45 reviewed HTTP endpoint pairs
+(Neon 14 Responses, Ofox/Zenmux 27 Messages, Freemodel 4 Chat), including a vendor-root rollback
+safeguard. Seven Copilot Messages endpoints remain unreviewed for vendor authentication/transport;
+four WSS records are the already-excluded Realtime family. The owner remains Review / Claimed with
+Completion Commit: Pending. Neither a staged candidate nor moving a residual into this parent is
+completion or a scope waiver. B/C/D remain unclaimed; #724/#748 stay open and no release is claimed.

@@ -30860,6 +30860,8 @@ image_input = true
 [[models]]
 id = "gpt-5.3-codex"
 provider = "freemodel"
+protocol = "openai-chat"
+api_base_url = "https://api.freemodel.dev/v1"
 context_limit = 400000
 output_limit = 128000
 release_date = "2026-02-05"
@@ -30878,6 +30880,8 @@ image_input = true
 [[models]]
 id = "gpt-5.4"
 provider = "freemodel"
+protocol = "openai-chat"
+api_base_url = "https://api.freemodel.dev/v1"
 context_limit = 1050000
 output_limit = 128000
 release_date = "2026-03-05"
@@ -30896,6 +30900,8 @@ image_input = true
 [[models]]
 id = "gpt-5.4-mini"
 provider = "freemodel"
+protocol = "openai-chat"
+api_base_url = "https://api.freemodel.dev/v1"
 context_limit = 400000
 output_limit = 128000
 release_date = "2026-03-17"
@@ -30914,6 +30920,8 @@ image_input = true
 [[models]]
 id = "gpt-5.5"
 provider = "freemodel"
+protocol = "openai-chat"
+api_base_url = "https://api.freemodel.dev/v1"
 context_limit = 1050000
 output_limit = 128000
 release_date = "2026-04-23"
@@ -69945,6 +69953,8 @@ reasoning = true
 [[models]]
 id = "gpt-5"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 400000
 output_limit = 128000
 release_date = "2025-08-07"
@@ -69963,6 +69973,8 @@ image_input = true
 [[models]]
 id = "gpt-5-1"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 400000
 output_limit = 128000
 release_date = "2025-11-13"
@@ -69981,6 +69993,8 @@ image_input = true
 [[models]]
 id = "gpt-5-2"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 400000
 output_limit = 128000
 release_date = "2025-12-11"
@@ -69999,6 +70013,8 @@ image_input = true
 [[models]]
 id = "gpt-5-3-codex"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 400000
 output_limit = 128000
 release_date = "2026-02-05"
@@ -70017,6 +70033,8 @@ image_input = true
 [[models]]
 id = "gpt-5-4"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 1050000
 output_limit = 128000
 release_date = "2026-03-05"
@@ -70035,6 +70053,8 @@ image_input = true
 [[models]]
 id = "gpt-5-4-mini"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 400000
 output_limit = 128000
 release_date = "2026-03-17"
@@ -70053,6 +70073,8 @@ image_input = true
 [[models]]
 id = "gpt-5-4-nano"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 400000
 output_limit = 128000
 release_date = "2026-03-17"
@@ -70071,6 +70093,8 @@ image_input = true
 [[models]]
 id = "gpt-5-5"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 1050000
 output_limit = 128000
 release_date = "2026-04-23"
@@ -70089,6 +70113,8 @@ image_input = true
 [[models]]
 id = "gpt-5-5-pro"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 1050000
 output_limit = 128000
 release_date = "2026-04-23"
@@ -70106,6 +70132,8 @@ image_input = true
 [[models]]
 id = "gpt-5-6-luna"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 1050000
 output_limit = 128000
 release_date = "2026-07-09"
@@ -70124,6 +70152,8 @@ image_input = true
 [[models]]
 id = "gpt-5-6-sol"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 1050000
 output_limit = 128000
 release_date = "2026-07-09"
@@ -70142,6 +70172,8 @@ image_input = true
 [[models]]
 id = "gpt-5-6-terra"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 1050000
 output_limit = 128000
 release_date = "2026-07-09"
@@ -70160,6 +70192,8 @@ image_input = true
 [[models]]
 id = "gpt-5-mini"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 400000
 output_limit = 128000
 release_date = "2025-08-07"
@@ -70178,6 +70212,8 @@ image_input = true
 [[models]]
 id = "gpt-5-nano"
 provider = "neon"
+protocol = "openai-responses"
+api_base_url = "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"
 context_limit = 400000
 output_limit = 128000
 release_date = "2025-08-07"
@@ -73035,6 +73071,8 @@ reasoning = true
 [[models]]
 id = "anthropic/claude-fable-5"
 provider = "ofox"
+protocol = "anthropic-messages"
+api_base_url = "https://api.ofox.ai/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-06-09"
@@ -73052,6 +73090,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-haiku-4.5"
 provider = "ofox"
+protocol = "anthropic-messages"
+api_base_url = "https://api.ofox.ai/anthropic/v1"
 context_limit = 200000
 output_limit = 64000
 release_date = "2025-10-15"
@@ -73069,6 +73109,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-opus-4.5"
 provider = "ofox"
+protocol = "anthropic-messages"
+api_base_url = "https://api.ofox.ai/anthropic/v1"
 context_limit = 200000
 output_limit = 64000
 release_date = "2025-11-24"
@@ -73086,6 +73128,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-opus-4.6"
 provider = "ofox"
+protocol = "anthropic-messages"
+api_base_url = "https://api.ofox.ai/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-02-05"
@@ -73103,6 +73147,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-opus-4.7"
 provider = "ofox"
+protocol = "anthropic-messages"
+api_base_url = "https://api.ofox.ai/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-04-16"
@@ -73120,6 +73166,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-opus-4.8"
 provider = "ofox"
+protocol = "anthropic-messages"
+api_base_url = "https://api.ofox.ai/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-05-28"
@@ -73137,6 +73185,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-opus-5"
 provider = "ofox"
+protocol = "anthropic-messages"
+api_base_url = "https://api.ofox.ai/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-07-24"
@@ -73154,6 +73204,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-sonnet-4.5"
 provider = "ofox"
+protocol = "anthropic-messages"
+api_base_url = "https://api.ofox.ai/anthropic/v1"
 context_limit = 200000
 output_limit = 64000
 release_date = "2025-09-29"
@@ -73171,6 +73223,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-sonnet-4.6"
 provider = "ofox"
+protocol = "anthropic-messages"
+api_base_url = "https://api.ofox.ai/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-02-17"
@@ -73188,6 +73242,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-sonnet-5"
 provider = "ofox"
+protocol = "anthropic-messages"
+api_base_url = "https://api.ofox.ai/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-06-30"
@@ -109938,6 +109994,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-fable-5"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-06-09"
@@ -109955,6 +110013,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-haiku-4.5"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 200000
 output_limit = 64000
 release_date = "2025-10-15"
@@ -109988,6 +110048,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-opus-4.1"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 200000
 output_limit = 64000
 release_date = "2025-08-05"
@@ -110005,6 +110067,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-opus-4.5"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 200000
 output_limit = 64000
 release_date = "2025-11-24"
@@ -110022,6 +110086,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-opus-4.6"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-02-06"
@@ -110039,6 +110105,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-opus-4.7"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-04-16"
@@ -110056,6 +110124,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-opus-4.8"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-05-28"
@@ -110090,6 +110160,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-sonnet-4.5"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 1000000
 output_limit = 64000
 release_date = "2025-09-29"
@@ -110107,6 +110179,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-sonnet-4.6"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 1000000
 output_limit = 64000
 release_date = "2026-02-18"
@@ -110124,6 +110198,8 @@ image_input = true
 [[models]]
 id = "anthropic/claude-sonnet-5"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-06-30"
@@ -110464,6 +110540,8 @@ tools = true
 [[models]]
 id = "minimax/minimax-m2"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 204000
 output_limit = 64000
 release_date = "2025-10-27"
@@ -110480,6 +110558,8 @@ reasoning = true
 [[models]]
 id = "minimax/minimax-m2.1"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 204000
 output_limit = 64000
 release_date = "2025-12-22"
@@ -110496,6 +110576,8 @@ reasoning = true
 [[models]]
 id = "minimax/minimax-m2.5"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 204800
 output_limit = 131072
 release_date = "2026-02-13"
@@ -110512,6 +110594,8 @@ reasoning = true
 [[models]]
 id = "minimax/minimax-m2.5-lightning"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 204800
 output_limit = 131072
 release_date = "2026-02-13"
@@ -110528,6 +110612,8 @@ reasoning = true
 [[models]]
 id = "minimax/minimax-m2.7"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 204800
 output_limit = 131070
 release_date = "2026-03-20"
@@ -110544,6 +110630,8 @@ image_input = true
 [[models]]
 id = "minimax/minimax-m2.7-highspeed"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 204800
 output_limit = 131070
 release_date = "2026-03-20"
@@ -110560,6 +110648,8 @@ image_input = true
 [[models]]
 id = "minimax/minimax-m3"
 provider = "zenmux"
+protocol = "anthropic-messages"
+api_base_url = "https://zenmux.ai/api/anthropic/v1"
 context_limit = 1048576
 output_limit = 512000
 release_date = "2026-06-01"

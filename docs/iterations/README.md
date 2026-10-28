@@ -393,5 +393,6 @@ owner for scope, acceptance and complete active/review/planned inventory.
 [I306](I306-provider008a-openai-responses.md) / [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md)
 is Review / Claimed after code #749 (`60e27eb6`) and catalog #775 (`6af8654c`) merged.
 CI3498/CI3509 each passed all eight jobs with exact-head technical review and CAS.
-Distinct model-endpoint routing remains unimplemented / withheld; owner acceptance and #748 closure
-remain pending. Parent #724 and unclaimed B/C/D are not Complete.
+Code #792 and the separate data stage add 45 reviewed HTTP model endpoint pairs; seven Copilot
+endpoints remain unreviewed for vendor auth/transport, while four WSS records are excluded Realtime.
+Owner acceptance and #748 closure remain pending; parent #724 and unclaimed B/C/D are not Complete.

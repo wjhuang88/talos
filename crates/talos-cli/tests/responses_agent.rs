@@ -27,6 +27,13 @@ fn read_request_at(socket: &mut TcpStream, path: &str) -> serde_json::Value {
                 headers.starts_with(&format!("POST {path} HTTP/1.1")),
                 "{headers}"
             );
+            assert!(
+                headers.lines().any(|line| line
+                    .split_once(':')
+                    .is_some_and(|(name, value)| name.eq_ignore_ascii_case("authorization")
+                        && value.trim() == "Bearer test-key")),
+                "configured API credential must be used"
+            );
             let length = headers
                 .lines()
                 .find_map(|line| {
@@ -45,6 +52,15 @@ fn read_request_at(socket: &mut TcpStream, path: &str) -> serde_json::Value {
 
 #[test]
 fn responses_image_and_native_read_complete_through_real_agent() {
+    image_and_native_read_round(false);
+}
+
+#[test]
+fn neon_packaged_model_endpoint_drives_a_real_agent_round() {
+    image_and_native_read_round(true);
+}
+
+fn image_and_native_read_round(catalog: bool) {
     let temp = tempfile::tempdir().expect("isolated home and workspace");
     let config_dir = temp.path().join(".talos");
     std::fs::create_dir(&config_dir).expect("config directory");
@@ -56,9 +72,15 @@ fn responses_image_and_native_read_complete_through_real_agent() {
     let listener = TcpListener::bind("127.0.0.1:0").expect("controlled endpoint");
     listener.set_nonblocking(true).expect("bounded accept");
     let address = listener.local_addr().expect("endpoint address");
-    std::fs::write(config_dir.join("config.toml"), format!(
+    let (expected_path, expected_model) = if catalog {
+        std::fs::write(config_dir.join("config.toml"), "provider = \"neon\"\nmodel = \"gpt-5-2\"\n[providers.neon]\nbase_url = \"${NEON_AI_GATEWAY_BASE_URL}/v1\"\napi_key_env = \"NEON_AI_GATEWAY_TOKEN\"\n").expect("catalog-routed config without model protocol/endpoint overrides");
+        ("/openai/v1/responses", "gpt-5-2")
+    } else {
+        std::fs::write(config_dir.join("config.toml"), format!(
         "provider = \"fixture\"\nmodel = \"test-model\"\n[providers.fixture]\nprotocol = \"openai-chat\"\nbase_url = \"http://127.0.0.1:9/provider\"\napi_key = \"test-key\"\n[providers.fixture.models.test-model]\nbase_url = \"${{TALOS_MODEL_ENDPOINT_TEST}}/model-wire\"\nprotocol = \"openai-responses\"\nimage_input = true\n"
     )).expect("config");
+        ("/model-wire/responses", "test-model")
+    };
     let server = std::thread::spawn(move || {
         let deadline = Instant::now() + Duration::from_secs(25);
         let mut requests = Vec::new();
@@ -76,7 +98,7 @@ fn responses_image_and_native_read_complete_through_real_agent() {
                     Err(error) => panic!("accept: {error}"),
                 }
             };
-            requests.push(read_request_at(&mut socket, "/model-wire/responses"));
+            requests.push(read_request_at(&mut socket, expected_path));
             let mut events = vec![serde_json::json!({"type": "response.created"})];
             if requests.len() == 1 {
                 let item = serde_json::json!({
@@ -108,6 +130,8 @@ fn responses_image_and_native_read_complete_through_real_agent() {
         .arg("Read note.txt and describe the image")
         .current_dir(temp.path())
         .env("TALOS_MODEL_ENDPOINT_TEST", format!("http://{address}"))
+        .env("NEON_AI_GATEWAY_BASE_URL", format!("http://{address}"))
+        .env("NEON_AI_GATEWAY_TOKEN", "test-key")
         .env("HOME", temp.path())
         .env("USERPROFILE", temp.path())
         .env("NO_PROXY", "127.0.0.1,localhost")
@@ -139,6 +163,7 @@ fn responses_image_and_native_read_complete_through_real_agent() {
     );
     let requests = server.join().expect("controlled endpoint finished");
     for request in &requests {
+        assert_eq!(request["model"], expected_model);
         assert_eq!(request["store"], false);
         assert_eq!(request["stream"], true);
         assert!(request.get("previous_response_id").is_none());

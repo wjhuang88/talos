@@ -232,20 +232,29 @@ fn parse_api_json(json: &str) -> Result<(Vec<TomlProvider>, Vec<TomlModel>), Str
                 .as_ref()
                 .and_then(|l| l.output)
                 .map(|v| v as u32);
-            let protocol = infer_model_protocol(
+            let mut protocol = infer_model_protocol(
                 model.provider.as_ref(),
                 provider.npm.as_deref(),
                 provider.api.as_deref(),
             );
 
+            let mut api_base_url = infer_model_api_base_url(
+                model.provider.as_ref(),
+                provider.npm.as_deref(),
+                provider.api.as_deref(),
+            );
+            if let Some(api) = api_base_url.as_deref()
+                && !protocol.as_ref().is_some_and(|wire| {
+                    reviewed_model_endpoint(provider_id, provider.api.as_deref(), api, wire)
+                })
+            {
+                protocol = None;
+                api_base_url = None;
+            }
             models.push(TomlModel {
                 id: model_id.clone(),
                 provider: provider_id.clone(),
-                api_base_url: infer_model_api_base_url(
-                    model.provider.as_ref(),
-                    provider.npm.as_deref(),
-                    provider.api.as_deref(),
-                ),
+                api_base_url,
                 protocol,
                 context_limit,
                 output_limit,
@@ -368,6 +377,38 @@ fn infer_model_api_base_url(
         return None;
     }
     Some(api.trim().trim_end_matches('/').to_string())
+}
+
+// A different endpoint is also a credential destination. These exact provider/root/wire pairs
+// were checked against primary vendor sources; SDK names alone do not establish vendor auth.
+// See the 2026-10-28 endpoint review in PROVIDER-008-A-CATALOG-PROTOCOLS.md. No live input can
+// expand this list. New pairs require a separately reviewed projection and transport evidence.
+fn reviewed_model_endpoint(
+    provider: &str,
+    parent: Option<&str>,
+    endpoint: &str,
+    protocol: &TomlModelProtocol,
+) -> bool {
+    let expected = match (provider, protocol) {
+        ("neon", TomlModelProtocol::OpenAIResponses) => (
+            "${NEON_AI_GATEWAY_BASE_URL}/v1",
+            "${NEON_AI_GATEWAY_BASE_URL}/openai/v1",
+        ),
+        ("ofox", TomlModelProtocol::AnthropicMessages) => {
+            ("https://api.ofox.ai/v1", "https://api.ofox.ai/anthropic/v1")
+        }
+        ("zenmux", TomlModelProtocol::AnthropicMessages) => (
+            "https://zenmux.ai/api/v1",
+            "https://zenmux.ai/api/anthropic/v1",
+        ),
+        ("freemodel", TomlModelProtocol::OpenAIChat) => (
+            "https://cc.freemodel.dev/v1",
+            "https://api.freemodel.dev/v1",
+        ),
+        _ => return false,
+    };
+    parent.is_some_and(|parent| parent.trim().trim_end_matches('/') == expected.0)
+        && endpoint.trim().trim_end_matches('/') == expected.1
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -593,6 +634,50 @@ mod protocol_admission_tests {
                     .is_none()
             );
         }
+    }
+
+    #[test]
+    fn different_endpoint_admission_requires_reviewed_wire_and_credential_destination() {
+        assert!(reviewed_model_endpoint(
+            "neon",
+            Some("${NEON_AI_GATEWAY_BASE_URL}/v1"),
+            "${NEON_AI_GATEWAY_BASE_URL}/openai/v1",
+            &TomlModelProtocol::OpenAIResponses
+        ));
+        assert!(reviewed_model_endpoint(
+            "freemodel",
+            Some("https://cc.freemodel.dev/v1"),
+            "https://api.freemodel.dev/v1",
+            &TomlModelProtocol::OpenAIChat
+        ));
+        assert!(!reviewed_model_endpoint(
+            "github-copilot",
+            Some("https://api.githubcopilot.com"),
+            "https://api.githubcopilot.com/v1",
+            &TomlModelProtocol::AnthropicMessages
+        ));
+        assert!(!reviewed_model_endpoint(
+            "neon",
+            Some("https://replaced.test/v1"),
+            "${NEON_AI_GATEWAY_BASE_URL}/openai/v1",
+            &TomlModelProtocol::OpenAIResponses
+        ));
+        assert!(!reviewed_model_endpoint(
+            "neon",
+            Some("${NEON_AI_GATEWAY_BASE_URL}/v1"),
+            "https://unreviewed.test/openai/v1",
+            &TomlModelProtocol::OpenAIResponses
+        ));
+        assert!(!reviewed_model_endpoint(
+            "neon",
+            Some("${NEON_AI_GATEWAY_BASE_URL}/v1"),
+            "${NEON_AI_GATEWAY_BASE_URL}/openai/v1",
+            &TomlModelProtocol::OpenAIChat
+        ));
+        let source = r#"{"github-copilot":{"npm":"@ai-sdk/openai-compatible","api":"https://api.githubcopilot.com","models":{"fixture":{"tool_call":true,"provider":{"npm":"@ai-sdk/anthropic","api":"https://api.githubcopilot.com/v1"}}}}}"#;
+        let (_, models) = parse_api_json(source).expect("catalog fixture");
+        assert!(models[0].protocol.is_none());
+        assert!(models[0].api_base_url.is_none());
     }
 
     #[test]

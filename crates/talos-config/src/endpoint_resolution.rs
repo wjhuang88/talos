@@ -31,6 +31,8 @@ impl Config {
     /// the unchanged provider root, and a matching effective protocol. Custom gateways never inherit
     /// a catalog vendor's endpoint through unique model-name matching. Packaged model endpoints are
     /// reviewed connection defaults, including their credential destination, like provider defaults.
+    /// A wire rollback on a routed catalog model retains its vendor root even if the host did not
+    /// save a provider-level URL, instead of falling through to a different vendor's adapter default.
     ///
     /// # Errors
     ///
@@ -62,25 +64,7 @@ impl Config {
         protocol: &ProviderProtocol,
     ) -> Result<ProviderEndpointResolution, ConfigError> {
         if let Some(endpoint) = explicit_model.or(catalog) {
-            let endpoint = crate::substitute_env_vars(endpoint);
-            if endpoint.contains("${") {
-                return Err(ConfigError::InvalidConfig(
-                    "model endpoint has an unresolved environment variable; configure its base URL"
-                        .into(),
-                ));
-            }
-            let normalized = crate::validate_provider_base_url(&endpoint).map_err(|reason| {
-                ConfigError::InvalidConfig(format!("invalid model endpoint: {reason}"))
-            })?;
-            // Normalization for a different wire is not protocol inference. Keep Responses roots
-            // and explicit full Messages URLs for the existing adapters to finish exactly once.
-            let base_url = if *protocol == ProviderProtocol::OpenAIChat
-                && normalized.protocol == ProviderProtocol::OpenAIChat
-            {
-                normalized.base_url
-            } else {
-                endpoint.trim().trim_end_matches('/').to_string()
-            };
+            let base_url = checked_model_endpoint(endpoint, protocol)?;
             return Ok(ProviderEndpointResolution {
                 base_url: Some(base_url),
                 source: if explicit_model.is_some() {
@@ -91,7 +75,15 @@ impl Config {
             });
         }
         Ok(ProviderEndpointResolution {
-            base_url: self.base_url(),
+            base_url: match self.base_url() {
+                Some(root) => Some(root),
+                None => crate::catalog_protocol::builtin_model_provider_root(
+                    &self.provider,
+                    &self.model,
+                )
+                .map(|root| checked_model_endpoint(&root, protocol))
+                .transpose()?,
+            },
             source: if self
                 .providers
                 .get(&self.provider)
@@ -103,6 +95,31 @@ impl Config {
             },
         })
     }
+}
+
+fn checked_model_endpoint(
+    endpoint: &str,
+    protocol: &ProviderProtocol,
+) -> Result<String, ConfigError> {
+    let endpoint = crate::substitute_env_vars(endpoint);
+    if endpoint.contains("${") {
+        return Err(ConfigError::InvalidConfig(
+            "model endpoint has an unresolved environment variable; configure its base URL".into(),
+        ));
+    }
+    let normalized = crate::validate_provider_base_url(&endpoint).map_err(|reason| {
+        ConfigError::InvalidConfig(format!("invalid model endpoint: {reason}"))
+    })?;
+    // Normalization is not protocol inference. Keep other wire roots for their selected adapter.
+    Ok(
+        if *protocol == ProviderProtocol::OpenAIChat
+            && normalized.protocol == ProviderProtocol::OpenAIChat
+        {
+            normalized.base_url
+        } else {
+            endpoint.trim().trim_end_matches('/').to_string()
+        },
+    )
 }
 
 #[cfg(test)]

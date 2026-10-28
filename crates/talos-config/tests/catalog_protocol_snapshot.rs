@@ -77,9 +77,9 @@ fn frozen_projection_counts_and_existing_provider_root_are_preserved() {
     let models = data["models"].as_array().expect("models");
     assert_eq!(models.len(), 6474);
     for (protocol, count) in [
-        ("openai-chat", 3853),
-        ("anthropic-messages", 38),
-        ("openai-responses", 119),
+        ("openai-chat", 3857),
+        ("anthropic-messages", 65),
+        ("openai-responses", 133),
     ] {
         assert_eq!(
             models
@@ -89,6 +89,22 @@ fn frozen_projection_counts_and_existing_provider_root_are_preserved() {
                 )
                 .count(),
             count
+        );
+    }
+    assert_eq!(
+        models
+            .iter()
+            .filter(|model| model.get("api_base_url").is_some())
+            .count(),
+        45
+    );
+    for model in models
+        .iter()
+        .filter(|model| model.get("api_base_url").is_some())
+    {
+        assert!(
+            model.get("protocol").is_some(),
+            "endpoint must retain its wire"
         );
     }
     let opencode = data["providers"]
