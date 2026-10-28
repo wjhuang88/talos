@@ -1,6 +1,6 @@
 # Iteration I309: Upgrade gix To Latest Stable 0.90.0
 
-> Document status: Review (implementation merged; baseline closure candidate pending review/CI/merge)
+> Document status: Complete (implementation and post-merge dependency baseline merged)
 > Published plan date: 2026-10-26
 > Planned objective: upgrade gix 0.87.1 to the latest observed stable, non-yanked 0.90.0 while preserving existing Git behavior and permission boundaries.
 > Baseline rule: preserve this target; append execution facts rather than rewriting acceptance.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | I309: gix 0.87.1 to 0.90.0 dependency graph, necessary consumer migrations, Git regression validation and dependency documentation; excludes Auto policy and search/provider implementation. |
@@ -19,7 +19,7 @@
 | Governance Claim PR | #774 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer explicitly requested latest gix upgrade; claim requires exact-head review, applicable CI, both validators and merge-time CAS. |
-| Implementation PR | #790 (merged as `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db`) |
+| Implementation PR | #790 (merged as `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db`); baseline #795 (merged as `958a391316c82181853d1df176687361b14ff82b`) |
 | Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Verified upgrade and existing implementation commit evidence; no release authorized. |
 
@@ -94,6 +94,28 @@ and necessary source migrations separately reviewable/revertible; revert the upg
 restore 0.87.1 without altering T7/T8 policy. Do not conceal a failed validation by narrowing scope.
 
 ## Evidence And Execution
+
+### Completion evidence — 2026-10-28
+
+Completion Commit: `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db`
+
+Implementation #790 and post-merge baseline #795 are both merged. Baseline #795
+head `4d4583105bd990ff49097b81fdc15d71130277b1` passed all eight exact-head jobs
+in [CI 40645856684](https://github.com/wjhuang88/talos/actions/runs/40645856684)
+and merged as `958a391316c82181853d1df176687361b14ff82b` after refreshed CAS.
+Independent static Agent review approved that exact head/base at
+https://github.com/wjhuang88/talos/pull/795#issuecomment-6463006022.
+The reviewer used the shared identity and ran no independent tests or advisory
+queries; this is not natural-person approval. The 83-record JSON snapshot names
+the merged implementation source, and its derived Markdown preserves human risk
+notes. Local/offline security and deprecation signals remain unknown; this
+completion does not claim vulnerability clearance or automatic dependency acceptance.
+Acceptance 1–3 is supported by the locked feature/workspace, all-feature, SDK and
+native CI evidence below; acceptance 4 by the recorded graph/MSRV/risk findings
+and baseline; acceptance 5 by exact-head review, CI and merge receipts for both PRs.
+No originating Issue exists (the request was made directly in the session).
+I308 and every later handoff task remain incomplete. Earlier pending statements
+below describe historical checkpoints, not the current delivery state.
 
 ### Merged implementation checkpoint — 2026-10-28
 
