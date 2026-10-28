@@ -1,6 +1,6 @@
 # PROVIDER-008-A: Protocol-Only Catalog Projection
 
-Carrier: endpoint data candidate on code PR #792 (`f43cd990`), with code-first merge required.
+Carrier: endpoint data candidate integrating merged code PR #792 (`e53c61c7`); fresh data-head CI required.
 The prior protocol-only data PR #775 merged as `6af8654c`. Historical stacked/Draft checkpoints
 remain below. This new data candidate is not independently activated; child A remains Review / Claimed.
 
@@ -492,3 +492,15 @@ waiver. B/C/D and active probing remain outside this claim. No completion or rel
 | zenmux | `minimax/minimax-m2.7` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
 | zenmux | `minimax/minimax-m2.7-highspeed` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
 | zenmux | `minimax/minimax-m3` | anthropic-messages | `https://zenmux.ai/api/anthropic/v1` |
+
+
+### Code-first Main Integration — 2026-10-28
+
+Code PR #792 merged as `e53c61c7f0344308a5c5535bb1521fefebbacc70` after exact-head
+CI3524 / run40628003993 passed all eight jobs and independent read-only Agent review approved.
+The endpoint data branch integrates that actual merged main before first publication. The additional
+main delta is #788's two Search backend files; no catalog/source regeneration or claim transfer is
+included. Final combined-tree test, standard preflight, independent object review and fresh data-head
+CI evidence are recorded in the data PR. Earlier failed local checks remain retained evidence.
+Status stays Review / Claimed, Completion Commit: Pending; seven unreviewed Copilot endpoints remain
+an acceptance residual. #724/#748 stay open, with no completion or release claim.

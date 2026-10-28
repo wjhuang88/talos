@@ -17,7 +17,7 @@
 | Claimed At | 2026-10-22 |
 | Source Issue | #748 |
 | Governance Claim PR | #747 |
-| Implementation PR | #749 (code), #775 (catalog data) |
+| Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child #748 records the bounded implementation requirement. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
 | Last Updated | 2026-10-28 |
@@ -525,3 +525,15 @@ family, not HTTP Chat. Neither distinction is a scope waiver or implementation c
 Keep Review / Claimed with Completion Commit: Pending until the remaining acceptance residual is
 resolved through implementation/confirmation or an explicit accepted scope decision. #724/#748 stay
 open; no sibling implementation or release is claimed.
+
+
+### Code-first Main Integration — 2026-10-28
+
+Code PR #792 merged as `e53c61c7f0344308a5c5535bb1521fefebbacc70` after exact-head
+CI3524 / run40628003993 passed all eight jobs and independent read-only Agent review approved.
+The endpoint data branch integrates that actual merged main before first publication. The additional
+main delta is #788's two Search backend files; no catalog/source regeneration or claim transfer is
+included. Final combined-tree test, standard preflight, independent object review and fresh data-head
+CI evidence are recorded in the data PR. Earlier failed local checks remain retained evidence.
+Status stays Review / Claimed, Completion Commit: Pending; seven unreviewed Copilot endpoints remain
+an acceptance residual. #724/#748 stay open, with no completion or release claim.
