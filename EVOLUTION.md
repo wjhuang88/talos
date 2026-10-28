@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-10-27 - Verify command review ownership through production dispatch
+
+- Trigger: I308 real Pull Auto acceptance test using generic registration.
+- Symptom: An externally registered GitPullTool received model command approval and executed, despite lacking built-in registration ownership.
+- Root cause: Command evidence was bound to its prepared plan but Agent dispatch forwarded it without the positive instance check already used by mutation, ordinary invocation and network review. Synthetic pipeline tests could not expose this composition gap.
+- Fix: Forward command review evidence only from a positively identified built-in instance; retain exact prepared admission and manual compatibility for other instances.
+- Prevention: Exercise actual registration, override and execution paths, including explicit human approval, instead of treating native provenance or producer evidence as built-in ownership.
+- Promoted to rule/check: `crates/talos-agent/src/tests/git_auto.rs`, real Pull model admission and external/replacement/manual compatibility scenarios.
+
 ## 2026-10-27 - Validate feature-gated consumers after changing shared review protocols
 
 - Trigger: I308 #783 CI failed two Desktop Auto fixtures on Linux and Windows after the full default-workspace preflight passed.

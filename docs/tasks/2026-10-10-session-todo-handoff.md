@@ -1,3 +1,33 @@
+## Active resume checkpoint — 2026-10-27 real Pull Auto ownership
+
+Active worktree `/private/tmp/talos-i308-save-active` now uses branch
+`feat/i308-git-auto-evidence`, stacked on Save PR #785 final head `4e869fd9a`.
+Save full preflight/SDK/xwin and static review passed; exact-head CI
+40525328345 was last confirmed pending. No merge is claimed.
+
+Real registered Pull Auto testing found external/replacement GitPullTool instances
+could receive model command evidence without positive built-in ownership. The
+dispatch fix `115b302ad` forwards that evidence only for registered built-in instances,
+retaining exact prepared/manual admission for other tools. Ten real local Git
+scenarios cover model allow/human/error/stale, Deny/mandatory-human, external and
+replacement refusal plus their explicit manual compatibility. The focused test
+and full Agent library suite (511/511) pass. Assessor assertion-reached counters
+prevent caught panics from masquerading as refusal evidence. Independent static
+review approved the executable delta. Initial full preflight exposed three Runtime
+fixtures that registered caller-owned tools but expected builtin Auto trust. Commit
+`e14c76164289ece98111d8725b263e57fd033359` switches them to production
+shared composition and explicitly enables its feature in Windows focused CI.
+Focused Runtime tests passed 3/3; fresh full standard preflight passed, including
+all workspace tests and external Runtime SDK execution (log:
+`/private/tmp/i308-git-auto-preflight-retry.log`). The workspace run actually
+executed those three Runtime tests. Agent/Runtime tests with shared composition
+passed Windows cargo-xwin check (log: `/private/tmp/i308-git-auto-xwin.log`).
+Both governance validators, format and CI classifier 15/15 passed. Independent
+static review approved exact `e14c76164` against previously reviewed `706ef86b2`;
+it did not independently execute tests. Pull ownership is published as stacked
+PR #786; native CI and merge remain outstanding. Save #785 final-head CI 40525328345 is running, not merged. T8 and
+all later tasks remain incomplete; original queue and acceptance are unchanged.
+
 ## Active resume checkpoint — 2026-10-27 cache/worktree cleanup
 
 Active branch: `feat/i308-save-auto`; worktree:

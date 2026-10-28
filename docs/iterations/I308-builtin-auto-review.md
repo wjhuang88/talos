@@ -24,6 +24,16 @@ CI/merge in #785, complete operation/profile reconciliation and final H/G
 acceptance remain outstanding. Guarded search cannot downgrade. The original
 acceptance and remaining handoff queue are unchanged.
 
+Pull ownership follow-up implementation `115b302ad` and production Runtime fixture
+correction `e14c76164289ece98111d8725b263e57fd033359` are locally validated.
+Full standard preflight passed, including workspace execution of the three real
+Runtime Pull tests and external SDK consumer. Explicit shared-composition Runtime
+focused tests passed 3/3; Agent/Runtime Windows tests passed cargo-xwin check.
+Both governance validators and independent exact-head static security/API review
+passed. Logs: `/private/tmp/i308-git-auto-preflight-retry.log` and
+`/private/tmp/i308-git-auto-xwin.log`. The reviewer did not run tests. Publication,
+native CI and merge in stacked PR #786 remain pending; no full T8 completion is claimed.
+
 ### Earlier merged-stage checkpoint — 2026-10-26
 
 Foundation #769 merged as `d45d08f0a82706c2abb26fcb32899f8b24fa64b1`.
@@ -63,7 +73,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, open) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, open); #786 (Pull Auto instance ownership, open) |
 | Last Updated | 2026-10-27 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
@@ -1491,3 +1501,29 @@ production composition before closing each row.
 | 5, higher-risk recovery | Reconcile `edit_auto`, mutation pipeline/recovery tests and Save recovery: special/config/security paths, destructive operation, partial failure, cancellation and stale target. Record unsupported native rename/batch inventory rather than inventing tools or rollback guarantees. |
 | 6, host reachability | Inspect CLI/Runtime/Desktop/MCP actual resolver installation and visible decisions, beyond registry equality; match applicable feature/native Windows evidence to these paths. |
 | 7, delivery gates | Save preflight/SDK/xwin, stable stage publication, exact-head native CI/review/CAS; then full H/G owner and user-doc reconciliation with implementation SHAs before Complete. |
+
+### Real Pull Auto ownership follow-up — 2026-10-27
+
+Production dispatch testing exposed a gap not covered by synthetic prepared-command
+pipeline fixtures: a real external/replacement GitPullTool could reach model command
+review because evidence forwarding omitted positive built-in ownership. Commit `115b302ad`
+filters evidence at Agent registry dispatch; external instances retain exact
+prepared manual admission, including successful explicit human approval. The
+public pipeline API remains a trusted embedder surface, now documented accordingly.
+
+The new separate `git_auto.rs` test exercises ten real local Pull scenarios with
+actual HEAD/worktree effects, zero retained grants, assessor assertion-reached
+checks and explicit discovery-only human fallback. Model allow executes; model
+human/error/stale, explicit Deny/mandatory-human and unregistered/replacement
+instances cannot silently execute. Explicit manual external/replacement approval
+still succeeds. Focused tests and full Agent library 511/511 pass; independent
+static security/API review approved the working delta without running tests.
+Agent library/test Clippy passed. Full standard preflight failed three Runtime
+Pull integration tests because caller `.tool(...)` registration no longer inherits
+builtin Auto trust. The fixtures now select production `.shared_tools()` registration;
+the focused Windows CI command explicitly enables `shared-composition` so this
+feature-gated suite cannot silently disappear there. Focused rerun passed 3/3; both
+governance validators passed. Fresh full preflight and Agent/Runtime Windows test
+cross-check passed; independent static review approved exact `e14c76164`. Native
+CI, publication and merge remain pending. This narrows a real registration trust gap; it does not add model
+Auto support to Add/Commit/Push/Checkout or complete profile/search/G acceptance.

@@ -930,7 +930,9 @@ impl Agent {
                                 authorization_request,
                                 user_intent,
                                 plan,
-                                evidence.as_ref(),
+                                evidence
+                                    .as_ref()
+                                    .filter(|_| registry.is_builtin_instance(&call.name)),
                             )
                             .await
                     };

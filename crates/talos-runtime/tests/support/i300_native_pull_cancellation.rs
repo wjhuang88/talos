@@ -51,7 +51,7 @@ async fn interrupt_running_pull_closes_hook_descendants_and_preserves_completed_
             allowed: true,
             assessor_failure: false,
         }))
-        .tool(Arc::new(talos_tools::git::GitPullTool::new(work.clone())))
+        .shared_tools()
         .approval_handler(Arc::new(Human {
             final_approvals: Arc::new(AtomicUsize::new(0)),
             allow_final: false,

@@ -542,6 +542,10 @@ impl PermissionPipeline {
     }
 
     /// Admits a retained command with producer evidence bound to the same plan.
+    ///
+    /// The caller must trust the evidence producer. Agent registry dispatch only
+    /// forwards command evidence from positively identified built-in instances;
+    /// a native provenance label or matching tool name does not establish trust.
     pub async fn authorize_prepared_plan_with_evidence(
         &self,
         authorization: PermissionAuthorizationRequest<'_>,

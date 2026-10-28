@@ -1,4 +1,5 @@
 //! Real Runtime -> Agent -> provider Auto -> supervised Git, using local repositories.
+#![cfg(feature = "shared-composition")]
 
 use async_trait::async_trait;
 use serde_json::{Value, json};
@@ -236,7 +237,7 @@ async fn runtime_pull_executes_auto_or_human_fallback_and_preserves_explicit_pol
                 allowed: !no_fetch && !conflict,
                 assessor_failure,
             }))
-            .tool(Arc::new(talos_tools::git::GitPullTool::new(work.clone())))
+            .shared_tools()
             .approval_handler(Arc::new(Human {
                 final_approvals: final_approvals.clone(),
                 allow_final: human_only || assessor_failure,

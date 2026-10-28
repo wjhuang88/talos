@@ -1,4 +1,5 @@
 #![allow(warnings)]
+mod git_auto;
 mod network_invocation;
 mod ordinary_auto;
 mod ordinary_http_auto;
