@@ -108,6 +108,8 @@ impl AgentTool for GuardedSearchRouterTool {
 mod tests {
     use std::time::Duration;
 
+    use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization};
+
     use super::*;
 
     fn tool() -> GuardedSearchRouterTool {
@@ -129,12 +131,20 @@ mod tests {
     #[test]
     fn seam_preserves_web_search_contract_without_registration_or_ambient_selection() {
         let tool = tool();
-        assert_eq!(tool.name(), "web_search");
-        assert_eq!(tool.nature(), ToolNature::Network);
-        assert_eq!(tool.family(), ToolFamily::Network);
-        assert_eq!(tool.summary_fields(), &["query"]);
-        assert!(tool.requires_network_invocation());
-        assert_eq!(tool.parameters(), talos_core::tool_parameters!(WebSearchInput));
+        let object: &dyn AgentTool = &tool;
+        assert_eq!(object.name(), "web_search");
+        assert_eq!(object.nature(), ToolNature::Network);
+        assert_eq!(object.family(), ToolFamily::Network);
+        assert_eq!(object.summary_fields(), &["query"]);
+        assert!(!object.is_read_only());
+        assert!(object.requires_network_invocation());
+        assert!(!object.requires_original_invocation());
+        assert_eq!(object.parameters(), talos_core::tool_parameters!(WebSearchInput));
+        assert!(
+            object.permission_profile(&input("q"))[0]
+                .resource
+                .is_none()
+        );
         assert_eq!(format!("{tool:?}"), "GuardedSearchRouterTool(<redacted>)");
     }
 
@@ -155,26 +165,49 @@ mod tests {
         assert_eq!(first.manifest().scope().endpoints().len(), 4);
         assert_eq!(first.permission_profile(), second.permission_profile());
         assert_eq!(first.permission_profile().len(), 4);
+        assert!(!format!("{:?}", first.manifest()).contains("first private query"));
     }
 
     #[test]
     fn malformed_and_blank_inputs_fail_before_network_admission() {
         let tool = tool();
-        assert!(matches!(
-            tool.prepare_network_invocation(&serde_json::json!({"query": 7})),
-            Err(ToolNetworkPreparationError::Invalid)
-        ));
-        assert!(matches!(
-            tool.prepare_network_invocation(&input("   ")),
-            Err(ToolNetworkPreparationError::Invalid)
-        ));
+        for invalid in [serde_json::json!({"query": 7}), input("   ")] {
+            assert!(matches!(
+                tool.prepare_network_invocation(&invalid),
+                Err(ToolNetworkPreparationError::Invalid)
+            ));
+        }
     }
 
     #[tokio::test]
-    async fn direct_execute_stays_fail_closed() {
+    async fn every_legacy_execution_surface_stays_fail_closed() {
         let tool = tool();
-        let output = tool.execute(input("rust")).await;
-        assert!(output.result.is_error);
-        assert_eq!(output.result.content, "search_prepared_invocation_required");
+        let object: &dyn AgentTool = &tool;
+        let input = input("rust");
+        let workspace = tempfile::tempdir().expect("workspace");
+        let paths = [ToolExecutionAuthorization::for_path(
+            "web_search",
+            ToolNature::Network,
+            workspace.path(),
+            ".",
+            ToolAuthorizationScope::Once,
+        )
+        .expect("path authorization")];
+
+        for result in [
+            object.execute(input.clone()).await,
+            object.execute_authorized(input.clone(), &paths).await,
+        ] {
+            assert!(result.is_error);
+            assert_eq!(result.content, "search_prepared_invocation_required");
+        }
+        for output in [
+            object.execute_with_output(input.clone()).await,
+            object.execute_authorized_with_output(input, &paths).await,
+        ] {
+            assert!(output.result.is_error);
+            assert_eq!(output.result.content, "search_prepared_invocation_required");
+            assert!(output.next_provider_parts.is_empty());
+        }
     }
 }
