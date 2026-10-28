@@ -1,4 +1,13 @@
-## Active resume checkpoint — 2026-10-28 merged stages and upgrade validation
+## Active resume checkpoint — 2026-10-28 remote base advance
+
+Fetch confirmed main advanced to `32b5579bcdb9b14e27e7a2b24b7a6a1c9c0aa7d9`
+through I293 PR #788. I309 #790 still retains head `3c5a3276c` on the prior
+base; rebase, fresh validation and final review are required before merge.
+CI 40624815706 passed the main Unix job; Windows remains in progress.
+Local owner reconciliation passed both governance validators and diff checks.
+I309 and the full T8 → T2/T3 → T4 → T5 → T1 → T6 queue remain incomplete.
+
+## Historical checkpoint — 2026-10-28 merged stages and upgrade validation
 
 Pull #786 and legacy search disposition #789 merged as
 `652749f42b7dac0d1ab9a665a4c54e6e48576312` and
@@ -8,10 +17,11 @@ delivery; T8 and subsequent T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
 Active worktree `/private/tmp/talos-i308-save-active`, branch
 `feat/i309-gix-090-current`, is rebased onto that main. The unmerged gix upgrade
 passes current-base all-feature workspace check, Clippy and tests. I309 records
-validation commit `83fbe9c05`; standard preflight is still running. Independent
-static review approved source head `9a0aae053` against `e03a29842`; current
-checkpoint changes only the owner evidence. Native exact-head CI, final review
-reconciliation, merge and accepted-baseline advancement remain outstanding.
+validation commit `83fbe9c05`; standard preflight passed, including both external
+Runtime SDK modes. Independent static review reconciled exact candidate
+`3c5a3276c` against `e03a29842`; its receipt is recorded on PR #790. Native
+exact-head CI run 40624815706, merge CAS, merge and accepted-baseline advancement
+remain outstanding.
 Earlier resume checkpoints below are historical.
 
 ## Historical checkpoint — 2026-10-28 rebased Pull and profile follow-up

@@ -19,8 +19,8 @@
 | Governance Claim PR | #774 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer explicitly requested latest gix upgrade; claim requires exact-head review, applicable CI, both validators and merge-time CAS. |
-| Implementation PR | Not started |
-| Last Updated | 2026-10-26 |
+| Implementation PR | #790 (open; exact-head CI pending) |
+| Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Verified upgrade and existing implementation commit evidence; no release authorized. |
 
 Claim and activation became effective when governance-only #774 merged at
@@ -94,6 +94,23 @@ and necessary source migrations separately reviewable/revertible; revert the upg
 restore 0.87.1 without altering T7/T8 policy. Do not conceal a failed validation by narrowing scope.
 
 ## Evidence And Execution
+
+### Current validation checkpoint — 2026-10-28
+
+Candidate #790 at `3c5a3276c73d1183acf79bc5ee0d7e8e401358f6` targets
+main `e03a2984267eacbd4f65d0085be1d028a8c420ed`. Main then advanced via I293
+PR #788 to `32b5579bcdb9b14e27e7a2b24b7a6a1c9c0aa7d9`, so this candidate
+requires rebase and fresh exact-head validation. Full locked standard
+preflight passed, including both external Runtime SDK modes, in
+`/private/tmp/i309-rebased-preflight.log`. Current-base all-feature workspace
+check, warnings-denied Clippy, tests and both governance validators passed.
+Independent Agent static security/API review approved this exact candidate;
+the reviewer did not run tests or independently reproduce historical advisory
+evidence. The receipt is recorded on #790. Run 40624815706 passed its main Unix
+job; Windows workspace validation remains in progress against the prior base.
+Merge CAS, implementation merge and post-merge accepted-baseline advancement
+remain required. I309 remains incomplete. Earlier checkpoints below
+are historical and do not override this record.
 
 - Initial observation: clean main source `881a27b890e5310055380e6e3f5b0da78f9fdd3c`; current manifest/lock gix 0.87.1.
 - crates.io sparse index `https://index.crates.io/3/g/gix`, fetched 2026-10-26: latest stable non-yanked 0.90.0, declared Rust 1.88. This is registry evidence, not a validated graph/MSRV result.
