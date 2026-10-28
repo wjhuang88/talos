@@ -727,24 +727,19 @@ install does not need a manual catalog initialization step: Talos does not creat
 `catalog.db` for model metadata. Model/provider metadata updates are build-time only through
 `BUILD_MODELS=1`; the legacy `--import-models` flag is kept as a no-op compatibility notice.
 
-The current I300 development candidate treats `git_add` paths literally, relative to
-the workspace. It first requests dedicated Git configuration-chain discovery
-permission, then separately authorizes the resulting staging plan. Configuration
-values remain internal. Discovery requires host Git support for `git var
-GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`. Unsupported filters, hooks, fsmonitor,
-object alternates, and split indexes are refused; any fallback requires separate
-authorization. The unpublished Unix candidate includes prepared Add, Commit,
-nonrecursive Checkout, limited Push and native Pull execution. Pull first authorizes
-configuration discovery, then one frozen command and its transitive effects
-(including network, merge/rebase, recursion and configured programs). It does not
-promise per-path or endpoint confinement. Compatible Auto review can approve the
-whole command once; explicit Deny and human-only policies retain authority.
-Conflicts and failures may leave fetched objects and partial integration state;
-Talos does not automatically reset or repair them. This remains an unpublished
-candidate pending final security, CI and native Windows acceptance.
-The Windows production preparation gate is removed in this candidate and the MSVC
-test targets cross-compile with `cargo xwin`; native Windows execution and exact-head
-CI are still unverified. T7 is not complete. See the [I300 migration inventory](docs/reference/I300-GIT-AUTHORIZATION-MIGRATION.md).
+Talos uses gix 0.90.0 for local repository inspection and uses prepared, permission-gated
+Add/Commit, Checkout, Push and Pull operations for Git changes. Pull authorizes one frozen
+whole command and its transitive effects; it does not promise per-path or endpoint confinement.
+Explicit Deny and human-only policy remain binding. Conflicts and failures may leave partial Git
+effects; Talos does not automatically reset or repair them. Direct mutation calls without a
+prepared authorization plan are refused.
+
+This gix upgrade does not remove the host Git dependency: admitted mutation and transport paths
+still invoke Git for native behavior, and some configuration discovery also depends on Git. No
+removal date is established. T7/I300 is complete at #735; broader built-in Auto behavior remains
+active in I308/T8. See the [I300 migration inventory](docs/reference/I300-GIT-AUTHORIZATION-MIGRATION.md)
+and [GIT-001](docs/backlog/active/GIT-001-embedded-git-tools.md) for the remaining operation
+boundary.
 
 On the tested Git for Windows build, default `git://` Push hangs even outside
 Talos. Explicit repository configuration `git config sendpack.sideband false`

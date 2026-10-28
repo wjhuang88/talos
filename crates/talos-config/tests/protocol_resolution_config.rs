@@ -95,9 +95,11 @@ fn preview_and_active_protocol_use_the_same_model_override_without_mutation() {
 }
 
 fn config_with_provider(name: &str, provider: ProviderConfig) -> Config {
-    let mut config = Config::default();
-    config.provider = name.to_string();
-    config.model = "test-model".to_string();
+    let mut config = Config {
+        provider: name.to_string(),
+        model: "test-model".to_string(),
+        ..Default::default()
+    };
     config.providers.insert(name.to_string(), provider);
     config
 }

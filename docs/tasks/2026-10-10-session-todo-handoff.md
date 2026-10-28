@@ -1,4 +1,46 @@
-## Active resume checkpoint — 2026-10-28 rebased Pull and profile follow-up
+## Active resume checkpoint — 2026-10-28 remote base advance
+
+Local I309 source is rebased onto main
+`e53c61c7f0344308a5c5535bb1521fefebbacc70` after PR #792. Commit
+`df955c2a2` removes a redundant fixture `format!` while preserving the emitted
+environment placeholder. Current-base locked all-target/all-feature check,
+warnings-denied Clippy and full all-feature workspace tests passed; the tests
+passed in approved host execution, including the process-observation test that
+previously failed under sandbox EPERM. Logs are recorded in the I309 owner.
+Both governance validators passed. Standard preflight passed exit 0, including
+both external Runtime SDK modes, log `/private/tmp/i309-e53-preflight-host.log`.
+Independent static review approved exact candidate `79f56c1ee` against main e53;
+the reviewer did not run tests.
+
+PR #790's last published head is `a9d5623c7`; older head `3c5a3276c` passed all
+eight gates in CI 40624815706, including native Windows. Those results and earlier
+static approvals do not certify the latest rebased candidate. Final evidence
+reconciliation, publication, CI, merge and accepted
+dependency-baseline advancement remain pending.
+
+Requested `cargo clean --locked` removed 26,276 files / 15.0 GiB. Only root and
+active `/private/tmp/talos-i308-save-active` worktrees remain; neither is stale,
+and prune dry-run is empty. Builds are regenerating the active target directory.
+I309 and the full T8 → T2/T3 → T4 → T5 → T1 → T6 queue remain incomplete.
+
+## Historical checkpoint — 2026-10-28 merged stages and upgrade validation
+
+Pull #786 and legacy search disposition #789 merged as
+`652749f42b7dac0d1ab9a665a4c54e6e48576312` and
+`e03a2984267eacbd4f65d0085be1d028a8c420ed`. I308 records the bounded
+delivery; T8 and subsequent T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
+
+Active worktree `/private/tmp/talos-i308-save-active`, branch
+`feat/i309-gix-090-current`, is rebased onto that main. The unmerged gix upgrade
+passes current-base all-feature workspace check, Clippy and tests. I309 records
+validation commit `83fbe9c05`; standard preflight passed, including both external
+Runtime SDK modes. Independent static review reconciled exact candidate
+`3c5a3276c` against `e03a29842`; its receipt is recorded on PR #790. Native
+exact-head CI run 40624815706, merge CAS, merge and accepted-baseline advancement
+remain outstanding.
+Earlier resume checkpoints below are historical.
+
+## Historical checkpoint — 2026-10-28 rebased Pull and profile follow-up
 
 Save #785 merged as `f0d484b255bf766eafb1573bd0870ef38ae8de77`.
 Pull #786 now targets main with exact candidate

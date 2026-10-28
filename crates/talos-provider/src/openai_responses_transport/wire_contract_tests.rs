@@ -1,21 +1,14 @@
-//! Standalone contract tests for OpenAI Responses HTTP/SSE transport before runtime activation.
+//! Recorded wire contracts exercised against the production transport.
 
-#[path = "../src/openai_responses_reasoning.rs"]
-mod openai_responses_reasoning;
-#[path = "../src/openai_responses_sse.rs"]
-mod openai_responses_sse;
-#[path = "../src/openai_responses_transport.rs"]
-mod openai_responses_transport;
-#[path = "../src/stream_utf8.rs"]
-mod stream_utf8;
+use crate::openai_responses_reasoning;
 
 #[test]
 fn synthetic_parallel_wire_preserves_each_call_across_byte_splits() {
-    use openai_responses_sse::ResponsesStreamOutput;
+    use crate::openai_responses_sse::ResponsesStreamOutput;
     use talos_core::message::{AgentEvent, StopReason};
-    let wire = include_bytes!("fixtures/responses_parallel.synthetic.sse");
+    let wire = include_bytes!("../../tests/fixtures/responses_parallel.synthetic.sse");
     for size in [1, 7, wire.len()] {
-        let mut decoder = openai_responses_transport::ResponsesSseDecoder::new();
+        let mut decoder = super::ResponsesSseDecoder::new();
         let mut outputs = Vec::new();
         for chunk in wire.chunks(size) {
             outputs.extend(decoder.push(chunk));
@@ -52,10 +45,11 @@ fn synthetic_parallel_wire_preserves_each_call_across_byte_splits() {
 
 #[test]
 fn upstream_sdk_recorded_turns_preserve_tools_reasoning_and_usage() {
-    use openai_responses_sse::ResponsesStreamOutput;
+    use crate::openai_responses_sse::ResponsesStreamOutput;
     use talos_core::message::{AgentEvent, ReasoningBlock, StopReason};
-    let fixture =
-        include_str!("fixtures/vercel-ai/openai-reasoning-encrypted-content.1.chunks.txt");
+    let fixture = include_str!(
+        "../../tests/fixtures/vercel-ai/openai-reasoning-encrypted-content.1.chunks.txt"
+    );
     let mut wire = String::new();
     let mut expected_summary = String::new();
     let mut expected_text = String::new();
@@ -78,7 +72,7 @@ fn upstream_sdk_recorded_turns_preserve_tools_reasoning_and_usage() {
         if event["type"] != "response.completed" {
             continue;
         }
-        let mut decoder = openai_responses_transport::ResponsesSseDecoder::new();
+        let mut decoder = super::ResponsesSseDecoder::new();
         let mut outputs = Vec::new();
         for chunk in wire.as_bytes().chunks(7) {
             outputs.extend(decoder.push(chunk));
@@ -162,15 +156,15 @@ fn upstream_sdk_recorded_turns_preserve_tools_reasoning_and_usage() {
 
 #[test]
 fn upstream_sdk_recorded_error_never_becomes_success() {
-    use openai_responses_sse::ResponsesStreamOutput;
+    use crate::openai_responses_sse::ResponsesStreamOutput;
     use talos_core::message::AgentEvent;
-    let fixture = include_str!("fixtures/vercel-ai/openai-error.1.chunks.txt");
+    let fixture = include_str!("../../tests/fixtures/vercel-ai/openai-error.1.chunks.txt");
     let wire: String = fixture
         .lines()
         .filter(|line| !line.trim().is_empty())
         .map(|line| format!("data: {line}\n\n"))
         .collect();
-    let mut decoder = openai_responses_transport::ResponsesSseDecoder::new();
+    let mut decoder = super::ResponsesSseDecoder::new();
     let mut outputs = Vec::new();
     for chunk in wire.as_bytes().chunks(1) {
         outputs.extend(decoder.push(chunk));

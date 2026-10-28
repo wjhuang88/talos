@@ -1,5 +1,18 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Current delivery checkpoint — 2026-10-28
+
+Pull #786 merged as `652749f42b7dac0d1ab9a665a4c54e6e48576312`; all eight
+exact-head CI checks passed in run 40610739691. Legacy search disposition #789
+merged as `e03a2984267eacbd4f65d0085be1d028a8c420ed`; all eight exact-head
+checks passed in run 40611467832. Both stages passed full local locked preflight.
+The search cases prove refusal of unavailable legacy search, not working search
+delivery. I293 retains search implementation ownership.
+
+T8 remains Active / Partial. Add/Commit/Push/Checkout model Auto evidence and
+remaining higher-risk recovery/profile/host acceptance are unfinished. The
+T2/T3 → T4 → T5 → T1 → T6 queue is unchanged. Earlier checkpoints are historical.
+
 ## Current delivery checkpoint — 2026-10-27
 
 I308/T8 remain Active / Partial. Ordinary Shell/Exec/HTTP #783 merged as
@@ -77,8 +90,8 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, open); #786 (Pull Auto instance ownership, open) |
-| Last Updated | 2026-10-27 |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, merged); #786 (Pull Auto instance ownership, merged); #789 (legacy search refusal evidence, merged) |
+| Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
 This governance candidate proposes claim and activation atomically in #765. Both are ineffective

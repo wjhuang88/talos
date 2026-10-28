@@ -9,7 +9,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-gix = { version = "0.87.1", default-features = false, features = ["basic", "status", "revision", "blob-diff", "index", "sha1"] }
+gix = { version = "0.90.0", default-features = false, features = ["basic", "status", "revision", "blob-diff", "index", "sha1"] }
 talos-core = { version = "0.10.1", path = "../talos-core" }
 talos-permission = { version = "0.10.1", path = "../talos-permission" }
 talos-conversation = { version = "0.10.1", path = "../talos-conversation" }

@@ -680,7 +680,7 @@ impl GitDiffTool {
 
             // Git paths are byte strings. Never use a lossy display conversion for
             // an object lookup or a filesystem access: distinct entries may collapse.
-            let path = gix::path::try_from_bstr(path_bytes.as_bstr())
+            let path = gix::path::from_bstr(path_bytes.as_bstr())
                 .map_err(|e| GitToolError::Git(format!("unrepresentable diff path: {e}")))?;
             let path_str = diff_path_label(&path_bytes);
 

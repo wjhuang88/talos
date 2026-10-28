@@ -26,7 +26,7 @@ const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 pub(crate) enum AppEvent {
     UserInput(String),
     UserInterrupt,
-    ApprovalRequested(TerminalApprovalRequest),
+    ApprovalRequested(Box<TerminalApprovalRequest>),
     AgentTextDelta(String),
     AgentToolCall {
         id: String,
@@ -159,7 +159,10 @@ impl EventLoop {
         let event_tx_approval = event_tx.clone();
         tokio::spawn(async move {
             while let Some(request) = approval_rx.recv().await {
-                if event_tx_approval.send(ApprovalRequested(request)).is_err() {
+                if event_tx_approval
+                    .send(ApprovalRequested(Box::new(request)))
+                    .is_err()
+                {
                     break;
                 }
             }
@@ -253,7 +256,7 @@ impl EventLoop {
         let event = match event {
             ApprovalRequested(request) => {
                 if matches!(self.state, AppState::AgentRunning { .. }) {
-                    self.approval_queue.push_back(request);
+                    self.approval_queue.push_back(*request);
                     self.render_active_approval();
                 } else {
                     let _ = request.response.send(talos_core::ApprovalChoice::Deny);

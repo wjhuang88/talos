@@ -76,9 +76,9 @@ fn image_and_native_read_round(catalog: bool) {
         std::fs::write(config_dir.join("config.toml"), "provider = \"neon\"\nmodel = \"gpt-5-2\"\n[providers.neon]\nbase_url = \"${NEON_AI_GATEWAY_BASE_URL}/v1\"\napi_key_env = \"NEON_AI_GATEWAY_TOKEN\"\n").expect("catalog-routed config without model protocol/endpoint overrides");
         ("/openai/v1/responses", "gpt-5-2")
     } else {
-        std::fs::write(config_dir.join("config.toml"), format!(
-        "provider = \"fixture\"\nmodel = \"test-model\"\n[providers.fixture]\nprotocol = \"openai-chat\"\nbase_url = \"http://127.0.0.1:9/provider\"\napi_key = \"test-key\"\n[providers.fixture.models.test-model]\nbase_url = \"${{TALOS_MODEL_ENDPOINT_TEST}}/model-wire\"\nprotocol = \"openai-responses\"\nimage_input = true\n"
-    )).expect("config");
+        std::fs::write(config_dir.join("config.toml"),
+            "provider = \"fixture\"\nmodel = \"test-model\"\n[providers.fixture]\nprotocol = \"openai-chat\"\nbase_url = \"http://127.0.0.1:9/provider\"\napi_key = \"test-key\"\n[providers.fixture.models.test-model]\nbase_url = \"${TALOS_MODEL_ENDPOINT_TEST}/model-wire\"\nprotocol = \"openai-responses\"\nimage_input = true\n"
+        ).expect("config");
         ("/model-wire/responses", "test-model")
     };
     let server = std::thread::spawn(move || {

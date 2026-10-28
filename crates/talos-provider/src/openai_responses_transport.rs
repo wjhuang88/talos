@@ -376,3 +376,7 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+#[path = "openai_responses_transport/wire_contract_tests.rs"]
+mod wire_contract_tests;

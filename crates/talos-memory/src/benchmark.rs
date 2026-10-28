@@ -373,7 +373,9 @@ fn report_value() -> serde_json::Value {
 }
 
 fn report_json() -> String {
-    serde_json::to_string_pretty(&report_value()).expect("benchmark report serializes")
+    let mut report = report_value();
+    report.sort_all_objects();
+    serde_json::to_string_pretty(&report).expect("benchmark report serializes")
 }
 
 #[cfg(test)]
