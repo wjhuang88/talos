@@ -139,7 +139,10 @@ mod tests {
         assert!(!object.is_read_only());
         assert!(object.requires_network_invocation());
         assert!(!object.requires_original_invocation());
-        assert_eq!(object.parameters(), talos_core::tool_parameters!(WebSearchInput));
+        assert_eq!(
+            object.parameters(),
+            talos_core::tool_parameters!(WebSearchInput)
+        );
         assert!(object.permission_profile(&input("q"))[0].resource.is_none());
         assert_eq!(format!("{tool:?}"), "GuardedSearchRouterTool(<redacted>)");
     }
@@ -157,7 +160,10 @@ mod tests {
             .expect("prepared");
 
         assert_eq!(first.manifest().scope(), second.manifest().scope());
-        assert_ne!(first.manifest().invocation_id(), second.manifest().invocation_id());
+        assert_ne!(
+            first.manifest().invocation_id(),
+            second.manifest().invocation_id()
+        );
         assert_eq!(first.manifest().scope().endpoints().len(), 4);
         assert_eq!(first.permission_profile(), second.permission_profile());
         assert_eq!(first.permission_profile().len(), 4);
