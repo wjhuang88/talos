@@ -322,10 +322,22 @@ impl ServerHandler for TalosMcpHandler {
                             let profile = operation.permission_profile().to_vec();
                             // A matching name or caller-provided provenance cannot
                             // establish ownership of automatic-review evidence.
-                            let evidence = operation.prepared_command_evidence()
-                                .filter(|_| registered_builtin);
+                            let evidence = operation.prepared_command_evidence();
+                            let mutation = operation.prepared_file_mutation_evidence();
+                            let configuration = operation.invocation_review_configuration();
+                            if usize::from(evidence.is_some()) + usize::from(mutation.is_some())
+                                + usize::from(configuration.is_some()) > 1 {
+                                return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
+                                    "ambiguous prepared review evidence", None));
+                            }
+                            let review = super::permission::PreparedReview {
+                                plan: &plan,
+                                command: evidence.as_ref().filter(|_| registered_builtin),
+                                mutation: mutation.as_ref().filter(|_| registered_builtin),
+                                builtin: registered_builtin,
+                            };
                             let admission = self.permission_gate
-                                .authorize_prepared_command_until(&hook_context, &talos_request, &profile, (&plan, evidence.as_ref(), registered_builtin), prepared_permission_deadline_at).await?;
+                                .authorize_prepared_command_until(&hook_context, &talos_request, &profile, review, prepared_permission_deadline_at).await?;
                             if context.ct.is_cancelled() || tokio::time::Instant::now() >= prepared_invocation_deadline_at {
                                 return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
                                     "prepared invocation cancelled or expired; effects may be incomplete", None));

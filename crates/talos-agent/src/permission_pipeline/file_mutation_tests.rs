@@ -93,23 +93,35 @@ async fn mutation_admission_requires_instance_ownership_and_matching_plan() {
             path.to_string_lossy(),
             ToolResourceKind::Path,
         )];
-        let result = pipeline
-            .authorize_registered_file_mutation(
-                PermissionAuthorizationRequest {
-                    tool_name: "edit",
-                    provenance: ToolProvenance::Native,
-                    profile: &facets,
-                    input: &input,
-                    presentation_input: serde_json::json!({"path":"<redacted>"}),
-                    summary_fields: vec![],
-                    deadline: Duration::from_secs(2),
-                },
-                Some("replace the old greeting"),
-                &plan,
-                &evidence,
-                builtin,
-            )
-            .await;
+        let authorization = PermissionAuthorizationRequest {
+            tool_name: "edit",
+            provenance: ToolProvenance::Native,
+            profile: &facets,
+            input: &input,
+            presentation_input: serde_json::json!({"path":"<redacted>"}),
+            summary_fields: vec![],
+            deadline: Duration::from_secs(2),
+        };
+        let result = if builtin {
+            pipeline
+                .authorize_prepared_file_mutation(
+                    authorization,
+                    Some("replace the old greeting"),
+                    &plan,
+                    &evidence,
+                )
+                .await
+        } else {
+            pipeline
+                .authorize_registered_file_mutation(
+                    authorization,
+                    Some("replace the old greeting"),
+                    &plan,
+                    &evidence,
+                    false,
+                )
+                .await
+        };
         assert_eq!(
             calls.load(Ordering::SeqCst),
             usize::from(builtin && matching)

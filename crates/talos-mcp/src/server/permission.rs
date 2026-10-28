@@ -23,6 +23,13 @@ pub struct McpPermissionGate {
     user_intent: Option<String>,
 }
 
+pub(super) struct PreparedReview<'a> {
+    pub plan: &'a talos_core::tool::PreparedPlanIdentity,
+    pub command: Option<&'a talos_core::tool::PreparedCommandEvidence>,
+    pub mutation: Option<&'a talos_core::tool::PreparedFileMutationEvidence>,
+    pub builtin: bool,
+}
+
 impl McpPermissionGate {
     /// Creates a permission gate backed by Talos permission and hook systems.
     #[must_use]
@@ -151,7 +158,12 @@ impl McpPermissionGate {
             hook_context,
             request,
             profile,
-            (plan, None, false),
+            PreparedReview {
+                plan,
+                command: None,
+                mutation: None,
+                builtin: false,
+            },
             deadline_at,
         )
         .await
@@ -162,11 +174,7 @@ impl McpPermissionGate {
         hook_context: &HookContext,
         request: &McpCallRequest,
         profile: &[ToolPermissionFacet],
-        prepared: (
-            &talos_core::tool::PreparedPlanIdentity,
-            Option<&talos_core::tool::PreparedCommandEvidence>,
-            bool,
-        ),
+        prepared: PreparedReview<'_>,
         deadline_at: tokio::time::Instant,
     ) -> Result<talos_permission::AdmittedInvocation, McpError> {
         match self
@@ -189,11 +197,7 @@ impl McpPermissionGate {
         hook_context: &HookContext,
         request: &McpCallRequest,
         profile: &[ToolPermissionFacet],
-        prepared: Option<(
-            &talos_core::tool::PreparedPlanIdentity,
-            Option<&talos_core::tool::PreparedCommandEvidence>,
-            bool,
-        )>,
+        prepared: Option<PreparedReview<'_>>,
         prepared_deadline_at: Option<tokio::time::Instant>,
     ) -> Result<McpAdmission, McpError> {
         let deadline_at = prepared_deadline_at.unwrap_or_else(|| self.prepared_deadline_at());
@@ -223,7 +227,7 @@ impl McpPermissionGate {
             .unwrap_or_else(|| serde_json::json!({}));
         let authorization_request = PermissionAuthorizationRequest {
             tool_name: request.name.as_str(),
-            provenance: if prepared.is_some_and(|(_, _, registered_builtin)| registered_builtin) {
+            provenance: if prepared.as_ref().is_some_and(|review| review.builtin) {
                 // Only registry-verified builtins reach this private evidence route.
                 talos_core::tool::ToolProvenance::Native
             } else {
@@ -237,16 +241,27 @@ impl McpPermissionGate {
             summary_fields: Vec::new(),
             deadline: deadline_at.saturating_duration_since(tokio::time::Instant::now()),
         };
-        let authorization = if let Some((plan, evidence, _)) = prepared {
-            self.pipeline
-                .authorize_prepared_plan_with_evidence(
-                    authorization_request,
-                    self.user_intent.as_deref(),
-                    plan,
-                    evidence,
-                )
-                .await
-                .map(|admission| McpAdmission::Prepared(Box::new(admission)))
+        let authorization = if let Some(review) = prepared {
+            let admission = if let Some(mutation) = review.mutation.filter(|_| review.builtin) {
+                self.pipeline
+                    .authorize_prepared_file_mutation(
+                        authorization_request,
+                        self.user_intent.as_deref(),
+                        review.plan,
+                        mutation,
+                    )
+                    .await
+            } else {
+                self.pipeline
+                    .authorize_prepared_plan_with_evidence(
+                        authorization_request,
+                        self.user_intent.as_deref(),
+                        review.plan,
+                        review.command.filter(|_| review.builtin),
+                    )
+                    .await
+            };
+            admission.map(|admission| McpAdmission::Prepared(Box::new(admission)))
         } else {
             self.pipeline
                 .authorize(authorization_request)
