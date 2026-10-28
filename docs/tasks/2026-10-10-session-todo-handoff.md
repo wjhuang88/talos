@@ -1,10 +1,22 @@
 ## Active resume checkpoint — 2026-10-28 remote base advance
 
-Fetch confirmed main advanced to `32b5579bcdb9b14e27e7a2b24b7a6a1c9c0aa7d9`
-through I293 PR #788. I309 #790 still retains head `3c5a3276c` on the prior
-base; rebase, fresh validation and final review are required before merge.
-CI 40624815706 passed the main Unix job; Windows remains in progress.
-Local owner reconciliation passed both governance validators and diff checks.
+Local I309 candidate `54250a3d4ff4761d40d889881b5bf68e4cadfbd1` is rebased onto
+main `32b5579bcdb9b14e27e7a2b24b7a6a1c9c0aa7d9` (I293 PR #788). Range-diff
+confirms the first nine patches are unchanged; the tenth reconciles owner/handoff
+records. Independent static review approved this exact candidate without running
+builds or tests.
+
+PR #790 still has remote head `3c5a3276c`; all eight gates in CI 40624815706
+passed, including native Windows. These certify the previous head only. Fresh
+standard preflight is live in session 90543, logging to
+`/private/tmp/i309-main32-preflight.log`; post-clean compilation is progressing.
+Both governance validators and diff checks passed in session 19452. Current-base
+all-feature validation, final evidence commit/review, publication, exact-head CI,
+merge and accepted dependency-baseline advancement remain pending.
+
+Requested `cargo clean --locked` removed 26,276 files / 15.0 GiB. Only root and
+active `/private/tmp/talos-i308-save-active` worktrees remain; neither is stale,
+and prune dry-run is empty. Builds are regenerating the active target directory.
 I309 and the full T8 → T2/T3 → T4 → T5 → T1 → T6 queue remain incomplete.
 
 ## Historical checkpoint — 2026-10-28 merged stages and upgrade validation

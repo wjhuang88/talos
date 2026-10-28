@@ -95,7 +95,7 @@ restore 0.87.1 without altering T7/T8 policy. Do not conceal a failed validation
 
 ## Evidence And Execution
 
-### Current validation checkpoint — 2026-10-28
+### Historical validation checkpoint — 2026-10-28 prior remote candidate
 
 Candidate #790 at `3c5a3276c73d1183acf79bc5ee0d7e8e401358f6` targets
 main `e03a2984267eacbd4f65d0085be1d028a8c420ed`. Main then advanced via I293
@@ -110,7 +110,7 @@ evidence. The receipt is recorded on #790. Run 40624815706 passed its main Unix
 job; Windows workspace validation remains in progress against the prior base.
 Merge CAS, implementation merge and post-merge accepted-baseline advancement
 remain required. I309 remains incomplete. Earlier checkpoints below
-are historical and do not override this record.
+are historical. The current candidate checkpoint below supersedes this record.
 
 - Initial observation: clean main source `881a27b890e5310055380e6e3f5b0da78f9fdd3c`; current manifest/lock gix 0.87.1.
 - crates.io sparse index `https://index.crates.io/3/g/gix`, fetched 2026-10-26: latest stable non-yanked 0.90.0, declared Rust 1.88. This is registry evidence, not a validated graph/MSRV result.
@@ -164,6 +164,13 @@ are historical and do not override this record.
 - Independent minimal (`--no-default-features`) and Git-only (`--no-default-features --features git`) Tools checks passed exit 0: `/private/tmp/i309-minimal-check.log`, `/private/tmp/i309-git-feature-check.log`. Current Windows cargo-xwin retry is running after the sandbox denied updating its existing `clang-cl` cache link; no Windows success is inferred from Unix tests.
 - Windows `cargo xwin check --locked -p talos-tools --all-features --target x86_64-pc-windows-msvc` passed exit 0 (1m14s): `/private/tmp/i309-current-xwin-unsandboxed.log`. This is cross-compilation only; native candidate CI remains outstanding.
 - Full standard locked release preflight passed exit 0, including workspace tests and external Runtime SDK validation: `/private/tmp/i309-current-preflight-unsandboxed.log`. Evidence applies to local source at `f56282840`; rebasing and final candidate review/CI remain outstanding.
+
+### Current candidate checkpoint — 2026-10-28
+
+- Rebased ten commits cleanly onto main `32b5579bcdb9b14e27e7a2b24b7a6a1c9c0aa7d9`; candidate before this evidence update is `54250a3d4ff4761d40d889881b5bf68e4cadfbd1`. Range-diff confirms the previous nine commits have identical patches; the tenth reconciles handoff/owner records. Working tree and diff whitespace checks passed.
+- Previous remote head `3c5a3276c73d1183acf79bc5ee0d7e8e401358f6` completed all eight CI gates successfully in run `40624815706`, including native Windows workspace validation. This is old-head evidence only and does not certify the rebased candidate.
+- Maintainer-requested `cargo clean --locked` removed 26,276 files / 15.0 GiB; disk free space increased to 26 GiB. Both remaining worktrees are valid, and prune dry-run found no stale registrations. No source/worktree was deleted.
+- Fresh standard preflight for the rebased candidate is running: `/private/tmp/i309-main32-preflight.log`. Independent static review approved exact candidate `54250a3d4ff4761d40d889881b5bf68e4cadfbd1` against main `32b5579bc`; it did not run builds/tests. Both governance validators and diff checks passed. Current-head all-feature validation, final evidence reconciliation, publication, CI, merge and accepted-baseline advancement remain outstanding.
 
 ### Latest-main convergence — 2026-10-28
 
