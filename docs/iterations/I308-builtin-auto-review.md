@@ -1967,3 +1967,11 @@ focused invocation executes that test and passes (1/1;
 `--exact` and an incomplete name ran zero tests and provides no validation evidence.
 The cause remains unproven; full preflight is not certified by the focused pass.
 Earlier host TUI failure and sandbox Push EPERM remain separate observations.
+
+Follow-up validation clarification: after the host preflight's parallel Tools run
+reported two connection-refusal budget failures, the unchanged original connection
+fixture module passed 4/4 in isolation, and a serial all-feature Tools run passed
+1010/1010 (`/private/tmp/i308-tools-serial.log`, `--test-threads=1`, exit 0).
+A temporary dynamic-port/held-socket experiment was reverted and is not evidence.
+This establishes serial local stability only; parallel preflight reliability and the
+underlying scheduling cause remain unknown. No production search code was changed.
