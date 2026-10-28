@@ -23,6 +23,8 @@ mod prepared_invocation;
 mod router_tool;
 // Dormant Talos-owned routing core; no WebSearchTool/registry/default activation.
 mod router;
+// Dormant bounded query-free health memory; no background probe or production ranking activation.
+mod health;
 // Dormant response parsing prerequisite; activation still requires ADR-090 parity/D gates.
 mod bing_parser;
 mod ddg_parser;
