@@ -1919,3 +1919,17 @@ The Save concurrent regression and focused warnings-denied Clippy also pass. Bot
 governance validators pass with zero warnings. Fresh fetch retains target main
 `4bf3488b2f4344b054754851b588686126c436f4`. This is local stage validation,
 not new-head native Windows CI, merge authorization or whole-I308 completion.
+
+MCP Save recovery-gate regression (local test-only follow-up): the real rmcp scenario
+now extracts the receipt from a successful retained replacement. Recovery is denied by
+the permission resolver by default with downloaded bytes unchanged; after an explicit
+test-controlled `ApproveOnce` response for the `save_url` recovery request, original
+bytes are restored, and reusing the one-use receipt fails without changing them. The
+Auto assessor call count does not increase and the parent observes only the one download.
+Locked focused test and warnings-denied test Clippy pass
+(`/private/tmp/i308-mcp-save-restore.log`, `/private/tmp/i308-save-restore-clippy.log`).
+This is a simulated human fallback, not UI evidence or restore-specific production policy;
+cross-session receipt ownership/privacy/storage cleanup remain unverified. Independent
+static test review approved immutable `55cc0e3cead7e6d9f21038d524a122d327747fb1`.
+Exact-head CI observed during this work is for preceding `c32a49088`; it cannot validate
+this commit. Updated candidate CI, full I308 gates and all later queue tasks remain open.
