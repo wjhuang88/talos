@@ -334,6 +334,8 @@ impl ServerHandler for TalosMcpHandler {
                                 plan: &plan,
                                 command: evidence.as_ref().filter(|_| registered_builtin),
                                 mutation: mutation.as_ref().filter(|_| registered_builtin),
+                                configuration: configuration.as_ref().filter(|_| registered_builtin),
+                                description: tool.description(),
                                 builtin: registered_builtin,
                             };
                             let admission = self.permission_gate

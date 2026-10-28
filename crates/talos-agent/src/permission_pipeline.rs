@@ -645,6 +645,30 @@ impl PermissionPipeline {
         }
     }
 
+    /// Admits a builtin prepared invocation using producer-owned configuration.
+    ///
+    /// This is a trusted embedder entrypoint. The caller must establish registered
+    /// builtin ownership and obtain configuration from that exact prepared operation,
+    /// never from remote request metadata. Admission remains bound to `plan`.
+    pub async fn authorize_prepared_builtin_invocation(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        description: &str,
+        configuration: &serde_json::Value,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        self.authorize_registered_prepared_invocation(
+            authorization,
+            user_intent,
+            plan,
+            description,
+            configuration,
+            true,
+        )
+        .await
+    }
+
     pub(crate) async fn authorize_registered_prepared_invocation(
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
