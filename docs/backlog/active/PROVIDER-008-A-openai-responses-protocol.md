@@ -19,7 +19,7 @@
 | Governance Claim PR | #747 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child requirement #748 records this bounded slice. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
-| Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime), #793 (reviewed endpoint data) |
+| Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime), #793 (reviewed endpoint data), #799 (public Copilot runtime) |
 | Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Claim activates only when #747 reaches main with accepted ADR-093. Sibling families remain unclaimed; Complete requires existing implementation commit evidence. |
 
@@ -355,3 +355,18 @@ a separately reviewed data stage using the unchanged archived source. At this ch
 rows are still withheld and 4,055 hints / 45 endpoint records remain the baseline. Review / Claimed;
 Completion Commit: Pending. No implementation merge, completion, live vendor probe or release is
 claimed for this follow-up before its validation and review gates finish.
+
+### Public Copilot native validation — 2026-10-28
+
+Runtime PR #799 head `de30465cd280d8a4c4bbbf973e2f41bdf6064217`, tree
+`906b30f81c40fa6d453306241eb716664a5e8c7d`, based on main
+`5d7d2fcca28379301c05ab712d33518667cbc8fa`, passed all eight jobs in native
+CI3549 / run40705093059, including full Unix workspace validation and native Windows
+workspace/Desktop checks. Independent read-only Agent source review APPROVE binds this tree/base;
+this is not distinct-human approval. The local standard preflight passed check/Clippy/governance
+then failed MCP git_prepared (26 passed / 21 failed, Git binding and denied socket fixtures).
+The environment restored an old workspace snapshot and removed the final local four-package log;
+its unseen terminal result is not counted as passing. Exact-head native CI provides durable full
+workspace evidence. This documentation backfill changes no runtime or catalog data. Final review,
+applicable CI and live CAS are still required before merge. Seven catalog rows remain withheld;
+Review / Claimed and Completion Commit: Pending remain unchanged. No release is claimed.
