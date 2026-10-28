@@ -1054,3 +1054,32 @@ async fn dynamic_child_attribute_target_requires_fresh_read_and_retains_identity
     assert!(auxiliary.revalidate(&fresh).is_err());
     assert!(!root.path().join(".git/COMMIT_EDITMSG").exists());
 }
+#[tokio::test]
+async fn retained_commit_refuses_changed_message_or_mode_before_mutation() {
+    for changed in ["message", "all", "missing"] {
+        let root = fixture();
+        let before = integration_git(root.path(), &["status", "--porcelain"]);
+        let mut plan = AddPlan::prepare_commit(
+            root.path(),
+            &serde_json::json!({"message": "reviewed commit", "all": true}),
+            ToolProvenance::Native,
+        ).expect("plan");
+        match changed {
+            "message" => {
+                let Operation::Commit(input) = &mut plan.operation else { unreachable!() };
+                input.message = "replacement message".into();
+            }
+            "all" => {
+                let Operation::Commit(input) = &mut plan.operation else { unreachable!() };
+                input.all = false;
+            }
+            "missing" => plan.native_commit_command = None,
+            _ => unreachable!(),
+        }
+        let output = execute_approved(plan).await;
+        assert!(output.result.is_error, "{changed}: {}", output.result.content);
+        assert!(output.result.content.contains("Native Commit command changed"),
+            "{changed}: {}", output.result.content);
+        assert_eq!(integration_git(root.path(), &["status", "--porcelain"]), before);
+    }
+}
