@@ -377,12 +377,78 @@ impl ServerHandler for TalosMcpHandler {
             }
             None => {
                 let profile = tool.permission_profile(&input);
-                let authorizations = self
-                    .permission_gate
-                    .authorize_call(&hook_context, &talos_request, &profile)
-                    .await?;
-                tool.execute_authorized_with_output(input, &authorizations)
-                    .await
+                if registered_builtin
+                    && matches!(request.name.as_ref(), "http_request" | "fetch_url")
+                    && !tool.requires_network_invocation()
+                {
+                    // Retain the exact registered instance/input across review. The
+                    // broad invocation capability never substitutes for protected
+                    // prepared-network admission (including search).
+                    reserve_prepared_request(&self.prepared_requests, &context.id)?;
+                    let configuration = tool.invocation_review_configuration().ok_or_else(|| {
+                        McpError::new(ErrorCode::INTERNAL_ERROR, "HTTP invocation configuration unavailable", None)
+                    })?;
+                    let review_configuration = serde_json::json!({
+                        "tool_configuration": configuration,
+                        "execution_directories": [],
+                        "execution_directories_resolved": true,
+                        "sandbox": null,
+                    });
+                    let plan = talos_core::tool::PreparedPlanIdentity::new();
+                    let invocation_deadline = tokio::time::Instant::now()
+                        + talos_core::tool::PREPARED_INVOCATION_TIMEOUT;
+                    tokio::select! {
+                        biased;
+                        _ = context.ct.cancelled() => {
+                            return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
+                                "HTTP invocation cancelled; effects may be incomplete; request ID remains reserved", None));
+                        }
+                        _ = tokio::time::sleep_until(invocation_deadline) => {
+                            return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
+                                "HTTP invocation deadline exceeded; effects may be incomplete; request ID remains reserved", None));
+                        }
+                        output = async {
+                            let admission = self.permission_gate.authorize_prepared_command_until(
+                                &hook_context,
+                                &talos_request,
+                                &profile,
+                                super::permission::PreparedReview {
+                                    plan: &plan,
+                                    command: None,
+                                    mutation: None,
+                                    configuration: Some(&review_configuration),
+                                    description: tool.description(),
+                                    builtin: true,
+                                },
+                                self.permission_gate.prepared_deadline_at(),
+                            ).await?;
+                            if context.ct.is_cancelled() || tokio::time::Instant::now() >= invocation_deadline {
+                                return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
+                                    "HTTP invocation cancelled or expired before execution; request ID remains reserved", None));
+                            }
+                            if tool.invocation_review_configuration().as_ref() != Some(&configuration) {
+                                return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
+                                    "HTTP invocation configuration changed after approval", None));
+                            }
+                            let permission_request = talos_permission::PermissionRequest::native(
+                                request.name.as_ref(), &profile, &input,
+                            ).with_transitive_effects();
+                            // Hooks have finished; consume only now, so a hook or
+                            // concurrent policy/session revision invalidates admission.
+                            let authorizations = admission.consume_for_prepared(&permission_request, &plan)
+                                .map_err(|error| McpError::new(ErrorCode::INTERNAL_ERROR,
+                                    format!("HTTP invocation admission invalidated: {error}"), None))?;
+                            Ok(tool.execute_authorized_with_output(input, &authorizations).await)
+                        } => output?,
+                    }
+                } else {
+                    let authorizations = self
+                        .permission_gate
+                        .authorize_call(&hook_context, &talos_request, &profile)
+                        .await?;
+                    tool.execute_authorized_with_output(input, &authorizations)
+                        .await
+                }
             }
         }
         .result;

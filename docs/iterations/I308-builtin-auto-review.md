@@ -1981,7 +1981,9 @@ proxy/redirect fixture now checks `http_request` and `fetch_url` with a broad
 deterministic Allow followed by an explicit domain-scoped Deny or Ask for an
 undisclosed destination. All four cases terminate without assessor calls, accepted
 or queued proxy connections, or installed grants. This verifies the existing
-transitive-policy guard before deterministic Allow; no production code changed.
+transitive-policy guard in the presence of a later broad Allow. The earlier default
+Network Ask shadows that Allow, so this fixture alone does not prove the
+deterministic-Allow ordering. No production code changed.
 The focused HTTP matrix and all 513 locked all-feature Agent library tests pass;
 all-target all-feature warnings-denied Agent Clippy passes. The unchanged parallel
 Tools library suite also passes 1010/1010 on this attempt; earlier preflight failure
@@ -1991,3 +1993,41 @@ pass 49/49, MCP Clippy and both governance validators pass. The preceding candid
 run `40705827501` is live; none of that CI certifies this later test follow-up.
 Ordinary MCP invocation routing, remaining profile/recovery/platform acceptance,
 final review/merge gates and the downstream queue remain incomplete.
+
+### Hosted-native MCP ordinary HTTP stage — 2026-10-28
+
+The local handler now admits registered implementation-owned `http_request` and
+`fetch_url` through the shared whole-invocation review, retaining exact input,
+configuration and a one-use plan identity. The request-ID ledger reserves calls
+before review; permission hooks complete before freshness-checked consumption.
+Protected prepared-network tools and untrusted replacements do not enter this route.
+Cancellation and the total invocation deadline drop the execution future and report
+that effects may be incomplete; they do not promise remote rollback.
+
+The real rmcp/subprocess proxy matrix passes for both tools: Auto success, actual
+deterministic Allow, a later Allow shadowed by default Ask, incompatible scoped
+Deny/Ask, uncertain/error/stale assessment, explicit human/Deny, Headless, absent
+intent and caller replacement. Proxy assertions verify method, URL and POST body;
+refusals produce no accepted or queued connection. Cancellation during assessment
+then same-ID replay rejects without a second assessment or installed grant.
+Command: `cargo test -p talos-mcp --all-features --locked --test native_http_auto`.
+The full all-feature MCP suite and warnings-denied all-target MCP Clippy passed
+before the final cancellation and deterministic-Allow test additions. The final
+rerun failed linking other test targets with ENOSPC; subsequent Clippy and format
+commands in that chain did not run. Authorized cleanup removed only this active
+worktree target. The low-debug, incremental-disabled locked full MCP rebuild
+passed (`/private/tmp/i308-mcp-http-rebuild.log`), as did all-target warnings-denied
+MCP Clippy (`/private/tmp/i308-mcp-http-clippy.log`) and the strengthened final
+scoped-policy matrix (`/private/tmp/i308-mcp-http-final-matrix.log`).
+The subsequent transport-cancellation regression passes for both tools: the proxy
+receives the complete request and withholds its response, the client cancels,
+the proxy observes EOF, and same-ID replay is refused without another assessment
+or grant (`/private/tmp/i308-mcp-http-transport-cancel.log`). This proves local
+transport closure after cancellation, not remote rollback. Formatting passed separately.
+
+Independent bounded static permission/security/API review found no blocker and
+approved the route and tests without running builds. Immutable-head confirmation
+and exact-head remote CI remain required. Remaining host/profile/recovery/platform
+acceptance, full preflight and final merge
+are not proven by this matrix. I308/T8 remains Active / Partial; the downstream
+MODEL-014 → T4 → T5 → T1 → T6 queue remains incomplete.
