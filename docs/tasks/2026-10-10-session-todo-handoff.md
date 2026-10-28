@@ -7,9 +7,11 @@ passed all eight jobs and independent static Agent review approved the head/base
 The owner records review and unknown advisory/deprecation coverage limits.
 
 Next is T8/I308, still Active / Partial. Local continuation branch
-`feat/i308-git-command-continuation` retains Add/Commit native invocations and
-records 338/338 Git-feature Tools tests plus warnings-denied Clippy. These local
-changes are not merged Auto admission delivery. Real Add/Commit/Push/Checkout
+`feat/i308-git-command-continuation` retains Add/Commit/Checkout/Push native
+invocations; Push implementation is `dc78bab16`. Full locked Git-feature Tools
+tests passed 340/340 in approved host execution, plus warnings-denied Clippy;
+see the I308 owner for logs and sandbox/validation limits. These local changes
+are not pushed or merged Auto admission delivery. Real Add/Commit/Push/Checkout
 Auto evidence and remaining original acceptance/gates remain outstanding.
 
 Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.

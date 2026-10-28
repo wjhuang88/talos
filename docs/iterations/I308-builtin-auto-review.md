@@ -1,5 +1,35 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Local retained Push checkpoint — 2026-10-28
+
+Implementation `dc78bab16` retains Push's executable, cwd, argv and environment
+at the first final mutation frontier, after receiver discovery and Windows
+internal-program rebinding, before that frontier receives admission. Subsequent
+checks reject a changed command rather than replacing it. The final dispatcher
+requires and executes the retained command. A real Git/local-listener regression
+rejects remote, branch, force, environment, cwd, program and missing-command
+changes without contacting the receiver or changing HEAD/worktree status.
+
+Full locked Git-feature Tools library tests passed 340/340 in approved host
+execution (`/private/tmp/i308-retained-push-full-host.log`). The initial focused
+run exposed fixture entrypoints bypassing the production retention seam; those
+now reuse the same retention check. The corrected sandbox focused run passed
+16/17, with only the existing process-observation EPERM failure. The host full
+run preserves that assertion and passes. Warnings-denied Git-feature library/test
+Clippy passed (`/private/tmp/i308-retained-push-clippy.log`); formatting and diff
+checks passed. Clippy's collapsible conditional was corrected after the full
+suite; the change is syntactic and Clippy compiled both library and tests.
+
+Fetched `origin/main` remains `4bf3488b2f4344b054754851b588686126c436f4`.
+Current rebased retention implementation mapping: Add `b6764dd48`, Commit
+`0cb83e527`, Checkout `48515fc40`, Push `dc78bab16`. Earlier SHA mappings below
+are historical. These local commits have not been pushed or merged. They do not
+implement operation-specific Add/Commit/Push/Checkout Auto assessment/admission.
+That implementation, higher-risk recovery/profile/platform coverage, full locked
+preflight, independent permission/security/API review, exact-head CI and merge
+remain required. I308/T8 and the full handoff goal remain Active / Partial;
+T2/T3 → T4 → T5 → T1 → T6 remain queued with unchanged acceptance.
+
 ## Local retained Checkout checkpoint — 2026-10-28
 
 Checkout now retains its exact executable, cwd, argv and environment, rejects
