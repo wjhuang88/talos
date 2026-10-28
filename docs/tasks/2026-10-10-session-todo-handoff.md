@@ -1,19 +1,20 @@
 ## Active resume checkpoint — 2026-10-28 remote base advance
 
-Local I309 candidate `2efacb8afe7376485ac98f0d955333482503bdb3` is rebased onto
-main `32b5579bcdb9b14e27e7a2b24b7a6a1c9c0aa7d9` (I293 PR #788). Independent
-static review approved this exact candidate; receipt is posted on PR #790.
+Local I309 source is rebased onto main
+`e53c61c7f0344308a5c5535bb1521fefebbacc70` after PR #792. Commit
+`df955c2a2` removes a redundant fixture `format!` while preserving the emitted
+environment placeholder. Current-base locked all-target/all-feature check,
+warnings-denied Clippy and full all-feature workspace tests passed; the tests
+passed in approved host execution, including the process-observation test that
+previously failed under sandbox EPERM. Logs are recorded in the I309 owner.
+Both governance validators passed. Standard preflight remains live in session
+44123, log `/private/tmp/i309-e53-preflight-host.log`.
 
-PR #790 still has remote head `3c5a3276c`; all eight gates in CI 40624815706
-passed, including native Windows. These certify the previous head only. Fresh
-standard preflight passed exit 0, including both external Runtime SDK modes, in
-`/private/tmp/i309-main32-preflight.log`; a later retry reproduced the process
-observation permission failure. Current-base all-feature check and
-warnings-denied Clippy passed. The all-feature test suite reached 1003/1004
-Tools tests but failed because `ps` process observation returned EPERM. Earlier unsandboxed full-suite evidence
-passed the same test, but current-base all-feature success is not established.
-Both governance validators passed. Final evidence reconciliation, publication,
-exact-head CI, merge and accepted dependency-baseline advancement remain pending.
+PR #790's last published head is `a9d5623c7`; older head `3c5a3276c` passed all
+eight gates in CI 40624815706, including native Windows. Those results and earlier
+static approvals do not certify the latest rebased candidate. Final evidence
+reconciliation, exact-head review, publication, CI, merge and accepted
+dependency-baseline advancement remain pending.
 
 Requested `cargo clean --locked` removed 26,276 files / 15.0 GiB. Only root and
 active `/private/tmp/talos-i308-save-active` worktrees remain; neither is stale,

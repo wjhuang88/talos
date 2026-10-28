@@ -165,18 +165,24 @@ are historical. The current candidate checkpoint below supersedes this record.
 - Windows `cargo xwin check --locked -p talos-tools --all-features --target x86_64-pc-windows-msvc` passed exit 0 (1m14s): `/private/tmp/i309-current-xwin-unsandboxed.log`. This is cross-compilation only; native candidate CI remains outstanding.
 - Full standard locked release preflight passed exit 0, including workspace tests and external Runtime SDK validation: `/private/tmp/i309-current-preflight-unsandboxed.log`. Evidence applies to local source at `f56282840`; rebasing and final candidate review/CI remain outstanding.
 
-### Current candidate checkpoint — 2026-10-28
+### Historical main32 candidate checkpoint — 2026-10-28
 
 - Rebased ten commits cleanly onto main `32b5579bcdb9b14e27e7a2b24b7a6a1c9c0aa7d9`; candidate before this evidence update is `54250a3d4ff4761d40d889881b5bf68e4cadfbd1`. Range-diff confirms the previous nine commits have identical patches; the tenth reconciles handoff/owner records. Working tree and diff whitespace checks passed.
 - Previous remote head `3c5a3276c73d1183acf79bc5ee0d7e8e401358f6` completed all eight CI gates successfully in run `40624815706`, including native Windows workspace validation. This is old-head evidence only and does not certify the rebased candidate.
 - Maintainer-requested `cargo clean --locked` removed 26,276 files / 15.0 GiB; disk free space increased to 26 GiB. Both remaining worktrees are valid, and prune dry-run found no stale registrations. No source/worktree was deleted.
 - Fresh standard preflight for the rebased candidate is running: `/private/tmp/i309-main32-preflight.log`. Independent static review approved exact candidate `54250a3d4ff4761d40d889881b5bf68e4cadfbd1` against main `32b5579bc`; it did not run builds/tests. Both governance validators and diff checks passed. Current-head all-feature validation, final evidence reconciliation, publication, CI, merge and accepted-baseline advancement remain outstanding.
 
-### Current-base validation receipt — 2026-10-28
+### Historical main32 validation receipt — 2026-10-28
 
 - The first standard preflight passed exit 0, including both external Runtime SDK modes: `/private/tmp/i309-main32-preflight.log`. A later retry reproduced the process-observation denial described below. All-target/all-feature workspace check and warnings-denied Clippy passed: `/private/tmp/i309-main32-all-feature-check.log`, `/private/tmp/i309-main32-all-feature-clippy.log`.
 - The all-feature test run reached 1003/1004 Tools tests, then failed in `prepared_local_push_runs_all_eight_admitted_stages` because its `ps` process-observation call returned `EPERM` (`/private/tmp/i309-main32-all-feature-test.log`). Repeating the standard preflight reproduced that same environment denial (`/private/tmp/i309-main32-preflight-retry.log`). The same test passed in earlier unsandboxed full-suite logs, including `/private/tmp/i309-all-feature-test-unsandboxed.log` and `/private/tmp/i309-main32-preflight.log`; this execution channel cannot currently reproduce that unsandboxed observation. Therefore the current-base all-feature suite is not claimed as passed.
 - Independent static review approved exact candidate `2efacb8afe7376485ac98f0d955333482503bdb3` against main `32b5579bcdb9b14e27e7a2b24b7a6a1c9c0aa7d9`; receipt: https://github.com/wjhuang88/talos/pull/790#issuecomment-6460622648 . The reviewer did not execute builds/tests. Publication, fresh exact-head CI, merge CAS and accepted-baseline advancement remain outstanding.
+
+### Latest-main validation receipt — 2026-10-28
+
+- Rebased cleanly onto main `e53c61c7f0344308a5c5535bb1521fefebbacc70` after #792 merged. The source range is unchanged apart from a bounded validation repair: removed the redundant `format!` from the newly merged Responses Agent fixture and preserved its literal `${TALOS_MODEL_ENDPOINT_TEST}` placeholder. This repairs warnings-denied Clippy without changing production behavior.
+- Locked all-target/all-feature check and warnings-denied Clippy passed (`/private/tmp/i309-e53-all-feature-check.log`, `/private/tmp/i309-e53-all-feature-clippy-retry.log`). Full locked all-feature workspace tests passed exit 0 in the approved host execution (`/private/tmp/i309-e53-all-feature-test-host.log`), including the process-observation test that failed with sandbox EPERM. No test was skipped or weakened. Both governance validators passed (`/private/tmp/i309-e53-governance.log`, `/private/tmp/i309-e53-claims.log`).
+- Current-base standard preflight is running in session 44123 (`/private/tmp/i309-e53-preflight-host.log`). Final candidate review, publication, exact-head CI, merge CAS and accepted-baseline advancement remain outstanding.
 
 ### Historical validation checkpoint — 2026-10-28
 
