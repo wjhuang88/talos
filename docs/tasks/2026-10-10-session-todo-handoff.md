@@ -6468,3 +6468,10 @@ tests and Agent/MCP Clippy pass. Capture denial has zero download; write denial 
 an authorized download but preserves the target. Owner I308 records review/validation
 limits and recovery/platform/remote gate residuals. This is unmerged implementation,
 not I308 completion. Queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
+MCP Save recovery local regression: 55cc0e3cead7e6d9f21038d524a122d327747fb1
+extends the real Save test through denied restore, explicitly simulated one-time human
+approval, successful restoration, and one-use receipt rejection. Focused locked test
+and test Clippy pass; reviewer confirms test-only boundary. This is not CI for this head,
+not actual human UI, not recovery-storage/cross-session acceptance, and not I308 completion.
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
