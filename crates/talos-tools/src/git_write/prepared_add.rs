@@ -254,6 +254,7 @@ pub(super) struct AddPlan {
     native_add_command: Option<command::FrozenCommand>,
     native_commit_command: Option<command::FrozenCommand>,
     native_checkout_command: Option<command::FrozenCommand>,
+    native_push_command: Option<command::FrozenCommand>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     workspace_review_root: PathBuf,
@@ -751,6 +752,7 @@ impl AddPlan {
             native_add_command,
             native_commit_command,
             native_checkout_command,
+            native_push_command: None,
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             workspace_review_root: workspace
@@ -1563,7 +1565,9 @@ impl AddPlan {
         let authorizations = proof
             .consume_for_prepared(&self.request(), &self.identity)
             .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
-        self.discover_admitted(&authorizations).await
+        let mut plan = self.discover_admitted(&authorizations).await?;
+        plan.retain_push_command()?;
+        Ok(plan)
     }
 
     fn discover_new_gitlinks(
@@ -3934,6 +3938,17 @@ impl AddPlan {
                 ));
             }
             retained.command()
+        } else if matches!(self.operation, Operation::Push(_)) {
+            let retained = self.native_push_command.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput("Native Push command missing; no command started".into())
+            })?;
+            if retained != &expected_command {
+                return Err(GitToolError::InvalidInput(
+                    "Native Push command changed after preparation; request a fresh authorization"
+                        .into(),
+                ));
+            }
+            retained.command()
         } else {
             expected_command.command()
         };
@@ -4267,7 +4282,49 @@ impl AddPlan {
         Ok(command)
     }
 
+    fn retain_push_command(&mut self) -> Result<(), GitToolError> {
+        if self.phase != Phase::Mutation || !matches!(self.operation, Operation::Push(_)) {
+            return Ok(());
+        }
+        let command = self.expected_push_command()?;
+        match &self.native_push_command {
+            None => self.native_push_command = Some(command),
+            Some(retained) if retained == &command => {}
+            Some(_) => {
+                return Err(GitToolError::InvalidInput(
+                    "Native Push command changed after preparation; request a fresh authorization"
+                        .into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn expected_push_command(&self) -> Result<command::FrozenCommand, GitToolError> {
+        let Operation::Push(input) = &self.operation else {
+            return Err(GitToolError::InvalidInput(
+                "Push command requested for another operation".into(),
+            ));
+        };
+        command::FrozenCommand::push(
+            &self.program,
+            &self.repository.workdir,
+            input,
+            !self.receiver_roots.is_empty(),
+            &self.environment,
+        )
+    }
+
     fn revalidate(&self) -> Result<(), GitToolError> {
+        if let Some(retained) = &self.native_push_command
+            && retained != &self.expected_push_command()?
+        {
+            return Err(GitToolError::InvalidInput(
+                "Native Push command changed after preparation; request a fresh authorization"
+                    .into(),
+            ));
+        }
+
         if let Operation::Commit(input) = &self.operation {
             let expected = command::FrozenCommand::commit(
                 &self.program,
@@ -5354,7 +5411,14 @@ impl PreparedNormalToolInvocation for AddPlan {
             }
         };
         match result {
-            Ok(plan) => PreparedNormalStage::Continue(plan),
+            Ok(mut plan) => {
+                if let Err(error) = plan.retain_push_command() {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                        error.to_string(),
+                    ));
+                }
+                PreparedNormalStage::Continue(plan)
+            }
             Err(error) => {
                 PreparedNormalStage::Complete(ToolExecutionOutput::error(error.to_string()))
             }
