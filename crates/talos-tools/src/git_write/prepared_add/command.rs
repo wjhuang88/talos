@@ -12,6 +12,12 @@ pub(super) struct FrozenCommand {
 }
 
 impl FrozenCommand {
+    /// Change only the executable at the separately admitted sender frontier.
+    /// Arguments, working directory and environment remain frozen.
+    pub(super) fn bind_sender_program(&mut self, program: &Path) {
+        self.program = program.to_path_buf();
+    }
+
     pub(super) fn checkout(
         program: &Path,
         workdir: &Path,

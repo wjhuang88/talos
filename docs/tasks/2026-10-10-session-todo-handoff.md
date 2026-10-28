@@ -1,4 +1,26 @@
-## Active resume checkpoint — 2026-10-28 I309 closed; I308 continues
+## Active resume checkpoint — 2026-10-28 I308 Windows correction pending
+
+I309 remains closed; the complete queue remains I309 → T8/I308 → T2+T3
+MODEL-014 → T4 → T5 → T1 → T6. I308 is Active / Partial.
+
+Git Auto PR #797 is open at `1993432dccd3571abac7849a32c5b4640007f622`
+against `4bf3488b2f4344b054754851b588686126c436f4` (main re-fetched).
+Exact-head CI `40659215369` has a failed native Windows workspace job; main
+workspace validation is still running. Do not merge or restart that live run.
+The Windows failure includes retained Add/Commit/Checkout command drift.
+
+Local branch `feat/i308-visible-auto-decisions` in the preserved active worktree
+contains unpublished CLI visibility and MCP default-disposition test commits,
+plus a local correction and regression for the separately admitted sender Git
+executable binding. Only the retained executable is updated; argv/cwd/env remain
+frozen. The corrected-feature focused test compiled but failed at link with
+ENOSPC and did not execute; about 215 MiB remains free. No target or worktree
+cleanup was performed. See I308 owner for exact logs and evidence limitations.
+Reconcile the correction into #797 only after local verification and independent
+review, then obtain new exact-head native CI/review before merge. Remaining I308
+acceptance and every later task remain outstanding.
+
+## Historical checkpoint — 2026-10-28 I309 closed; I308 continues
 
 I309 owner is Complete / Closed with existing implementation Completion Commit
 `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db` (#790). Post-merge baseline #795
