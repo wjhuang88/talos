@@ -132,6 +132,7 @@ async fn real_pull_auto_admission_updates_only_after_complete_model_approval() {
         let target = root.path().join("target");
         std::fs::create_dir(&source).expect("source");
         git(&source, &["init", "--template=", "--initial-branch=main"]);
+        git(&source, &["config", "core.autocrlf", "false"]);
         std::fs::write(source.join("tracked.txt"), "before\n").expect("before");
         commit(&source, "before");
         git(
@@ -139,6 +140,7 @@ async fn real_pull_auto_admission_updates_only_after_complete_model_approval() {
             &[
                 "clone",
                 "--template=",
+                "--config=core.autocrlf=false",
                 source.to_str().expect("source path"),
                 target.to_str().expect("target path"),
             ],
