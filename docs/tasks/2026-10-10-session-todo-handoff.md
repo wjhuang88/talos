@@ -1,16 +1,20 @@
-## Active resume checkpoint — 2026-10-28 I309 implementation merged
+## Active resume checkpoint — 2026-10-28 I309 closed; I308 continues
 
-PR #790 merged as `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db` after refreshed
-CAS, independent static security/API approval, all eight exact-head CI jobs and
-fresh full locked all-feature tests passed. I309 owner records the exact logs and
-review limits. The active worktree uses `docs/i309-merged-baseline-closure` based on merged main with
-post-merge baseline/owner edits; no source edits. Snapshot generation succeeded
-against that merged dependency tree; JSON and derived Markdown are locally updated
-and baseline-table parity/equality passes. Closure review/CI/merge remains pending;
-I309 is Review, not Complete. Earlier checkpoints below are historical.
+I309 owner is Complete / Closed with existing implementation Completion Commit
+`8b8c43e684bfd7c6bf326ea9cffd192b2cc480db` (#790). Post-merge baseline #795
+merged as `958a391316c82181853d1df176687361b14ff82b`; exact-head CI 40645856684
+passed all eight jobs and independent static Agent review approved the head/base.
+The owner records review and unknown advisory/deprecation coverage limits.
+
+Next is T8/I308, still Active / Partial. Local continuation branch
+`feat/i308-git-command-continuation` retains Add/Commit native invocations and
+records 338/338 Git-feature Tools tests plus warnings-denied Clippy. These local
+changes are not merged Auto admission delivery. Real Add/Commit/Push/Checkout
+Auto evidence and remaining original acceptance/gates remain outstanding.
 
 Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
-Overall goal remains Active. No downstream requirement is closed by this merge.
+Overall goal remains Active. No downstream requirement is closed by I309.
+Earlier checkpoints below are historical.
 
 ## Historical checkpoint — 2026-10-28 exact-head CI and disk-limited tests
 
