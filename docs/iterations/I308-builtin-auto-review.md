@@ -1942,3 +1942,28 @@ earlier network phase and rely on a later rollback. Nine locked MCP scenarios pa
 (`/private/tmp/i308-mcp-save-policy.log`); focused warnings-denied test Clippy is recorded
 separately after completion. This is host test evidence only, not native Windows CI or
 full profile inventory.
+
+MCP Git host-coverage follow-up: a real rmcp test now invokes production registered
+`git_add`, `git_commit`, `git_checkout` and `git_push` contributions through the injected
+permission pipeline. For each operation the Auto assessor checks the exact tool,
+versioned command operation and current user intent, returns AllowOnce, and the test
+verifies the actual Git index, commit subject, branch, or bare-receiver ref. The test
+resolver permits configuration discovery but denies the operation-specific command
+fallback, so the final effects require model admission. Focused test passes; all 49
+`git_prepared` integration tests and warnings-denied test Clippy pass
+(`/private/tmp/i308-mcp-git-four-ops.log`,
+`/private/tmp/i308-mcp-git-prepared-all.log`,
+`/private/tmp/i308-mcp-git-four-ops-clippy.log`). Independent bounded static review
+approved the test. This supplies standalone MCP success-path evidence for four Git
+mutations; it does not finish negative-policy/replacement matrices across every host,
+native Windows, profile/feature reconciliation or the complete H/G acceptance.
+
+Full host preflight for this follow-up is terminal exit 101
+(`/private/tmp/i308-mcp-git-four-ops-preflight-host-final.log`): Tools 1009/1010
+passed; `refused_connection_consumes_budget_before_the_next_source_can_resolve`
+returned first-source Request rather than next-source RequestLimit. An all-feature
+focused invocation executes that test and passes (1/1;
+`/private/tmp/i308-search-refusal-focused-real.log`). An earlier invocation with
+`--exact` and an incomplete name ran zero tests and provides no validation evidence.
+The cause remains unproven; full preflight is not certified by the focused pass.
+Earlier host TUI failure and sandbox Push EPERM remain separate observations.
