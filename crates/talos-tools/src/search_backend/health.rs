@@ -136,7 +136,11 @@ impl SearchHealthState {
         observed_at: Instant,
     ) {
         self.purge_expired(observed_at);
-        if let Some(index) = self.entries.iter().position(|entry| entry.backend == backend) {
+        if let Some(index) = self
+            .entries
+            .iter()
+            .position(|entry| entry.backend == backend)
+        {
             self.entries.remove(index);
         }
         if self.entries.len() == self.capacity {
@@ -303,9 +307,8 @@ mod tests {
     #[test]
     fn failure_normalization_drops_raw_error_and_status_details() {
         let secret = "opaque private backend detail";
-        let opaque = SearchRouterFailureKind::Backend(SearchBackendError::RequestFailed(
-            secret.to_owned(),
-        ));
+        let opaque =
+            SearchRouterFailureKind::Backend(SearchBackendError::RequestFailed(secret.to_owned()));
         let status = SearchRouterFailureKind::Backend(SearchBackendError::HttpStatus(503));
 
         let opaque_signal = SearchHealthSignal::from_failure(&opaque);
