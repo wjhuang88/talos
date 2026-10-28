@@ -6459,3 +6459,12 @@ checking pass. I300 records scope limits and logs. This does not establish full
 recursive checkout/effect coverage: recursive and production guards remain,
 and simplified orchestration, external programs and review/platform gates are
 still outstanding. T7 and the full T1–T8 handoff remain incomplete.
+
+
+MCP Save local continuation (2026-10-28): builtin producer configuration now reaches
+plan-bound Auto capture admission; retained writes require a second complete-image
+review. Real rmcp allow/refusal/replacement/missing-intent scenarios, full locked MCP
+tests and Agent/MCP Clippy pass. Capture denial has zero download; write denial follows
+an authorized download but preserves the target. Owner I308 records review/validation
+limits and recovery/platform/remote gate residuals. This is unmerged implementation,
+not I308 completion. Queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.

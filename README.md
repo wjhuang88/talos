@@ -328,8 +328,11 @@ host approval; missing intent, Headless context and explicit Ask/Deny cannot acq
 authorization. Same-name external replacements cannot supply native Auto command evidence.
 This MCP route covers retained Git command evidence and complete-image retained edit/delete
 mutation review. Replaced registrations cannot supply mutation evidence, and a changed target
-refuses execution after review. Save capture/configuration, network and ordinary invocation
-Auto routing remain unavailable through this MCP route. Disabling auto returns interactive surfaces to
+refuses execution after review. Retained `save_url` replacement separately reviews producer-owned
+capture configuration before downloading, then the complete before/after image before writing.
+Capture refusal prevents download; write refusal preserves the destination after an authorized
+download. Other prepared network and ordinary invocation Auto routing remain unavailable
+through this MCP route. Disabling auto returns interactive surfaces to
 human approval and headless surfaces to denial.
 
 Product-owned `bash`/`powershell`, `exec`, `fetch_url` and ordinary `http_request` requests can

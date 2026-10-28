@@ -1879,3 +1879,26 @@ through MCP remain outstanding, as do full acceptance, coherent final preflight,
 independent exact-head security/API review, Windows CI and merge CAS. PR #797 still
 publishes the older 1993432dc candidate with failing Windows Git tests; local host
 success does not certify native Windows behavior. I308/T8 and the full goal remain Partial.
+
+
+### Hosted-native MCP Save configuration stage — 2026-10-28
+
+Local implementation adds a trusted-embedder prepared builtin configuration API; MCP
+forwards configuration from the exact operation only after registry builtin ownership
+verification. Ambiguous evidence still refuses. Save capture and complete-image write
+remain distinct plan-bound admissions. The API does not authenticate arbitrary callers.
+
+Real rmcp Save tests cover allow, capture refusal, write refusal, external replacement
+and missing current-turn intent. Capture refusal performs no download; write refusal
+follows one authorized download and preserves the original destination. Assessor
+completion counters and parent-observed proxy connections supplement file assertions.
+Locked MCP all-features tests and Agent/MCP all-features warnings-denied Clippy pass
+(`/private/tmp/i308-mcp-save-full.log`, `/private/tmp/i308-save-config-clippy.log`).
+Independent bounded shared-identity Agent static review approved the dirty code snapshot,
+without running tests; immutable-head confirmation remains required.
+
+This supersedes the preceding local Save configuration gap, not the remaining prepared
+network/ordinary MCP routes. Recovery execution through MCP, recovery-storage inventory
+on refusal, concurrent Save changes, native Windows, coherent standard preflight,
+publication/exact-head CI/review/CAS/merge and full acceptance remain outstanding.
+I308/T8 remains Partial; no completion evidence is claimed.

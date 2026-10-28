@@ -27,6 +27,8 @@ pub(super) struct PreparedReview<'a> {
     pub plan: &'a talos_core::tool::PreparedPlanIdentity,
     pub command: Option<&'a talos_core::tool::PreparedCommandEvidence>,
     pub mutation: Option<&'a talos_core::tool::PreparedFileMutationEvidence>,
+    pub configuration: Option<&'a serde_json::Value>,
+    pub description: &'a str,
     pub builtin: bool,
 }
 
@@ -162,6 +164,8 @@ impl McpPermissionGate {
                 plan,
                 command: None,
                 mutation: None,
+                configuration: None,
+                description: "",
                 builtin: false,
             },
             deadline_at,
@@ -249,6 +253,16 @@ impl McpPermissionGate {
                         self.user_intent.as_deref(),
                         review.plan,
                         mutation,
+                    )
+                    .await
+            } else if let Some(configuration) = review.configuration.filter(|_| review.builtin) {
+                self.pipeline
+                    .authorize_prepared_builtin_invocation(
+                        authorization_request,
+                        self.user_intent.as_deref(),
+                        review.plan,
+                        review.description,
+                        configuration,
                     )
                     .await
             } else {
