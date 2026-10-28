@@ -1,3 +1,20 @@
+## Active resume checkpoint — 2026-10-28 rebased Pull and profile follow-up
+
+Save #785 merged as `f0d484b255bf766eafb1573bd0870ef38ae8de77`.
+Pull #786 now targets main with exact candidate
+`cee25226e3ab24564d8076c22f3ffdf1de5fd3e0`; full locked preflight passed,
+including workspace tests and external Runtime SDK execution. Independent
+static security/API review approved that head against main `9d38a7365`.
+Native CI and merge CAS remain required. Windows CRLF fixture repair is included;
+no production behavior was altered by that repair.
+
+Active local branch `feat/i308-profile-rebased` in
+`/private/tmp/talos-i308-save-active` replays the search disposition test and
+handoff corrections onto the new Pull candidate, excluding the duplicate CRLF
+repair. The concrete search test passed again (six scenarios). Full profile-stage
+gates remain outstanding. Current gix is still 0.87.1; the separate 0.90 upgrade
+branch is not delivered. T8 and T2/T3 → T4 → T5 → T1 → T6 remain incomplete.
+
 ## Active resume checkpoint — 2026-10-28 Pull Windows fixture correction
 
 Save #785 is merged at `f0d484b255bf766eafb1573bd0870ef38ae8de77` after

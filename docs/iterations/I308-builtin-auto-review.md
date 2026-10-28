@@ -9,30 +9,24 @@ exact-head CI 40504783551, independent static permission/security/API approval,
 both governance validators and merge-time CAS. The review receipt is
 https://github.com/wjhuang88/talos/pull/784#issuecomment-6443350514.
 
-Recoverable Save Auto is implemented locally at
-`085903952` (rebased from `0013e63fe36646feba5175eebf32e96d1a83205b`): the retained-download capture and
-subsequent complete-text mutation receive separate invocation-local assessments.
-Unregistered/replacement instances retain manual authorization without builtin
-model evidence. Binary, sensitive, incomplete and default non-recoverable writes
-retain fallback. Tests passed: Save 21/21, Agent 510/510, Core 122/122;
-Agent test Clippy and independent static permission/security/API review passed.
-The reviewer did not independently execute tests. After earlier ENOSPC failures,
-authorized cache cleanup and worktree relocation, full standard preflight passed
-for candidate `bafc87af7`, including workspace tests and the external SDK fixture.
-Windows test cross-compilation via cargo xwin passed. Native Windows execution, Save stage
-CI/merge in #785, complete operation/profile reconciliation and final H/G
-acceptance remain outstanding. Guarded search cannot downgrade. The original
-acceptance and remaining handoff queue are unchanged.
+Recoverable Save Auto #785 merged as
+`f0d484b255bf766eafb1573bd0870ef38ae8de77` after exact-head CI
+40525328345 passed all eight checks, full locked preflight/SDK, Windows xwin,
+independent static permission/security/API review and merge CAS. This closes
+only the Save stage; the original complete acceptance below is unchanged.
 
-Pull ownership follow-up implementation `115b302ad` and production Runtime fixture
-correction `e14c76164289ece98111d8725b263e57fd033359` are locally validated.
-Full standard preflight passed, including workspace execution of the three real
-Runtime Pull tests and external SDK consumer. Explicit shared-composition Runtime
-focused tests passed 3/3; Agent/Runtime Windows tests passed cargo-xwin check.
-Both governance validators and independent exact-head static security/API review
-passed. Logs: `/private/tmp/i308-git-auto-preflight-retry.log` and
-`/private/tmp/i308-git-auto-xwin.log`. The reviewer did not run tests. Publication,
-native CI and merge in stacked PR #786 remain pending; no full T8 completion is claimed.
+Pull ownership PR #786 now targets main at candidate
+`cee25226e3ab24564d8076c22f3ffdf1de5fd3e0`, based on
+`9d38a7365c494ade99a484bdd158476f850f4428`. The rebased five patches
+preserve builtin instance ownership and production shared Runtime composition.
+Windows CI 40530302518 failed a strict content assertion because host Git
+converted LF to CRLF. The candidate explicitly disables autocrlf in source and
+clone fixtures; production semantics and strict effect assertions are unchanged.
+Fresh full locked standard preflight passed, including workspace tests and
+external Runtime SDK execution (log:
+`/private/tmp/i308-pull-rebased-preflight.log`). Independent static security/API
+review approved this exact head/base without independently running tests.
+Native exact-head CI and merge CAS remain required; no Pull merge is claimed.
 
 Concrete legacy WebSearch disposition is now checked locally in six production
 Agent registration scenarios (Auto, disabled Auto, Deny, mandatory-human,
@@ -42,7 +36,7 @@ resolution runs, including under explicit Allow. This is an unavailable search
 path, not successful manual/search backend coverage. I293 owns the protected
 search implementation; I308 must not route it through ordinary HTTP Auto.
 Focused locked test passed (1 test / 6 scenarios), log
-`/private/tmp/i308-search-disposition.log`; full stage validation is pending.
+`/private/tmp/i308-profile-rebased-search.log` after replay onto the current main-based Pull candidate; full stage validation is pending.
 
 ### Earlier merged-stage checkpoint — 2026-10-26
 
