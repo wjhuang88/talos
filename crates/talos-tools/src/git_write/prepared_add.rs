@@ -252,6 +252,7 @@ pub(super) struct AddPlan {
     target_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
     native_pull_command: Option<command::FrozenCommand>,
     native_add_command: Option<command::FrozenCommand>,
+    native_commit_command: Option<command::FrozenCommand>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     workspace_review_root: PathBuf,
@@ -683,6 +684,15 @@ impl AddPlan {
         } else {
             None
         };
+        let native_commit_command = match &operation {
+            Operation::Commit(input) => Some(command::FrozenCommand::commit(
+                &program,
+                &repository.workdir,
+                input,
+                &environment,
+            )?),
+            _ => None,
+        };
         Ok(Self {
             phase: Phase::SenderConfiguration,
             command_budget: std::sync::Mutex::new(CommandBudget::default()),
@@ -729,6 +739,7 @@ impl AddPlan {
             target_hook_evidence: Vec::new(),
             native_pull_command,
             native_add_command,
+            native_commit_command,
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             workspace_review_root: workspace
@@ -3888,6 +3899,18 @@ impl AddPlan {
                 ));
             }
             retained.command()
+        } else if matches!(self.operation, Operation::Commit(_)) {
+            let retained = self.native_commit_command.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput(
+                    "Native Commit command missing; no command started".into(),
+                )
+            })?;
+            if retained != &expected_command {
+                return Err(GitToolError::InvalidInput(
+                    "Native Commit command changed after preparation; request a fresh authorization".into(),
+                ));
+            }
+            retained.command()
         } else {
             expected_command.command()
         };
@@ -4222,6 +4245,19 @@ impl AddPlan {
     }
 
     fn revalidate(&self) -> Result<(), GitToolError> {
+        if let Operation::Commit(input) = &self.operation {
+            let expected = command::FrozenCommand::commit(
+                &self.program,
+                &self.repository.workdir,
+                input,
+                &self.environment,
+            )?;
+            if self.native_commit_command.as_ref() != Some(&expected) {
+                return Err(GitToolError::InvalidInput(
+                    "Native Commit command changed after preparation; request a fresh authorization".into(),
+                ));
+            }
+        }
         if matches!(self.operation, Operation::Add) {
             let expected = command::FrozenCommand::add(
                 &self.program,

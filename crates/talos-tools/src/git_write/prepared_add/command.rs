@@ -12,6 +12,30 @@ pub(super) struct FrozenCommand {
 }
 
 impl FrozenCommand {
+    /// Retain commit message and mode without exposing them in review output.
+    pub(super) fn commit(
+        program: &Path,
+        workdir: &Path,
+        input: &GitCommitInput,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, GitToolError> {
+        let mut arguments = vec![
+            "--no-pager",
+            "--literal-pathspecs",
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
+            "commit",
+            "-m",
+            &input.message,
+        ];
+        if input.all {
+            arguments.push("--all");
+        }
+        Self::new(program, workdir, arguments, environment)
+    }
+
     /// Retain literal staging arguments before permission assessment.
     pub(super) fn add(
         program: &Path,
