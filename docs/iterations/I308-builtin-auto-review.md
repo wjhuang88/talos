@@ -2,6 +2,21 @@
 
 ## Local retained Add checkpoint — 2026-10-28
 
+Rebased onto baseline closure merge `958a391316c82181853d1df176687361b14ff82b`:
+Add implementation is now `e6237f668`; retained Commit implementation is
+`686a57641`. Commit retains the exact message/mode, executable, cwd and
+environment, rejects changed message/`--all` or missing retained command before
+mutation, and executes the retained invocation. Current Git-feature Tools tests
+passed 338/338 in approved host execution
+(`/private/tmp/i308-retained-add-git-full-host-tests.log`), and Git-feature
+library/tests warnings-denied Clippy passed
+(`/private/tmp/i308-retained-commit-clippy.log`). The new fixture initially assumed
+an existing HEAD in an unborn repository; it now checks actual unchanged status.
+These remain local retention changes, not Add/Commit Auto admission or merged
+delivery. Push/Checkout retention, operation-specific assessment/admission and
+original stage gates remain outstanding. Earlier Add-only SHA/results below are
+historical pre-rebase evidence.
+
 Implementation `cda61015c` retains Add's exact executable, cwd, literal argv and
 environment before assessment and executes that retained command after matching
 revalidation. A real Git fixture refuses path, environment, cwd, executable or
