@@ -98,6 +98,38 @@ impl FrozenCommand {
         Self::new(program, workdir, arguments, environment)
     }
 
+    pub(super) fn push(
+        program: &Path,
+        workdir: &Path,
+        input: &GitPushInput,
+        local_receiver: bool,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, GitToolError> {
+        let receiver = local_receiver
+            .then(|| receiver_command(program))
+            .transpose()?;
+        let mut arguments = vec![
+            "--no-pager",
+            "--literal-pathspecs",
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
+            "push",
+        ];
+        if let Some(receiver) = &receiver {
+            arguments.extend(["--receive-pack", receiver]);
+        }
+        if input.force {
+            arguments.push("--force");
+        }
+        arguments.extend(["--", input.remote.as_deref().unwrap_or("origin")]);
+        if let Some(branch) = &input.branch {
+            arguments.push(branch);
+        }
+        Self::new(program, workdir, arguments, environment)
+    }
+
     pub(super) fn new(
         program: &Path,
         workdir: &Path,
