@@ -12,6 +12,23 @@ pub(super) struct FrozenCommand {
 }
 
 impl FrozenCommand {
+    /// Retain literal staging arguments before permission assessment.
+    pub(super) fn add(
+        program: &Path,
+        workdir: &Path,
+        paths: &[String],
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, GitToolError> {
+        Self::new(
+            program,
+            workdir,
+            ["--no-pager", "--literal-pathspecs", "add", "--"]
+                .into_iter()
+                .chain(paths.iter().map(String::as_str)),
+            environment,
+        )
+    }
+
     /// Keep Git's native upstream selection, integration and recursion policy.
     /// This describes the future operation; it confers no execution authority.
     pub(super) fn pull(

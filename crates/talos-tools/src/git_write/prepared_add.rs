@@ -251,6 +251,7 @@ pub(super) struct AddPlan {
     target_hook_paths: Option<Vec<PathBuf>>,
     target_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
     native_pull_command: Option<command::FrozenCommand>,
+    native_add_command: Option<command::FrozenCommand>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     workspace_review_root: PathBuf,
@@ -672,6 +673,16 @@ impl AddPlan {
             )?),
             _ => None,
         };
+        let native_add_command = if matches!(operation, Operation::Add) {
+            Some(command::FrozenCommand::add(
+                &program,
+                &repository.workdir,
+                &paths,
+                &environment,
+            )?)
+        } else {
+            None
+        };
         Ok(Self {
             phase: Phase::SenderConfiguration,
             command_budget: std::sync::Mutex::new(CommandBudget::default()),
@@ -717,6 +728,7 @@ impl AddPlan {
             target_hook_paths: None,
             target_hook_evidence: Vec::new(),
             native_pull_command,
+            native_add_command,
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             workspace_review_root: workspace
@@ -3859,13 +3871,26 @@ impl AddPlan {
                 }
             }
         }
-        let command = command::FrozenCommand::new(
+        let expected_command = command::FrozenCommand::new(
             &self.program,
             &self.repository.workdir,
             &args,
             &self.environment,
-        )?
-        .command();
+        )?;
+        let command = if matches!(self.operation, Operation::Add) {
+            let retained = self.native_add_command.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput("Native Add command missing; no command started".into())
+            })?;
+            if retained != &expected_command {
+                return Err(GitToolError::InvalidInput(
+                    "Native Add command changed after preparation; request a fresh authorization"
+                        .into(),
+                ));
+            }
+            retained.command()
+        } else {
+            expected_command.command()
+        };
         if !self.receiver_roots.is_empty()
             && self.inspect_receiver_storage(authorizations)? != self.receiver_storage
         {
@@ -4197,6 +4222,20 @@ impl AddPlan {
     }
 
     fn revalidate(&self) -> Result<(), GitToolError> {
+        if matches!(self.operation, Operation::Add) {
+            let expected = command::FrozenCommand::add(
+                &self.program,
+                &self.repository.workdir,
+                &self.paths,
+                &self.environment,
+            )?;
+            if self.native_add_command.as_ref() != Some(&expected) {
+                return Err(GitToolError::InvalidInput(
+                    "Native Add command changed after preparation; request a fresh authorization"
+                        .into(),
+                ));
+            }
+        }
         if let Operation::Pull(pull) = &self.operation {
             let expected = command::FrozenCommand::pull(
                 &self.program,
