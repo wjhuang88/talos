@@ -25,6 +25,8 @@ mod router_tool;
 mod router;
 // Dormant bounded query-free health memory; no background probe or production ranking activation.
 mod health;
+// Dormant query/secret-free eligibility seam; availability never implies optional-provider consent.
+mod selection;
 // Dormant response parsing prerequisite; activation still requires ADR-090 parity/D gates.
 mod bing_parser;
 mod ddg_parser;
