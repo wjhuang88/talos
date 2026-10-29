@@ -2105,13 +2105,14 @@ ban on all configuration changes.
 
 Regression sensitivity was checked by temporarily removing the path guard:
 `native_mutation_auto` failed with one assessor invocation instead of zero for
-the `.env` scenario (`/private/tmp/i308-sensitive-path-red.log`). The assessor's
-ordinary-file intent assertion also failed after that unexpected invocation.
-Restoring the guard passes the locked all-feature MCP retained mutation and Save
-integration tests (2/2, `/private/tmp/i308-sensitive-path-green.log`), using
-nonincremental/low-debug builds. This is local integration evidence; fresh
-protected-scope independent review, complete candidate validation, exact-head
-CI and merge remain outstanding, as do the broader I308 acceptance rows.
+the `.env` scenario (`/private/tmp/i308-sensitive-path-red2.log`); after the
+fixture was corrected to accept the scenario-specific intent, the failure was
+specifically the unexpected model-call count. Restoring the guard passes the
+locked all-feature MCP retained mutation and Save integration tests (2/2,
+`/private/tmp/i308-sensitive-path-green2.log`), using nonincremental/low-debug
+builds. This is local integration evidence; fresh protected-scope independent
+review, complete candidate validation, exact-head CI and merge remain
+outstanding, as do the broader I308 acceptance rows.
 
 ## MCP recovery stale-target integration — 2026-10-29
 
@@ -2120,6 +2121,13 @@ initial successful mutation and before a separately human-approved recovery.
 Both the first recovery attempt and its repeat refuse to overwrite the new user
 content; the assessor remains at one invocation and no persistent grant exists.
 The locked all-feature `native_mutation_auto` suite passes
-(`/private/tmp/i308-recovery-stale.log`). This proves stale-content protection
-through this MCP composition, not atomic protection against every concurrent
-rename race or restart-persistent recovery. I308 remains Partial.
+(`/private/tmp/i308-recovery-stale.log`); the latest full locked standard
+`release_preflight.sh` also passes at the implementation candidate containing
+this test (`/private/tmp/i308-sensitive-recovery-preflight-host.log`), including
+workspace tests, doctests and the external Runtime SDK fixture. Sandbox execution
+of that preflight had one process-observation EPERM in a Push test; the authorized
+host run passed it. The governance validators pass with zero warnings. This proves
+stale-content protection through this MCP composition, not atomic protection
+against every concurrent rename race or restart-persistent recovery. I308 remains
+Partial. This local candidate is not covered by PR #801's older head, independent
+review, exact-head CI or merge.
