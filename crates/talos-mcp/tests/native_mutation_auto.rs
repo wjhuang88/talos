@@ -102,6 +102,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
         for scenario in [
             "allow",
             "restore",
+            "restore_denied",
             "restore_changed",
             "deny",
             "error",
@@ -142,7 +143,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                     delete,
                     file_name,
                 }),
-                if matches!(scenario, "restore" | "restore_changed") {
+                if matches!(scenario, "restore" | "restore_denied" | "restore_changed") {
                     Arc::new(ApproveRecovery) as Arc<dyn ApprovalResolver>
                 } else {
                     Arc::new(Deny)
@@ -285,7 +286,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
             );
             if matches!(
                 scenario,
-                "allow" | "restore" | "restore_changed" | "headless"
+                "allow" | "restore" | "restore_denied" | "restore_changed" | "headless"
             ) {
                 let result = result.expect("Auto admission");
                 assert_ne!(result.is_error, Some(true), "{result:?}");
@@ -294,7 +295,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                 } else {
                     assert_eq!(std::fs::read_to_string(&path).expect("edited"), "hello");
                 }
-                if matches!(scenario, "restore" | "restore_changed") {
+                if matches!(scenario, "restore" | "restore_denied" | "restore_changed") {
                     let text = result
                         .content
                         .iter()
@@ -313,6 +314,40 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                         std::fs::write(&path, "new user content").expect("concurrent replacement");
                     }
                     let input = json!({"path":"selected.txt", "recovery_id":id});
+                    if scenario == "restore_denied" {
+                        let mut denied_engine =
+                            PermissionEngine::with_workspace_root(root.path().into());
+                        denied_engine.add_rule(PermissionRule::new_nature(
+                            talos_core::tool::ToolNature::Write,
+                            None,
+                            None,
+                            PermissionDecision::Deny("recovery denied by policy".into()),
+                        ));
+                        state
+                            .replace_policy(denied_engine)
+                            .expect("install recovery denial");
+                        let denied = client
+                            .peer()
+                            .call_tool(
+                                rmcp::model::CallToolRequestParams::new(if delete {
+                                    "delete"
+                                } else {
+                                    "edit"
+                                })
+                                .with_arguments(input.as_object().expect("args").clone()),
+                            )
+                            .await
+                            .expect_err("denied recovery must reject at MCP admission");
+                        assert!(denied.to_string().contains("permission denied"), "{denied}");
+                        assert_eq!(calls.load(Ordering::SeqCst), 1);
+                        if delete {
+                            assert!(!path.exists(), "denied restore must preserve deletion");
+                        } else {
+                            assert_eq!(std::fs::read_to_string(&path).expect("edited"), "hello");
+                        }
+                        assert_eq!(state.grant_count().expect("grant count"), 0);
+                        continue;
+                    }
                     for replay in [false, true] {
                         let restored = client
                             .peer()

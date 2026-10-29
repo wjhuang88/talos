@@ -2142,3 +2142,15 @@ unchanged, the assessor runs once and no grant is created. The locked focused
 with warnings denied pass. This covers cancellation during assessment before
 mutation; it does not establish rollback after filesystem effects begin. The
 change is local and still needs review, exact-head CI and merge.
+
+## MCP recovery refusal preserves prior effect — 2026-10-29
+
+The real retained edit/delete fixture also denies the separate recovery request
+after the initial Auto mutation. A denied edit restore leaves the edited bytes;
+a denied delete restore leaves the target absent. The recovery assessor is not
+called again and no grant is installed, so recovery requires its own permission
+decision and denial does not execute the receipt. Focused locked MCP integration
+test (`cargo test -p talos-mcp --all-features --locked --test
+native_mutation_auto`) passes on this local follow-up candidate. This is explicit
+Write Deny after the initial operation, not a human resolver denial; the MCP
+transport correctly returns a permission error before tool execution.
