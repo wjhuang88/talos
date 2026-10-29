@@ -169,6 +169,23 @@ impl SearchHealthState {
             .map(|entry| entry.observation)
     }
 
+    /// Stable selection bucket for one already-eligible backend.
+    ///
+    /// Unknown and query-specific no-result evidence share the static baseline bucket. Health can
+    /// therefore reorder a healthy or degraded endpoint without turning absence into an outage or
+    /// preventing a stale/degraded route from being retried by a later user search.
+    pub(crate) fn selection_rank(&mut self, backend: SearchBackendId, now: Instant) -> u8 {
+        match self
+            .observation(backend, now)
+            .map(|observation| observation.signal.availability_effect())
+        {
+            Some(SearchHealthAvailability::Healthy) => 0,
+            None | Some(SearchHealthAvailability::Neutral) => 1,
+            Some(SearchHealthAvailability::Degraded) => 2,
+            Some(SearchHealthAvailability::Unavailable) => 3,
+        }
+    }
+
     pub(crate) fn len(&mut self, now: Instant) -> usize {
         self.purge_expired(now);
         self.entries.len()
@@ -290,6 +307,21 @@ mod tests {
                 .is_none()
         );
         assert!(state.is_empty(now + Duration::from_secs(5)));
+    }
+
+    #[test]
+    fn selection_rank_keeps_unknown_and_no_results_at_static_baseline() {
+        let now = Instant::now();
+        let mut state = SearchHealthState::new(2, Duration::from_secs(60)).expect("health state");
+        state.record(
+            SearchBackendId::DuckDuckGo,
+            SearchHealthSignal::NoResults,
+            Duration::from_millis(2),
+            now,
+        );
+
+        assert_eq!(state.selection_rank(SearchBackendId::DuckDuckGo, now), 1);
+        assert_eq!(state.selection_rank(SearchBackendId::SearXng, now), 1);
     }
 
     #[test]
