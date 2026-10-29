@@ -130,3 +130,20 @@ and [I306](../iterations/I306-provider008a-openai-responses.md).
 
 `ModelConfig` gains optional `base_url`; downstream explicit struct literals should use
 `base_url: None` or `..Default::default()` in the same pre-1.0 minor migration.
+
+
+### Public GitHub Copilot static credentials
+
+The shared factory recognizes only the reviewed public `https://api.githubcopilot.com` HTTPS
+origin. Its existing Chat, Responses and Messages adapters use Bearer authentication there, with
+truthful Talos attribution and no redirects. Messages uses `/v1/messages` and retains the Anthropic
+version header; it never sends the GitHub credential as `x-api-key`. Other gateways retain their
+own authentication. Wire overrides remain explicit and never cause a fallback retry.
+
+Use a Copilot-compatible credential authorized for the selected model. The packaged provider advertises
+`GITHUB_TOKEN` to connection setup; a manual `[providers.github-copilot]` entry must explicitly set
+`api_key_env = "GITHUB_TOKEN"` or, for example,
+`api_key_env = "COPILOT_GITHUB_TOKEN"`. Talos does not perform OAuth login, token exchange, refresh
+or enterprise endpoint discovery. Account scopes, subscriptions, integration quotas and model
+allowlists remain server-side decisions. No real credentials or live vendor probe are used in tests.
+See [ADR-093 section 9](../decisions/093-openai-responses-protocol-boundary.md) for the pinned contract.

@@ -37,6 +37,15 @@ impl OpenAIResponsesProvider {
         }
     }
 
+    pub(crate) fn with_copilot_client(
+        mut self,
+        client: reqwest::Client,
+        headers: serde_json::Map<String, serde_json::Value>,
+    ) -> Self {
+        self.client = self.client.with_copilot_client(client, headers);
+        self
+    }
+
     /// Bind the Talos provider identity used for durable reasoning replay isolation.
     #[must_use]
     pub fn with_provider_key(mut self, provider_key: impl Into<String>) -> Self {
