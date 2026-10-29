@@ -107,7 +107,8 @@ impl ApprovalResolver for ApprovePreparedSearch {
             .expect("prepared search network scope");
         assert_eq!(scope.endpoints().len(), 4);
         assert!(
-            scope.endpoints()
+            scope
+                .endpoints()
                 .iter()
                 .all(|endpoint| endpoint.method() == "GET")
         );
@@ -151,7 +152,12 @@ async fn real_prepared_search_without_resolver_is_denied_before_execution() {
     let root = tempfile::tempdir().expect("owned workspace");
     let probe = Arc::new(SearchRouterIntegrationProbe::default());
     let observed = Arc::new(Observations::default());
-    let agent = agent(root.path(), Arc::clone(&probe), Arc::clone(&observed), false);
+    let agent = agent(
+        root.path(),
+        Arc::clone(&probe),
+        Arc::clone(&observed),
+        false,
+    );
 
     tokio::time::timeout(WAIT, agent.run("search".into()))
         .await
@@ -162,12 +168,16 @@ async fn real_prepared_search_without_resolver_is_denied_before_execution() {
     assert_eq!(observed.denied_results.load(Ordering::SeqCst), 1);
     let denial = observed.denial.lock().expect("search observation");
     assert!(
-        denial
-            .as_deref()
-            .is_some_and(|value| value.contains("approval") && !value.contains("permission state error")),
+        denial.as_deref().is_some_and(
+            |value| value.contains("approval") && !value.contains("permission state error")
+        ),
         "actual permission rejection: {denial:?}"
     );
-    assert_eq!(probe.starts(), 0, "permission denial must precede execution");
+    assert_eq!(
+        probe.starts(),
+        0,
+        "permission denial must precede execution"
+    );
     assert_eq!(probe.drops(), 0, "no prepared execution was owned");
 }
 
@@ -176,12 +186,7 @@ async fn real_prepared_search_session_interrupt_drops_before_cancelled_terminal(
     let root = tempfile::tempdir().expect("owned workspace");
     let probe = Arc::new(SearchRouterIntegrationProbe::default());
     let observed = Arc::new(Observations::default());
-    let agent = agent(
-        root.path(),
-        Arc::clone(&probe),
-        Arc::clone(&observed),
-        true,
-    );
+    let agent = agent(root.path(), Arc::clone(&probe), Arc::clone(&observed), true);
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
         workspace_root: root.path().to_path_buf(),
