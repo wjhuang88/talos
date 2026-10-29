@@ -440,10 +440,10 @@ fn record_health_signal(
 ) {
     let observed_at = Instant::now();
     if let Some(state) = health.as_mut() {
-        (&mut **state).record(
+        (**state).record(
             backend,
             signal,
-            observed_at.saturating_duration_since(started_at),
+            observed_at.duration_since(started_at),
             observed_at,
         );
     }
