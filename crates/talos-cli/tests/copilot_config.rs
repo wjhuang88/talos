@@ -96,13 +96,10 @@ fn explicit_copilot_messages_and_wire_rollback_keep_the_selected_vendor_and_auth
 }
 
 #[test]
-fn unreviewed_copilot_catalog_row_keeps_chat_default_until_data_admission() {
+fn reviewed_copilot_catalog_row_selects_native_messages_by_default() {
     let fixture = setup();
     let snapshot = preview(fixture.path());
-    assert_eq!(
-        snapshot["url"],
-        "https://api.githubcopilot.com/chat/completions"
-    );
+    assert_eq!(snapshot["url"], "https://api.githubcopilot.com/v1/messages");
     auth(&snapshot);
 }
 

@@ -155,26 +155,25 @@ fn omitted_provider_root_cannot_relocate_credentials_to_an_adapter_default_on_ro
 }
 
 #[test]
-fn unreviewed_copilot_messages_endpoint_is_not_auto_activated() {
+fn reviewed_copilot_messages_endpoint_is_auto_activated() {
     let config = configured(
         "github-copilot",
         "claude-sonnet-4.6",
         "https://api.githubcopilot.com",
     );
-    assert_eq!(config.provider_protocol(), ProviderProtocol::OpenAIChat);
+    assert_eq!(config.provider_protocol(), ProviderProtocol::AnthropicMessages);
     assert_eq!(
         config
             .resolve_provider_endpoint()
             .expect("provider route")
             .source,
-        EndpointResolutionSource::ProviderConfigured
+        EndpointResolutionSource::CatalogInferred
     );
     let preview = build_configured_provider(&config, "key")
         .expect("existing adapter")
         .request_preview(&[])
         .expect("preview");
-    assert_eq!(
-        preview["url"],
-        "https://api.githubcopilot.com/chat/completions"
-    );
+    assert_eq!(preview["url"], "https://api.githubcopilot.com/v1/messages");
+    assert_eq!(preview["headers"]["Authorization"], "Bearer ***");
+    assert!(preview["headers"].get("x-api-key").is_none());
 }

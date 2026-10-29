@@ -12,10 +12,10 @@ probe or a claim that vendor-specific authentication/transports have been implem
 - Snapshot bytes: 5,955,477; 232 upstream providers.
 - Preserved packaged models: 6,474, with the same IDs, providers, limits, pricing, capabilities,
   release dates and variants. Provider metadata and API roots are byte-for-byte unchanged.
-- Current candidate protocol keys: 3,857 Chat, 65 Anthropic Messages, 133 Responses (4,055 total).
-- Added reviewed model endpoint records: 45 (14 Responses / 27 Messages / 4 Chat).
-- Withheld: 918 absent, 1,353 unsupported transports (including four WSS/Realtimes), seven
-  unreviewed model endpoints (Copilot Messages), and 141 provider-root drift records.
+- Current local candidate protocol keys: 3,857 Chat, 72 Anthropic Messages, 133 Responses (4,062 total).
+- Current local candidate endpoint records: 52 (14 Responses / 34 Messages / 4 Chat); 45 are already merged.
+- Current local candidate withheld: 918 absent, 1,353 unsupported transports (including four WSS/Realtimes),
+  zero unreviewed endpoints, and 141 provider-root drift records.
 
 The projection matches only exact `(provider, model)` identities already in the package. It uses the
 shared `protocol_signal.rs` map: explicit `responses`/`completions` shape first, otherwise exact
@@ -536,3 +536,34 @@ Realtime family. Neither parent tracking nor withheld data constitutes an accept
 Status stays Review / Claimed; Completion Commit: Pending. #724/#748 remain open until the remaining
 acceptance residual is resolved by implementation/confirmation or an explicit accepted scope decision.
 No sibling implementation, tag or release is claimed.
+
+## Public Copilot data candidate — 2026-10-29
+
+Runtime #799 merged as `5ad8cc7ab606f762cb5bb94650e855c9aa456303` after CI3552 attempt 2
+passed all eight jobs, exact-object independent Agent review and live CAS. Earlier non-admission
+checkpoints above are historical. This separate local data candidate uses the same frozen input.
+
+| Provider/model | Protocol | API root |
+|---|---|---|
+| github-copilot / claude-fable-5 | anthropic-messages | https://api.githubcopilot.com/v1 |
+| github-copilot / claude-haiku-4.5 | anthropic-messages | https://api.githubcopilot.com/v1 |
+| github-copilot / claude-opus-4.7 | anthropic-messages | https://api.githubcopilot.com/v1 |
+| github-copilot / claude-opus-4.8 | anthropic-messages | https://api.githubcopilot.com/v1 |
+| github-copilot / claude-opus-5 | anthropic-messages | https://api.githubcopilot.com/v1 |
+| github-copilot / claude-sonnet-4.6 | anthropic-messages | https://api.githubcopilot.com/v1 |
+| github-copilot / claude-sonnet-5 | anthropic-messages | https://api.githubcopilot.com/v1 |
+
+Credential/transport evidence is ADR-093 section 9: pinned first-party GitHub AWF static public
+Bearer contract and Microsoft copilot-api 0.5.2 native Messages path. The implemented profile uses
+truthful Talos integration headers, request-scoped static Bearer, no redirect, no OAuth/exchange/
+refresh/enterprise routing, and no cross-wire retry. Server-side subscription/scopes/model allowlists
+remain authoritative; controlled fixtures and catalog admission do not claim live account access.
+
+Offline audit: 6,474 records, 52 endpoint pairs, 4,062 protocol hints, zero mismatches; source and
+non-routing hashes unchanged. The prior 4,055 hints and all non-routing fields are preserved.
+Unchanged provider root or omitted root permits catalog inference. A changed provider root suppresses
+it, including an explicitly saved public /v1 root under the existing exact-root policy; manual wire
+selection remains available there. All seven rows are tested through the real factory for automatic
+Messages and explicit Chat rollback with/without a saved default URL. Changed gateways retain their
+own destination/authentication. A catalog-driven real Agent image/read round and real CLI default
+preview are included. Execution results, independent review and native CI remain pending.

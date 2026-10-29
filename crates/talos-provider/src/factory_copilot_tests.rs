@@ -394,3 +394,76 @@ fn copilot_full_wire_paths_survive_model_override_validation() {
         }
     }
 }
+
+#[test]
+fn reviewed_copilot_catalog_rows_choose_native_wire_and_preserve_rollback() {
+    for model in [
+        "claude-fable-5",
+        "claude-haiku-4.5",
+        "claude-opus-4.7",
+        "claude-opus-4.8",
+        "claude-opus-5",
+        "claude-sonnet-4.6",
+        "claude-sonnet-5",
+    ] {
+        for root in [None, Some("https://api.githubcopilot.com")] {
+            let mut configured = config(
+                ProviderProtocol::Unspecified,
+                "https://api.githubcopilot.com",
+            );
+            configured.model = model.into();
+            configured
+                .providers
+                .get_mut("github-copilot")
+                .expect("host")
+                .base_url = root.map(str::to_string);
+            let resolution = configured.resolve_provider_protocol();
+            assert_eq!(resolution.protocol, ProviderProtocol::AnthropicMessages);
+            assert_eq!(
+                resolution.source,
+                talos_config::ProtocolResolutionSource::CatalogInferred
+            );
+            let snapshot = build_configured_provider(&configured, KEY)
+                .expect("catalog factory")
+                .request_preview(&[])
+                .expect("preview");
+            assert_eq!(snapshot["url"], "https://api.githubcopilot.com/v1/messages");
+            assert_eq!(snapshot["headers"]["Authorization"], "Bearer ***");
+            configured
+                .providers
+                .get_mut("github-copilot")
+                .expect("host")
+                .protocol = ProviderProtocol::OpenAIChat;
+            let snapshot = build_configured_provider(&configured, KEY)
+                .expect("rollback factory")
+                .request_preview(&[])
+                .expect("preview");
+            assert_eq!(
+                snapshot["url"],
+                "https://api.githubcopilot.com/chat/completions"
+            );
+            assert_eq!(snapshot["headers"]["Authorization"], "Bearer ***");
+        }
+        for root in [
+            "https://gateway.test/v1",
+            "https://api.githubcopilot.com/v1",
+        ] {
+            let mut configured = config(ProviderProtocol::Unspecified, root);
+            configured.model = model.into();
+            assert_eq!(configured.provider_protocol(), ProviderProtocol::OpenAIChat);
+            let snapshot = build_configured_provider(&configured, KEY)
+                .expect("changed-root factory")
+                .request_preview(&[])
+                .expect("preview");
+            if root.contains("gateway.test") {
+                assert_eq!(snapshot["url"], "https://gateway.test/v1/chat/completions");
+                assert!(snapshot["headers"].get("Copilot-Integration-Id").is_none());
+            } else {
+                assert_eq!(
+                    snapshot["url"],
+                    "https://api.githubcopilot.com/chat/completions"
+                );
+            }
+        }
+    }
+}
