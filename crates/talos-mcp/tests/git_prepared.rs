@@ -293,150 +293,186 @@ async fn registered_mcp_git_add_commit_checkout_and_push_execute_after_bound_aut
                 "push this branch to the configured receiver",
             ),
         ] {
-            let temp = tempfile::tempdir().expect("fixture");
-            let repository = temp.path().join("work");
-            std::fs::create_dir(&repository).expect("repository");
-            let git = |args: &[&str]| {
-                let output = std::process::Command::new("git")
-                    .args(args)
-                    .current_dir(&repository)
-                    .output()
-                    .expect("fixture git");
-                assert!(
-                    output.status.success(),
-                    "{args:?}: {}",
-                    String::from_utf8_lossy(&output.stderr)
+            for explicit_deny in [false, true] {
+                let temp = tempfile::tempdir().expect("fixture");
+                let repository = temp.path().join("work");
+                std::fs::create_dir(&repository).expect("repository");
+                let git = |args: &[&str]| {
+                    let output = std::process::Command::new("git")
+                        .args(args)
+                        .current_dir(&repository)
+                        .output()
+                        .expect("fixture git");
+                    assert!(
+                        output.status.success(),
+                        "{args:?}: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    );
+                    output.stdout
+                };
+                git(&["init", "--template=", "--initial-branch=main"]);
+                git(&["config", "user.name", "Fixture"]);
+                git(&["config", "user.email", "fixture@example.invalid"]);
+                git(&["config", "commit.gpgSign", "false"]);
+                git(&["config", "maintenance.auto", "false"]);
+                std::fs::write(repository.join("tracked.txt"), "initial\n").expect("tracked");
+                git(&["add", "tracked.txt"]);
+                git(&["commit", "-m", "initial"]);
+
+                let input = match name {
+                    "git_add" => {
+                        std::fs::write(repository.join("selected.txt"), "selected\n")
+                            .expect("selected");
+                        json!({"paths": ["selected.txt"]})
+                    }
+                    "git_commit" => {
+                        std::fs::write(repository.join("selected.txt"), "committed\n")
+                            .expect("selected");
+                        git(&["add", "selected.txt"]);
+                        json!({"message": "operation-bound MCP commit"})
+                    }
+                    "git_checkout" => {
+                        git(&["branch", "target"]);
+                        json!({"branch": "target"})
+                    }
+                    "git_push" => {
+                        let receiver = temp.path().join("receiver.git");
+                        let output = std::process::Command::new("git")
+                            .args(["init", "--bare", receiver.to_str().expect("receiver")])
+                            .current_dir(temp.path())
+                            .output()
+                            .expect("bare receiver");
+                        assert!(output.status.success(), "{:?}", output);
+                        git(&[
+                            "remote",
+                            "add",
+                            "origin",
+                            receiver.to_str().expect("receiver"),
+                        ]);
+                        json!({"branch": "main"})
+                    }
+                    _ => unreachable!(),
+                };
+
+                let before_head = git(&["rev-parse", "HEAD"]);
+                let before_index = git(&["diff", "--cached", "--binary"]);
+                let before_branch = git(&["branch", "--show-current"]);
+                let receiver = temp.path().join("receiver.git");
+                let mut engine = PermissionEngine::with_workspace_root(repository.clone());
+                if explicit_deny {
+                    engine.add_rule(PermissionRule::new_nature(
+                        ToolNature::Execute,
+                        Some(scope.into()),
+                        None,
+                        PermissionDecision::Deny("explicit operation denial".into()),
+                    ));
+                }
+                let state = Arc::new(PermissionSessionState::new(engine));
+                let calls = Arc::new(AtomicUsize::new(0));
+                let resolver = AutoPermissionResolver::new(
+                    Arc::new(Assessor {
+                        calls: calls.clone(),
+                        tool: name,
+                        operation,
+                        intent,
+                    }),
+                    Arc::new(ApproveDiscoveryDenyCommand(scope)),
+                    ManagedWorkspaceLease::for_permission_session(&repository, state.clone())
+                        .expect("lease"),
+                    Duration::from_secs(10),
+                    AutoPermissionControl::new(true),
                 );
-                output.stdout
-            };
-            git(&["init", "--template=", "--initial-branch=main"]);
-            git(&["config", "user.name", "Fixture"]);
-            git(&["config", "user.email", "fixture@example.invalid"]);
-            git(&["config", "commit.gpgSign", "false"]);
-            git(&["config", "maintenance.auto", "false"]);
-            std::fs::write(repository.join("tracked.txt"), "initial\n").expect("tracked");
-            git(&["add", "tracked.txt"]);
-            git(&["commit", "-m", "initial"]);
-
-            let input = match name {
-                "git_add" => {
-                    std::fs::write(repository.join("selected.txt"), "selected\n")
-                        .expect("selected");
-                    json!({"paths": ["selected.txt"]})
+                let pipeline = PermissionPipeline::new(
+                    state.clone(),
+                    PermissionContext::new(
+                        PermissionMode::Interactive,
+                        InteractionCapability::Available,
+                    ),
+                    Some(Arc::new(resolver)),
+                );
+                let gate =
+                    McpPermissionGate::with_pipeline(pipeline, Arc::new(HookRegistry::new()))
+                        .with_user_intent(intent.into());
+                let mut registry = ToolRegistry::new();
+                registry
+                    .register_builtin_contributions(talos_tools::git_mutation_tool_contributions(
+                        repository.clone(),
+                    ))
+                    .expect("native Git registration");
+                assert!(registry.is_builtin_instance(name));
+                let handler = TalosMcpHandler::new(Arc::new(registry), Arc::new(gate));
+                let (client_io, server_io) = tokio::io::duplex(65536);
+                let server = tokio::spawn(async move {
+                    let running = handler.serve(server_io).await.expect("server");
+                    let _ = running.waiting().await;
+                });
+                let client = ().serve(client_io).await.expect("client");
+                let args = input.as_object().expect("arguments").clone();
+                let result = client
+                    .peer()
+                    .call_tool(rmcp::model::CallToolRequestParams::new(name).with_arguments(args))
+                    .await;
+                if explicit_deny {
+                    let error = result.expect_err("explicit Execute Deny must reject admission");
+                    assert!(
+                        error.to_string().contains("permission denied"),
+                        "{name}: {error}"
+                    );
+                    assert_eq!(calls.load(Ordering::SeqCst), 0, "{name}: assessor called");
+                    assert_eq!(git(&["rev-parse", "HEAD"]), before_head, "{name}");
+                    assert_eq!(
+                        git(&["diff", "--cached", "--binary"]),
+                        before_index,
+                        "{name}"
+                    );
+                    assert_eq!(git(&["branch", "--show-current"]), before_branch, "{name}");
+                    if name == "git_push" {
+                        assert!(
+                            !receiver.join("refs/heads/main").exists(),
+                            "push changed remote ref"
+                        );
+                    }
+                } else {
+                    let result = result.expect("transport");
+                    assert_ne!(result.is_error, Some(true), "{name}: {result:?}");
+                    assert!(
+                        calls.load(Ordering::SeqCst) > 0,
+                        "{name}: Auto assessor not reached"
+                    );
+                    match name {
+                        "git_add" => assert_eq!(git(&["show", ":selected.txt"]), b"selected\n"),
+                        "git_commit" => assert_eq!(
+                            String::from_utf8(git(&["log", "-1", "--format=%s"]))
+                                .expect("subject")
+                                .trim(),
+                            "operation-bound MCP commit",
+                        ),
+                        "git_checkout" => assert_eq!(
+                            String::from_utf8(git(&["branch", "--show-current"]))
+                                .expect("branch")
+                                .trim(),
+                            "target",
+                        ),
+                        "git_push" => {
+                            let output = std::process::Command::new("git")
+                                .args([
+                                    "--git-dir",
+                                    receiver.to_str().expect("receiver"),
+                                    "rev-parse",
+                                    "refs/heads/main",
+                                ])
+                                .output()
+                                .expect("remote ref");
+                            assert!(output.status.success(), "{:?}", output);
+                            assert_eq!(output.stdout, git(&["rev-parse", "HEAD"]));
+                        }
+                        _ => unreachable!(),
+                    }
                 }
-                "git_commit" => {
-                    std::fs::write(repository.join("selected.txt"), "committed\n")
-                        .expect("selected");
-                    git(&["add", "selected.txt"]);
-                    json!({"message": "operation-bound MCP commit"})
-                }
-                "git_checkout" => {
-                    git(&["branch", "target"]);
-                    json!({"branch": "target"})
-                }
-                "git_push" => {
-                    let receiver = temp.path().join("receiver.git");
-                    let output = std::process::Command::new("git")
-                        .args(["init", "--bare", receiver.to_str().expect("receiver")])
-                        .current_dir(temp.path())
-                        .output()
-                        .expect("bare receiver");
-                    assert!(output.status.success(), "{:?}", output);
-                    git(&[
-                        "remote",
-                        "add",
-                        "origin",
-                        receiver.to_str().expect("receiver"),
-                    ]);
-                    json!({"branch": "main"})
-                }
-                _ => unreachable!(),
-            };
-
-            let state = Arc::new(PermissionSessionState::new(
-                PermissionEngine::with_workspace_root(repository.clone()),
-            ));
-            let calls = Arc::new(AtomicUsize::new(0));
-            let resolver = AutoPermissionResolver::new(
-                Arc::new(Assessor {
-                    calls: calls.clone(),
-                    tool: name,
-                    operation,
-                    intent,
-                }),
-                Arc::new(ApproveDiscoveryDenyCommand(scope)),
-                ManagedWorkspaceLease::for_permission_session(&repository, state.clone())
-                    .expect("lease"),
-                Duration::from_secs(10),
-                AutoPermissionControl::new(true),
-            );
-            let pipeline = PermissionPipeline::new(
-                state,
-                PermissionContext::new(
-                    PermissionMode::Interactive,
-                    InteractionCapability::Available,
-                ),
-                Some(Arc::new(resolver)),
-            );
-            let gate = McpPermissionGate::with_pipeline(pipeline, Arc::new(HookRegistry::new()))
-                .with_user_intent(intent.into());
-            let mut registry = ToolRegistry::new();
-            registry
-                .register_builtin_contributions(talos_tools::git_mutation_tool_contributions(
-                    repository.clone(),
-                ))
-                .expect("native Git registration");
-            assert!(registry.is_builtin_instance(name));
-            let handler = TalosMcpHandler::new(Arc::new(registry), Arc::new(gate));
-            let (client_io, server_io) = tokio::io::duplex(65536);
-            let server = tokio::spawn(async move {
-                let running = handler.serve(server_io).await.expect("server");
-                let _ = running.waiting().await;
-            });
-            let client = ().serve(client_io).await.expect("client");
-            let args = input.as_object().expect("arguments").clone();
-            let result = client
-                .peer()
-                .call_tool(rmcp::model::CallToolRequestParams::new(name).with_arguments(args))
-                .await
-                .expect("transport");
-            assert_ne!(result.is_error, Some(true), "{name}: {result:?}");
-            assert!(
-                calls.load(Ordering::SeqCst) > 0,
-                "{name}: Auto assessor not reached"
-            );
-            match name {
-                "git_add" => assert_eq!(git(&["show", ":selected.txt"]), b"selected\n"),
-                "git_commit" => assert_eq!(
-                    String::from_utf8(git(&["log", "-1", "--format=%s"]))
-                        .expect("subject")
-                        .trim(),
-                    "operation-bound MCP commit",
-                ),
-                "git_checkout" => assert_eq!(
-                    String::from_utf8(git(&["branch", "--show-current"]))
-                        .expect("branch")
-                        .trim(),
-                    "target",
-                ),
-                "git_push" => {
-                    let remote = temp.path().join("receiver.git");
-                    let output = std::process::Command::new("git")
-                        .args([
-                            "--git-dir",
-                            remote.to_str().expect("receiver"),
-                            "rev-parse",
-                            "refs/heads/main",
-                        ])
-                        .output()
-                        .expect("remote ref");
-                    assert!(output.status.success(), "{:?}", output);
-                    assert_eq!(output.stdout, git(&["rev-parse", "HEAD"]));
-                }
-                _ => unreachable!(),
+                assert_eq!(state.grant_count().expect("grant count"), 0, "{name}");
+                let _ = client.cancel().await;
+                server.await.expect("server joined");
             }
-            let _ = client.cancel().await;
-            server.await.expect("server joined");
         }
     })
     .await

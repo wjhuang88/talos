@@ -2052,3 +2052,19 @@ Locked focused MCP integration tests pass for retained edit/delete and Save
 test evidence only; warnings-denied Clippy, governance validation, independent
 review and fresh exact-head CI remain required. It does not close MCP ordinary
 Shell/Exec Auto routing, WebSearch, recovery/profile/platform coverage, or I308.
+
+## MCP Git operation-specific Execute Deny regression — 2026-10-29
+
+The registered MCP Add/Commit/Checkout/Push Auto matrix now runs both success
+and explicit operation-scoped Execute Deny for each operation. Deny returns a
+permission-denied MCP error before any assessor call; HEAD, staged binary diff
+and current branch remain unchanged, and Push creates no receiver main ref.
+Both outcomes install zero persistent grants. These are independent operation
+fixtures, not renamed Pull evidence. All 49 `git_prepared` integration tests pass
+with `cargo test -p talos-mcp --all-features --locked --test git_prepared`
+(low-debug/nonincremental build), and all-target/all-feature MCP Clippy passes
+with `--locked -- -D warnings`. The preceding retained mutation checkpoint's
+Clippy and both governance validators also passed before publication.
+
+This extends local policy evidence only; fresh candidate review/CI, merge and
+remaining I308 host/profile/recovery/platform acceptance are still outstanding.
