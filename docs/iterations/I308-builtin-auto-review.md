@@ -2073,3 +2073,13 @@ Each returns a permission-denied MCP error after exactly one assessor call,
 without changing HEAD, the staged diff, current branch or Push receiver ref; no
 persistent grant is installed. All 49 Git prepared integration tests passed
 again after adding this failure branch.
+
+The real hosted-native MCP retained edit/delete matrix now also injects a file
+mutation assessor error for both operations. Review receives the complete image,
+then fails; the operation refuses without modifying or deleting the original
+file and leaves no persistent grant. Locked focused retained mutation and Save
+tests pass (2/2 integration tests), as does all-target/all-feature MCP Clippy
+with warnings denied and format/diff checks. This adds production-pipeline
+assessor-error evidence only. It does not close special/config/security-path,
+partial-failure, cancellation, or stale-identity recovery acceptance, nor the
+broader I308 recovery and platform rows.

@@ -54,6 +54,9 @@ impl AutoPermissionAssessor for Assessor {
         if self.scenario == "changed" {
             std::fs::write(&request.mutation.path, "concurrent update").expect("concurrent writer");
         }
+        if self.scenario == "error" {
+            return Err("injected file mutation assessor failure".into());
+        }
         Ok(
             json!({"schema":request.schema,"request_digest":request.request_digest,
             "decision":if self.scenario == "deny" {"human_required"} else {"allow_once"},
@@ -81,6 +84,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
         for scenario in [
             "allow",
             "deny",
+            "error",
             "replacement",
             "changed",
             "policy_write_deny",
