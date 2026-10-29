@@ -159,6 +159,11 @@ pub use http_request::{HttpRequestError, HttpRequestInput, HttpRequestTool};
 pub use read_image_tool::ReadImageTool;
 #[cfg(all(feature = "network", feature = "file-write"))]
 pub use save_url::{SaveUrlError, SaveUrlInput, SaveUrlTool};
+#[cfg(feature = "search-integration-test")]
+#[doc(hidden)]
+pub use search_backend::integration_test::{
+    SearchRouterIntegrationProbe, i293_guarded_search_router_tool_fixture,
+};
 #[cfg(feature = "search")]
 pub use search_tools::{GlobInput, GlobTool, GrepInput, GrepTool};
 #[cfg(feature = "file-read")]

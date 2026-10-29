@@ -1,6 +1,9 @@
 //! Dormant prepared-only AgentTool seam for the Talos-owned SearchRouter.
 //! Official WebSearch registration and production selection remain unchanged.
 
+#[cfg(feature = "search-integration-test")]
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use serde_json::Value;
 use talos_core::tool::{
@@ -9,6 +12,8 @@ use talos_core::tool::{
 };
 
 use super::composition::SearchCompositionConfiguration;
+#[cfg(feature = "search-integration-test")]
+use super::integration_test::SearchRouterIntegrationProbe;
 use super::prepared_invocation::PreparedSearchRouterInvocation;
 use super::router::SearchRouterPolicy;
 use super::transport::TransportLimits;
@@ -22,6 +27,8 @@ pub(in crate::search_backend) struct GuardedSearchRouterTool {
     configuration: SearchCompositionConfiguration,
     limits: TransportLimits,
     policy: SearchRouterPolicy,
+    #[cfg(feature = "search-integration-test")]
+    integration_probe: Option<Arc<SearchRouterIntegrationProbe>>,
 }
 
 impl std::fmt::Debug for GuardedSearchRouterTool {
@@ -40,7 +47,18 @@ impl GuardedSearchRouterTool {
             configuration,
             limits,
             policy,
+            #[cfg(feature = "search-integration-test")]
+            integration_probe: None,
         }
+    }
+
+    #[cfg(feature = "search-integration-test")]
+    pub(in crate::search_backend) fn with_integration_probe(
+        mut self,
+        probe: Arc<SearchRouterIntegrationProbe>,
+    ) -> Self {
+        self.integration_probe = Some(probe);
+        self
     }
 
     fn prepare(
@@ -49,7 +67,7 @@ impl GuardedSearchRouterTool {
     ) -> Result<PreparedSearchRouterInvocation, ToolNetworkPreparationError> {
         let parsed: WebSearchInput = serde_json::from_value(input.clone())
             .map_err(|_| ToolNetworkPreparationError::Invalid)?;
-        PreparedSearchRouterInvocation::prepare(
+        let prepared = PreparedSearchRouterInvocation::prepare(
             &self.configuration,
             &parsed.query,
             parsed.max_results.clamp(1, 20),
@@ -57,7 +75,13 @@ impl GuardedSearchRouterTool {
             self.limits,
             self.policy,
         )
-        .map_err(|_| ToolNetworkPreparationError::Invalid)
+        .map_err(|_| ToolNetworkPreparationError::Invalid)?;
+        #[cfg(feature = "search-integration-test")]
+        let prepared = match &self.integration_probe {
+            Some(probe) => prepared.with_integration_probe(Arc::clone(probe)),
+            None => prepared,
+        };
+        Ok(prepared)
     }
 }
 
