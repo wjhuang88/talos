@@ -73,7 +73,11 @@ impl AutoPermissionAssessor for Assessor {
             std::future::pending::<()>().await;
         }
         Ok(
-            json!({"schema":request.schema,"request_digest":request.request_digest,
+            json!({"schema":request.schema,"request_digest":if self.scenario == "wrong_digest" {
+                "sha256:another-mutation".to_owned()
+            } else {
+                request.request_digest
+            },
             "decision":if self.scenario == "deny" {"human_required"} else {"allow_once"},
             "confidence":"high"})
             .to_string(),
@@ -116,6 +120,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
             "restore_changed",
             "deny",
             "error",
+            "wrong_digest",
             "cancel",
             "sensitive_path",
             "credential_path",
