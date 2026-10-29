@@ -16,6 +16,7 @@ use tokio::sync::oneshot;
 use tokio::time::{Instant, sleep, sleep_until};
 
 use super::composition::RunningSearchComposition;
+use super::health::{SearchHealthSignal, SearchHealthState};
 use super::{
     SearchBackend, SearchBackendError, SearchBackendId, SearchBackendRequest, SearchBackendResult,
 };
@@ -27,6 +28,12 @@ type CandidateFuture<'a> =
 
 struct RouterCandidate<'a> {
     id: SearchBackendId,
+    future: CandidateFuture<'a>,
+}
+
+struct ActiveCandidate<'a> {
+    id: SearchBackendId,
+    started_at: Instant,
     future: CandidateFuture<'a>,
 }
 
@@ -141,7 +148,7 @@ impl<'a> SearchRouter<'a> {
         Ok(Self { candidates, policy })
     }
 
-    /// Routes one already-eligible reusable-backend request without spawning detached work.
+    /// Routes one already-eligible reusable-backend request without health-based ordering.
     pub(crate) async fn search(
         &self,
         request: SearchBackendRequest,
@@ -149,8 +156,41 @@ impl<'a> SearchRouter<'a> {
         cancellation: &mut oneshot::Receiver<()>,
     ) -> Result<SearchRouterSuccess, SearchRouterError> {
         let requested = request.max_results as usize;
-        let candidates = self
-            .candidates
+        let candidates = self.candidates_for(&request);
+        route_candidates(
+            self.policy,
+            candidates,
+            requested,
+            deadline,
+            cancellation,
+            None,
+        )
+        .await
+    }
+
+    /// Routes one already-eligible reusable-backend request using explicit bounded health memory.
+    pub(crate) async fn search_with_health(
+        &self,
+        request: SearchBackendRequest,
+        deadline: Instant,
+        cancellation: &mut oneshot::Receiver<()>,
+        health: &mut SearchHealthState,
+    ) -> Result<SearchRouterSuccess, SearchRouterError> {
+        let requested = request.max_results as usize;
+        let candidates = self.candidates_for(&request);
+        route_candidates(
+            self.policy,
+            candidates,
+            requested,
+            deadline,
+            cancellation,
+            Some(health),
+        )
+        .await
+    }
+
+    fn candidates_for(&self, request: &SearchBackendRequest) -> Vec<RouterCandidate<'a>> {
+        self.candidates
             .iter()
             .cloned()
             .map(|backend| {
@@ -161,8 +201,7 @@ impl<'a> SearchRouter<'a> {
                     future: Box::pin(async move { backend.search(candidate_request).await }),
                 }
             })
-            .collect();
-        route_candidates(self.policy, candidates, requested, deadline, cancellation).await
+            .collect()
     }
 }
 
@@ -191,17 +230,62 @@ pub(crate) async fn search_prepared(
             }
         })
         .collect();
-    route_candidates(policy, candidates, requested, deadline, cancellation).await
+    route_candidates(
+        policy,
+        candidates,
+        requested,
+        deadline,
+        cancellation,
+        None,
+    )
+    .await
+}
+
+/// Health-aware variant of the dormant prepared path. No production caller uses this stage.
+pub(crate) async fn search_prepared_with_health(
+    composition: RunningSearchComposition,
+    policy: SearchRouterPolicy,
+    cancellation: &mut oneshot::Receiver<()>,
+    health: &mut SearchHealthState,
+) -> Result<SearchRouterSuccess, SearchRouterError> {
+    let requested = composition.requested_results();
+    let deadline = composition.deadline();
+    let candidates = composition
+        .into_candidates()
+        .into_iter()
+        .map(|candidate| {
+            let id = candidate.id();
+            RouterCandidate {
+                id,
+                future: Box::pin(async move {
+                    candidate
+                        .execute()
+                        .await
+                        .map_err(|error| error.into_backend_error())
+                }),
+            }
+        })
+        .collect();
+    route_candidates(
+        policy,
+        candidates,
+        requested,
+        deadline,
+        cancellation,
+        Some(health),
+    )
+    .await
 }
 
 /// Shared first-valid-success scheduler for reusable and one-shot prepared candidates.
 /// Closing the cancellation sender is cancellation; dropping this future drops all owned futures.
 async fn route_candidates<'a>(
     policy: SearchRouterPolicy,
-    candidates: Vec<RouterCandidate<'a>>,
+    mut candidates: Vec<RouterCandidate<'a>>,
     requested: usize,
     deadline: Instant,
     cancellation: &mut oneshot::Receiver<()>,
+    mut health: Option<&mut SearchHealthState>,
 ) -> Result<SearchRouterSuccess, SearchRouterError> {
     if requested == 0 || requested > policy.max_examined_results {
         return Err(SearchRouterError::InvalidRequest);
@@ -211,8 +295,12 @@ async fn route_candidates<'a>(
         return Err(error);
     }
 
+    if let Some(state) = health.as_mut() {
+        candidates = order_candidates_by_health(candidates, &mut **state, Instant::now());
+    }
+
     let mut remaining = candidates.into_iter();
-    let mut active: Vec<(SearchBackendId, CandidateFuture<'a>)> = Vec::new();
+    let mut active: Vec<ActiveCandidate<'a>> = Vec::new();
     let mut failures = Vec::new();
     let mut launch_next = true;
     let hedge = sleep(policy.hedge_delay);
@@ -226,7 +314,11 @@ async fn route_candidates<'a>(
         if (launch_next || active.is_empty()) && active.len() < policy.max_in_flight {
             launch_next = false;
             if let Some(candidate) = remaining.next() {
-                active.push((candidate.id, candidate.future));
+                active.push(ActiveCandidate {
+                    id: candidate.id,
+                    started_at: Instant::now(),
+                    future: candidate.future,
+                });
                 hedge.as_mut().reset(Instant::now() + policy.hedge_delay);
             } else if active.is_empty() {
                 return if failures.is_empty() {
@@ -242,20 +334,25 @@ async fn route_candidates<'a>(
             _ = &mut *cancellation => return Err(SearchRouterError::Cancelled),
             _ = sleep_until(deadline) => return Err(SearchRouterError::Deadline),
             (index, outcome) = poll_fn(|cx| {
-                for (index, (_, future)) in active.iter_mut().enumerate() {
-                    if let Poll::Ready(outcome) = future.as_mut().poll(cx) {
+                for (index, candidate) in active.iter_mut().enumerate() {
+                    if let Poll::Ready(outcome) = candidate.future.as_mut().poll(cx) {
                         return Poll::Ready((index, outcome));
                     }
                 }
                 Poll::Pending
             }), if !active.is_empty() => {
-                let (backend, completed) = active.remove(index);
+                let ActiveCandidate {
+                    id: backend,
+                    started_at,
+                    future: completed,
+                } = active.remove(index);
                 drop(completed);
                 match outcome {
-                    Err(error) => failures.push(SearchRouterFailure {
-                        backend,
-                        kind: SearchRouterFailureKind::Backend(error),
-                    }),
+                    Err(error) => {
+                        let kind = SearchRouterFailureKind::Backend(error);
+                        record_health_failure(&mut health, backend, &kind, started_at);
+                        failures.push(SearchRouterFailure { backend, kind });
+                    }
                     Ok(results) => match admit(
                         policy,
                         backend,
@@ -268,16 +365,24 @@ async fn route_candidates<'a>(
                             if let Some(error) = control(deadline, cancellation) {
                                 return Err(error);
                             }
+                            record_health_signal(
+                                &mut health,
+                                backend,
+                                SearchHealthSignal::Success,
+                                started_at,
+                            );
                             return Ok(SearchRouterSuccess { backend, results });
                         }
-                        Err(AdmissionError::NoResults) => failures.push(SearchRouterFailure {
-                            backend,
-                            kind: SearchRouterFailureKind::NoResults,
-                        }),
-                        Err(AdmissionError::InvalidResults) => failures.push(SearchRouterFailure {
-                            backend,
-                            kind: SearchRouterFailureKind::InvalidResults,
-                        }),
+                        Err(AdmissionError::NoResults) => {
+                            let kind = SearchRouterFailureKind::NoResults;
+                            record_health_failure(&mut health, backend, &kind, started_at);
+                            failures.push(SearchRouterFailure { backend, kind });
+                        }
+                        Err(AdmissionError::InvalidResults) => {
+                            let kind = SearchRouterFailureKind::InvalidResults;
+                            record_health_failure(&mut health, backend, &kind, started_at);
+                            failures.push(SearchRouterFailure { backend, kind });
+                        }
                         Err(AdmissionError::Control(error)) => return Err(error),
                     },
                 }
@@ -291,6 +396,56 @@ async fn route_candidates<'a>(
                 launch_next = true;
             }
         }
+    }
+}
+
+fn order_candidates_by_health<'a>(
+    candidates: Vec<RouterCandidate<'a>>,
+    health: &mut SearchHealthState,
+    now: Instant,
+) -> Vec<RouterCandidate<'a>> {
+    let mut ranked = candidates
+        .into_iter()
+        .enumerate()
+        .map(|(position, candidate)| {
+            (health.selection_rank(candidate.id, now), position, candidate)
+        })
+        .collect::<Vec<_>>();
+    ranked.sort_by_key(|(rank, position, _)| (*rank, *position));
+    ranked
+        .into_iter()
+        .map(|(_, _, candidate)| candidate)
+        .collect()
+}
+
+fn record_health_failure(
+    health: &mut Option<&mut SearchHealthState>,
+    backend: SearchBackendId,
+    kind: &SearchRouterFailureKind,
+    started_at: Instant,
+) {
+    record_health_signal(
+        health,
+        backend,
+        SearchHealthSignal::from_failure(kind),
+        started_at,
+    );
+}
+
+fn record_health_signal(
+    health: &mut Option<&mut SearchHealthState>,
+    backend: SearchBackendId,
+    signal: SearchHealthSignal,
+    started_at: Instant,
+) {
+    let observed_at = Instant::now();
+    if let Some(state) = health.as_mut() {
+        (&mut **state).record(
+            backend,
+            signal,
+            observed_at.saturating_duration_since(started_at),
+            observed_at,
+        );
     }
 }
 
@@ -371,6 +526,8 @@ fn control(
     }
 }
 
+#[cfg(test)]
+mod health_tests;
 #[cfg(test)]
 mod prepared_tests;
 #[cfg(test)]
