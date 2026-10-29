@@ -161,7 +161,10 @@ fn reviewed_copilot_messages_endpoint_is_auto_activated() {
         "claude-sonnet-4.6",
         "https://api.githubcopilot.com",
     );
-    assert_eq!(config.provider_protocol(), ProviderProtocol::AnthropicMessages);
+    assert_eq!(
+        config.provider_protocol(),
+        ProviderProtocol::AnthropicMessages
+    );
     assert_eq!(
         config
             .resolve_provider_endpoint()

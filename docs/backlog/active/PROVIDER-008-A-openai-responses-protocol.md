@@ -19,7 +19,7 @@
 | Governance Claim PR | #747 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child requirement #748 records this bounded slice. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
-| Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime), #793 (reviewed endpoint data), #799 (public Copilot runtime) |
+| Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime), #793 (reviewed endpoint data), #799 (public Copilot runtime), #803 (Copilot catalog data) |
 | Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Claim activates only when #747 reaches main with accepted ADR-093. Sibling families remain unclaimed; Complete requires existing implementation commit evidence. |
 
@@ -393,3 +393,11 @@ no local Rust test success is claimed for this data candidate. The offline exhau
 rerun successfully. Independent review found stale 65/45 snapshot counts and an old Copilot
 non-activation assertion; these were updated to 72/52 and catalog-inferred Messages/Bearer,
 retaining the separate rollback and gateway-isolation checks. Fresh native CI remains a merge gate.
+
+Data candidate #803 was published at head 214e8a781bffaf4bfe5c4e365f76b883f1434d7e,
+tree bf6c9ecea2265033ddfa0fe58d9746e514b88dff, after independent exact-tree source/data
+APPROVE and offline audit. CI3566/run40835851075 passed both governance validators,
+text boundary, classifier tests and frozen projection audit, then Unix preflight/Windows format
+rejected a long assertion that needed rustfmt line wrapping. This is a formatting failure,
+not passing Rust validation. The wrapping and this actual PR-number backfill are batched in
+one correction; no runtime behavior or data changed. Fresh exact-head CI remains required.
