@@ -2112,3 +2112,14 @@ integration tests (2/2, `/private/tmp/i308-sensitive-path-green.log`), using
 nonincremental/low-debug builds. This is local integration evidence; fresh
 protected-scope independent review, complete candidate validation, exact-head
 CI and merge remain outstanding, as do the broader I308 acceptance rows.
+
+## MCP recovery stale-target integration — 2026-10-29
+
+The real retained edit/delete Auto matrix now changes the destination after the
+initial successful mutation and before a separately human-approved recovery.
+Both the first recovery attempt and its repeat refuse to overwrite the new user
+content; the assessor remains at one invocation and no persistent grant exists.
+The locked all-feature `native_mutation_auto` suite passes
+(`/private/tmp/i308-recovery-stale.log`). This proves stale-content protection
+through this MCP composition, not atomic protection against every concurrent
+rename race or restart-persistent recovery. I308 remains Partial.

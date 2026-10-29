@@ -98,6 +98,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
         for scenario in [
             "allow",
             "restore",
+            "restore_changed",
             "deny",
             "error",
             "sensitive_path",
@@ -136,7 +137,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                     delete,
                     file_name,
                 }),
-                if scenario == "restore" {
+                if matches!(scenario, "restore" | "restore_changed") {
                     Arc::new(ApproveRecovery) as Arc<dyn ApprovalResolver>
                 } else {
                     Arc::new(Deny)
@@ -211,7 +212,10 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                 expected_reviews,
                 "assessment evidence assertions must complete: {scenario}"
             );
-            if matches!(scenario, "allow" | "restore" | "headless") {
+            if matches!(
+                scenario,
+                "allow" | "restore" | "restore_changed" | "headless"
+            ) {
                 let result = result.expect("Auto admission");
                 assert_ne!(result.is_error, Some(true), "{result:?}");
                 if delete {
@@ -219,7 +223,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                 } else {
                     assert_eq!(std::fs::read_to_string(&path).expect("edited"), "hello");
                 }
-                if scenario == "restore" {
+                if matches!(scenario, "restore" | "restore_changed") {
                     let text = result
                         .content
                         .iter()
@@ -234,6 +238,9 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                         .split([';', '\n'])
                         .next()
                         .expect("recovery id");
+                    if scenario == "restore_changed" {
+                        std::fs::write(&path, "new user content").expect("concurrent replacement");
+                    }
                     let input = json!({"path":"selected.txt", "recovery_id":id});
                     for replay in [false, true] {
                         let restored = client
@@ -248,8 +255,19 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                             )
                             .await
                             .expect("recovery transport");
-                        assert_eq!(restored.is_error == Some(true), replay, "{restored:?}");
-                        assert_eq!(std::fs::read_to_string(&path).expect("restored"), "hi");
+                        assert_eq!(
+                            restored.is_error == Some(true),
+                            replay || scenario == "restore_changed",
+                            "{restored:?}"
+                        );
+                        assert_eq!(
+                            std::fs::read_to_string(&path).expect("restored or preserved"),
+                            if scenario == "restore_changed" {
+                                "new user content"
+                            } else {
+                                "hi"
+                            }
+                        );
                         assert_eq!(
                             calls.load(Ordering::SeqCst),
                             1,
