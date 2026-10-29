@@ -2092,3 +2092,23 @@ Auto assessor call. The focused locked MCP mutation suite passes. This proves
 one-use instance-local recovery in this composition, not persistence across
 restart, cross-session ownership, special/config/security-path behavior,
 partial-failure recovery, or cancellation/stale-identity coverage.
+
+## Sensitive-path retained mutation Auto boundary — 2026-10-29
+
+Retained file mutation review now applies the existing sensitive-target predicate
+to the prepared target path before exposing complete images to the assessor.
+Real registered MCP edit/delete fixtures with benign contents at `.env` and
+`.aws/credentials` refuse via the denying human fallback with zero model calls,
+unchanged originals and no persistent grants. This reuses the conservative
+existing path policy; it is not an exhaustive credential classifier or a blanket
+ban on all configuration changes.
+
+Regression sensitivity was checked by temporarily removing the path guard:
+`native_mutation_auto` failed with one assessor invocation instead of zero for
+the `.env` scenario (`/private/tmp/i308-sensitive-path-red.log`). The assessor's
+ordinary-file intent assertion also failed after that unexpected invocation.
+Restoring the guard passes the locked all-feature MCP retained mutation and Save
+integration tests (2/2, `/private/tmp/i308-sensitive-path-green.log`), using
+nonincremental/low-debug builds. This is local integration evidence; fresh
+protected-scope independent review, complete candidate validation, exact-head
+CI and merge remain outstanding, as do the broader I308 acceptance rows.

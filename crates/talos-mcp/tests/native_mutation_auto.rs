@@ -27,6 +27,7 @@ struct Assessor {
     verified: Arc<AtomicUsize>,
     scenario: &'static str,
     delete: bool,
+    file_name: &'static str,
 }
 
 #[async_trait]
@@ -48,7 +49,7 @@ impl AutoPermissionAssessor for Assessor {
         );
         assert_eq!(
             request.user_intent,
-            "update selected.txt with a retained backup"
+            format!("update {} with a retained backup", self.file_name)
         );
         self.verified.fetch_add(1, Ordering::SeqCst);
         if self.scenario == "changed" {
@@ -99,13 +100,21 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
             "restore",
             "deny",
             "error",
+            "sensitive_path",
+            "credential_path",
             "replacement",
             "changed",
             "policy_write_deny",
             "headless",
         ] {
             let root = tempfile::tempdir().expect("workspace");
-            let path = root.path().join("selected.txt");
+            let file_name = match scenario {
+                "sensitive_path" => ".env",
+                "credential_path" => ".aws/credentials",
+                _ => "selected.txt",
+            };
+            let path = root.path().join(file_name);
+            std::fs::create_dir_all(path.parent().expect("parent")).expect("fixture directory");
             std::fs::write(&path, "hi").expect("fixture");
             let calls = Arc::new(AtomicUsize::new(0));
             let verified = Arc::new(AtomicUsize::new(0));
@@ -125,6 +134,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                     verified: verified.clone(),
                     scenario,
                     delete,
+                    file_name,
                 }),
                 if scenario == "restore" {
                     Arc::new(ApproveRecovery) as Arc<dyn ApprovalResolver>
@@ -153,7 +163,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                 Some(Arc::new(resolver)),
             );
             let gate = McpPermissionGate::with_pipeline(pipeline, Arc::new(HookRegistry::new()))
-                .with_user_intent("update selected.txt with a retained backup".into());
+                .with_user_intent(format!("update {file_name} with a retained backup"));
             let mut registry = ToolRegistry::new();
             registry
                 .register_builtin_contributions(talos_tools::ordinary_file_tool_contributions(
@@ -180,9 +190,9 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
             });
             let client = ().serve(client_io).await.expect("client");
             let input = if delete {
-                json!({"path":"selected.txt", "retain_backup":true})
+                json!({"path":file_name, "retain_backup":true})
             } else {
-                json!({"path":"selected.txt", "old_string":"hi", "new_string":"hello", "retain_backup":true})
+                json!({"path":file_name, "old_string":"hi", "new_string":"hello", "retain_backup":true})
             };
             let result = client
                 .peer()
@@ -191,8 +201,10 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                         .with_arguments(input.as_object().expect("args").clone()),
                 )
                 .await;
-            let expected_reviews =
-                usize::from(!matches!(scenario, "replacement" | "policy_write_deny"));
+            let expected_reviews = usize::from(!matches!(
+                scenario,
+                "replacement" | "policy_write_deny" | "sensitive_path" | "credential_path"
+            ));
             assert_eq!(calls.load(Ordering::SeqCst), expected_reviews, "{scenario}");
             assert_eq!(
                 verified.load(Ordering::SeqCst),
