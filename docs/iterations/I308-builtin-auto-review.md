@@ -1,5 +1,17 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Local Desktop durable Todo correction — 2026-10-29
+
+The real `RuntimeHost` durable-session dispatch regression exposed that Todo
+registration and work projection used the global default sessions directory,
+although Desktop opens its durable transcript in a workspace-local binding.
+Both now use that binding's root. The focused locked Desktop `desktop-ui` binary
+test failed before the production correction (no item in the bound store) and
+passed afterward, verifying actual Todo creation and session isolation. Both
+governance validators passed with zero warnings. This local change is not yet
+committed, independently reviewed or certified by full preflight/exact-head CI;
+it does not complete I308, T8 or the handoff queue.
+
 ## Local MCP injected command Auto stage — 2026-10-28
 
 The MCP gate now accepts an explicitly injected permission pipeline and current-turn
