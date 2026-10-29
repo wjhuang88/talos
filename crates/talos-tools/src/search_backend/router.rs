@@ -230,15 +230,7 @@ pub(crate) async fn search_prepared(
             }
         })
         .collect();
-    route_candidates(
-        policy,
-        candidates,
-        requested,
-        deadline,
-        cancellation,
-        None,
-    )
-    .await
+    route_candidates(policy, candidates, requested, deadline, cancellation, None).await
 }
 
 /// Health-aware variant of the dormant prepared path. No production caller uses this stage.
@@ -408,7 +400,11 @@ fn order_candidates_by_health<'a>(
         .into_iter()
         .enumerate()
         .map(|(position, candidate)| {
-            (health.selection_rank(candidate.id, now), position, candidate)
+            (
+                health.selection_rank(candidate.id, now),
+                position,
+                candidate,
+            )
         })
         .collect::<Vec<_>>();
     ranked.sort_by_key(|(rank, position, _)| (*rank, *position));
