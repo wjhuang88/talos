@@ -288,7 +288,7 @@ async fn route_candidates<'a>(
     }
 
     if let Some(state) = health.as_mut() {
-        candidates = order_candidates_by_health(candidates, &mut **state, Instant::now());
+        candidates = order_candidates_by_health(candidates, state, Instant::now());
     }
 
     let mut remaining = candidates.into_iter();
@@ -436,7 +436,7 @@ fn record_health_signal(
 ) {
     let observed_at = Instant::now();
     if let Some(state) = health.as_mut() {
-        (**state).record(
+        state.record(
             backend,
             signal,
             observed_at.duration_since(started_at),
