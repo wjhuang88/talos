@@ -390,7 +390,7 @@ remaining full built-in coverage stays unclaimed and subsequent. See the I300
 owner for scope, acceptance and complete active/review/planned inventory.
 
 
-## Current I306 Review — 2026-10-28
+## Historical I306 Review — 2026-10-28
 
 [I306](I306-provider008a-openai-responses.md) / [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md)
 is Review / Claimed after code #749 (`60e27eb6`) and catalog #775 (`6af8654c`) merged.
@@ -398,3 +398,12 @@ CI3498/CI3509 each passed all eight jobs with exact-head technical review and CA
 Code #792 and the separate data stage add 45 reviewed HTTP model endpoint pairs; seven Copilot
 endpoints remain unreviewed for vendor auth/transport, while four WSS records are excluded Realtime.
 Owner acceptance and #748 closure remain pending; parent #724 and unclaimed B/C/D are not Complete.
+
+
+## Current I306 Complete — 2026-10-29
+
+[I306](I306-provider008a-openai-responses.md) and its child-A owner are Complete / Closed,
+with existing implementation `dd6c5f82ed88cc963b47758dee06fa506cb407a1` (#803) and earlier
+merged evidence. Full child acceptance, all 52 reviewed HTTP endpoint pairs, CI3570 8/8 and
+independent technical review are recorded owner-first. #748 closes after this closure merges.
+Parent #724 remains open for unimplemented/unclaimed Gemini, Azure and Bedrock siblings.

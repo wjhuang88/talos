@@ -1,6 +1,6 @@
 # PROVIDER-008: Complete Wire-Protocol Family Coverage And Protocol Mode Configuration
 
-**Status**: Refinement / Unclaimed (child A implementation merged; acceptance remains Review)
+**Status**: Refinement / Unclaimed (child A Complete / Closed; B/C/D unimplemented)
 **Type**: Provider / Config / Model-Catalog Epic (child Stories decompose at claim time)
 **Parent Epic**: None
 **Source Issue**: [#724](https://github.com/wjhuang88/talos/issues/724)
@@ -153,3 +153,15 @@ safeguard. Seven Copilot Messages endpoints remain unreviewed for vendor authent
 four WSS records are the already-excluded Realtime family. The owner remains Review / Claimed with
 Completion Commit: Pending. Neither a staged candidate nor moving a residual into this parent is
 completion or a scope waiver. B/C/D remain unclaimed; #724/#748 stay open and no release is claimed.
+
+
+## Child A acceptance closure — 2026-10-29
+
+Child A / #748 / I306 closes owner-first with existing implementation evidence
+`dd6c5f82ed88cc963b47758dee06fa506cb407a1` (#803) and the earlier implementation chain
+recorded in its owner. All 52 supported reviewed HTTP endpoint pairs are now active; the seven
+Copilot records are no longer an implementation residual. CI3570 passed 8/8 and exact-object
+technical review approved. Four WSS records remain the original Realtime exclusion. Prior
+checkpoints above are historical. Parent #724 remains open and incomplete: B Gemini, C Azure
+and D Bedrock need independent claims, ADRs, runnable implementations and full acceptance.
+No release or sibling completion is claimed. #748 closes only after the owner closure reaches main.

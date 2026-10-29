@@ -1,6 +1,6 @@
 # PROVIDER-008-A: Protocol Architecture And OpenAI Responses
 
-**Status**: Review / Claimed; implementation merged, acceptance residual remains
+**Status**: Complete / Closed
 **Type**: Provider / Config / Model-Catalog Story
 **Parent Epic**: [PROVIDER-008](PROVIDER-008-openai-responses-api-support.md) / [Issue #724](https://github.com/wjhuang88/talos/issues/724)
 **Source Issue**: [#748](https://github.com/wjhuang88/talos/issues/748)
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 / talos开发 #724 continuation 2026-10-26 |
 | Work Slice | PROVIDER-008-A protocol architecture plus OpenAI Responses only; Gemini, Azure and Bedrock remain separate children. |
@@ -20,7 +20,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child requirement #748 records this bounded slice. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
 | Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime), #793 (reviewed endpoint data), #799 (public Copilot runtime), #803 (Copilot catalog data) |
-| Last Updated | 2026-10-28 |
+| Last Updated | 2026-10-29 |
 | Handoff / Release Condition | Claim activates only when #747 reaches main with accepted ADR-093. Sibling families remain unclaimed; Complete requires existing implementation commit evidence. |
 
 ## Goal
@@ -401,3 +401,51 @@ text boundary, classifier tests and frozen projection audit, then Unix preflight
 rejected a long assertion that needed rustfmt line wrapping. This is a formatting failure,
 not passing Rust validation. The wrapping and this actual PR-number backfill are batched in
 one correction; no runtime behavior or data changed. Fresh exact-head CI remains required.
+
+
+## Acceptance closure — 2026-10-29
+
+Completion Commit: dd6c5f82ed88cc963b47758dee06fa506cb407a1
+
+This existing main merge includes the final Copilot catalog data (#803), after runtime #799
+`5ad8cc7ab606f762cb5bb94650e855c9aa456303`. Earlier implementation evidence remains #749
+`60e27eb6653b3a8fef638a2b9a7294a036b78db0`, #775
+`6af8654c6ee6e422d4d3f4e5dad171c78604cafd`, #792
+`e53c61c7f0344308a5c5535bb1521fefebbacc70` and #793
+`8e3171534367ec242e02fdc1a90e012d533f8e96`. The closure commit is not its own implementation evidence.
+
+Final data head `56789a427a90c4fd907e6f9e2b990d27416f8fb0`, tree
+`88fe262ae165fe6a8fe06b23151144d340aba81f`, passed CI3570/run40837047324 attempt 1,
+all eight jobs including standard preflight, native Windows workspace/Desktop and governance.
+Independent read-only Agent APPROVE bound that remote head/tree and main `743cb6f`; final CAS
+confirmed the same claim/actor/slice, no blocking review or overlapping PR, and isolated Search
+base changes. #803 merged under the established Single-maintainer path. Shared-account Agent
+review is not distinct-natural-person approval. Earlier format failures, local cargo-unavailable
+and MCP environmental failures remain historical failures, not retroactive local passes.
+
+Full child-A acceptance was re-audited against the merged source:
+
+| Acceptance | Existing implementation / test evidence |
+|---|---|
+| Defaults, explicit rollback, unknown gateways, model precedence and ambiguity | protocol_resolution and catalog_protocol config tests; factory uses the shared resolver. |
+| Stateless text/image/native tools/reasoning/output limit | openai_responses_request maps ordered input parts, call IDs and opaque replay; store=false and no previous_response_id. Ordered-part tests cover text/image/text; no dedicated two-image test is claimed. |
+| Streaming, parallel tools, usage, terminal/error/unknown/EOF | wire_contract_tests with pinned upstream persisted SDK fixtures, explicitly synthetic parallel fixtures, SSE state machine and byte-boundary proptest. No live Talos capture is claimed. |
+| Complete Agent rounds | responses_agent real CLI binary tests cover native tools, image continuation, one-shot read_image and Compat/Strict; Copilot catalog tests use the permission-gated Agent round. |
+| Actionable rejection without cross-wire retry | Responses client 404/405 diagnostics and non-retry tests; no fallback adapter dispatch. |
+| Config round-trip, omitted protocol and provenance | round-trip/select/credential tests plus picker/browser/model context using shared resolution. |
+| Distinct HTTP endpoint residual | 52 reviewed pairs now active, including all seven Copilot rows; exhaustive frozen audit 6474 models / 4062 hints / zero mismatches. Four WSS rows remain the original Realtime non-goal. |
+| Documentation and migration | Protocol reference, bilingual README, architecture, SDK contract and unreleased-provider008a release notes record defaults, rollback and required pre-1.0 minor migration. |
+
+Child A and I306 are Complete / Closed in this closure candidate. Earlier Active/Review/Pending
+checkpoints above are historical and preserve the published baseline and failure record. The
+closure state becomes target-branch truth only after this documentation candidate passes its
+applicable exact-head checks, independent review and merge CAS. #748 stays open until then.
+Parent #724 stays open: Gemini, Azure and Bedrock remain unimplemented, unclaimed siblings and
+require their own claims/iterations/ADRs. This closes no parent requirement by scope transfer.
+No version bump, tag, release, live vendor test or new transport scope is authorized or claimed.
+
+Closure local validation: collaboration claims passed with zero warnings and whitespace checks
+passed. Project governance reached its SQLite consumer check but could not execute cargo after
+the environment restore (one error, zero warnings); delivery workflow cases passed. This is not
+a full local governance pass. The closure requires native exact-head applicable CI, including
+both governance validators, before merge. No dependency, test or validation guard is changed.

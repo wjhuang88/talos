@@ -749,3 +749,20 @@ I115 corrects those findings under ADR-039:
 - steering drains only on authoritative session completion;
 - `AppServerSession` owns successful turn-message persistence;
 - TUI, interactive, inline, print, embedded runtime, and RPC use the session protocol.
+
+
+### Model wire-protocol construction (PROVIDER-008-A)
+
+`talos-config` resolves model-explicit, provider-explicit, reviewed catalog-model and confirmed
+provider signals in that order, with conservative Chat fallback and visible provenance.
+`talos_provider::openai_responses::factory::build_configured_provider` is the shared adapter construction boundary used by
+hosts. Dedicated Chat, Responses and Messages module groups map wire requests/streams to existing
+`LanguageModel` events; hosts retain credential lookup and model/variant materialization.
+Responses is stateless (`store: false`, no `previous_response_id`); an error never triggers a
+cross-protocol retry. Reviewed model endpoints are paired with their wire protocol and suppressed
+for changed gateways or incompatible explicit wire overrides. Public Copilot uses a narrowly
+origin-checked static Bearer transport profile; no OAuth or enterprise routing is implied.
+See [protocol and migration reference](PROVIDER-PROTOCOLS.md),
+[ADR-093](../decisions/093-openai-responses-protocol-boundary.md) and the
+[reviewed catalog ledger](PROVIDER-008-A-CATALOG-PROTOCOLS.md).
+Gemini, Azure and Bedrock remain separately governed, unimplemented sibling families.
