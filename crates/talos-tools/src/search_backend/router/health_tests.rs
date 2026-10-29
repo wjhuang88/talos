@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tokio::sync::oneshot;
 use tokio::time::{Instant, sleep};
 
-use super::super::super::health::{SearchHealthSignal, SearchHealthState};
+use super::super::health::{SearchHealthSignal, SearchHealthState};
 use super::*;
 
 type SharedStarts = Arc<Mutex<Vec<SearchBackendId>>>;
