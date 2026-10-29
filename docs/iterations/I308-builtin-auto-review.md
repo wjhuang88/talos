@@ -688,7 +688,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | `web_search` | ADR-090 excludes ordinary whole-invocation Auto, including compatibility/default search. Concrete production legacy registration currently refuses before model/human review because its profile has no safe typed network resource, including with explicit policy Allow. Six real-Agent disposition scenarios pass locally; this is unavailable behavior, not a working search path. Guarded instances require their dedicated prepared-network route and cannot downgrade. I293 backend/transport activation remains separately owned; synthetic carrier fixtures do not prove search backend success. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
-| `bash` (Unix) / `powershell` (Windows), `exec` | Whole-invocation Auto merged in #783 with actual Unix allow/refusal/cancel/stale/registration/replay tests and exact-head Windows workspace CI. Per-entry-point reachability/final acceptance still requires reconciliation; cross-compilation alone is never native evidence. |
+| `bash` (Unix) / `powershell` (Windows), `exec` | Whole-invocation Auto merged in #783 with real Agent allow/refusal/cancel/stale/registration/replay tests. MCP now routes registered instances through cwd-aware one-use invocation admission; local MCP integration proves Exec and Unix Bash Git-config mutation after AllowOnce plus explicit Execute Deny. Windows PowerShell MCP execution and exact-head Windows CI for this route remain outstanding; full profile acceptance remains open. |
 | `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Session-scoped Internal facets retain default deterministic Allow, not model approval. Local real-Agent tests cover all nine operations under default Allow and explicit Internal Deny, actual SQLite effects, unchanged other-session data, zero assessor calls and zero grants. MCP does not add Todo; complete profile/platform evidence remains outstanding. |
 | `status` | MCP-only read tool; concrete built-in ownership checked. |
 | `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Scheduler registration and action review merged in #772. Product-owned instances are built-ins; caller-supplied instances remain external. Exact scheduling/cancellation review does not approve future tool effects. `list_scheduled_tasks` retains Read policy. Complete profile/final acceptance remains open. |
@@ -2154,3 +2154,55 @@ test (`cargo test -p talos-mcp --all-features --locked --test
 native_mutation_auto`) passes on this local follow-up candidate. This is explicit
 Write Deny after the initial operation, not a human resolver denial; the MCP
 transport correctly returns a permission error before tool execution.
+
+## MCP ordinary command invocation admission — 2026-10-29
+
+The MCP ordinary-invocation route now admits only registered native
+`bash`/`powershell`/`exec` alongside ordinary HTTP/fetch. The shared pipeline
+receives the tool-owned starting directory, exact normalized arguments, frozen
+implementation configuration, resolved initial execution directories and their
+resolution state. A one-use prepared admission is consumed after hooks and
+freshness checks; execution is refused if configuration, directory list or
+starting directory changes. The new MCP integration fixture executes real Git
+config mutation through registered Exec and Unix Bash only after model
+AllowOnce, and explicit Execute Deny rejects before assessor invocation or
+mutation. Its locked test passes locally. Windows PowerShell runtime coverage,
+assessor uncertainty/error/cancellation across this new MCP route, exact-head
+CI and independent permission/security/API review remain outstanding. Default
+standalone MCP remains Headless and fail-closed without an injected pipeline and
+current-turn intent. Full I308 remains Partial.
+
+The exact-head CI run `40820098820` completed with Linux preflight failure in
+`cancelled_push_closes_transport_and_confirms_cleanup`: the fixture's Git commit
+left background auto-maintenance rewriting the object layout between preparation
+and Push discovery. The full local host preflight passed and the same test passed
+there. The fixture commit now disables Git auto-detach so maintenance completes
+before snapshot capture; this local corrective test change requires fresh full
+validation, exact-head review/CI and merge evidence.
+
+## Post-failure local validation and MCP ordinary command route — 2026-10-29
+
+The fixture correction is committed as `bf057a41e` and the MCP registered
+ordinary command route as `15be68e49`. Standard local validation completed with
+exit 0 using the repository `./scripts/release_preflight.sh` entrypoint and
+`CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0
+RUST_TEST_THREADS=1`; this includes workspace check, warnings-denied Clippy,
+workspace tests/doctests and both external Runtime SDK modes. Tools passed
+1010/1010, including `cancelled_push_closes_transport_and_confirms_cleanup`
+and the eight-stage local Push test. Governance and collaboration validators
+reported zero warnings. An earlier sandbox attempt was incomplete: process
+observation returned EPERM at the local Push test, and the next full run ran out
+of disk while building the SDK coding-mode archive. The approved-host run above
+is the successful evidence; the two failed attempts are not counted as passes.
+
+The MCP command route admits only registered `bash`/`powershell`/`exec` when
+they use ordinary invocation review. It binds exact arguments, the tool-owned
+starting directory, configuration and the resolved initial execution-directory
+set, then rechecks those values before consuming the one-use admission and
+executing the retained instance. A real MCP integration fixture verifies
+registered Exec and platform shell mutation after AllowOnce and explicit Execute
+Deny before assessor invocation or mutation. This does not establish native
+Windows PowerShell behavior, assessor uncertainty/error/cancellation cases on
+this route, the full I308 matrix, or independent final permission/security/API
+review. PR #801 still points at the prior head; fresh exact-head CI, authorized
+review, latest-base rebase/CAS and merge remain required. I308 remains Partial.
