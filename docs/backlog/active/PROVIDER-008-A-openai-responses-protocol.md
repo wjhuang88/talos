@@ -428,7 +428,7 @@ Full child-A acceptance was re-audited against the merged source:
 | Acceptance | Existing implementation / test evidence |
 |---|---|
 | Defaults, explicit rollback, unknown gateways, model precedence and ambiguity | protocol_resolution and catalog_protocol config tests; factory uses the shared resolver. |
-| Stateless text/image/native tools/reasoning/output limit | openai_responses_request maps ordered input parts, call IDs and opaque replay; store=false and no previous_response_id. Ordered-part tests cover text/image/text; no dedicated two-image test is claimed. |
+| Stateless text/image/native tools/reasoning/output limit | openai_responses_request maps ordered input parts, call IDs and opaque replay; store=false and no previous_response_id. The closeout candidate strengthens the request regression to two distinct image payloads interleaved with text; fresh exact-head test execution is required. |
 | Streaming, parallel tools, usage, terminal/error/unknown/EOF | wire_contract_tests with pinned upstream persisted SDK fixtures, explicitly synthetic parallel fixtures, SSE state machine and byte-boundary proptest. No live Talos capture is claimed. |
 | Complete Agent rounds | responses_agent real CLI binary tests cover native tools, image continuation, one-shot read_image and Compat/Strict; Copilot catalog tests use the permission-gated Agent round. |
 | Actionable rejection without cross-wire retry | Responses client 404/405 diagnostics and non-retry tests; no fallback adapter dispatch. |
@@ -448,4 +448,20 @@ Closure local validation: collaboration claims passed with zero warnings and whi
 passed. Project governance reached its SQLite consumer check but could not execute cargo after
 the environment restore (one error, zero warnings); delivery workflow cases passed. This is not
 a full local governance pass. The closure requires native exact-head applicable CI, including
-both governance validators, before merge. No dependency, test or validation guard is changed.
+both governance validators, before merge. No dependency or validation guard is changed.
+
+Full issue recheck identified that #724 explicitly requires multi-image order testing. The
+initial closeout review had treated the missing dedicated two-image assertion as optional;
+that conclusion is corrected. This same candidate now asserts both distinct encoded image
+payloads and all five ordered text/image parts. Prior documentation-only approval/CI cannot
+validate this test change; fresh exact-head full native CI and review are mandatory. The
+existing implementation SHA remains the behavioral evidence, not this status-change commit.
+
+Validation recovery for the multi-image candidate: pinned Rust 1.99 and its components were
+restored. An initial concurrent component download failed with a missing temporary rustfmt
+file; the subsequent pinned `cargo fmt --all -- --check` passed. Both governance validators
+then passed with zero warnings (SQLite fixtures 17 cases, delivery workflow 12 cases).
+The focused locked two-image test passed (1 passed, 201 filtered). The subsequent unfiltered
+`cargo test -p talos-provider --locked` passed all 236 tests in 11 groups, including doctests,
+with zero failures, ignored or filtered tests. Standard workspace preflight is still running
+at this checkpoint; no full local preflight pass is claimed. Fresh full native CI is required.
