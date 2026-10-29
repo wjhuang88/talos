@@ -217,6 +217,7 @@ async fn registered_mcp_git_add_commit_checkout_and_push_execute_after_bound_aut
         tool: &'static str,
         operation: &'static str,
         intent: &'static str,
+        fail: bool,
     }
     #[async_trait]
     impl AutoPermissionAssessor for Assessor {
@@ -232,6 +233,9 @@ async fn registered_mcp_git_add_commit_checkout_and_push_execute_after_bound_aut
             assert_eq!(request.tool, self.tool);
             assert_eq!(request.command.operation, self.operation);
             assert_eq!(request.user_intent, self.intent);
+            if self.fail {
+                return Err("injected operation assessor failure".into());
+            }
             Ok(json!({
                 "schema": request.schema,
                 "request_digest": request.request_digest,
@@ -293,7 +297,8 @@ async fn registered_mcp_git_add_commit_checkout_and_push_execute_after_bound_aut
                 "push this branch to the configured receiver",
             ),
         ] {
-            for explicit_deny in [false, true] {
+            for (explicit_deny, assessor_failure) in [(false, false), (true, false), (false, true)]
+            {
                 let temp = tempfile::tempdir().expect("fixture");
                 let repository = temp.path().join("work");
                 std::fs::create_dir(&repository).expect("repository");
@@ -375,6 +380,7 @@ async fn registered_mcp_git_add_commit_checkout_and_push_execute_after_bound_aut
                         tool: name,
                         operation,
                         intent,
+                        fail: assessor_failure,
                     }),
                     Arc::new(ApproveDiscoveryDenyCommand(scope)),
                     ManagedWorkspaceLease::for_permission_session(&repository, state.clone())
@@ -412,13 +418,17 @@ async fn registered_mcp_git_add_commit_checkout_and_push_execute_after_bound_aut
                     .peer()
                     .call_tool(rmcp::model::CallToolRequestParams::new(name).with_arguments(args))
                     .await;
-                if explicit_deny {
-                    let error = result.expect_err("explicit Execute Deny must reject admission");
+                if explicit_deny || assessor_failure {
+                    let error = result.expect_err("denied admission must reject the operation");
                     assert!(
                         error.to_string().contains("permission denied"),
                         "{name}: {error}"
                     );
-                    assert_eq!(calls.load(Ordering::SeqCst), 0, "{name}: assessor called");
+                    assert_eq!(
+                        calls.load(Ordering::SeqCst),
+                        usize::from(assessor_failure),
+                        "{name}: unexpected assessor calls"
+                    );
                     assert_eq!(git(&["rev-parse", "HEAD"]), before_head, "{name}");
                     assert_eq!(
                         git(&["diff", "--cached", "--binary"]),

@@ -2068,3 +2068,8 @@ Clippy and both governance validators also passed before publication.
 
 This extends local policy evidence only; fresh candidate review/CI, merge and
 remaining I308 host/profile/recovery/platform acceptance are still outstanding.
+The same four operation fixtures now inject an assessor transport/error result.
+Each returns a permission-denied MCP error after exactly one assessor call,
+without changing HEAD, the staged diff, current branch or Push receiver ref; no
+persistent grant is installed. All 49 Git prepared integration tests passed
+again after adding this failure branch.
