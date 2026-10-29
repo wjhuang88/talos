@@ -335,6 +335,7 @@ impl ServerHandler for TalosMcpHandler {
                                 command: evidence.as_ref().filter(|_| registered_builtin),
                                 mutation: mutation.as_ref().filter(|_| registered_builtin),
                                 configuration: configuration.as_ref().filter(|_| registered_builtin),
+                                working_directory: None,
                                 description: tool.description(),
                                 builtin: registered_builtin,
                             };
@@ -378,20 +379,30 @@ impl ServerHandler for TalosMcpHandler {
             None => {
                 let profile = tool.permission_profile(&input);
                 if registered_builtin
-                    && matches!(request.name.as_ref(), "http_request" | "fetch_url")
+                    && matches!(
+                        request.name.as_ref(),
+                        "http_request" | "fetch_url" | "bash" | "powershell" | "exec"
+                    )
                     && !tool.requires_network_invocation()
                 {
-                    // Retain the exact registered instance/input across review. The
-                    // broad invocation capability never substitutes for protected
-                    // prepared-network admission (including search).
+                    // Retain the exact registered instance/input and execution context.
                     reserve_prepared_request(&self.prepared_requests, &context.id)?;
                     let configuration = tool.invocation_review_configuration().ok_or_else(|| {
-                        McpError::new(ErrorCode::INTERNAL_ERROR, "HTTP invocation configuration unavailable", None)
+                        McpError::new(ErrorCode::INTERNAL_ERROR, "invocation review configuration unavailable", None)
                     })?;
+                    let execution_directories = tool
+                        .invocation_execution_directories(&input)
+                        .and_then(|directories| {
+                            directories
+                                .iter()
+                                .map(|directory| directory.to_str().map(str::to_owned))
+                                .collect::<Option<Vec<_>>>()
+                        });
+                    let working_directory = tool.execution_working_directory();
                     let review_configuration = serde_json::json!({
                         "tool_configuration": configuration,
-                        "execution_directories": [],
-                        "execution_directories_resolved": true,
+                        "execution_directories": execution_directories.clone().unwrap_or_default(),
+                        "execution_directories_resolved": execution_directories.is_some(),
                         "sandbox": null,
                     });
                     let plan = talos_core::tool::PreparedPlanIdentity::new();
@@ -401,11 +412,11 @@ impl ServerHandler for TalosMcpHandler {
                         biased;
                         _ = context.ct.cancelled() => {
                             return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
-                                "HTTP invocation cancelled; effects may be incomplete; request ID remains reserved", None));
+                                "invocation cancelled; effects may be incomplete; request ID remains reserved", None));
                         }
                         _ = tokio::time::sleep_until(invocation_deadline) => {
                             return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
-                                "HTTP invocation deadline exceeded; effects may be incomplete; request ID remains reserved", None));
+                                "invocation deadline exceeded; effects may be incomplete; request ID remains reserved", None));
                         }
                         output = async {
                             let admission = self.permission_gate.authorize_prepared_command_until(
@@ -417,6 +428,7 @@ impl ServerHandler for TalosMcpHandler {
                                     command: None,
                                     mutation: None,
                                     configuration: Some(&review_configuration),
+                                    working_directory: working_directory.as_deref(),
                                     description: tool.description(),
                                     builtin: true,
                                 },
@@ -424,11 +436,22 @@ impl ServerHandler for TalosMcpHandler {
                             ).await?;
                             if context.ct.is_cancelled() || tokio::time::Instant::now() >= invocation_deadline {
                                 return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
-                                    "HTTP invocation cancelled or expired before execution; request ID remains reserved", None));
+                                "invocation cancelled or expired before execution; request ID remains reserved", None));
                             }
-                            if tool.invocation_review_configuration().as_ref() != Some(&configuration) {
+                            let current_directories = tool
+                                .invocation_execution_directories(&input)
+                                .and_then(|directories| {
+                                    directories
+                                        .iter()
+                                        .map(|directory| directory.to_str().map(str::to_owned))
+                                        .collect::<Option<Vec<_>>>()
+                                });
+                            if tool.invocation_review_configuration().as_ref() != Some(&configuration)
+                                || current_directories != execution_directories
+                                || tool.execution_working_directory() != working_directory
+                            {
                                 return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
-                                    "HTTP invocation configuration changed after approval", None));
+                                    "invocation configuration or execution directories changed after approval", None));
                             }
                             let permission_request = talos_permission::PermissionRequest::native(
                                 request.name.as_ref(), &profile, &input,
