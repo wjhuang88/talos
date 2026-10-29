@@ -45,6 +45,12 @@ impl AutoPermissionAssessor for Assessor {
         if self.behavior == "failure" {
             return Err("private provider error".into());
         }
+        if self.behavior == "timeout" {
+            return std::future::pending().await;
+        }
+        if self.behavior == "oversized" {
+            return Ok("x".repeat(MAX_AUTO_ASSESSOR_OUTPUT_BYTES + 1));
+        }
         if self.behavior == "panic" {
             panic!("provider panic");
         }
@@ -106,153 +112,184 @@ impl ApprovalResolver for Human {
 
 #[tokio::test]
 async fn effectful_command_requires_complete_bound_response_and_preserves_policy() {
-    for behavior in [
-        "allow",
-        "missing_effect",
-        "wrong_digest",
-        "confined",
-        "low",
-        "human",
-        "unknown",
-        "failure",
-        "panic",
-        "mode_change",
-        "reset_reenable",
-        "revision_change",
-        "replay",
-        "explicit_ask",
-        "deny",
-        "missing_intent",
+    for (tool, capability, operation) in [
+        ("git_pull", "git:pull-command", "git:pull-command/v1"),
+        ("git_add", "git:add-command", "git:add-command/v1"),
+        ("git_commit", "git:commit-command", "git:commit-command/v1"),
+        (
+            "git_checkout",
+            "git:checkout-command",
+            "git:checkout-command/v1",
+        ),
+        ("git_push", "git:push-command", "git:push-command/v1"),
     ] {
-        let root = tempfile::tempdir().expect("workspace");
-        let mut engine = PermissionEngine::with_workspace_root(root.path().to_owned());
-        if matches!(behavior, "explicit_ask" | "deny") {
-            engine.add_rule(PermissionRule::new_nature(
-                ToolNature::Write,
-                Some("unseen-helper-output/**".into()),
-                None,
-                if behavior == "deny" {
-                    PermissionDecision::Deny("private".into())
-                } else {
-                    PermissionDecision::Ask
-                },
-            ));
-        }
-        let state = Arc::new(PermissionSessionState::new(engine));
-        let lease = ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
-            .expect("lease");
-        let control = AutoPermissionControl::new(true);
-        let calls = Arc::new(AtomicUsize::new(0));
-        let human_calls = Arc::new(AtomicUsize::new(0));
-        let resolver = Arc::new(AutoPermissionResolver::new(
-            Arc::new(Assessor {
-                behavior,
-                calls: calls.clone(),
-                control: control.clone(),
-                previous: Mutex::new(None),
-                state: state.clone(),
-            }),
-            Arc::new(Human(human_calls.clone())),
-            lease,
-            Duration::from_secs(2),
-            control,
-        ));
-        let pipeline = PermissionPipeline::new(
-            state.clone(),
-            PermissionContext::new(
-                PermissionMode::Interactive,
-                InteractionCapability::Available,
-            ),
-            Some(resolver),
-        );
-        let facets = [
-            ToolPermissionFacet::with_resource(
-                ToolNature::Read,
-                root.path().to_string_lossy(),
-                ToolResourceKind::Path,
-            ),
-            ToolPermissionFacet::with_resource(
-                ToolNature::Execute,
-                root.path().join("git").to_string_lossy(),
-                ToolResourceKind::Command,
-            ),
-            ToolPermissionFacet::with_resource(
-                ToolNature::Execute,
-                "git:pull-command",
-                ToolResourceKind::Remote,
-            ),
-        ];
-        let input = serde_json::json!({"remote": "origin"});
-        for attempt in 0..if behavior == "replay" { 2 } else { 1 } {
-            let plan = PreparedPlanIdentity::new();
-            let evidence = PreparedCommandEvidence::new(
-                plan.clone(),
-                PreparedCommandDescription {
-                    operation: "git:pull-command/v1".into(),
-                    arguments: vec!["pull".into()],
-                    effects: vec![
-                        PreparedCommandEffect::Execute,
-                        PreparedCommandEffect::Network,
-                        PreparedCommandEffect::WorktreeMutation,
-                        PreparedCommandEffect::MetadataMutation,
-                        PreparedCommandEffect::Recursion,
-                        PreparedCommandEffect::ConfiguredPrograms,
-                    ],
-                    confined: false,
-                    targets: talos_core::tool::PreparedCommandTargets {
-                        repository: ".".into(),
-                        metadata: vec![".git".into()],
-                        remote_selection: "configured upstream".into(),
-                        configured_remote_hosts: vec!["example.test".into()],
-                        invocation_remote_host: None,
-                        configured_program_categories: vec!["credentials".into()],
-                        dynamic_effects_unknown: true,
-                    },
-                },
-            );
-            let result = pipeline
-                .authorize_prepared_plan_with_evidence(
-                    PermissionAuthorizationRequest {
-                        tool_name: "git_pull",
-                        provenance: ToolProvenance::Native,
-                        profile: &facets,
-                        input: &input,
-                        presentation_input: input.clone(),
-                        summary_fields: vec![],
-                        deadline: Duration::from_secs(2),
-                    },
-                    if behavior == "missing_intent" {
-                        None
+        for behavior in [
+            "allow",
+            "missing_effect",
+            "wrong_digest",
+            "confined",
+            "low",
+            "human",
+            "unknown",
+            "failure",
+            "timeout",
+            "oversized",
+            "panic",
+            "mode_change",
+            "reset_reenable",
+            "revision_change",
+            "replay",
+            "explicit_ask",
+            "deny",
+            "missing_intent",
+            "wrong_operation",
+        ] {
+            let root = tempfile::tempdir().expect("workspace");
+            let mut engine = PermissionEngine::with_workspace_root(root.path().to_owned());
+            if matches!(behavior, "explicit_ask" | "deny") {
+                engine.add_rule(PermissionRule::new_nature(
+                    ToolNature::Write,
+                    Some("unseen-helper-output/**".into()),
+                    None,
+                    if behavior == "deny" {
+                        PermissionDecision::Deny("private".into())
                     } else {
-                        Some("update this repository from its configured upstream")
+                        PermissionDecision::Ask
                     },
-                    &plan,
-                    Some(&evidence),
-                )
-                .await;
-            if behavior == "allow" || (behavior == "replay" && attempt == 0) {
-                result
-                    .unwrap_or_else(|error| panic!("{behavior}: {error}"))
-                    .consume_for_prepared(
-                        &talos_permission::PermissionRequest::native("git_pull", &facets, &input),
-                        &plan,
-                    )
-                    .expect("one-use proof");
-            } else {
-                assert!(result.is_err(), "{behavior} must not approve");
+                ));
             }
+            let state = Arc::new(PermissionSessionState::new(engine));
+            let lease = ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
+                .expect("lease");
+            let control = AutoPermissionControl::new(true);
+            let calls = Arc::new(AtomicUsize::new(0));
+            let human_calls = Arc::new(AtomicUsize::new(0));
+            let resolver = Arc::new(AutoPermissionResolver::new(
+                Arc::new(Assessor {
+                    behavior,
+                    calls: calls.clone(),
+                    control: control.clone(),
+                    previous: Mutex::new(None),
+                    state: state.clone(),
+                }),
+                Arc::new(Human(human_calls.clone())),
+                lease,
+                if behavior == "timeout" {
+                    Duration::from_millis(10)
+                } else {
+                    Duration::from_secs(2)
+                },
+                control,
+            ));
+            let pipeline = PermissionPipeline::new(
+                state.clone(),
+                PermissionContext::new(
+                    PermissionMode::Interactive,
+                    InteractionCapability::Available,
+                ),
+                Some(resolver),
+            );
+            let facets = [
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Read,
+                    root.path().to_string_lossy(),
+                    ToolResourceKind::Path,
+                ),
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Execute,
+                    root.path().join("git").to_string_lossy(),
+                    ToolResourceKind::Command,
+                ),
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Execute,
+                    capability,
+                    ToolResourceKind::Remote,
+                ),
+            ];
+            let input = serde_json::json!({"remote": "origin"});
+            for attempt in 0..if behavior == "replay" { 2 } else { 1 } {
+                let plan = PreparedPlanIdentity::new();
+                let evidence = PreparedCommandEvidence::new(
+                    plan.clone(),
+                    PreparedCommandDescription {
+                        operation: if behavior == "wrong_operation" {
+                            if tool == "git_pull" {
+                                "git:add-command/v1"
+                            } else {
+                                "git:pull-command/v1"
+                            }
+                        } else {
+                            operation
+                        }
+                        .into(),
+                        arguments: vec!["pull".into()],
+                        effects: vec![
+                            PreparedCommandEffect::Execute,
+                            PreparedCommandEffect::Network,
+                            PreparedCommandEffect::WorktreeMutation,
+                            PreparedCommandEffect::MetadataMutation,
+                            PreparedCommandEffect::Recursion,
+                            PreparedCommandEffect::ConfiguredPrograms,
+                        ],
+                        confined: false,
+                        targets: talos_core::tool::PreparedCommandTargets {
+                            repository: ".".into(),
+                            metadata: vec![".git".into()],
+                            remote_selection: "configured upstream".into(),
+                            configured_remote_hosts: vec!["example.test".into()],
+                            invocation_remote_host: None,
+                            configured_program_categories: vec!["credentials".into()],
+                            dynamic_effects_unknown: true,
+                        },
+                    },
+                );
+                let result = pipeline
+                    .authorize_prepared_plan_with_evidence(
+                        PermissionAuthorizationRequest {
+                            tool_name: tool,
+                            provenance: ToolProvenance::Native,
+                            profile: &facets,
+                            input: &input,
+                            presentation_input: input.clone(),
+                            summary_fields: vec![],
+                            deadline: Duration::from_secs(2),
+                        },
+                        if behavior == "missing_intent" {
+                            None
+                        } else {
+                            Some("update this repository from its configured upstream")
+                        },
+                        &plan,
+                        Some(&evidence),
+                    )
+                    .await;
+                if behavior == "allow" || (behavior == "replay" && attempt == 0) {
+                    result
+                        .unwrap_or_else(|error| panic!("{behavior}: {error}"))
+                        .consume_for_prepared(
+                            &talos_permission::PermissionRequest::native(tool, &facets, &input),
+                            &plan,
+                        )
+                        .expect("one-use proof");
+                } else {
+                    assert!(result.is_err(), "{behavior} must not approve");
+                }
+            }
+            let expected_calls = match behavior {
+                "deny" | "explicit_ask" | "missing_intent" | "wrong_operation" => 0,
+                "replay" => 2,
+                _ => 1,
+            };
+            assert_eq!(calls.load(Ordering::SeqCst), expected_calls, "{behavior}");
+            assert_eq!(
+                human_calls.load(Ordering::SeqCst),
+                usize::from(
+                    !matches!(behavior, "allow" | "deny")
+                        && !(behavior == "explicit_ask" && tool != "git_pull")
+                ),
+                "{behavior}"
+            );
+            assert_eq!(state.grant_count().expect("grants"), 0, "{behavior}");
         }
-        let expected_calls = match behavior {
-            "deny" | "explicit_ask" | "missing_intent" => 0,
-            "replay" => 2,
-            _ => 1,
-        };
-        assert_eq!(calls.load(Ordering::SeqCst), expected_calls, "{behavior}");
-        assert_eq!(
-            human_calls.load(Ordering::SeqCst),
-            usize::from(!matches!(behavior, "allow" | "deny")),
-            "{behavior}"
-        );
-        assert_eq!(state.grant_count().expect("grants"), 0, "{behavior}");
     }
 }

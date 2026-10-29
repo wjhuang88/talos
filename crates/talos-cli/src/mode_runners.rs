@@ -65,6 +65,13 @@ fn format_auto_review_report(report: &talos_agent::auto_resolver::AutoDecisionRe
     let text = match (report.outcome.as_str(), report.reason.as_str()) {
         ("allow_once", "shell_command") => "model allowed once — bounded read-only shell command",
         ("allow_once", "bounded_create") => "model allowed once — bounded workspace file creation",
+        ("allow_once", "prepared_command") => {
+            "model allowed once — assessed Git command with disclosed transitive effects"
+        }
+        ("allow_once", "file_mutation") => "model allowed once — assessed file mutation",
+        ("allow_once", "builtin_network") => "model allowed once — assessed network request",
+        ("allow_once", "ordinary_invocation") => "model allowed once — assessed tool invocation",
+        ("allow_once", _) => "model allowed once — assessed request",
         ("human_required", "classifier_not_eligible") => {
             "model not consulted — request outside automatic review scope"
         }

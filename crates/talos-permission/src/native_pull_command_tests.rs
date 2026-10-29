@@ -289,3 +289,57 @@ fn prepared_command_proof_binds_plan_input_and_policy_generation() {
         }
     }
 }
+
+#[test]
+fn git_operation_authority_preserves_unknown_effect_restrictions_before_allow() {
+    let root = std::env::current_dir().expect("root");
+    let input = serde_json::json!({});
+    for (tool, capability) in [
+        ("git_add", "git:add-command"),
+        ("git_commit", "git:commit-command"),
+        ("git_checkout", "git:checkout-command"),
+        ("git_push", "git:push-command"),
+    ] {
+        let mut facets = profile(&root);
+        facets.last_mut().expect("capability").resource = Some(capability.into());
+        for decision in [
+            PermissionDecision::Ask,
+            PermissionDecision::Deny("private".into()),
+        ] {
+            let mut engine = PermissionEngine::with_workspace_root(root.clone());
+            engine.set_trusted_workspace(true);
+            engine.add_rule(PermissionRule::new_nature(
+                ToolNature::Execute,
+                None,
+                None,
+                PermissionDecision::Allow,
+            ));
+            engine.add_rule(PermissionRule::new_nature(
+                ToolNature::Write,
+                Some("undiscovered/**".into()),
+                None,
+                decision,
+            ));
+            let request = PermissionRequest::native(tool, &facets, &input);
+            let report = engine.evaluate_request(&request, &PermissionContext::compatibility());
+            assert_eq!(
+                report.outcome(),
+                PermissionOutcome::Deny,
+                "{tool}: unconfined scoped restriction must be terminal"
+            );
+        }
+        let state =
+            PermissionSessionState::new(PermissionEngine::with_workspace_root(root.clone()));
+        let request = PermissionRequest::native(tool, &facets, &input);
+        let context = PermissionContext::compatibility();
+        let proposal = state
+            .propose(&request, &context, GrantScope::Session)
+            .expect("proposal");
+        assert_eq!(proposal.preview().scope(), GrantScope::Once);
+        let wrong = PermissionRequest::native("git_pull", &facets, &input);
+        assert!(
+            state.propose(&wrong, &context, GrantScope::Once).is_err(),
+            "{tool}: capability cannot impersonate Pull"
+        );
+    }
+}

@@ -20,6 +20,8 @@ use super::{
 
 #[path = "prepared_add/command.rs"]
 mod command;
+#[path = "prepared_add/command_evidence.rs"]
+mod command_evidence;
 #[path = "prepared_add/host_path.rs"]
 mod host_path;
 #[path = "prepared_add/pull_command.rs"]
@@ -251,6 +253,10 @@ pub(super) struct AddPlan {
     target_hook_paths: Option<Vec<PathBuf>>,
     target_hook_evidence: Vec<(PathBuf, snapshot::RegularEvidence)>,
     native_pull_command: Option<command::FrozenCommand>,
+    native_add_command: Option<command::FrozenCommand>,
+    native_commit_command: Option<command::FrozenCommand>,
+    native_checkout_command: Option<command::FrozenCommand>,
+    native_push_command: Option<command::FrozenCommand>,
     identity: PreparedPlanIdentity,
     workspace: PathBuf,
     workspace_review_root: PathBuf,
@@ -672,6 +678,34 @@ impl AddPlan {
             )?),
             _ => None,
         };
+        let native_add_command = if matches!(operation, Operation::Add) {
+            Some(command::FrozenCommand::add(
+                &program,
+                &repository.workdir,
+                &paths,
+                &environment,
+            )?)
+        } else {
+            None
+        };
+        let native_commit_command = match &operation {
+            Operation::Commit(input) => Some(command::FrozenCommand::commit(
+                &program,
+                &repository.workdir,
+                input,
+                &environment,
+            )?),
+            _ => None,
+        };
+        let native_checkout_command = match &operation {
+            Operation::Checkout(input) => Some(command::FrozenCommand::checkout(
+                &program,
+                &repository.workdir,
+                input,
+                &environment,
+            )?),
+            _ => None,
+        };
         Ok(Self {
             phase: Phase::SenderConfiguration,
             command_budget: std::sync::Mutex::new(CommandBudget::default()),
@@ -717,6 +751,10 @@ impl AddPlan {
             target_hook_paths: None,
             target_hook_evidence: Vec::new(),
             native_pull_command,
+            native_add_command,
+            native_commit_command,
+            native_checkout_command,
+            native_push_command: None,
             identity: PreparedPlanIdentity::new(),
             workspace: workspace.to_owned(),
             workspace_review_root: workspace
@@ -817,6 +855,19 @@ impl AddPlan {
             } else {
                 bound.canonical.clone()
             };
+            // revalidate() above checked the original frozen invocation. Only
+            // this separately admitted executable may change at this frontier;
+            // never recapture arguments, cwd or environment from mutable state.
+            for command in [
+                &mut self.native_add_command,
+                &mut self.native_commit_command,
+                &mut self.native_checkout_command,
+            ]
+            .into_iter()
+            .flatten()
+            {
+                command.bind_sender_program(&invocation);
+            }
             let old_path = std::mem::replace(&mut self.program, invocation);
             let old_entry = std::mem::replace(&mut self.program_entry, bound.program);
             self.sender_entry_program = Some((old_path, old_entry));
@@ -1369,6 +1420,22 @@ impl AddPlan {
         }
         self.config = Some(config);
         self.revalidate()?;
+        let command_capability = match &self.operation {
+            Operation::Add => Some("git:add-command"),
+            Operation::Commit(_) => Some("git:commit-command"),
+            Operation::Checkout(_) => Some("git:checkout-command"),
+            Operation::Push(_) => Some("git:push-command"),
+            Operation::Pull(_) => None,
+        };
+        if let Some(capability) = command_capability {
+            self.facets.push(
+                ToolPermissionFacet::with_resource(
+                    ToolNature::Execute,
+                    capability,
+                    ToolResourceKind::Remote,
+                ).with_description("one retained native Git operation; configured programs may have unconfined file, network and recursive effects; no rollback guarantee"),
+            );
+        }
         self.facets
             .retain(|facet| facet.resource.as_deref() != Some("git:configuration-chain"));
         self.auxiliary_paths
@@ -1529,7 +1596,9 @@ impl AddPlan {
         let authorizations = proof
             .consume_for_prepared(&self.request(), &self.identity)
             .map_err(|error| GitToolError::InvalidInput(error.to_string()))?;
-        self.discover_admitted(&authorizations).await
+        let mut plan = self.discover_admitted(&authorizations).await?;
+        plan.retain_push_command()?;
+        Ok(plan)
     }
 
     fn discover_new_gitlinks(
@@ -3859,13 +3928,61 @@ impl AddPlan {
                 }
             }
         }
-        let command = command::FrozenCommand::new(
+        let expected_command = command::FrozenCommand::new(
             &self.program,
             &self.repository.workdir,
             &args,
             &self.environment,
-        )?
-        .command();
+        )?;
+        let command = if matches!(self.operation, Operation::Add) {
+            let retained = self.native_add_command.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput("Native Add command missing; no command started".into())
+            })?;
+            if retained != &expected_command {
+                return Err(GitToolError::InvalidInput(
+                    "Native Add command changed after preparation; request a fresh authorization"
+                        .into(),
+                ));
+            }
+            retained.command()
+        } else if matches!(self.operation, Operation::Commit(_)) {
+            let retained = self.native_commit_command.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput(
+                    "Native Commit command missing; no command started".into(),
+                )
+            })?;
+            if retained != &expected_command {
+                return Err(GitToolError::InvalidInput(
+                    "Native Commit command changed after preparation; request a fresh authorization".into(),
+                ));
+            }
+            retained.command()
+        } else if matches!(self.operation, Operation::Checkout(_)) {
+            let retained = self.native_checkout_command.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput(
+                    "Native Checkout command missing; no command started".into(),
+                )
+            })?;
+            if retained != &expected_command {
+                return Err(GitToolError::InvalidInput(
+                    "Native Checkout command changed after preparation; request a fresh authorization".into(),
+                ));
+            }
+            retained.command()
+        } else if matches!(self.operation, Operation::Push(_)) {
+            let retained = self.native_push_command.as_ref().ok_or_else(|| {
+                GitToolError::InvalidInput("Native Push command missing; no command started".into())
+            })?;
+            if retained != &expected_command {
+                return Err(GitToolError::InvalidInput(
+                    "Native Push command changed after preparation; request a fresh authorization"
+                        .into(),
+                ));
+            }
+            retained.command()
+        } else {
+            expected_command.command()
+        };
         if !self.receiver_roots.is_empty()
             && self.inspect_receiver_storage(authorizations)? != self.receiver_storage
         {
@@ -4196,7 +4313,89 @@ impl AddPlan {
         Ok(command)
     }
 
+    fn retain_push_command(&mut self) -> Result<(), GitToolError> {
+        if self.phase != Phase::Mutation || !matches!(self.operation, Operation::Push(_)) {
+            return Ok(());
+        }
+        let command = self.expected_push_command()?;
+        match &self.native_push_command {
+            None => self.native_push_command = Some(command),
+            Some(retained) if retained == &command => {}
+            Some(_) => {
+                return Err(GitToolError::InvalidInput(
+                    "Native Push command changed after preparation; request a fresh authorization"
+                        .into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn expected_push_command(&self) -> Result<command::FrozenCommand, GitToolError> {
+        let Operation::Push(input) = &self.operation else {
+            return Err(GitToolError::InvalidInput(
+                "Push command requested for another operation".into(),
+            ));
+        };
+        command::FrozenCommand::push(
+            &self.program,
+            &self.repository.workdir,
+            input,
+            !self.receiver_roots.is_empty(),
+            &self.environment,
+        )
+    }
+
     fn revalidate(&self) -> Result<(), GitToolError> {
+        if let Some(retained) = &self.native_push_command
+            && retained != &self.expected_push_command()?
+        {
+            return Err(GitToolError::InvalidInput(
+                "Native Push command changed after preparation; request a fresh authorization"
+                    .into(),
+            ));
+        }
+
+        if let Operation::Commit(input) = &self.operation {
+            let expected = command::FrozenCommand::commit(
+                &self.program,
+                &self.repository.workdir,
+                input,
+                &self.environment,
+            )?;
+            if self.native_commit_command.as_ref() != Some(&expected) {
+                return Err(GitToolError::InvalidInput(
+                    "Native Commit command changed after preparation; request a fresh authorization".into(),
+                ));
+            }
+        }
+        if matches!(self.operation, Operation::Add) {
+            let expected = command::FrozenCommand::add(
+                &self.program,
+                &self.repository.workdir,
+                &self.paths,
+                &self.environment,
+            )?;
+            if self.native_add_command.as_ref() != Some(&expected) {
+                return Err(GitToolError::InvalidInput(
+                    "Native Add command changed after preparation; request a fresh authorization"
+                        .into(),
+                ));
+            }
+        }
+        if let Operation::Checkout(input) = &self.operation {
+            let expected = command::FrozenCommand::checkout(
+                &self.program,
+                &self.repository.workdir,
+                input,
+                &self.environment,
+            )?;
+            if self.native_checkout_command.as_ref() != Some(&expected) {
+                return Err(GitToolError::InvalidInput(
+                    "Native Checkout command changed after preparation; request a fresh authorization".into(),
+                ));
+            }
+        }
         if let Operation::Pull(pull) = &self.operation {
             let expected = command::FrozenCommand::pull(
                 &self.program,
@@ -5075,80 +5274,7 @@ impl PreparedNormalToolInvocation for AddPlan {
     }
 
     fn prepared_command_evidence(&self) -> Option<talos_core::tool::PreparedCommandEvidence> {
-        use talos_core::tool::{
-            PreparedCommandDescription, PreparedCommandEffect as Effect, PreparedCommandEvidence,
-            PreparedCommandTargets,
-        };
-        let Operation::Pull(input) = &self.operation else {
-            return None;
-        };
-        if self.phase != Phase::PullCommandMutation || self.native_pull_command.is_none() {
-            return None;
-        }
-        let mut arguments = [
-            "-c",
-            "maintenance.autoDetach=false",
-            "-c",
-            "gc.autoDetach=false",
-            "--no-pager",
-            "pull",
-        ]
-        .map(str::to_owned)
-        .to_vec();
-        if input.remote.is_some() {
-            arguments.extend(["--".into(), "<retained-remote>".into()]);
-        }
-        let config = self.config.as_ref()?;
-        let label = |path: &Path| {
-            path.strip_prefix(&self.workspace_review_root)
-                .ok()
-                .map(|path| {
-                    if path.as_os_str().is_empty() {
-                        ".".into()
-                    } else {
-                        path.to_string_lossy().replace('\\', "/")
-                    }
-                })
-                .unwrap_or_else(|| "<outside-workspace>".into())
-        };
-        Some(PreparedCommandEvidence::new(
-            self.identity.clone(),
-            PreparedCommandDescription {
-                operation: "git:pull-command/v1".into(),
-                arguments,
-                effects: vec![
-                    Effect::Execute,
-                    Effect::Network,
-                    Effect::WorktreeMutation,
-                    Effect::MetadataMutation,
-                    Effect::Recursion,
-                    Effect::ConfiguredPrograms,
-                ],
-                confined: false,
-                targets: PreparedCommandTargets {
-                    repository: label(&self.repository.workdir),
-                    metadata: [&self.repository.git_dir, &self.repository.common_dir]
-                        .map(|path| label(path))
-                        .to_vec(),
-                    remote_selection: if input.remote.is_some() {
-                        "explicit retained remote; name/location withheld"
-                    } else {
-                        "configured upstream"
-                    }
-                    .into(),
-                    configured_remote_hosts: config.pull_command_remote_hosts(),
-                    invocation_remote_host: input.remote.as_deref().and_then(|remote| {
-                        super::config_state::command_remote_host(remote.as_bytes())
-                    }),
-                    configured_program_categories: config
-                        .pull_command_program_categories()
-                        .into_iter()
-                        .map(str::to_owned)
-                        .collect(),
-                    dynamic_effects_unknown: true,
-                },
-            },
-        ))
+        self.git_command_evidence()
     }
 
     fn permission_profile(&self) -> &[ToolPermissionFacet] {
@@ -5243,7 +5369,14 @@ impl PreparedNormalToolInvocation for AddPlan {
             }
         };
         match result {
-            Ok(plan) => PreparedNormalStage::Continue(plan),
+            Ok(mut plan) => {
+                if let Err(error) = plan.retain_push_command() {
+                    return PreparedNormalStage::Complete(ToolExecutionOutput::error(
+                        error.to_string(),
+                    ));
+                }
+                PreparedNormalStage::Continue(plan)
+            }
             Err(error) => {
                 PreparedNormalStage::Complete(ToolExecutionOutput::error(error.to_string()))
             }

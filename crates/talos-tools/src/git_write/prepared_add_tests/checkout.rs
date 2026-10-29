@@ -1,4 +1,39 @@
 #[tokio::test]
+async fn retained_checkout_refuses_changed_invocation_before_mutation() {
+    for changed in ["branch", "create", "environment", "cwd", "program", "missing"] {
+        let root = fixture();
+        integration_git(root.path(), &["add", "file"]);
+        integration_git(root.path(), &["commit", "-m", "initial"]);
+        integration_git(root.path(), &["branch", "target"]);
+        let before = integration_git(root.path(), &["symbolic-ref", "HEAD"]);
+        let mut plan = AddPlan::prepare_checkout(
+            root.path(), &serde_json::json!({"branch":"target"}), ToolProvenance::Native,
+        ).expect("plan");
+        match changed {
+            "branch" => {
+                let Operation::Checkout(input) = &mut plan.operation else { unreachable!() };
+                input.branch = "replacement".into();
+            }
+            "create" => {
+                let Operation::Checkout(input) = &mut plan.operation else { unreachable!() };
+                input.create = true;
+            }
+            "environment" => { plan.environment.insert("GIT_CONFIG_NOSYSTEM".into(), "changed".into()); }
+            "cwd" => plan.repository.workdir = root.path().join("other-directory"),
+            "program" => plan.program = root.path().join("replacement-git"),
+            "missing" => plan.native_checkout_command = None,
+            _ => unreachable!(),
+        }
+        let output = execute_approved(plan).await;
+        assert!(output.result.is_error, "{changed}: {}", output.result.content);
+        assert!(output.result.content.contains("Native Checkout command changed"),
+            "{changed}: {}", output.result.content);
+        assert_eq!(integration_git(root.path(), &["symbolic-ref", "HEAD"]), before);
+        assert_eq!(integration_git(root.path(), &["status", "--porcelain"]), "");
+    }
+}
+
+#[tokio::test]
 async fn checkout_linked_worktree_admits_actual_metadata_and_preserves_main_head() {
     let root = fixture();
     let linked = tempfile::tempdir().expect("linked worktree");

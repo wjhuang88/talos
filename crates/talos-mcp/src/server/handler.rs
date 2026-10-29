@@ -267,11 +267,18 @@ impl ServerHandler for TalosMcpHandler {
             name: request.name.to_string(),
             arguments: input.as_object().cloned(),
         };
+        let registered_builtin = self
+            .tool_registry
+            .is_builtin_instance(request.name.as_ref());
         let prepared = tool
             .prepare_normalized_with_provenance(
                 &input,
-                talos_core::tool::ToolProvenance::McpRemote {
-                    server: "standalone-mcp".into(),
+                if registered_builtin {
+                    talos_core::tool::ToolProvenance::Native
+                } else {
+                    talos_core::tool::ToolProvenance::McpRemote {
+                        server: "standalone-mcp".into(),
+                    }
                 },
             )
             .map_err(|error| McpError::new(ErrorCode::INVALID_PARAMS, error, None))?;
@@ -313,9 +320,27 @@ impl ServerHandler for TalosMcpHandler {
                                 return Err(McpError::new(ErrorCode::INTERNAL_ERROR, "prepared stage limit or reused identity; authorization profile budget may be exhausted", None));
                             }
                             let profile = operation.permission_profile().to_vec();
+                            // A matching name or caller-provided provenance cannot
+                            // establish ownership of automatic-review evidence.
                             let evidence = operation.prepared_command_evidence();
+                            let mutation = operation.prepared_file_mutation_evidence();
+                            let configuration = operation.invocation_review_configuration();
+                            if usize::from(evidence.is_some()) + usize::from(mutation.is_some())
+                                + usize::from(configuration.is_some()) > 1 {
+                                return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
+                                    "ambiguous prepared review evidence", None));
+                            }
+                            let review = super::permission::PreparedReview {
+                                plan: &plan,
+                                command: evidence.as_ref().filter(|_| registered_builtin),
+                                mutation: mutation.as_ref().filter(|_| registered_builtin),
+                                configuration: configuration.as_ref().filter(|_| registered_builtin),
+                                working_directory: None,
+                                description: tool.description(),
+                                builtin: registered_builtin,
+                            };
                             let admission = self.permission_gate
-                                .authorize_prepared_command_until(&hook_context, &talos_request, &profile, (&plan, evidence.as_ref()), prepared_permission_deadline_at).await?;
+                                .authorize_prepared_command_until(&hook_context, &talos_request, &profile, review, prepared_permission_deadline_at).await?;
                             if context.ct.is_cancelled() || tokio::time::Instant::now() >= prepared_invocation_deadline_at {
                                 return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
                                     "prepared invocation cancelled or expired; effects may be incomplete", None));
@@ -353,12 +378,112 @@ impl ServerHandler for TalosMcpHandler {
             }
             None => {
                 let profile = tool.permission_profile(&input);
-                let authorizations = self
-                    .permission_gate
-                    .authorize_call(&hook_context, &talos_request, &profile)
-                    .await?;
-                tool.execute_authorized_with_output(input, &authorizations)
-                    .await
+                if registered_builtin
+                    && matches!(
+                        request.name.as_ref(),
+                        "http_request" | "fetch_url" | "bash" | "powershell" | "exec"
+                    )
+                    && !tool.requires_network_invocation()
+                {
+                    // Retain the exact registered instance/input and execution context.
+                    reserve_prepared_request(&self.prepared_requests, &context.id)?;
+                    let configuration = tool.invocation_review_configuration().ok_or_else(|| {
+                        McpError::new(ErrorCode::INTERNAL_ERROR, "invocation review configuration unavailable", None)
+                    })?;
+                    let execution_directories = tool
+                        .invocation_execution_directories(&input)
+                        .and_then(|directories| {
+                            directories
+                                .iter()
+                                .map(|directory| directory.to_str().map(str::to_owned))
+                                .collect::<Option<Vec<_>>>()
+                        });
+                    let working_directory = tool.execution_working_directory();
+                    let identity_paths = execution_directories.clone().unwrap_or_else(|| {
+                        working_directory.iter().map(|path| path.to_string_lossy().into_owned()).collect()
+                    });
+                    let directory_identities = identity_paths.iter()
+                        .map(|path| talos_agent::auto_resolver::execution_directory_identity(std::path::Path::new(path)))
+                        .collect::<Option<Vec<_>>>()
+                        .ok_or_else(|| McpError::new(ErrorCode::INTERNAL_ERROR,
+                            "invocation execution directory identity unavailable", None))?;
+                    let review_configuration = serde_json::json!({
+                        "tool_configuration": configuration,
+                        "execution_directories": execution_directories.clone().unwrap_or_default(),
+                        "execution_directories_resolved": execution_directories.is_some(),
+                        "execution_directory_identities": directory_identities,
+                        "sandbox": null,
+                    });
+                    let plan = talos_core::tool::PreparedPlanIdentity::new();
+                    let invocation_deadline = tokio::time::Instant::now()
+                        + talos_core::tool::PREPARED_INVOCATION_TIMEOUT;
+                    tokio::select! {
+                        biased;
+                        _ = context.ct.cancelled() => {
+                            return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
+                                "invocation cancelled; effects may be incomplete; request ID remains reserved", None));
+                        }
+                        _ = tokio::time::sleep_until(invocation_deadline) => {
+                            return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
+                                "invocation deadline exceeded; effects may be incomplete; request ID remains reserved", None));
+                        }
+                        output = async {
+                            let admission = self.permission_gate.authorize_prepared_command_until(
+                                &hook_context,
+                                &talos_request,
+                                &profile,
+                                super::permission::PreparedReview {
+                                    plan: &plan,
+                                    command: None,
+                                    mutation: None,
+                                    configuration: Some(&review_configuration),
+                                    working_directory: working_directory.as_deref(),
+                                    description: tool.description(),
+                                    builtin: true,
+                                },
+                                self.permission_gate.prepared_deadline_at(),
+                            ).await?;
+                            if context.ct.is_cancelled() || tokio::time::Instant::now() >= invocation_deadline {
+                                return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
+                                "invocation cancelled or expired before execution; request ID remains reserved", None));
+                            }
+                            let current_directories = tool
+                                .invocation_execution_directories(&input)
+                                .and_then(|directories| {
+                                    directories
+                                        .iter()
+                                        .map(|directory| directory.to_str().map(str::to_owned))
+                                        .collect::<Option<Vec<_>>>()
+                                });
+                            if tool.invocation_review_configuration().as_ref() != Some(&configuration)
+                                || current_directories != execution_directories
+                                || tool.execution_working_directory() != working_directory
+                                || identity_paths.iter().map(|path| {
+                                    talos_agent::auto_resolver::execution_directory_identity(std::path::Path::new(path))
+                                }).collect::<Option<Vec<_>>>().as_ref() != Some(&directory_identities)
+                            {
+                                return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
+                                    "invocation configuration or execution directories changed after approval", None));
+                            }
+                            let permission_request = talos_permission::PermissionRequest::native(
+                                request.name.as_ref(), &profile, &input,
+                            ).with_transitive_effects();
+                            // Hooks have finished; consume only now, so a hook or
+                            // concurrent policy/session revision invalidates admission.
+                            let authorizations = admission.consume_for_prepared(&permission_request, &plan)
+                                .map_err(|error| McpError::new(ErrorCode::INTERNAL_ERROR,
+                                    format!("HTTP invocation admission invalidated: {error}"), None))?;
+                            Ok(tool.execute_authorized_with_output(input, &authorizations).await)
+                        } => output?,
+                    }
+                } else {
+                    let authorizations = self
+                        .permission_gate
+                        .authorize_call(&hook_context, &talos_request, &profile)
+                        .await?;
+                    tool.execute_authorized_with_output(input, &authorizations)
+                        .await
+                }
             }
         }
         .result;

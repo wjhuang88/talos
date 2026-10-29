@@ -305,6 +305,9 @@ timing; bounded-response failures include byte counters, while invalid JSON incl
 line/column, never the raw review, prompt, command or provider error. The provider's 4096-token
 generation limit is separate from the local review's 16 KiB combined text/reasoning byte budget.
 Failures still require human approval; diagnostics do not authorize execution.
+CLI/TUI success notices explicitly say when the model allowed a request once and
+identify assessed Git commands, file mutations, network requests or other tool
+invocations without displaying review payloads or provider identifiers.
 
 GLM-5.3 Auto reviews explicitly request `thinking.type = enabled` and `reasoning_effort = low`:
 this model cannot disable thinking. This request-local setting does not change conversation
@@ -314,11 +317,26 @@ request's remaining budget. Provider transport/idle limits, cancellation, output
 final permission validation still apply. Other models retain their existing bounded-decision
 request shape; GLM-specific parameters are not sent to them.
 
-Auto assistance is available only when the active surface supplies an interactive approval
-resolver (Goal and interactive CLI/TUI). Headless CLI, embedded Runtime and standalone MCP keep
-their existing fail-closed behavior for unresolved `Ask` decisions; enabling `auto` in config does
-not silently grant those surfaces model authority. Disabling auto always returns an interactive
-surface to human approval and a headless surface to denial.
+Auto assistance requires an explicitly supplied interactive permission context and resolver
+(Goal and interactive CLI/TUI supply these). Default headless CLI, embedded Runtime and
+standalone MCP compositions keep their fail-closed behavior for unresolved `Ask` decisions;
+enabling `auto` in config does not silently grant those surfaces model authority. MCP embedders
+can supply a session-owned pipeline using `McpPermissionGate::with_pipeline`. Retained native
+Git command review additionally requires `with_user_intent` from the current user turn, a fresh
+gate for that turn, and production builtin registration. Configuration discovery still requires
+host approval; missing intent, Headless context and explicit Ask/Deny cannot acquire model
+authorization. Same-name external replacements cannot supply native Auto command evidence.
+This MCP route covers retained Git command evidence, complete-image retained edit/delete
+mutation review, ordinary HTTP/fetch, and registered `bash`/`powershell`/`exec` invocation review.
+Command review binds exact arguments, implementation configuration, resolved execution directories
+and the tool-owned starting directory; admission is consumed once before execution. Replaced
+registrations cannot supply mutation or command evidence, and changed execution configuration
+or directories refuse execution after review. Retained `save_url` replacement separately reviews
+producer-owned capture configuration before downloading, then the complete before/after image
+before writing. Capture refusal prevents download; write refusal preserves the destination after
+an authorized download. Search and other protected prepared-network tools retain their dedicated
+admission path. Disabling auto returns interactive surfaces to
+human approval and headless surfaces to denial.
 
 Product-owned `bash`/`powershell`, `exec`, `fetch_url` and ordinary `http_request` requests can
 receive one-use Auto approval of the complete invocation and its transitive effects.
@@ -748,8 +766,12 @@ install does not need a manual catalog initialization step: Talos does not creat
 `BUILD_MODELS=1`; the legacy `--import-models` flag is kept as a no-op compatibility notice.
 
 Talos uses gix 0.90.0 for local repository inspection and uses prepared, permission-gated
-Add/Commit, Checkout, Push and Pull operations for Git changes. Pull authorizes one frozen
-whole command and its transitive effects; it does not promise per-path or endpoint confinement.
+Add/Commit, Checkout, Push and Pull operations for Git changes. With Auto assistance enabled,
+each built-in operation has separate command review evidence and can receive one-invocation
+approval. Review binds the retained executable, arguments, working directory and environment;
+changed evidence requires fresh authorization. Approval authorizes the whole command and its
+disclosed transitive effects, including configured hooks and helpers; it does not promise per-path
+or endpoint confinement. Uncertain or unavailable model assessment falls back to human approval.
 Explicit Deny and human-only policy remain binding. Conflicts and failures may leave partial Git
 effects; Talos does not automatically reset or repair them. Direct mutation calls without a
 prepared authorization plan are refused.

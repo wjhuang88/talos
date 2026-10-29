@@ -42,6 +42,10 @@ struct Model {
     reviews: Arc<AtomicUsize>,
     allowed: bool,
     assessor_failure: bool,
+    tool_name: &'static str,
+    operation: &'static str,
+    intent_fragment: &'static str,
+    input: Value,
 }
 #[async_trait]
 impl LanguageModel for Model {
@@ -51,9 +55,9 @@ impl LanguageModel for Model {
         if first {
             tx.try_send(AgentEvent::ToolCall {
                 call: ToolCall {
-                    id: "pull".into(),
-                    name: "git_pull".into(),
-                    input: json!({}),
+                    id: self.tool_name.into(),
+                    name: self.tool_name.into(),
+                    input: self.input.clone(),
                 },
                 provenance: Default::default(),
                 summary_fields: vec![],
@@ -63,7 +67,9 @@ impl LanguageModel for Model {
             let result = messages
                 .iter()
                 .find_map(|message| match message {
-                    Message::Tool { result } if result.tool_use_id == "pull" => Some(result),
+                    Message::Tool { result } if result.tool_use_id == self.tool_name => {
+                        Some(result)
+                    }
                     _ => None,
                 })
                 .expect("paired real tool result");
@@ -99,6 +105,8 @@ impl LanguageModel for Model {
             .expect("isolated review payload");
         let request: Value = serde_json::from_str(payload).expect("review JSON");
         assert_eq!(request["schema"], "prepared-command/v1");
+        assert_eq!(request["tool"], self.tool_name);
+        assert_eq!(request["command"]["operation"], self.operation);
         assert_eq!(
             request["command"]["effects"]
                 .as_array()
@@ -111,7 +119,7 @@ impl LanguageModel for Model {
             request["user_intent"]
                 .as_str()
                 .expect("trusted intent")
-                .contains("upstream")
+                .contains(self.intent_fragment)
         );
         self.reviews.fetch_add(1, Ordering::SeqCst);
         if self.assessor_failure {
@@ -120,7 +128,7 @@ impl LanguageModel for Model {
             ));
         }
         let response = json!({"schema":"prepared-command/v1", "request_digest":request["request_digest"],
-            "decision":"allow_once", "confidence":"high", "acknowledged_effects":request["command"]["effects"],
+            "decision":if self.allowed || self.tool_name == "git_pull" { "allow_once" } else { "human_required" }, "confidence":"high", "acknowledged_effects":request["command"]["effects"],
             "accepts_unconfined_effects":true});
         let (tx, rx) = mpsc::channel(2);
         tx.try_send(AgentEvent::TextDelta {
@@ -152,11 +160,26 @@ impl ApprovalHandler for Human {
         _: &[String],
         preview: &GrantPreview,
     ) -> ApprovalChoice {
-        if preview
-            .facets()
-            .iter()
-            .any(|facet| facet.normalized_scope == "git:pull-command")
-        {
+        if preview.facets().iter().any(|facet| {
+            matches!(
+                facet.normalized_scope.as_str(),
+                "git:pull-command"
+                    | "git:add-command"
+                    | "git:commit-command"
+                    | "git:checkout-command"
+                    | "git:push-command"
+            )
+        }) {
+            if !self.allow_final
+                && preview.facets().iter().any(|facet| {
+                    facet.normalized_scope != "git:pull-command"
+                        && facet.normalized_scope.starts_with("git:")
+                        && facet.normalized_scope.ends_with("-command")
+                })
+            {
+                self.final_approvals.fetch_add(1, Ordering::SeqCst);
+                return ApprovalChoice::Deny;
+            }
             assert!(
                 self.allow_final,
                 "Auto-only case must not fall back to human command approval"
@@ -236,6 +259,10 @@ async fn runtime_pull_executes_auto_or_human_fallback_and_preserves_explicit_pol
                 reviews: reviews.clone(),
                 allowed: !no_fetch && !conflict,
                 assessor_failure,
+                tool_name: "git_pull",
+                operation: "git:pull-command/v1",
+                intent_fragment: "upstream",
+                input: json!({}),
             }))
             .shared_tools()
             .approval_handler(Arc::new(Human {
@@ -304,6 +331,137 @@ async fn runtime_pull_executes_auto_or_human_fallback_and_preserves_explicit_pol
             assert!(content.contains("<<<<<<<") && content.contains(">>>>>>>"));
         }
         runtime.shutdown().await.expect("shutdown");
+    }
+}
+
+#[tokio::test]
+async fn runtime_git_add_commit_checkout_and_push_use_operation_specific_auto_review() {
+    for (tool_name, operation, intent_fragment) in [
+        ("git_add", "git:add-command/v1", "stage"),
+        ("git_commit", "git:commit-command/v1", "commit"),
+        ("git_checkout", "git:checkout-command/v1", "switch"),
+        ("git_push", "git:push-command/v1", "push"),
+    ] {
+        for allowed in [false, true] {
+            let root = tempfile::tempdir().expect("fixture");
+            let work = root.path().join("work");
+            std::fs::create_dir(&work).expect("work");
+            git(&work, &["init", "-b", "main"]);
+            for (key, value) in [
+                ("user.name", "Fixture"),
+                ("user.email", "fixture@example.invalid"),
+                ("commit.gpgSign", "false"),
+                ("core.autocrlf", "false"),
+            ] {
+                git(&work, &["config", key, value]);
+            }
+            std::fs::write(work.join("tracked.txt"), "initial\n").expect("initial");
+            git(&work, &["add", "tracked.txt"]);
+            git(&work, &["commit", "-m", "initial"]);
+            let input = match tool_name {
+                "git_add" => {
+                    std::fs::write(work.join("added.txt"), "added\n").expect("add input");
+                    json!({"paths":["added.txt"]})
+                }
+                "git_commit" => {
+                    std::fs::write(work.join("committed.txt"), "committed\n")
+                        .expect("commit input");
+                    git(&work, &["add", "committed.txt"]);
+                    json!({"message":"runtime operation commit"})
+                }
+                "git_checkout" => {
+                    git(&work, &["branch", "target"]);
+                    json!({"branch":"target"})
+                }
+                "git_push" => {
+                    let receiver = root.path().join("receiver.git");
+                    git(
+                        root.path(),
+                        &["init", "--bare", receiver.to_str().expect("receiver path")],
+                    );
+                    git(
+                        &work,
+                        &[
+                            "remote",
+                            "add",
+                            "origin",
+                            receiver.to_str().expect("receiver path"),
+                        ],
+                    );
+                    json!({"branch":"main"})
+                }
+                _ => unreachable!(),
+            };
+            let reviews = Arc::new(AtomicUsize::new(0));
+            let final_approvals = Arc::new(AtomicUsize::new(0));
+            let mut runtime = RuntimeBuilder::new()
+                .workspace_root(&work)
+                .provider(Arc::new(Model {
+                    turns: AtomicUsize::new(0),
+                    reviews: reviews.clone(),
+                    allowed,
+                    assessor_failure: false,
+                    tool_name,
+                    operation,
+                    intent_fragment,
+                    input,
+                }))
+                .shared_tools()
+                .approval_handler(Arc::new(Human {
+                    final_approvals: final_approvals.clone(),
+                    allow_final: false,
+                    drift_repository: None,
+                }))
+                .permission_mode(PermissionMode::Interactive)
+                .auto_assistance(true)
+                .build()
+                .expect("runtime");
+            runtime
+                .submit(format!("{intent_fragment} this change in this repository"))
+                .await
+                .expect("submit");
+            let terminal = tokio::time::timeout(
+                Duration::from_secs(30),
+                collect_until_turn_completed(&mut runtime),
+            )
+            .await
+            .expect("bounded turn")
+            .expect("terminal");
+            assert!(matches!(terminal, TurnCompletionStatus::Success { .. }));
+            assert_eq!(reviews.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                final_approvals.load(Ordering::SeqCst),
+                usize::from(!allowed)
+            );
+            match tool_name {
+                "git_add" => assert_eq!(
+                    !git(&work, &["diff", "--cached", "--name-only"]).is_empty(),
+                    allowed
+                ),
+                "git_commit" => assert_eq!(
+                    String::from_utf8(git(&work, &["log", "-1", "--format=%s"]))
+                        .expect("subject")
+                        .trim(),
+                    if allowed {
+                        "runtime operation commit"
+                    } else {
+                        "initial"
+                    }
+                ),
+                "git_checkout" => assert_eq!(
+                    String::from_utf8(git(&work, &["branch", "--show-current"]))
+                        .expect("branch")
+                        .trim(),
+                    if allowed { "target" } else { "main" }
+                ),
+                "git_push" => assert_eq!(
+                    root.path().join("receiver.git/refs/heads/main").exists(),
+                    allowed
+                ),
+                _ => unreachable!(),
+            }
+            runtime.shutdown().await.expect("shutdown");
+        }
     }
 }
 

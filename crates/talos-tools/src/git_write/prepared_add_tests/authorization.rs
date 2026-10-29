@@ -275,6 +275,10 @@ async fn cancelled_push_closes_transport_and_confirms_cleanup() {
                 .current_dir(root.path())
                 .args([
                     "-c",
+                    "maintenance.autoDetach=false",
+                    "-c",
+                    "gc.autoDetach=false",
+                    "-c",
                     "user.name=Fixture",
                     "-c",
                     "user.email=fixture@example.invalid",

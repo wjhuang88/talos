@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 /// Keeps the original object alive while comparing its serialized identity.
 #[derive(Clone, Debug, Serialize)]
 #[serde(transparent)]
-pub(crate) struct ExecutionDirectoryIdentity {
+pub struct ExecutionDirectoryIdentity {
     token: String,
     #[serde(skip)]
     _directory: Arc<cap_std::fs::Dir>,
@@ -33,7 +33,7 @@ impl PartialEq for ExecutionDirectoryIdentity {
 /// execution confinement. Windows' upstream 64-bit index does not cover ReFS's
 /// full 128-bit identity. On Windows cap-std also prevents rename/deletion of
 /// the retained directory by opening without FILE_SHARE_DELETE.
-pub(crate) fn execution_directory_identity(path: &Path) -> Option<ExecutionDirectoryIdentity> {
+pub fn execution_directory_identity(path: &Path) -> Option<ExecutionDirectoryIdentity> {
     std::panic::catch_unwind(|| {
         use cap_fs_ext::MetadataExt;
         let canonical = path.canonicalize().ok()?;

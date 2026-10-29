@@ -95,18 +95,25 @@ impl AutoPermissionResolver {
         let started = Instant::now();
         let epoch = self.control.reset_epoch();
         let description = evidence.description();
-        // Only registered native Pull currently supplies the reviewed effect contract.
+        // Tool and producer operation must agree. A Pull description cannot
+        // authorize another Git operation, even when effect classes overlap.
         let intent = intent
             .and_then(bounded_user_intent)
             .filter(|value| !contains_secret_like_shell_input(value));
         let eligible = auto_allowed
             && self.control.is_enabled()
             && !self.circuit_open()
-            && request.tool_name == "git_pull"
+            && matches!(
+                (request.tool_name.as_str(), description.operation.as_str()),
+                ("git_pull", "git:pull-command/v1")
+                    | ("git_add", "git:add-command/v1")
+                    | ("git_commit", "git:commit-command/v1")
+                    | ("git_checkout", "git:checkout-command/v1")
+                    | ("git_push", "git:push-command/v1")
+            )
             && request.provenance == ToolProvenance::Native
             && request.binding.mode == PermissionMode::Interactive
             && request.binding.interaction == InteractionCapability::Available
-            && description.operation == "git:pull-command/v1"
             && description.arguments.len() <= 32
             && description.arguments.iter().all(|word| word.len() <= 256)
             && description.effects

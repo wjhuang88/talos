@@ -1,3 +1,33 @@
+#[tokio::test]
+async fn retained_add_refuses_changed_invocation_before_staging() {
+    for changed in ["paths", "environment", "cwd", "program", "missing"] {
+        let root = fixture();
+        std::fs::write(root.path().join("other"), "must remain unstaged\n")
+            .expect("other file");
+        let mut plan = AddPlan::prepare(
+            root.path(),
+            &serde_json::json!({"paths": ["file"]}),
+            ToolProvenance::Native,
+        )
+        .expect("plan");
+        match changed {
+            "paths" => plan.paths = vec!["other".into()],
+            "environment" => {
+                plan.environment.insert("GIT_CONFIG_NOSYSTEM".into(), "changed".into());
+            }
+            "cwd" => plan.repository.workdir = root.path().join("other-directory"),
+            "program" => plan.program = root.path().join("replacement-git"),
+            "missing" => plan.native_add_command = None,
+            _ => unreachable!(),
+        }
+        let output = execute_approved(plan).await;
+        assert!(output.result.is_error, "{changed}: {}", output.result.content);
+        assert!(output.result.content.contains("Native Add command changed"),
+            "{changed}: {}", output.result.content);
+        assert_eq!(integration_git(root.path(), &["diff", "--cached", "--name-only"]), "");
+    }
+}
+
 // Original selective-staging acceptance: preserve another path's staged blob
 // even when its working copy has additional, deliberately unstaged changes.
 #[tokio::test]

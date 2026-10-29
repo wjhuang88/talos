@@ -36,6 +36,31 @@ fn auto_review_report_distinguishes_model_decision_from_classifier_bypass() {
 struct DashboardLogBuffer(Arc<StdMutex<Vec<u8>>>);
 
 #[test]
+fn effectful_auto_allow_reports_the_decision_without_request_details() {
+    for (reason, expected) in [
+        (
+            "prepared_command",
+            "Git command with disclosed transitive effects",
+        ),
+        ("file_mutation", "file mutation"),
+        ("builtin_network", "network request"),
+        ("ordinary_invocation", "tool invocation"),
+        ("future_assessment", "assessed request"),
+    ] {
+        let report = talos_agent::auto_resolver::AutoDecisionReport {
+            outcome: "allow_once".into(),
+            reason: reason.into(),
+            evaluator: "private-provider-marker".into(),
+            request_digest: "private-request-marker".into(),
+        };
+        let text = super::format_auto_review_report(&report);
+        assert!(text.contains("model allowed once"), "{text}");
+        assert!(text.contains(expected), "{text}");
+        assert!(!text.contains("private-"), "{text}");
+    }
+}
+
+#[test]
 fn auto_review_failure_categories_are_visible_without_raw_errors() {
     for (reason, expected) in [
         ("review_timeout", "timed out"),

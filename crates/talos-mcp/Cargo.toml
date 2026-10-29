@@ -31,7 +31,7 @@ reqwest = { version = "0.13.4", default-features = false, features = ["rustls", 
 talos-sandbox = { version = "0.10.1", path = "../talos-sandbox" }
 tempfile = "3"
 # I009-S4 begin
-talos-tools = { version = "0.10.1", path = "../talos-tools", default-features = false, features = ["file-write", "shell", "git"] }
+talos-tools = { version = "0.10.1", path = "../talos-tools", default-features = false, features = ["file-write", "shell", "git", "network"] }
 # I009-S4 end
 
 [lints]

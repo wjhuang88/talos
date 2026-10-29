@@ -12,6 +12,72 @@ pub(super) struct FrozenCommand {
 }
 
 impl FrozenCommand {
+    /// Change only the executable at the separately admitted sender frontier.
+    /// Arguments, working directory and environment remain frozen.
+    pub(super) fn bind_sender_program(&mut self, program: &Path) {
+        self.program = program.to_path_buf();
+    }
+
+    pub(super) fn checkout(
+        program: &Path,
+        workdir: &Path,
+        input: &GitCheckoutInput,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, GitToolError> {
+        let branch = if input.branch == "-" && !input.create {
+            "@{-1}"
+        } else {
+            &input.branch
+        };
+        let mut arguments = vec!["--no-pager", "--literal-pathspecs", "checkout"];
+        if input.create {
+            arguments.push("-b");
+        }
+        arguments.extend([branch, "--"]);
+        Self::new(program, workdir, arguments, environment)
+    }
+
+    /// Retain commit message and mode without exposing them in review output.
+    pub(super) fn commit(
+        program: &Path,
+        workdir: &Path,
+        input: &GitCommitInput,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, GitToolError> {
+        let mut arguments = vec![
+            "--no-pager",
+            "--literal-pathspecs",
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
+            "commit",
+            "-m",
+            &input.message,
+        ];
+        if input.all {
+            arguments.push("--all");
+        }
+        Self::new(program, workdir, arguments, environment)
+    }
+
+    /// Retain literal staging arguments before permission assessment.
+    pub(super) fn add(
+        program: &Path,
+        workdir: &Path,
+        paths: &[String],
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, GitToolError> {
+        Self::new(
+            program,
+            workdir,
+            ["--no-pager", "--literal-pathspecs", "add", "--"]
+                .into_iter()
+                .chain(paths.iter().map(String::as_str)),
+            environment,
+        )
+    }
+
     /// Keep Git's native upstream selection, integration and recursion policy.
     /// This describes the future operation; it confers no execution authority.
     pub(super) fn pull(
@@ -34,6 +100,38 @@ impl FrozenCommand {
         if let Some(remote) = &input.remote {
             super::super::validate_git_positional(remote)?;
             arguments.extend([OsString::from("--"), OsString::from(remote)]);
+        }
+        Self::new(program, workdir, arguments, environment)
+    }
+
+    pub(super) fn push(
+        program: &Path,
+        workdir: &Path,
+        input: &GitPushInput,
+        local_receiver: bool,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<Self, GitToolError> {
+        let receiver = local_receiver
+            .then(|| receiver_command(program))
+            .transpose()?;
+        let mut arguments = vec![
+            "--no-pager",
+            "--literal-pathspecs",
+            "-c",
+            "maintenance.autoDetach=false",
+            "-c",
+            "gc.autoDetach=false",
+            "push",
+        ];
+        if let Some(receiver) = &receiver {
+            arguments.extend(["--receive-pack", receiver]);
+        }
+        if input.force {
+            arguments.push("--force");
+        }
+        arguments.extend(["--", input.remote.as_deref().unwrap_or("origin")]);
+        if let Some(branch) = &input.branch {
+            arguments.push(branch);
         }
         Self::new(program, workdir, arguments, environment)
     }

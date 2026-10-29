@@ -30,7 +30,54 @@ async fn finish_push_program_approved(mut plan: Box<AddPlan>) -> Box<AddPlan> {
         plan.phase = Phase::Mutation;
         plan.identity = PreparedPlanIdentity::new();
     }
+    plan.retain_push_command().expect("retained Push command");
     plan
+}
+
+#[tokio::test]
+async fn retained_push_refuses_changed_invocation_before_transport() {
+    for changed in ["remote", "branch", "force", "environment", "cwd", "program", "missing"] {
+        let root = fixture();
+        integration_git(root.path(), &["add", "file"]);
+        integration_git(root.path(), &["commit", "-m", "initial"]);
+        let before = integration_git(root.path(), &["rev-parse", "HEAD"]);
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("listener");
+        listener.set_nonblocking(true).expect("nonblocking");
+        let destination = format!("git://{}/repo", listener.local_addr().expect("address"));
+        let plan = AddPlan::prepare_push(
+            root.path(),
+            &serde_json::json!({"remote":destination,"branch":"HEAD:refs/heads/test"}),
+            ToolProvenance::Native,
+        ).expect("plan");
+        let next = Box::new(plan).discover().await.expect("discovery");
+        let mut next = finish_push_program_approved(next).await;
+        assert!(next.native_push_command.is_some());
+        let admission = proof(&next);
+        match changed {
+            "remote" | "branch" | "force" => {
+                let Operation::Push(input) = &mut next.operation else { unreachable!() };
+                match changed {
+                    "remote" => input.remote = Some("replacement".into()),
+                    "branch" => input.branch = Some("HEAD:refs/heads/replacement".into()),
+                    "force" => input.force = true,
+                    _ => unreachable!(),
+                }
+            }
+            "environment" => { next.environment.insert("GIT_CONFIG_NOSYSTEM".into(), "changed".into()); }
+            "cwd" => next.repository.workdir = root.path().join("other-directory"),
+            "program" => next.program = root.path().join("replacement-git"),
+            "missing" => next.native_push_command = None,
+            _ => unreachable!(),
+        }
+        let output = next.execute(Box::new(admission)).await;
+        assert!(output.result.is_error, "{changed}: {}", output.result.content);
+        assert!(output.result.content.contains("Native Push command"),
+            "{changed}: {}", output.result.content);
+        assert!(matches!(listener.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock),
+            "{changed}: rejected command contacted receiver");
+        assert_eq!(integration_git(root.path(), &["rev-parse", "HEAD"]), before);
+        assert_eq!(integration_git(root.path(), &["status", "--porcelain"]), "");
+    }
 }
 
 #[cfg(unix)]

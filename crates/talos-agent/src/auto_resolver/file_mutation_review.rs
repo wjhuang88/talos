@@ -1,6 +1,9 @@
 //! Complete-image review for retained native file mutations.
-use super::network_review::{bounded_json, sensitive_json, sensitive_text};
 use super::*;
+use super::{
+    contains_sensitive_shell_target,
+    network_review::{bounded_json, sensitive_json, sensitive_text},
+};
 use crate::permission_pipeline::BuiltinFileMutationReviewEvidence;
 use futures_util::FutureExt;
 use talos_core::tool::{PreparedFileMutationDescription, ToolPermissionFacet};
@@ -102,6 +105,7 @@ impl AutoPermissionResolver {
                 .after
                 .as_ref()
                 .is_some_and(|text| sensitive_text(text))
+            && !contains_sensitive_shell_target(&description.path.to_string_lossy())
             && let Some(intent) = intent
         {
             let mut payload = FileMutationAssessmentRequest {

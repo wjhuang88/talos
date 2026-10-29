@@ -50,6 +50,10 @@ async fn interrupt_running_pull_closes_hook_descendants_and_preserves_completed_
             reviews: reviews.clone(),
             allowed: true,
             assessor_failure: false,
+            tool_name: "git_pull",
+            operation: "git:pull-command/v1",
+            intent_fragment: "upstream",
+            input: json!({}),
         }))
         .shared_tools()
         .approval_handler(Arc::new(Human {

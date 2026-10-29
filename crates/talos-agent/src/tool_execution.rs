@@ -914,16 +914,26 @@ impl Agent {
                             )
                             .await
                     } else if let Some(configuration) = configuration.as_ref() {
-                        pipeline
-                            .authorize_registered_prepared_invocation(
-                                authorization_request,
-                                user_intent,
-                                plan,
-                                tool.description(),
-                                configuration,
-                                registry.is_builtin_instance(&call.name),
-                            )
-                            .await
+                        if registry.is_builtin_instance(&call.name) {
+                            pipeline
+                                .authorize_prepared_builtin_invocation_with_working_directory(
+                                    authorization_request,
+                                    user_intent,
+                                    plan,
+                                    tool.description(),
+                                    configuration,
+                                    working_directory.as_deref(),
+                                )
+                                .await
+                        } else {
+                            pipeline
+                                .authorize_unregistered_prepared_invocation(
+                                    authorization_request,
+                                    user_intent,
+                                    plan,
+                                )
+                                .await
+                        }
                     } else {
                         pipeline
                             .authorize_prepared_plan_with_evidence(

@@ -569,6 +569,23 @@ impl PermissionPipeline {
         .into_prepared()
     }
 
+    /// Admits a retained mutation with complete producer-owned before/after evidence.
+    ///
+    /// The caller must verify the producer is the registered builtin instance;
+    /// names, provenance labels and remote payloads do not establish ownership.
+    /// The evidence must belong to this exact prepared plan. Callers without
+    /// trusted evidence must use ordinary prepared admission instead.
+    pub async fn authorize_prepared_file_mutation(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        evidence: &talos_core::tool::PreparedFileMutationEvidence,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        self.authorize_registered_file_mutation(authorization, user_intent, plan, evidence, true)
+            .await
+    }
+
     pub(crate) async fn authorize_registered_file_mutation(
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
@@ -628,6 +645,54 @@ impl PermissionPipeline {
         }
     }
 
+    /// Admits a builtin prepared invocation using producer-owned configuration.
+    ///
+    /// This is a trusted embedder entrypoint. The caller must establish registered
+    /// builtin ownership and obtain configuration from that exact prepared operation,
+    /// never from remote request metadata. Admission remains bound to `plan`.
+    pub async fn authorize_prepared_builtin_invocation(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        description: &str,
+        configuration: &serde_json::Value,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        self.authorize_prepared_builtin_invocation_with_working_directory(
+            authorization,
+            user_intent,
+            plan,
+            description,
+            configuration,
+            None,
+        )
+        .await
+    }
+
+    /// Admits a builtin prepared invocation with its implementation-owned working directory.
+    ///
+    /// This additive entrypoint preserves the existing API while making the directory available
+    /// to ordinary invocation review. The caller must obtain it from the same registered tool.
+    pub async fn authorize_prepared_builtin_invocation_with_working_directory(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
+        description: &str,
+        configuration: &serde_json::Value,
+        working_directory: Option<&std::path::Path>,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        self.authorize_registered_prepared_invocation(
+            authorization,
+            user_intent,
+            plan,
+            description,
+            configuration,
+            working_directory,
+        )
+        .await
+    }
+
     pub(crate) async fn authorize_registered_prepared_invocation(
         &self,
         authorization: PermissionAuthorizationRequest<'_>,
@@ -635,18 +700,34 @@ impl PermissionPipeline {
         plan: &talos_core::tool::PreparedPlanIdentity,
         description: &str,
         configuration: &serde_json::Value,
-        builtin: bool,
+        working_directory: Option<&std::path::Path>,
+    ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
+        self.authorize_inner(
+            authorization,
+            user_intent,
+            working_directory,
+            Some((plan, None)),
+            Some(InvocationReviewSource::Builtin(
+                description,
+                Some(configuration),
+            )),
+        )
+        .await?
+        .into_prepared()
+    }
+
+    pub(crate) async fn authorize_unregistered_prepared_invocation(
+        &self,
+        authorization: PermissionAuthorizationRequest<'_>,
+        user_intent: Option<&str>,
+        plan: &talos_core::tool::PreparedPlanIdentity,
     ) -> Result<talos_permission::AdmittedInvocation, PermissionPipelineError> {
         self.authorize_inner(
             authorization,
             user_intent,
             None,
             Some((plan, None)),
-            Some(if builtin {
-                InvocationReviewSource::Builtin(description, Some(configuration))
-            } else {
-                InvocationReviewSource::UnregisteredPreparedInvocation
-            }),
+            Some(InvocationReviewSource::UnregisteredPreparedInvocation),
         )
         .await?
         .into_prepared()

@@ -1,4 +1,93 @@
-## Active resume checkpoint — 2026-10-28 I309 closed; I308 continues
+## Active resume checkpoint — 2026-10-28 MCP Git host coverage
+
+Queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+I309 is closed; full I308 and the goal remain Active / Partial.
+PR #797 publishes `8e62c4e207917a88325037d967ef14d402dc9191` against
+`4bf3488b2f4344b054754851b588686126c436f4`. Exact-head CI run `40684972778`
+is terminal SUCCESS for all eight jobs, including native Windows workspace and
+Linux/Windows Desktop. This is stage evidence, not full-I308 completion or merge.
+
+The local follow-up adds real registered MCP Add/Commit/Checkout/Push success-path
+evidence, with operation-bound Auto assessment and command fallback denied.
+All 49 Git prepared integration tests and focused warnings-denied Clippy pass.
+The owner records test/review limits. Standard host preflight session 35964 is terminal exit 101, log
+`/private/tmp/i308-mcp-git-four-ops-preflight-host-final.log`: Tools 1009/1010
+passed; a search connection-refusal budget assertion failed. The same all-feature
+focused test passes (1 executed); root cause remains unproven. Do not use
+preceding-head CI or this focused result as complete local preflight certification.
+An earlier host preflight failed a TUI highlighting assertion; focused reproduction
+passed, but the cause is unproven. Sandbox runs separately hit Push observation EPERM.
+The original connection fixture module passes 4/4 in isolation, and serial all-feature
+Tools tests pass 1010/1010 (`/private/tmp/i308-tools-serial.log`, exit 0). This is
+serial local evidence only; parallel reliability and the scheduling cause remain unknown.
+
+Next: diagnose the search test failure, review/commit the coherent follow-up, obtain fresh
+exact-head CI/review and merge-time CAS for #797, then continue remaining I308
+host/profile/recovery and ordinary MCP Auto acceptance. All downstream tasks remain
+unimplemented or incomplete as specified by their owners. Preserve both worktrees.
+Earlier checkpoints below are historical.
+
+## Historical checkpoint — 2026-10-28 MCP command Auto local regression passes
+
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
+I309 is closed; I308 and the full goal remain Active / Partial. Local MCP changes
+add explicit pipeline/current-user-turn intent injection, verified builtin command evidence
+and consistent prepared provenance. Real Git Add Auto succeeds; same-name replacement,
+absent intent, Headless, explicit Ask/Deny fail closed. Locked Git prepared tests pass 48/48
+and handshake tests 3/3 (`/private/tmp/i308-mcp-hosted-native-tests.log`). Ordinary file
+approval injection is verified separately and does not establish file Auto.
+
+Preflight session 80805 is terminal exit 0, but predates compilation of the new MCP code;
+do not reuse it as final candidate certification. Current work remains local/unpublished;
+fresh review, full coherent checks, Windows CI and CAS merge remain necessary. MCP non-command
+Auto routing, all other I308 acceptance and all later queue items remain outstanding.
+See I308 owner for exact evidence and historical CI failure. Preserve both worktrees.
+
+## Historical checkpoint — 2026-10-28 I308 rebuild verified; preflight running
+
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+I309 is closed; I308 and the overall goal remain Active / Partial.
+Local sender-binding correction `6696d880c9cbb36d7d3d300d46d9410244a56045`
+passes the three all-feature focused tests and all 1010 Tools library tests in
+authorized host execution. The sandbox full suite's only failure was EPERM from
+process observation; retain that limitation separately. The maintainer explicitly
+authorized active-worktree target cleanup (27.1 GiB removed); both worktrees and
+sources remain, main has no target, and about 24 GiB is now free.
+
+Standard host preflight is running (session 80805), log
+`/private/tmp/i308-sender-binding-preflight-host.log`; poll that handle instead of
+restarting. Both governance validators and format/diff checks pass. Fresh fetch
+still shows main `4bf3488b2f4344b054754851b588686126c436f4`.
+#797 still publishes old head `1993432dccd3571abac7849a32c5b4640007f622`:
+Windows failed, offline dependency parity passed, Linux Desktop still running at
+inspection. New native Windows CI/review and CAS remain mandatory before merge.
+The unpublished CLI/MCP followups and correction share the current I308 slice;
+MCP model Auto reachability and the remaining acceptance are still open.
+
+## Historical checkpoint — 2026-10-28 I308 Windows correction pending
+
+I309 remains closed; the complete queue remains I309 → T8/I308 → T2+T3
+MODEL-014 → T4 → T5 → T1 → T6. I308 is Active / Partial.
+
+Git Auto PR #797 is open at `1993432dccd3571abac7849a32c5b4640007f622`
+against `4bf3488b2f4344b054754851b588686126c436f4` (main re-fetched).
+Exact-head CI `40659215369` has a failed native Windows workspace job; main
+workspace validation is still running. Do not merge or restart that live run.
+The Windows failure includes retained Add/Commit/Checkout command drift.
+
+Local branch `feat/i308-visible-auto-decisions` in the preserved active worktree
+contains unpublished CLI visibility and MCP default-disposition test commits,
+plus a local correction and regression for the separately admitted sender Git
+executable binding. Only the retained executable is updated; argv/cwd/env remain
+frozen. The corrected-feature focused test compiled but failed at link with
+ENOSPC and did not execute; about 215 MiB remains free. No target or worktree
+cleanup was performed. See I308 owner for exact logs and evidence limitations.
+Reconcile the correction into #797 only after local verification and independent
+review, then obtain new exact-head native CI/review before merge. Remaining I308
+acceptance and every later task remain outstanding.
+
+## Historical checkpoint — 2026-10-28 I309 closed; I308 continues
 
 I309 owner is Complete / Closed with existing implementation Completion Commit
 `8b8c43e684bfd7c6bf326ea9cffd192b2cc480db` (#790). Post-merge baseline #795
@@ -7,9 +96,11 @@ passed all eight jobs and independent static Agent review approved the head/base
 The owner records review and unknown advisory/deprecation coverage limits.
 
 Next is T8/I308, still Active / Partial. Local continuation branch
-`feat/i308-git-command-continuation` retains Add/Commit native invocations and
-records 338/338 Git-feature Tools tests plus warnings-denied Clippy. These local
-changes are not merged Auto admission delivery. Real Add/Commit/Push/Checkout
+`feat/i308-git-command-continuation` retains Add/Commit/Checkout/Push native
+invocations; Push implementation is `dc78bab16`. Full locked Git-feature Tools
+tests passed 340/340 in approved host execution, plus warnings-denied Clippy;
+see the I308 owner for logs and sandbox/validation limits. These local changes
+are not pushed or merged Auto admission delivery. Real Add/Commit/Push/Checkout
 Auto evidence and remaining original acceptance/gates remain outstanding.
 
 Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
@@ -6385,3 +6476,19 @@ checking pass. I300 records scope limits and logs. This does not establish full
 recursive checkout/effect coverage: recursive and production guards remain,
 and simplified orchestration, external programs and review/platform gates are
 still outstanding. T7 and the full T1–T8 handoff remain incomplete.
+
+
+MCP Save local continuation (2026-10-28): builtin producer configuration now reaches
+plan-bound Auto capture admission; retained writes require a second complete-image
+review. Real rmcp allow/refusal/replacement/missing-intent scenarios, full locked MCP
+tests and Agent/MCP Clippy pass. Capture denial has zero download; write denial follows
+an authorized download but preserves the target. Owner I308 records review/validation
+limits and recovery/platform/remote gate residuals. This is unmerged implementation,
+not I308 completion. Queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
+MCP Save recovery local regression: 55cc0e3cead7e6d9f21038d524a122d327747fb1
+extends the real Save test through denied restore, explicitly simulated one-time human
+approval, successful restoration, and one-use receipt rejection. Focused locked test
+and test Clippy pass; reviewer confirms test-only boundary. This is not CI for this head,
+not actual human UI, not recovery-storage/cross-session acceptance, and not I308 completion.
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.

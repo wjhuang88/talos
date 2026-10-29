@@ -126,6 +126,25 @@ async fn child(scenario: String, tool: String) {
         registry.register(tool);
     }
     let mut engine = PermissionEngine::with_workspace_root(root.path().to_owned());
+    if matches!(scenario.as_str(), "scoped_deny" | "scoped_human") {
+        // Whole-invocation approval cannot confine undiscovered redirect/proxy
+        // effects. A broad deterministic Allow must not bypass a scoped policy.
+        engine.add_rule(talos_permission::PermissionRule::new(
+            &tool,
+            None,
+            PermissionDecision::Allow,
+        ));
+        engine.add_rule(talos_permission::PermissionRule::new_nature(
+            ToolNature::Network,
+            Some("private.example.invalid".into()),
+            Some(talos_core::tool::ToolResourceKind::Domain.into()),
+            if scenario == "scoped_deny" {
+                PermissionDecision::Deny("restricted undiscovered destination".into())
+            } else {
+                PermissionDecision::Ask
+            },
+        ));
+    }
     if matches!(scenario.as_str(), "deny" | "human") {
         engine.add_rule(talos_permission::PermissionRule::new(
             &tool,
@@ -139,7 +158,7 @@ async fn child(scenario: String, tool: String) {
     }
     let expected_calls = usize::from(!matches!(
         scenario.as_str(),
-        "deny" | "human" | "external" | "replacement"
+        "deny" | "human" | "scoped_deny" | "scoped_human" | "external" | "replacement"
     ));
     let state = Arc::new(talos_permission::PermissionSessionState::new(engine));
     let calls = Arc::new(AtomicUsize::new(0));
@@ -252,6 +271,8 @@ async fn real_http_auto_controls_proxy_and_redirect_effects() {
             "stale",
             "deny",
             "human",
+            "scoped_deny",
+            "scoped_human",
             "external",
             "replacement",
         ] {

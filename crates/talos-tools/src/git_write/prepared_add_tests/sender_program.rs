@@ -65,6 +65,28 @@ async fn sender_program_binding_requires_new_exact_read_admission() {
 }
 
 #[tokio::test]
+async fn sender_program_binding_keeps_each_native_command_frozen() {
+    for operation in ["add", "commit", "checkout"] {
+        let root = fixture();
+        integration_git(root.path(), &["add", "file"]);
+        integration_git(root.path(), &["commit", "-m", "base"]);
+        integration_git(root.path(), &["branch", "target"]);
+        let plan = match operation {
+            "add" => AddPlan::prepare(root.path(), &serde_json::json!({"paths":["file"]}), ToolProvenance::Native),
+            "commit" => AddPlan::prepare_commit(root.path(), &serde_json::json!({"message":"frozen"}), ToolProvenance::Native),
+            _ => AddPlan::prepare_checkout(root.path(), &serde_json::json!({"branch":"target"}), ToolProvenance::Native),
+        }.expect("plan");
+        let plan = Box::new(plan).request_sender_program().await.expect("executable frontier");
+        let tokens = proof(&plan).consume_for_prepared(&plan.request(), &plan.identity).expect("exact admission");
+        let mut plan = plan.discover_sender(&tokens).await.expect("admitted executable binding");
+        plan.revalidate().expect("unchanged frozen command after binding");
+        plan.environment.insert("GIT_CONFIG_NOSYSTEM".into(), "changed".into());
+        let error = plan.revalidate().expect_err("binding must not unfreeze environment");
+        assert!(error.to_string().contains("command changed after preparation"), "{operation}: {error}");
+    }
+}
+
+#[tokio::test]
 async fn sender_program_binding_preserves_invocation_budget() {
     let root = fixture();
     let plan = prepare(root.path());

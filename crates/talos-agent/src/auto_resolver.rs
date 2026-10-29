@@ -6,7 +6,7 @@
 
 mod action_review;
 mod directory_identity;
-pub(crate) use directory_identity::{ExecutionDirectoryIdentity, execution_directory_identity};
+pub use directory_identity::{ExecutionDirectoryIdentity, execution_directory_identity};
 mod file_mutation_review;
 mod invocation_review;
 mod network_review;

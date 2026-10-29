@@ -1,5 +1,311 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Local Desktop durable Todo correction — 2026-10-29
+
+The real `RuntimeHost` durable-session dispatch regression exposed that Todo
+registration and work projection used the global default sessions directory,
+although Desktop opens its durable transcript in a workspace-local binding.
+Both now use that binding's root. The focused locked Desktop `desktop-ui` binary
+test failed before the production correction (no item in the bound store) and
+passed afterward, verifying actual Todo creation and session isolation. Both
+governance validators passed with zero warnings. This local change is not yet
+committed, independently reviewed or certified by full preflight/exact-head CI;
+it does not complete I308, T8 or the handoff queue.
+
+## Local MCP injected command Auto stage — 2026-10-28
+
+The MCP gate now accepts an explicitly injected permission pipeline and current-turn
+embedder intent; the default constructor remains Headless without a resolver. Registry
+factory identity determines native prepared provenance consistently at preparation and
+admission. Matching names and external replacement instances cannot carry command Auto
+evidence. A new real rmcp client/server test runs the production Auto resolver and Git Add,
+asserts the staged blob, and denies final commands through human fallback so success cannot
+masquerade as model approval. Configuration discovery is separately host-approved. Negative
+cases cover same-name replacement, absent intent, Headless context, explicit Ask and Deny;
+all refuse model assessment and leave the index absent. A separate injected ordinary approval
+test proves actual file write/denial, not file Auto.
+
+Locked `git_prepared` (48/48) and `server_handshake` (3/3) pass with low-debug,
+nonincremental settings (`/private/tmp/i308-mcp-hosted-native-tests.log`). The first test
+attempts exposed missing interactive fixture context, separately approved discovery and
+inconsistent prepared provenance; all were corrected without weakening the Auto resolver.
+The earlier host preflight (session 80805) exited 0, including external Runtime SDK fixtures,
+but compiled MCP before these edits, so it does not certify this candidate. Fresh Clippy,
+independent permission/security/API review, final coherent preflight, exact-head CI (including
+Windows), merge and completion evidence remain required. MCP file/network/ordinary invocation
+Auto routing and the remaining I308 acceptance are still unfinished; this is not I308 closure.
+
+## Sender-binding rebuild verification — 2026-10-28
+
+Implementation correction is local commit
+`6696d880c9cbb36d7d3d300d46d9410244a56045`. After the maintainer explicitly
+authorized cleaning this active worktree's regenerable target, `cargo clean
+--locked` removed 54,761 files (27.1 GiB). Both worktrees and their sources were
+preserved; the main worktree has no target directory. Free space is now about
+24 GiB after rebuilding. Earlier disk-exhaustion checkpoints below are historical.
+
+With `CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0`,
+locked all-feature sender-binding tests pass 3/3
+(`/private/tmp/i308-sender-binding-rebuild.log`). Full all-feature Tools library
+tests first reported 1009 passed / 1 failed under sandbox process-observation
+EPERM (`/private/tmp/i308-sender-binding-tools-full.log`). The unchanged authorized
+host retry exits 0 with 1010/1010 passing
+(`/private/tmp/i308-sender-binding-tools-host.log`). Warnings-denied all-feature
+Tools lib/tests Clippy passed before cleanup
+(`/private/tmp/i308-sender-binding-clippy.log`). Format, whitespace and both
+governance validators pass. Standard host `release_preflight.sh` is running with
+the same low-debug/nonincremental settings plus `RUST_TEST_THREADS=1`; inspect
+`/private/tmp/i308-sender-binding-preflight-host.log` for its terminal outcome.
+No complete preflight result is claimed yet.
+
+Fresh fetch leaves main at `4bf3488b2f4344b054754851b588686126c436f4`.
+#797 remains open at old head `1993432dccd3571abac7849a32c5b4640007f622`.
+Its CI `40659215369` passed offline dependency parity; Linux Desktop validation
+was still running, and Windows workspace remains failed. New-source native
+Windows execution, exact-head independent review/CI and merge CAS remain required.
+MCP default disposition is not model Auto reachability; all remaining I308
+acceptance and MODEL-014 → T4 → T5 → T1 → T6 remain unfinished.
+
+## Local CLI decision visibility follow-up — 2026-10-28
+
+Git stage #797 is published at
+`1993432dccd3571abac7849a32c5b4640007f622`, based on
+`4bf3488b2f4344b054754851b588686126c436f4`. Independent final-head static
+permission/security/API review approved with shared-identity limits; the receipt
+is posted on the PR. Exact-head CI `40659215369` is running, not passed or merged.
+The preceding local-only checkpoint below describes its pre-publication state.
+
+The next local branch makes CLI/TUI effectful AllowOnce notices explicitly say
+that the model allowed the request once, with a safe Git/file/network/invocation
+category rather than generic completion. Regression covers those categories and
+unknown future reasons without exposing provider identity or request digest.
+Locked focused CLI tests pass 8/8
+(`/private/tmp/i308-visible-auto-cli-tests.log`); warnings-denied CLI/test Clippy
+passed (`/private/tmp/i308-visible-auto-cli-clippy.log`).
+This follow-up has not been published. Full stage checks, review and publication remain
+pending. MCP hosted-native model reachability, complete profile/recovery/platform
+coverage and all later handoff tasks remain unfinished; I308 stays Active / Partial.
+
+### Standalone MCP fail-closed disposition regression — 2026-10-28
+
+Added a real MCP client/server integration test using the production file-tool
+contribution factory and permission gate. With the default standalone headless
+composition, native `read` returns the existing file contents, while `write` to a
+new path is rejected, creates no file and leaves the original unchanged. Locked
+handshake integration suite passed 2/2
+(`cargo test --locked -p talos-mcp --test server_handshake`,
+`/private/tmp/i308-mcp-native-default.log`). This proves the default profile's
+read-Allow/write-deny disposition; it does not establish model Auto reachability.
+ADR-064 requires an embedder to inject a resolver and effective policy, and CLI
+configuration is not implicitly loaded by MCP. MCP hosted-native Auto remains open.
+The focused compile consumed disk; available space was about 671 MiB afterward, so
+the full preflight was not run. This local test has not received final review or CI.
+
+### Git-stage Windows CI finding — 2026-10-28
+
+Exact-head run `40659215369` at `1993432dccd3571abac7849a32c5b4640007f622`
+has a failed Windows workspace job `122717780697`; the main workspace job was
+still running at inspection. Windows format/check/Clippy passed, but structured
+Git guard tests and workspace tests failed. Tools reports 923 passed / 40 failed;
+MCP Checkout and Runtime Checkout also fail. Multiple failures report retained
+Add/Commit/Checkout command drift after preparation. Job log:
+`/private/tmp/i308-git-windows-job.log`. Sender-program discovery/rebinding after
+initial command capture is the current investigation lead, not a proven complete
+root cause. Do not merge this candidate or claim native Windows coverage. No live
+workflow was restarted. The local MCP disposition test above does not fix this.
+
+Inspection confirmed that `FrozenCommand` captured the entry Git executable before
+the separately admitted sender-program frontier, while Commit and Checkout can
+rebind to Git for Windows' internal `git.exe`; Add did not take that path. The
+local correction validates the old command before binding, then changes only its
+retained executable path at that exact admission boundary. Arguments, workdir and
+environment remain frozen and revalidation still rejects changes. A regression
+exercises Add/Commit/Checkout frozen-field checks after binding. This is a focused
+source-level hypothesis and regression, not confirmed Windows runtime evidence.
+
+Low-debug locked focused validation was attempted twice. The first invocation
+omitted the `git` feature and therefore selected zero sender tests; it compiled
+but is not test evidence. The correct `--all-features --lib sender_program_binding`
+invocation failed while linking `talos-tools` with `ld: write() failed, errno=28`
+at about 215 MiB free. The test did not execute. No target cleanup was performed;
+another active worktree's target remains untouched. Re-run focused tests and native
+Windows CI when disk capacity permits, then obtain fresh exact-head review and CI.
+
+Subsequent low-debug `cargo check --locked -p talos-tools --all-features --tests`
+passed (`/private/tmp/i308-sender-binding-check.log`), including the new regression's
+compilation. This does not execute tests. Independent local Agent design review
+found no blocking permission/security finding: old invocation validation precedes
+exact admitted executable capture, only program changes, and subsequent identity
+checks remain. The reviewer ran no builds/tests and explicitly did not approve a
+committed final head. Both governance validators passed with zero warnings after
+the owner/handoff checkpoint. Native Windows and repair runtime validation remain
+required. Latest fetched main remains `4bf3488b2f4344b054754851b588686126c436f4`.
+
+## Local operation-specific Git Auto checkpoint — 2026-10-28
+
+Git stage delivery state: Review (local candidate; remote gates pending).
+Iteration delivery remains Active / Partial; this stage does not close I308.
+
+Implementation is committed locally as
+`a1490da3479f6da752c98d2ccca8cefeed4b17b5`; it is not pushed or merged.
+Independent static permission/security/API review approved that exact implementation
+against `4bf3488b2f4344b054754851b588686126c436f4`, without running tests.
+Approved-host Windows Tools all-feature cross-check passed
+(`/private/tmp/i308-git-command-xwin-host.log`); this is compilation evidence,
+not native Windows execution. The unchanged focused Push eight-stage test also
+passed in a subsequent sandbox run, without establishing why earlier workspace
+runs received EPERM from process observation. Final approved-host standard
+preflight with default debug/incremental settings failed at workspace test linking
+with ENOSPC (exit 101; `/private/tmp/i308-git-command-final-preflight-host.log`).
+After explicitly authorized deletion of only this worktree's regenerable
+`target/debug/incremental` cache, the standard script passed completely (exit 0) with
+`CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0
+RUST_TEST_THREADS=1` in approved host execution
+(`/private/tmp/i308-git-command-final-preflight-host-lowdebug.log`), including
+workspace tests and both external Runtime SDK consumer modes. This certifies the
+unchanged executable implementation; the owner evidence update requires its own
+governance checks. No remote gate or native Windows execution is claimed.
+
+The four-operation Agent matrix now also covers same-name external registration
+and replacement of a trusted builtin instance: both invoke zero assessors and
+produce no Git mutation (`/private/tmp/i308-git-instance-trust.log`). Its denied
+command fallback checks structured capability scope rather than relying only on
+explanation text. The shared five-operation resolver matrix also rejects assessor
+timeout and oversized output (`/private/tmp/i308-git-resolver-bounds.log`).
+Standard preflight completed successfully, including both external SDK modes
+(`/private/tmp/i308-git-command-preflight.log`), but that run overlapped subsequent
+fixture changes; final frozen-tree validation is still required.
+
+Runtime shared-composition integration now exercises Add, Commit, Checkout and
+Push through RuntimeBuilder, provider Auto review, admission and real local Git.
+Each operation checks AllowOnce against human-required with command fallback
+denied, including actual index, commit, branch and receiver-ref effects. The
+complete integration file passes 4/4, preserving existing Pull policy, recursion
+and cancellation coverage (`/private/tmp/i308-git-runtime-integration.log`).
+Runtime integration warnings-denied Clippy passes after replacing two fixture
+`unwrap()` calls with contextual `expect()` calls
+(`/private/tmp/i308-git-runtime-clippy.log`). Both governance validators pass
+(`/private/tmp/i308-git-auto-governance.log`,
+`/private/tmp/i308-git-auto-claims.log`). Fresh fetch and GitHub main-ref query
+both confirm `4bf3488b2f4344b054754851b588686126c436f4`.
+This is local host evidence, not Windows runtime or merged delivery. The earlier
+overlapping preflight is superseded by the final low-debug run recorded above.
+
+The current locally committed continuation produces separate versioned Add, Commit,
+Checkout and Push review evidence only at their final retained-command frontier.
+The closed capability compiler checks each tool/capability pair and downgrades
+approval to Once. Unknown transitive effects remain explicitly disclosed;
+active Deny and incompatible scoped human checkpoints are checked before Allow.
+This does not extend Pull authorization merely by relabeling its proof.
+
+Real registered Agent dispatch passes four operations across nine scenarios
+(Allow, human-required, unsupported model `deny` output, assessor error, session expiry, policy Deny,
+scoped Ask, external registration, trusted-instance replacement), with actual index/commit/branch/receiver-ref assertions and zero
+persistent grants. Policy restrictions prevent model assessment. The fixture
+denies command-review fallback so it cannot mask failed Auto approval. Existing
+Pull's ten-scenario matrix also passes. Log:
+`/private/tmp/i308-git-real-auto-policy-matrix.log`.
+
+Agent library tests passed 513/513 before the final added negative scenarios;
+the expanded resolver operation-mismatch matrix subsequently passed. Permission
+library tests passed 167/167. Git-feature Tools passed 341/341 in approved host
+execution (`/private/tmp/i308-git-command-tools-full-host.log`); sandbox execution
+passed 340 and failed the unchanged process-observation assertion with EPERM.
+Agent/Permission library/test warnings-denied Clippy passed before the final
+policy fixture expansion (`/private/tmp/i308-git-agent-permission-clippy.log`).
+
+Initial actual Agent testing found a request-fingerprint mismatch from a redundant
+transitive-effects marker. The marker was removed: operation capability guards
+already enforce the restriction, including manually registered Git instances.
+Full Agent rerun then passed. No new permission-pipeline marker remains.
+Fetched main remains `4bf3488b2f4344b054754851b588686126c436f4`.
+Remaining: final owner-evidence checks, production/profile reconciliation and native
+Windows evidence, final exact-head permission/security/API review,
+exact-head CI/CAS/merge and remaining original
+I308 acceptance. This is local implementation evidence, not merged delivery.
+I308/T8 and the full handoff remain Active / Partial; MODEL-014 → T4 → T5 → T1 →
+T6 retain their complete scope.
+
+## Local retained Push checkpoint — 2026-10-28
+
+Implementation `dc78bab16` retains Push's executable, cwd, argv and environment
+at the first final mutation frontier, after receiver discovery and Windows
+internal-program rebinding, before that frontier receives admission. Subsequent
+checks reject a changed command rather than replacing it. The final dispatcher
+requires and executes the retained command. A real Git/local-listener regression
+rejects remote, branch, force, environment, cwd, program and missing-command
+changes without contacting the receiver or changing HEAD/worktree status.
+
+Full locked Git-feature Tools library tests passed 340/340 in approved host
+execution (`/private/tmp/i308-retained-push-full-host.log`). The initial focused
+run exposed fixture entrypoints bypassing the production retention seam; those
+now reuse the same retention check. The corrected sandbox focused run passed
+16/17, with only the existing process-observation EPERM failure. The host full
+run preserves that assertion and passes. Warnings-denied Git-feature library/test
+Clippy passed (`/private/tmp/i308-retained-push-clippy.log`); formatting and diff
+checks passed. Clippy's collapsible conditional was corrected after the full
+suite; the change is syntactic and Clippy compiled both library and tests.
+
+Fetched `origin/main` remains `4bf3488b2f4344b054754851b588686126c436f4`.
+Current rebased retention implementation mapping: Add `b6764dd48`, Commit
+`0cb83e527`, Checkout `48515fc40`, Push `dc78bab16`. Earlier SHA mappings below
+are historical. These local commits have not been pushed or merged. They do not
+implement operation-specific Add/Commit/Push/Checkout Auto assessment/admission.
+That implementation, higher-risk recovery/profile/platform coverage, full locked
+preflight, independent permission/security/API review, exact-head CI and merge
+remain required. I308/T8 and the full handoff goal remain Active / Partial;
+T2/T3 → T4 → T5 → T1 → T6 remain queued with unchanged acceptance.
+
+## Local retained Checkout checkpoint — 2026-10-28
+
+Checkout now retains its exact executable, cwd, argv and environment, rejects
+changed branch/create/environment/cwd/program or missing retained command before
+mutation, and executes the retained invocation after equality checks. Real Git
+regression verifies unchanged HEAD and clean status in all six refusal cases.
+Focused regression passed; full Git-feature Tools tests passed 339/339 in
+approved host execution (`/private/tmp/i308-retained-checkout-full-host.log`),
+and warnings-denied library/test Clippy passed
+(`/private/tmp/i308-retained-checkout-clippy.log`). The sandbox full run passed
+338/339 and failed the existing Push process-observation fixture with EPERM;
+the host rerun preserves that assertion and passes. No Auto admission, full
+workspace/platform validation, final security/API review or merged delivery is
+claimed. Push command retention and operation-specific Add/Commit/Push/Checkout
+assessment/admission remain outstanding, together with original full acceptance.
+
+## Local retained Add checkpoint — 2026-10-28
+
+Rebased onto baseline closure merge `958a391316c82181853d1df176687361b14ff82b`:
+Add implementation is now `e6237f668`; retained Commit implementation is
+`686a57641`. Commit retains the exact message/mode, executable, cwd and
+environment, rejects changed message/`--all` or missing retained command before
+mutation, and executes the retained invocation. Current Git-feature Tools tests
+passed 338/338 in approved host execution
+(`/private/tmp/i308-retained-add-git-full-host-tests.log`), and Git-feature
+library/tests warnings-denied Clippy passed
+(`/private/tmp/i308-retained-commit-clippy.log`). The new fixture initially assumed
+an existing HEAD in an unborn repository; it now checks actual unchanged status.
+These remain local retention changes, not Add/Commit Auto admission or merged
+delivery. Push/Checkout retention, operation-specific assessment/admission and
+original stage gates remain outstanding. Earlier Add-only SHA/results below are
+historical pre-rebase evidence.
+
+Implementation `cda61015c` retains Add's exact executable, cwd, literal argv and
+environment before assessment and executes that retained command after matching
+revalidation. A real Git fixture refuses path, environment, cwd, executable or
+missing-command substitutions before staging; existing selective-staging behavior
+is preserved. This is command-retention groundwork, not Add model Auto admission.
+Commit/Push/Checkout Auto and the full original H/G acceptance remain unfinished.
+
+Git-feature Tools library tests passed 337/337 in approved host execution:
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked -p talos-tools --no-default-features --features git --lib`
+(`/private/tmp/i308-retained-add-git-full-host-tests.log`). The sandbox run passed
+336/337, failing only the existing Push process-observation assertion with EPERM;
+no assertion was skipped or weakened. Git-feature library/tests Clippy with
+`-D warnings` passed (`/private/tmp/i308-retained-add-git-clippy.log`), and
+format/diff checks passed. Full preflight, independent security/API review,
+Windows evidence, remote CI and merge are outstanding for this local stage.
+T8 remains Active / Partial; T2/T3 → T4 → T5 → T1 → T6 remain unchanged.
+
 ## Current delivery checkpoint — 2026-10-28
 
 Pull #786 merged as `652749f42b7dac0d1ab9a665a4c54e6e48576312`; all eight
@@ -394,7 +700,7 @@ Runtime shared composition has a separate Product/Runtime inventory-equivalence 
 | `web_search` | ADR-090 excludes ordinary whole-invocation Auto, including compatibility/default search. Concrete production legacy registration currently refuses before model/human review because its profile has no safe typed network resource, including with explicit policy Allow. Six real-Agent disposition scenarios pass locally; this is unavailable behavior, not a working search path. Guarded instances require their dedicated prepared-network route and cannot downgrade. I293 backend/transport activation remains separately owned; synthetic carrier fixtures do not prove search backend success. |
 | `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list` | Real Agent dispatch verifies default Read Allow returns actual temporary-repository status/diff/history/commit/branch evidence and explicit Read Deny rejects all five, with zero assessor calls/grants. Complete profile/platform evidence remains outstanding. |
 | `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout` | I300 prepared command route retained; no reopening of accepted whole-command Pull semantics. I308 full coverage evidence outstanding. |
-| `bash` (Unix) / `powershell` (Windows), `exec` | Whole-invocation Auto merged in #783 with actual Unix allow/refusal/cancel/stale/registration/replay tests and exact-head Windows workspace CI. Per-entry-point reachability/final acceptance still requires reconciliation; cross-compilation alone is never native evidence. |
+| `bash` (Unix) / `powershell` (Windows), `exec` | Whole-invocation Auto merged in #783 with real Agent allow/refusal/cancel/stale/registration/replay tests. MCP now routes registered instances through cwd-aware one-use invocation admission; local MCP integration proves Exec and Unix Bash Git-config mutation after AllowOnce plus explicit Execute Deny. Windows PowerShell MCP execution and exact-head Windows CI for this route remain outstanding; full profile acceptance remains open. |
 | `todo_create`, `todo_create_batch`, `todo_update_batch`, `todo_update_status`, `todo_update`, `todo_delete`, `todo_add_dependency`, `todo_remove_dependency`, `todo_query` | Session-scoped Internal facets retain default deterministic Allow, not model approval. Local real-Agent tests cover all nine operations under default Allow and explicit Internal Deny, actual SQLite effects, unchanged other-session data, zero assessor calls and zero grants. MCP does not add Todo; complete profile/platform evidence remains outstanding. |
 | `status` | MCP-only read tool; concrete built-in ownership checked. |
 | `delay`, `schedule`, `list_scheduled_tasks`, `cancel_scheduled_task` | Scheduler registration and action review merged in #772. Product-owned instances are built-ins; caller-supplied instances remain external. Exact scheduling/cancellation review does not approve future tool effects. `list_scheduled_tasks` retains Read policy. Complete profile/final acceptance remains open. |
@@ -1519,6 +1825,18 @@ production composition before closing each row.
 | 6, host reachability | Inspect CLI/Runtime/Desktop/MCP actual resolver installation and visible decisions, beyond registry equality; match applicable feature/native Windows evidence to these paths. |
 | 7, delivery gates | Save preflight/SDK/xwin, stable stage publication, exact-head native CI/review/CAS; then full H/G owner and user-doc reconciliation with implementation SHAs before Complete. |
 
+Current production-entrypoint inspection (2026-10-28): standalone
+`run_mcp_server` constructs `McpPermissionGate::new` with a default engine.
+That gate uses Headless/Unavailable interaction and no resolver; it labels calls
+as `McpRemote { server: "standalone-mcp" }` even for its hosted native registry.
+This proves a fail-closed standalone disposition, not model Auto reachability.
+Acceptance 6 remains open: reconcile intended hosted-native behavior and add
+real gate/handler evidence before claiming MCP coverage. RuntimeBuilder Git
+integration and Desktop ordinary-shell Auto tests do not cover this entrypoint.
+Likewise CLI `format_auto_review_report` currently formats `prepared_command`
+AllowOnce through its generic completion fallback; operation-specific visible
+decision/rationale coverage must still be verified under acceptance 6.
+
 ### Real Pull Auto ownership follow-up — 2026-10-27
 
 Production dispatch testing exposed a gap not covered by synthetic prepared-command
@@ -1544,3 +1862,376 @@ governance validators passed. Fresh full preflight and Agent/Runtime Windows tes
 cross-check passed; independent static review approved exact `e14c76164`. Native
 CI, publication and merge remain pending. This narrows a real registration trust gap; it does not add model
 Auto support to Add/Commit/Push/Checkout or complete profile/search/G acceptance.
+
+
+### Hosted-native MCP retained mutation stage — 2026-10-28
+
+The local candidate forwards complete-image prepared edit/delete evidence only for
+registry-verified builtin instances, with consistent Native preparation/admission
+provenance. Ambiguous command/mutation/configuration evidence fails closed.
+The additive trusted-embedder `authorize_prepared_file_mutation` API requires the
+caller to establish builtin ownership; it does not infer trust from names or payloads.
+Existing plan-binding regression now exercises this public API for allow, deny and
+mismatched-plan cases; the untrusted internal path remains explicitly tested.
+
+Real duplex rmcp tests exercise retained edit and delete with AllowOnce, model refusal,
+same-name external replacement and a concurrent target update. Only AllowOnce changes
+the expected target; concurrent contents are preserved. External assertion-completion
+counters prevent contained assessor panics from masquerading as expected refusal.
+The final focused test and Agent API regression pass. Full MCP all-features tests
+passed before the assertion-counter-only test refinement; warnings-denied MCP Clippy
+passed before the Agent regression/test refinement. Logs:
+`/private/tmp/i308-mcp-all-after-mutation.log`,
+`/private/tmp/i308-mcp-mutation-verified.log`,
+`/private/tmp/i308-public-mutation-api-test.log`.
+
+This is local implementation, not merged delivery or complete recovery evidence.
+Save capture/configuration, prepared network and ordinary invocation Auto dispatch
+through MCP remain outstanding, as do full acceptance, coherent final preflight,
+independent exact-head security/API review, Windows CI and merge CAS. PR #797 still
+publishes the older 1993432dc candidate with failing Windows Git tests; local host
+success does not certify native Windows behavior. I308/T8 and the full goal remain Partial.
+
+
+### Hosted-native MCP Save configuration stage — 2026-10-28
+
+Local implementation adds a trusted-embedder prepared builtin configuration API; MCP
+forwards configuration from the exact operation only after registry builtin ownership
+verification. Ambiguous evidence still refuses. Save capture and complete-image write
+remain distinct plan-bound admissions. The API does not authenticate arbitrary callers.
+
+Real rmcp Save tests cover allow, capture refusal, write refusal, external replacement
+and missing current-turn intent. Capture refusal performs no download; write refusal
+follows one authorized download and preserves the original destination. Assessor
+completion counters and parent-observed proxy connections supplement file assertions.
+Locked MCP all-features tests and Agent/MCP all-features warnings-denied Clippy pass
+(`/private/tmp/i308-mcp-save-full.log`, `/private/tmp/i308-save-config-clippy.log`).
+Independent bounded shared-identity Agent static review approved the dirty code snapshot,
+without running tests; immutable-head confirmation remains required.
+
+This supersedes the preceding local Save configuration gap, not the remaining prepared
+network/ordinary MCP routes. Recovery execution through MCP, recovery-storage inventory
+on refusal, concurrent Save changes, native Windows, coherent standard preflight,
+publication/exact-head CI/review/CAS/merge and full acceptance remain outstanding.
+I308/T8 remains Partial; no completion evidence is claimed.
+
+Save stale-target follow-up: the real MCP test now mutates the destination during
+complete-image assessment before returning AllowOnce. Execution refuses and preserves
+`concurrent update`, with two completed assessments and exactly one prior authorized
+download. The six-scenario focused test passes
+(`/private/tmp/i308-mcp-save-concurrent.log`). This supersedes the concurrent Save
+regression gap above; recovery execution/storage and platform/remote gates remain open.
+
+Stable Save/MCP candidate validation: standard `./scripts/release_preflight.sh`
+with locked commands passed on the host, including both external Runtime SDK modes
+(`/private/tmp/i308-save-config-preflight-host.log`). The initial sandbox run
+(`/private/tmp/i308-save-config-preflight.log`) failed one Tools Push process-observation
+test with EPERM (1009 passed / 1 failed); the unchanged host retry passed.
+The Save concurrent regression and focused warnings-denied Clippy also pass. Both
+governance validators pass with zero warnings. Fresh fetch retains target main
+`4bf3488b2f4344b054754851b588686126c436f4`. This is local stage validation,
+not new-head native Windows CI, merge authorization or whole-I308 completion.
+
+MCP Save recovery-gate regression (local test-only follow-up): the real rmcp scenario
+now extracts the receipt from a successful retained replacement. Recovery is denied by
+the permission resolver by default with downloaded bytes unchanged; after an explicit
+test-controlled `ApproveOnce` response for the `save_url` recovery request, original
+bytes are restored, and reusing the one-use receipt fails without changing them. The
+Auto assessor call count does not increase and the parent observes only the one download.
+Locked focused test and warnings-denied test Clippy pass
+(`/private/tmp/i308-mcp-save-restore.log`, `/private/tmp/i308-save-restore-clippy.log`).
+This is a simulated human fallback, not UI evidence or restore-specific production policy;
+cross-session receipt ownership/privacy/storage cleanup remain unverified. Independent
+static test review approved immutable `55cc0e3cead7e6d9f21038d524a122d327747fb1`.
+Exact-head CI observed during this work is for preceding `c32a49088`; it cannot validate
+this commit. Updated candidate CI, full I308 gates and all later queue tasks remain open.
+
+Save explicit-policy disposition follow-up: the real MCP fixture adds Headless, explicit
+Network Deny and explicit Write Deny. All three refuse before model assessment or download
+and preserve the destination. In particular, an explicit Write Deny on Save's declared
+transitive effects rejects the whole operation at capture admission; it does not permit an
+earlier network phase and rely on a later rollback. Nine locked MCP scenarios pass
+(`/private/tmp/i308-mcp-save-policy.log`); focused warnings-denied test Clippy is recorded
+separately after completion. This is host test evidence only, not native Windows CI or
+full profile inventory.
+
+MCP Git host-coverage follow-up: a real rmcp test now invokes production registered
+`git_add`, `git_commit`, `git_checkout` and `git_push` contributions through the injected
+permission pipeline. For each operation the Auto assessor checks the exact tool,
+versioned command operation and current user intent, returns AllowOnce, and the test
+verifies the actual Git index, commit subject, branch, or bare-receiver ref. The test
+resolver permits configuration discovery but denies the operation-specific command
+fallback, so the final effects require model admission. Focused test passes; all 49
+`git_prepared` integration tests and warnings-denied test Clippy pass
+(`/private/tmp/i308-mcp-git-four-ops.log`,
+`/private/tmp/i308-mcp-git-prepared-all.log`,
+`/private/tmp/i308-mcp-git-four-ops-clippy.log`). Independent bounded static review
+approved the test. This supplies standalone MCP success-path evidence for four Git
+mutations; it does not finish negative-policy/replacement matrices across every host,
+native Windows, profile/feature reconciliation or the complete H/G acceptance.
+
+Full host preflight for this follow-up is terminal exit 101
+(`/private/tmp/i308-mcp-git-four-ops-preflight-host-final.log`): Tools 1009/1010
+passed; `refused_connection_consumes_budget_before_the_next_source_can_resolve`
+returned first-source Request rather than next-source RequestLimit. An all-feature
+focused invocation executes that test and passes (1/1;
+`/private/tmp/i308-search-refusal-focused-real.log`). An earlier invocation with
+`--exact` and an incomplete name ran zero tests and provides no validation evidence.
+The cause remains unproven; full preflight is not certified by the focused pass.
+Earlier host TUI failure and sandbox Push EPERM remain separate observations.
+
+Follow-up validation clarification: after the host preflight's parallel Tools run
+reported two connection-refusal budget failures, the unchanged original connection
+fixture module passed 4/4 in isolation, and a serial all-feature Tools run passed
+1010/1010 (`/private/tmp/i308-tools-serial.log`, `--test-threads=1`, exit 0).
+A temporary dynamic-port/held-socket experiment was reverted and is not evidence.
+This establishes serial local stability only; parallel preflight reliability and the
+underlying scheduling cause remain unknown. No production search code was changed.
+
+Ordinary HTTP policy regression follow-up (2026-10-28): the production Agent
+proxy/redirect fixture now checks `http_request` and `fetch_url` with a broad
+deterministic Allow followed by an explicit domain-scoped Deny or Ask for an
+undisclosed destination. All four cases terminate without assessor calls, accepted
+or queued proxy connections, or installed grants. This verifies the existing
+transitive-policy guard in the presence of a later broad Allow. The earlier default
+Network Ask shadows that Allow, so this fixture alone does not prove the
+deterministic-Allow ordering. No production code changed.
+The focused HTTP matrix and all 513 locked all-feature Agent library tests pass;
+all-target all-feature warnings-denied Agent Clippy passes. The unchanged parallel
+Tools library suite also passes 1010/1010 on this attempt; earlier preflight failure
+causes remain unknown, so this is not full preflight certification. MCP Git tests
+pass 49/49, MCP Clippy and both governance validators pass. The preceding candidate
+`3fffc458f212350ac0a70ba0d3671772fd377efa` was published to #797 and its own CI
+run `40705827501` is live; none of that CI certifies this later test follow-up.
+Ordinary MCP invocation routing, remaining profile/recovery/platform acceptance,
+final review/merge gates and the downstream queue remain incomplete.
+
+### Hosted-native MCP ordinary HTTP stage — 2026-10-28
+
+The local handler now admits registered implementation-owned `http_request` and
+`fetch_url` through the shared whole-invocation review, retaining exact input,
+configuration and a one-use plan identity. The request-ID ledger reserves calls
+before review; permission hooks complete before freshness-checked consumption.
+Protected prepared-network tools and untrusted replacements do not enter this route.
+Cancellation and the total invocation deadline drop the execution future and report
+that effects may be incomplete; they do not promise remote rollback.
+
+The real rmcp/subprocess proxy matrix passes for both tools: Auto success, actual
+deterministic Allow, a later Allow shadowed by default Ask, incompatible scoped
+Deny/Ask, uncertain/error/stale assessment, explicit human/Deny, Headless, absent
+intent and caller replacement. Proxy assertions verify method, URL and POST body;
+refusals produce no accepted or queued connection. Cancellation during assessment
+then same-ID replay rejects without a second assessment or installed grant.
+Command: `cargo test -p talos-mcp --all-features --locked --test native_http_auto`.
+The full all-feature MCP suite and warnings-denied all-target MCP Clippy passed
+before the final cancellation and deterministic-Allow test additions. The final
+rerun failed linking other test targets with ENOSPC; subsequent Clippy and format
+commands in that chain did not run. Authorized cleanup removed only this active
+worktree target. The low-debug, incremental-disabled locked full MCP rebuild
+passed (`/private/tmp/i308-mcp-http-rebuild.log`), as did all-target warnings-denied
+MCP Clippy (`/private/tmp/i308-mcp-http-clippy.log`) and the strengthened final
+scoped-policy matrix (`/private/tmp/i308-mcp-http-final-matrix.log`).
+The subsequent transport-cancellation regression passes for both tools: the proxy
+receives the complete request and withholds its response, the client cancels,
+the proxy observes EOF, and same-ID replay is refused without another assessment
+or grant (`/private/tmp/i308-mcp-http-transport-cancel.log`). This proves local
+transport closure after cancellation, not remote rollback. Formatting passed separately.
+
+Independent bounded static permission/security/API review found no blocker and
+approved immutable commit `64de053969e36f7d96d65e2ec2913ed268374ca0` against
+base `4bf3488b2f4344b054754851b588686126c436f4`; the review was static and did
+not run builds. PR #801 targets `main` base `97cdc9bce2f372f57327ab4187ba6c84fbd263c4`.
+Exact-head CI run `40795244372` has passed classification, Linux Desktop,
+installer and owner reconciliation; workspace, Windows workspace and Windows
+Desktop jobs remain pending. Remaining host/profile/recovery/platform
+acceptance, full preflight and final merge
+are not proven by this matrix. I308/T8 remains Active / Partial; the downstream
+MODEL-014 → T4 → T5 → T1 → T6 queue remains incomplete.
+
+## Retained mutation policy and Headless profile regression — 2026-10-29
+
+The real MCP edit/delete Auto matrix now also covers an explicit Write Deny and
+an injected Headless pipeline with an Auto resolver. For both retained edit and
+delete, explicit Write Deny rejects before assessor invocation and preserves the
+source file. In Headless mode the injected resolver can return AllowOnce; the
+actual edit/delete occurs, while no persistent grant is installed. The test keeps
+the default standalone MCP composition's separate fail-closed behavior covered
+by `server_handshake`.
+
+Locked focused MCP integration tests pass for retained edit/delete and Save
+(`cargo test -p talos-mcp --all-features --locked --test native_mutation_auto
+--test native_save_auto`, low-debug/nonincremental settings). This is local host
+test evidence only; warnings-denied Clippy, governance validation, independent
+review and fresh exact-head CI remain required. It does not close MCP ordinary
+Shell/Exec Auto routing, WebSearch, recovery/profile/platform coverage, or I308.
+
+## MCP Git operation-specific Execute Deny regression — 2026-10-29
+
+The registered MCP Add/Commit/Checkout/Push Auto matrix now runs both success
+and explicit operation-scoped Execute Deny for each operation. Deny returns a
+permission-denied MCP error before any assessor call; HEAD, staged binary diff
+and current branch remain unchanged, and Push creates no receiver main ref.
+Both outcomes install zero persistent grants. These are independent operation
+fixtures, not renamed Pull evidence. All 49 `git_prepared` integration tests pass
+with `cargo test -p talos-mcp --all-features --locked --test git_prepared`
+(low-debug/nonincremental build), and all-target/all-feature MCP Clippy passes
+with `--locked -- -D warnings`. The preceding retained mutation checkpoint's
+Clippy and both governance validators also passed before publication.
+
+This extends local policy evidence only; fresh candidate review/CI, merge and
+remaining I308 host/profile/recovery/platform acceptance are still outstanding.
+The same four operation fixtures now inject an assessor transport/error result.
+Each returns a permission-denied MCP error after exactly one assessor call,
+without changing HEAD, the staged diff, current branch or Push receiver ref; no
+persistent grant is installed. All 49 Git prepared integration tests passed
+again after adding this failure branch.
+
+The real hosted-native MCP retained edit/delete matrix now also injects a file
+mutation assessor error for both operations. Review receives the complete image,
+then fails; the operation refuses without modifying or deleting the original
+file and leaves no persistent grant. Locked focused retained mutation and Save
+tests pass (2/2 integration tests), as does all-target/all-feature MCP Clippy
+with warnings denied and format/diff checks. This adds production-pipeline
+assessor-error evidence only. It does not close special/config/security-path,
+partial-failure, cancellation, or stale-identity recovery acceptance, nor the
+broader I308 recovery and platform rows.
+
+The hosted-native MCP retained mutation integration now also exercises the
+recovery receipt through the same registered edit/delete tool instance. After
+an Auto edit or delete, a separately resolved one-shot recovery approval restores
+the original file; replaying the consumed receipt is rejected without another
+Auto assessor call. The focused locked MCP mutation suite passes. This proves
+one-use instance-local recovery in this composition, not persistence across
+restart, cross-session ownership, special/config/security-path behavior,
+partial-failure recovery, or cancellation/stale-identity coverage.
+
+## Sensitive-path retained mutation Auto boundary — 2026-10-29
+
+Retained file mutation review now applies the existing sensitive-target predicate
+to the prepared target path before exposing complete images to the assessor.
+Real registered MCP edit/delete fixtures with benign contents at `.env` and
+`.aws/credentials` refuse via the denying human fallback with zero model calls,
+unchanged originals and no persistent grants. This reuses the conservative
+existing path policy; it is not an exhaustive credential classifier or a blanket
+ban on all configuration changes.
+
+Regression sensitivity was checked by temporarily removing the path guard:
+`native_mutation_auto` failed with one assessor invocation instead of zero for
+the `.env` scenario (`/private/tmp/i308-sensitive-path-red2.log`); after the
+fixture was corrected to accept the scenario-specific intent, the failure was
+specifically the unexpected model-call count. Restoring the guard passes the
+locked all-feature MCP retained mutation and Save integration tests (2/2,
+`/private/tmp/i308-sensitive-path-green2.log`), using nonincremental/low-debug
+builds. This is local integration evidence; fresh protected-scope independent
+review, complete candidate validation, exact-head CI and merge remain
+outstanding, as do the broader I308 acceptance rows.
+
+## MCP recovery stale-target integration — 2026-10-29
+
+The real retained edit/delete Auto matrix now changes the destination after the
+initial successful mutation and before a separately human-approved recovery.
+Both the first recovery attempt and its repeat refuse to overwrite the new user
+content; the assessor remains at one invocation and no persistent grant exists.
+The locked all-feature `native_mutation_auto` suite passes
+(`/private/tmp/i308-recovery-stale.log`); the latest full locked standard
+`release_preflight.sh` also passes at the implementation candidate containing
+this test (`/private/tmp/i308-sensitive-recovery-preflight-host.log`), including
+workspace tests, doctests and the external Runtime SDK fixture. Sandbox execution
+of that preflight had one process-observation EPERM in a Push test; the authorized
+host run passed it. The governance validators pass with zero warnings. This proves
+stale-content protection through this MCP composition, not atomic protection
+against every concurrent rename race or restart-persistent recovery. I308 remains
+Partial. This local candidate is not covered by PR #801's older head, independent
+review, exact-head CI or merge.
+
+## MCP retained mutation cancellation and replay — 2026-10-29
+
+The real MCP retained edit/delete Auto fixture now sends JSON-RPC cancellation
+after the assessor receives the complete mutation request. The server remains
+responsive, the same request ID is reserved against replay, the original file is
+unchanged, the assessor runs once and no grant is created. The locked focused
+`native_mutation_auto` integration test and all-target/all-feature MCP Clippy
+with warnings denied pass. This covers cancellation during assessment before
+mutation; it does not establish rollback after filesystem effects begin. The
+change is local and still needs review, exact-head CI and merge.
+
+## MCP recovery refusal preserves prior effect — 2026-10-29
+
+The real retained edit/delete fixture also denies the separate recovery request
+after the initial Auto mutation. A denied edit restore leaves the edited bytes;
+a denied delete restore leaves the target absent. The recovery assessor is not
+called again and no grant is installed, so recovery requires its own permission
+decision and denial does not execute the receipt. Focused locked MCP integration
+test (`cargo test -p talos-mcp --all-features --locked --test
+native_mutation_auto`) passes on this local follow-up candidate. This is explicit
+Write Deny after the initial operation, not a human resolver denial; the MCP
+transport correctly returns a permission error before tool execution.
+
+## MCP ordinary command invocation admission — 2026-10-29
+
+The MCP ordinary-invocation route now admits only registered native
+`bash`/`powershell`/`exec` alongside ordinary HTTP/fetch. The shared pipeline
+receives the tool-owned starting directory, exact normalized arguments, frozen
+implementation configuration, resolved initial execution directories and their
+resolution state. A one-use prepared admission is consumed after hooks and
+freshness checks; execution is refused if configuration, directory list or
+starting directory changes. The new MCP integration fixture executes real Git
+config mutation through registered Exec and Unix Bash only after model
+AllowOnce, and explicit Execute Deny rejects before assessor invocation or
+mutation. Its locked test passes locally. Windows PowerShell runtime coverage,
+assessor uncertainty/error/cancellation across this new MCP route, exact-head
+CI and independent permission/security/API review remain outstanding. Default
+standalone MCP remains Headless and fail-closed without an injected pipeline and
+current-turn intent. Full I308 remains Partial.
+
+The exact-head CI run `40820098820` completed with Linux preflight failure in
+`cancelled_push_closes_transport_and_confirms_cleanup`: the fixture's Git commit
+left background auto-maintenance rewriting the object layout between preparation
+and Push discovery. The full local host preflight passed and the same test passed
+there. The fixture commit now disables Git auto-detach so maintenance completes
+before snapshot capture; this local corrective test change requires fresh full
+validation, exact-head review/CI and merge evidence.
+
+## Post-failure local validation and MCP ordinary command route — 2026-10-29
+
+The fixture correction is committed as `bf057a41e` and the MCP registered
+ordinary command route as `15be68e49`. Standard local validation completed with
+exit 0 using the repository `./scripts/release_preflight.sh` entrypoint and
+`CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0
+RUST_TEST_THREADS=1`; this includes workspace check, warnings-denied Clippy,
+workspace tests/doctests and both external Runtime SDK modes. Tools passed
+1010/1010, including `cancelled_push_closes_transport_and_confirms_cleanup`
+and the eight-stage local Push test. Governance and collaboration validators
+reported zero warnings. An earlier sandbox attempt was incomplete: process
+observation returned EPERM at the local Push test, and the next full run ran out
+of disk while building the SDK coding-mode archive. The approved-host run above
+is the successful evidence; the two failed attempts are not counted as passes.
+
+The MCP command route admits only registered `bash`/`powershell`/`exec` when
+they use ordinary invocation review. It binds exact arguments, the tool-owned
+starting directory, configuration and the resolved initial execution-directory
+set, then rechecks those values before consuming the one-use admission and
+executing the retained instance. A real MCP integration fixture verifies
+registered Exec and platform shell mutation after AllowOnce and explicit Execute
+Deny before assessor invocation or mutation. This does not establish native
+Windows PowerShell behavior, assessor uncertainty/error/cancellation cases on
+this route, the full I308 matrix, or independent final permission/security/API
+review. PR #801 still points at the prior head; fresh exact-head CI, authorized
+review, latest-base rebase/CAS and merge remain required. I308 remains Partial.
+
+## MCP ordinary invocation refusal and cancellation coverage — 2026-10-29
+
+The real registered MCP Exec/Shell integration now exercises model uncertainty
+and assessor error in addition to AllowOnce and explicit Execute Deny. All
+non-Allow outcomes return an MCP permission error before Git configuration is
+written and leave the session grant count at zero. A raw JSON-RPC cancellation
+case waits until the ordinary-invocation assessor starts, sends
+`notifications/cancelled`, verifies the server still answers `ping`, then
+replays the same request ID and confirms it is rejected. The cancelled command
+does not write Git configuration or retain a grant; the assessor is invoked
+once. Locked `cargo test -p talos-mcp --test native_exec_auto` passes 2/2 and
+`cargo fmt --all` passes. A full locked preflight has not been run on this
+candidate. Native Windows PowerShell execution, changed-input/configuration
+staleness on this MCP route, exact-head CI, independent permission/security/API
+review and merge remain outstanding; this does not close the full operation /
+profile matrix or I308 acceptance.
