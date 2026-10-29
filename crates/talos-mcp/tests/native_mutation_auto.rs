@@ -29,6 +29,15 @@ struct Assessor {
     scenario: &'static str,
     delete: bool,
     file_name: &'static str,
+    dropped: Arc<tokio::sync::Notify>,
+}
+
+struct AssessmentDrop(Arc<tokio::sync::Notify>);
+
+impl Drop for AssessmentDrop {
+    fn drop(&mut self) {
+        self.0.notify_one();
+    }
 }
 
 #[async_trait]
@@ -60,6 +69,7 @@ impl AutoPermissionAssessor for Assessor {
             return Err("injected file mutation assessor failure".into());
         }
         if self.scenario == "cancel" {
+            let _guard = AssessmentDrop(self.dropped.clone());
             std::future::pending::<()>().await;
         }
         Ok(
@@ -125,6 +135,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
             std::fs::write(&path, "hi").expect("fixture");
             let calls = Arc::new(AtomicUsize::new(0));
             let verified = Arc::new(AtomicUsize::new(0));
+            let dropped = Arc::new(tokio::sync::Notify::new());
             let mut engine = PermissionEngine::with_workspace_root(root.path().into());
             if scenario == "policy_write_deny" {
                 engine.add_rule(PermissionRule::new_nature(
@@ -142,6 +153,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                     scenario,
                     delete,
                     file_name,
+                    dropped: dropped.clone(),
                 }),
                 if matches!(scenario, "restore" | "restore_denied" | "restore_changed") {
                     Arc::new(ApproveRecovery) as Arc<dyn ApprovalResolver>
@@ -239,6 +251,9 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                     .write_all(format!("{cancelled}\n").as_bytes())
                     .await
                     .expect("cancel");
+                tokio::time::timeout(Duration::from_secs(1), dropped.notified())
+                    .await
+                    .expect("cancel must drop assessment before its deadline or transport close");
                 let ping = json!({"jsonrpc":"2.0","id":2,"method":"ping"});
                 write
                     .write_all(format!("{ping}\n").as_bytes())
