@@ -2026,8 +2026,12 @@ or grant (`/private/tmp/i308-mcp-http-transport-cancel.log`). This proves local
 transport closure after cancellation, not remote rollback. Formatting passed separately.
 
 Independent bounded static permission/security/API review found no blocker and
-approved the route and tests without running builds. Immutable-head confirmation
-and exact-head remote CI remain required. Remaining host/profile/recovery/platform
+approved immutable commit `64de053969e36f7d96d65e2ec2913ed268374ca0` against
+base `4bf3488b2f4344b054754851b588686126c436f4`; the review was static and did
+not run builds. PR #801 targets `main` base `97cdc9bce2f372f57327ab4187ba6c84fbd263c4`.
+Exact-head CI run `40795244372` has passed classification, Linux Desktop,
+installer and owner reconciliation; workspace, Windows workspace and Windows
+Desktop jobs remain pending. Remaining host/profile/recovery/platform
 acceptance, full preflight and final merge
 are not proven by this matrix. I308/T8 remains Active / Partial; the downstream
 MODEL-014 → T4 → T5 → T1 → T6 queue remains incomplete.
