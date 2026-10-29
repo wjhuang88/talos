@@ -118,6 +118,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
             "restore",
             "restore_denied",
             "restore_changed",
+            "restore_wrong_path",
             "deny",
             "error",
             "wrong_digest",
@@ -160,7 +161,10 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                     file_name,
                     dropped: dropped.clone(),
                 }),
-                if matches!(scenario, "restore" | "restore_denied" | "restore_changed") {
+                if matches!(
+                    scenario,
+                    "restore" | "restore_denied" | "restore_changed" | "restore_wrong_path"
+                ) {
                     Arc::new(ApproveRecovery) as Arc<dyn ApprovalResolver>
                 } else {
                     Arc::new(Deny)
@@ -306,7 +310,12 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
             );
             if matches!(
                 scenario,
-                "allow" | "restore" | "restore_denied" | "restore_changed" | "headless"
+                "allow"
+                    | "restore"
+                    | "restore_denied"
+                    | "restore_changed"
+                    | "restore_wrong_path"
+                    | "headless"
             ) {
                 let result = result.expect("Auto admission");
                 assert_ne!(result.is_error, Some(true), "{result:?}");
@@ -315,7 +324,10 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                 } else {
                     assert_eq!(std::fs::read_to_string(&path).expect("edited"), "hello");
                 }
-                if matches!(scenario, "restore" | "restore_denied" | "restore_changed") {
+                if matches!(
+                    scenario,
+                    "restore" | "restore_denied" | "restore_changed" | "restore_wrong_path"
+                ) {
                     let text = result
                         .content
                         .iter()
@@ -332,6 +344,41 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                         .expect("recovery id");
                     if scenario == "restore_changed" {
                         std::fs::write(&path, "new user content").expect("concurrent replacement");
+                    }
+                    if scenario == "restore_wrong_path" {
+                        let other = root.path().join("other.txt");
+                        std::fs::write(&other, "unrelated user content").expect("other target");
+                        let rejected = client
+                            .peer()
+                            .call_tool(
+                                rmcp::model::CallToolRequestParams::new(if delete {
+                                    "delete"
+                                } else {
+                                    "edit"
+                                })
+                                .with_arguments(
+                                    json!({"path":"other.txt", "recovery_id":id})
+                                        .as_object()
+                                        .expect("wrong-path recovery args")
+                                        .clone(),
+                                ),
+                            )
+                            .await
+                            .expect("wrong-path recovery transport");
+                        assert_eq!(rejected.is_error, Some(true), "{rejected:?}");
+                        assert_eq!(
+                            std::fs::read_to_string(&other).expect("unrelated target"),
+                            "unrelated user content"
+                        );
+                        if delete {
+                            assert!(!path.exists(), "wrong-path restore preserves deletion");
+                        } else {
+                            assert_eq!(std::fs::read_to_string(&path).expect("edited"), "hello");
+                        }
+                        assert_eq!(calls.load(Ordering::SeqCst), 1);
+                        assert_eq!(state.grant_count().expect("grant count"), 0);
+                        // The failed cross-target attempt must not consume the receipt:
+                        // the normal restore and one-use replay checks below still apply.
                     }
                     let input = json!({"path":"selected.txt", "recovery_id":id});
                     if scenario == "restore_denied" {
