@@ -47,6 +47,7 @@ enum AssessorOutcome {
     Allow,
     Uncertain,
     Error,
+    WrongDigest,
     ReplaceDirectory,
 }
 
@@ -123,9 +124,9 @@ impl AutoPermissionAssessor for Assessor {
         }
         match self.outcome {
             AssessorOutcome::Error => Err("injected assessor failure".into()),
-            AssessorOutcome::Allow | AssessorOutcome::Uncertain | AssessorOutcome::ReplaceDirectory => Ok(json!({
+            AssessorOutcome::Allow | AssessorOutcome::Uncertain | AssessorOutcome::WrongDigest | AssessorOutcome::ReplaceDirectory => Ok(json!({
             "schema": request.action.schema,
-            "request_digest": request.action.request_digest,
+            "request_digest": if matches!(self.outcome, AssessorOutcome::WrongDigest) { "sha256:another-invocation".to_owned() } else { request.action.request_digest },
             "decision": if !matches!(self.outcome, AssessorOutcome::Uncertain) { "allow_once" } else { "human_required" },
             "confidence": if !matches!(self.outcome, AssessorOutcome::Uncertain) { "high" } else { "low" },
         })
@@ -156,6 +157,7 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
             (true, AssessorOutcome::Allow),
             (false, AssessorOutcome::Uncertain),
             (false, AssessorOutcome::Error),
+            (false, AssessorOutcome::WrongDigest),
             (false, AssessorOutcome::ReplaceDirectory),
         ] {
             let replacement = matches!(outcome, AssessorOutcome::ReplaceDirectory);
