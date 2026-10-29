@@ -92,6 +92,7 @@ impl AutoPermissionAssessor for Assessor {
         self.calls.fetch_add(1, Ordering::SeqCst);
         if let Some(started) = &self.started {
             started.notify_one();
+            return std::future::pending().await;
         }
         match self.outcome {
             AssessorOutcome::Error => Err("injected assessor failure".into()),
@@ -236,6 +237,12 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
 
 #[tokio::test]
 async fn cancelled_registered_exec_auto_review_cannot_mutate_or_replay() {
+    tokio::time::timeout(Duration::from_secs(15), cancelled_exec_review())
+        .await
+        .expect("cancelled MCP review deadline");
+}
+
+async fn cancelled_exec_review() {
     let root = tempfile::tempdir().expect("workspace");
     let root_path = root.path().canonicalize().expect("canonical root");
     assert!(
