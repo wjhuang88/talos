@@ -10,6 +10,7 @@ rust-version.workspace = true
 
 [features]
 plugin-acceptance = ["code-intelligence"]
+search-integration-test = ["network"]
 default = ["file-read", "search"]
 file-read = ["dep:sha2", "dep:uuid", "dep:walkdir", "tokio/fs"]
 file-write = ["file-read", "dep:libc", "dep:windows-sys", "dep:cap-std", "dep:talos-permission", "tokio/fs", "tokio/io-util"]

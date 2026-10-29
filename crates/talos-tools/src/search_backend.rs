@@ -27,6 +27,9 @@ mod router;
 mod health;
 // Dormant query/secret-free eligibility seam; availability never implies optional-provider consent.
 mod selection;
+// Explicit opt-in bridge for cross-crate caller-boundary tests; never built by default.
+#[cfg(feature = "search-integration-test")]
+pub(crate) mod integration_test;
 // Dormant response parsing prerequisite; activation still requires ADR-090 parity/D gates.
 mod bing_parser;
 mod ddg_parser;

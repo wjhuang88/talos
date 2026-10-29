@@ -15,6 +15,8 @@ use super::SearchBackendId;
 use super::composition::{
     PreparedSearchComposition, SearchCompositionConfiguration, SearchCompositionPreparationError,
 };
+#[cfg(feature = "search-integration-test")]
+use super::integration_test::SearchRouterIntegrationProbe;
 use super::router::{SearchRouterError, SearchRouterPolicy, SearchRouterSuccess, search_prepared};
 use super::transport::TransportLimits;
 
@@ -28,6 +30,8 @@ pub(in crate::search_backend) struct PreparedSearchRouterInvocation {
     policy: SearchRouterPolicy,
     query: String,
     include_snippets: bool,
+    #[cfg(feature = "search-integration-test")]
+    integration_probe: Option<Arc<SearchRouterIntegrationProbe>>,
 }
 
 impl std::fmt::Debug for PreparedSearchRouterInvocation {
@@ -50,7 +54,18 @@ impl PreparedSearchRouterInvocation {
             policy,
             query: query.to_owned(),
             include_snippets,
+            #[cfg(feature = "search-integration-test")]
+            integration_probe: None,
         })
+    }
+
+    #[cfg(feature = "search-integration-test")]
+    pub(in crate::search_backend) fn with_integration_probe(
+        mut self,
+        probe: Arc<SearchRouterIntegrationProbe>,
+    ) -> Self {
+        self.integration_probe = Some(probe);
+        self
     }
 }
 
@@ -68,14 +83,27 @@ impl PreparedNetworkToolInvocation for PreparedSearchRouterInvocation {
         self: Box<Self>,
         authority: Arc<dyn ToolNetworkAuthority>,
     ) -> ToolExecutionOutput {
+        #[cfg(feature = "search-integration-test")]
+        let integration_probe = self.integration_probe.clone();
         let Self {
             composition,
             policy,
             query,
             include_snippets,
+            ..
         } = *self;
         let running = composition.start(authority);
         let deadline = running.deadline();
+
+        // Cross-crate C-V10 tests hold the real running composition here, before any candidate
+        // future is polled. Caller/Session cancellation therefore proves ownership/drop propagation
+        // without DNS/HTTP. Production builds do not compile this branch.
+        #[cfg(feature = "search-integration-test")]
+        let integration_receipt = integration_probe.map(|probe| probe.enter());
+        #[cfg(feature = "search-integration-test")]
+        if integration_receipt.is_some() {
+            std::future::pending::<()>().await;
+        }
 
         // PreparedNetworkToolInvocation has no separate cancellation token. The Agent owns and
         // awaits this future; dropping it drops this guard, Router and every owned candidate future.
