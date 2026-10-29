@@ -2083,3 +2083,12 @@ with warnings denied and format/diff checks. This adds production-pipeline
 assessor-error evidence only. It does not close special/config/security-path,
 partial-failure, cancellation, or stale-identity recovery acceptance, nor the
 broader I308 recovery and platform rows.
+
+The hosted-native MCP retained mutation integration now also exercises the
+recovery receipt through the same registered edit/delete tool instance. After
+an Auto edit or delete, a separately resolved one-shot recovery approval restores
+the original file; replaying the consumed receipt is rejected without another
+Auto assessor call. The focused locked MCP mutation suite passes. This proves
+one-use instance-local recovery in this composition, not persistence across
+restart, cross-session ownership, special/config/security-path behavior,
+partial-failure recovery, or cancellation/stale-identity coverage.

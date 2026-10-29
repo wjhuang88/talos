@@ -78,11 +78,25 @@ impl ApprovalResolver for Deny {
     }
 }
 
+struct ApproveRecovery;
+#[async_trait]
+impl ApprovalResolver for ApproveRecovery {
+    async fn resolve(
+        &self,
+        request: PermissionApprovalRequest,
+        _: Duration,
+    ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        assert!(request.arguments.get("recovery_id").is_some());
+        Ok(ApprovalChoice::ApproveOnce)
+    }
+}
+
 #[tokio::test]
 async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
     for delete in [false, true] {
         for scenario in [
             "allow",
+            "restore",
             "deny",
             "error",
             "replacement",
@@ -112,7 +126,11 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                     scenario,
                     delete,
                 }),
-                Arc::new(Deny),
+                if scenario == "restore" {
+                    Arc::new(ApproveRecovery) as Arc<dyn ApprovalResolver>
+                } else {
+                    Arc::new(Deny)
+                },
                 ManagedWorkspaceLease::for_permission_session(root.path(), state.clone())
                     .expect("lease"),
                 Duration::from_secs(5),
@@ -181,13 +199,51 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                 expected_reviews,
                 "assessment evidence assertions must complete: {scenario}"
             );
-            if matches!(scenario, "allow" | "headless") {
+            if matches!(scenario, "allow" | "restore" | "headless") {
                 let result = result.expect("Auto admission");
                 assert_ne!(result.is_error, Some(true), "{result:?}");
                 if delete {
                     assert!(!path.exists());
                 } else {
                     assert_eq!(std::fs::read_to_string(&path).expect("edited"), "hello");
+                }
+                if scenario == "restore" {
+                    let text = result
+                        .content
+                        .iter()
+                        .filter_map(|part| part.as_text())
+                        .map(|part| part.text.as_str())
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    let id = text
+                        .split("recovery_id: ")
+                        .nth(1)
+                        .expect("receipt")
+                        .split([';', '\n'])
+                        .next()
+                        .expect("recovery id");
+                    let input = json!({"path":"selected.txt", "recovery_id":id});
+                    for replay in [false, true] {
+                        let restored = client
+                            .peer()
+                            .call_tool(
+                                rmcp::model::CallToolRequestParams::new(if delete {
+                                    "delete"
+                                } else {
+                                    "edit"
+                                })
+                                .with_arguments(input.as_object().expect("args").clone()),
+                            )
+                            .await
+                            .expect("recovery transport");
+                        assert_eq!(restored.is_error == Some(true), replay, "{restored:?}");
+                        assert_eq!(std::fs::read_to_string(&path).expect("restored"), "hi");
+                        assert_eq!(
+                            calls.load(Ordering::SeqCst),
+                            1,
+                            "restore must not reuse Auto"
+                        );
+                    }
                 }
             } else {
                 assert!(
