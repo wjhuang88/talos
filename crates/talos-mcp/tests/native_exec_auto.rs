@@ -29,6 +29,14 @@ struct Assessor {
     calls: Arc<AtomicUsize>,
     root: String,
     tool: &'static str,
+    outcome: AssessorOutcome,
+}
+
+#[derive(Clone, Copy)]
+enum AssessorOutcome {
+    Allow,
+    Uncertain,
+    Error,
 }
 
 #[async_trait]
@@ -80,13 +88,16 @@ impl AutoPermissionAssessor for Assessor {
             true
         );
         self.calls.fetch_add(1, Ordering::SeqCst);
-        Ok(json!({
+        match self.outcome {
+            AssessorOutcome::Error => Err("injected assessor failure".into()),
+            AssessorOutcome::Allow | AssessorOutcome::Uncertain => Ok(json!({
             "schema": request.action.schema,
             "request_digest": request.action.request_digest,
-            "decision": "allow_once",
-            "confidence": "high",
+            "decision": if matches!(self.outcome, AssessorOutcome::Allow) { "allow_once" } else { "human_required" },
+            "confidence": if matches!(self.outcome, AssessorOutcome::Allow) { "high" } else { "low" },
         })
-        .to_string())
+            .to_string()),
+        }
     }
 }
 
@@ -107,7 +118,12 @@ impl ApprovalResolver for Deny {
 async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutation() {
     let shell_tool = if cfg!(windows) { "powershell" } else { "bash" };
     for tool in ["exec", shell_tool] {
-        for explicit_deny in [false, true] {
+        for (explicit_deny, outcome) in [
+            (false, AssessorOutcome::Allow),
+            (true, AssessorOutcome::Allow),
+            (false, AssessorOutcome::Uncertain),
+            (false, AssessorOutcome::Error),
+        ] {
             let root = tempfile::tempdir().expect("workspace");
             let root_path = root.path().canonicalize().expect("canonical root");
             assert!(
@@ -134,6 +150,7 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
                     calls: calls.clone(),
                     root: root_path.to_string_lossy().into_owned(),
                     tool,
+                    outcome,
                 }),
                 Arc::new(Deny),
                 ManagedWorkspaceLease::for_permission_session(&root_path, state.clone())
@@ -186,6 +203,7 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
                 )
                 .await;
             assert_eq!(calls.load(Ordering::SeqCst), usize::from(!explicit_deny));
+            let admitted = !explicit_deny && matches!(outcome, AssessorOutcome::Allow);
             assert_eq!(
                 std::process::Command::new("git")
                     .current_dir(&root_path)
@@ -194,14 +212,14 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
                     .expect("read Git config")
                     .status
                     .success(),
-                !explicit_deny,
+                admitted,
                 "{result:?}"
             );
-            if explicit_deny {
-                assert!(result.is_err(), "explicit policy denial is an MCP error");
-            } else {
+            if admitted {
                 let result = result.expect("Auto admission");
                 assert_ne!(result.is_error, Some(true), "{result:?}");
+            } else {
+                assert!(result.is_err(), "non-allow outcomes must deny the MCP call");
             }
             assert_eq!(state.grant_count().expect("grants"), 0);
             client.cancel().await.expect("cancel");
