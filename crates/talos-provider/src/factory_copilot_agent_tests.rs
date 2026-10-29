@@ -8,6 +8,15 @@ use talos_core::tool::ToolRegistry;
 
 #[tokio::test]
 async fn copilot_messages_image_and_native_read_complete_through_real_agent() {
+    run_copilot_agent_round(false).await;
+}
+
+#[tokio::test]
+async fn catalog_copilot_messages_image_and_native_read_complete_through_real_agent() {
+    run_copilot_agent_round(true).await;
+}
+
+async fn run_copilot_agent_round(catalog: bool) {
     let temp = tempfile::tempdir().expect("workspace");
     let workspace = temp.path().canonicalize().expect("canonical workspace");
     std::fs::write(workspace.join("fixture.txt"), "COPILOT_READ_OK\n").expect("read fixture");
@@ -32,7 +41,14 @@ async fn copilot_messages_image_and_native_read_complete_through_real_agent() {
     let mut server = Server::new_async().await;
     let protocol = ProviderProtocol::AnthropicMessages;
     let provider = controlled(
-        &config(protocol.clone(), "https://api.githubcopilot.com"),
+        &config(
+            if catalog {
+                ProviderProtocol::Unspecified
+            } else {
+                protocol.clone()
+            },
+            "https://api.githubcopilot.com",
+        ),
         &server,
     );
     let preview = provider.request_preview(&[]).expect("preview");

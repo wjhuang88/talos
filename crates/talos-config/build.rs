@@ -390,6 +390,10 @@ fn reviewed_model_endpoint(
     protocol: &TomlModelProtocol,
 ) -> bool {
     let expected = match (provider, protocol) {
+        ("github-copilot", TomlModelProtocol::AnthropicMessages) => (
+            "https://api.githubcopilot.com",
+            "https://api.githubcopilot.com/v1",
+        ),
         ("neon", TomlModelProtocol::OpenAIResponses) => (
             "${NEON_AI_GATEWAY_BASE_URL}/v1",
             "${NEON_AI_GATEWAY_BASE_URL}/openai/v1",
@@ -650,7 +654,7 @@ mod protocol_admission_tests {
             "https://api.freemodel.dev/v1",
             &TomlModelProtocol::OpenAIChat
         ));
-        assert!(!reviewed_model_endpoint(
+        assert!(reviewed_model_endpoint(
             "github-copilot",
             Some("https://api.githubcopilot.com"),
             "https://api.githubcopilot.com/v1",
@@ -676,8 +680,26 @@ mod protocol_admission_tests {
         ));
         let source = r#"{"github-copilot":{"npm":"@ai-sdk/openai-compatible","api":"https://api.githubcopilot.com","models":{"fixture":{"tool_call":true,"provider":{"npm":"@ai-sdk/anthropic","api":"https://api.githubcopilot.com/v1"}}}}}"#;
         let (_, models) = parse_api_json(source).expect("catalog fixture");
-        assert!(models[0].protocol.is_none());
-        assert!(models[0].api_base_url.is_none());
+        assert!(matches!(
+            models[0].protocol,
+            Some(TomlModelProtocol::AnthropicMessages)
+        ));
+        assert_eq!(
+            models[0].api_base_url.as_deref(),
+            Some("https://api.githubcopilot.com/v1")
+        );
+        assert!(!reviewed_model_endpoint(
+            "github-copilot",
+            Some("https://gateway.test"),
+            "https://api.githubcopilot.com/v1",
+            &TomlModelProtocol::AnthropicMessages
+        ));
+        assert!(!reviewed_model_endpoint(
+            "github-copilot",
+            Some("https://api.githubcopilot.com"),
+            "https://api.githubcopilot.com/v1",
+            &TomlModelProtocol::OpenAIChat
+        ));
     }
 
     #[test]

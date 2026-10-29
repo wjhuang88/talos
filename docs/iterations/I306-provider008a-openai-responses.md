@@ -17,7 +17,7 @@
 | Claimed At | 2026-10-22 |
 | Source Issue | #748 |
 | Governance Claim PR | #747 |
-| Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime), #793 (reviewed endpoint data), #799 (public Copilot runtime) |
+| Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime), #793 (reviewed endpoint data), #799 (public Copilot runtime), #803 (Copilot catalog data) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child #748 records the bounded implementation requirement. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
 | Last Updated | 2026-10-28 |
@@ -629,3 +629,34 @@ its unseen terminal result is not counted as passing. Exact-head native CI provi
 workspace evidence. This documentation backfill changes no runtime or catalog data. Final review,
 applicable CI and live CAS are still required before merge. Seven catalog rows remain withheld;
 Review / Claimed and Completion Commit: Pending remain unchanged. No release is claimed.
+
+### Copilot runtime merged / data convergence — 2026-10-29
+
+Runtime #799 merged as `5ad8cc7ab606f762cb5bb94650e855c9aa456303` after exact-head
+CI3552/run40713312471 attempt 2 passed all eight jobs, independent object review APPROVE,
+and live CAS under the Single-maintainer path. Attempt 1's Desktop Auto watchdog timeout
+remains recorded in the PR. The data work starts from this actual merged main.
+
+The local separate data stage admits exactly seven existing github-copilot Messages records
+from the unchanged frozen source. Offline exhaustive audit passes: 6474 models, 52 endpoint
+pairs, 4062 protocol hints (3857 Chat / 72 Messages / 133 Responses), zero mismatches and
+unchanged non-routing digest acc90a95ff8f87fbf131788548066575d02cd8e1ccb8f3545a9c62e01712947d.
+Runtime automatic selection/rollback/isolation tests, catalog ledger synchronization, full
+validation, independent data review and native CI remain pending. This local audit alone is
+not data delivery or acceptance. Review / Claimed; Completion Commit: Pending. Parent #724
+still requires independently claimed Gemini, Azure and Bedrock implementations.
+
+Data validation recovery: the environment retained the source edits but removed the toolchain
+and temporary test logs. A fresh standard preflight invocation stopped at cargo-not-found (127);
+no local Rust test success is claimed for this data candidate. The offline exhaustive audit was
+rerun successfully. Independent review found stale 65/45 snapshot counts and an old Copilot
+non-activation assertion; these were updated to 72/52 and catalog-inferred Messages/Bearer,
+retaining the separate rollback and gateway-isolation checks. Fresh native CI remains a merge gate.
+
+Data candidate #803 was published at head 214e8a781bffaf4bfe5c4e365f76b883f1434d7e,
+tree bf6c9ecea2265033ddfa0fe58d9746e514b88dff, after independent exact-tree source/data
+APPROVE and offline audit. CI3566/run40835851075 passed both governance validators,
+text boundary, classifier tests and frozen projection audit, then Unix preflight/Windows format
+rejected a long assertion that needed rustfmt line wrapping. This is a formatting failure,
+not passing Rust validation. The wrapping and this actual PR-number backfill are batched in
+one correction; no runtime behavior or data changed. Fresh exact-head CI remains required.

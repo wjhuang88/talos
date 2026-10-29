@@ -30,6 +30,7 @@ SDK = {
 # Credential-destination admission is frozen alongside the source. These exact tuples require
 # primary vendor evidence; unsupported/unverified vendor wrappers are not inferred from SDK names.
 REVIEWED_ENDPOINTS = {
+    ("github-copilot", "https://api.githubcopilot.com", "https://api.githubcopilot.com/v1"): "anthropic-messages",
     ("neon", "${NEON_AI_GATEWAY_BASE_URL}/v1", "${NEON_AI_GATEWAY_BASE_URL}/openai/v1"): "openai-responses",
     ("ofox", "https://api.ofox.ai/v1", "https://api.ofox.ai/anthropic/v1"): "anthropic-messages",
     ("zenmux", "https://zenmux.ai/api/v1", "https://zenmux.ai/api/anthropic/v1"): "anthropic-messages",

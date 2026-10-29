@@ -31511,6 +31511,8 @@ image_input = true
 [[models]]
 id = "claude-fable-5"
 provider = "github-copilot"
+protocol = "anthropic-messages"
+api_base_url = "https://api.githubcopilot.com/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-06-09"
@@ -31528,6 +31530,8 @@ image_input = true
 [[models]]
 id = "claude-haiku-4.5"
 provider = "github-copilot"
+protocol = "anthropic-messages"
+api_base_url = "https://api.githubcopilot.com/v1"
 context_limit = 200000
 output_limit = 64000
 release_date = "2025-10-15"
@@ -31579,6 +31583,8 @@ image_input = true
 [[models]]
 id = "claude-opus-4.7"
 provider = "github-copilot"
+protocol = "anthropic-messages"
+api_base_url = "https://api.githubcopilot.com/v1"
 context_limit = 200000
 output_limit = 32000
 release_date = "2026-04-16"
@@ -31596,6 +31602,8 @@ image_input = true
 [[models]]
 id = "claude-opus-4.8"
 provider = "github-copilot"
+protocol = "anthropic-messages"
+api_base_url = "https://api.githubcopilot.com/v1"
 context_limit = 200000
 output_limit = 64000
 release_date = "2026-05-28"
@@ -31613,6 +31621,8 @@ image_input = true
 [[models]]
 id = "claude-opus-5"
 provider = "github-copilot"
+protocol = "anthropic-messages"
+api_base_url = "https://api.githubcopilot.com/v1"
 context_limit = 1000000
 output_limit = 64000
 release_date = "2026-07-24"
@@ -31665,6 +31675,8 @@ image_input = true
 [[models]]
 id = "claude-sonnet-4.6"
 provider = "github-copilot"
+protocol = "anthropic-messages"
+api_base_url = "https://api.githubcopilot.com/v1"
 context_limit = 200000
 output_limit = 32000
 release_date = "2026-02-17"
@@ -31682,6 +31694,8 @@ image_input = true
 [[models]]
 id = "claude-sonnet-5"
 provider = "github-copilot"
+protocol = "anthropic-messages"
+api_base_url = "https://api.githubcopilot.com/v1"
 context_limit = 1000000
 output_limit = 128000
 release_date = "2026-06-30"

@@ -78,7 +78,7 @@ fn frozen_projection_counts_and_existing_provider_root_are_preserved() {
     assert_eq!(models.len(), 6474);
     for (protocol, count) in [
         ("openai-chat", 3857),
-        ("anthropic-messages", 65),
+        ("anthropic-messages", 72),
         ("openai-responses", 133),
     ] {
         assert_eq!(
@@ -96,7 +96,7 @@ fn frozen_projection_counts_and_existing_provider_root_are_preserved() {
             .iter()
             .filter(|model| model.get("api_base_url").is_some())
             .count(),
-        45
+        52
     );
     for model in models
         .iter()
