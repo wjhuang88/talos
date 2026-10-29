@@ -1,6 +1,6 @@
 # Iteration I306: Protocol Architecture And OpenAI Responses
 
-> Document status: Review
+> Document status: Complete
 > Published plan date: 2026-10-22
 > Planned objective: establish model-level wire-protocol resolution and deliver a complete OpenAI Responses adapter under ADR-093.
 > Baseline rule: preserve this bounded child-A scope; Gemini, Azure or Bedrock use separate owners/iterations.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 / talos开发 #724 continuation 2026-10-26 |
 | Work Slice | PROVIDER-008-A protocol architecture plus OpenAI Responses only; no Gemini/Azure/Bedrock implementation. |
@@ -20,7 +20,7 @@
 | Implementation PR | #749 (code), #775 (catalog data), #792 (model endpoint runtime), #793 (reviewed endpoint data), #799 (public Copilot runtime), #803 (Copilot catalog data) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of parent #724 in the 2026-10-22 talos开发 session; child #748 records the bounded implementation requirement. Governance-only #747 must pass exact-head applicable CI, both governance validators, provider/API technical review and merge-time CAS before this claim is effective. |
-| Last Updated | 2026-10-28 |
+| Last Updated | 2026-10-29 |
 | Handoff / Release Condition | Activates only when #747 merges with accepted ADR-093. Complete only with existing implementation commit evidence; siblings B-D remain separate. |
 
 ## Published Baseline
@@ -111,7 +111,7 @@ must start from the #747 merge or a later main commit.
 
 ## Completion / Residuals
 
-No Completion Commit exists. PROVIDER-008-B/C/D and every excluded Responses feature remain residual
+Historical baseline: no Completion Commit existed at activation. PROVIDER-008-B/C/D and every excluded Responses feature remain residual
 under the parent epic. Do not mark I306 or PROVIDER-008-A Complete without an already-existing
 implementation/evidence commit SHA.
 
@@ -660,3 +660,67 @@ text boundary, classifier tests and frozen projection audit, then Unix preflight
 rejected a long assertion that needed rustfmt line wrapping. This is a formatting failure,
 not passing Rust validation. The wrapping and this actual PR-number backfill are batched in
 one correction; no runtime behavior or data changed. Fresh exact-head CI remains required.
+
+
+## Acceptance closure — 2026-10-29
+
+Completion Commit: dd6c5f82ed88cc963b47758dee06fa506cb407a1
+
+This existing main merge includes the final Copilot catalog data (#803), after runtime #799
+`5ad8cc7ab606f762cb5bb94650e855c9aa456303`. Earlier implementation evidence remains #749
+`60e27eb6653b3a8fef638a2b9a7294a036b78db0`, #775
+`6af8654c6ee6e422d4d3f4e5dad171c78604cafd`, #792
+`e53c61c7f0344308a5c5535bb1521fefebbacc70` and #793
+`8e3171534367ec242e02fdc1a90e012d533f8e96`. The closure commit is not its own implementation evidence.
+
+Final data head `56789a427a90c4fd907e6f9e2b990d27416f8fb0`, tree
+`88fe262ae165fe6a8fe06b23151144d340aba81f`, passed CI3570/run40837047324 attempt 1,
+all eight jobs including standard preflight, native Windows workspace/Desktop and governance.
+Independent read-only Agent APPROVE bound that remote head/tree and main `743cb6f`; final CAS
+confirmed the same claim/actor/slice, no blocking review or overlapping PR, and isolated Search
+base changes. #803 merged under the established Single-maintainer path. Shared-account Agent
+review is not distinct-natural-person approval. Earlier format failures, local cargo-unavailable
+and MCP environmental failures remain historical failures, not retroactive local passes.
+
+Full child-A acceptance was re-audited against the merged source:
+
+| Acceptance | Existing implementation / test evidence |
+|---|---|
+| Defaults, explicit rollback, unknown gateways, model precedence and ambiguity | protocol_resolution and catalog_protocol config tests; factory uses the shared resolver. |
+| Stateless text/image/native tools/reasoning/output limit | openai_responses_request maps ordered input parts, call IDs and opaque replay; store=false and no previous_response_id. The closeout candidate strengthens the request regression to two distinct image payloads interleaved with text; fresh exact-head test execution is required. |
+| Streaming, parallel tools, usage, terminal/error/unknown/EOF | wire_contract_tests with pinned upstream persisted SDK fixtures, explicitly synthetic parallel fixtures, SSE state machine and byte-boundary proptest. No live Talos capture is claimed. |
+| Complete Agent rounds | responses_agent real CLI binary tests cover native tools, image continuation, one-shot read_image and Compat/Strict; Copilot catalog tests use the permission-gated Agent round. |
+| Actionable rejection without cross-wire retry | Responses client 404/405 diagnostics and non-retry tests; no fallback adapter dispatch. |
+| Config round-trip, omitted protocol and provenance | round-trip/select/credential tests plus picker/browser/model context using shared resolution. |
+| Distinct HTTP endpoint residual | 52 reviewed pairs now active, including all seven Copilot rows; exhaustive frozen audit 6474 models / 4062 hints / zero mismatches. Four WSS rows remain the original Realtime non-goal. |
+| Documentation and migration | Protocol reference, bilingual README, architecture, SDK contract and unreleased-provider008a release notes record defaults, rollback and required pre-1.0 minor migration. |
+
+Child A and I306 are Complete / Closed in this closure candidate. Earlier Active/Review/Pending
+checkpoints above are historical and preserve the published baseline and failure record. The
+closure state becomes target-branch truth only after this documentation candidate passes its
+applicable exact-head checks, independent review and merge CAS. #748 stays open until then.
+Parent #724 stays open: Gemini, Azure and Bedrock remain unimplemented, unclaimed siblings and
+require their own claims/iterations/ADRs. This closes no parent requirement by scope transfer.
+No version bump, tag, release, live vendor test or new transport scope is authorized or claimed.
+
+Closure local validation: collaboration claims passed with zero warnings and whitespace checks
+passed. Project governance reached its SQLite consumer check but could not execute cargo after
+the environment restore (one error, zero warnings); delivery workflow cases passed. This is not
+a full local governance pass. The closure requires native exact-head applicable CI, including
+both governance validators, before merge. No dependency or validation guard is changed.
+
+Full issue recheck identified that #724 explicitly requires multi-image order testing. The
+initial closeout review had treated the missing dedicated two-image assertion as optional;
+that conclusion is corrected. This same candidate now asserts both distinct encoded image
+payloads and all five ordered text/image parts. Prior documentation-only approval/CI cannot
+validate this test change; fresh exact-head full native CI and review are mandatory. The
+existing implementation SHA remains the behavioral evidence, not this status-change commit.
+
+Validation recovery for the multi-image candidate: pinned Rust 1.99 and its components were
+restored. An initial concurrent component download failed with a missing temporary rustfmt
+file; the subsequent pinned `cargo fmt --all -- --check` passed. Both governance validators
+then passed with zero warnings (SQLite fixtures 17 cases, delivery workflow 12 cases).
+The focused locked two-image test passed (1 passed, 201 filtered). The subsequent unfiltered
+`cargo test -p talos-provider --locked` passed all 236 tests in 11 groups, including doctests,
+with zero failures, ignored or filtered tests. Standard workspace preflight is still running
+at this checkpoint; no full local preflight pass is claimed. Fresh full native CI is required.

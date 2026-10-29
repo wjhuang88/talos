@@ -495,11 +495,14 @@ mod tests {
     }
 
     #[test]
-    fn multimodal_input_preserves_text_image_text_order() {
+    fn multimodal_input_preserves_distinct_images_and_text_order() {
         let directory = tempfile::tempdir().expect("tempdir");
         let path = directory.path().join("image.png");
         std::fs::write(&path, b"\x89PNG\r\n\x1a\nfixture").expect("write fixture");
         let canonical = path.canonicalize().expect("canonical path");
+        let second_path = directory.path().join("second.png");
+        std::fs::write(&second_path, b"\x89PNG\r\n\x1a\nsecond").expect("write second fixture");
+        let second_canonical = second_path.canonicalize().expect("second canonical path");
 
         let body = build_request_body(
             "gpt-test",
@@ -515,6 +518,15 @@ mod tests {
                         content_digest: ContentDigest::default(),
                     },
                     ContentPart::Text {
+                        text: "between".into(),
+                    },
+                    ContentPart::Image {
+                        path: second_canonical,
+                        mime: "image/png".into(),
+                        byte_count: 14,
+                        content_digest: ContentDigest::default(),
+                    },
+                    ContentPart::Text {
                         text: "after".into(),
                     },
                 ],
@@ -527,18 +539,24 @@ mod tests {
         let content = body["input"][0]["content"]
             .as_array()
             .expect("content array");
-        assert_eq!(content.len(), 3);
+        assert_eq!(content.len(), 5);
         assert_eq!(content[0]["type"], "input_text");
         assert_eq!(content[0]["text"], "before");
         assert_eq!(content[1]["type"], "input_image");
         assert_eq!(content[1]["detail"], "auto");
-        assert!(
-            content[1]["image_url"]
-                .as_str()
-                .expect("data url")
-                .starts_with("data:image/png;base64,")
+        assert_eq!(
+            content[1]["image_url"],
+            "data:image/png;base64,iVBORw0KGgpmaXh0dXJl"
         );
         assert_eq!(content[2]["type"], "input_text");
-        assert_eq!(content[2]["text"], "after");
+        assert_eq!(content[2]["text"], "between");
+        assert_eq!(content[3]["type"], "input_image");
+        assert_eq!(content[3]["detail"], "auto");
+        assert_eq!(
+            content[3]["image_url"],
+            "data:image/png;base64,iVBORw0KGgpzZWNvbmQ="
+        );
+        assert_eq!(content[4]["type"], "input_text");
+        assert_eq!(content[4]["text"], "after");
     }
 }

@@ -505,3 +505,18 @@ The example proves child-frame discovery, exact authorization, one action, and s
 rejection; it is not native Chromium/CDP evidence. Standalone MCP does not advertise or execute
 v2 until its raw-ingress duplicate-key proof is available. Existing tools and default Runtime
 composition remain unchanged.
+
+
+## Provider protocol migration (PROVIDER-008-A, unreleased)
+
+Embedders using the optional built-in provider/config APIs must account for the ADR-093 pre-1.0
+minor boundary: `ProviderProtocol` and `CatalogProviderProtocol` add `OpenAIResponses` and become
+non-exhaustive; downstream matches need a catch-all arm. `ModelConfig` adds optional `base_url`;
+explicit struct literals need that field or `..Default::default()`. These are origin-crate APIs,
+not new runtime facade re-exports. Custom `LanguageModel` composition remains the existing contract.
+
+`Config::provider_protocol()` reports the effective runtime protocol; the resolver also exposes
+provenance. Explicit Chat remains the rollback for confirmed catalog defaults, with no automatic
+cross-wire retry. Follow the [full protocol migration](PROVIDER-PROTOCOLS.md) and
+[unreleased notes](../releases/unreleased-provider008a.md). No patch release or publication is
+claimed by this source-development contract.
