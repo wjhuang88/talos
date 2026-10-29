@@ -2131,3 +2131,14 @@ stale-content protection through this MCP composition, not atomic protection
 against every concurrent rename race or restart-persistent recovery. I308 remains
 Partial. This local candidate is not covered by PR #801's older head, independent
 review, exact-head CI or merge.
+
+## MCP retained mutation cancellation and replay — 2026-10-29
+
+The real MCP retained edit/delete Auto fixture now sends JSON-RPC cancellation
+after the assessor receives the complete mutation request. The server remains
+responsive, the same request ID is reserved against replay, the original file is
+unchanged, the assessor runs once and no grant is created. The locked focused
+`native_mutation_auto` integration test and all-target/all-feature MCP Clippy
+with warnings denied pass. This covers cancellation during assessment before
+mutation; it does not establish rollback after filesystem effects begin. The
+change is local and still needs review, exact-head CI and merge.

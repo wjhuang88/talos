@@ -21,6 +21,7 @@ use talos_permission::{
     PermissionRule, PermissionSessionState,
 };
 use talos_plugin::HookRegistry;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 struct Assessor {
     calls: Arc<AtomicUsize>,
@@ -57,6 +58,9 @@ impl AutoPermissionAssessor for Assessor {
         }
         if self.scenario == "error" {
             return Err("injected file mutation assessor failure".into());
+        }
+        if self.scenario == "cancel" {
+            std::future::pending::<()>().await;
         }
         Ok(
             json!({"schema":request.schema,"request_digest":request.request_digest,
@@ -101,6 +105,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
             "restore_changed",
             "deny",
             "error",
+            "cancel",
             "sensitive_path",
             "credential_path",
             "replacement",
@@ -189,12 +194,78 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                     .await
                     .expect("shutdown");
             });
-            let client = ().serve(client_io).await.expect("client");
             let input = if delete {
                 json!({"path":file_name, "retain_backup":true})
             } else {
                 json!({"path":file_name, "old_string":"hi", "new_string":"hello", "retain_backup":true})
             };
+            if scenario == "cancel" {
+                let (read, mut write) = tokio::io::split(client_io);
+                let mut read = BufReader::new(read);
+                let initialize = json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"mutation-cancel-test","version":"1"}}});
+                write
+                    .write_all(format!("{initialize}\n").as_bytes())
+                    .await
+                    .expect("initialize");
+                let mut line = String::new();
+                read.read_line(&mut line)
+                    .await
+                    .expect("initialized response");
+                assert!(
+                    serde_json::from_str::<serde_json::Value>(&line)
+                        .expect("JSON")
+                        .get("result")
+                        .is_some()
+                );
+                write
+                    .write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n")
+                    .await
+                    .expect("initialized");
+                let call = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":if delete {"delete"} else {"edit"},"arguments":input}});
+                write
+                    .write_all(format!("{call}\n").as_bytes())
+                    .await
+                    .expect("call");
+                tokio::time::timeout(Duration::from_secs(5), async {
+                    while calls.load(Ordering::SeqCst) == 0 {
+                        tokio::task::yield_now().await;
+                    }
+                })
+                .await
+                .expect("assessment started");
+                let cancelled = json!({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1}});
+                write
+                    .write_all(format!("{cancelled}\n").as_bytes())
+                    .await
+                    .expect("cancel");
+                let ping = json!({"jsonrpc":"2.0","id":2,"method":"ping"});
+                write
+                    .write_all(format!("{ping}\n").as_bytes())
+                    .await
+                    .expect("ping");
+                line.clear();
+                read.read_line(&mut line).await.expect("ping response");
+                assert_eq!(
+                    serde_json::from_str::<serde_json::Value>(&line).expect("JSON")["id"],
+                    2
+                );
+                write
+                    .write_all(format!("{call}\n").as_bytes())
+                    .await
+                    .expect("replay");
+                line.clear();
+                read.read_line(&mut line).await.expect("replay response");
+                let replay: serde_json::Value = serde_json::from_str(&line).expect("JSON");
+                assert!(replay.get("error").is_some(), "{replay}");
+                assert_eq!(calls.load(Ordering::SeqCst), 1);
+                assert_eq!(state.grant_count().expect("grant count"), 0);
+                assert_eq!(std::fs::read_to_string(&path).expect("preserved"), "hi");
+                drop(read);
+                drop(write);
+                task.await.expect("joined");
+                continue;
+            }
+            let client = ().serve(client_io).await.expect("client");
             let result = client
                 .peer()
                 .call_tool(
