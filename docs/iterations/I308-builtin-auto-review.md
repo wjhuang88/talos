@@ -2206,3 +2206,20 @@ Windows PowerShell behavior, assessor uncertainty/error/cancellation cases on
 this route, the full I308 matrix, or independent final permission/security/API
 review. PR #801 still points at the prior head; fresh exact-head CI, authorized
 review, latest-base rebase/CAS and merge remain required. I308 remains Partial.
+
+## MCP ordinary invocation refusal and cancellation coverage — 2026-10-29
+
+The real registered MCP Exec/Shell integration now exercises model uncertainty
+and assessor error in addition to AllowOnce and explicit Execute Deny. All
+non-Allow outcomes return an MCP permission error before Git configuration is
+written and leave the session grant count at zero. A raw JSON-RPC cancellation
+case waits until the ordinary-invocation assessor starts, sends
+`notifications/cancelled`, verifies the server still answers `ping`, then
+replays the same request ID and confirms it is rejected. The cancelled command
+does not write Git configuration or retain a grant; the assessor is invoked
+once. Locked `cargo test -p talos-mcp --test native_exec_auto` passes 2/2 and
+`cargo fmt --all` passes. A full locked preflight has not been run on this
+candidate. Native Windows PowerShell execution, changed-input/configuration
+staleness on this MCP route, exact-head CI, independent permission/security/API
+review and merge remain outstanding; this does not close the full operation /
+profile matrix or I308 acceptance.

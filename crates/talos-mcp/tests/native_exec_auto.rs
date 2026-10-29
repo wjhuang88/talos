@@ -24,12 +24,14 @@ use talos_permission::{
     PermissionRule, PermissionSessionState,
 };
 use talos_plugin::HookRegistry;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 struct Assessor {
     calls: Arc<AtomicUsize>,
     root: String,
     tool: &'static str,
     outcome: AssessorOutcome,
+    started: Option<Arc<tokio::sync::Notify>>,
 }
 
 #[derive(Clone, Copy)]
@@ -88,6 +90,9 @@ impl AutoPermissionAssessor for Assessor {
             true
         );
         self.calls.fetch_add(1, Ordering::SeqCst);
+        if let Some(started) = &self.started {
+            started.notify_one();
+        }
         match self.outcome {
             AssessorOutcome::Error => Err("injected assessor failure".into()),
             AssessorOutcome::Allow | AssessorOutcome::Uncertain => Ok(json!({
@@ -151,6 +156,7 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
                     root: root_path.to_string_lossy().into_owned(),
                     tool,
                     outcome,
+                    started: None,
                 }),
                 Arc::new(Deny),
                 ManagedWorkspaceLease::for_permission_session(&root_path, state.clone())
@@ -226,4 +232,135 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
             server.await.expect("server joined");
         }
     }
+}
+
+#[tokio::test]
+async fn cancelled_registered_exec_auto_review_cannot_mutate_or_replay() {
+    let root = tempfile::tempdir().expect("workspace");
+    let root_path = root.path().canonicalize().expect("canonical root");
+    assert!(
+        std::process::Command::new("git")
+            .current_dir(&root_path)
+            .args(["init", "--quiet"])
+            .status()
+            .expect("initialize Git fixture")
+            .success()
+    );
+
+    let state = Arc::new(PermissionSessionState::new(
+        PermissionEngine::with_workspace_root(root_path.clone()),
+    ));
+    let calls = Arc::new(AtomicUsize::new(0));
+    let started = Arc::new(tokio::sync::Notify::new());
+    let resolver = AutoPermissionResolver::new(
+        Arc::new(Assessor {
+            calls: calls.clone(),
+            root: root_path.to_string_lossy().into_owned(),
+            tool: "exec",
+            outcome: AssessorOutcome::Allow,
+            started: Some(started.clone()),
+        }),
+        Arc::new(Deny),
+        ManagedWorkspaceLease::for_permission_session(&root_path, state.clone()).expect("lease"),
+        Duration::from_secs(5),
+        AutoPermissionControl::new(true),
+    );
+    let pipeline = PermissionPipeline::new(
+        state.clone(),
+        PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        ),
+        Some(Arc::new(resolver)),
+    );
+    let gate = McpPermissionGate::with_pipeline(pipeline, Arc::new(HookRegistry::new()))
+        .with_user_intent("record the fixture identity in Git config".into());
+    let mut registry = ToolRegistry::new();
+    registry
+        .register_builtin_contributions(talos_tools::shell_tool_contributions(root_path.clone()))
+        .expect("registered native shell tools");
+    let handler = TalosMcpHandler::new(Arc::new(registry), Arc::new(gate));
+    let (client_io, server_io) = tokio::io::duplex(65536);
+    let server = tokio::spawn(async move {
+        handler
+            .serve(server_io)
+            .await
+            .expect("server")
+            .waiting()
+            .await
+            .expect("shutdown");
+    });
+    let (read, mut write) = tokio::io::split(client_io);
+    let mut read = BufReader::new(read);
+    let initialize = json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"exec-cancel-test","version":"1"}}});
+    write
+        .write_all(format!("{initialize}\n").as_bytes())
+        .await
+        .expect("initialize");
+    let mut line = String::new();
+    read.read_line(&mut line)
+        .await
+        .expect("initialize response");
+    assert!(
+        serde_json::from_str::<serde_json::Value>(&line)
+            .expect("JSON")
+            .get("result")
+            .is_some()
+    );
+    write
+        .write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n")
+        .await
+        .expect("initialized");
+
+    let call = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"exec","arguments":{"command":"git","args":["config","--local","user.name","Fixture"],"cwd":"."}}});
+    write
+        .write_all(format!("{call}\n").as_bytes())
+        .await
+        .expect("call");
+    tokio::time::timeout(Duration::from_secs(5), started.notified())
+        .await
+        .expect("assessor started");
+    let cancelled = json!({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1,"reason":"fixture cancellation"}});
+    write
+        .write_all(format!("{cancelled}\n").as_bytes())
+        .await
+        .expect("cancel");
+    let ping = json!({"jsonrpc":"2.0","id":2,"method":"ping"});
+    write
+        .write_all(format!("{ping}\n").as_bytes())
+        .await
+        .expect("ping");
+    line.clear();
+    read.read_line(&mut line).await.expect("ping response");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&line).expect("JSON")["id"],
+        2
+    );
+    write
+        .write_all(format!("{call}\n").as_bytes())
+        .await
+        .expect("replay");
+    line.clear();
+    read.read_line(&mut line).await.expect("replay response");
+    let replay: serde_json::Value = serde_json::from_str(&line).expect("JSON");
+    assert!(
+        replay["error"]["message"]
+            .as_str()
+            .expect("error")
+            .contains("already used")
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(state.grant_count().expect("grants"), 0);
+    assert!(
+        !std::process::Command::new("git")
+            .current_dir(&root_path)
+            .args(["config", "--local", "--get", "user.name"])
+            .output()
+            .expect("read Git config")
+            .status
+            .success()
+    );
+    drop(read);
+    drop(write);
+    server.await.expect("server joined");
 }
