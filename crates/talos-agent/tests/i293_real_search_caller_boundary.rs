@@ -106,11 +106,21 @@ impl ApprovalResolver for ApprovePreparedSearch {
             .network_scope()
             .expect("prepared search network scope");
         assert_eq!(scope.endpoints().len(), 4);
-        assert!(
+        assert_eq!(
             scope
                 .endpoints()
                 .iter()
-                .all(|endpoint| endpoint.method() == "GET")
+                .filter(|endpoint| endpoint.method() == "GET")
+                .count(),
+            3
+        );
+        assert_eq!(
+            scope
+                .endpoints()
+                .iter()
+                .filter(|endpoint| endpoint.method() == "POST")
+                .count(),
+            1
         );
         self.0.approvals.fetch_add(1, Ordering::SeqCst);
         Ok(ApprovalChoice::ApproveOnce)
