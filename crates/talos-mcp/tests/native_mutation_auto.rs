@@ -17,8 +17,8 @@ use talos_core::ApprovalChoice;
 use talos_core::tool::ToolRegistry;
 use talos_mcp::server::{McpPermissionGate, TalosMcpHandler};
 use talos_permission::{
-    InteractionCapability, PermissionContext, PermissionEngine, PermissionMode,
-    PermissionSessionState,
+    InteractionCapability, PermissionContext, PermissionDecision, PermissionEngine, PermissionMode,
+    PermissionRule, PermissionSessionState,
 };
 use talos_plugin::HookRegistry;
 
@@ -78,15 +78,29 @@ impl ApprovalResolver for Deny {
 #[tokio::test]
 async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
     for delete in [false, true] {
-        for scenario in ["allow", "deny", "replacement", "changed"] {
+        for scenario in [
+            "allow",
+            "deny",
+            "replacement",
+            "changed",
+            "policy_write_deny",
+            "headless",
+        ] {
             let root = tempfile::tempdir().expect("workspace");
             let path = root.path().join("selected.txt");
             std::fs::write(&path, "hi").expect("fixture");
             let calls = Arc::new(AtomicUsize::new(0));
             let verified = Arc::new(AtomicUsize::new(0));
-            let state = Arc::new(PermissionSessionState::new(
-                PermissionEngine::with_workspace_root(root.path().into()),
-            ));
+            let mut engine = PermissionEngine::with_workspace_root(root.path().into());
+            if scenario == "policy_write_deny" {
+                engine.add_rule(PermissionRule::new_nature(
+                    talos_core::tool::ToolNature::Write,
+                    None,
+                    None,
+                    PermissionDecision::Deny("explicit write denial".into()),
+                ));
+            }
+            let state = Arc::new(PermissionSessionState::new(engine));
             let resolver = AutoPermissionResolver::new(
                 Arc::new(Assessor {
                     calls: calls.clone(),
@@ -101,10 +115,18 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                 AutoPermissionControl::new(true),
             );
             let pipeline = PermissionPipeline::new(
-                state,
+                state.clone(),
                 PermissionContext::new(
-                    PermissionMode::Interactive,
-                    InteractionCapability::Available,
+                    if scenario == "headless" {
+                        PermissionMode::Headless
+                    } else {
+                        PermissionMode::Interactive
+                    },
+                    if scenario == "headless" {
+                        InteractionCapability::Unavailable
+                    } else {
+                        InteractionCapability::Available
+                    },
                 ),
                 Some(Arc::new(resolver)),
             );
@@ -147,17 +169,15 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                         .with_arguments(input.as_object().expect("args").clone()),
                 )
                 .await;
-            assert_eq!(
-                calls.load(Ordering::SeqCst),
-                usize::from(scenario != "replacement"),
-                "{scenario}"
-            );
+            let expected_reviews =
+                usize::from(!matches!(scenario, "replacement" | "policy_write_deny"));
+            assert_eq!(calls.load(Ordering::SeqCst), expected_reviews, "{scenario}");
             assert_eq!(
                 verified.load(Ordering::SeqCst),
-                usize::from(scenario != "replacement"),
+                expected_reviews,
                 "assessment evidence assertions must complete: {scenario}"
             );
-            if scenario == "allow" {
+            if matches!(scenario, "allow" | "headless") {
                 let result = result.expect("Auto admission");
                 assert_ne!(result.is_error, Some(true), "{result:?}");
                 if delete {
@@ -181,6 +201,7 @@ async fn retained_edit_and_delete_require_trusted_complete_image_auto_review() {
                     }
                 );
             }
+            assert_eq!(state.grant_count().expect("grant count"), 0, "{scenario}");
             let _ = client.cancel().await;
             task.await.expect("joined");
         }

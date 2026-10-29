@@ -2035,3 +2035,20 @@ Desktop jobs remain pending. Remaining host/profile/recovery/platform
 acceptance, full preflight and final merge
 are not proven by this matrix. I308/T8 remains Active / Partial; the downstream
 MODEL-014 → T4 → T5 → T1 → T6 queue remains incomplete.
+
+## Retained mutation policy and Headless profile regression — 2026-10-29
+
+The real MCP edit/delete Auto matrix now also covers an explicit Write Deny and
+an injected Headless pipeline with an Auto resolver. For both retained edit and
+delete, explicit Write Deny rejects before assessor invocation and preserves the
+source file. In Headless mode the injected resolver can return AllowOnce; the
+actual edit/delete occurs, while no persistent grant is installed. The test keeps
+the default standalone MCP composition's separate fail-closed behavior covered
+by `server_handshake`.
+
+Locked focused MCP integration tests pass for retained edit/delete and Save
+(`cargo test -p talos-mcp --all-features --locked --test native_mutation_auto
+--test native_save_auto`, low-debug/nonincremental settings). This is local host
+test evidence only; warnings-denied Clippy, governance validation, independent
+review and fresh exact-head CI remain required. It does not close MCP ordinary
+Shell/Exec Auto routing, WebSearch, recovery/profile/platform coverage, or I308.
