@@ -399,10 +399,19 @@ impl ServerHandler for TalosMcpHandler {
                                 .collect::<Option<Vec<_>>>()
                         });
                     let working_directory = tool.execution_working_directory();
+                    let identity_paths = execution_directories.clone().unwrap_or_else(|| {
+                        working_directory.iter().map(|path| path.to_string_lossy().into_owned()).collect()
+                    });
+                    let directory_identities = identity_paths.iter()
+                        .map(|path| talos_agent::auto_resolver::execution_directory_identity(std::path::Path::new(path)))
+                        .collect::<Option<Vec<_>>>()
+                        .ok_or_else(|| McpError::new(ErrorCode::INTERNAL_ERROR,
+                            "invocation execution directory identity unavailable", None))?;
                     let review_configuration = serde_json::json!({
                         "tool_configuration": configuration,
                         "execution_directories": execution_directories.clone().unwrap_or_default(),
                         "execution_directories_resolved": execution_directories.is_some(),
+                        "execution_directory_identities": directory_identities,
                         "sandbox": null,
                     });
                     let plan = talos_core::tool::PreparedPlanIdentity::new();
@@ -449,6 +458,9 @@ impl ServerHandler for TalosMcpHandler {
                             if tool.invocation_review_configuration().as_ref() != Some(&configuration)
                                 || current_directories != execution_directories
                                 || tool.execution_working_directory() != working_directory
+                                || identity_paths.iter().map(|path| {
+                                    talos_agent::auto_resolver::execution_directory_identity(std::path::Path::new(path))
+                                }).collect::<Option<Vec<_>>>().as_ref() != Some(&directory_identities)
                             {
                                 return Err(McpError::new(ErrorCode::INTERNAL_ERROR,
                                     "invocation configuration or execution directories changed after approval", None));

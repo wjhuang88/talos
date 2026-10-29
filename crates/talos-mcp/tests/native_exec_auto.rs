@@ -31,7 +31,15 @@ struct Assessor {
     root: String,
     tool: &'static str,
     outcome: AssessorOutcome,
-    started: Option<Arc<tokio::sync::Notify>>,
+    started: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
+}
+
+struct AssessmentDrop(Arc<tokio::sync::Notify>);
+
+impl Drop for AssessmentDrop {
+    fn drop(&mut self) {
+        self.0.notify_one();
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -39,6 +47,7 @@ enum AssessorOutcome {
     Allow,
     Uncertain,
     Error,
+    ReplaceDirectory,
 }
 
 #[async_trait]
@@ -84,23 +93,41 @@ impl AutoPermissionAssessor for Assessor {
             Some(self.root.as_str())
         );
         assert!(request.directory_identity.is_some());
-        assert_eq!(request.configuration["execution_directories"][0], self.root);
+        let replacement = matches!(self.outcome, AssessorOutcome::ReplaceDirectory);
+        let expected_directory = if replacement {
+            std::path::Path::new(&self.root).join("cwd")
+        } else {
+            std::path::PathBuf::from(&self.root)
+        };
+        assert_eq!(
+            request.configuration["execution_directories"][0],
+            expected_directory.to_str().expect("path")
+        );
+        if replacement {
+            std::fs::rename(
+                &expected_directory,
+                std::path::Path::new(&self.root).join("old-cwd"),
+            )
+            .expect("rename assessed directory");
+            std::fs::create_dir(&expected_directory).expect("replace assessed directory");
+        }
         assert_eq!(
             request.configuration["execution_directories_resolved"],
             true
         );
         self.calls.fetch_add(1, Ordering::SeqCst);
-        if let Some(started) = &self.started {
+        if let Some((started, dropped)) = &self.started {
+            let _guard = AssessmentDrop(dropped.clone());
             started.notify_one();
             return std::future::pending().await;
         }
         match self.outcome {
             AssessorOutcome::Error => Err("injected assessor failure".into()),
-            AssessorOutcome::Allow | AssessorOutcome::Uncertain => Ok(json!({
+            AssessorOutcome::Allow | AssessorOutcome::Uncertain | AssessorOutcome::ReplaceDirectory => Ok(json!({
             "schema": request.action.schema,
             "request_digest": request.action.request_digest,
-            "decision": if matches!(self.outcome, AssessorOutcome::Allow) { "allow_once" } else { "human_required" },
-            "confidence": if matches!(self.outcome, AssessorOutcome::Allow) { "high" } else { "low" },
+            "decision": if !matches!(self.outcome, AssessorOutcome::Uncertain) { "allow_once" } else { "human_required" },
+            "confidence": if !matches!(self.outcome, AssessorOutcome::Uncertain) { "high" } else { "low" },
         })
             .to_string()),
         }
@@ -129,7 +156,12 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
             (true, AssessorOutcome::Allow),
             (false, AssessorOutcome::Uncertain),
             (false, AssessorOutcome::Error),
+            (false, AssessorOutcome::ReplaceDirectory),
         ] {
+            let replacement = matches!(outcome, AssessorOutcome::ReplaceDirectory);
+            if replacement && (tool != "exec" || cfg!(windows)) {
+                continue; // Windows retained handles prevent replacement; Unix verifies rejection.
+            }
             let root = tempfile::tempdir().expect("workspace");
             let root_path = root.path().canonicalize().expect("canonical root");
             assert!(
@@ -140,6 +172,9 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
                     .expect("initialize Git fixture")
                     .success()
             );
+            if replacement {
+                std::fs::create_dir(root_path.join("cwd")).expect("initial cwd");
+            }
             let mut engine = PermissionEngine::with_workspace_root(root_path.clone());
             if explicit_deny {
                 engine.add_rule(PermissionRule::new_nature(
@@ -197,7 +232,7 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
                 json!({
                     "command": "git",
                     "args": ["config", "--local", "user.name", "Fixture"],
-                    "cwd": ".",
+                    "cwd": if replacement { "cwd" } else { "." },
                 })
             } else {
                 json!({"command":"git config --local user.name Fixture"})
@@ -222,6 +257,19 @@ async fn registered_mcp_exec_requires_bound_auto_review_before_git_config_mutati
                 admitted,
                 "{result:?}"
             );
+            if replacement {
+                assert!(
+                    root_path.join("old-cwd").is_dir(),
+                    "assessor must complete the replacement"
+                );
+                assert!(
+                    result
+                        .as_ref()
+                        .expect_err("stale cwd denied")
+                        .to_string()
+                        .contains("execution directories changed")
+                );
+            }
             if admitted {
                 let result = result.expect("Auto admission");
                 assert_ne!(result.is_error, Some(true), "{result:?}");
@@ -259,13 +307,14 @@ async fn cancelled_exec_review() {
     ));
     let calls = Arc::new(AtomicUsize::new(0));
     let started = Arc::new(tokio::sync::Notify::new());
+    let dropped = Arc::new(tokio::sync::Notify::new());
     let resolver = AutoPermissionResolver::new(
         Arc::new(Assessor {
             calls: calls.clone(),
             root: root_path.to_string_lossy().into_owned(),
             tool: "exec",
             outcome: AssessorOutcome::Allow,
-            started: Some(started.clone()),
+            started: Some((started.clone(), dropped.clone())),
         }),
         Arc::new(Deny),
         ManagedWorkspaceLease::for_permission_session(&root_path, state.clone()).expect("lease"),
@@ -332,6 +381,9 @@ async fn cancelled_exec_review() {
         .write_all(format!("{cancelled}\n").as_bytes())
         .await
         .expect("cancel");
+    tokio::time::timeout(Duration::from_secs(1), dropped.notified())
+        .await
+        .expect("cancellation drops assessment before its five-second timeout or transport close");
     let ping = json!({"jsonrpc":"2.0","id":2,"method":"ping"});
     write
         .write_all(format!("{ping}\n").as_bytes())
