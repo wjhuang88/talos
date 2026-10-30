@@ -402,6 +402,108 @@ async fn app_server_session_registers_session_owned_process_tool() {
 }
 
 #[tokio::test]
+async fn session_process_dispatch_respects_read_and_cancel_policy() {
+    use talos_core::tool::ToolNature;
+    use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+
+    for (action, denied) in [("list", false), ("list", true), ("cancel", true)] {
+        let root = tempfile::tempdir().expect("workspace");
+        let mut engine = PermissionEngine::empty();
+        engine.set_workspace_root(root.path().into());
+        engine.add_rule(PermissionRule::new_nature(
+            if action == "cancel" {
+                ToolNature::Execute
+            } else {
+                ToolNature::Read
+            },
+            None,
+            None,
+            if denied {
+                PermissionDecision::Deny("process fixture policy".into())
+            } else {
+                PermissionDecision::Allow
+            },
+        ));
+        let model = MockModel::new(vec![
+            vec![
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "process-policy".into(),
+                        name: "process".into(),
+                        input: serde_json::json!({"action": action, "job_id": "not-owned"}),
+                    },
+                    provenance: talos_core::tool::ToolProvenance::Native,
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Default::default(),
+                },
+            ],
+            success_events("done"),
+        ]);
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(model),
+            ToolRegistry::new(),
+            Some(Arc::new(engine)),
+            None,
+            root.path().into(),
+            Arc::new(talos_plugin::HookRegistry::new()),
+        );
+        let (handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        let mut events = handle.eq_rx;
+        let task = tokio::spawn(async move { actor.run().await });
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "inspect owned jobs".into(),
+            })
+            .await
+            .expect("submit");
+        let captured = collect_until_completions(&mut events, 1).await;
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        task.await.expect("actor");
+        let results: Vec<_> = captured
+            .iter()
+            .filter_map(|event| match progress_event(event) {
+                Some(AgentEvent::ToolResult { result, .. })
+                    if result.tool_use_id == "process-policy" =>
+                {
+                    Some(result)
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(results.len(), 1, "{action}: {captured:?}");
+        let result = results[0];
+        assert_eq!(result.is_error, denied, "{action}: {}", result.content);
+        if denied {
+            assert!(
+                result.content.contains("Permission denied:"),
+                "{}",
+                result.content
+            );
+        } else {
+            let value: serde_json::Value =
+                serde_json::from_str(&result.content).expect("process list");
+            assert_eq!(value["jobs"].as_array().map(Vec::len), Some(0));
+        }
+    }
+}
+
+#[tokio::test]
 async fn shutdown_before_start_commit_performs_no_provider_work() {
     let calls = Arc::new(AtomicUsize::new(0));
     let agent = make_agent(CountingModel {
