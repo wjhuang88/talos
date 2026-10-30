@@ -1,3 +1,10 @@
+## I308 candidate gate — 2026-10-30
+
+I308/T8 remains Active / Partial. Final acceptance candidate #809 at `70d05dfe8`
+has independent static approval; CI `41007199388` remains in progress.
+The I308 owner records local ENOSPC and resumed SDK component verification.
+No completion is claimed; the full handoff queue remains unchanged.
+
 ## Completed gix upgrade — 2026-10-28
 
 [I309](iterations/I309-gix-090-upgrade.md) is Complete / Closed. Implementation #790 merged as

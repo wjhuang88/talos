@@ -1,3 +1,24 @@
+## Published candidate checkpoint — 2026-10-30
+
+I308/T8 remains Active / Partial. PR #809 publishes exact head
+`70d05dfe835d6d3f8d521539f513eeefd9e5cc41` against
+`d15c7688b24e72ddab4be8ab8cb581ad98672220`. Independent static
+permission/security/API review approved that pair; receipt:
+https://github.com/wjhuang88/talos/pull/809#issuecomment-6515540333.
+The reviewer did not run tests and shares the external account identity.
+
+Local standard preflight `/private/tmp/i308-final-preflight.log` passed workspace
+checks, Clippy, tests and default external SDK execution, then failed with ENOSPC
+while building the coding SDK fixture. After removing only this active worktree's
+rebuildable examples cache, the locked coding fixture passed exit 0 in
+`/private/tmp/i308-sdk-coding-retry.log`. This is resumed component evidence, not
+an exit-0 full script run. Exact-head CI `41007199388` is in progress; merge CAS,
+merge and owner-first completion evidence remain required. Earlier unpublished
+and validation-pending checkpoint statements below are historical.
+
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+No downstream activation or whole-goal completion is claimed.
+
 ## Active resume checkpoint — 2026-10-30
 
 I309 is closed; I308/T8 remains Active / Partial. #801 and #807 are merged

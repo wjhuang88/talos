@@ -1,5 +1,24 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Published candidate checkpoint — 2026-10-30
+
+I308/T8 remains Active / Partial. PR #809 publishes exact head
+`70d05dfe835d6d3f8d521539f513eeefd9e5cc41` against
+`d15c7688b24e72ddab4be8ab8cb581ad98672220`. Independent static
+permission/security/API review approved that pair; receipt:
+https://github.com/wjhuang88/talos/pull/809#issuecomment-6515540333.
+The reviewer did not run tests and shares the external account identity.
+
+Local standard preflight `/private/tmp/i308-final-preflight.log` passed workspace
+checks, Clippy, tests and default external SDK execution, then failed with ENOSPC
+while building the coding SDK fixture. After removing only this active worktree's
+rebuildable examples cache, the locked coding fixture passed exit 0 in
+`/private/tmp/i308-sdk-coding-retry.log`. This is resumed component evidence, not
+an exit-0 full script run. Exact-head CI `41007199388` is in progress; merge CAS,
+merge and owner-first completion evidence remain required. Earlier unpublished
+and validation-pending checkpoint statements below are historical.
+
+
 ## Acceptance evidence reconciliation — 2026-10-30
 
 Status remains Active / Partial; the following maps current implementation to the
@@ -490,7 +509,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, merged); #786 (Pull Auto instance ownership, merged); #789 (legacy search refusal evidence, merged); #801 (Git/host/visible decisions, merged); #807 (recovery and inventory regressions, merged); #797 (superseded by #801, closed) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, merged); #786 (Pull Auto instance ownership, merged); #789 (legacy search refusal evidence, merged); #801 (Git/host/visible decisions, merged); #807 (recovery and inventory regressions, merged); #797 (superseded by #801, closed); #809 (final acceptance candidate, CI pending) |
 | Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
