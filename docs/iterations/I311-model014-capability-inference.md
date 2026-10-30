@@ -1,6 +1,6 @@
 # Iteration I311: Catalog-Assisted Custom-Model Capability And Variant Inference
 
-> Document status: Active (#813 merged; implementation in progress)
+> Document status: Review (implementation PR #815; remote gates pending)
 > Published plan date: 2026-10-30
 > Planned objective: deliver full MODEL-014 and handoff T2+T3 using shared canonical identity, explicit overrides, provenance, protocol-safe requests and a real local walkthrough.
 > Baseline rule: preserve this scope; a narrower compatibility patch cannot close it.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #813 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Finalized exact-head governance/API/security review and CI required before merge; no implementation before effective claim. |
-| Implementation PR | Local implementation in progress; not published |
+| Implementation PR | #815 |
 | Last Updated | 2026-10-30 |
 | Handoff / Release Condition | Full MODEL-014 acceptance, merged implementation and owner evidence; no release/tag. |
 
@@ -154,3 +154,14 @@ running tests. The reviewer accepts the explicit combined custom-variant evidenc
 boundary above. The prior preflight exited 101 due to ENOSPC, not a passing gate.
 After authorized cleaning of this active worktree's target, standard preflight
 is rebuilding (`/private/tmp/model014-preflight-rebuild.log`); no success claimed yet.
+
+
+Stable candidate published as PR #815, head
+`b0131f5e24d9b6f0ba7c0b9b692a3822ab3a4648`. Standard
+`./scripts/release_preflight.sh` exited 0 with locked workspace check/Clippy/tests
+and both independent external Runtime SDK modes
+(`/private/tmp/model014-preflight-authorized.log`). The unchanged sandbox retry
+failed process observation with EPERM; the authorized unsandboxed run passed.
+This is local validation, not remote CI. Initial exact-head CI `41021654423`
+was queued when published; the synchronized documentation candidate requires its
+own exact-head remote evidence. Delivery remains Review, not Complete.

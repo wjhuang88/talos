@@ -1,9 +1,10 @@
-## MODEL-014 atomic activation proposal — 2026-10-30
+## MODEL-014 implementation review — 2026-10-30
 
-[I311](iterations/I311-model014-capability-inference.md) proposes full handoff T2+T3 after completed I308/#812.
-Proposed Active/Claimed state in #813 is ineffective until merge; ADR-095 defines authority.
-No implementation before finalized claim/activation merges. I310/ADR-094 remain
-reserved by independent Gemini proposal #811. Full handoff stays Active.
+[I311](iterations/I311-model014-capability-inference.md) is Review in PR #815; claim #813 is merged/effective.
+Local standard preflight and static independent security/API review passed;
+exact-head remote CI and merge remain pending. I310/ADR-094 remain independently
+owned by #811. Earlier activation/intake snapshots below are historical.
+Full handoff stays Active: MODEL-014 → T4 → T5 → T1 → T6.
 
 ## I308/T8 completed — 2026-10-30
 
