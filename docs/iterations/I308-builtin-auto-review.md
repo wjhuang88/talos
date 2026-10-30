@@ -1,5 +1,66 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Completion evidence — 2026-10-30
+
+Status: Complete. Completion Commit: `5dea4925a143151071ea231779c100a75734e6fe`.
+I308's unchanged seven acceptance rows and PERM-007-H/G scope passed independent
+closure review against implementation head `70d05dfe835d6d3f8d521539f513eeefd9e5cc41`.
+CI `41007199388` passed all eight exact-head jobs, including full locked preflight,
+native Windows workspace/CLI smoke and Linux/Windows Desktop. PR #809 merged
+following exact-head static permission/security/API approval and merge-time CAS.
+The reviewer independently checked CI but did not run tests; shared external
+account identity remains disclosed. Earlier Partial/pending sections are history.
+
+Recovery is opt-in, bounded and target-bound, with stale-target/replay refusal and
+partial-failure receipts; no universal or cross-process rollback is promised.
+Unavailable/protected search stays independently owned by I293. Standalone MCP
+requires an explicitly injected interactive pipeline/intent for Auto; otherwise
+it remains headless. Unix process tests execute real jobs; non-Unix cancellation
+fixtures cover pending jobs. These are explicit supported boundaries, not claims
+that every operation has identical Auto behavior on every platform.
+
+Only I308/T8 and PERM-007-H/G close here. MODEL-014 → T4 → T5 → T1 → T6 remain
+unimplemented/incomplete, and the complete handoff goal remains Active.
+
+
+## Merged implementation checkpoint — 2026-10-30
+
+PR #809 merged as `5dea4925a143151071ea231779c100a75734e6fe`.
+Exact implementation head `70d05dfe835d6d3f8d521539f513eeefd9e5cc41`
+passed all eight checks in CI `41007199388`, including full standard release
+preflight, native Windows workspace/CLI smoke and Linux/Windows Desktop.
+Independent exact-head permission/security/API static approval is recorded at
+https://github.com/wjhuang88/talos/pull/809#issuecomment-6515540333.
+Merge CAS rechecked target `d15c7688b24e72ddab4be8ab8cb581ad98672220`,
+effective claimant/slice, non-overlapping PRs and expected head before merge.
+The merged implementation branch was deleted locally/remotely; both worktrees
+remain. Local ENOSPC history is retained below; remote full preflight succeeded.
+
+I308 remains Active / Partial pending final owner/Story acceptance reconciliation
+and protected closeout review. MODEL-014 is restored Refinement / Unclaimed;
+all subsequent handoff work remains incomplete. Earlier CI-pending checkpoints
+are historical and do not override this merged evidence.
+
+
+## Published candidate checkpoint — 2026-10-30
+
+I308/T8 remains Active / Partial. PR #809 publishes exact head
+`70d05dfe835d6d3f8d521539f513eeefd9e5cc41` against
+`d15c7688b24e72ddab4be8ab8cb581ad98672220`. Independent static
+permission/security/API review approved that pair; receipt:
+https://github.com/wjhuang88/talos/pull/809#issuecomment-6515540333.
+The reviewer did not run tests and shares the external account identity.
+
+Local standard preflight `/private/tmp/i308-final-preflight.log` passed workspace
+checks, Clippy, tests and default external SDK execution, then failed with ENOSPC
+while building the coding SDK fixture. After removing only this active worktree's
+rebuildable examples cache, the locked coding fixture passed exit 0 in
+`/private/tmp/i308-sdk-coding-retry.log`. This is resumed component evidence, not
+an exit-0 full script run. Exact-head CI `41007199388` is in progress; merge CAS,
+merge and owner-first completion evidence remain required. Earlier unpublished
+and validation-pending checkpoint statements below are historical.
+
+
 ## Acceptance evidence reconciliation — 2026-10-30
 
 Status remains Active / Partial; the following maps current implementation to the
@@ -471,7 +532,7 @@ Ordinary effectful Execute/HTTP/WebSearch Auto, remaining registered
 operation/profile dispositions and final delivery gates remain outstanding.
 Earlier checkpoints below preserve historical states and do not override this one.
 
-> Document status: Active (#765 merged; effective at `8f0ce2340d7728ac5b3ee8eba814050a2360e194`)
+> Document status: Complete — #809 merged; completion evidence above
 > Published plan date: 2026-10-26
 > Planned objective: complete handoff T8 with model-assisted, invocation-local approval across registered native tools, including suitable Write, Network and Execute operations and higher-risk file changes.
 > Baseline rule: preserve this published target; implementation stages do not reduce acceptance.
@@ -481,7 +542,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | I308 / PERM-007-H and PERM-007-G: native-tool Auto evidence, shared assessment and invocation-local admission, higher-risk file recovery, production registration coverage, tests and documentation; excludes search transport and provider protocol implementation. |
@@ -490,8 +551,8 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, merged); #786 (Pull Auto instance ownership, merged); #789 (legacy search refusal evidence, merged); #801 (Git/host/visible decisions, merged); #807 (recovery and inventory regressions, merged); #797 (superseded by #801, closed) |
-| Last Updated | 2026-10-28 |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, merged); #786 (Pull Auto instance ownership, merged); #789 (legacy search refusal evidence, merged); #801 (Git/host/visible decisions, merged); #807 (recovery and inventory regressions, merged); #797 (superseded by #801, closed); #809 (final acceptance implementation, merged) |
+| Last Updated | 2026-10-30 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 
 This governance candidate proposes claim and activation atomically in #765. Both are ineffective

@@ -165,3 +165,15 @@ technical review approved. Four WSS records remain the original Realtime exclusi
 checkpoints above are historical. Parent #724 remains open and incomplete: B Gemini, C Azure
 and D Bedrock need independent claims, ADRs, runnable implementations and full acceptance.
 No release or sibling completion is claimed. #748 closes only after the owner closure reaches main.
+
+
+## Pending child intake registration — 2026-10-30
+
+**Child owner ID**: PROVIDER-008-B
+**Source Issue**: #810
+
+Gemini child intake is recorded here only until its canonical child owner in
+PR #811 reaches main. #811 proposes I310/ADR-094 and a dedicated child owner;
+that proposal is not yet effective. This registration does not activate, claim,
+change or implement the Gemini/auth scope. After #811 merges, repoint the Issue
+matrix to `docs/backlog/active/PROVIDER-008-B-google-gemini.md`.
