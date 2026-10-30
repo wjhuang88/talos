@@ -1,5 +1,52 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Current delivery checkpoint — 2026-10-30
+
+I308 / T8 remains Active / Partial. This checkpoint supersedes pending-stage
+statements below; historical validation records remain preserved.
+
+- #801 merged as `d7127ada56aecd49e2de427f93a0389d148c19f3` after all eight
+  exact-head checks in run `40850718750` passed. #797 was closed as superseded
+  by #801 after independent final-tree comparison; #797 was not itself merged.
+- #807 merged as `d15c7688b24e72ddab4be8ab8cb581ad98672220` after all eight
+  checks in `40857055679` passed for `58618291ff0ad3f46ea21eb432a59888fa4bb556`.
+  Exact-head independent static approval is recorded in PR comment
+  https://github.com/wjhuang88/talos/pull/807#issuecomment-6494157236.
+  Target claimant/slice and open overlap were rechecked; merge used that exact
+  expected head. Reviewer did not run tests and shares the external account.
+- Local follow-up `700b180f298cf5fc5f505cc613618edd22c3cdc9` adds actual
+  `EditTool.execute` post-rename failure, visible receipt, restore and replay
+  refusal. The focused locked all-feature Tools test passed before its rebase
+  onto #807/main; formatting was corrected and bounded static review approved.
+  This is direct tool evidence, not Agent/MCP failure injection or persistence
+  across sessions/processes. It is not yet published or remotely certified.
+
+- Local Desktop regression `009778263` now runs two sequential actual RuntimeHost
+  instances with different durable bindings in the same storage and verifies each
+  retains exactly its own Todo. Focused locked `talos-desktop` / `desktop-ui` /
+  `talos-desktop-mock` test passed. Independent static review approved; reviewer
+  did not run tests. The initial command named a nonexistent `talos-desktop` binary
+  and did not execute tests; the corrected target above passed. This does not
+  establish concurrent hosts or all nine Todo operations.
+- Concrete conditional-registration gap: Session adds `process` outside shared
+  composition. `app_server_session_registers_session_owned_process_tool` currently
+  calls the tool directly, so it is not admission evidence. The new
+  `session_process_dispatch_respects_read_and_cancel_policy` regression exercises
+  real Session registration/provider dispatch: Read Allow returns an empty jobs
+  list; Read Deny and Execute Deny reject list/unknown-job cancel. Focused locked
+  Agent test passes, and independent static review approves (no reviewer test
+  execution). The first assertion incorrectly required the custom deny text;
+  actual public output is the generic permission-denied error. No production
+  permission logic changed. Real running-job cancellation, cross-session job
+  isolation and Auto disposition remain to be closed for acceptance 1/6.
+  Runtime opt-in `skill_read` already has actual body/reference Read Allow/Deny
+  dispatch in `tests::skill_disclosure`; Desktop does not opt into this tool.
+
+Remaining acceptance is the unchanged seven-row baseline below: reconcile actual
+conditional/profile inventories and host reachability, finish missing higher-risk
+recovery cases, and obtain final integrated review/platform/gate evidence.
+The full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
 ## Local Desktop durable Todo correction — 2026-10-29
 
 The real `RuntimeHost` durable-session dispatch regression exposed that Todo
@@ -413,7 +460,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, merged); #786 (Pull Auto instance ownership, merged); #789 (legacy search refusal evidence, merged) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, merged); #786 (Pull Auto instance ownership, merged); #789 (legacy search refusal evidence, merged); #801 (Git/host/visible decisions, merged); #807 (recovery and inventory regressions, merged); #797 (superseded by #801, closed) |
 | Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 

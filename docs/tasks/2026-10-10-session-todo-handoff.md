@@ -1,3 +1,15 @@
+## Active resume checkpoint — 2026-10-30
+
+I309 is closed; I308/T8 remains Active / Partial. #801 and #807 are merged
+(`d7127ada56aecd49e2de427f93a0389d148c19f3` and
+`d15c7688b24e72ddab4be8ab8cb581ad98672220`); both exact-head CI runs passed
+all eight checks. #797 is closed as superseded by #801, not merged separately.
+Current local branch `feat/i308-final-acceptance-recovery` retains a direct
+EditTool partial-failure recovery regression at `700b180f298cf5fc5f505cc613618edd22c3cdc9`.
+It is not yet published; see the I308 owner current checkpoint for test/review
+limits and remaining acceptance. Earlier resume checkpoints below are historical.
+Queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
 ## Active resume checkpoint — 2026-10-28 MCP Git host coverage
 
 Queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
