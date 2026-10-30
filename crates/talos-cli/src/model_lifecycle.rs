@@ -757,6 +757,66 @@ mod tests {
     }
 
     #[test]
+    fn model014_custom_reasoning_walkthrough_picker_provenance() {
+        let catalog = talos_config::model::builtin_models();
+        let model = catalog
+            .iter()
+            .find(|model| {
+                model.capabilities.image_input
+                    && model.capabilities.reasoning
+                    && model.output_limit.is_some()
+                    && catalog
+                        .iter()
+                        .filter(|candidate| candidate.id == model.id)
+                        .count()
+                        == 1
+            })
+            .expect("unique vision/reasoning fixture shared with real-Agent walkthrough");
+        let id = format!("proxy/{}", model.id);
+        let source = format!(
+            r#"provider = "fixture"
+model = {id:?}
+[providers.fixture]
+protocol = "openai-responses"
+base_url = "http://127.0.0.1:9/model-wire"
+api_key = "test-key"
+[providers.fixture.models.{id:?}.reasoning]
+effort = "high"
+replay = false
+"#
+        );
+        let config: Config = toml::from_str(&source).expect("custom walkthrough config");
+        let before = toml::to_string(&config).expect("original config");
+        let picker = build_model_picker_data(&config);
+        let row = picker
+            .ready_models
+            .iter()
+            .find(|row| row.provider == "fixture" && row.model_id == id)
+            .expect("authenticated custom model reaches production picker");
+        assert!(row.is_current);
+        for expected in [
+            "image: true (catalog inferred)".to_owned(),
+            "reasoning: true (catalog inferred)".to_owned(),
+            format!(
+                "output: {} (catalog inferred)",
+                model.output_limit.expect("output")
+            ),
+            format!(
+                "catalog: {}/{} (endpoint unverified)",
+                model.provider, model.id
+            ),
+        ] {
+            assert!(
+                row.label.contains(&expected),
+                "{} lacks {}",
+                row.label,
+                expected
+            );
+        }
+        assert_eq!(toml::to_string(&config).expect("unchanged config"), before);
+    }
+
+    #[test]
     fn model014_picker_labels_explicit_negative_and_unknown_sources() {
         let mut config = Config::default();
         config

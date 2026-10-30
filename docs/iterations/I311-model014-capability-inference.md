@@ -180,3 +180,22 @@ run tests. Merge-time CAS verified the target base, effective claim, exact head,
 non-overlapping open PRs and passing gates. Earlier pending-CI statements are
 historical. Delivery remains Review pending owner-first acceptance closeout;
 T4 → T5 → T1 → T6 and the overall handoff remain incomplete.
+
+### Acceptance audit correction — 2026-10-30
+
+Independent closeout audit requested changes: the merged custom-provider fixture
+proved images/output but deliberately omitted reasoning, while the separate
+variant fixture used a built-in provider identity. Neither asserted custom source
+display. Passing CI did not waive the original combined walkthrough requirement.
+
+The local follow-up retains the no-preset regression and adds
+`custom_catalog_reasoning_and_image_complete_through_real_agent`: a unique custom
+proxy identity with explicit high effort and inferred capabilities sends actual
+Responses requests with reasoning, images and native-tool continuation, while
+config bytes stay unchanged. The focused locked test passed.
+`model014_custom_reasoning_walkthrough_picker_provenance` uses the same fixture
+identity/config shape through production picker construction and asserts inferred
+image/reasoning/output, matched catalog identity and endpoint-unverified labels;
+the focused locked test passed. This is production picker-data coverage, not an
+interactive terminal-rendering observation. Independent acceptance re-review and
+full candidate validation remain required; no completion is claimed.
