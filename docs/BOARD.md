@@ -11,7 +11,7 @@ Full handoff stays Active: MODEL-014 → T4 → T5 → T1 → T6.
 I308 and PERM-007-H/G owners are Complete with Completion Commit `5dea4925a143151071ea231779c100a75734e6fe`
 (#809), all-eight-success exact-head CI `41007199388` and independent protected
 closure review. Owner boundaries and historical failures remain recorded.
-MODEL-014 is restored Refinement / Unclaimed; next is its atomic claim/activation.
+Historical snapshot (superseded by the current Review entry above): MODEL-014 was restored Refinement / Unclaimed; next was its atomic claim/activation.
 Full handoff remains Active: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
 Earlier Active/Partial rows below are historical, superseded by owner evidence.
 
