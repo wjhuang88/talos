@@ -59,3 +59,11 @@ if self.compactor.should_compact(&self.history) {
 ```
 
 Layers 4-5 are implemented in `compaction.rs` (`apply_collapse`, `apply_autocompact`) but not called.
+
+## Current source reconciliation — 2026-10-30
+
+The wiring description above is historical: both current Session submission paths
+call Compactor::compact with the Agent provider. This does not prove the five
+acceptance rows complete. Planned I312 consumes their higher-layer convergence
+and 50-turn verification within T4, under MEM-005's request-budget policy. No
+second summarizer is authorized. I312 remains unclaimed before atomic activation.

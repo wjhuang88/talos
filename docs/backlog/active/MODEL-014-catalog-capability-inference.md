@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Story ID | MODEL-014 |
-| Status | Review (implementation PR #815 merged; acceptance closeout pending) |
+| Status | Complete |
 | Collaboration Claim | Delegated to I311 / merged #813 |
 
 **Type**: Product / Configuration Story
@@ -67,7 +67,7 @@ Before activation, decide the representation of inferred/unknown/explicit capabi
 
 ## State / Status Owners
 
-This file owns scope and readiness. PRODUCT-BACKLOG.md is the compact index; BOARD.md is a derived operating view. Implementation #815 is merged; delivery remains Review until acceptance closeout.
+This file owns scope and readiness. PRODUCT-BACKLOG.md is the compact index; BOARD.md is a derived operating view. Implementation #815 and acceptance follow-up #816 are merged; see I311 for final acceptance evidence.
 
 ## User-Facing Documentation
 
@@ -115,3 +115,11 @@ Unclaimed intake record is historical only after that merge. No code is included
 
 Implementation #815 merged as `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`;
 see I311 for exact-head CI and review evidence. Acceptance closeout remains pending.
+
+## Completion — 2026-10-30
+
+Completion Commit: `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`, `b04421fb964737911551c7e0704d6c81e80aa406`.
+All eight acceptance rows are reconciled in I311. Full locked preflight, exact-head
+CI `41032515451`, independent review and CAS passed; #816 merged as
+`ca4a79961366eba7bc722b90bd449404cc7b07d5`. Earlier pending-closeout entries
+are historical. MODEL-011/#124 and handoff T4/T5/T1/T6 remain separate.

@@ -171,3 +171,12 @@ model-directed semantic checkpoints while retaining runtime-owned context bounds
 authoritative Session history. This intake record creates no implementation authority; any
 production work requires a separately selected iteration, Collaboration Claim, and change
 control against MEM-002, MEM-003, MEM-007, and the Session persistence boundary.
+
+## T4 preparation — 2026-10-30
+
+[I312](../../iterations/I312-whole-request-compaction.md) proposes full handoff T4
+with all eleven acceptance rows preserved. ADR-096 and the linked design define
+whole-request pressure, structured sequential folding, manual Actor operations
+and raw-history-preserving projection. I312 is Planned/Unclaimed and grants no
+implementation authority. T5 remains the dependent model-callable checkpoint and
+bounded authoritative-history recovery delivery; #390 stays open until both close.

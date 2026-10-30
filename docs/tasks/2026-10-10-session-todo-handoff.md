@@ -1,3 +1,15 @@
+## Current phase — MODEL-014 closed, T4 preparing — 2026-10-30
+
+Overall goal remains Active. I309, I308/T8 and I311/MODEL-014 T2+T3 are Complete.
+Completion Commit for T2+T3: `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`,
+`b04421fb964737911551c7e0704d6c81e80aa406`. #816 merged as
+`ca4a79961366eba7bc722b90bd449404cc7b07d5`; exact-head CI41032515451 all eight
+jobs passed, full local preflight and independent acceptance review passed, and
+CAS verified new target80b93933. See I311 for test/review limitations and failures.
+I312 T4 is Planned/Unclaimed; no implementation authority before atomic activation.
+Full queue retained: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+Earlier checkpoints below are historical; no whole-goal completion is claimed.
+
 ## Current phase — 2026-10-30
 
 Overall goal remains Active. I309 and I308/T8 are closed on main (#812 merge

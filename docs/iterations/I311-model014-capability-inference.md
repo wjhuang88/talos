@@ -1,6 +1,6 @@
 # Iteration I311: Catalog-Assisted Custom-Model Capability And Variant Inference
 
-> Document status: Review (implementation PR #815 merged; acceptance closeout pending)
+> Document status: Complete
 > Published plan date: 2026-10-30
 > Planned objective: deliver full MODEL-014 and handoff T2+T3 using shared canonical identity, explicit overrides, provenance, protocol-safe requests and a real local walkthrough.
 > Baseline rule: preserve this scope; a narrower compatibility patch cannot close it.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | MODEL-014 / handoff T2+T3: capability/limit/variant resolution, explicit-negative schema, config/runtime/provider/UI consistency, regression and local walkthrough; excludes new protocol/auth implementations and probing. |
@@ -19,7 +19,7 @@
 | Governance Claim PR | #813 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Finalized exact-head governance/API/security review and CI required before merge; no implementation before effective claim. |
-| Implementation PR | #815 |
+| Implementation PR | #815; #816 |
 | Last Updated | 2026-10-30 |
 | Handoff / Release Condition | Full MODEL-014 acceptance, merged implementation and owner evidence; no release/tag. |
 
@@ -199,3 +199,40 @@ image/reasoning/output, matched catalog identity and endpoint-unverified labels;
 the focused locked test passed. This is production picker-data coverage, not an
 interactive terminal-rendering observation. Independent acceptance re-review and
 full candidate validation remain required; no completion is claimed.
+
+## Final acceptance reconciliation — 2026-10-30
+
+Completion Commit: `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`, `b04421fb964737911551c7e0704d6c81e80aa406`.
+The first commit contains production MODEL-014 implementation; the second supplies
+required custom-provider reasoning/provenance acceptance coverage. PR #816 merged as `ca4a79961366eba7bc722b90bd449404cc7b07d5`.
+
+| Original acceptance | Implementation and executable evidence |
+|---|---|
+| Unique shared identity and per-field inference | Config resolver uses one canonical identity and resolves fields independently; config suite 265 passed |
+| Explicit overrides including false | Negative override/catalog-change/roundtrip tests; independent context/output resolution |
+| Unknown/ambiguous/missing fields | Exact ambiguity stops prefix fallback; missing fields retain unknown; no fabricated presets |
+| Permission-gated inferred images | Real PNG admission, external-path refusal and invalid-content regressions; real custom CLI image/tool continuation |
+| Reasoning/variant invocation consistency | Three-protocol negative-override HTTP captures preserve raw history/pairing; GLM Auto zero-request refusal; custom high-effort real CLI fixture; controlled catalog variant inheritance plus catalog-scoped real variant walkthrough |
+| Output authority and protocol caps | Factory and request-capture tests plus real custom inferred-output assertions; explicit limits retain precedence |
+| No probing or config materialization | Local-only resolver; clone-based runtime materialization; walkthrough config bytes unchanged |
+| Truthful provenance and full local walkthrough | Production current authenticated picker row labels inferred image/reasoning/output and endpoint-unverified identity; matching real custom provider uses image/high effort/tool continuation |
+
+No paid probe or unsupported endpoint claim. Embedded custom variant IDs remain
+ambiguous; controlled-catalog inheritance and catalog-provider runtime walkthrough
+are complementary coverage, not fabricated custom unique-variant execution.
+Independent acceptance review explicitly accepted the combined production picker
+and real binary scenario; it did not require a terminal-renderer observation.
+
+Local standard preflight at b04421fb passed with pinned Rust 1.99.0, locked check,
+warnings-denied Clippy, workspace tests and both external Runtime SDK modes in
+/private/tmp/model014-acceptance-preflight-host.log. Earlier sandbox preflight
+failed existing process observation with EPERM (Tools 1032 pass/1 fail); that
+failure remains recorded. Responses real-Agent suite passed 8/8; new picker test
+passed. Static exact-head review approved b04421fb against 0469f8041 with shared
+external identity and no independent test execution. Exact-head CI `41032515451` passed all eight jobs. CAS rechecked target
+`80b9393375812475901b1b9565cbff6fca273537`, unchanged head, claim and overlaps.
+Independent new-base review approved the unrelated Gemini governance advance:
+https://github.com/wjhuang88/talos/pull/816#issuecomment-6525029478.
+
+Only MODEL-014/I311 and handoff T2+T3 close here. T4 → T5 → T1 → T6 remain
+incomplete and the full handoff stays Active. Active probing remains MODEL-011/#124.
