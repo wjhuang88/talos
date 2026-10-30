@@ -503,6 +503,178 @@ async fn session_process_dispatch_respects_read_and_cancel_policy() {
     }
 }
 
+#[cfg(unix)]
+#[tokio::test]
+async fn session_process_cancels_only_its_own_running_job() {
+    use talos_core::tool::ToolNature;
+    use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+
+    struct HumanApproval;
+    #[async_trait]
+    impl crate::permission_pipeline::ApprovalResolver for HumanApproval {
+        async fn resolve(
+            &self,
+            _: crate::permission_pipeline::PermissionApprovalRequest,
+            _: Duration,
+        ) -> Result<talos_core::ApprovalChoice, crate::permission_pipeline::ApprovalResolverError>
+        {
+            Ok(talos_core::ApprovalChoice::ApproveOnce)
+        }
+    }
+
+    async fn collect_job_turn(
+        events: &mut tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
+    ) -> Vec<SessionEvent> {
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let mut captured = Vec::new();
+            loop {
+                let event = events.recv().await.expect("session event");
+                let completed = completed_status(&event).is_some();
+                captured.push(event);
+                if completed {
+                    return captured;
+                }
+            }
+        })
+        .await
+        .expect("bounded job-control turn")
+    }
+
+    fn tool_events(name: &str, input: serde_json::Value) -> Vec<AgentEvent> {
+        vec![
+            AgentEvent::ToolCall {
+                call: talos_core::message::ToolCall {
+                    id: "job-control".into(),
+                    name: name.into(),
+                    input,
+                },
+                provenance: Default::default(),
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Default::default(),
+            },
+        ]
+    }
+    fn tool_result(events: &[SessionEvent]) -> &talos_core::message::MessageToolResult {
+        events
+            .iter()
+            .find_map(|event| match progress_event(event) {
+                Some(AgentEvent::ToolResult { result, .. })
+                    if result.tool_use_id == "job-control" =>
+                {
+                    Some(result)
+                }
+                _ => None,
+            })
+            .expect("actual tool result")
+    }
+    let root = tempfile::tempdir().expect("workspace");
+    let mut sessions = Vec::new();
+    for _ in 0..2 {
+        let model = MockModel::new(vec![]);
+        let responses = model.responses.clone();
+        let mut tools = ToolRegistry::new();
+        tools.register(Arc::new(talos_tools::ExecTool::new(root.path().into())));
+        let mut engine = PermissionEngine::empty();
+        engine.set_workspace_root(root.path().into());
+        for nature in [ToolNature::Read, ToolNature::Execute] {
+            engine.add_rule(PermissionRule::new_nature(
+                nature,
+                None,
+                None,
+                PermissionDecision::Allow,
+            ));
+        }
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(model),
+            tools,
+            Some(Arc::new(engine)),
+            None,
+            root.path().into(),
+            Arc::new(talos_plugin::HookRegistry::new()),
+        )
+        .with_approval_resolver(Arc::new(HumanApproval));
+        let (handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        let task = tokio::spawn(async move { actor.run().await });
+        sessions.push((handle, responses, task));
+    }
+    sessions[0].1.lock().expect("responses").extend([
+        tool_events("exec", serde_json::json!({"command":"/bin/sleep", "args":["30"], "background":true, "timeout_secs":30})),
+        success_events("started"),
+    ]);
+    sessions[0]
+        .0
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "start bounded job".into(),
+        })
+        .await
+        .expect("submit");
+    let events = collect_job_turn(&mut sessions[0].0.eq_rx).await;
+    let result = tool_result(&events);
+    assert!(!result.is_error, "{}", result.content);
+    let started: serde_json::Value = serde_json::from_str(&result.content).expect("receipt");
+    let id = started["job_id"].as_str().expect("job id").to_owned();
+    for (session, action) in [(1, "status"), (1, "cancel"), (0, "status"), (0, "cancel")] {
+        sessions[session].1.lock().expect("responses").extend([
+            tool_events(
+                "process",
+                serde_json::json!({"action":action, "job_id":id, "wait_ms":5000}),
+            ),
+            success_events("observed"),
+        ]);
+        sessions[session]
+            .0
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "inspect or cancel job".into(),
+            })
+            .await
+            .expect("submit");
+        let events = collect_job_turn(&mut sessions[session].0.eq_rx).await;
+        let result = tool_result(&events);
+        if session == 1 {
+            assert!(result.is_error, "foreign {action}: {}", result.content);
+            assert_eq!(result.content, "unknown background job");
+        } else {
+            assert!(!result.is_error, "owner {action}: {}", result.content);
+            let status: serde_json::Value = serde_json::from_str(&result.content).expect("status");
+            assert_eq!(
+                status["state"],
+                if action == "cancel" {
+                    "cancelled"
+                } else {
+                    "running"
+                }
+            );
+            if action == "cancel" {
+                assert_eq!(status["cleanup_outcome"], "terminated");
+            }
+        }
+    }
+    for (handle, _, task) in sessions {
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        tokio::time::timeout(Duration::from_secs(10), task)
+            .await
+            .expect("bounded shutdown")
+            .expect("actor");
+    }
+}
+
 #[tokio::test]
 async fn shutdown_before_start_commit_performs_no_provider_work() {
     let calls = Arc::new(AtomicUsize::new(0));
