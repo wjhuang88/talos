@@ -71,6 +71,7 @@ impl AutoPermissionResolver {
         if matches!(
             request.tool_name.as_str(),
             "delay"
+                | "process"
                 | "schedule"
                 | "cancel_scheduled_task"
                 | "bash"

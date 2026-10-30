@@ -30,6 +30,27 @@ struct ProcessInput {
     wait_ms: Option<u64>,
 }
 
+/// Recognizes cancellation evidence emitted by the owned supervisor, never a
+/// caller-supplied command or an unknown-job fallback resource.
+pub(crate) fn auto_cancel_profile(input: &Value, profile: &[ToolPermissionFacet]) -> bool {
+    let Some(id) = input.get("job_id").and_then(Value::as_str) else {
+        return false;
+    };
+    let Some(uuid) = id.strip_prefix("job_") else {
+        return false;
+    };
+    input.get("action").and_then(Value::as_str) == Some("cancel")
+        && uuid::Uuid::parse_str(uuid).is_ok()
+        && profile.len() == 1
+        && profile[0].nature == ToolNature::Execute
+        && profile[0].resource_kind == Some(ToolResourceKind::Command)
+        && profile[0].resource.as_deref().is_some_and(|resource| {
+            resource.starts_with("background:")
+                && !resource.starts_with("background:unknown:")
+                && resource.ends_with(&format!(":job:{id}"))
+        })
+}
+
 /// Model-visible control surface for live, session-owned background jobs.
 pub(crate) struct ProcessTool {
     supervisor: BackgroundJobSupervisor,
@@ -135,6 +156,37 @@ mod tests {
     use std::time::Duration;
     use talos_core::background_job::{BackgroundJobHost, BackgroundJobRequest};
     use tokio::sync::mpsc;
+
+    #[tokio::test]
+    async fn auto_cancel_requires_owned_job_resource_and_exact_identity() {
+        let (events, _) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(events, "session".into(), 1);
+        let _permit = supervisor
+            .reserve(BackgroundJobRequest {
+                tool_name: "exec".into(),
+                timeout: Duration::from_secs(5),
+            })
+            .await
+            .expect("reservation");
+        let id = supervisor.job_ids().remove(0);
+        let tool = ProcessTool::new(supervisor);
+        let input = serde_json::json!({"action":"cancel", "job_id":id});
+        let profile = tool.permission_profile(&input);
+        assert!(auto_cancel_profile(&input, &profile));
+        let foreign = serde_json::json!({"action":"cancel", "job_id":format!("job_{}", uuid::Uuid::new_v4())});
+        assert!(!auto_cancel_profile(&foreign, &profile));
+        assert!(!auto_cancel_profile(
+            &foreign,
+            &tool.permission_profile(&foreign)
+        ));
+        assert!(!auto_cancel_profile(
+            &serde_json::json!({"action":"list", "job_id":id}),
+            &profile
+        ));
+        let mut mixed = profile.clone();
+        mixed.push(ToolPermissionFacet::new(ToolNature::Write));
+        assert!(!auto_cancel_profile(&input, &mixed));
+    }
 
     #[test]
     fn process_schema_requires_action_and_has_bounded_controls() {

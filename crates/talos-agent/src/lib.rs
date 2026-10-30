@@ -407,8 +407,19 @@ impl Agent {
         &mut self,
         supervisor: crate::background_jobs::BackgroundJobSupervisor,
     ) {
-        self.tools
-            .register(Arc::new(crate::process_tool::ProcessTool::new(supervisor)));
+        let process = Arc::new(crate::process_tool::ProcessTool::new(supervisor));
+        if self
+            .tools
+            .register_builtin_contributions([talos_core::tool::ToolContribution::new(
+                talos_core::tool::ToolContributionSource::new("talos-agent:session-process"),
+                process.clone(),
+            )])
+            .is_err()
+        {
+            // Preserve historical replacement behavior without upgrading a conflicting
+            // registration to trusted Auto evidence.
+            self.tools.register(process);
+        }
         let (descriptions, definitions, names) = crate::configuration::describe_presented_tools(
             &self.tools,
             &self.tool_presentation_policy,

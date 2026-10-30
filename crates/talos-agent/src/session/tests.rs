@@ -387,6 +387,7 @@ async fn app_server_session_registers_session_owned_process_tool() {
         model_context_limit: 128_000,
     };
     let (_handle, actor) = AppServerSession::new(agent, config);
+    assert!(actor.agent.tools.is_builtin_instance("process"));
     let process = actor
         .agent
         .tools
