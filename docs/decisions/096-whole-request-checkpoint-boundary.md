@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed for I312 / handoff T4. Ineffective until finalized atomic activation
-merges. This is no authorization to implement and does not close #390 or T5.
+Accepted as the proposed I312 / handoff T4 contract in #817. Ineffective until
+finalized atomic activation merges. This is no authorization to implement and does not close #390 or T5.
 
 ## Context and constraints
 

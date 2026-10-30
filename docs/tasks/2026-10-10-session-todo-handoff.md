@@ -6,7 +6,7 @@ Completion Commit for T2+T3: `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`,
 `ca4a79961366eba7bc722b90bd449404cc7b07d5`; exact-head CI41032515451 all eight
 jobs passed, full local preflight and independent acceptance review passed, and
 CAS verified new target80b93933. See I311 for test/review limitations and failures.
-I312 T4 is Planned/Unclaimed; no implementation authority before atomic activation.
+I312 T4 is proposed Active/Claimed in #817; no implementation authority before merge.
 Full queue retained: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
 Earlier checkpoints below are historical; no whole-goal completion is claimed.
 

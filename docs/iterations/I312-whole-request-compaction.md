@@ -1,6 +1,6 @@
 # Iteration I312: Whole-Request Compaction And Manual Controls
 
-> Document status: Planned
+> Document status: Active (proposed in #817; ineffective until merge)
 > Published plan date: 2026-10-30
 > Planned objective: deliver full handoff T4 through MEM-005 policy and MEM-003 convergence, preserving the later T5 Actor recovery deliverable.
 > Baseline rule: preserve all parent acceptance; successful trimming alone cannot close this iteration.
@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | Handoff T4: whole-request pressure/admission, shared structured checkpoint generation, raw-history-preserving projection, manual command, observable outcomes and long-session regression |
-| Claimed At | Not applicable |
+| Claimed At | 2026-10-30 |
 | Source Issue | #390 (T4 subset; T5 remains outstanding) |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Preparation only; independent API/privacy review and atomic activation required |
+| Governance Claim PR | #817 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Independent exact-head governance/API/privacy review, CI, both validators and merge CAS required; no implementation before merge |
 | Implementation PR | Not started |
 | Last Updated | 2026-10-30 |
 | Handoff / Release Condition | MODEL-014 acceptance closeout and effective target-branch claim before implementation |
@@ -143,3 +143,18 @@ only whole-request fit/reclamation (intermediate folds validate their own reques
 and schema), exactly-once terminal outcomes under cancellation/application races,
 and successful long-session fixtures within the proposed 64-call/120-second
 bounds. Safe refusal alone cannot satisfy semantic long-session acceptance.
+
+## Atomic activation proposal — PR #817
+
+The maintainer's accepted autonomous handoff queue selects T4 after merged
+MODEL-014 implementation and acceptance follow-up. This PR closes I311 owner-first
+and proposes Claimed/Active I312 atomically; both new claim and activation remain
+ineffective until this finalized record merges to main. Earlier preparation
+paragraphs are historical, not competing current status. MEM-005/MEM-003 delegate
+this T4 execution to I312 without creating duplicate claim records.
+
+I293/I294 search and I310 Gemini continue under their independent owners. This
+handoff's accepted serial queue and existing independent lanes are preserved;
+I312 changes no search endpoint, Gemini wire/auth or permission grant policy.
+Shared Agent request-budget/API files require overlap inspection before each
+stable implementation candidate; do not overwrite another lane's changes.

@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | MEM-005 |
 | Priority | P2 |
-| Status | Planned |
+| Status | In Progress (T4 delegated to I312; effective only after #817 merge) |
 | Depends On | MEM-002; MEM-003 for full LLM layers |
 | Origin | User feedback 2026-06-18 — context compaction needs explicit trigger and runtime logic |
 
@@ -180,3 +180,9 @@ whole-request pressure, structured sequential folding, manual Actor operations
 and raw-history-preserving projection. I312 is Planned/Unclaimed and grants no
 implementation authority. T5 remains the dependent model-callable checkpoint and
 bounded authoritative-history recovery delivery; #390 stays open until both close.
+
+## Atomic T4 activation proposal — #817
+
+Execution is delegated to I312, proposed Claimed/Active in #817 and ineffective
+until target-branch merge. Original acceptance remains unchanged. Prior preparation
+status is historical; no implementation exists yet. #390/T5 remains outstanding.
