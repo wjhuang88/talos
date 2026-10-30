@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | PERM-007-G |
 | Type | Permission / Safety Story |
-| Status | Complete |
+| Status | Complete / Closed |
 | Source | [GitHub Issue #563](https://github.com/wjhuang88/talos/issues/563) |
 | Selected Iteration | I308 / #765, activated at `8f0ce2340` |
 | Collaboration Claim | Delegated to the effective I308 claim in merged #765 |
