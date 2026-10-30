@@ -480,6 +480,10 @@ context_limit = 202752
 output_limit = 4096
 ```
 
+The unreleased I311 candidate adds catalog-assisted custom-model capabilities and explicit
+negative overrides. See [capability inference and Rust migration](docs/reference/MODEL-CAPABILITY-INFERENCE.md)
+for precedence, endpoint uncertainty and current delivery status.
+
 Talos also supports `protocol = "openai-responses"` at provider or model scope. Official OpenAI
 uses Responses when the protocol is omitted and support is confirmed; unconfirmed gateways retain
 Chat. An explicit `openai-chat` override provides rollback, with no automatic cross-protocol retry.

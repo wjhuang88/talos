@@ -6572,3 +6572,11 @@ approval, successful restoration, and one-use receipt rejection. Focused locked 
 and test Clippy pass; reviewer confirms test-only boundary. This is not CI for this head,
 not actual human UI, not recovery-storage/cross-session acceptance, and not I308 completion.
 Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
+
+MODEL-014 local checkpoint (2026-10-30): I311 claim #813 is merged at
+`0aff4e4fbf2a653521f0da9907900341772efc24`; implementation has local config/provider/CLI commits
+`2cbc699e4`, `3e1e9971e`, `d624ea553` and remains Active/unmerged. A real local HTTP regression covers
+reasoning-negative requests and preserved tool pairing across three protocols.
+See I311 owner for exact commands/logs and unimplemented/unverified acceptance.
+Overall handoff remains Active; retain I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.

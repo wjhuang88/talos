@@ -252,6 +252,9 @@ context_limit = 202752
 output_limit = 4096
 ```
 
+尚未发布的 I311 候选实现增加自定义模型目录能力推断与显式负面覆盖。优先级、端点不确定性、
+当前交付状态及 Rust 配置迁移见[能力推断说明](docs/reference/MODEL-CAPABILITY-INFERENCE.md)。
+
 Talos 也支持在 provider 或模型级配置 `protocol = "openai-responses"`。官方 OpenAI 在未显式
 配置协议且支持已确认时使用 Responses；未确认的兼容网关仍使用 Chat。显式 `openai-chat`
 可用于回退，系统不会自动跨协议重试。模型选择器与目录浏览器显示生效协议及其来源。优先级、

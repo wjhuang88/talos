@@ -520,3 +520,9 @@ provenance. Explicit Chat remains the rollback for confirmed catalog defaults, w
 cross-wire retry. Follow the [full protocol migration](PROVIDER-PROTOCOLS.md) and
 [unreleased notes](../releases/unreleased-provider008a.md). No patch release or publication is
 claimed by this source-development contract.
+
+## Unreleased I311 configuration literal migration
+
+Consumers using `talos_config::ModelConfig` directly must account for its new optional
+`reasoning_supported` field. See [the configuration migration](MODEL-CAPABILITY-INFERENCE.md#rust-configuration-migration)
+for source compatibility and the required next pre-1.0 minor release boundary.
