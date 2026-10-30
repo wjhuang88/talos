@@ -1,6 +1,6 @@
 # Iteration I311: Catalog-Assisted Custom-Model Capability And Variant Inference
 
-> Document status: Planned
+> Document status: Active (proposed in #813; effective only on merge)
 > Published plan date: 2026-10-30
 > Planned objective: deliver full MODEL-014 and handoff T2+T3 using shared canonical identity, explicit overrides, provenance, protocol-safe requests and a real local walkthrough.
 > Baseline rule: preserve this scope; a narrower compatibility patch cannot close it.
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | MODEL-014 / handoff T2+T3: capability/limit/variant resolution, explicit-negative schema, config/runtime/provider/UI consistency, regression and local walkthrough; excludes new protocol/auth implementations and probing. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-10-30 |
 | Source Issue | None; maintainer full handoff request |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #813 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Finalized exact-head governance/API/security review and CI required before merge; no implementation before effective claim. |
 | Implementation PR | Not started |
@@ -84,6 +84,7 @@ or mutating user config. Do not downgrade/retry through another wire protocol.
 
 ## Execution and completion evidence
 
-Not activated; no implementation or test evidence yet. Final claim/activation
+Proposed Active/Claimed state in #813 is ineffective before merge; no implementation
+or test evidence yet. Final claim/activation
 must reach main before implementation starts. Completion requires an existing
 merged implementation SHA and all acceptance above; full handoff remains Active.

@@ -1,27 +1,22 @@
 # MODEL-014: Catalog-Assisted Custom-Model Capability And Limit Inference
 
-**Status**: Refinement
+| Field | Value |
+|---|---|
+| Story ID | MODEL-014 |
+| Status | In Progress (proposed in #813; effective only on merge) |
+| Collaboration Claim | Delegated to I311 / #813; ineffective until merge |
+
 **Type**: Product / Configuration Story
 **Parent Epic**: None
 **Source**: Maintainer request in the current session; related to MODEL-011 / Issue #124 and MODEL-013 / Issue #312.
-**Selected Iteration**: I311 (draft proposal; ineffective until claim merge)
+**Selected Iteration**: I311 / #813 (ineffective until claim merge)
 
-## Collaboration Claim
+## Execution ownership
 
-| Field | Value |
-|---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
-| Source Issue | None; related discussion #124 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
-| Implementation PR | Not started |
-| Last Updated | 2026-10-09 |
-| Handoff / Release Condition | Resolve capability authority and adapter semantics, then establish a target-branch claim before implementation. |
+Execution claim is delegated to [I311](../../iterations/I311-model014-capability-inference.md)
+in #813. Its proposed Claimed/Active state becomes effective only on target-branch
+merge. The original Unclaimed intake baseline is preserved at `d46b044d3`.
+This Story does not create a second effective claim for the same Work Slice.
 
 ## Identity / Goal / Value
 
@@ -113,6 +108,6 @@ scope are not claimed here. No paid probes or endpoint-support claims are added.
 
 I311 selects the complete original T2+T3 scope. ADR-095 defines the reviewed
 authority, negative override/schema compatibility and protocol mapping. These
-records remain draft and ineffective until a finalized numbered claim PR merges.
+records are proposed in #813 and ineffective until that finalized claim PR merges.
 The single effective execution claim will live in I311; this Story's prior
 Unclaimed intake record is historical only after that merge. No code is included.

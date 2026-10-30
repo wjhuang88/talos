@@ -2,7 +2,7 @@
 
 Overall goal remains Active. I309 and I308/T8 are closed on main (#812 merge
 `85aa2d0f495a6c337b0bf62f9e05a7fe6a35194c`); #563 is closed.
-I311/ADR-095 propose MODEL-014 T2+T3 activation, currently Planned/Unclaimed.
+I311/ADR-095 propose MODEL-014 T2+T3 Active/Claimed in #813, ineffective until merge.
 No capability implementation has begun. Queue remains MODEL-014 → T4 → T5 → T1 → T6.
 
 ## I308/T8 phase completion evidence — 2026-10-30

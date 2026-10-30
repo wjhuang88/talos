@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed for MODEL-014 / I311. No implementation authority until the atomic
-claim/activation and this ADR merge. I310/ADR-094 belong to #811 Gemini.
+Accepted as the proposed MODEL-014 / I311 contract in #813; effective only when
+the finalized atomic claim/activation and this ADR merge. No implementation before merge. I310/ADR-094 belong to #811 Gemini.
 
 ## Context
 

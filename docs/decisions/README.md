@@ -23,7 +23,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
-| [095: Custom-Model Capability Authority](095-model014-catalog-capability-authority.md) | Proposed / I311 draft | Unique canonical identity, explicit-negative overrides and per-field provenance; no implementation authority before atomic claim merge. |
+| [095: Custom-Model Capability Authority](095-model014-catalog-capability-authority.md) | Proposed / I311 #813 | Unique canonical identity, explicit-negative overrides and per-field provenance; no implementation authority before atomic claim merge. |
 | [093: Wire-Protocol Family Expansion Boundary](093-openai-responses-protocol-boundary.md) | **Proposed / #724 intake (amended 2026-10-20)** | Umbrella principles for all wire families (confirmed-support default, statelessness, no cross-protocol downgrade, model-level resolution) plus the OpenAI Responses contract for PROVIDER-008-A. No claim or implementation yet. |
 | [092: Embedded Skill Progressive Disclosure](092-embedded-skill-progressive-disclosure.md) | Accepted / I303 Complete | Effective at #720 merge `9b7ba281`; confined shared disclosure, RuntimeHandle skill context, opt-in `skill_read`. |
 | [091: Test-Only Current-Process Handle Snapshots](091-test-only-current-process-handle-snapshots.md) | Accepted via #718; TEST-004 amendment proposed #730 | I305 known-resource acceptance becomes effective only after #730 protected review/CI/CAS/main merge; retain I302 unknown-resource residual and historical failed +2 gate. |

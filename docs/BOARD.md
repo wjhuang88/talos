@@ -1,7 +1,7 @@
-## MODEL-014 atomic activation draft — 2026-10-30
+## MODEL-014 atomic activation proposal — 2026-10-30
 
 [I311](iterations/I311-model014-capability-inference.md) proposes full handoff T2+T3 after completed I308/#812.
-Draft remains Planned/Unclaimed; authority is defined in proposed ADR-095.
+Proposed Active/Claimed state in #813 is ineffective until merge; ADR-095 defines authority.
 No implementation before finalized claim/activation merges. I310/ADR-094 remain
 reserved by independent Gemini proposal #811. Full handoff stays Active.
 
