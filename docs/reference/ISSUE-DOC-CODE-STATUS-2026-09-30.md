@@ -8,7 +8,6 @@
 
 | Issue | Summary | Owner | Owner Status | Disposition |
 |---|---|---|---|---|
-| [#810](https://github.com/wjhuang88/talos/issues/810) | Gemini protocol and AI Studio / Vertex authentication | [PROVIDER-008-B](../backlog/active/PROVIDER-008-openai-responses-api-support.md) | Intake / claim proposal pending | Temporary parent intake registration; canonical child owner and I310/ADR-094 proposed by #811, ineffective until merge. Repoint after #811 merges. |
 | [#757](https://github.com/wjhuang88/talos/issues/757) | Bubblewrap workspace visibility below /tmp | [SANDBOX-001](../backlog/active/SANDBOX-001-bubblewrap-workspace-visibility.md) | In Progress / proposed activation | I307 claim proposed in #758; implementation unauthorized until merge. |
 | [#22](https://github.com/wjhuang88/talos/issues/22) | feat: 设计权限沙箱模型 | [PERM-004](../backlog/active/PERM-004-workspace-trust-sandbox.md) | Partial | Keep open: broader sandbox/security residuals. |
 | [#29](https://github.com/wjhuang88/talos/issues/29) | proposal: 构建 talos-desktop | [DESKTOP-001](../backlog/active/DESKTOP-001-desktop-product-direction.md) | Deferred | Directional proposal; no implementation authorization. |
@@ -79,9 +78,11 @@
 | [#729](https://github.com/wjhuang88/talos/issues/729) | known Windows returned-resource cleanup acceptance | [TEST-004](../backlog/active/TEST-004-windows-known-resource-acceptance.md) | Complete / Closed | #716 merged `b5b8241e`; owner Completion Commit plus CI3221/review/CAS. #729 closes only after closeout main merge; #717 residual open. |
 | [#717](https://github.com/wjhuang88/talos/issues/717) | Test-only current-process handle evidence | [TEST-003](../backlog/active/TEST-003-windows-owned-handle-evidence.md) | Review / Claimed | #718 effective f4313237; #716 mergedb5b8241e, CI3221 known-resource gate passed. I305 closes only narrowed criterion; prior+3/unknown/native lifetime residual remains open. |
 | [#719](https://github.com/wjhuang88/talos/issues/719) | Embedded Skill Level 1/2 progressive disclosure | [SKILL-006](../backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) | Complete / Closed | #721 merged as 6d72975e; closeout records Completion Commit. |
-| [#724](https://github.com/wjhuang88/talos/issues/724) | Complete wire-protocol family coverage (Responses, Gemini, Azure, Bedrock) | [PROVIDER-008](../backlog/active/PROVIDER-008-openai-responses-api-support.md) | Refinement / Unclaimed | Parent epic remains unclaimed; child A/#748 is effective under merged governance #747 and implemented in Draft #749. |
+| [#724](https://github.com/wjhuang88/talos/issues/724) | Complete wire-protocol family coverage (Responses, Gemini, Azure, Bedrock) | [PROVIDER-008](../backlog/active/PROVIDER-008-openai-responses-api-support.md) | Refinement / Unclaimed | Parent epic remains open; A/#748 completed via #806; B/#810 claim proposal #811 is not effective until merged; C/D remain unclaimed. |
 | [#748](https://github.com/wjhuang88/talos/issues/748) | Protocol architecture + OpenAI Responses adapter | [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md) | Active / Claimed | Child A of #724; #747 merged as 4722fee8. Draft #749 is in progress; catalog/fixture audit, full validation, CI and API review remain pending. |
 | [#768](https://github.com/wjhuang88/talos/issues/768) | macOS parallel search refusal fixture validation residual | [I308](../iterations/I308-builtin-auto-review.md) | Open / validation residual | Discovered during I308 validation; two parallel preflights failed, serial standard preflight passed. Root cause and fixture repair remain open; no search transport ownership or policy change is authorized. |
+
+| [#810](https://github.com/wjhuang88/talos/issues/810) | Native Gemini with AI Studio and Vertex authentication | [PROVIDER-008-B](../backlog/active/PROVIDER-008-B-google-gemini.md) | Intake / claim proposal pending | Proposed atomically in #811; ineffective until merge, no implementation yet. |
 
 ## Synchronization Notes
 

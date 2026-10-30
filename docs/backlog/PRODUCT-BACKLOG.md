@@ -300,3 +300,8 @@ evidence.
 ### TUI-062 / I289 Closeout — 2026-10-03
 
 Complete / Closed; owner Completion Commit `1226f313e7136f4b2a3d8db6f9179c4ed52072e1` (#628 merge). Full preflight, CI `37115859644`, exact-head Agent review and maintainer native acceptance passed. No remaining slice residuals.
+
+## Gemini child selection — 2026-10-30
+
+[PROVIDER-008-B](active/PROVIDER-008-B-google-gemini.md) / #810 / I310 proposes Active / Claimed
+in governance #811; effective only on merge. A is Complete; C/D remain unclaimed; #724 open.
