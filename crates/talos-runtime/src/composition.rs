@@ -171,6 +171,66 @@ mod tests {
     }
 
     #[test]
+    fn shared_profiles_reject_uninventoried_native_operations() {
+        // Coverage inventory, never an admission allowlist. Equality between two
+        // profiles alone would miss an unreviewed addition shared by both.
+        let shared = [
+            "exec",
+            "read",
+            "write",
+            "edit",
+            "ls",
+            "delete",
+            "document_extract",
+            "grep",
+            "glob",
+            "diff",
+            "stat",
+            "tree",
+            "save_url",
+            "fetch_url",
+            "http_request",
+            "web_search",
+            "find_symbol",
+            "find_references",
+            "list_symbols",
+            "list_imports",
+            "git_status",
+            "git_diff",
+            "git_log",
+            "git_show",
+            "git_branch_list",
+            "git_add",
+            "git_commit",
+            "git_push",
+            "git_pull",
+            "git_checkout",
+        ];
+        for profile in [
+            SharedToolProfile::Product,
+            SharedToolProfile::Runtime,
+            SharedToolProfile::Mcp,
+        ] {
+            let mut expected: std::collections::BTreeSet<_> = shared.into_iter().collect();
+            expected.insert(if cfg!(windows) { "powershell" } else { "bash" });
+            if profile != SharedToolProfile::Mcp {
+                expected.insert("read_image");
+            }
+            let actual = names(profile);
+            let unique: std::collections::BTreeSet<_> = actual.iter().map(String::as_str).collect();
+            assert_eq!(
+                actual.len(),
+                unique.len(),
+                "duplicate operation in {profile:?}"
+            );
+            assert_eq!(
+                expected, unique,
+                "{profile:?}: update I308 disposition for inventory changes"
+            );
+        }
+    }
+
+    #[test]
     fn mcp_profile_omits_image_and_uses_ordinary_file_group() {
         let mcp = names(SharedToolProfile::Mcp);
         assert!(!mcp.iter().any(|name| name == "read_image"));

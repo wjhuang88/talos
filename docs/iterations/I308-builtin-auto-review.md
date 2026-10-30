@@ -8,9 +8,26 @@ although Desktop opens its durable transcript in a workspace-local binding.
 Both now use that binding's root. The focused locked Desktop `desktop-ui` binary
 test failed before the production correction (no item in the bound store) and
 passed afterward, verifying actual Todo creation and session isolation. Both
-governance validators passed with zero warnings. This local change is not yet
-committed, independently reviewed or certified by full preflight/exact-head CI;
-it does not complete I308, T8 or the handoff queue.
+governance validators passed with zero warnings. The correction is committed
+and published as `547163766c2d4aa5640703c591749227c1402c32` in #801.
+Independent read-only agent permission/security/API review approved that exact
+head against `743cb6f4505137d8114cefccc8d0f76e1f269ba3`; the reviewer did not
+run tests and shares the external account/tool environment. Receipt:
+https://github.com/wjhuang88/talos/pull/801#issuecomment-6493694687.
+Exact-head run `40850718750` passed the main release-preflight job and both
+Desktop platform jobs; native Windows workspace validation is still live at
+this checkpoint. This does not complete I308, T8 or the handoff queue.
+
+Local follow-up commits `69797b78f5840c46f7657e551bb14d9367a39675` and
+`355dc75bfb275b802c70f7f9947b38c9dc4a7bb2` add real MCP edit/delete refusal
+for mismatched review digests and cross-target recovery receipts. Wrong-path
+recovery preserves both targets, does not consume the receipt, and the correct
+restore remains one-use. Locked all-feature `native_mutation_auto` passes and
+warnings-denied focused Clippy passes. Independent incremental static review
+approved both; no independent test execution. These commits are not in the
+published 547 head or certified by its CI. Cross-process/session persistence,
+full partial-failure recovery and final operation/profile/platform acceptance
+remain outstanding. The owner and complete handoff remain Active / Partial.
 
 ## Local MCP injected command Auto stage — 2026-10-28
 
