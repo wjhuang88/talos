@@ -175,11 +175,10 @@ async fn skill_read_tool_is_opt_in_and_reads_bound_skills() {
         .build()
         .expect("runtime");
     run_turn(&mut runtime, "hi").await;
-    assert!(
-        !requests.lock().expect("requests")[0]
-            .1
-            .iter()
-            .any(|name| name == "skill_read")
+    assert_eq!(
+        requests.lock().expect("requests")[0].1,
+        vec!["process"],
+        "minimal Runtime/Session inventory changed; declare its disposition"
     );
     runtime.shutdown().await.expect("shutdown");
 
@@ -208,7 +207,13 @@ async fn skill_read_tool_is_opt_in_and_reads_bound_skills() {
     }
     let requests = requests.lock().expect("requests").clone();
     assert_eq!(requests.len(), 6, "tool round plus final per turn");
-    assert!(requests[0].1.iter().any(|name| name == "skill_read"));
+    let mut names = requests[0].1.clone();
+    names.sort();
+    assert_eq!(
+        names,
+        vec!["process", "skill_read"],
+        "opt-in Runtime/Session inventory changed; declare its disposition"
+    );
     assert!(requests[1].0.contains("ALPHA-BODY"), "{}", requests[1].0);
     assert!(requests[1].0.contains("- SKILL.md"), "{}", requests[1].0);
     assert!(requests[3].0.contains("BETA-CONTRACT"), "{}", requests[3].0);

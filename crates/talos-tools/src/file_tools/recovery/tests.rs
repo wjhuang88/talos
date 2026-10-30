@@ -3,6 +3,39 @@ use crate::file_tools::EditTool;
 use serde_json::json;
 use talos_core::tool::AgentTool;
 
+#[tokio::test]
+async fn edit_tool_partial_failure_exposes_usable_recovery_receipt() {
+    let dir = tempfile::tempdir().expect("dir");
+    let root = dir.path().canonicalize().expect("root");
+    let path = root.join("file.txt");
+    std::fs::write(&path, "original").expect("write");
+    let tool = EditTool::new(root);
+    super::super::snapshot::FAIL_AFTER_RENAME.set(true);
+    let result = tool
+        .execute(json!({
+            "path": "file.txt", "old_string": "original",
+            "new_string": "edited", "retain_backup": true
+        }))
+        .await;
+    assert!(result.is_error, "{}", result.content);
+    assert_eq!(std::fs::read_to_string(&path).expect("read"), "edited");
+    let id = result
+        .content
+        .split("recovery_id: ")
+        .nth(1)
+        .expect("receipt");
+    let restored = tool
+        .execute(json!({"path": "file.txt", "recovery_id": id}))
+        .await;
+    assert!(!restored.is_error, "{}", restored.content);
+    assert_eq!(std::fs::read_to_string(&path).expect("read"), "original");
+    let replay = tool
+        .execute(json!({"path": "file.txt", "recovery_id": id}))
+        .await;
+    assert!(replay.is_error, "{}", replay.content);
+    assert_eq!(std::fs::read_to_string(&path).expect("read"), "original");
+}
+
 #[test]
 fn post_rename_edit_failure_keeps_usable_recovery_receipt() {
     let dir = tempfile::tempdir().expect("dir");

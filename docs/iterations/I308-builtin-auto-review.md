@@ -1,5 +1,82 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Acceptance evidence reconciliation — 2026-10-30
+
+Status remains Active / Partial; the following maps current implementation to the
+unchanged seven acceptance rows, not a completion declaration.
+
+| Acceptance | Current concrete evidence | Remaining delivery evidence |
+|---|---|---|
+| 1 inventory | CLI fixed production registry set; Runtime shared fixed profile sets; `adf7f8121` asserts Session process and opt-in Runtime skill_read exact inventories | Final candidate platform CI |
+| 2 actual model execution | Agent write/edit/save/HTTP/command/Git fixtures and MCP native mutation/save/HTTP/exec/Git fixtures; `825dcb147` adds process cancel to shared action review | Final candidate review/CI |
+| 3 atomicity/read fast path | permission_pipeline facet tests; read_auto, todo_auto, scheduler_auto and Runtime skill_disclosure execute actual policy paths | Final integrated validation |
+| 4 refusal/freshness | Existing ordinary/Git/file fixtures plus process_auto allow/uncertain/error/stale/Deny/unknown-job/replaced-instance matrix | Final integrated validation |
+| 5 higher-risk recovery | edit_auto special/config/security paths, recovery_dispatch policy/concurrent changes, file recovery stale/capacity/partial failure, MCP wrong-target receipt refusal; `700b180f2` exercises visible post-rename error and recovery through EditTool | Final integrated validation; no universal rollback or cross-process recovery promise |
+| 6 host visibility | CLI/Runtime/Desktop Auto report sinks and real host fixtures; MCP injected pipeline fixtures; `009778263` actual two bound Desktop sessions; `09e6610f9` actual Unix process cancellation/session isolation | Native Windows validation for latest candidate; standalone MCP remains headless without injected Auto resolver |
+| 7 delivery | Incremental static reviews and focused tests below | Frozen-head preflight, independent final review, exact-head CI, CAS, merge and owner-first completion evidence |
+
+`825dcb147` implements owned process cancellation Auto using exact job resource,
+arguments, intent and session binding through the existing shared action assessor.
+Unix fixtures launch real sleep processes: AllowOnce terminates, refusal scenarios
+leave the job running before fixture cleanup. Non-Unix fixtures cover pending-job
+cancellation only; no Auto background-start claim. Agent library 517/517 and
+warnings-denied library/test Clippy passed. Independent static review approved;
+reviewer did not run tests. `adf7f8121` conditional inventory tests both passed and
+received independent static approval. These commits remain local, not merged.
+
+The preflight on the earlier baseline stopped at Tools: 1032 passed, one Git Push
+process-observation test failed with sandbox EPERM. The same named test with
+all-features passed outside the sandbox. An earlier default-feature retry ran zero
+tests and is not evidence. Neither retry certifies the whole preflight or newer
+process implementation. Final validation remains required.
+
+## Current delivery checkpoint — 2026-10-30
+
+I308 / T8 remains Active / Partial. This checkpoint supersedes pending-stage
+statements below; historical validation records remain preserved.
+
+- #801 merged as `d7127ada56aecd49e2de427f93a0389d148c19f3` after all eight
+  exact-head checks in run `40850718750` passed. #797 was closed as superseded
+  by #801 after independent final-tree comparison; #797 was not itself merged.
+- #807 merged as `d15c7688b24e72ddab4be8ab8cb581ad98672220` after all eight
+  checks in `40857055679` passed for `58618291ff0ad3f46ea21eb432a59888fa4bb556`.
+  Exact-head independent static approval is recorded in PR comment
+  https://github.com/wjhuang88/talos/pull/807#issuecomment-6494157236.
+  Target claimant/slice and open overlap were rechecked; merge used that exact
+  expected head. Reviewer did not run tests and shares the external account.
+- Local follow-up `700b180f298cf5fc5f505cc613618edd22c3cdc9` adds actual
+  `EditTool.execute` post-rename failure, visible receipt, restore and replay
+  refusal. The focused locked all-feature Tools test passed before its rebase
+  onto #807/main; formatting was corrected and bounded static review approved.
+  This is direct tool evidence, not Agent/MCP failure injection or persistence
+  across sessions/processes. It is not yet published or remotely certified.
+
+- Local Desktop regression `009778263` now runs two sequential actual RuntimeHost
+  instances with different durable bindings in the same storage and verifies each
+  retains exactly its own Todo. Focused locked `talos-desktop` / `desktop-ui` /
+  `talos-desktop-mock` test passed. Independent static review approved; reviewer
+  did not run tests. The initial command named a nonexistent `talos-desktop` binary
+  and did not execute tests; the corrected target above passed. This does not
+  establish concurrent hosts or all nine Todo operations.
+- Concrete conditional-registration gap: Session adds `process` outside shared
+  composition. `app_server_session_registers_session_owned_process_tool` currently
+  calls the tool directly, so it is not admission evidence. The new
+  `session_process_dispatch_respects_read_and_cancel_policy` regression exercises
+  real Session registration/provider dispatch: Read Allow returns an empty jobs
+  list; Read Deny and Execute Deny reject list/unknown-job cancel. Focused locked
+  Agent test passes, and independent static review approves (no reviewer test
+  execution). The first assertion incorrectly required the custom deny text;
+  actual public output is the generic permission-denied error. No production
+  permission logic changed. Real running-job cancellation, cross-session job
+  isolation and Auto disposition remain to be closed for acceptance 1/6.
+  Runtime opt-in `skill_read` already has actual body/reference Read Allow/Deny
+  dispatch in `tests::skill_disclosure`; Desktop does not opt into this tool.
+
+Remaining acceptance is the unchanged seven-row baseline below: reconcile actual
+conditional/profile inventories and host reachability, finish missing higher-risk
+recovery cases, and obtain final integrated review/platform/gate evidence.
+The full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
 ## Local Desktop durable Todo correction — 2026-10-29
 
 The real `RuntimeHost` durable-session dispatch regression exposed that Todo
@@ -413,7 +490,7 @@ Earlier checkpoints below preserve historical states and do not override this on
 | Governance Claim PR | #765 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized continued full handoff delivery; #765 requires independent permission/security/API review, exact-head CI, both validators and final merge-time CAS before merge. |
-| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, merged); #786 (Pull Auto instance ownership, merged); #789 (legacy search refusal evidence, merged) |
+| Implementation PR | #769 (foundation, merged); #770 (file mutation, merged); #771 (policy/read tests, merged); #772 (scheduler and native operation evidence, merged); #773 (parent Runtime registration, merged); #779 (Desktop Todo registration, merged); #783 (ordinary Shell/Exec/HTTP, merged); #784 (Fetch URL, merged); #785 (recoverable Save URL, merged); #786 (Pull Auto instance ownership, merged); #789 (legacy search refusal evidence, merged); #801 (Git/host/visible decisions, merged); #807 (recovery and inventory regressions, merged); #797 (superseded by #801, closed) |
 | Last Updated | 2026-10-28 |
 | Handoff / Release Condition | Satisfy full H/G acceptance with existing implementation commits, independent permission/security/API review and platform evidence; no release authorized. |
 

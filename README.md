@@ -338,6 +338,14 @@ an authorized download. Search and other protected prepared-network tools retain
 admission path. Disabling auto returns interactive surfaces to
 human approval and headless surfaces to denial.
 
+Session-owned `process(cancel)` can receive one-use Auto approval to stop the exact
+background job named by the user. Review binds its job ID, cancellation resource,
+current intent and permission session; it never approves starting another process.
+Opaque IDs do not describe job contents: ambiguous target or interruption effects
+require human review. Cancellation may interrupt writes/network activity and does
+not undo completed effects. Unknown jobs and externally replaced registrations do
+not gain this Auto route; explicit Deny and mandatory-human policy remain authoritative.
+
 Product-owned `bash`/`powershell`, `exec`, `fetch_url` and ordinary `http_request` requests can
 receive one-use Auto approval of the complete invocation and its transitive effects.
 `fetch_url` review discloses constructor and timeout-override redirect limits separately;

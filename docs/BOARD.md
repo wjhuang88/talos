@@ -9,8 +9,8 @@ I308/T8 and all later handoff tasks remain incomplete.
 ## Active T8 implementation — 2026-10-28
 
 [I308](iterations/I308-builtin-auto-review.md) is Active after #765 merged at `8f0ce2340`.
-Stages #769–#772 are merged; full H/G Auto behavior remains incomplete.
-Ordinary command/network Auto admission, remaining recovery/profile acceptance
+Stages through #801 and #807 are merged; ordinary command/network Auto and
+Git operation evidence are implemented. Full H/G recovery/profile acceptance
 and final delivery gates remain open. See I308 for exact merged evidence.
 T7 is Complete; later handoff tasks remain incomplete.
 
