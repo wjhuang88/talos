@@ -8,7 +8,6 @@
 
 | Issue | Summary | Owner | Owner Status | Disposition |
 |---|---|---|---|---|
-| [#810](https://github.com/wjhuang88/talos/issues/810) | Gemini protocol and AI Studio / Vertex authentication | [PROVIDER-008-B](../backlog/active/PROVIDER-008-openai-responses-api-support.md) | Intake / claim proposal pending | Temporary parent intake registration; canonical child owner and I310/ADR-094 proposed by #811, ineffective until merge. Repoint after #811 merges. |
 | [#757](https://github.com/wjhuang88/talos/issues/757) | Bubblewrap workspace visibility below /tmp | [SANDBOX-001](../backlog/active/SANDBOX-001-bubblewrap-workspace-visibility.md) | In Progress / proposed activation | I307 claim proposed in #758; implementation unauthorized until merge. |
 | [#22](https://github.com/wjhuang88/talos/issues/22) | feat: 设计权限沙箱模型 | [PERM-004](../backlog/active/PERM-004-workspace-trust-sandbox.md) | Partial | Keep open: broader sandbox/security residuals. |
 | [#29](https://github.com/wjhuang88/talos/issues/29) | proposal: 构建 talos-desktop | [DESKTOP-001](../backlog/active/DESKTOP-001-desktop-product-direction.md) | Deferred | Directional proposal; no implementation authorization. |
