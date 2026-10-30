@@ -1,3 +1,10 @@
+## MODEL-014 restored intake — 2026-10-30
+
+[MODEL-014](active/MODEL-014-catalog-capability-inference.md) remains Refinement /
+Unclaimed. Its original full custom-model capability/output/variant scope is
+restored; authority/schema proposal review does not activate implementation.
+Handoff order remains I308 → MODEL-014 → T4 → T5 → T1 → T6 after completed I309.
+
 ## Proposed T8 selection — 2026-10-26
 
 [I308](../iterations/I308-builtin-auto-review.md) proposes full PERM-007-H/G Auto coverage in #765.
