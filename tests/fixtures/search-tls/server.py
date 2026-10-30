@@ -118,8 +118,13 @@ def proxy_handler(client):
         head = read_head(client)
         record("connect", head.decode("ascii"))
         emit({"connect_seen": True})
-        expected = f"CONNECT 127.0.0.1:{tls_port} HTTP/1.1\r\n".encode()
-        if not head.startswith(expected):
+        # Fixed local witness authorities only. The hostname case proves remote-DNS CONNECT
+        # behavior without turning this fixture into an arbitrary relay.
+        allowed = (
+            f"CONNECT 127.0.0.1:{tls_port} HTTP/1.1\r\n".encode(),
+            f"CONNECT search-fixture.invalid:{tls_port} HTTP/1.1\r\n".encode(),
+        )
+        if not head.startswith(allowed):
             client.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
             return
         if args.proxy_mode == "deny":

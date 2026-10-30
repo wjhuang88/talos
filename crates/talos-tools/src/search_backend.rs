@@ -1,36 +1,36 @@
 //! Private compatibility boundary for web-search backends.
 //!
-//! Typed contracts and dormant controlled compatibility infrastructure. The existing
-//! `WebSearchTool` remains the compatibility composition until SEARCH-001-C
-//! explicitly activates Talos-owned routing behavior.
-//!
-//! The seam is intentionally staged before adapter wiring; the allowlist keeps this
-//! intermediate contract from becoming a production behavior change.
+//! Typed contracts and controlled compatibility infrastructure. Production `web_search` activation
+//! is assembled only through the protected router factory; the legacy `WebSearchTool` remains in
+//! the crate solely as the version/deployment rollback implementation and must never be a runtime
+//! fallback from a protected invocation.
 
 #![allow(dead_code)]
 
 use async_trait::async_trait;
 use thiserror::Error;
 
-// Staged, private transport infrastructure. Not wired into WebSearchTool before
-// ADR-090's protocol/parity/D activation gates. Uses the existing staged seam.
+// Controlled transport infrastructure used by the protected compatibility route.
 mod transport;
-// Dormant owner for one prepared manifest, candidate set and shared dispatch budget.
+// Owner for one prepared manifest, candidate set and shared dispatch budget.
 mod composition;
-// Dormant owned bridge from prepared composition into the core network invocation carrier.
+// Owned bridge from prepared composition into the core network invocation carrier.
 mod prepared_invocation;
-// Dormant prepared-only AgentTool seam; no WebSearchTool/registry/default activation.
+// Prepared-only AgentTool seam used by the protected production contribution.
 mod router_tool;
-// Dormant Talos-owned routing core; no WebSearchTool/registry/default activation.
+// Talos-owned routing core.
 mod router;
-// Dormant bounded query-free health memory; no background probe or production ranking activation.
+// Bounded query-free health memory; no background probe.
 mod health;
-// Dormant query/secret-free eligibility seam; availability never implies optional-provider consent.
+// Query/secret-free eligibility seam; availability never implies optional-provider consent.
 mod selection;
+// Production zero-key composition and activation boundary.
+mod production;
+pub(crate) use production::production_search_router_tool;
 // Explicit opt-in bridge for cross-crate caller-boundary tests; never built by default.
 #[cfg(feature = "search-integration-test")]
 pub(crate) mod integration_test;
-// Dormant response parsing prerequisite; activation still requires ADR-090 parity/D gates.
+// Controlled response parsing prerequisites.
 mod bing_parser;
 mod ddg_parser;
 mod instant_answer;

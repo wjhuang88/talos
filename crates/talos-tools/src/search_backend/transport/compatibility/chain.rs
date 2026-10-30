@@ -1,7 +1,9 @@
-//! Dormant traditional fixed-source subset; no probe, retry or default activation.
-//! Order derives from rust-websearch0.1.2 searcher.rs, VCS b30180a0.
+//! Dormant traditional fixed-source subset; no startup probe or default activation.
+//! Order/retry behavior derives from rust-websearch 0.1.2, VCS b30180a0.
 //! MIT notice: crates/talos-tools/LICENSES/rust-websearch-MIT.txt.
 //! Talos owns preparation, terminal error policy, admitted results and one shared budget.
+
+use std::time::Duration;
 
 use super::{
     CompatibilityError, CompatibilityProtocol, PreparedCompatibilitySearch, SearchTransport,
@@ -12,6 +14,7 @@ use super::{
     headers::CompatibilityHeaders,
 };
 use thiserror::Error;
+use tokio::time::{Instant, sleep, timeout_at};
 
 pub(super) const ORDER: [CompatibilityProtocol; 4] = [
     CompatibilityProtocol::Lite,
@@ -19,6 +22,13 @@ pub(super) const ORDER: [CompatibilityProtocol; 4] = [
     CompatibilityProtocol::Html,
     CompatibilityProtocol::Bing,
 ];
+
+// The legacy compatibility dependency applies fifteen seconds to each request and retries one
+// reqwest Timeout/Network failure after 500ms for Lite, HTML and Bing. Instant Answer does not
+// retry. Preserve that same-destination recovery window before disclosing the query to a later
+// compatibility destination.
+const LEGACY_COMPATIBILITY_REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
+const LEGACY_COMPATIBILITY_RETRY_DELAY: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub(in crate::search_backend) enum CompatibilityChainError {
@@ -40,6 +50,12 @@ impl std::fmt::Debug for PreparedCompatibilityChain {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("PreparedCompatibilityChain(<redacted>)")
     }
+}
+
+#[derive(Debug)]
+enum AttemptFailure {
+    SourceTimeout,
+    Compatibility(CompatibilityError),
 }
 
 impl PreparedCompatibilityChain {
@@ -65,16 +81,38 @@ impl PreparedCompatibilityChain {
         if !(1..=20).contains(&max_results) {
             return Err(TransportError::InvalidRequest.into());
         }
+
+        // Validate all legacy query-bearing attempts before drawing any headers. Retry objects are
+        // frozen now, before approval, rather than cloned/reconstructed after failure.
         let [lite, instant, html, bing] = [
             ORDER[0].prepare_payload(manifest, query)?,
             ORDER[1].prepare_payload(manifest, query)?,
             ORDER[2].prepare_payload(manifest, query)?,
             ORDER[3].prepare_payload(manifest, query)?,
         ];
-        let freeze = |protocol, mut request: super::PreparedTransportRequest| {
-            request.headers = Some(CompatibilityHeaders::capture(protocol, &select)?);
+        let retry_for = |protocol: CompatibilityProtocol| {
+            if protocol.retries_network_failure() {
+                Ok::<_, CompatibilityError>(Some(protocol.prepare_payload(manifest, query)?))
+            } else {
+                Ok(None)
+            }
+        };
+        let lite_retry = retry_for(ORDER[0])?;
+        let instant_retry = retry_for(ORDER[1])?;
+        let html_retry = retry_for(ORDER[2])?;
+        let bing_retry = retry_for(ORDER[3])?;
+
+        let freeze = |protocol,
+                      mut request: super::PreparedTransportRequest,
+                      mut retry: Option<super::PreparedTransportRequest>| {
+            let headers = CompatibilityHeaders::capture(protocol, &select)?;
+            request.headers = Some(headers);
+            if let Some(retry) = retry.as_mut() {
+                retry.headers = Some(headers);
+            }
             Ok::<_, CompatibilityError>(PreparedCompatibilitySearch {
                 request,
+                retry,
                 protocol,
                 query: query.to_owned(),
                 max_results,
@@ -82,10 +120,10 @@ impl PreparedCompatibilityChain {
         };
         Ok(Self {
             sources: [
-                freeze(ORDER[0], lite)?,
-                freeze(ORDER[1], instant)?,
-                freeze(ORDER[2], html)?,
-                freeze(ORDER[3], bing)?,
+                freeze(ORDER[0], lite, lite_retry)?,
+                freeze(ORDER[1], instant, instant_retry)?,
+                freeze(ORDER[2], html, html_retry)?,
+                freeze(ORDER[3], bing, bing_retry)?,
             ],
         })
     }
@@ -94,25 +132,106 @@ impl PreparedCompatibilityChain {
         self,
         transport: &SearchTransport,
     ) -> Result<AdmittedCompatibilityResults, CompatibilityChainError> {
+        self.execute_with_policy(
+            transport,
+            LEGACY_COMPATIBILITY_REQUEST_TIMEOUT,
+            LEGACY_COMPATIBILITY_RETRY_DELAY,
+        )
+        .await
+    }
+
+    #[cfg(test)]
+    async fn execute_with_source_timeout(
+        self,
+        transport: &SearchTransport,
+        source_timeout: Duration,
+    ) -> Result<AdmittedCompatibilityResults, CompatibilityChainError> {
+        self.execute_with_policy(transport, source_timeout, LEGACY_COMPATIBILITY_RETRY_DELAY)
+            .await
+    }
+
+    async fn execute_with_policy(
+        self,
+        transport: &SearchTransport,
+        source_timeout: Duration,
+        retry_delay: Duration,
+    ) -> Result<AdmittedCompatibilityResults, CompatibilityChainError> {
         // Sentinels cannot escape: exhaustion is reached only after all four slots
         // are replaced with observed typed availability or semantic failures in the fixed order.
         let mut failures = [CompatibilityError::Transport(TransportError::InvalidRequest); 4];
         for (index, source) in self.sources.into_iter().enumerate() {
-            let protocol = source.protocol;
+            let PreparedCompatibilitySearch {
+                request,
+                retry,
+                protocol,
+                query,
+                max_results,
+            } = source;
             let terminal = |error| CompatibilityChainError::Terminal { protocol, error };
             transport
                 .budget
                 .check_live()
                 .map_err(|e| terminal(e.into()))?;
-            let outcome = source.execute(transport).await;
+
+            let first = execute_attempt(
+                protocol,
+                &query,
+                max_results,
+                request,
+                transport,
+                source_timeout,
+            )
+            .await;
+
+            let final_outcome = match (first, retry) {
+                (Ok(results), _) => return Ok(results),
+                (Err(AttemptFailure::SourceTimeout), Some(retry)) => {
+                    wait_before_retry(transport, retry_delay)
+                        .await
+                        .map_err(terminal)?;
+                    execute_attempt(
+                        protocol,
+                        &query,
+                        max_results,
+                        retry,
+                        transport,
+                        source_timeout,
+                    )
+                    .await
+                }
+                (Err(AttemptFailure::Compatibility(error)), Some(retry))
+                    if may_retry_network(error) =>
+                {
+                    wait_before_retry(transport, retry_delay)
+                        .await
+                        .map_err(terminal)?;
+                    execute_attempt(
+                        protocol,
+                        &query,
+                        max_results,
+                        retry,
+                        transport,
+                        source_timeout,
+                    )
+                    .await
+                }
+                (other, _) => other,
+            };
+
             transport
                 .budget
                 .check_live()
                 .map_err(|e| terminal(e.into()))?;
-            match outcome {
+            match final_outcome {
                 Ok(results) => return Ok(results),
-                Err(error) if may_continue(error) => failures[index] = error,
-                Err(error) => return Err(terminal(error)),
+                Err(AttemptFailure::SourceTimeout) => {
+                    // This is a source-local timeout, not the enclosing execution deadline.
+                    failures[index] = CompatibilityError::Transport(TransportError::Deadline);
+                }
+                Err(AttemptFailure::Compatibility(error)) if may_continue(error) => {
+                    failures[index] = error;
+                }
+                Err(AttemptFailure::Compatibility(error)) => return Err(terminal(error)),
             }
         }
         transport
@@ -124,6 +243,55 @@ impl PreparedCompatibilityChain {
             })?;
         Err(CompatibilityChainError::Exhausted(failures))
     }
+}
+
+async fn execute_attempt(
+    protocol: CompatibilityProtocol,
+    query: &str,
+    max_results: u32,
+    request: super::PreparedTransportRequest,
+    transport: &SearchTransport,
+    source_timeout: Duration,
+) -> Result<AdmittedCompatibilityResults, AttemptFailure> {
+    transport
+        .budget
+        .check_live()
+        .map_err(|error| AttemptFailure::Compatibility(error.into()))?;
+    let now = Instant::now();
+    let source_deadline = std::cmp::min(now + source_timeout, transport.budget.deadline);
+    match timeout_at(
+        source_deadline,
+        super::execute_request(protocol, query, max_results, request, transport),
+    )
+    .await
+    {
+        Ok(result) => result.map_err(AttemptFailure::Compatibility),
+        Err(_) => match transport.budget.check_live() {
+            Ok(()) => Err(AttemptFailure::SourceTimeout),
+            Err(error) => Err(AttemptFailure::Compatibility(error.into())),
+        },
+    }
+}
+
+async fn wait_before_retry(
+    transport: &SearchTransport,
+    delay: Duration,
+) -> Result<(), CompatibilityError> {
+    transport.budget.check_live()?;
+    timeout_at(transport.budget.deadline, sleep(delay))
+        .await
+        .map_err(|_| CompatibilityError::Transport(TransportError::Deadline))?;
+    transport.budget.check_live()?;
+    Ok(())
+}
+
+fn may_retry_network(error: CompatibilityError) -> bool {
+    matches!(
+        error,
+        CompatibilityError::Transport(
+            TransportError::Dns | TransportError::ConnectionRefused | TransportError::Network
+        )
+    )
 }
 
 fn may_continue(error: CompatibilityError) -> bool {
@@ -139,9 +307,11 @@ fn may_continue(error: CompatibilityError) -> bool {
             | TransportError::ResponseEncoding
             | TransportError::Deadline
             | TransportError::Request => false,
-            // Only typed resolver failure or connection refusal permits the next already
-            // prepared source, under the same authority and enclosing budget.
-            TransportError::Dns | TransportError::ConnectionRefused => true,
+            // After the protocol-specific retry budget is exhausted, legacy availability/network
+            // failures permit the next already-prepared source under the same authority.
+            TransportError::Dns | TransportError::ConnectionRefused | TransportError::Network => {
+                true
+            }
         },
         CompatibilityError::Ddg(error) => match error {
             DdgParseError::Empty | DdgParseError::Status | DdgParseError::Challenge => true,
@@ -163,3 +333,5 @@ fn may_continue(error: CompatibilityError) -> bool {
 
 #[cfg(test)]
 pub(super) mod tests;
+#[cfg(test)]
+mod timeout_tests;

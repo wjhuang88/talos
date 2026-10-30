@@ -1,5 +1,5 @@
-//! Dormant direct-only configuration and its owned approval/execution plan.
-//! No ambient proxy selection or official tool/root activation.
+//! Dormant compatibility configuration and its owned approval/execution plan.
+//! Production may freeze one environment proxy at construction; no runtime ambient selection.
 
 use std::sync::Arc;
 
@@ -15,11 +15,15 @@ use super::{
     chain::{CompatibilityChainError, ORDER, PreparedCompatibilityChain},
     manifest_extends_scope_without_policy_widening,
 };
-use crate::search_backend::transport::{SearchTransport, SystemSearchDns, TransportBudget};
+use crate::search_backend::transport::{
+    SearchTransport, SystemSearchDns, TransportBudget, TransportProxy,
+};
 
-/// Store once per direct-only configuration; never infer this from proxy availability.
+/// Store once per compatibility configuration. Production freezes ambient proxy state here rather
+/// than consulting environment variables while preparing or executing a query.
 pub(in crate::search_backend) struct DirectCompatibilityConfiguration {
     scope: ToolNetworkScope,
+    proxy: Option<Arc<TransportProxy>>,
 }
 
 impl std::fmt::Debug for DirectCompatibilityConfiguration {
@@ -30,13 +34,31 @@ impl std::fmt::Debug for DirectCompatibilityConfiguration {
 
 impl DirectCompatibilityConfiguration {
     pub(in crate::search_backend) fn new() -> Result<Self, TransportError> {
+        Self::build(false)
+    }
+
+    pub(in crate::search_backend) fn new_with_environment_proxy() -> Result<Self, TransportError> {
+        Self::build(true)
+    }
+
+    fn build(snapshot_environment_proxy: bool) -> Result<Self, TransportError> {
         let endpoints = ORDER
             .iter()
             .map(|protocol| protocol.destination())
             .collect::<Result<Vec<_>, _>>()?;
-        let scope = ToolNetworkScope::new_configuration(endpoints, None, vec![], 0)
-            .map_err(|_| TransportError::InvalidRequest)?;
-        Ok(Self { scope })
+        let proxy = if snapshot_environment_proxy {
+            TransportProxy::from_environment(&endpoints)?
+        } else {
+            None
+        };
+        let scope = ToolNetworkScope::new_configuration(
+            endpoints,
+            proxy.as_ref().map(|proxy| proxy.endpoint().clone()),
+            vec![],
+            0,
+        )
+        .map_err(|_| TransportError::InvalidRequest)?;
+        Ok(Self { scope, proxy })
     }
 
     pub(in crate::search_backend) fn scope(&self) -> &ToolNetworkScope {
@@ -69,6 +91,7 @@ impl DirectCompatibilityConfiguration {
             manifest: manifest.clone(),
             chain,
             facets,
+            proxy: self.proxy.clone(),
             #[cfg(test)]
             dns: Arc::new(SystemSearchDns),
         })
@@ -82,6 +105,9 @@ fn facets(manifest: &ToolNetworkManifest) -> Vec<ToolPermissionFacet> {
         .iter()
         .map(|endpoint| endpoint.host())
         .collect();
+    if let Some(proxy) = manifest.scope().proxy() {
+        hosts.push(proxy.host());
+    }
     hosts.sort_unstable();
     hosts.dedup();
     hosts
@@ -98,6 +124,7 @@ pub(in crate::search_backend) struct PreparedCompatibilityPlan {
     manifest: ToolNetworkManifest,
     chain: PreparedCompatibilityChain,
     facets: Vec<ToolPermissionFacet>,
+    proxy: Option<Arc<TransportProxy>>,
     #[cfg(test)]
     dns: Arc<dyn crate::search_backend::transport::SearchDns>,
 }
@@ -134,8 +161,9 @@ impl PreparedCompatibilityPlan {
         let dns = Arc::new(SystemSearchDns);
         #[cfg(test)]
         let dns = self.dns;
-        let transport = SearchTransport::new(self.manifest, authority, budget, dns)
-            .map_err(CompatibilityPlanError::Transport)?;
+        let transport =
+            SearchTransport::new_with_proxy(self.manifest, authority, budget, dns, self.proxy)
+                .map_err(CompatibilityPlanError::Transport)?;
         self.chain
             .execute(&transport)
             .await

@@ -42,7 +42,22 @@ impl SearchCompositionConfiguration {
     /// Builds the zero-key direct candidate plus an optional explicitly supplied SearXNG route.
     /// Credential discovery and production selection are intentionally outside this stage.
     pub(crate) fn new(searxng: Option<SearXngConfiguration>) -> Result<Self, TransportError> {
-        let direct = DirectCompatibilityConfiguration::new()?;
+        Self::from_direct(DirectCompatibilityConfiguration::new()?, searxng)
+    }
+
+    /// Production freezes supported environment-proxy state once at tool construction. Optional
+    /// providers are deliberately absent so their proxy policy cannot be accidentally widened.
+    pub(crate) fn new_production() -> Result<Self, TransportError> {
+        Self::from_direct(
+            DirectCompatibilityConfiguration::new_with_environment_proxy()?,
+            None,
+        )
+    }
+
+    fn from_direct(
+        direct: DirectCompatibilityConfiguration,
+        searxng: Option<SearXngConfiguration>,
+    ) -> Result<Self, TransportError> {
         let scope = combined_scope(
             direct.scope(),
             searxng.as_ref().map(SearXngConfiguration::scope),
@@ -292,7 +307,9 @@ impl SearchCandidateExecutionError {
 
 fn transport_backend_error(error: TransportError) -> SearchBackendError {
     match error {
-        TransportError::Dns | TransportError::ConnectionRefused => SearchBackendError::Unreachable,
+        TransportError::Dns | TransportError::ConnectionRefused | TransportError::Network => {
+            SearchBackendError::Unreachable
+        }
         TransportError::Deadline => SearchBackendError::Timeout,
         TransportError::ResponseEncoding => SearchBackendError::Parse,
         TransportError::InvalidRequest
@@ -457,6 +474,13 @@ mod tests {
         assert_eq!(
             SearchCandidateExecutionError::SearXng(SearXngError::Transport(TransportError::Dns))
                 .into_backend_error(),
+            SearchBackendError::Unreachable
+        );
+        assert_eq!(
+            SearchCandidateExecutionError::SearXng(SearXngError::Transport(
+                TransportError::Network
+            ))
+            .into_backend_error(),
             SearchBackendError::Unreachable
         );
         assert_eq!(
