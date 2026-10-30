@@ -1,3 +1,10 @@
+## MODEL-014 atomic activation draft — 2026-10-30
+
+[I311](iterations/I311-model014-capability-inference.md) proposes full handoff T2+T3 after completed I308/#812.
+Draft remains Planned/Unclaimed; authority is defined in proposed ADR-095.
+No implementation before finalized claim/activation merges. I310/ADR-094 remain
+reserved by independent Gemini proposal #811. Full handoff stays Active.
+
 ## I308/T8 completed — 2026-10-30
 
 I308 and PERM-007-H/G owners are Complete with Completion Commit `5dea4925a143151071ea231779c100a75734e6fe`

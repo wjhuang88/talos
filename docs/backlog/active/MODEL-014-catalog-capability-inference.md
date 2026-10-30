@@ -4,7 +4,7 @@
 **Type**: Product / Configuration Story
 **Parent Epic**: None
 **Source**: Maintainer request in the current session; related to MODEL-011 / Issue #124 and MODEL-013 / Issue #312.
-**Selected Iteration**: None
+**Selected Iteration**: I311 (draft proposal; ineffective until claim merge)
 
 ## Collaboration Claim
 
@@ -107,3 +107,12 @@ claim or implementation. A finalized ADR and atomic claim/activation remain
 required after I308 closure, with fresh iteration/PR overlap inventory.
 PR #811 separately proposes I310/ADR-094 for Gemini; those IDs and its protocol/auth
 scope are not claimed here. No paid probes or endpoint-support claims are added.
+
+
+## Atomic activation proposal — 2026-10-30
+
+I311 selects the complete original T2+T3 scope. ADR-095 defines the reviewed
+authority, negative override/schema compatibility and protocol mapping. These
+records remain draft and ineffective until a finalized numbered claim PR merges.
+The single effective execution claim will live in I311; this Story's prior
+Unclaimed intake record is historical only after that merge. No code is included.

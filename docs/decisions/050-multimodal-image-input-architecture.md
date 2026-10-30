@@ -254,3 +254,13 @@ Revisit if:
 - SEC-001: External-Path File Authorization Gap
 - MODEL-009: Multimodal Image Input (parent story)
 - MODEL-009-A: Image Input ADR And Security Spike (this iteration)
+
+
+## Proposed MODEL-014 amendment — 2026-10-30
+
+ADR-095 / I311 proposes extending sections 8 and 10 only for a uniquely matched
+canonical catalog identity (exact ID or single-prefix). Inferred image true may
+enable explicit user attachments through the existing permission/content/protocol
+gates; unknown/ambiguous and explicit false remain fail-closed. No fuzzy-name or
+endpoint-support inference. This amendment is ineffective until the finalized
+I311 claim and ADR-095 merge; historical MODEL-009 implementation is unchanged.
