@@ -26,41 +26,167 @@ pub struct ContextLimitResolution {
     pub source: ContextLimitSource,
 }
 
+/// Source of one resolved model field; inference never verifies an endpoint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelFieldSource {
+    /// An explicit user value, including false.
+    Configured,
+    /// A uniquely matched canonical catalog record.
+    CatalogInferred,
+    /// No applicable value is known.
+    Unknown,
+}
+
+/// A model field with its independent provenance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedModelField<T> {
+    /// Known value; absence is distinct from an explicit false or zero.
+    pub value: Option<T>,
+    /// Authority that supplied the value.
+    pub source: ModelFieldSource,
+}
+
+impl<T> ResolvedModelField<T> {
+    fn resolve(configured: Option<T>, inferred: Option<T>) -> Self {
+        let (value, source) = if configured.is_some() {
+            (configured, ModelFieldSource::Configured)
+        } else if inferred.is_some() {
+            (inferred, ModelFieldSource::CatalogInferred)
+        } else {
+            (None, ModelFieldSource::Unknown)
+        };
+        Self { value, source }
+    }
+}
+
+/// Canonical identity supplying inferred fields, not a verified endpoint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatchedCatalogIdentity {
+    /// Catalog provider owning the record.
+    pub provider: String,
+    /// Exact catalog model identifier.
+    pub model: String,
+}
+
+/// Per-field model resolution without operational fallback or config mutation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelFieldResolution {
+    /// Unique canonical identity, if one exists.
+    pub matched_catalog: Option<MatchedCatalogIdentity>,
+    /// Input context tokens.
+    pub context_limit: ResolvedModelField<u32>,
+    /// Output request ceiling in tokens.
+    pub output_limit: ResolvedModelField<u32>,
+    /// Image capability; unknown remains distinct from unsupported.
+    pub image_input: ResolvedModelField<bool>,
+    /// Reasoning capability, distinct from configured reasoning parameters.
+    pub reasoning_supported: ResolvedModelField<bool>,
+}
+
 fn infer_catalog_context(
     catalog: &[model::ModelMetadata],
     provider: &str,
     model_id: &str,
 ) -> Option<u32> {
+    infer_catalog_model(catalog, provider, model_id).and_then(|meta| meta.context_limit)
+}
+
+// Resolve identity once so every inferred field comes from the same record.
+// Exact ambiguity must not fall through to a normalized identity.
+fn infer_catalog_model<'a>(
+    catalog: &'a [model::ModelMetadata],
+    provider: &str,
+    model_id: &str,
+) -> Option<&'a model::ModelMetadata> {
     if model::builtin_providers()
         .iter()
         .any(|entry| entry.id == provider)
     {
-        return model::find_model_by_provider(catalog, provider, model_id)
-            .and_then(|meta| meta.context_limit);
+        return model::find_model_by_provider(catalog, provider, model_id);
     }
 
-    let exact: Vec<_> = catalog.iter().filter(|meta| meta.id == model_id).collect();
-    match exact.as_slice() {
-        [meta] => return meta.context_limit,
-        [] => {}
-        _ => return None,
+    let mut exact = catalog.iter().filter(|meta| meta.id == model_id);
+    if let Some(candidate) = exact.next() {
+        return exact.next().is_none().then_some(candidate);
     }
 
     let normalized = model_id
         .split_once(['/', ':'])
-        .and_then(|(_, remainder)| (!remainder.is_empty()).then_some(remainder));
-    normalized.and_then(|normalized| {
-        let matches: Vec<_> = catalog
-            .iter()
-            .filter(|meta| meta.id == normalized)
-            .collect();
-        (matches.len() == 1)
-            .then(|| matches[0].context_limit)
-            .flatten()
-    })
+        .and_then(|(_, remainder)| (!remainder.is_empty()).then_some(remainder))?;
+    let mut matches = catalog.iter().filter(|meta| meta.id == normalized);
+    let candidate = matches.next()?;
+    matches.next().is_none().then_some(candidate)
 }
 
 impl Config {
+    /// Resolve image eligibility without collapsing unknown into unsupported.
+    /// Protocol support and file authorization remain separate host gates.
+    #[must_use]
+    pub fn resolved_image_input_capability(&self) -> talos_core::model::ImageInputCapability {
+        use talos_core::model::ImageInputCapability;
+        match self.resolve_model_fields().image_input.value {
+            Some(true) => ImageInputCapability::Supported,
+            Some(false) => ImageInputCapability::Unsupported,
+            None => ImageInputCapability::Unknown,
+        }
+    }
+
+    /// Resolve the active model's fields from packaged catalog metadata.
+    ///
+    /// Performs no network requests and never writes inferred values to config.
+    #[must_use]
+    pub fn resolve_model_fields(&self) -> ModelFieldResolution {
+        self.resolve_model_fields_with_catalog(&model::builtin_models())
+    }
+
+    /// Resolve fields from one unique identity in the supplied local catalog.
+    #[must_use]
+    pub fn resolve_model_fields_with_catalog(
+        &self,
+        catalog: &[model::ModelMetadata],
+    ) -> ModelFieldResolution {
+        self.resolve_named_model_fields_with_catalog(&self.provider, &self.model, catalog)
+    }
+
+    /// Resolve a picker model without changing the active model or persisted config.
+    #[must_use]
+    pub fn resolve_named_model_fields_with_catalog(
+        &self,
+        provider: &str,
+        model_id: &str,
+        catalog: &[model::ModelMetadata],
+    ) -> ModelFieldResolution {
+        let configured = self
+            .providers
+            .get(provider)
+            .and_then(|entry| entry.models.get(model_id));
+        let matched = infer_catalog_model(catalog, provider, model_id);
+        ModelFieldResolution {
+            matched_catalog: matched.map(|meta| MatchedCatalogIdentity {
+                provider: meta.provider.clone(),
+                model: meta.id.clone(),
+            }),
+            context_limit: ResolvedModelField::resolve(
+                configured.as_ref().and_then(|model| model.context_limit),
+                matched.and_then(|model| model.context_limit),
+            ),
+            output_limit: ResolvedModelField::resolve(
+                configured.as_ref().and_then(|model| model.output_limit),
+                matched.and_then(|model| model.output_limit),
+            ),
+            reasoning_supported: ResolvedModelField::resolve(
+                configured
+                    .as_ref()
+                    .and_then(|model| model.reasoning_supported),
+                matched.map(|model| model.capabilities.reasoning),
+            ),
+            image_input: ResolvedModelField::resolve(
+                configured.as_ref().and_then(|model| model.image_input),
+                matched.map(|model| model.capabilities.image_input),
+            ),
+        }
+    }
+
     /// Returns the default path for the configuration file: `~/.talos/config.toml`.
     pub fn default_path() -> PathBuf {
         let mut path = home_dir();
@@ -267,48 +393,33 @@ impl Config {
     ) -> (u32, Option<u32>) {
         const CONSERVATIVE_FALLBACK: u32 = 128_000;
 
-        if let Some(model_config) = self.active_model_config()
-            && let Some(ctx) = model_config.context_limit
-        {
-            return (ctx, model_config.output_limit);
-        }
-
-        if !model::builtin_providers()
-            .iter()
-            .any(|provider| provider.id == self.provider)
-        {
-            let builtin_catalog;
-            let inference_catalog = match catalog {
-                Some(catalog) => catalog,
-                None => {
-                    builtin_catalog = model::builtin_models();
-                    &builtin_catalog
-                }
-            };
-            if let Some(context_limit) =
-                infer_catalog_context(inference_catalog, &self.provider, &self.model)
-            {
-                return (context_limit, None);
-            }
-            return (CONSERVATIVE_FALLBACK, None);
-        }
-
-        if let Some(catalog_models) = catalog
-            && let Some(meta) =
-                model::find_model_by_provider(catalog_models, &self.provider, &self.model)
-            && let Some(ctx) = meta.context_limit
-        {
-            return (ctx, meta.output_limit);
-        }
-
+        let configured = self.active_model_config();
         let builtins = model::builtin_models();
-        if let Some(meta) = model::find_model_by_provider(&builtins, &self.provider, &self.model)
-            && let Some(ctx) = meta.context_limit
-        {
-            return (ctx, meta.output_limit);
-        }
+        let inference_catalog = catalog.unwrap_or(&builtins);
+        let inferred =
+            infer_catalog_model(inference_catalog, &self.provider, &self.model).or_else(|| {
+                // Built-in providers retain their packaged fallback if an
+                // external catalog omits the model. Custom ambiguity never
+                // falls through to a different catalog.
+                model::builtin_providers()
+                    .iter()
+                    .any(|provider| provider.id == self.provider)
+                    .then(|| model::find_model_by_provider(&builtins, &self.provider, &self.model))
+                    .flatten()
+            });
 
-        (CONSERVATIVE_FALLBACK, None)
+        // Resolve fields independently. A context override must not erase a
+        // catalog output ceiling, and an output override does not require context.
+        let context = configured
+            .as_ref()
+            .and_then(|model| model.context_limit)
+            .or_else(|| inferred.and_then(|model| model.context_limit))
+            .unwrap_or(CONSERVATIVE_FALLBACK);
+        let output = configured
+            .as_ref()
+            .and_then(|model| model.output_limit)
+            .or_else(|| inferred.and_then(|model| model.output_limit));
+        (context, output)
     }
 
     /// Returns the active provider config with built-in defaults applied.
@@ -573,14 +684,32 @@ impl Config {
         }
         for (provider_name, provider) in &self.providers {
             for (model_id, cfg) in &provider.models {
-                if cfg.context_limit.is_none()
-                    && let Some(existing) = models
-                        .iter_mut()
-                        .find(|entry| entry.provider == *provider_name && entry.id == *model_id)
-                    && existing.context_limit.is_none()
+                let matched = infer_catalog_model(&inference_catalog, provider_name, model_id);
+                if let Some(existing) = models
+                    .iter_mut()
+                    .find(|entry| entry.provider == *provider_name && entry.id == *model_id)
                 {
-                    existing.context_limit =
-                        infer_catalog_context(&inference_catalog, provider_name, model_id);
+                    existing.context_limit = cfg
+                        .context_limit
+                        .or_else(|| matched.and_then(|model| model.context_limit));
+                    existing.output_limit = cfg
+                        .output_limit
+                        .or_else(|| matched.and_then(|model| model.output_limit));
+                    existing.capabilities.image_input = cfg
+                        .image_input
+                        .or_else(|| matched.map(|model| model.capabilities.image_input))
+                        .unwrap_or(false);
+                    existing.capabilities.reasoning = cfg
+                        .reasoning_supported
+                        .or_else(|| matched.map(|model| model.capabilities.reasoning))
+                        .unwrap_or(false);
+                    existing.variants = if existing.capabilities.reasoning {
+                        matched
+                            .map(|model| model.variants.clone())
+                            .unwrap_or_default()
+                    } else {
+                        Vec::new()
+                    };
                 }
             }
         }

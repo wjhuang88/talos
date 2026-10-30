@@ -95,6 +95,7 @@ pub fn import_opencode_providers(
                 output_limit: model.limit.output,
                 protocol: None,
                 reasoning: None,
+                reasoning_supported: None,
                 image_input: None,
             };
             config.models.insert(model_name, model_config);

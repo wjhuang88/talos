@@ -27,7 +27,10 @@ mod store_finalization_tests;
 mod tests;
 mod types;
 
-pub use config::{ContextLimitResolution, ContextLimitSource};
+pub use config::{
+    ContextLimitResolution, ContextLimitSource, MatchedCatalogIdentity, ModelFieldResolution,
+    ModelFieldSource, ResolvedModelField,
+};
 pub use credentials::Credentials;
 pub use endpoint::{
     NormalizedProviderEndpoint, normalize_provider_endpoint, validate_model_base_url,
