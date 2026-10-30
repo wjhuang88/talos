@@ -387,6 +387,18 @@ async fn app_server_session_registers_session_owned_process_tool() {
         model_context_limit: 128_000,
     };
     let (_handle, actor) = AppServerSession::new(agent, config);
+    let names: std::collections::BTreeSet<_> = actor
+        .agent
+        .tools
+        .list()
+        .iter()
+        .map(|tool| tool.name().to_owned())
+        .collect();
+    assert_eq!(
+        names,
+        std::collections::BTreeSet::from(["process".to_owned()]),
+        "new Session-owned operations require an explicit I308 disposition"
+    );
     assert!(actor.agent.tools.is_builtin_instance("process"));
     let process = actor
         .agent
