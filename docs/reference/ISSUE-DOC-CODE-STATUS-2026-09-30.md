@@ -83,7 +83,7 @@
 | [#748](https://github.com/wjhuang88/talos/issues/748) | Protocol architecture + OpenAI Responses adapter | [PROVIDER-008-A](../backlog/active/PROVIDER-008-A-openai-responses-protocol.md) | Active / Claimed | Child A of #724; #747 merged as 4722fee8. Draft #749 is in progress; catalog/fixture audit, full validation, CI and API review remain pending. |
 | [#768](https://github.com/wjhuang88/talos/issues/768) | macOS parallel search refusal fixture validation residual | [I308](../iterations/I308-builtin-auto-review.md) | Open / validation residual | Discovered during I308 validation; two parallel preflights failed, serial standard preflight passed. Root cause and fixture repair remain open; no search transport ownership or policy change is authorized. |
 
-| [#810](https://github.com/wjhuang88/talos/issues/810) | Native Gemini with AI Studio and Vertex authentication | [PROVIDER-008-B](../backlog/active/PROVIDER-008-B-google-gemini.md) | Active / Claimed | Proposed atomically in #811; ineffective until merge, no implementation yet. |
+| [#810](https://github.com/wjhuang88/talos/issues/810) | Native Gemini with AI Studio and Vertex authentication | [PROVIDER-008-B](../backlog/active/PROVIDER-008-B-google-gemini.md) | Intake / claim proposal pending | Proposed atomically in #811; ineffective until merge, no implementation yet. |
 
 ## Synchronization Notes
 
