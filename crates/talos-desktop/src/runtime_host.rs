@@ -200,6 +200,8 @@ pub(crate) enum WorkProjectionState {
 /// Presentation-safe projection of an authoritative Runtime event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RuntimeOutput {
+    /// Configuration projection notice; does not alter authoritative history.
+    ConfigurationNotice(String),
     /// A tool call was requested; this does not imply successful execution.
     ToolStarted { call_id: String, name: String },
     /// Metadata from the tool request; requested paths are not proof of a completed change.
@@ -973,7 +975,11 @@ impl RuntimeHost {
         provider: Arc<dyn LanguageModel>,
         workspace_root: impl Into<PathBuf>,
     ) -> Result<Self, String> {
-        Self::start_with(move || Ok((provider, 128_000, false)), workspace_root, None)
+        Self::start_with(
+            move || Ok((provider, 128_000, false, None)),
+            workspace_root,
+            None,
+        )
     }
 
     /// Load configuration and bind the host to a caller-selected durable session identity.
@@ -1002,11 +1008,12 @@ impl RuntimeHost {
         Self::start_with(
             || {
                 let config = talos_config::Config::load().map_err(|error| error.to_string())?;
-                let provider = crate::provider::configured_provider(&config)?;
+                let (provider, diagnostic) = crate::provider::configured_provider(&config)?;
                 Ok((
                     provider,
                     config.resolve_model_limits().0,
                     config.auto.enabled,
+                    diagnostic,
                 ))
             },
             workspace_root,
@@ -1023,7 +1030,9 @@ impl RuntimeHost {
     }
 
     fn start_with(
-        provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32, bool), String> + Send + 'static,
+        provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32, bool, Option<String>), String>
+        + Send
+        + 'static,
         workspace_root: impl Into<PathBuf>,
         durable_identity: Option<DurableBinding>,
     ) -> Result<Self, String> {
@@ -1031,7 +1040,9 @@ impl RuntimeHost {
     }
 
     fn start_with_evaluation(
-        provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32, bool), String> + Send + 'static,
+        provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32, bool, Option<String>), String>
+        + Send
+        + 'static,
         workspace_root: impl Into<PathBuf>,
         durable_identity: Option<DurableBinding>,
         evaluation_harness: Option<EvaluationHarness>,
@@ -1047,7 +1058,9 @@ impl RuntimeHost {
     }
 
     fn start_with_evaluation_observed(
-        provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32, bool), String> + Send + 'static,
+        provider: impl FnOnce() -> Result<(Arc<dyn LanguageModel>, u32, bool, Option<String>), String>
+        + Send
+        + 'static,
         workspace_root: impl Into<PathBuf>,
         durable_identity: Option<DurableBinding>,
         evaluation_harness: Option<EvaluationHarness>,
@@ -1072,12 +1085,23 @@ impl RuntimeHost {
                 let terminal = match executor {
                     Ok(executor) => {
                         let terminal = executor.block_on(async move {
-                            let (provider, context_limit, auto_enabled) = match provider() {
-                                Ok(provider) => provider,
-                                Err(error) => {
-                                    return RuntimeOutput::Error(error);
-                                }
-                            };
+                            let (provider, context_limit, auto_enabled, diagnostic) =
+                                match provider() {
+                                    Ok(provider) => provider,
+                                    Err(error) => {
+                                        return RuntimeOutput::Error(error);
+                                    }
+                                };
+                            if let Some(diagnostic) = diagnostic
+                                && outputs
+                                    .send(RuntimeOutput::ConfigurationNotice(diagnostic))
+                                    .await
+                                    .is_err()
+                            {
+                                return RuntimeOutput::Error(
+                                    "Desktop configuration surface closed during startup".into(),
+                                );
+                            }
                             let approval_root = workspace_root.clone();
                             let approval = Arc::new(DesktopApprovalHandler::new(
                                 outputs.clone(),
@@ -2246,13 +2270,63 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
+    async fn configured_reasoning_notice_reaches_desktop_without_mutating_config() {
+        let workspace = TestWorkspace::new();
+        let mut config = talos_config::Config {
+            provider: "gateway".into(),
+            model: "unknown-notice-fixture".into(),
+            ..Default::default()
+        };
+        let provider = config.providers.entry("gateway".into()).or_default();
+        provider.protocol = talos_config::ProviderProtocol::OpenAIResponses;
+        provider.api_key = Some("test-key".into());
+        provider.base_url = Some("http://127.0.0.1:9".into());
+        provider.models.insert(
+            config.model.clone(),
+            talos_config::ModelConfig {
+                reasoning_supported: Some(false),
+                reasoning: Some(talos_config::ReasoningOptions::default()),
+                ..Default::default()
+            },
+        );
+        let before = serde_json::to_value(&config).expect("config snapshot");
+        let mut host = RuntimeHost::start_with(
+            move || {
+                let (provider, diagnostic) = crate::provider::configured_provider(&config)?;
+                assert_eq!(
+                    serde_json::to_value(&config).expect("config snapshot"),
+                    before
+                );
+                Ok((provider, 128_000, false, diagnostic))
+            },
+            workspace.0.clone(),
+            None,
+        )
+        .expect("host starts");
+        let event = tokio::time::timeout(std::time::Duration::from_secs(5), host.recv())
+            .await
+            .expect("bounded notice")
+            .expect("notice");
+        assert!(
+            matches!(event, RuntimeOutput::ConfigurationNotice(ref message) if message.contains("capability is disabled")),
+            "{event:?}"
+        );
+        host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while !matches!(host.recv().await, Some(RuntimeOutput::Stopped) | None) {}
+        })
+        .await
+        .expect("shutdown completes");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
     async fn opening_a_missing_existing_session_does_not_create_a_binding() {
         let workspace = TestWorkspace::new();
         let storage = workspace.0.join(".talos").join("desktop-sessions");
         let external_id = "desktop-task-v1-missing";
         let provider = Arc::new(MockProvider::new());
         let mut host = RuntimeHost::start_with(
-            move || Ok((provider, 128_000, false)),
+            move || Ok((provider, 128_000, false, None)),
             workspace.0.clone(),
             Some(DurableBinding {
                 root: storage.clone(),
@@ -2284,7 +2358,7 @@ mod tests {
         let provider = Arc::new(MockProvider::new().with_response("durable response"));
         let configured = provider.clone();
         let mut host = RuntimeHost::start_with(
-            move || Ok((configured, 128_000, false)),
+            move || Ok((configured, 128_000, false, None)),
             workspace.0.clone(),
             Some(DurableBinding {
                 root: storage.clone(),
@@ -2334,7 +2408,7 @@ mod tests {
 
         let provider = Arc::new(MockProvider::new().with_response("second host"));
         let mut reopened = RuntimeHost::start_with(
-            move || Ok((provider, 128_000, false)),
+            move || Ok((provider, 128_000, false, None)),
             workspace.0.clone(),
             Some(DurableBinding {
                 root: storage.clone(),
@@ -2395,7 +2469,7 @@ mod tests {
         );
         let configured = provider.clone();
         let mut host = RuntimeHost::start_with(
-            move || Ok((configured, 128_000, false)),
+            move || Ok((configured, 128_000, false, None)),
             workspace.0.clone(),
             Some(DurableBinding {
                 root: storage,
@@ -2693,7 +2767,7 @@ mod tests {
         ));
         let configured = provider.clone();
         let mut host = RuntimeHost::start_with(
-            move || Ok((configured, 128_000, false)),
+            move || Ok((configured, 128_000, false, None)),
             workspace.0.clone(),
             Some(DurableBinding {
                 root: storage.clone(),
@@ -2742,7 +2816,7 @@ mod tests {
             }),
         ));
         let mut reopened = RuntimeHost::start_with(
-            move || Ok((replay_provider, 128_000, false)),
+            move || Ok((replay_provider, 128_000, false, None)),
             workspace.0.clone(),
             Some(DurableBinding {
                 root: storage.clone(),
@@ -2928,7 +3002,7 @@ mod tests {
                 std::time::Duration::from_secs(30),
             );
             let mut host = RuntimeHost::start_with_evaluation(
-                || Ok((Arc::new(MockProvider::new()), 128_000, false)),
+                || Ok((Arc::new(MockProvider::new()), 128_000, false, None)),
                 workspace.0.clone(),
                 None,
                 Some(harness),
@@ -3073,7 +3147,7 @@ mod tests {
             let provider = Arc::new(MockProvider::new());
             let configured = provider.clone();
             let mut host = RuntimeHost::start_with_evaluation(
-                move || Ok((configured, 128_000, false)),
+                move || Ok((configured, 128_000, false, None)),
                 workspace.0.clone(),
                 None,
                 Some(evaluation_harness(verdict, goal_revision)),
@@ -3137,7 +3211,7 @@ mod tests {
         let provider = Arc::new(MockProvider::new());
         let configured = provider.clone();
         let mut host = RuntimeHost::start_with(
-            move || Ok((configured, 128_000, false)),
+            move || Ok((configured, 128_000, false, None)),
             workspace.0.clone(),
             None,
         )
@@ -3907,7 +3981,7 @@ mod tests {
             );
             let configured = provider.clone();
             let mut host = RuntimeHost::start_with(
-                move || Ok((configured, 128_000, false)),
+                move || Ok((configured, 128_000, false, None)),
                 workspace.0.clone(),
                 Some(DurableBinding {
                     root: storage.clone(),
