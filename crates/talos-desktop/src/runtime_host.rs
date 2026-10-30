@@ -3891,86 +3891,73 @@ mod tests {
     async fn durable_runtime_host_dispatches_todo_into_bound_session() {
         let workspace = TestWorkspace::new();
         let storage = workspace.0.join(".talos").join("desktop-sessions");
-        let external_id = "desktop-todo-dispatch".to_owned();
-        let session_id = talos_session::DurableSession::open_or_create(&storage, &external_id)
-            .expect("durable session opens")
-            .id();
-        let provider = Arc::new(
-            MockProvider::new()
-                .with_tool_call(
-                    "todo_create",
-                    serde_json::json!({"title": "desktop-bound-item"}),
-                )
-                .with_response("Todo item created."),
-        );
-        let configured = provider.clone();
-        let mut host = RuntimeHost::start_with(
-            move || Ok((configured, 128_000, false)),
-            workspace.0.clone(),
-            Some(DurableBinding {
-                root: storage.clone(),
-                external_id,
-                mode: DurableOpenMode::Existing,
-            }),
-        )
-        .expect("durable host starts");
-        host.try_send(RuntimeCommand::Submit("create a desktop task".into()))
-            .expect("submit");
+        let mut bound_sessions = Vec::new();
+        for (external_id, title) in [
+            ("desktop-todo-dispatch-first", "first session item"),
+            ("desktop-todo-dispatch-second", "second session item"),
+        ] {
+            let external_id = external_id.to_owned();
+            let session_id = talos_session::DurableSession::open_or_create(&storage, &external_id)
+                .expect("durable session opens")
+                .id();
+            let provider = Arc::new(
+                MockProvider::new()
+                    .with_tool_call("todo_create", serde_json::json!({"title": title}))
+                    .with_response("Todo item created."),
+            );
+            let configured = provider.clone();
+            let mut host = RuntimeHost::start_with(
+                move || Ok((configured, 128_000, false)),
+                workspace.0.clone(),
+                Some(DurableBinding {
+                    root: storage.clone(),
+                    external_id,
+                    mode: DurableOpenMode::Existing,
+                }),
+            )
+            .expect("durable host starts");
+            host.try_send(RuntimeCommand::Submit("create a desktop task".into()))
+                .expect("submit");
 
-        tokio::time::timeout(std::time::Duration::from_secs(10), async {
-            loop {
-                match host.recv().await.expect("host event") {
-                    RuntimeOutput::ToolResult {
-                        is_error, content, ..
-                    } => {
-                        assert!(!is_error, "todo tool failed: {content}");
+            tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                loop {
+                    match host.recv().await.expect("host event") {
+                        RuntimeOutput::ToolResult {
+                            is_error, content, ..
+                        } => {
+                            assert!(!is_error, "todo tool failed: {content}");
+                        }
+                        RuntimeOutput::Completed { status } => {
+                            assert_eq!(status, TerminalStatus::Success);
+                            break;
+                        }
+                        RuntimeOutput::Error(error) => panic!("host error: {error}"),
+                        _ => {}
                     }
-                    RuntimeOutput::Completed { status } => {
-                        assert_eq!(status, TerminalStatus::Success);
-                        break;
-                    }
-                    RuntimeOutput::Error(error) => panic!("host error: {error}"),
-                    _ => {}
                 }
-            }
-        })
-        .await
-        .expect("todo dispatch completes");
+            })
+            .await
+            .expect("todo dispatch completes");
 
+            host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
+            tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                while !matches!(host.recv().await, Some(RuntimeOutput::Stopped) | None) {}
+            })
+            .await
+            .expect("host shutdown completes");
+            bound_sessions.push((session_id, title));
+        }
+        assert_ne!(bound_sessions[0].0, bound_sessions[1].0);
         let repository = talos_runtime::SessionManager::with_dir(storage)
             .todo_repository()
             .expect("todo repository");
-        let mut repository = repository;
-        let items = repository
-            .list(session_id, talos_session::todo::TodoQuery::default())
-            .expect("bound todo items");
-        if items.is_empty() {
-            let _ = host.try_send(RuntimeCommand::Shutdown);
-            panic!("Desktop Todo dispatch did not persist into its durable session");
+        for (session_id, title) in bound_sessions {
+            let items = repository
+                .list(session_id, talos_session::todo::TodoQuery::default())
+                .expect("bound todo items");
+            assert_eq!(items.len(), 1, "each host must persist only its own item");
+            assert_eq!(items[0].title, title);
         }
-        assert_eq!(items[0].title, "desktop-bound-item");
-        let created_id = items[0].id;
-        assert!(
-            repository
-                .delete(session_id, created_id)
-                .expect("remove fixture todo")
-        );
-        assert!(
-            repository
-                .list(
-                    uuid::Uuid::new_v4(),
-                    talos_session::todo::TodoQuery::default()
-                )
-                .expect("other session todo items")
-                .is_empty()
-        );
-
-        host.try_send(RuntimeCommand::Shutdown).expect("shutdown");
-        tokio::time::timeout(std::time::Duration::from_secs(10), async {
-            while !matches!(host.recv().await, Some(RuntimeOutput::Stopped) | None) {}
-        })
-        .await
-        .expect("host shutdown completes");
     }
 
     #[test]
