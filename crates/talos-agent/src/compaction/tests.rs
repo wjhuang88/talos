@@ -749,6 +749,54 @@ async fn test_manual_compact_failed_on_provider_error() {
     );
 }
 
+// Invalid streamed summaries must not commit deterministic preprocessing either.
+#[tokio::test]
+async fn manual_compact_invalid_stream_preserves_original_context() {
+    struct InvalidSummaryProvider {
+        partial: bool,
+    }
+    #[async_trait]
+    impl LanguageModel for InvalidSummaryProvider {
+        async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let (tx, rx) = mpsc::channel(4);
+            if self.partial {
+                tx.send(AgentEvent::TextDelta {
+                    delta: "partial checkpoint".into(),
+                })
+                .await
+                .unwrap();
+                tx.send(AgentEvent::Error {
+                    message: "PRIVATE_PROVIDER_DETAIL".into(),
+                })
+                .await
+                .unwrap();
+            }
+            Ok(rx)
+        }
+    }
+    for partial in [false, true] {
+        let mut compactor = Compactor::new(TokenEstimator::new(), 1);
+        let mut messages = Vec::new();
+        for i in 0..15 {
+            messages.extend(make_turn(
+                &format!("q{i}"),
+                &format!("r{i}"),
+                vec![(&format!("c{i}"), &"x".repeat(MAX_TOOL_RESULT_CHARS + 100))],
+            ));
+        }
+        let original = messages.clone();
+        let (result, status) = compactor
+            .manual_compact(messages, &InvalidSummaryProvider { partial })
+            .await;
+        assert!(matches!(status, CompactionStatus::Failed { .. }));
+        assert_eq!(
+            result, original,
+            "failed summary must roll back every compaction layer"
+        );
+        assert!(!format!("{status:?}").contains("PRIVATE_PROVIDER_DETAIL"));
+    }
+}
+
 // ========== MEM-005-A: hidden-output guard ==========
 
 #[test]
