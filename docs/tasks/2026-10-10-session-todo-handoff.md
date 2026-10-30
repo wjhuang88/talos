@@ -3,8 +3,9 @@
 Overall goal remains Active. I309 and I308/T8 are closed on main (#812 merge
 `85aa2d0f495a6c337b0bf62f9e05a7fe6a35194c`); #563 is closed.
 I311/ADR-095 MODEL-014 T2+T3 claim #813 is effective on main at `0aff4e4fbf2a653521f0da9907900341772efc24`.
-Local implementation through `4d644ba03865880bd59f88f3885f8b6ac81935c4` is published in PR #815, Review/unmerged;
-local full preflight and independent static review passed, remote gates remain open.
+PR #815 merged as `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`; I311 remains Review pending acceptance closeout.
+Local full preflight, independent static review, all eight exact-head CI checks
+(`41022658026`) and merge CAS passed. Review limitations remain recorded in I311.
 Queue remains MODEL-014 → T4 → T5 → T1 → T6.
 
 ## I308/T8 phase completion evidence — 2026-10-30

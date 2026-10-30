@@ -70,16 +70,26 @@ fn configured_gateway_endpoint_preserves_catalog_variant_through_real_agent() {
     image_and_native_read_round(ImageFixture::CatalogVariant);
 }
 
+#[test]
+fn custom_catalog_reasoning_and_image_complete_through_real_agent() {
+    image_and_native_read_round(ImageFixture::CustomReasoning);
+}
+
 #[derive(Clone, Copy)]
 enum ImageFixture {
     Configured,
     Packaged,
     CustomInferred,
+    CustomReasoning,
     CatalogVariant,
 }
 
 fn image_and_native_read_round(fixture: ImageFixture) {
-    let inferred = matches!(fixture, ImageFixture::CustomInferred);
+    let custom_reasoning = matches!(fixture, ImageFixture::CustomReasoning);
+    let inferred = matches!(
+        fixture,
+        ImageFixture::CustomInferred | ImageFixture::CustomReasoning
+    );
     let catalog = matches!(fixture, ImageFixture::Packaged);
     let variant = matches!(fixture, ImageFixture::CatalogVariant);
     let temp = tempfile::tempdir().expect("isolated home and workspace");
@@ -152,6 +162,15 @@ api_key = "test-key"
         ).expect("config");
         ("/model-wire/responses", "test-model")
     };
+    if custom_reasoning {
+        use std::io::Write;
+        let mut config = std::fs::OpenOptions::new()
+            .append(true)
+            .open(config_dir.join("config.toml"))
+            .expect("existing custom config");
+        writeln!(config, "[providers.fixture.models.{inferred_id:?}.reasoning]\neffort = \"high\"\nreplay = false")
+            .expect("explicit effort without capability override");
+    }
     let config_before = std::fs::read(config_dir.join("config.toml")).expect("config bytes");
     let server = std::thread::spawn(move || {
         let deadline = Instant::now() + Duration::from_secs(25);
@@ -251,10 +270,14 @@ api_key = "test-key"
                 request["max_output_tokens"],
                 inferred_model.output_limit.expect("output")
             );
-            assert!(
-                request.get("reasoning").is_none(),
-                "capability alone must not invent a preset"
-            );
+            if custom_reasoning {
+                assert_eq!(request["reasoning"]["effort"], "high");
+            } else {
+                assert!(
+                    request.get("reasoning").is_none(),
+                    "capability alone must not invent a preset"
+                );
+            }
         }
         assert_eq!(request["store"], false);
         assert_eq!(request["stream"], true);

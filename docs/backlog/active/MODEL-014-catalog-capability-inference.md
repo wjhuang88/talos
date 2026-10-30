@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Story ID | MODEL-014 |
-| Status | Review (implementation PR #815) |
+| Status | Review (implementation PR #815 merged; acceptance closeout pending) |
 | Collaboration Claim | Delegated to I311 / merged #813 |
 
 **Type**: Product / Configuration Story
@@ -48,7 +48,9 @@ MODEL-013 identity resolver; MODEL-007 variants; MODEL-009 image-input boundary;
 - A gateway can filter capabilities despite sharing a canonical model ID. Source presentation must not describe inferred metadata as endpoint-verified support.
 - Any public API or config-schema compatibility change requires the repository's decision and migration process.
 
-## Uncertainty And Validation Path
+## Historical Intake Uncertainty And Validation Path
+
+The following records pre-activation uncertainty, resolved by ADR-095 and effective claim #813; it does not override the current merged implementation checkpoint.
 
 Before activation, decide the representation of inferred/unknown/explicit capabilities, whether inferred image support directly enables attachments, reasoning enablement versus effort presets, negative override semantics, and protocol-specific output caps. The requested end-to-end inference is accepted as scope; these implementation and safety decisions remain unresolved.
 
@@ -65,7 +67,7 @@ Before activation, decide the representation of inferred/unknown/explicit capabi
 
 ## State / Status Owners
 
-This file owns scope and readiness. PRODUCT-BACKLOG.md is the compact index; BOARD.md is a derived operating view. No implementation is active or complete.
+This file owns scope and readiness. PRODUCT-BACKLOG.md is the compact index; BOARD.md is a derived operating view. Implementation #815 is merged; delivery remains Review until acceptance closeout.
 
 ## User-Facing Documentation
 
@@ -89,7 +91,7 @@ Focused config/resolver, explicit-override, ambiguity, image-eligibility, reason
 
 Active endpoint verification remains MODEL-011 / #124. Pricing and role/routing inference require separate scope decisions.
 
-## Restoration and activation preparation — 2026-10-30
+## Historical restoration and activation preparation — 2026-10-30
 
 The original published intake above is restored from
 `1bda5181f033b49f3f05f304cfd1bef2489e6a04` without reducing its scope.
@@ -103,10 +105,13 @@ PR #811 separately proposes I310/ADR-094 for Gemini; those IDs and its protocol/
 scope are not claimed here. No paid probes or endpoint-support claims are added.
 
 
-## Atomic activation proposal — 2026-10-30
+## Historical atomic activation proposal — 2026-10-30
 
 I311 selects the complete original T2+T3 scope. ADR-095 defines the reviewed
 authority, negative override/schema compatibility and protocol mapping. These
 records are proposed in #813 and ineffective until that finalized claim PR merges.
 The single effective execution claim will live in I311; this Story's prior
 Unclaimed intake record is historical only after that merge. No code is included.
+
+Implementation #815 merged as `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`;
+see I311 for exact-head CI and review evidence. Acceptance closeout remains pending.
