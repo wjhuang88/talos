@@ -4,10 +4,32 @@
 |---|---|
 | Story ID | PERM-007-G |
 | Type | Permission / Safety Story |
-| Status | In Progress (#765 merged; I308 active) |
+| Status | Complete |
 | Source | [GitHub Issue #563](https://github.com/wjhuang88/talos/issues/563) |
 | Selected Iteration | I308 / #765, activated at `8f0ce2340` |
 | Collaboration Claim | Delegated to the effective I308 claim in merged #765 |
+
+## Completion evidence — 2026-10-30
+
+Status: Complete. Completion Commit: `5dea4925a143151071ea231779c100a75734e6fe`.
+I308's unchanged seven acceptance rows and PERM-007-H/G scope passed independent
+closure review against implementation head `70d05dfe835d6d3f8d521539f513eeefd9e5cc41`.
+CI `41007199388` passed all eight exact-head jobs, including full locked preflight,
+native Windows workspace/CLI smoke and Linux/Windows Desktop. PR #809 merged
+following exact-head static permission/security/API approval and merge-time CAS.
+The reviewer independently checked CI but did not run tests; shared external
+account identity remains disclosed. Earlier Partial/pending sections are history.
+
+Recovery is opt-in, bounded and target-bound, with stale-target/replay refusal and
+partial-failure receipts; no universal or cross-process rollback is promised.
+Unavailable/protected search stays independently owned by I293. Standalone MCP
+requires an explicitly injected interactive pipeline/intent for Auto; otherwise
+it remains headless. Unix process tests execute real jobs; non-Unix cancellation
+fixtures cover pending jobs. These are explicit supported boundaries, not claims
+that every operation has identical Auto behavior on every platform.
+
+Only I308/T8 and PERM-007-H/G close here. MODEL-014 → T4 → T5 → T1 → T6 remain
+unimplemented/incomplete, and the complete handoff goal remains Active.
 
 ## Current Execution — 2026-10-26
 

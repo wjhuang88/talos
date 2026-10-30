@@ -1,8 +1,18 @@
-## I308 candidate gate — 2026-10-30
+## I308/T8 completed — 2026-10-30
 
-I308/T8 remains Active / Partial. Final acceptance candidate #809 at `70d05dfe8`
-has independent static approval; CI `41007199388` remains in progress.
-The I308 owner records local ENOSPC and resumed SDK component verification.
+I308 and PERM-007-H/G owners are Complete with Completion Commit `5dea4925a143151071ea231779c100a75734e6fe`
+(#809), all-eight-success exact-head CI `41007199388` and independent protected
+closure review. Owner boundaries and historical failures remain recorded.
+MODEL-014 is restored Refinement / Unclaimed; next is its atomic claim/activation.
+Full handoff remains Active: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+Earlier Active/Partial rows below are historical, superseded by owner evidence.
+
+## I308 merged implementation — 2026-10-30
+
+I308/T8 remains Active / Partial pending owner/Story closeout review.
+#809 merged as `5dea4925a`; exact-head CI `41007199388` passed all eight checks.
+The I308 owner records independent static approval, full remote preflight success
+and the retained local ENOSPC/resumed SDK component verification history.
 No completion is claimed; the full handoff queue remains unchanged.
 
 ## Completed gix upgrade — 2026-10-28
