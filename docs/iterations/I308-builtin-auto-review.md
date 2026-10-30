@@ -1,5 +1,35 @@
 # Iteration I308: Shared Auto Review For All Built-In Tools
 
+## Acceptance evidence reconciliation — 2026-10-30
+
+Status remains Active / Partial; the following maps current implementation to the
+unchanged seven acceptance rows, not a completion declaration.
+
+| Acceptance | Current concrete evidence | Remaining delivery evidence |
+|---|---|---|
+| 1 inventory | CLI fixed production registry set; Runtime shared fixed profile sets; `adf7f8121` asserts Session process and opt-in Runtime skill_read exact inventories | Final candidate platform CI |
+| 2 actual model execution | Agent write/edit/save/HTTP/command/Git fixtures and MCP native mutation/save/HTTP/exec/Git fixtures; `825dcb147` adds process cancel to shared action review | Final candidate review/CI |
+| 3 atomicity/read fast path | permission_pipeline facet tests; read_auto, todo_auto, scheduler_auto and Runtime skill_disclosure execute actual policy paths | Final integrated validation |
+| 4 refusal/freshness | Existing ordinary/Git/file fixtures plus process_auto allow/uncertain/error/stale/Deny/unknown-job/replaced-instance matrix | Final integrated validation |
+| 5 higher-risk recovery | edit_auto special/config/security paths, recovery_dispatch policy/concurrent changes, file recovery stale/capacity/partial failure, MCP wrong-target receipt refusal; `700b180f2` exercises visible post-rename error and recovery through EditTool | Final integrated validation; no universal rollback or cross-process recovery promise |
+| 6 host visibility | CLI/Runtime/Desktop Auto report sinks and real host fixtures; MCP injected pipeline fixtures; `009778263` actual two bound Desktop sessions; `09e6610f9` actual Unix process cancellation/session isolation | Native Windows validation for latest candidate; standalone MCP remains headless without injected Auto resolver |
+| 7 delivery | Incremental static reviews and focused tests below | Frozen-head preflight, independent final review, exact-head CI, CAS, merge and owner-first completion evidence |
+
+`825dcb147` implements owned process cancellation Auto using exact job resource,
+arguments, intent and session binding through the existing shared action assessor.
+Unix fixtures launch real sleep processes: AllowOnce terminates, refusal scenarios
+leave the job running before fixture cleanup. Non-Unix fixtures cover pending-job
+cancellation only; no Auto background-start claim. Agent library 517/517 and
+warnings-denied library/test Clippy passed. Independent static review approved;
+reviewer did not run tests. `adf7f8121` conditional inventory tests both passed and
+received independent static approval. These commits remain local, not merged.
+
+The preflight on the earlier baseline stopped at Tools: 1032 passed, one Git Push
+process-observation test failed with sandbox EPERM. The same named test with
+all-features passed outside the sandbox. An earlier default-feature retry ran zero
+tests and is not evidence. Neither retry certifies the whole preflight or newer
+process implementation. Final validation remains required.
+
 ## Current delivery checkpoint — 2026-10-30
 
 I308 / T8 remains Active / Partial. This checkpoint supersedes pending-stage
