@@ -60,6 +60,11 @@ impl OpenAIResponsesProvider {
         self
     }
 
+    pub(crate) fn with_reasoning_disabled(mut self, disabled: bool) -> Self {
+        self.client = self.client.with_reasoning_disabled(disabled);
+        self
+    }
+
     /// Configure reasoning and the Responses `max_output_tokens` limit.
     #[must_use]
     pub fn with_reasoning(

@@ -29,6 +29,7 @@ pub(crate) struct OpenAIResponsesClient {
     client: Client,
     copilot_headers: serde_json::Map<String, Value>,
     reasoning: Option<ReasoningOptions>,
+    reasoning_disabled: bool,
     output_limit: Option<u32>,
     timeout_config: ProviderTimeoutConfig,
 }
@@ -43,6 +44,7 @@ impl OpenAIResponsesClient {
             client: Client::new(),
             copilot_headers: serde_json::Map::new(),
             reasoning: None,
+            reasoning_disabled: false,
             output_limit: None,
             timeout_config: ProviderTimeoutConfig::default(),
         }
@@ -68,6 +70,11 @@ impl OpenAIResponsesClient {
     #[must_use]
     pub(crate) fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
         self.base_url = base_url.into();
+        self
+    }
+
+    pub(crate) fn with_reasoning_disabled(mut self, disabled: bool) -> Self {
+        self.reasoning_disabled = disabled;
         self
     }
 
@@ -103,10 +110,11 @@ impl OpenAIResponsesClient {
     /// Credentials are always redacted and image content follows the existing preview projection so
     /// diagnostics cannot turn a request preview into an implicit file read.
     pub(crate) fn request_preview(&self, messages: &[Message]) -> Value {
-        let replay = self
-            .reasoning
-            .as_ref()
-            .is_none_or(|reasoning| reasoning.replay);
+        let replay = !self.reasoning_disabled
+            && self
+                .reasoning
+                .as_ref()
+                .is_none_or(|reasoning| reasoning.replay);
         let preview_messages = crate::image_io::preview_messages(messages);
         let messages =
             replay_safe_messages(&self.provider_key, &self.model, replay, &preview_messages);
@@ -162,10 +170,11 @@ impl OpenAIResponsesClient {
         progress_tx: Option<&mpsc::UnboundedSender<ProviderProgress>>,
         images: Vec<talos_core::provider::EphemeralImage>,
     ) -> ProviderResult<mpsc::Receiver<ResponsesStreamOutput>> {
-        let replay = self
-            .reasoning
-            .as_ref()
-            .is_none_or(|reasoning| reasoning.replay);
+        let replay = !self.reasoning_disabled
+            && self
+                .reasoning
+                .as_ref()
+                .is_none_or(|reasoning| reasoning.replay);
         let messages = replay_safe_messages(&self.provider_key, &self.model, replay, messages);
         let mut body = build_request_body(
             &self.model,

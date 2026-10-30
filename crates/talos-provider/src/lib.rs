@@ -85,6 +85,23 @@ fn protocol_scope(
     Some(format!("protocol-v1:{digest}"))
 }
 
+// Request-only projection; authoritative history and tool pairing are untouched.
+fn reasoning_request_messages(
+    messages: &[Message],
+    disabled: bool,
+) -> std::borrow::Cow<'_, [Message]> {
+    if !disabled {
+        return std::borrow::Cow::Borrowed(messages);
+    }
+    let mut projected = messages.to_vec();
+    for message in &mut projected {
+        if let Message::Assistant { reasoning, .. } = message {
+            *reasoning = None;
+        }
+    }
+    std::borrow::Cow::Owned(projected)
+}
+
 /// Projects durable native tool blocks into bounded compatibility text while preserving IDs.
 /// This is used only for non-native protocol requests; native requests retain structured blocks.
 pub(crate) fn compatibility_messages(messages: &[Message]) -> Vec<Message> {
@@ -137,6 +154,7 @@ pub struct AnthropicProvider {
     copilot_headers: serde_json::Map<String, Value>,
     copilot_auth: bool,
     reasoning: Option<ReasoningOptions>,
+    reasoning_disabled: bool,
     output_limit: Option<u32>,
     timeout_config: ProviderTimeoutConfig,
 }
@@ -157,6 +175,7 @@ impl AnthropicProvider {
             copilot_headers: serde_json::Map::new(),
             copilot_auth: false,
             reasoning: None,
+            reasoning_disabled: false,
             output_limit: None,
             timeout_config: ProviderTimeoutConfig::default(),
         }
@@ -179,6 +198,23 @@ impl AnthropicProvider {
         self
     }
 
+    pub(crate) fn with_reasoning_disabled(mut self, disabled: bool) -> Self {
+        self.reasoning_disabled = disabled;
+        self
+    }
+
+    fn request_body(
+        &self,
+        model: &str,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        reasoning: Option<&ReasoningOptions>,
+        output_limit: Option<u32>,
+    ) -> serde_json::Value {
+        let messages = crate::reasoning_request_messages(messages, self.reasoning_disabled);
+        anthropic_request::build_request_body(model, &messages, tools, reasoning, output_limit)
+    }
+
     /// Set per-model reasoning and output token configuration.
     pub fn with_reasoning(
         mut self,
@@ -197,7 +233,7 @@ impl AnthropicProvider {
     }
 
     async fn make_request(&self, messages: &[Message]) -> ProviderResult<reqwest::Response> {
-        let body = anthropic_request::build_request_body(
+        let body = self.request_body(
             &self.model,
             messages,
             &[],
@@ -212,7 +248,7 @@ impl AnthropicProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
     ) -> ProviderResult<reqwest::Response> {
-        let body = anthropic_request::build_request_body(
+        let body = self.request_body(
             &self.model,
             messages,
             tools,
@@ -459,7 +495,7 @@ impl LanguageModel for AnthropicProvider {
             "Internal capability probe; do not execute",
             json!({"type":"object","properties":{}}),
         );
-        let mut body = anthropic_request::build_request_body(
+        let mut body = self.request_body(
             &self.model,
             &[Message::User {
                 content: "Respond with the probe tool call.".into(),
@@ -577,7 +613,7 @@ impl LanguageModel for AnthropicProvider {
         } else {
             compatibility_messages(messages)
         };
-        let mut body = anthropic_request::build_request_body(
+        let mut body = self.request_body(
             &self.model,
             &projected,
             if native { tools } else { &[] },
@@ -615,7 +651,7 @@ impl LanguageModel for AnthropicProvider {
             ));
         }
         if matches!(protocol, talos_core::tool::ToolProtocol::Native) {
-            let body = anthropic_request::build_request_body(
+            let body = self.request_body(
                 &self.model,
                 messages,
                 tools,
@@ -635,7 +671,7 @@ impl LanguageModel for AnthropicProvider {
             Ok(rx)
         } else {
             let projected = compatibility_messages(messages);
-            let body = anthropic_request::build_request_body(
+            let body = self.request_body(
                 &self.model,
                 &projected,
                 &[],
@@ -692,7 +728,7 @@ impl LanguageModel for AnthropicProvider {
         tools: &[ToolDefinition],
         progress_tx: mpsc::UnboundedSender<ProviderProgress>,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
-        let body = anthropic_request::build_request_body(
+        let body = self.request_body(
             &self.model,
             messages,
             tools,
@@ -713,7 +749,7 @@ impl LanguageModel for AnthropicProvider {
 
     fn request_preview(&self, messages: &[Message]) -> Option<Value> {
         let messages = crate::image_io::preview_messages(messages);
-        let body = anthropic_request::build_request_body(
+        let body = self.request_body(
             &self.model,
             &messages,
             &[],

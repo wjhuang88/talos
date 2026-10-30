@@ -21,7 +21,7 @@ mod copilot_tests;
 /// existing CLI/Desktop hosts: one quarter of context, bounded to 4K..32K and never above context.
 #[must_use]
 pub fn effective_output_limit(config: &Config) -> u32 {
-    config.output_limit().unwrap_or_else(|| {
+    config.resolve_model_limits().1.unwrap_or_else(|| {
         let (context_limit, _) = config.resolve_model_limits();
         (context_limit / 4).clamp(4096, 32_768).min(context_limit)
     })
@@ -51,7 +51,10 @@ fn build_with_connection(
 ) -> ProviderResult<Arc<dyn LanguageModel>> {
     let provider_config = config.active_provider_config();
     let model_config = provider_config.models.get(&config.model).cloned();
-    let reasoning = model_config.and_then(|model| model.reasoning);
+    let reasoning_disabled = config.resolve_model_fields().reasoning_supported.value == Some(false);
+    let reasoning = model_config
+        .and_then(|model| model.reasoning)
+        .filter(|_| !reasoning_disabled);
     let output_limit = Some(effective_output_limit(config));
     let timeout = provider_config.timeout;
     let endpoint = config
@@ -114,6 +117,7 @@ fn build_with_connection(
             }
             provider = provider
                 .with_reasoning(reasoning, output_limit)
+                .with_reasoning_disabled(reasoning_disabled)
                 .with_timeout_config(timeout);
             Ok(Arc::new(provider))
         }
@@ -128,6 +132,7 @@ fn build_with_connection(
             }
             provider = provider
                 .with_reasoning(reasoning, output_limit)
+                .with_reasoning_disabled(reasoning_disabled)
                 .with_timeout_config(timeout);
             Ok(Arc::new(provider))
         }
@@ -143,6 +148,7 @@ fn build_with_connection(
             }
             provider = provider
                 .with_reasoning(reasoning, output_limit)
+                .with_reasoning_disabled(reasoning_disabled)
                 .with_timeout_config(timeout);
             Ok(Arc::new(provider))
         }
@@ -157,6 +163,297 @@ fn build_with_connection(
 mod tests {
     use super::*;
     use talos_core::tool::{CapabilityProbe, ProtocolCapabilities};
+
+    #[test]
+    fn model014_direct_factory_suppresses_disabled_reasoning_parameters() {
+        for (protocol, field) in [
+            (ProviderProtocol::OpenAIChat, "reasoning_effort"),
+            (ProviderProtocol::OpenAIResponses, "reasoning"),
+            (ProviderProtocol::AnthropicMessages, "thinking"),
+        ] {
+            let config = Config {
+                provider: "gateway".into(),
+                model: "unknown-fixture".into(),
+                providers: std::collections::HashMap::from([(
+                    "gateway".into(),
+                    talos_config::ProviderConfig {
+                        protocol,
+                        base_url: Some("https://gateway.test/v1".into()),
+                        models: std::collections::HashMap::from([(
+                            "unknown-fixture".into(),
+                            talos_config::ModelConfig {
+                                reasoning_supported: Some(false),
+                                reasoning: Some(talos_config::ReasoningOptions::default()),
+                                ..Default::default()
+                            },
+                        )]),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            };
+            let provider = build_configured_provider(&config, "fixture-key").expect("provider");
+            let history = vec![talos_core::message::Message::Assistant {
+                content: "visible answer".into(),
+                tool_calls: vec![],
+                reasoning: Some(talos_core::message::AssistantReasoning {
+                    provider: "gateway".into(),
+                    model: "unknown-fixture".into(),
+                    blocks: vec![talos_core::message::ReasoningBlock::Plain {
+                        text: "private-replay-sentinel".into(),
+                    }],
+                }),
+            }];
+            let before = serde_json::to_value(&history).expect("history");
+            let preview = provider.request_preview(&history).expect("preview");
+            assert!(preview["body"].get(field).is_none(), "{preview}");
+            assert!(
+                !preview["body"]
+                    .to_string()
+                    .contains("private-replay-sentinel")
+            );
+            assert_eq!(serde_json::to_value(&history).expect("history"), before);
+            assert!(
+                config.providers["gateway"].models["unknown-fixture"]
+                    .reasoning
+                    .is_some()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn model014_disabled_reasoning_http_preserves_tool_pairing_and_raw_history() {
+        use serde_json::{Value, json};
+        use talos_core::message::{
+            AssistantReasoning, Message, MessageToolResult, ReasoningBlock, ToolCall,
+        };
+        for (protocol, path, field, output_field) in [
+            (
+                ProviderProtocol::OpenAIChat,
+                "/chat/completions",
+                "reasoning_effort",
+                "max_completion_tokens",
+            ),
+            (
+                ProviderProtocol::OpenAIResponses,
+                "/responses",
+                "reasoning",
+                "max_output_tokens",
+            ),
+            (
+                ProviderProtocol::AnthropicMessages,
+                "/messages",
+                "thinking",
+                "max_tokens",
+            ),
+        ] {
+            let mut server = mockito::Server::new_async().await;
+            let config = Config {
+                provider: "gateway".into(),
+                model: "unknown-fixture".into(),
+                providers: std::collections::HashMap::from([(
+                    "gateway".into(),
+                    talos_config::ProviderConfig {
+                        protocol,
+                        base_url: Some(server.url()),
+                        models: std::collections::HashMap::from([(
+                            "unknown-fixture".into(),
+                            talos_config::ModelConfig {
+                                reasoning_supported: Some(false),
+                                reasoning: Some(talos_config::ReasoningOptions::default()),
+                                output_limit: Some(1234),
+                                ..Default::default()
+                            },
+                        )]),
+                        timeout: talos_config::ProviderTimeoutConfig {
+                            max_attempts: 0,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            };
+            let encrypted = crate::openai_responses_reasoning::encode_completed_reasoning_item(&json!({
+                "type": "reasoning", "id": "rs_fixture", "summary": [], "encrypted_content": "private-cipher-sentinel"
+            })).expect("encode").expect("encrypted item");
+            let history = vec![
+                Message::User {
+                    content: "run probe".into(),
+                },
+                Message::Assistant {
+                    content: "visible answer".into(),
+                    tool_calls: vec![ToolCall {
+                        id: "call_fixture".into(),
+                        name: "probe".into(),
+                        input: json!({}),
+                    }],
+                    reasoning: Some(AssistantReasoning {
+                        provider: "gateway".into(),
+                        model: "unknown-fixture".into(),
+                        blocks: vec![
+                            ReasoningBlock::Plain {
+                                text: "private-plain-sentinel".into(),
+                            },
+                            ReasoningBlock::Thinking {
+                                text: "private-thinking-sentinel".into(),
+                                signature: Some("private-signature-sentinel".into()),
+                            },
+                            ReasoningBlock::Redacted { data: encrypted },
+                        ],
+                    }),
+                },
+                Message::Tool {
+                    result: MessageToolResult {
+                        tool_use_id: "call_fixture".into(),
+                        content: "probe-result".into(),
+                        is_error: false,
+                    },
+                },
+            ];
+            let before = serde_json::to_value(&history).expect("history");
+            let mock = server
+                .mock("POST", path)
+                .match_request(move |request| {
+                    let body: Value =
+                        serde_json::from_slice(request.body().expect("body")).expect("json");
+                    let wire = body.to_string();
+                    body.get(field).is_none()
+                        && body[output_field] == 1234
+                        && !wire.contains("private-")
+                        && wire.contains("visible answer")
+                        && wire.contains("probe-result")
+                        && wire.matches("call_fixture").count() == 2
+                })
+                .with_status(200)
+                .with_header("content-type", "text/event-stream")
+                .with_body("")
+                .expect(1)
+                .create_async()
+                .await;
+            let provider = build_configured_provider(&config, "fixture-key").expect("provider");
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                let mut events = provider.stream(&history).await.expect("request accepted");
+                while events.recv().await.is_some() {}
+            })
+            .await
+            .expect("bounded request");
+            mock.assert_async().await;
+            assert_eq!(serde_json::to_value(&history).expect("history"), before);
+        }
+    }
+
+    #[tokio::test]
+    async fn model014_negative_override_refuses_glm_auto_review_before_dispatch() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/chat/completions")
+            .expect(0)
+            .create_async()
+            .await;
+        let config = Config {
+            provider: "gateway".into(),
+            model: "glm-5.3".into(),
+            providers: std::collections::HashMap::from([(
+                "gateway".into(),
+                talos_config::ProviderConfig {
+                    protocol: ProviderProtocol::OpenAIChat,
+                    base_url: Some(server.url()),
+                    models: std::collections::HashMap::from([(
+                        "glm-5.3".into(),
+                        talos_config::ModelConfig {
+                            reasoning_supported: Some(false),
+                            ..Default::default()
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let provider = build_configured_provider(&config, "fixture-key").expect("provider");
+        let error = provider
+            .stream_auto_review(
+                &[talos_core::message::Message::User {
+                    content: "review this request".into(),
+                }],
+                talos_core::provider::DecisionRequestLimits {
+                    max_output_tokens: 128,
+                    max_retries: 0,
+                },
+            )
+            .await
+            .expect_err("explicit negative must not be overridden by Auto");
+        assert!(
+            error
+                .to_string()
+                .contains("reasoning capability is disabled"),
+            "{error}"
+        );
+        mock.assert_async().await;
+    }
+
+    #[test]
+    fn model014_output_ceiling_is_sent_without_reasoning() {
+        let catalog = talos_config::model::builtin_models();
+        let model = catalog
+            .iter()
+            .find(|model| {
+                model.output_limit.is_some()
+                    && catalog
+                        .iter()
+                        .filter(|candidate| candidate.id == model.id)
+                        .count()
+                        == 1
+            })
+            .expect("unique catalog model with output");
+        for (protocol, field) in [
+            (ProviderProtocol::OpenAIChat, "max_completion_tokens"),
+            (ProviderProtocol::OpenAIResponses, "max_output_tokens"),
+            (ProviderProtocol::AnthropicMessages, "max_tokens"),
+        ] {
+            let mut config = Config {
+                provider: "gateway".into(),
+                model: model.id.clone(),
+                providers: std::collections::HashMap::from([(
+                    "gateway".into(),
+                    talos_config::ProviderConfig {
+                        base_url: Some("https://gateway.test/v1".into()),
+                        protocol,
+                        models: std::collections::HashMap::from([(
+                            model.id.clone(),
+                            talos_config::ModelConfig {
+                                reasoning_supported: Some(false),
+                                ..Default::default()
+                            },
+                        )]),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            };
+            assert_eq!(
+                effective_output_limit(&config),
+                model.output_limit.expect("output")
+            );
+            let provider = build_configured_provider(&config, "fixture-key").expect("provider");
+            let preview = provider.request_preview(&[]).expect("preview");
+            assert_eq!(preview["body"][field], model.output_limit.expect("output"));
+            config
+                .providers
+                .get_mut("gateway")
+                .expect("provider")
+                .models
+                .get_mut(&model.id)
+                .expect("model")
+                .output_limit = Some(1234);
+            let provider = build_configured_provider(&config, "fixture-key").expect("provider");
+            assert_eq!(
+                provider.request_preview(&[]).expect("preview")["body"][field],
+                1234
+            );
+        }
+    }
 
     #[test]
     fn model_messages_override_constructs_a_full_endpoint_from_a_gateway_root() {

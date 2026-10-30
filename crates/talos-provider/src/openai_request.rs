@@ -251,7 +251,9 @@ pub(crate) fn build_request_body(
             ReasoningEffort::High => "high",
         };
         body["reasoning_effort"] = json!(effort);
-        body["max_completion_tokens"] = json!(output_limit.unwrap_or(4096));
+    }
+    if let Some(limit) = output_limit.or_else(|| reasoning.map(|_| 4096)) {
+        body["max_completion_tokens"] = json!(limit);
     }
 
     body
