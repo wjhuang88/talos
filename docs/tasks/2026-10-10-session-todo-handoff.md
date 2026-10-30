@@ -1,9 +1,11 @@
-## Next phase draft — 2026-10-30
+## Current phase — 2026-10-30
 
 Overall goal remains Active. I309 and I308/T8 are closed on main (#812 merge
 `85aa2d0f495a6c337b0bf62f9e05a7fe6a35194c`); #563 is closed.
-I311/ADR-095 propose MODEL-014 T2+T3 Active/Claimed in #813, ineffective until merge.
-No capability implementation has begun. Queue remains MODEL-014 → T4 → T5 → T1 → T6.
+I311/ADR-095 MODEL-014 T2+T3 claim #813 is effective on main at `0aff4e4fbf2a653521f0da9907900341772efc24`.
+Local implementation through `4d644ba03865880bd59f88f3885f8b6ac81935c4` is Active/unmerged;
+static independent review approves that head, but full preflight/remote gates remain open.
+Queue remains MODEL-014 → T4 → T5 → T1 → T6.
 
 ## I308/T8 phase completion evidence — 2026-10-30
 

@@ -141,3 +141,16 @@ acceptance review (including the custom-variant evidence boundary), frozen
 independent security/API authorization, exact-head CI, CAS and merge. Re-run both
 governance validators after final owner/documentation synchronization. Keep all
 eight acceptance rows; none is closed by this checkpoint alone.
+
+
+Desktop review follow-up `4d644ba03865880bd59f88f3885f8b6ac81935c4` carries
+materialization diagnostics through RuntimeOutput to the actual window output.
+`cargo test --locked -p talos-desktop --features desktop-ui --bin talos-desktop-mock`
+passes 114/114; UI-enabled all-target warnings-denied Clippy passes
+(`/private/tmp/model014-desktop-suite.log`, `/private/tmp/model014-desktop-clippy.log`).
+Independent static security/API/acceptance re-review approves this exact head
+against base `0aff4e4fbf2a653521f0da9907900341772efc24`, without independently
+running tests. The reviewer accepts the explicit combined custom-variant evidence
+boundary above. The prior preflight exited 101 due to ENOSPC, not a passing gate.
+After authorized cleaning of this active worktree's target, standard preflight
+is rebuilding (`/private/tmp/model014-preflight-rebuild.log`); no success claimed yet.
