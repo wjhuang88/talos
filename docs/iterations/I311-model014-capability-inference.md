@@ -1,6 +1,6 @@
 # Iteration I311: Catalog-Assisted Custom-Model Capability And Variant Inference
 
-> Document status: Review (implementation PR #815; remote gates pending)
+> Document status: Review (implementation PR #815 merged; acceptance closeout pending)
 > Published plan date: 2026-10-30
 > Planned objective: deliver full MODEL-014 and handoff T2+T3 using shared canonical identity, explicit overrides, provenance, protocol-safe requests and a real local walkthrough.
 > Baseline rule: preserve this scope; a narrower compatibility patch cannot close it.
@@ -165,3 +165,18 @@ failed process observation with EPERM; the authorized unsandboxed run passed.
 This is local validation, not remote CI. Initial exact-head CI `41021654423`
 was queued when published; the synchronized documentation candidate requires its
 own exact-head remote evidence. Delivery remains Review, not Complete.
+
+
+### Merged implementation checkpoint — 2026-10-30
+
+PR #815 merged as `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`.
+Exact head `a9ee503d27c4a6bf59364c40e87033aad1c7cdd8` passed all eight
+checks in CI `41022658026`; both governance validators passed with zero warnings.
+Independent governance follow-up inherited unchanged reviewed source and approved
+that head against base `0aff4e4fbf2a653521f0da9907900341772efc24`:
+https://github.com/wjhuang88/talos/pull/815#issuecomment-6519015187.
+Review was static, with shared GitHub identity disclosed, and did not independently
+run tests. Merge-time CAS verified the target base, effective claim, exact head,
+non-overlapping open PRs and passing gates. Earlier pending-CI statements are
+historical. Delivery remains Review pending owner-first acceptance closeout;
+T4 → T5 → T1 → T6 and the overall handoff remain incomplete.

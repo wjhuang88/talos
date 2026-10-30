@@ -1,8 +1,8 @@
 ## MODEL-014 implementation review — 2026-10-30
 
-[I311](I311-model014-capability-inference.md) is Review in PR #815; claim #813 is merged/effective.
+[I311](I311-model014-capability-inference.md) is Review after PR #815 merged as `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`; acceptance closeout remains pending.
 Local standard preflight and static independent security/API review passed;
-exact-head remote CI and merge remain pending. I310/ADR-094 remain independently
+all eight exact-head CI checks passed in `41022658026`; independent static review and merge CAS passed. I310/ADR-094 remain independently
 owned by #811. Earlier activation/intake snapshots below are historical.
 Full handoff stays Active: MODEL-014 → T4 → T5 → T1 → T6.
 
