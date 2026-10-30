@@ -103,8 +103,10 @@ fn maybe_inject_provider(provider: Arc<dyn LanguageModel>) -> Arc<dyn LanguageMo
 }
 
 /// Builds the configured provider without creating an async runtime.
-pub(crate) fn configured_provider(config: &Config) -> Result<Arc<dyn LanguageModel>, String> {
-    let (config, _resolution) = talos_config::variant::materialize_runtime_model_config(config);
+pub(crate) fn configured_provider(
+    config: &Config,
+) -> Result<(Arc<dyn LanguageModel>, Option<String>), String> {
+    let (config, resolution) = talos_config::variant::materialize_runtime_model_config(config);
     if config.provider.trim().is_empty() || config.model.trim().is_empty() {
         return Err("provider setup is incomplete; configure a provider and model first".into());
     }
@@ -112,7 +114,7 @@ pub(crate) fn configured_provider(config: &Config) -> Result<Arc<dyn LanguageMod
     let provider =
         talos_provider::openai_responses::factory::build_configured_provider(&config, &api_key)
             .map_err(|error| error.to_string())?;
-    Ok(maybe_inject_provider(provider))
+    Ok((maybe_inject_provider(provider), resolution.diagnostic))
 }
 
 #[cfg(test)]
@@ -126,7 +128,7 @@ mod tests {
         config.variant = Some("high-reasoning".into());
         config.providers.entry("openai".into()).or_default().api_key =
             Some("test-only-fixture".into());
-        let provider = configured_provider(&config).expect("provider builds");
+        let (provider, _) = configured_provider(&config).expect("provider builds");
         let preview = provider
             .request_preview(&[talos_runtime::Message::User {
                 content: "probe".into(),

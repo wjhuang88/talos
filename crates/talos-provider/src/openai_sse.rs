@@ -770,11 +770,11 @@ mod tests {
     }
 
     #[test]
-    fn test_openai_non_reasoning_keeps_body() {
+    fn test_openai_non_reasoning_preserves_output_ceiling() {
         let body = build_request_body("gpt-4o", &[], &[], None, Some(2048));
 
         assert!(body.get("reasoning_effort").is_none());
-        assert!(body.get("max_completion_tokens").is_none());
+        assert_eq!(body["max_completion_tokens"], 2048);
     }
 
     #[test]

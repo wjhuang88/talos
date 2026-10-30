@@ -172,7 +172,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
             &config,
             prompt,
             request_preview,
-            &config.all_models(),
+            &talos_config::model::builtin_models(),
             &workspace_root,
         )?)
         .await
@@ -280,9 +280,15 @@ fn build_print_submit_op(
 
     // Capability gate (R3 equivalent for print mode): refuse before any
     // file-system probe when the active model is not confirmed Supported.
-    let metadata =
-        talos_config::model::find_model_by_provider(all_models, &config.provider, &config.model);
-    let capability = ImageInputCapability::from_metadata(metadata);
+    let capability = match config
+        .resolve_model_fields_with_catalog(all_models)
+        .image_input
+        .value
+    {
+        Some(true) => ImageInputCapability::Supported,
+        Some(false) => ImageInputCapability::Unsupported,
+        None => ImageInputCapability::Unknown,
+    };
     if !capability.allows_attachment() {
         bail!(
             "Active model {}/{} does not support image input (capability: {:?}). \
@@ -480,6 +486,112 @@ mod tests {
             SessionOp::PreviewRequest { message } => assert_eq!(message, "hello"),
             other => panic!("expected PreviewRequest, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn model014_print_unknown_and_explicit_negative_refuse_before_file_probe() {
+        let cli = cli_with_attach(vec![std::path::PathBuf::from("/missing/model014.png")]);
+        let mut config = config_with("gateway", "proxy/vision-fixture");
+        let unknown = build_print_submit_op(
+            &cli,
+            &config,
+            "describe".into(),
+            None,
+            &[],
+            std::path::Path::new("/tmp"),
+        )
+        .expect_err("unknown refusal");
+        assert!(unknown.to_string().contains("Unknown"));
+        config
+            .providers
+            .entry("gateway".into())
+            .or_default()
+            .models
+            .insert(
+                "proxy/vision-fixture".into(),
+                talos_config::ModelConfig {
+                    image_input: Some(false),
+                    ..Default::default()
+                },
+            );
+        let catalog = vec![metadata_for("source", "vision-fixture", true)];
+        let denied = build_print_submit_op(
+            &cli,
+            &config,
+            "describe".into(),
+            None,
+            &catalog,
+            std::path::Path::new("/tmp"),
+        )
+        .expect_err("negative override");
+        assert!(denied.to_string().contains("Unsupported"));
+    }
+
+    #[test]
+    fn model014_inferred_image_requires_workspace_permission_and_valid_content() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let external = tempfile::tempdir().expect("external directory");
+        let image_path = workspace.path().join("vision.png");
+        image::RgbaImage::new(4, 4)
+            .save_with_format(&image_path, image::ImageFormat::Png)
+            .expect("real PNG");
+        let config = config_with("gateway", "proxy/vision-fixture");
+        let before = toml::to_string(&config).expect("config");
+        let catalog = vec![metadata_for("source", "vision-fixture", true)];
+        let op = build_print_submit_op(
+            &cli_with_attach(vec![image_path]),
+            &config,
+            "describe".into(),
+            None,
+            &catalog,
+            workspace.path(),
+        )
+        .expect("inferred capability and workspace read admission");
+        match op {
+            SessionOp::SubmitMultimodal { text, attachments } => {
+                assert_eq!(text, "describe");
+                assert_eq!(attachments.len(), 1);
+                assert!(
+                    matches!(&attachments[0], talos_core::message::ContentPart::Image { mime, .. } if mime == "image/png")
+                );
+            }
+            other => panic!("expected multimodal submission, got {other:?}"),
+        }
+        let outside = external.path().join("not-an-image.png");
+        std::fs::write(
+            &outside,
+            b"invalid image must not be decoded before permission",
+        )
+        .expect("external fixture");
+        let error = build_print_submit_op(
+            &cli_with_attach(vec![outside]),
+            &config,
+            "describe".into(),
+            None,
+            &catalog,
+            workspace.path(),
+        )
+        .expect_err("catalog inference cannot grant external reads");
+        let error = error.to_string();
+        assert!(
+            error.contains("outside the workspace") || error.contains("permission"),
+            "{error}"
+        );
+        let invalid = workspace.path().join("invalid.png");
+        std::fs::write(&invalid, b"invalid image").expect("invalid fixture");
+        assert!(
+            build_print_submit_op(
+                &cli_with_attach(vec![invalid]),
+                &config,
+                "describe".into(),
+                None,
+                &catalog,
+                workspace.path(),
+            )
+            .is_err(),
+            "inference cannot bypass image validation"
+        );
+        assert_eq!(toml::to_string(&config).expect("config"), before);
     }
 
     /// R8 regression: --attach on a model whose capability is

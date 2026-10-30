@@ -260,7 +260,7 @@ async fn copilot_redirects_and_auth_errors_do_not_replay_or_change_wire() {
                 }])
                 .await;
             assert!(result.is_err(), "{protocol:?}/{status}");
-            let error = result.err().expect("refusal");
+            let error = result.expect_err("refusal");
             if status == 401 {
                 assert!(matches!(error, ProviderError::AuthenticationFailed(_)));
             }

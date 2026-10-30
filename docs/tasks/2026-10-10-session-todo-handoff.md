@@ -1,9 +1,11 @@
-## Next phase draft — 2026-10-30
+## Current phase — 2026-10-30
 
 Overall goal remains Active. I309 and I308/T8 are closed on main (#812 merge
 `85aa2d0f495a6c337b0bf62f9e05a7fe6a35194c`); #563 is closed.
-I311/ADR-095 propose MODEL-014 T2+T3 Active/Claimed in #813, ineffective until merge.
-No capability implementation has begun. Queue remains MODEL-014 → T4 → T5 → T1 → T6.
+I311/ADR-095 MODEL-014 T2+T3 claim #813 is effective on main at `0aff4e4fbf2a653521f0da9907900341772efc24`.
+Local implementation through `4d644ba03865880bd59f88f3885f8b6ac81935c4` is published in PR #815, Review/unmerged;
+local full preflight and independent static review passed, remote gates remain open.
+Queue remains MODEL-014 → T4 → T5 → T1 → T6.
 
 ## I308/T8 phase completion evidence — 2026-10-30
 
@@ -6572,3 +6574,11 @@ approval, successful restoration, and one-use receipt rejection. Focused locked 
 and test Clippy pass; reviewer confirms test-only boundary. This is not CI for this head,
 not actual human UI, not recovery-storage/cross-session acceptance, and not I308 completion.
 Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
+
+MODEL-014 local checkpoint (2026-10-30): I311 claim #813 is merged at
+`0aff4e4fbf2a653521f0da9907900341772efc24`; implementation has local config/provider/CLI commits
+`2cbc699e4`, `3e1e9971e`, `d624ea553` and remains Active/unmerged. A real local HTTP regression covers
+reasoning-negative requests and preserved tool pairing across three protocols.
+See I311 owner for exact commands/logs and unimplemented/unverified acceptance.
+Overall handoff remains Active; retain I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.

@@ -1,6 +1,6 @@
 # Iteration I311: Catalog-Assisted Custom-Model Capability And Variant Inference
 
-> Document status: Active (proposed in #813; effective only on merge)
+> Document status: Review (implementation PR #815; remote gates pending)
 > Published plan date: 2026-10-30
 > Planned objective: deliver full MODEL-014 and handoff T2+T3 using shared canonical identity, explicit overrides, provenance, protocol-safe requests and a real local walkthrough.
 > Baseline rule: preserve this scope; a narrower compatibility patch cannot close it.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #813 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Finalized exact-head governance/API/security review and CI required before merge; no implementation before effective claim. |
-| Implementation PR | Not started |
+| Implementation PR | #815 |
 | Last Updated | 2026-10-30 |
 | Handoff / Release Condition | Full MODEL-014 acceptance, merged implementation and owner evidence; no release/tag. |
 
@@ -88,3 +88,80 @@ Proposed Active/Claimed state in #813 is ineffective before merge; no implementa
 or test evidence yet. Final claim/activation
 must reach main before implementation starts. Completion requires an existing
 merged implementation SHA and all acceptance above; full handoff remains Active.
+
+### Local implementation checkpoint — 2026-10-30
+
+Claim #813 is effective through merge `0aff4e4fbf2a653521f0da9907900341772efc24`.
+The activation paragraph above preserves the pre-merge baseline. Current local
+implementation commits are `2cbc699e4` (config authority), `3e1e9971e` (provider
+request policy) and `d624ea553` (CLI gates, provenance and actual request tests).
+They are not pushed/merged completion evidence. Full handoff remains Active.
+
+Validation used pinned Rust 1.99.0 and `--locked`, with incremental compilation
+and dev/test debug info disabled to bound local disk consumption:
+
+| Evidence | Result | Local log |
+|---|---|---|
+| Config/provider library suites | 265/265 and 206/206 | `/private/tmp/model014-config-provider-suite.log` |
+| CLI binary unit suite | 382/382 | `/private/tmp/model014-cli-full.log` |
+| Config/provider/CLI all-target warnings-denied Clippy | Pass after existing Copilot test lint correction | `/private/tmp/model014-clippy-retry.log` |
+| Responses real-Agent integration suite | 6/6 before added variant case | `/private/tmp/model014-cli-responses-suite.log` |
+| Additional gateway catalog-variant walkthrough | Pass | `/private/tmp/model014-variant-walkthrough.log` |
+| Current walkthrough test Clippy | Pass | `/private/tmp/model014-walkthrough-clippy.log` |
+
+Provider HTTP regression sends actual local requests through Chat, Responses and
+Messages. Explicit false removes reasoning options and plain/signed/encrypted
+replay while preserving tool-call/result IDs and raw history. Its empty response
+stream proves transmission, not model generation. Independent static mid-review
+found GLM-5.3 Auto re-enabling reasoning; the fix refuses that incompatible request
+before dispatch, covered by a zero-request HTTP mock. Final exact-head review is
+still required; the mid-review did not run tests or approve a frozen candidate.
+
+Print-mode coverage admits a real PNG through the inferred capability and normal
+workspace read permission, refuses an external path before image decoding, and
+refuses invalid image content. The real binary walkthrough then uses a custom
+prefixed ID with no image/output overrides, sends the PNG to a loopback Responses
+endpoint, executes native read, retains the image across the second request,
+receives final text and leaves config bytes unchanged. Both captured requests
+assert inferred output. Capability alone invents no reasoning preset.
+
+The initial combined custom variant fixture failed because all three embedded
+variant records have ambiguous cross-provider IDs (8, 7 and 8 matches). Unique
+custom matching therefore correctly refuses those records. Controlled-catalog
+regression covers custom variant inheritance and negative override suppression.
+A separate real walkthrough keeps the known catalog provider identity but points
+its endpoint at loopback: selected high effort overrides configured low while
+images, tool pairing and config bytes remain intact. This is endpoint override
+plus catalog-scoped variant execution, not custom-provider unique-match evidence.
+No catalog data or matching rule was weakened, and no paid endpoint/probe ran.
+
+README en/zh, capability reference and SDK migration document the unreleased
+candidate. Remaining gates: full current workspace preflight, final host and
+acceptance review (including the custom-variant evidence boundary), frozen
+independent security/API authorization, exact-head CI, CAS and merge. Re-run both
+governance validators after final owner/documentation synchronization. Keep all
+eight acceptance rows; none is closed by this checkpoint alone.
+
+
+Desktop review follow-up `4d644ba03865880bd59f88f3885f8b6ac81935c4` carries
+materialization diagnostics through RuntimeOutput to the actual window output.
+`cargo test --locked -p talos-desktop --features desktop-ui --bin talos-desktop-mock`
+passes 114/114; UI-enabled all-target warnings-denied Clippy passes
+(`/private/tmp/model014-desktop-suite.log`, `/private/tmp/model014-desktop-clippy.log`).
+Independent static security/API/acceptance re-review approves this exact head
+against base `0aff4e4fbf2a653521f0da9907900341772efc24`, without independently
+running tests. The reviewer accepts the explicit combined custom-variant evidence
+boundary above. The prior preflight exited 101 due to ENOSPC, not a passing gate.
+After authorized cleaning of this active worktree's target, standard preflight
+is rebuilding (`/private/tmp/model014-preflight-rebuild.log`); no success claimed yet.
+
+
+Stable candidate published as PR #815, head
+`b0131f5e24d9b6f0ba7c0b9b692a3822ab3a4648`. Standard
+`./scripts/release_preflight.sh` exited 0 with locked workspace check/Clippy/tests
+and both independent external Runtime SDK modes
+(`/private/tmp/model014-preflight-authorized.log`). The unchanged sandbox retry
+failed process observation with EPERM; the authorized unsandboxed run passed.
+This is local validation, not remote CI. Initial exact-head CI `41021654423`
+was queued when published; the synchronized documentation candidate requires its
+own exact-head remote evidence. Delivery remains Review, not Complete.

@@ -265,10 +265,7 @@ pub(crate) fn set_request_budget_spec(agent: &mut Agent, config: &Config) {
 }
 
 pub(crate) fn set_image_input_capability(agent: &mut Agent, config: &Config) {
-    let all_models = config.all_models();
-    let meta =
-        talos_config::model::find_model_by_provider(&all_models, &config.provider, &config.model);
-    let cap = talos_core::model::ImageInputCapability::from_metadata(meta);
+    let cap = config.resolved_image_input_capability();
     agent.set_image_input_supported(cap.allows_attachment());
 }
 

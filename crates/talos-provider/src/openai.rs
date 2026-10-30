@@ -42,6 +42,7 @@ pub struct OpenAIProvider {
     client: Client,
     copilot_headers: serde_json::Map<String, Value>,
     reasoning: Option<ReasoningOptions>,
+    reasoning_disabled: bool,
     output_limit: Option<u32>,
     timeout_config: ProviderTimeoutConfig,
 }
@@ -57,7 +58,7 @@ impl OpenAIProvider {
         let mut isolated = self.clone();
         isolated.timeout_config.max_attempts =
             limits.max_retries.min(self.timeout_config.max_attempts);
-        let mut body = build_request_body(
+        let mut body = self.request_body(
             &self.model,
             messages,
             &[],
@@ -68,6 +69,11 @@ impl OpenAIProvider {
         // GLM-5.3 requires thinking; disabling it is an API error. Keep this
         // documented model capability local to Auto, never infer it for other models.
         if auto_review && self.model.eq_ignore_ascii_case("glm-5.3") {
+            if self.reasoning_disabled {
+                return Err(ProviderError::InvalidResponse(
+                    "GLM-5.3 Auto review requires thinking, but resolved reasoning capability is disabled".into(),
+                ));
+            }
             body["thinking"] = json!({"type": "enabled"});
             body["reasoning_effort"] = json!("low");
         }
@@ -97,6 +103,7 @@ impl OpenAIProvider {
             client: Client::new(),
             copilot_headers: serde_json::Map::new(),
             reasoning: None,
+            reasoning_disabled: false,
             output_limit: None,
             timeout_config: ProviderTimeoutConfig::default(),
         }
@@ -127,6 +134,23 @@ impl OpenAIProvider {
         self
     }
 
+    pub(crate) fn with_reasoning_disabled(mut self, disabled: bool) -> Self {
+        self.reasoning_disabled = disabled;
+        self
+    }
+
+    fn request_body(
+        &self,
+        model: &str,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        reasoning: Option<&ReasoningOptions>,
+        output_limit: Option<u32>,
+    ) -> serde_json::Value {
+        let messages = crate::reasoning_request_messages(messages, self.reasoning_disabled);
+        build_request_body(model, &messages, tools, reasoning, output_limit)
+    }
+
     /// Set per-model reasoning and output token configuration.
     pub fn with_reasoning(
         mut self,
@@ -152,7 +176,7 @@ impl OpenAIProvider {
     }
 
     async fn make_request(&self, messages: &[Message]) -> ProviderResult<reqwest::Response> {
-        let body = build_request_body(
+        let body = self.request_body(
             &self.model,
             messages,
             &[],
@@ -167,7 +191,7 @@ impl OpenAIProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
     ) -> ProviderResult<reqwest::Response> {
-        let body = build_request_body(
+        let body = self.request_body(
             &self.model,
             messages,
             tools,
@@ -407,7 +431,7 @@ impl LanguageModel for OpenAIProvider {
             "Internal capability probe; do not execute",
             serde_json::json!({"type":"object","properties":{}}),
         );
-        let mut body = build_request_body(
+        let mut body = self.request_body(
             &self.model,
             &[Message::User {
                 content: "Respond with the probe tool call.".into(),
@@ -494,7 +518,7 @@ impl LanguageModel for OpenAIProvider {
         } else {
             crate::compatibility_messages(messages)
         };
-        let body = build_request_body(
+        let body = self.request_body(
             &self.model,
             &projected,
             if native { tools } else { &[] },
@@ -564,7 +588,7 @@ impl LanguageModel for OpenAIProvider {
         } else {
             crate::compatibility_messages(messages)
         };
-        let mut body = build_request_body(
+        let mut body = self.request_body(
             &self.model,
             &projected,
             if native { tools } else { &[] },
@@ -625,7 +649,7 @@ impl LanguageModel for OpenAIProvider {
         tools: &[ToolDefinition],
         progress_tx: mpsc::UnboundedSender<ProviderProgress>,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
-        let body = build_request_body(
+        let body = self.request_body(
             &self.model,
             messages,
             tools,
@@ -646,7 +670,7 @@ impl LanguageModel for OpenAIProvider {
 
     fn request_preview(&self, messages: &[Message]) -> Option<Value> {
         let messages = crate::image_io::preview_messages(messages);
-        let body = build_request_body(
+        let body = self.request_body(
             &self.model,
             &messages,
             &[],

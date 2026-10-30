@@ -247,7 +247,7 @@ pub(crate) fn resolve_model_info(config: &Config) -> ModelInfo {
     let all_models = config.all_models();
     let meta =
         talos_config::model::find_model_by_provider(&all_models, &config.provider, &config.model);
-    let image_input_capability = talos_core::model::ImageInputCapability::from_metadata(meta);
+    let image_input_capability = config.resolved_image_input_capability();
 
     let (context_limit, _) = config.resolve_model_limits();
 

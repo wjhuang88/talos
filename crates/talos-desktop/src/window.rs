@@ -2037,6 +2037,9 @@ impl DesktopWindow {
                             let mut switch_action = None;
                             let mut should_quit = false;
                             match event {
+                                RuntimeOutput::ConfigurationNotice(message) => {
+                                    live.output.push_str(&format!("[model configuration] {message}\n"));
+                                }
                                 RuntimeOutput::ToolStarted { call_id, name } => {
                                     live.status = LiveStatus::Streaming;
                                     live.output.push_str(&format!("\n→ {name} [{call_id}]\n"));

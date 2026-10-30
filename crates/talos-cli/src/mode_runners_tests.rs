@@ -185,6 +185,7 @@ async fn handle_connect_with_credential_preserves_unrelated_provider_fields() {
                         output_limit: None,
                         protocol: None,
                         reasoning: None,
+                        reasoning_supported: None,
                         image_input: None,
                     },
                 )]),

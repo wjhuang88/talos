@@ -52,15 +52,36 @@ fn read_request_at(socket: &mut TcpStream, path: &str) -> serde_json::Value {
 
 #[test]
 fn responses_image_and_native_read_complete_through_real_agent() {
-    image_and_native_read_round(false);
+    image_and_native_read_round(ImageFixture::Configured);
 }
 
 #[test]
 fn neon_packaged_model_endpoint_drives_a_real_agent_round() {
-    image_and_native_read_round(true);
+    image_and_native_read_round(ImageFixture::Packaged);
 }
 
-fn image_and_native_read_round(catalog: bool) {
+#[test]
+fn custom_catalog_image_and_output_complete_through_real_agent() {
+    image_and_native_read_round(ImageFixture::CustomInferred);
+}
+
+#[test]
+fn configured_gateway_endpoint_preserves_catalog_variant_through_real_agent() {
+    image_and_native_read_round(ImageFixture::CatalogVariant);
+}
+
+#[derive(Clone, Copy)]
+enum ImageFixture {
+    Configured,
+    Packaged,
+    CustomInferred,
+    CatalogVariant,
+}
+
+fn image_and_native_read_round(fixture: ImageFixture) {
+    let inferred = matches!(fixture, ImageFixture::CustomInferred);
+    let catalog = matches!(fixture, ImageFixture::Packaged);
+    let variant = matches!(fixture, ImageFixture::CatalogVariant);
     let temp = tempfile::tempdir().expect("isolated home and workspace");
     let config_dir = temp.path().join(".talos");
     std::fs::create_dir(&config_dir).expect("config directory");
@@ -72,7 +93,57 @@ fn image_and_native_read_round(catalog: bool) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("controlled endpoint");
     listener.set_nonblocking(true).expect("bounded accept");
     let address = listener.local_addr().expect("endpoint address");
-    let (expected_path, expected_model) = if catalog {
+    let models = talos_config::model::builtin_models();
+    let inferred_model = models
+        .iter()
+        .find(|model| {
+            model.capabilities.image_input
+                && model.capabilities.reasoning
+                && model.output_limit.is_some()
+                && models
+                    .iter()
+                    .filter(|candidate| candidate.id == model.id)
+                    .count()
+                    == 1
+        })
+        .expect("unique vision/reasoning catalog fixture");
+    let inferred_id = format!("proxy/{}", inferred_model.id);
+    let (expected_path, expected_model) = if variant {
+        std::fs::write(
+            config_dir.join("config.toml"),
+            format!(
+                r#"provider = "openai"
+model = "o3"
+variant = "high-reasoning"
+[providers.openai]
+protocol = "openai-responses"
+base_url = "http://{address}/model-wire"
+api_key = "test-key"
+[providers.openai.models.o3.reasoning]
+effort = "low"
+replay = false
+"#
+            ),
+        )
+        .expect("gateway endpoint with catalog-scoped variant");
+        ("/model-wire/responses", "o3")
+    } else if inferred {
+        std::fs::write(
+            config_dir.join("config.toml"),
+            format!(
+                r#"provider = "fixture"
+model = {inferred_id:?}
+[providers.fixture]
+protocol = "openai-responses"
+base_url = "http://{address}/model-wire"
+api_key = "test-key"
+[providers.fixture.models.{inferred_id:?}]
+"#,
+            ),
+        )
+        .expect("inferred config without capability or limit overrides");
+        ("/model-wire/responses", inferred_id.as_str())
+    } else if catalog {
         std::fs::write(config_dir.join("config.toml"), "provider = \"neon\"\nmodel = \"gpt-5-2\"\n[providers.neon]\nbase_url = \"${NEON_AI_GATEWAY_BASE_URL}/v1\"\napi_key_env = \"NEON_AI_GATEWAY_TOKEN\"\n").expect("catalog-routed config without model protocol/endpoint overrides");
         ("/openai/v1/responses", "gpt-5-2")
     } else {
@@ -81,6 +152,7 @@ fn image_and_native_read_round(catalog: bool) {
         ).expect("config");
         ("/model-wire/responses", "test-model")
     };
+    let config_before = std::fs::read(config_dir.join("config.toml")).expect("config bytes");
     let server = std::thread::spawn(move || {
         let deadline = Instant::now() + Duration::from_secs(25);
         let mut requests = Vec::new();
@@ -162,8 +234,28 @@ fn image_and_native_read_round(catalog: bool) {
         String::from_utf8_lossy(&output.stderr)
     );
     let requests = server.join().expect("controlled endpoint finished");
+    assert_eq!(
+        std::fs::read(config_dir.join("config.toml")).expect("config bytes"),
+        config_before
+    );
     for request in &requests {
         assert_eq!(request["model"], expected_model);
+        if variant {
+            assert_eq!(
+                request["reasoning"]["effort"], "high",
+                "selected variant overrides explicit effort"
+            );
+        }
+        if inferred {
+            assert_eq!(
+                request["max_output_tokens"],
+                inferred_model.output_limit.expect("output")
+            );
+            assert!(
+                request.get("reasoning").is_none(),
+                "capability alone must not invent a preset"
+            );
+        }
         assert_eq!(request["store"], false);
         assert_eq!(request["stream"], true);
         assert!(request.get("previous_response_id").is_none());

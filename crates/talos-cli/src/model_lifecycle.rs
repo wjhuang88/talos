@@ -22,6 +22,7 @@ fn model_picker_label(
     config: &Config,
     model: &talos_config::model::ModelMetadata,
     is_builtin_provider: bool,
+    inference_catalog: &[talos_config::model::ModelMetadata],
 ) -> String {
     let context = model
         .context_limit
@@ -41,10 +42,42 @@ fn model_picker_label(
         })
         .unwrap_or_else(|| "?".to_string());
     let protocol = config.resolve_model_protocol(&model.provider, &model.id);
-    format!(
+    let mut label = format!(
         "{}   {}   {}   {} ({})",
         model.id, model.provider, context, protocol.protocol, protocol.source
-    )
+    );
+    if !is_builtin_provider {
+        let fields = config.resolve_named_model_fields_with_catalog(
+            &model.provider,
+            &model.id,
+            inference_catalog,
+        );
+        fn field<T: std::fmt::Display>(field: &talos_config::ResolvedModelField<T>) -> String {
+            use talos_config::ModelFieldSource;
+            let source = match field.source {
+                ModelFieldSource::Configured => "configured",
+                ModelFieldSource::CatalogInferred => "catalog inferred",
+                ModelFieldSource::Unknown => "unknown",
+            };
+            field
+                .value
+                .as_ref()
+                .map_or_else(|| "unknown".into(), |value| format!("{value} ({source})"))
+        }
+        label.push_str(&format!(
+            "   image: {}   reasoning: {}   output: {}",
+            field(&fields.image_input),
+            field(&fields.reasoning_supported),
+            field(&fields.output_limit)
+        ));
+        if let Some(identity) = fields.matched_catalog {
+            label.push_str(&format!(
+                "   catalog: {}/{} (endpoint unverified)",
+                identity.provider, identity.model
+            ));
+        }
+    }
+    label
 }
 
 /// Constructs [`ModelPickerData`] from the given [`Config`].
@@ -53,6 +86,7 @@ fn model_picker_label(
 /// authenticated providers appear in `ready_models`; unauthenticated providers
 /// are intentionally omitted from `/model` and handled by `/connect`.
 pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
+    let inference_catalog = talos_config::model::builtin_models();
     let catalog = config.all_models();
     let builtin_providers: std::collections::HashSet<_> = talos_config::model::builtin_providers()
         .into_iter()
@@ -79,7 +113,12 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
                 // duplicate model IDs in the structured switch lifecycle.
                 model_id: m.id.clone(),
                 provider: m.provider.clone(),
-                label: model_picker_label(config, m, builtin_providers.contains(&m.provider)),
+                label: model_picker_label(
+                    config,
+                    m,
+                    builtin_providers.contains(&m.provider),
+                    &inference_catalog,
+                ),
                 context_limit: m.context_limit,
                 pricing: pricing_str,
                 authenticated: true,
@@ -131,7 +170,12 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
                 command: "/model".to_string(),
                 model_id: m.id.clone(),
                 provider: m.provider.clone(),
-                label: model_picker_label(config, m, builtin_providers.contains(&m.provider)),
+                label: model_picker_label(
+                    config,
+                    m,
+                    builtin_providers.contains(&m.provider),
+                    &inference_catalog,
+                ),
                 context_limit: m.context_limit,
                 pricing: pricing_str,
                 authenticated: true,
@@ -710,6 +754,33 @@ mod tests {
         fn file_extension(&self) -> &'static str {
             "jsonl"
         }
+    }
+
+    #[test]
+    fn model014_picker_labels_explicit_negative_and_unknown_sources() {
+        let mut config = Config::default();
+        config
+            .providers
+            .entry("gateway".into())
+            .or_default()
+            .models
+            .insert(
+                "model014-unknown".into(),
+                talos_config::ModelConfig {
+                    image_input: Some(false),
+                    output_limit: Some(1234),
+                    ..Default::default()
+                },
+            );
+        let models = config.all_models();
+        let row = models
+            .iter()
+            .find(|m| m.provider == "gateway")
+            .expect("custom model");
+        let label = model_picker_label(&config, row, false, &talos_config::model::builtin_models());
+        assert!(label.contains("image: false (configured)"), "{label}");
+        assert!(label.contains("reasoning: unknown"), "{label}");
+        assert!(label.contains("output: 1234 (configured)"), "{label}");
     }
 
     #[test]

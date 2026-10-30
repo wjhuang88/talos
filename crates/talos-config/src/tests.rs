@@ -469,6 +469,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
                         output_limit: Some(4096),
                         protocol: None,
                         reasoning: None,
+                        reasoning_supported: None,
                         image_input: None,
                     },
                 )]),
@@ -812,6 +813,7 @@ fn test_resolve_model_limits_returns_user_config_when_set() {
                         output_limit: Some(8000),
                         protocol: None,
                         reasoning: None,
+                        reasoning_supported: None,
                         image_input: None,
                     },
                 )]),
@@ -896,6 +898,7 @@ fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
                         output_limit: None,
                         protocol: None,
                         reasoning: None,
+                        reasoning_supported: None,
                         image_input: None,
                     },
                 )]),
@@ -906,7 +909,7 @@ fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
     };
     let (ctx, out) = config.resolve_model_limits();
     assert_eq!(ctx, 100_000);
-    assert_eq!(out, None);
+    assert_eq!(out, Some(64_000));
 }
 
 fn catalog_model(id: &str, provider: &str, context_limit: Option<u32>) -> model::ModelMetadata {
@@ -1064,13 +1067,13 @@ fn test_explicit_custom_context_limit_always_wins() {
 }
 
 #[test]
-fn test_custom_catalog_projection_never_inherits_output_limit() {
+fn test_custom_catalog_projection_inherits_output_limit_under_model014() {
     let config = custom_model_config("unique-model", None);
     let catalog = vec![catalog_model("unique-model", "gateway", Some(256_000))];
 
     assert_eq!(
         config.resolve_model_limits_with_catalog(Some(&catalog)),
-        (256_000, None)
+        (256_000, Some(9_999))
     );
 }
 
@@ -1530,6 +1533,7 @@ fn test_all_models_user_override_matches_by_provider_and_id() {
                         output_limit: Some(1000),
                         protocol: None,
                         reasoning: None,
+                        reasoning_supported: None,
                         image_input: None,
                     },
                 )]),
@@ -1833,6 +1837,7 @@ fn test_all_models_with_catalog_user_config_overrides_catalog() {
                     output_limit: Some(4_200),
                     protocol: None,
                     reasoning: None,
+                    reasoning_supported: None,
                     image_input: None,
                 },
             )]),
@@ -1913,6 +1918,7 @@ fn test_resolve_model_limits_with_catalog_user_overrides_catalog() {
                     output_limit: Some(11_100),
                     protocol: None,
                     reasoning: None,
+                    reasoning_supported: None,
                     image_input: None,
                 },
             )]),
@@ -4088,4 +4094,212 @@ fn interruption_rollback_required_completes_rollback() {
     assert_both_unchanged(&dir, &cfg_b, &cred_b);
     assert!(!txn_dir.exists());
     let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn custom_catalog_exact_ambiguity_does_not_fall_through_to_prefix_match() {
+    let config = custom_model_config("route/unique-model", None);
+    let catalog = vec![
+        catalog_model("route/unique-model", "first", Some(100_000)),
+        catalog_model("route/unique-model", "second", Some(200_000)),
+        catalog_model("unique-model", "normalized", Some(300_000)),
+    ];
+    let resolution = config.resolve_context_limit_with_catalog(&catalog);
+    assert_eq!(resolution.limit, None);
+    assert_eq!(resolution.source, ContextLimitSource::Unknown);
+}
+
+#[test]
+fn model014_limits_resolve_independently_without_persisting_inference() {
+    let mut config = custom_model_config("proxy/unique-model", Some(42_000));
+    let catalog = vec![catalog_model("unique-model", "source", Some(256_000))];
+    let before = toml::to_string(&config).expect("serialize config");
+    assert_eq!(
+        config.resolve_model_limits_with_catalog(Some(&catalog)),
+        (42_000, Some(9_999))
+    );
+    assert_eq!(toml::to_string(&config).expect("serialize config"), before);
+    let model = config
+        .providers
+        .get_mut("gateway")
+        .expect("provider")
+        .models
+        .get_mut("proxy/unique-model")
+        .expect("model");
+    model.context_limit = None;
+    model.output_limit = Some(1234);
+    assert_eq!(
+        config.resolve_model_limits_with_catalog(Some(&catalog)),
+        (256_000, Some(1234))
+    );
+}
+
+#[test]
+fn model014_output_inference_does_not_require_catalog_context() {
+    let config = custom_model_config("unique-model", None);
+    let catalog = vec![catalog_model("unique-model", "source", None)];
+    assert_eq!(
+        config.resolve_model_limits_with_catalog(Some(&catalog)),
+        (128_000, Some(9_999))
+    );
+    let ambiguous = vec![
+        catalog[0].clone(),
+        catalog_model("unique-model", "other", Some(10_000)),
+    ];
+    assert_eq!(
+        config.resolve_model_limits_with_catalog(Some(&ambiguous)),
+        (128_000, None)
+    );
+}
+
+#[test]
+fn model014_field_provenance_preserves_unknown_and_explicit_negative() {
+    use crate::ModelFieldSource;
+    let mut config = custom_model_config("proxy/unique-model", Some(42_000));
+    let mut catalog = vec![catalog_model("unique-model", "source", Some(256_000))];
+    catalog[0].capabilities.image_input = true;
+    let inferred = config.resolve_model_fields_with_catalog(&catalog);
+    assert_eq!(
+        inferred.matched_catalog.expect("identity").provider,
+        "source"
+    );
+    assert_eq!(inferred.context_limit.source, ModelFieldSource::Configured);
+    assert_eq!(inferred.output_limit.value, Some(9_999));
+    assert_eq!(
+        inferred.output_limit.source,
+        ModelFieldSource::CatalogInferred
+    );
+    assert_eq!(inferred.image_input.value, Some(true));
+    config
+        .providers
+        .get_mut("gateway")
+        .expect("provider")
+        .models
+        .get_mut("proxy/unique-model")
+        .expect("model")
+        .image_input = Some(false);
+    let explicit = config.resolve_model_fields_with_catalog(&catalog);
+    assert_eq!(explicit.image_input.value, Some(false));
+    assert_eq!(explicit.image_input.source, ModelFieldSource::Configured);
+    let unknown = custom_model_config("unknown", None).resolve_model_fields_with_catalog(&catalog);
+    assert_eq!(unknown.image_input.value, None);
+    assert_eq!(unknown.image_input.source, ModelFieldSource::Unknown);
+    assert_eq!(unknown.matched_catalog, None);
+}
+
+#[test]
+fn model014_reasoning_negative_override_survives_catalog_and_roundtrip() {
+    use crate::ModelFieldSource;
+    let mut config = custom_model_config("unique-model", None);
+    let mut catalog = vec![catalog_model("unique-model", "source", Some(256_000))];
+    catalog[0].capabilities.reasoning = true;
+    assert_eq!(
+        config
+            .resolve_model_fields_with_catalog(&catalog)
+            .reasoning_supported
+            .value,
+        Some(true)
+    );
+    config
+        .providers
+        .get_mut("gateway")
+        .expect("provider")
+        .models
+        .get_mut("unique-model")
+        .expect("model")
+        .reasoning_supported = Some(false);
+    let restored: Config =
+        toml::from_str(&toml::to_string(&config).expect("serialize")).expect("deserialize");
+    let field = restored
+        .resolve_model_fields_with_catalog(&catalog)
+        .reasoning_supported;
+    assert_eq!(field.value, Some(false));
+    assert_eq!(field.source, ModelFieldSource::Configured);
+    catalog[0].capabilities.reasoning = false;
+    assert_eq!(
+        restored
+            .resolve_model_fields_with_catalog(&catalog)
+            .reasoning_supported
+            .value,
+        Some(false)
+    );
+    assert_eq!(
+        custom_model_config("unknown", None)
+            .resolve_model_fields_with_catalog(&catalog)
+            .reasoning_supported
+            .value,
+        None
+    );
+}
+
+#[test]
+fn model014_custom_picker_inherits_one_identity_and_negative_override_hides_variants() {
+    let mut config = custom_model_config("proxy/unique-model", None);
+    let mut catalog = vec![catalog_model("unique-model", "source", Some(256_000))];
+    catalog[0].capabilities.image_input = true;
+    catalog[0].capabilities.reasoning = true;
+    catalog[0].variants = vec![talos_core::model::VariantDef {
+        id: "high".into(),
+        label: "High".into(),
+        reasoning_effort: Some(talos_core::model::ReasoningEffort::High),
+    }];
+    let before = toml::to_string(&config).expect("serialize");
+    let models = config.all_models_with_catalog(Some(&catalog));
+    let row = model::find_model_by_provider(&models, "gateway", "proxy/unique-model")
+        .expect("custom row");
+    assert_eq!(row.context_limit, Some(256_000));
+    assert_eq!(row.output_limit, Some(9_999));
+    assert!(row.capabilities.image_input);
+    assert!(row.capabilities.reasoning);
+    assert_eq!(row.variants, catalog[0].variants);
+    assert_eq!(toml::to_string(&config).expect("serialize"), before);
+    let overrides = config
+        .providers
+        .get_mut("gateway")
+        .expect("provider")
+        .models
+        .get_mut("proxy/unique-model")
+        .expect("model");
+    overrides.reasoning_supported = Some(false);
+    overrides.image_input = Some(false);
+    let models = config.all_models_with_catalog(Some(&catalog));
+    let row = model::find_model_by_provider(&models, "gateway", "proxy/unique-model")
+        .expect("custom row");
+    assert!(!row.capabilities.reasoning);
+    assert!(!row.capabilities.image_input);
+    assert!(row.variants.is_empty());
+}
+
+#[test]
+fn model014_image_gate_distinguishes_unknown_and_explicit_false() {
+    use talos_core::model::ImageInputCapability;
+    let mut config = custom_model_config("unknown-model014-fixture", None);
+    assert_eq!(
+        config.resolved_image_input_capability(),
+        ImageInputCapability::Unknown
+    );
+    config
+        .providers
+        .get_mut("gateway")
+        .expect("provider")
+        .models
+        .get_mut("unknown-model014-fixture")
+        .expect("model")
+        .image_input = Some(false);
+    assert_eq!(
+        config.resolved_image_input_capability(),
+        ImageInputCapability::Unsupported
+    );
+    config
+        .providers
+        .get_mut("gateway")
+        .expect("provider")
+        .models
+        .get_mut("unknown-model014-fixture")
+        .expect("model")
+        .image_input = Some(true);
+    assert_eq!(
+        config.resolved_image_input_capability(),
+        ImageInputCapability::Supported
+    );
 }

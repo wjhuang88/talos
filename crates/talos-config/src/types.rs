@@ -88,6 +88,10 @@ pub struct ModelConfig {
     /// Per-model reasoning/thinking configuration (ADR-034).
     #[serde(default)]
     pub reasoning: Option<ReasoningOptions>,
+    /// Explicit reasoning capability override, independent of effort/budget options.
+    /// False disables reasoning parameters and replay; omission permits catalog inference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_supported: Option<bool>,
     /// Whether this model accepts image input.
     ///
     /// When `Some(true)`, overrides the catalog default so that

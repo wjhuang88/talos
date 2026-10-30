@@ -61,7 +61,7 @@ pub fn materialize_runtime_model_config(config: &Config) -> (Config, VariantReso
     let all_models = config.all_models();
     let metadata =
         crate::model::find_model_by_provider(&all_models, &config.provider, &config.model);
-    let resolution = metadata.map_or_else(
+    let mut resolution = metadata.map_or_else(
         || {
             resolve_variant(
                 config.variant.as_deref(),
@@ -92,5 +92,212 @@ pub fn materialize_runtime_model_config(config: &Config) -> (Config, VariantReso
         reasoning.effort = Some(reasoning_effort);
     }
 
+    if config.resolve_model_fields().reasoning_supported.value == Some(false)
+        && let Some(model) = runtime_config
+            .providers
+            .get_mut(&runtime_config.provider)
+            .and_then(|provider| provider.models.get_mut(&runtime_config.model))
+    {
+        if model.reasoning.is_some() {
+            append_diagnostic(
+                &mut resolution,
+                "Reasoning options and replay omitted: resolved capability is disabled.",
+            );
+        }
+        model.reasoning = None;
+    }
+
+    if let Some(options) = runtime_config
+        .providers
+        .get(&runtime_config.provider)
+        .and_then(|provider| provider.models.get(&runtime_config.model))
+        .and_then(|model| model.reasoning.as_ref())
+    {
+        use crate::ProviderProtocol;
+        match config
+            .resolve_model_protocol(&config.provider, &config.model)
+            .protocol
+        {
+            ProviderProtocol::OpenAIChat | ProviderProtocol::OpenAIResponses
+                if options.budget_tokens.is_some() =>
+            {
+                append_diagnostic(
+                    &mut resolution,
+                    "Reasoning budget_tokens omitted: this protocol uses effort.",
+                );
+            }
+            ProviderProtocol::AnthropicMessages if options.effort.is_some() => {
+                append_diagnostic(
+                    &mut resolution,
+                    "Reasoning effort omitted: this protocol uses a thinking budget.",
+                );
+            }
+            _ => {}
+        }
+    }
     (runtime_config, resolution)
+}
+
+fn append_diagnostic(resolution: &mut VariantResolution, message: &str) {
+    match resolution.diagnostic.as_mut() {
+        Some(existing) => {
+            existing.push(' ');
+            existing.push_str(message);
+        }
+        None => resolution.diagnostic = Some(message.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ModelConfig, ProviderConfig};
+    use std::collections::HashMap;
+
+    fn configured(model: &str, supported: Option<bool>) -> Config {
+        Config {
+            provider: "gateway".into(),
+            model: model.into(),
+            providers: HashMap::from([(
+                "gateway".into(),
+                ProviderConfig {
+                    models: HashMap::from([(
+                        model.into(),
+                        ModelConfig {
+                            reasoning_supported: supported,
+                            reasoning: Some(ReasoningOptions {
+                                effort: Some(ReasoningEffort::High),
+                                budget_tokens: Some(2048),
+                                replay: true,
+                            }),
+                            ..Default::default()
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn negative_reasoning_materialization_preserves_persisted_options() {
+        let config = configured("unknown-model014-fixture", Some(false));
+        let before = toml::to_string(&config).expect("serialize");
+        let (runtime, _) = materialize_runtime_model_config(&config);
+        assert!(
+            runtime.providers["gateway"]
+                .models
+                .get(&runtime.model)
+                .expect("model")
+                .reasoning
+                .is_none()
+        );
+        assert!(
+            config.providers["gateway"]
+                .models
+                .get(&config.model)
+                .expect("model")
+                .reasoning
+                .is_some()
+        );
+        assert_eq!(toml::to_string(&config).expect("serialize"), before);
+    }
+
+    #[test]
+    fn materialization_reports_disabled_and_protocol_omissions_without_persisting() {
+        let config = configured("unknown-model014-fixture", Some(false));
+        let (_, resolution) = materialize_runtime_model_config(&config);
+        assert!(
+            resolution
+                .diagnostic
+                .expect("disabled diagnostic")
+                .contains("capability is disabled")
+        );
+        for (protocol, expected) in [
+            (crate::ProviderProtocol::OpenAIChat, "budget_tokens omitted"),
+            (
+                crate::ProviderProtocol::OpenAIResponses,
+                "budget_tokens omitted",
+            ),
+            (crate::ProviderProtocol::AnthropicMessages, "effort omitted"),
+        ] {
+            let mut config = configured("unknown-model014-fixture", Some(true));
+            let provider = config.providers.get_mut("gateway").expect("provider");
+            provider.protocol = protocol;
+            let options = provider
+                .models
+                .get_mut("unknown-model014-fixture")
+                .expect("model")
+                .reasoning
+                .as_mut()
+                .expect("options");
+            options.effort = Some(ReasoningEffort::High);
+            options.budget_tokens = Some(2048);
+            let before = toml::to_string(&config).expect("config");
+            let (_, resolution) = materialize_runtime_model_config(&config);
+            let diagnostic = resolution.diagnostic.expect("protocol diagnostic");
+            assert!(diagnostic.contains(expected), "{diagnostic}");
+            assert!(diagnostic.len() < 200);
+            assert_eq!(toml::to_string(&config).expect("config"), before);
+        }
+    }
+
+    #[test]
+    fn unknown_reasoning_preserves_explicit_legacy_options() {
+        let config = configured("unknown-model014-fixture", None);
+        let (runtime, _) = materialize_runtime_model_config(&config);
+        assert_eq!(
+            runtime.providers["gateway"]
+                .models
+                .get(&runtime.model)
+                .expect("model")
+                .reasoning,
+            config.providers["gateway"]
+                .models
+                .get(&config.model)
+                .expect("model")
+                .reasoning
+        );
+    }
+
+    #[test]
+    fn catalog_negative_suppresses_options_unless_explicitly_overridden() {
+        let catalog = crate::model::builtin_models();
+        let model = catalog
+            .iter()
+            .find(|model| {
+                !model.capabilities.reasoning
+                    && catalog
+                        .iter()
+                        .filter(|candidate| candidate.id == model.id)
+                        .count()
+                        == 1
+            })
+            .expect("unique non-reasoning catalog model");
+        let config = configured(&model.id, None);
+        assert_eq!(
+            config.resolve_model_fields().reasoning_supported.value,
+            Some(false)
+        );
+        let (runtime, _) = materialize_runtime_model_config(&config);
+        assert!(
+            runtime.providers["gateway"]
+                .models
+                .get(&runtime.model)
+                .expect("model")
+                .reasoning
+                .is_none()
+        );
+        let config = configured(&model.id, Some(true));
+        let (runtime, _) = materialize_runtime_model_config(&config);
+        assert!(
+            runtime.providers["gateway"]
+                .models
+                .get(&runtime.model)
+                .expect("model")
+                .reasoning
+                .is_some()
+        );
+    }
 }

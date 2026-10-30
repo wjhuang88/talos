@@ -3,19 +3,18 @@
 | Field | Value |
 |---|---|
 | Story ID | MODEL-014 |
-| Status | In Progress (proposed in #813; effective only on merge) |
-| Collaboration Claim | Delegated to I311 / #813; ineffective until merge |
+| Status | Review (implementation PR #815) |
+| Collaboration Claim | Delegated to I311 / merged #813 |
 
 **Type**: Product / Configuration Story
 **Parent Epic**: None
 **Source**: Maintainer request in the current session; related to MODEL-011 / Issue #124 and MODEL-013 / Issue #312.
-**Selected Iteration**: I311 / #813 (ineffective until claim merge)
+**Selected Iteration**: I311 / merged #813; implementation #815
 
 ## Execution ownership
 
 Execution claim is delegated to [I311](../../iterations/I311-model014-capability-inference.md)
-in #813. Its proposed Claimed/Active state becomes effective only on target-branch
-merge. The original Unclaimed intake baseline is preserved at `d46b044d3`.
+in merged #813; target-branch claim is effective at `0aff4e4fbf2a653521f0da9907900341772efc24`. The original Unclaimed intake baseline is preserved at `d46b044d3`.
 This Story does not create a second effective claim for the same Work Slice.
 
 ## Identity / Goal / Value

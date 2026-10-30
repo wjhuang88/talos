@@ -147,7 +147,7 @@ async fn exercise_auto(enabled: bool, allow: bool) {
         observed: Mutex::new(Vec::new()),
     });
     let mut host = RuntimeHost::start_with_evaluation_observed(
-        move || Ok((configured, 128_000, enabled)),
+        move || Ok((configured, 128_000, enabled, None)),
         workspace.0.clone(),
         None,
         None,
