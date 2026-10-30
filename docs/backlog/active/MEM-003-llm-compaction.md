@@ -4,7 +4,7 @@
 |-------|-------|
 | Story ID | MEM-003 |
 | Priority | P3 |
-| Status | Planned |
+| Status | In Progress (T4 delegated to I312; effective only after #817 merge) |
 | Depends On | MEM-002/I024 in Review; close or explicitly accept residuals before activation |
 | Blocks | None |
 | Origin | I024 Day 4 audit gap |
@@ -59,3 +59,17 @@ if self.compactor.should_compact(&self.history) {
 ```
 
 Layers 4-5 are implemented in `compaction.rs` (`apply_collapse`, `apply_autocompact`) but not called.
+
+## Current source reconciliation — 2026-10-30
+
+The wiring description above is historical: both current Session submission paths
+call Compactor::compact with the Agent provider. This does not prove the five
+acceptance rows complete. Planned I312 consumes their higher-layer convergence
+and 50-turn verification within T4, under MEM-005's request-budget policy. No
+second summarizer is authorized. I312 remains unclaimed before atomic activation.
+
+## Atomic T4 activation proposal — #817
+
+Execution is delegated to I312, proposed Claimed/Active in #817 and ineffective
+until target-branch merge. Original acceptance remains unchanged. Prior preparation
+status is historical; no implementation exists yet. #390/T5 remains outstanding.

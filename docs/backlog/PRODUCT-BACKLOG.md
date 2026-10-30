@@ -1,3 +1,11 @@
+## MODEL-014 complete; T4 preparation — 2026-10-30
+
+[I311](../iterations/I311-model014-capability-inference.md) and MODEL-014 are Complete/Closed. Completion Commit:
+`0469f8041ed0d24bb2dffb465e9ff7fa3609a034`, `b04421fb964737911551c7e0704d6c81e80aa406`.
+#816 merged as `ca4a79961366eba7bc722b90bd449404cc7b07d5` after all-eight-success
+CI, independent review and CAS. I312 is proposed Active/Claimed in #817, ineffective until merge.
+Full handoff remains Active: T4 → T5 → T1 → T6. Earlier snapshots below are historical.
+
 ## MODEL-014 atomic activation proposal — 2026-10-30
 
 [I311](../iterations/I311-model014-capability-inference.md) proposes full handoff T2+T3 after completed I308/#812.

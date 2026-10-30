@@ -1,3 +1,8 @@
+## Proposed checkpoint boundary — 2026-10-30
+
+[ADR-096](096-whole-request-checkpoint-boundary.md) is proposed for I312/T4;
+no implementation authority before effective activation.
+
 # Architecture Decision Records
 
 ## Purpose
