@@ -142,3 +142,6 @@ The original detailed decision descriptions and ordering are retained at:
 - [`DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md`](DECISIONS-INDEX-pre-I170-closeout-2026-08-01.md)
 
 All individual ADR documents remain in this directory and are not replaced by the compact index.
+
+- [ADR-094: Gemini protocol/authentication](094-google-gemini-protocol-boundary.md) — accepted
+  proposal effective only with governance #811; PROVIDER-008-B / I310 / #810.

@@ -1,6 +1,6 @@
 # Iteration I310: Native Google Gemini
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-10-30
 > Planned objective: complete child B, including AI Studio and Vertex OAuth.
 > Baseline rule: preserve this scope; changed objectives require a new iteration.
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | PROVIDER-008-B native Gemini wire with AI Studio and Vertex authentication only |
 | Claimed At | 2026-10-30 |
 | Source Issue | #810 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #811 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized completing parent #724; distinct human reviewer unavailable in this session. Exact-head checks, independent protocol/auth review and merge CAS required. |
 | Implementation PR | Not started |
@@ -82,6 +82,6 @@ C Azure and D Bedrock remain unclaimed. This inventory does not transfer those o
 
 ## Execution / completion
 
-Governance preparation only. Draft record is Unclaimed until actual PR-number backfill and
-reviewable atomic Claimed/Active proposal. Both remain ineffective until target merge.
+Governance-only #811 proposes Claimed/Active atomically. Both remain ineffective until target
+merge; the actual PR number is backfilled. Independent review and exact-head checks remain required.
 Completion Commit: Pending. No code, dependency, catalog data or implementation tests in this PR.

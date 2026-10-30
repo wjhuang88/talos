@@ -1,6 +1,6 @@
 # ADR-094: Native Gemini protocol and authentication boundary
 
-**Status**: Proposed
+**Status**: Accepted (effective only when governance #811 merges)
 **Date**: 2026-10-30
 **Owner**: PROVIDER-008-B / #810 / I310
 

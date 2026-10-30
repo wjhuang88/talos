@@ -424,3 +424,8 @@ with existing implementation `dd6c5f82ed88cc963b47758dee06fa506cb407a1` (#803) a
 merged evidence. Full child acceptance, all 52 reviewed HTTP endpoint pairs, CI3570 8/8 and
 independent technical review are recorded owner-first. #748 closes after this closure merges.
 Parent #724 remains open for unimplemented/unclaimed Gemini, Azure and Bedrock siblings.
+
+## I310 Gemini — 2026-10-30
+
+[I310](I310-provider008b-google-gemini.md) proposes atomic claim/activation in #811 for #810.
+See its complete nonterminal inventory and disposition. No implementation before claim merge.
