@@ -14,6 +14,7 @@
 //! long-lived integration code.
 
 mod copilot;
+mod gemini_auth;
 mod image_io;
 pub mod mock;
 pub mod openai;

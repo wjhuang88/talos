@@ -85,3 +85,13 @@ C Azure and D Bedrock remain unclaimed. This inventory does not transfer those o
 Governance-only #811 proposes Claimed/Active atomically. Both remain ineffective until target
 merge; the actual PR number is backfilled. Independent review and exact-head checks remain required.
 Completion Commit: Pending. No code, dependency, catalog data or implementation tests in this PR.
+
+### Remote recovery checkpoint — 2026-10-31
+
+Maintainer explicitly requested timely remote code checkpoints after workspace rollback.
+This checkpoint reconstructs bounded credential-file admission only. It rejects executable /
+external / impersonated credentials and endpoint relocation before signer or network creation.
+It is not wired into runtime yet, is not a merge candidate, and has no passing test claim.
+Remaining: request-owned OAuth refresh/signing, reviewed dependency graph and ADR amendment,
+config/factory, Gemini wire/SSE, full acceptance and native CI. Keep Active; completion pending.
+Historical auth audit and recovery rationale are durably recorded in issue #810.
