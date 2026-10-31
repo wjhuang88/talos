@@ -59,6 +59,41 @@ mod tests {
     }
 }
 
+/// Read an explicitly selected credential file. The caller owns the dispatch deadline.
+/// Never fall back to metadata or another account when a selected file is invalid.
+pub(crate) async fn read_credentials(
+    path: &std::path::Path,
+    deadline: std::time::Instant,
+) -> ProviderResult<Value> {
+    use tokio::io::AsyncReadExt;
+    tokio::time::timeout_at(deadline.into(), async {
+        let file = tokio::fs::File::open(path).await
+            .map_err(|_| auth_error("cannot open Vertex credential file"))?;
+        let mut bytes = Vec::new();
+        file.take((MAX_CREDENTIAL_BYTES + 1) as u64).read_to_end(&mut bytes).await
+            .map_err(|_| auth_error("cannot read Vertex credential file"))?;
+        parse_credentials(&bytes)
+    }).await.map_err(|_| auth_error("Vertex credential file read timed out"))?
+}
+
+#[cfg(test)]
+mod file_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    #[tokio::test]
+    async fn explicit_invalid_file_fails_without_account_fallback_or_path_disclosure() {
+        let dir = tempfile::tempdir().expect("directory");
+        let path = dir.path().join("private-account-name.json");
+        std::fs::write(&path, b"not credential JSON").expect("write");
+        let error = read_credentials(&path, Instant::now() + Duration::from_secs(2))
+            .await.expect_err("invalid file").to_string();
+        assert!(!error.contains("private-account-name"));
+        std::fs::write(&path, vec![b' '; MAX_CREDENTIAL_BYTES + 1]).expect("large file");
+        assert!(read_credentials(&path, Instant::now() + Duration::from_secs(2)).await.is_err());
+    }
+}
+
 /// Request-owned authorized-user refresh. Service-account signing is integrated separately.
 #[derive(Clone)]
 pub(crate) struct UserTokenSource {
