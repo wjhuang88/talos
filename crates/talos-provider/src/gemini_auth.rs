@@ -136,6 +136,9 @@ impl UserTokenSource {
 
     /// Lock acquisition and refresh share the caller's deadline. No background refresh is spawned.
     pub(crate) async fn token(&self, deadline: std::time::Instant) -> ProviderResult<String> {
+        if deadline <= std::time::Instant::now() {
+            return Err(auth_error("Vertex credential acquisition timed out"));
+        }
         tokio::time::timeout_at(deadline.into(), self.refresh()).await
             .map_err(|_| auth_error("Vertex credential acquisition timed out"))?
     }
@@ -289,6 +292,19 @@ mod refresh_tests {
             assert!(auth.cache.lock().await.is_none());
             mock.assert_async().await;
         }
+    }
+
+    #[tokio::test]
+    async fn expired_deadline_cannot_return_cached_credentials() {
+        let auth = source();
+        *auth.cache.lock().await = Some(CachedToken {
+            token: "fixture-cached-token".into(),
+            refresh_at: Instant::now() + Duration::from_secs(3600),
+        });
+        let error = auth.token(Instant::now() - Duration::from_secs(1))
+            .await.expect_err("expired caller deadline");
+        assert!(!error.to_string().contains("fixture-cached-token"));
+        assert!(auth.cache.try_lock().is_ok());
     }
 
     #[tokio::test]
