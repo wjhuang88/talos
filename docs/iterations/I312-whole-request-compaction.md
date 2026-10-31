@@ -8,6 +8,32 @@
 
 ## Current manual failure increment — 2026-10-31 (uncommitted)
 
+2026-11-01 current validation: preflight 1696 completed exit 0, including both
+external SDK modes (`/private/tmp/i312-recovered-preflight.log`), for the current
+Rust source including inline fork repair. Subsequent edits are acceptance-script
+and evidence changes. Real POSIX cancellation now waits for the cancelled status
+before sending an ordinary turn in the same process; it receives the local
+provider reply and preserves the original raw prefix. The full script passes
+(`/private/tmp/i312-compact-cli-cancel-resume.log`). The former same-process
+recovery residual is covered; numeric cancellation feedback, interactive TUI and
+final remote/platform/review/merge gates remain unresolved.
+
+CLI repeated-failure regression now proves two distinct manual operation IDs on
+an unchanged failed request produce two visible refusals but only one provider
+call (`/private/tmp/i312-compact-cli-bounded-retry.log`, exit 0). The initial test
+incorrectly expected immediate retry success and failed; retained log
+`/private/tmp/i312-compact-cli-retry.log`. Existing bounded attempt suppression is
+preserved, not bypassed. This does not prove same-process recovery after cancel;
+that remains separate from successful restart/reuse evidence.
+
+CLI routing/success/failure/reuse stage committed at `e19a73159`. A subsequent
+real POSIX CLI cancellation fixture now passes: a loopback summary request hangs,
+SIGINT cancels it, the binary emits exactly one cancelled terminal, exits normally,
+never reports Applied and preserves raw transcript bytes. Complete script log:
+`/private/tmp/i312-compact-cli-cancel.log`. This is POSIX signal evidence only;
+Windows signals and interactive TUI are not certified. Numeric cancellation
+feedback remains an I312 residual. Current full preflight session 1696 remains live.
+
 Current recovery validation: real CLI script passes after file restoration.
 The next-turn fixture now also asserts the summary-call count equals a standalone
 manual pass and no automatic-start event appears, excluding extra automatic

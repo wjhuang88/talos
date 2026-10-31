@@ -1,5 +1,16 @@
 ## Current acceptance checkpoint — 2026-10-31
 
+2026-11-01 latest: current Rust preflight 1696 completed exit 0 with both SDK
+modes (`/private/tmp/i312-recovered-preflight.log`). Real POSIX CLI cancellation
+followed by an ordinary turn in the same process passes, with original transcript
+prefix preserved (`/private/tmp/i312-compact-cli-cancel-resume.log`). Numeric
+cancellation feedback and final T4 review/platform/CI/merge remain open.
+
+CLI stage committed `e19a73159`; additional real POSIX SIGINT compaction
+cancellation passes with exactly one visible terminal and unchanged raw bytes
+(`/private/tmp/i312-compact-cli-cancel.log`). Windows signal/TUI and numeric
+cancellation feedback remain uncertified; I312 and the whole queue stay Active.
+
 2026-11-01: missing worktree files were restored from HEAD without overwriting
 surviving edits; cause remains unknown. Current-source preflight session 1696 is
 running (`/private/tmp/i312-recovered-preflight.log`). Real CLI smoke passes after

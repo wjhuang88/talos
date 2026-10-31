@@ -9,6 +9,8 @@ import tempfile
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
+import signal
+import queue
 
 
 def main():
@@ -61,6 +63,8 @@ def main():
         print("CLI compact smoke passed: TLOG/legacy resume/fork visible results; raw transcripts unchanged")
         requests = []
         response_mode = ["valid"]
+        summary_entered = threading.Event()
+        release_summary = threading.Event()
 
         class SummaryHandler(BaseHTTPRequestHandler):
             def log_message(self, *_args):
@@ -69,6 +73,10 @@ def main():
             def do_POST(self):
                 payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 requests.append(payload)
+                if response_mode[0] == "hang":
+                    summary_entered.set()
+                    release_summary.wait(timeout=40)
+                    return
                 prompt = payload["messages"][-1]["content"]
                 if isinstance(prompt, str) and prompt.startswith("Produce only a JSON checkpoint"):
                     sources = json.loads(prompt.split("\nSources: ")[-1])
@@ -78,6 +86,8 @@ def main():
                                 "facts", "assumptions", "resources", "open_loops"]:
                         checkpoint[key] = []
                     summary = json.dumps(checkpoint) if response_mode[0] == "valid" else "invalid-private-summary"
+                    if response_mode[0] == "invalid-once":
+                        response_mode[0] = "valid"
                 else:
                     summary = "LOCAL_CHECKPOINT_CONTINUATION_OK"
                 events = [
@@ -128,6 +138,56 @@ def main():
             assert len(requests) > previous_calls, "failure path did not contact provider"
             assert large.read_bytes() == saved, "failed compaction rewrote raw history"
             print("CLI compact failure passed: visible measured refusal; private summary excluded")
+            response_mode[0] = "invalid-once"
+            previous_calls = len(requests)
+            output = run(["--session", large.stem], "/compact\n/compact\n")
+            assert output.count("failed (preparation or validation rejected)") == 2, output
+            assert "applied: estimated tokens" not in output, output
+            assert len(requests) == previous_calls + 1, "unchanged failed request was retried"
+            assert large.read_bytes() == saved, "retry after failure changed raw history"
+            print("CLI bounded retry passed: unchanged failed request does not redispatch")
+            if os.name == "posix":
+                response_mode[0] = "hang"
+                process = subprocess.Popen(arguments + ["--session", large.stem],
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, env=environment, cwd=root)
+                try:
+                    process.stdin.write("/compact\n")
+                    process.stdin.flush()
+                    assert summary_entered.wait(timeout=15), "summary request never started"
+                    process.send_signal(signal.SIGINT)
+                    lines = []
+                    cancelled = queue.Queue()
+
+                    def observe_cancel():
+                        for line in process.stdout:
+                            lines.append(line)
+                            if "cancelled: prior context retained" in line:
+                                cancelled.put(True)
+                                return
+
+                    observer = threading.Thread(target=observe_cancel, daemon=True)
+                    observer.start()
+                    cancelled.get(timeout=15)
+                    observer.join(timeout=5)
+                    assert large.read_bytes() == saved, "cancel changed raw history"
+                    response_mode[0] = "valid"
+                    release_summary.set()
+                    remainder, _ = process.communicate(input="Continue after cancellation\n/quit\n", timeout=20)
+                    output = "".join(lines) + remainder
+                    assert process.returncode == 0, output
+                    assert output.count("cancelled: prior context retained") == 1, output
+                    assert "Compaction 1: applied" not in output, output
+                    assert "LOCAL_CHECKPOINT_CONTINUATION_OK" in output, output
+                    assert large.read_bytes().startswith(saved), "post-cancel turn rewrote history"
+                    print("CLI cancellation passed: one terminal and same-process ordinary continuation")
+                finally:
+                    release_summary.set()
+                    if process.poll() is None:
+                        process.kill()
+                        process.communicate(timeout=5)
+                # Subsequent independent reuse fixtures start from the original raw seed.
+                large.write_bytes(saved)
             response_mode[0] = "valid"
             previous_calls = len(requests)
             output = run(["--session", large.stem], "/compact\nContinue local report\n")
