@@ -262,6 +262,14 @@ impl Server {
     }
 
     pub(super) fn new_with_delays(responses: Vec<String>, response_delays: Vec<Duration>) -> Self {
+        Self::new_with_resets(responses, response_delays, Vec::new())
+    }
+
+    pub(super) fn new_with_resets(
+        responses: Vec<String>,
+        response_delays: Vec<Duration>,
+        reset_requests: Vec<usize>,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("loopback fixture");
         listener.set_nonblocking(true).expect("nonblocking");
         let port = listener.local_addr().expect("address").port();
@@ -284,6 +292,7 @@ impl Server {
         let worker = thread::spawn(move || {
             let mut responses: VecDeque<_> = responses.into();
             let mut response_delays: VecDeque<_> = response_delays.into();
+            let mut request_index = 0;
             let limit = std::time::Instant::now() + Duration::from_secs(10);
             while !s.load(Ordering::Relaxed) && std::time::Instant::now() < limit {
                 let (mut socket, _) = match listener.accept() {
@@ -348,6 +357,14 @@ impl Server {
                     .expect("request times")
                     .push(std::time::Instant::now());
                 r.lock().expect("requests").push(bytes);
+                let current_request = request_index;
+                request_index += 1;
+                if reset_requests.contains(&current_request) {
+                    socket2::SockRef::from(&socket)
+                        .set_linger(Some(Duration::ZERO))
+                        .expect("abort fixture connection");
+                    continue;
+                }
                 if let Some(response) = responses.pop_front() {
                     if let Some(delay) = response_delays.pop_front()
                         && !delay.is_zero()
