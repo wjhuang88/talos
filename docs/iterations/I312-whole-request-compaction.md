@@ -6,7 +6,62 @@
 > Baseline rule: preserve all parent acceptance; successful trimming alone cannot close this iteration.
 > MVP deliverable: a long-running session compacts complete provider requests safely, exposes numeric outcomes and accepts a typed /compact command while raw history remains recoverable.
 
-## Current acceptance increment — 2026-10-31 (uncommitted)
+## Current manual failure increment — 2026-10-31 (uncommitted)
+
+Prior observability/semantic stage is committed as `102bdab06`.
+Its standard host preflight session 64989 terminated with exit 101: workspace
+test compilation exhausted disk (`/private/tmp/i312-observability-acceptance-preflight.log`).
+Workspace check and Clippy completed; full tests and SDK fixtures did not finish.
+Authorized cleanup removes only the active worktree's rebuildable target; both
+worktrees and sources remain. Subsequent builds use zero debug information and
+disabled incremental compilation consistently to avoid duplicate large profiles.
+
+The new manual failure increment adds a measured failure variant with bounded
+preparation/provider/timeout/commit categories. A missing or unpropagated estimate
+is explicitly unavailable. Outer idle/boundary timeouts retain measured estimates;
+task join/response loss may still lose them. Independent review identified this
+distinction; the correction awaits re-review. It includes request-preservation and display
+regressions; verification and independent review are pending. ADR-096 records the
+next-minor enum migration. Cancellation metrics and full CLI binary acceptance
+remain outstanding, as do final full gates and T5/T1/T6.
+
+Focused validation: invalid-summary/expired-helper regression passed 1/1
+(`/private/tmp/i312-manual-failure-test.log`); display regression passed 1/1
+(`/private/tmp/i312-manual-failure-display.log`). Hanging-summary regression first
+failed because the inner timeout surfaced as Provider before the outer timer;
+classification now prioritizes the shared elapsed deadline and the retry passed
+1/1 (`/private/tmp/i312-manual-outer-timeout-fixed.log`). Retain initial failure
+at `/private/tmp/i312-manual-outer-timeout.log`. Independent static review approved
+the prior correction, but the final deadline-classification change still needs
+review; no full-suite or full-T4 approval is claimed.
+
+Follow-up evidence: Agent library passed 597/597 before the added provider-error
+fixture (`/private/tmp/i312-manual-metrics-agent.log`). The latest manual matrix
+passes 18/18 (`/private/tmp/i312-manual-matrix.log`), including provider-error
+classification and serialized diagnostic exclusion. The hanging-summary test is
+renamed `manual_summary_timeout_retains_already_measured_estimate`: it can hit
+the inner timer and does not independently force an outer timeout. Both governance
+validators pass with zero warnings. Affected-crate all-target Clippy is running
+as session 36034 (`/private/tmp/i312-manual-metrics-clippy.log`).
+
+Independent static review approved the deadline correction against base
+`102bdab063f103c59513cac769f62ae0f6a8d346`, diff SHA-256
+`dc5069677667fe498ed087c1909f21090d9b6163417b61671f37e719c0d61230`;
+it predates the added provider-error fixture and test rename. Reviewer did not
+run tests. Final stage review/preflight and all full-T4 residuals remain open.
+
+Clippy session 36034 failed on two unnecessary lazy fallback closures. They are
+replaced with eager `unwrap_or` values without changing outcome semantics; retry
+session 36833 writes `/private/tmp/i312-manual-metrics-clippy-fixed.log`.
+Latest static test follow-up approved diff
+`11ea0f2d2fc4a912989d2e2cd88a6087b15c1c28b13e740095d9a64b0110eec5`
+against `102bdab06` before this mechanical Clippy correction. Preserve the failed
+log `/private/tmp/i312-manual-metrics-clippy.log`; do not report it as clean.
+Retry session 36833 completed exit 0: affected Agent/Conversation/Runtime
+all-target warnings-denied Clippy passed. The config build script emits its
+existing model-catalog compression notice; no Rust/Clippy diagnostic remains.
+
+## Prior acceptance increment — 2026-10-31
 
 The latest acceptance suite now passes 4/4 in
 `/private/tmp/i312-cli-persistence-acceptance.log`. The additional fixture uses

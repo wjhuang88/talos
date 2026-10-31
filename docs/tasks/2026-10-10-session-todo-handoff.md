@@ -1,5 +1,18 @@
 ## Current acceptance checkpoint — 2026-10-31
 
+Update: observability/semantic stage is committed at `102bdab06`; preflight
+session 64989 is terminal exit 101 from disk exhaustion during test compilation.
+Do not poll or certify it as successful. Authorized active-target cleanup and
+consistent low-debug/non-incremental builds address storage. The next uncommitted
+increment implements measured manual failure outcomes; tests/review are pending.
+I312 owns evidence and residuals; the running statements below are historical.
+
+Manual failure increment now passes 18/18 focused tests, including measured
+provider failure, shared-deadline timeout and diagnostic privacy. Both governance
+validators pass; affected-crate Clippy session 36034 is running. Review approved
+the runtime correction before the last test addition. Full preflight/CLI acceptance,
+final review/CI/merge remain pending; no T4 or whole-goal completion is claimed.
+
 Overall goal remains Active; queue remains I309 → T8/I308 → T2+T3 MODEL-014 →
 T4 → T5 → T1 → T6. T4/I312 has uncommitted semantic acceptance fixtures passing
 2/2 (50 heavy-tool turns with repeated folding/export/restart and text-heavy

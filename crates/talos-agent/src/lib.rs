@@ -1795,6 +1795,7 @@ impl Agent {
                 {
                     let deadline =
                         tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+                    let mut measured_before = None;
                     let preparation = async {
                         let Some(limit) = request_context_limit else {
                             return checkpoint_manual::ManualCheckpointResult::Outcome(
@@ -1846,6 +1847,7 @@ impl Agent {
                                 talos_core::session::CompactOutcome::Failed,
                             );
                         }
+                        measured_before = Some(plan.estimated_tokens);
                         self.prepare_manual_checkpoint(
                             &mut plan,
                             limit,
@@ -1859,7 +1861,13 @@ impl Agent {
                         () = job.result.closed() => {},
                         result = tokio::time::timeout_at(deadline, preparation) => {
                             let result = result.unwrap_or(checkpoint_manual::ManualCheckpointResult::Outcome(
-                                talos_core::session::CompactOutcome::Failed));
+                                match measured_before {
+                                    Some(before) => talos_core::session::CompactOutcome::FailedWithEstimate {
+                                        before,
+                                        reason: talos_core::session::CompactFailureReason::Timeout,
+                                    },
+                                    None => talos_core::session::CompactOutcome::Failed,
+                                }));
                             let _ = job.result.send(result);
                         },
                     }

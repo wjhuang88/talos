@@ -105,8 +105,29 @@ pub enum CompactOutcome {
     NotEligible { before: u32 },
     /// Preparation or checkpoint validation failed; prior state remains usable.
     Failed,
+    /// A prepared request failed compaction; no partial projection was applied.
+    FailedWithEstimate {
+        /// Whole-request estimate before the failed attempt.
+        before: u32,
+        /// Content-free category; never includes provider error text.
+        reason: CompactFailureReason,
+    },
     /// Cancellation won before application.
     Cancelled,
+}
+
+/// Content-free failure categories for manual checkpoint attempts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CompactFailureReason {
+    /// Preparation or checkpoint validation rejected the candidate.
+    Preparation,
+    /// The summarizer provider failed.
+    Provider,
+    /// The shared operation deadline elapsed.
+    Timeout,
+    /// Atomic installation rejected the candidate.
+    CommitRejected,
 }
 
 /// Transient operation lifecycle; never a durable transcript entry.

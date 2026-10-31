@@ -164,7 +164,10 @@ impl ManualCompaction {
                         .install_checkpoint_projection(*projection, deadline)
                     {
                         Ok(()) => CompactOutcome::Applied { before, after },
-                        Err(_) => CompactOutcome::Failed,
+                        Err(_) => CompactOutcome::FailedWithEstimate {
+                            before,
+                            reason: talos_core::session::CompactFailureReason::CommitRejected,
+                        },
                     }
                 }
             }
@@ -187,9 +190,11 @@ impl ManualCompaction {
                     }
                 }
                 CompactOutcome::Cancelled => TurnCompletionStatus::Cancelled,
-                CompactOutcome::Failed => TurnCompletionStatus::Error {
-                    message: "checkpoint failed".into(),
-                },
+                CompactOutcome::Failed | CompactOutcome::FailedWithEstimate { .. } => {
+                    TurnCompletionStatus::Error {
+                        message: "checkpoint failed".into(),
+                    }
+                }
             };
             control.finish_active(Some(&status));
         }

@@ -558,6 +558,135 @@ fn checkpoint_prompt(
 #[cfg(test)]
 #[allow(deprecated)]
 mod tests {
+    #[tokio::test(start_paused = true)]
+    async fn manual_summary_timeout_retains_already_measured_estimate() {
+        use talos_core::session::{CompactFailureReason, CompactOutcome};
+        struct HangingSummary;
+        #[async_trait]
+        impl LanguageModel for HangingSummary {
+            async fn stream(
+                &self,
+                _: &[Message],
+            ) -> ProviderResult<tokio::sync::mpsc::Receiver<AgentEvent>> {
+                std::future::pending().await
+            }
+        }
+        let agent = Agent::new(Arc::new(HangingSummary), ToolRegistry::new());
+        let raw = history();
+        let limit = agent.estimate_provider_request_tokens(&raw, &[]);
+        let result = agent.compact_session_history(raw, 0, limit, None).await;
+        assert!(matches!(result,
+            crate::checkpoint_manual::ManualCheckpointResult::Outcome(
+                CompactOutcome::FailedWithEstimate { before, reason: CompactFailureReason::Timeout }
+            ) if before > 0
+        ));
+        assert!(
+            agent
+                .checkpoint_projection_state
+                .lock()
+                .expect("cache")
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn manual_provider_failure_retains_estimate_without_exposing_error_text() {
+        use talos_core::session::{CompactFailureReason, CompactOutcome};
+        struct FailingSummary;
+        #[async_trait]
+        impl LanguageModel for FailingSummary {
+            async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+                Err(talos_core::provider::ProviderError::ServerError(
+                    "private-provider-detail".into(),
+                ))
+            }
+        }
+        let agent = Agent::new(Arc::new(FailingSummary), ToolRegistry::new());
+        let raw = history();
+        let limit = agent.estimate_provider_request_tokens(&raw, &[]);
+        let result = agent.compact_session_history(raw, 0, limit, None).await;
+        let crate::checkpoint_manual::ManualCheckpointResult::Outcome(outcome) = result else {
+            panic!("provider error cannot produce a candidate");
+        };
+        assert!(matches!(outcome, CompactOutcome::FailedWithEstimate {
+            before, reason: CompactFailureReason::Provider,
+        } if before > 0));
+        assert!(
+            !serde_json::to_string(&outcome)
+                .expect("serialize")
+                .contains("private-provider-detail")
+        );
+        assert!(
+            agent
+                .checkpoint_projection_state
+                .lock()
+                .expect("cache")
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn manual_failure_reports_estimate_and_reason_without_changing_request() {
+        use talos_core::session::{CompactFailureReason, CompactOutcome};
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: true,
+            fail_after: None,
+        });
+        let agent = Agent::new(provider, ToolRegistry::new());
+        let raw = history();
+        let source = crate::compaction::HistorySource::bind(
+            0,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len())
+                .map(|index| format!("source-{index}"))
+                .collect(),
+        )
+        .expect("source");
+        let before = agent.estimate_provider_request_tokens(&raw, &[]);
+        for expired in [false, true] {
+            let mut plan = ProviderRequestPlan {
+                messages: raw.clone(),
+                tool_definitions: vec![],
+                estimated_tokens: before,
+                ephemeral_image_tokens: 0,
+                omitted_tool_exchanges: 0,
+                tool_protocol: ToolProtocol::Native,
+            };
+            let deadline = tokio::time::Instant::now()
+                + if expired {
+                    Duration::ZERO
+                } else {
+                    Duration::from_secs(120)
+                };
+            let result = agent
+                .prepare_manual_checkpoint(
+                    &mut plan,
+                    before,
+                    &PrivateTokens::default(),
+                    &source,
+                    deadline,
+                )
+                .await;
+            let crate::checkpoint_manual::ManualCheckpointResult::Outcome(outcome) = result else {
+                panic!("failure cannot produce a candidate");
+            };
+            assert_eq!(
+                outcome,
+                CompactOutcome::FailedWithEstimate {
+                    before,
+                    reason: if expired {
+                        CompactFailureReason::Timeout
+                    } else {
+                        CompactFailureReason::Preparation
+                    },
+                }
+            );
+            assert_eq!(plan.messages, raw);
+            assert_eq!(plan.estimated_tokens, before);
+        }
+    }
     use super::*;
     use async_trait::async_trait;
     use std::sync::{Arc, Mutex};

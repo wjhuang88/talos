@@ -55,6 +55,15 @@ ordinary turn admission; consumers must not treat it as a turn terminal or a man
 operation receipt. Initial and continuation attempts share this observer and the
 Runtime interrupt/shutdown commit gate. UI adapters discard old generations.
 
+Manual `CompactOutcome::FailedWithEstimate` carries the already measured whole
+request estimate and a bounded `CompactFailureReason` (preparation, provider,
+timeout or commit rejection). Consumers must handle this additional variant in
+the same next-minor migration. Failures whose estimate was not obtained or could
+not be propagated retain `Failed` and display an unavailable estimate, never a
+fabricated zero. Outer preparation timeouts preserve an already measured estimate;
+task join or response loss may still lose it. Neither outcome carries
+provider strings or checkpoint content; prior context remains unchanged.
+
 Ship only in the next pre-1.0 minor release, never as an existing-minor patch.
 Consumers must add the typed compact handling or explicit unsupported response to
 exhaustive matches, rebuild against the new minor, and preserve target-generation

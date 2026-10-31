@@ -1,7 +1,7 @@
 //! Manual checkpoint preparation shares ordinary request construction and admission.
 
 use talos_core::message::Message;
-use talos_core::session::CompactOutcome;
+use talos_core::session::{CompactFailureReason, CompactOutcome};
 use talos_plugin::{HookContext, TurnId};
 
 use crate::Agent;
@@ -28,6 +28,7 @@ impl Agent {
         recovered: Option<&HistorySource>,
     ) -> ManualCheckpointResult {
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+        let mut measured_before = None;
         // Dropping this entire future cancels preparation as well as provider I/O.
         tokio::time::timeout_at(deadline, async {
             let source = HistorySource::bind_recovered_until(
@@ -64,6 +65,7 @@ impl Agent {
                 )
                 .await
                 .map_err(|_| ())?;
+            measured_before = Some(plan.estimated_tokens);
             Ok::<_, ()>(
                 self.prepare_manual_checkpoint(
                     &mut plan,
@@ -78,7 +80,15 @@ impl Agent {
         .await
         .ok()
         .and_then(Result::ok)
-        .unwrap_or(ManualCheckpointResult::Outcome(CompactOutcome::Failed))
+        .unwrap_or({
+            ManualCheckpointResult::Outcome(match measured_before {
+                Some(before) => CompactOutcome::FailedWithEstimate {
+                    before,
+                    reason: CompactFailureReason::Timeout,
+                },
+                None => CompactOutcome::Failed,
+            })
+        })
     }
     /// Prepare against the exact request at a safe boundary. This does not rebuild
     /// prompts, replace raw history, or publish the candidate into shared state.
@@ -90,10 +100,13 @@ impl Agent {
         source: &HistorySource,
         deadline: tokio::time::Instant,
     ) -> ManualCheckpointResult {
-        if tokio::time::Instant::now() >= deadline {
-            return ManualCheckpointResult::Outcome(CompactOutcome::Failed);
-        }
         let before = plan.estimated_tokens;
+        if tokio::time::Instant::now() >= deadline {
+            return ManualCheckpointResult::Outcome(CompactOutcome::FailedWithEstimate {
+                before,
+                reason: CompactFailureReason::Timeout,
+            });
+        }
         if RequestPressure::assess(before, limit) == RequestPressure::Normal {
             return ManualCheckpointResult::Outcome(CompactOutcome::NotEligible { before });
         }
@@ -116,7 +129,20 @@ impl Agent {
                 after: plan.estimated_tokens,
                 deadline,
             },
-            _ => ManualCheckpointResult::Outcome(CompactOutcome::Failed),
+            (result, _) => {
+                let reason = match result {
+                    _ if tokio::time::Instant::now() >= deadline => CompactFailureReason::Timeout,
+                    Err(_) => CompactFailureReason::Timeout,
+                    Ok(Err(crate::compaction::CompactionError::ProviderError(_))) => {
+                        CompactFailureReason::Provider
+                    }
+                    _ => CompactFailureReason::Preparation,
+                };
+                ManualCheckpointResult::Outcome(CompactOutcome::FailedWithEstimate {
+                    before,
+                    reason,
+                })
+            }
         }
     }
 }

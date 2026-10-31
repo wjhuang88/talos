@@ -78,7 +78,19 @@ pub fn format_compact_status(id: u64, state: talos_core::session::CompactState) 
                 CompactOutcome::NotEligible { before } => {
                     format!("skipped: estimated tokens {before}, below threshold")
                 }
-                CompactOutcome::Failed => "failed: prior context retained".into(),
+                CompactOutcome::Failed => {
+                    "failed during preparation: estimate unavailable; prior context retained".into()
+                }
+                CompactOutcome::FailedWithEstimate { before, reason } => {
+                    use talos_core::session::CompactFailureReason;
+                    let reason = match reason {
+                        CompactFailureReason::Preparation => "preparation or validation rejected",
+                        CompactFailureReason::Provider => "provider failure",
+                        CompactFailureReason::Timeout => "deadline exceeded",
+                        CompactFailureReason::CommitRejected => "candidate installation rejected",
+                    };
+                    format!("failed ({reason}): estimated tokens {before}; prior context retained")
+                }
                 CompactOutcome::Cancelled => "cancelled: prior context retained".into(),
             };
             if replayed {
@@ -118,4 +130,31 @@ pub fn format_automatic_compact_status(
         }
     };
     format!("Automatic compaction {status}")
+}
+
+#[cfg(test)]
+mod compact_status_tests {
+    #[test]
+    fn manual_failure_distinguishes_measured_request_from_unavailable_estimate() {
+        use talos_core::session::{CompactFailureReason, CompactOutcome, CompactState};
+        let render = |outcome| {
+            super::format_compact_status(
+                7,
+                CompactState::Completed {
+                    outcome,
+                    replayed: false,
+                },
+            )
+        };
+        let unknown = render(CompactOutcome::Failed);
+        assert!(unknown.contains("estimate unavailable"));
+        assert!(!unknown.contains("tokens 0"));
+        let measured = render(CompactOutcome::FailedWithEstimate {
+            before: 24_001,
+            reason: CompactFailureReason::Timeout,
+        });
+        assert!(measured.contains("deadline exceeded"));
+        assert!(measured.contains("estimated tokens 24001"));
+        assert!(measured.contains("prior context retained"));
+    }
 }
