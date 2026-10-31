@@ -64,15 +64,18 @@ impl SearchDns for Effects {
 }
 
 // Only this cfg(test) module can relocate the fixed query chain or inject DNS. Existing plan
-// fixtures predate reachability parity, so seed the legacy cache as reachable and keep these tests
-// focused on query-chain authority/budget/drop behavior. Probe execution has its own fixtures.
+// fixtures predate reachability parity, so use a plan-local reachability override and keep these
+// tests focused on query-chain authority/budget/drop behavior. Probe execution has its own fixtures.
 pub(in crate::search_backend::transport::compatibility) fn controlled(
     mut plan: PreparedCompatibilityPlan,
     server: &Server,
     allowed: usize,
     mismatch: bool,
 ) -> (PreparedCompatibilityPlan, Arc<Effects>) {
-    super::super::probe::seed_cache(true, true);
+    plan.reachability = Some(Reachability {
+        duckduckgo: true,
+        bing: true,
+    });
     let (chain, manifest) = super::super::chain::tests::relocate(plan.chain, server);
     plan.chain = chain;
     plan.manifest = manifest;
