@@ -157,6 +157,9 @@ pub(crate) async fn read_response(
     idle: std::time::Duration,
 ) -> ProviderResult<()> {
     use futures_util::StreamExt;
+    if std::time::Instant::now() >= deadline {
+        return Err(invalid("Gemini SSE read timed out"));
+    }
     let mut decoder = GeminiSse::new();
     let mut stream = response.bytes_stream();
     let first_deadline = std::time::Instant::now()
@@ -172,16 +175,28 @@ pub(crate) async fn read_response(
         } else {
             first_deadline
         };
+        if std::time::Instant::now() >= read_deadline {
+            return Err(invalid("Gemini SSE read timed out"));
+        }
         let next = tokio::time::timeout_at(read_deadline.into(), stream.next())
             .await
             .map_err(|_| invalid("Gemini SSE read timed out"))?;
+        if std::time::Instant::now() >= read_deadline {
+            return Err(invalid("Gemini SSE read timed out"));
+        }
         let events = match next {
             Some(Ok(bytes)) => decoder.push(&bytes)?,
             Some(Err(_)) => {
                 return Err(ProviderError::NetworkError("Gemini SSE read failed".into()));
             }
             None => {
+                if std::time::Instant::now() >= deadline {
+                    return Err(invalid("Gemini SSE read timed out"));
+                }
                 for event in decoder.finish()? {
+                    if std::time::Instant::now() >= deadline {
+                        return Err(invalid("Gemini SSE delivery timed out"));
+                    }
                     tokio::time::timeout_at(deadline.into(), tx.send(event))
                         .await
                         .map_err(|_| invalid("Gemini SSE delivery timed out"))?
@@ -191,6 +206,9 @@ pub(crate) async fn read_response(
             }
         };
         for event in events {
+            if std::time::Instant::now() >= deadline {
+                return Err(invalid("Gemini SSE delivery timed out"));
+            }
             tokio::time::timeout_at(deadline.into(), tx.send(event))
                 .await
                 .map_err(|_| invalid("Gemini SSE delivery timed out"))?
@@ -220,6 +238,37 @@ mod tests {
             Some(GeminiOutput::Event(AgentEvent::TurnEnd { .. }))
         ));
         text
+    }
+
+    #[tokio::test]
+    async fn expired_budget_cannot_release_buffered_tool_response() {
+        use std::time::{Duration, Instant};
+        let mut server = mockito::Server::new_async().await;
+        let mock = server.mock("GET", "/").with_body(
+            "data: {\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"ping\"}}]},\"finishReason\":\"STOP\"}]}\n\n"
+        ).create_async().await;
+        let response = reqwest::Client::builder()
+            .no_proxy()
+            .build()
+            .expect("client")
+            .get(server.url())
+            .send()
+            .await
+            .expect("response");
+        let (tx, mut rx) = tokio::sync::mpsc::channel(4);
+        assert!(
+            read_response(
+                response,
+                &tx,
+                Instant::now() - Duration::from_secs(1),
+                Duration::from_secs(1),
+                Duration::from_secs(1)
+            )
+            .await
+            .is_err()
+        );
+        assert!(rx.try_recv().is_err());
+        mock.assert_async().await;
     }
 
     #[tokio::test]
