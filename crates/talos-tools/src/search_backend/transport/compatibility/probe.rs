@@ -74,6 +74,14 @@ pub(super) fn clear_cache() {
     }
 }
 
+#[cfg(test)]
+pub(super) fn seed_cache(duckduckgo: bool, bing: bool) {
+    clear_cache();
+    let now = StdInstant::now();
+    record(ProbeBackend::DuckDuckGo, duckduckgo, now);
+    record(ProbeBackend::Bing, bing, now);
+}
+
 fn root(backend: ProbeBackend) -> Result<Url, TransportError> {
     Url::parse(match backend {
         ProbeBackend::DuckDuckGo => "https://duckduckgo.com/",
@@ -253,5 +261,16 @@ mod tests {
         for status in [199, 400, 404, 500, 599] {
             assert!(!is_reachable_status(status), "{status}");
         }
+    }
+
+    #[test]
+    fn deterministic_cache_seed_is_query_free_and_bounded_to_both_legacy_families() {
+        seed_cache(false, true);
+        let now = StdInstant::now();
+        assert_eq!(cached(ProbeBackend::DuckDuckGo, now), Some(false));
+        assert_eq!(cached(ProbeBackend::Bing, now), Some(true));
+        clear_cache();
+        assert_eq!(cached(ProbeBackend::DuckDuckGo, now), None);
+        assert_eq!(cached(ProbeBackend::Bing, now), None);
     }
 }
