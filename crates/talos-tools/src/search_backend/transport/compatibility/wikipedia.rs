@@ -128,7 +128,51 @@ fn parse(body: &[u8], max_results: u32) -> Result<Vec<SearchBackendResult>, Comp
 #[cfg(test)]
 mod tests {
     use super::*;
-    use talos_core::tool::{ToolNetworkManifest, ToolNetworkScope};
+    use crate::search_backend::transport::{SearchDns, TransportBudget, tests::Server};
+    use async_trait::async_trait;
+    use std::{
+        net::SocketAddr,
+        sync::{Arc, atomic::{AtomicUsize, Ordering}},
+    };
+    use talos_core::tool::{
+        ToolNetworkAuthority, ToolNetworkAuthorizationError, ToolNetworkScope,
+    };
+
+    struct Effects {
+        manifest: ToolNetworkManifest,
+        dns: AtomicUsize,
+    }
+
+    impl ToolNetworkAuthority for Effects {
+        fn check(
+            &self,
+            invocation: uuid::Uuid,
+            endpoint: &ToolNetworkEndpoint,
+        ) -> Result<(), ToolNetworkAuthorizationError> {
+            if invocation == self.manifest.invocation_id()
+                && self.manifest.scope().contains(endpoint)
+            {
+                Ok(())
+            } else {
+                Err(ToolNetworkAuthorizationError::Mismatch)
+            }
+        }
+    }
+
+    #[async_trait]
+    impl SearchDns for Effects {
+        async fn resolve(&self, _: &str, port: u16) -> Result<Vec<SocketAddr>, TransportError> {
+            self.dns.fetch_add(1, Ordering::Relaxed);
+            Ok(vec![SocketAddr::from(([127, 0, 0, 1], port))])
+        }
+    }
+
+    fn response(body: &str) -> String {
+        format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
 
     #[test]
     fn endpoint_is_fixed_and_query_free() {
@@ -171,5 +215,65 @@ mod tests {
         );
         assert_eq!(rows[0].title, "Rust");
         assert_eq!(rows[1].url, "https://tokio.rs");
+    }
+
+    #[tokio::test]
+    async fn prepared_fallback_executes_once_through_controlled_transport() {
+        let body = r#"["q",["Rust"],["Lang"],["https://rust-lang.org/"]]"#;
+        let server = Server::new(vec![response(body)]);
+        let mut url = server.url("/w/api.php");
+        url.query_pairs_mut()
+            .append_pair("action", "opensearch")
+            .append_pair("search", "private query")
+            .append_pair("limit", "1")
+            .append_pair("namespace", "0")
+            .append_pair("format", "json");
+        let endpoint = request_endpoint(&url, &Method::GET).expect("endpoint");
+        let manifest = ToolNetworkManifest::new(
+            ToolNetworkScope::new_configuration(
+                vec![endpoint],
+                None,
+                vec!["127.0.0.1".parse().expect("loopback")],
+                0,
+            )
+            .expect("scope"),
+        );
+        let prepared = PreparedWikipediaSearch {
+            request: PreparedTransportRequest::json_bytes(
+                &manifest,
+                url,
+                Method::GET,
+                None,
+            )
+            .expect("prepared request"),
+            max_results: 1,
+        };
+        let effects = Arc::new(Effects {
+            manifest: manifest.clone(),
+            dns: AtomicUsize::new(0),
+        });
+        let transport = SearchTransport::new(
+            manifest,
+            effects.clone(),
+            Arc::new(
+                TransportBudget::new(Duration::from_secs(5), 1, 1024).expect("budget"),
+            ),
+            effects.clone(),
+        )
+        .expect("transport");
+
+        let rows = prepared
+            .execute(&transport)
+            .await
+            .expect("fallback response")
+            .into_results();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].backend, SearchBackendId::DuckDuckGo);
+        assert_eq!(rows[0].url, "https://rust-lang.org/");
+        assert_eq!(server.count(), 1);
+        let sent = server.request(0);
+        assert!(sent.starts_with("GET /w/api.php?"));
+        assert!(sent.contains("search=private+query"));
+        assert_eq!(effects.dns.load(Ordering::Relaxed), 1);
     }
 }
