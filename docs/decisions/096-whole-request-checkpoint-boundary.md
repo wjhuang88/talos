@@ -48,6 +48,13 @@ matches: every in-repository bridge/adapter and both independent Runtime SDK
 fixtures must be updated to handle the new variant explicitly. Do not silently
 ignore the operation in an adapter that advertises manual support.
 
+Automatic checkpoint feedback uses additive `SessionEvent::AutomaticCompactStatus`
+with typed bounded state/failure categories and numeric estimates, emitted directly
+to Session consumers rather than durable Agent transcript events. It may precede
+ordinary turn admission; consumers must not treat it as a turn terminal or a manual
+operation receipt. Initial and continuation attempts share this observer and the
+Runtime interrupt/shutdown commit gate. UI adapters discard old generations.
+
 Ship only in the next pre-1.0 minor release, never as an existing-minor patch.
 Consumers must add the typed compact handling or explicit unsupported response to
 exhaustive matches, rebuild against the new minor, and preserve target-generation

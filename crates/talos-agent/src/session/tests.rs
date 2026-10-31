@@ -4409,6 +4409,7 @@ async fn manual_boundary_applies_checkpoint_before_continuation_and_preserves_ra
             0,
             raw.len() as u64,
             None,
+            None,
         )
         .await
         .expect("estimate initial request");
@@ -4684,3 +4685,177 @@ async fn durable_turn_receipts_bind_live_actor_history_for_success_error_and_can
         }
     }
 }
+
+#[tokio::test]
+async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messages() {
+    use talos_core::session::AutomaticCompactState;
+    struct ProgressModel {
+        invalid: bool,
+        block: bool,
+        entered: tokio::sync::Notify,
+    }
+    #[async_trait]
+    impl LanguageModel for ProgressModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let events = if let [Message::User { content }] = messages
+                && content.starts_with("Produce only a JSON checkpoint")
+            {
+                self.entered.notify_one();
+                if self.block {
+                    return std::future::pending().await;
+                }
+                if self.invalid {
+                    success_events("invalid checkpoint")
+                } else {
+                    let sources: Vec<serde_json::Value> =
+                        serde_json::from_str(content.split("\nSources: ").last().expect("sources"))
+                            .expect("source JSON");
+                    let item = serde_json::json!({"text":"retained task", "sources":[sources[0]["source"]]});
+                    success_events(&serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                        "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                        "facts":[],"assumptions":[],"resources":[],"open_loops":[]}).to_string())
+                }
+            } else {
+                success_events("ordinary reply")
+            };
+            let (tx, rx) = mpsc::channel(8);
+            for event in events {
+                tx.send(event).await.expect("event");
+            }
+            Ok(rx)
+        }
+    }
+    for outcome in ["applied", "failed", "cancelled"] {
+        let directory = tempfile::tempdir().expect("directory");
+        let model = Arc::new(ProgressModel {
+            invalid: outcome == "failed",
+            block: outcome == "cancelled",
+            entered: tokio::sync::Notify::new(),
+        });
+        #[allow(deprecated)]
+        let agent = Agent::new(model.clone(), ToolRegistry::new());
+        let raw: Vec<_> = (0..20)
+            .flat_map(|index| {
+                [
+                    Message::User {
+                        content: format!("original constraint {index}: {}", "a".repeat(4000)),
+                    },
+                    Message::Assistant {
+                        content: "ack".into(),
+                        tool_calls: vec![],
+                        reasoning: None,
+                    },
+                ]
+            })
+            .collect();
+        let probe = agent
+            .prepare_turn_start(
+                "continue".into(),
+                vec![Message::User {
+                    content: "continue".into(),
+                }],
+                raw.clone(),
+                Some(u32::MAX),
+            )
+            .await
+            .expect("probe");
+        let limit = probe.initial_plan.estimated_tokens * 100 / 96;
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: directory.path().to_path_buf(),
+                initial_history: raw.clone(),
+                model_context_limit: limit,
+            },
+        );
+        let control = RuntimeAdmissionControl::new();
+        actor.set_runtime_admission(control.clone());
+        let task = tokio::spawn(async move {
+            actor.run().await;
+            actor
+        });
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "continue".into(),
+            })
+            .await
+            .expect("submit");
+        let mut states = vec![];
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(10), handle.eq_rx.recv())
+                .await
+                .expect("deadline")
+                .expect("event");
+            if let SessionEvent::AutomaticCompactStatus { state, .. } = &event {
+                states.push(*state);
+                if outcome == "cancelled" && matches!(state, AutomaticCompactState::Started { .. })
+                {
+                    tokio::time::timeout(Duration::from_secs(5), model.entered.notified())
+                        .await
+                        .expect("summary started");
+                    control.interrupt_active();
+                }
+            }
+            if let Some(status) = completed_status(&event) {
+                assert!(
+                    matches!(
+                        (outcome, status),
+                        ("cancelled", TurnCompletionStatus::Cancelled)
+                            | ("applied" | "failed", TurnCompletionStatus::Success { .. })
+                    ),
+                    "{outcome}: {status:?}"
+                );
+                break;
+            }
+        }
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        let actor = task.await.expect("actor");
+        assert_eq!(states.len(), 2, "one start and one terminal: {states:?}");
+        let AutomaticCompactState::Started { before } = states[0] else {
+            panic!("start first");
+        };
+        assert!(before > 0);
+        match (outcome, states[1]) {
+            (
+                "applied",
+                AutomaticCompactState::Applied {
+                    before: prior,
+                    after,
+                },
+            ) => {
+                assert_eq!(prior, before);
+                assert!(after < before && after <= limit);
+            }
+            ("failed", AutomaticCompactState::Failed { before: prior, .. })
+            | ("cancelled", AutomaticCompactState::Cancelled { before: prior }) => {
+                assert_eq!(prior, before)
+            }
+            _ => panic!("unexpected outcome: {outcome}, {states:?}"),
+        }
+        assert_eq!(&actor.history[..raw.len()], raw);
+        assert!(
+            !serde_json::to_string(&actor.history)
+                .expect("history")
+                .contains("Automatic compaction")
+        );
+        if outcome != "applied" {
+            assert!(
+                actor
+                    .agent
+                    .checkpoint_projection_state
+                    .lock()
+                    .expect("cache")
+                    .is_none()
+            );
+        }
+    }
+}
+
+#[path = "checkpoint_acceptance_tests.rs"]
+mod checkpoint_acceptance;

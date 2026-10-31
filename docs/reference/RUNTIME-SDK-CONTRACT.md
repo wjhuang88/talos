@@ -548,3 +548,14 @@ without retrying its hook. Interrupt/shutdown cancel pending work.
 Status contains bounded enums and numeric estimates, never checkpoint text. The
 external SDK fixture exercises below-threshold compaction before an ordinary turn
 in both dependency modes; it does not certify long-history semantic retention.
+
+Automatic attempts emit `SessionEvent::AutomaticCompactStatus` directly, including
+initial request preparation before an ordinary turn starts. The Runtime re-exports
+`AutomaticCompactState` and `AutomaticCompactFailure`; variant tags and typed
+failure categories are bounded reason codes, with whole-request token estimates.
+Consumers should display these as transient progress, reject old generations and
+continue waiting for the ordinary turn's terminal event. Automatic status is not a
+manual operation receipt and does not complete the turn or write transcript text.
+Cancellation before the shared Runtime checkpoint commit gate prevents installation;
+cancellation after Applied does not undo that projection. Provider error strings,
+summary content and image bytes are never included in these status events.

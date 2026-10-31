@@ -18,6 +18,8 @@ pub(super) struct ProviderRequestPlan {
     pub(super) messages: Vec<Message>,
     pub(super) tool_definitions: Vec<ToolDefinition>,
     pub(super) estimated_tokens: u32,
+    /// Request-only image reserve, including its input safety margin.
+    pub(super) ephemeral_image_tokens: u32,
     pub(super) omitted_tool_exchanges: u32,
     pub(super) tool_protocol: talos_core::tool::ToolProtocol,
 }
@@ -33,6 +35,7 @@ pub(crate) struct PreparedSessionTurn {
     pub(super) initial_plan: ProviderRequestPlan,
     pub(super) request_context_limit: Option<u32>,
     pub(super) history_source: Option<crate::compaction::HistorySource>,
+    pub(super) checkpoint_observer: Option<crate::checkpoint_progress::CheckpointObserver>,
 }
 
 impl Agent {
@@ -59,6 +62,17 @@ impl Agent {
         images: &[talos_core::provider::EphemeralImage],
         limit: Option<u32>,
     ) -> AgentResult<()> {
+        self.reserve_ephemeral_images(plan, images)?;
+        self.recover_request_budget(plan, limit)
+    }
+
+    /// Reserve metadata before checkpoint policy, without prematurely trimming.
+    /// Repeated reservation replaces the prior reserve and never double-counts it.
+    pub(super) fn reserve_ephemeral_images(
+        &self,
+        plan: &mut ProviderRequestPlan,
+        images: &[talos_core::provider::EphemeralImage],
+    ) -> AgentResult<()> {
         if !images.is_empty() && !self.image_input_supported {
             return Err(AgentError::ToolError(
                 "selected model does not support image input".into(),
@@ -77,16 +91,12 @@ impl Agent {
         let margin = u64::from(image_tokens)
             .saturating_mul(u64::from(self.request_budget_spec.input_safety_margin_bps))
             .div_ceil(10_000);
-        let estimated = self
+        plan.ephemeral_image_tokens =
+            image_tokens.saturating_add(u32::try_from(margin).unwrap_or(u32::MAX));
+        plan.estimated_tokens = self
             .estimate_provider_request_tokens(&plan.messages, &plan.tool_definitions)
-            .saturating_add(image_tokens)
-            .saturating_add(u32::try_from(margin).unwrap_or(u32::MAX));
-        plan.estimated_tokens = estimated;
-        self.recover_request_budget(
-            plan,
-            limit,
-            image_tokens.saturating_add(u32::try_from(margin).unwrap_or(u32::MAX)),
-        )
+            .saturating_add(plan.ephemeral_image_tokens);
+        Ok(())
     }
 
     pub(super) fn structured_session_inputs(items: &[SubmissionItem]) -> (String, Vec<Message>) {
@@ -174,10 +184,12 @@ impl Agent {
             history,
             request_context_limit,
             source,
+            None,
         )
         .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn prepare_session_turn_at_revision(
         &self,
         items: &[SubmissionItem],
@@ -186,6 +198,7 @@ impl Agent {
         generation: u64,
         revision: u64,
         recovered: Option<&crate::compaction::HistorySource>,
+        checkpoint_observer: Option<crate::checkpoint_progress::CheckpointObserver>,
     ) -> AgentResult<PreparedSessionTurn> {
         let source = crate::compaction::HistorySource::bind_recovered_until(
             generation,
@@ -202,6 +215,7 @@ impl Agent {
             history,
             Some(request_context_limit),
             source,
+            checkpoint_observer,
         )
         .await
     }
@@ -213,6 +227,7 @@ impl Agent {
         history: Vec<Message>,
         request_context_limit: Option<u32>,
         history_source: Option<crate::compaction::HistorySource>,
+        checkpoint_observer: Option<crate::checkpoint_progress::CheckpointObserver>,
     ) -> AgentResult<PreparedSessionTurn> {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
@@ -264,6 +279,7 @@ impl Agent {
                 request_context_limit,
                 &PrivateTokens::default(),
                 history_source.as_ref(),
+                checkpoint_observer.as_ref(),
             )
             .await
         {
@@ -284,6 +300,7 @@ impl Agent {
             initial_plan,
             request_context_limit,
             history_source,
+            checkpoint_observer,
         })
     }
 
@@ -357,6 +374,7 @@ impl Agent {
             messages: owned_messages,
             tool_definitions,
             estimated_tokens,
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol,
         };
@@ -373,6 +391,7 @@ impl Agent {
         request_context_limit: Option<u32>,
         private_tokens: &PrivateTokens,
         history_source: Option<&crate::compaction::HistorySource>,
+        checkpoint_observer: Option<&crate::checkpoint_progress::CheckpointObserver>,
     ) -> AgentResult<ProviderRequestPlan> {
         let plan = self
             .observe_provider_request_plan(
@@ -383,8 +402,14 @@ impl Agent {
                 private_tokens,
             )
             .await?;
-        self.seal_observed_request_plan(plan, request_context_limit, private_tokens, history_source)
-            .await
+        self.seal_observed_request_plan(
+            plan,
+            request_context_limit,
+            private_tokens,
+            history_source,
+            checkpoint_observer,
+        )
+        .await
     }
 
     /// Complete budget/projection admission without invoking the request hook again.
@@ -394,6 +419,7 @@ impl Agent {
         request_context_limit: Option<u32>,
         private_tokens: &PrivateTokens,
         history_source: Option<&crate::compaction::HistorySource>,
+        checkpoint_observer: Option<&crate::checkpoint_progress::CheckpointObserver>,
     ) -> AgentResult<ProviderRequestPlan> {
         if let Some(limit) = request_context_limit {
             use crate::compaction::RequestPressure;
@@ -434,12 +460,71 @@ impl Agent {
             {
                 // Failure leaves the sealed projection intact. Existing bounded
                 // recovery must still admit it or return an explicit refusal.
-                let _ = self
-                    .checkpoint_request_once(&mut plan, limit, private_tokens, history_source)
+                let progress = crate::checkpoint_progress::CheckpointProgress::start(
+                    checkpoint_observer,
+                    plan.estimated_tokens,
+                );
+                let deadline = history_source
+                    .and_then(crate::compaction::HistorySource::deadline)
+                    .unwrap_or_else(|| {
+                        tokio::time::Instant::now() + std::time::Duration::from_secs(120)
+                    });
+                let mut candidate = plan.clone();
+                let mut projection = None;
+                let prepared = self
+                    .checkpoint_request_once_deferred(
+                        &mut candidate,
+                        limit,
+                        private_tokens,
+                        history_source,
+                        Some(&mut projection),
+                    )
                     .await;
+                if prepared.is_ok()
+                    && let Some(projection) = projection
+                {
+                    let install = || self.install_checkpoint_projection(projection, deadline);
+                    let committed = if let Some(control) =
+                        checkpoint_observer.and_then(|observer| observer.admission.as_ref())
+                    {
+                        control.commit_checkpoint(install)
+                    } else {
+                        Some(install())
+                    };
+                    match committed {
+                        Some(Ok(())) => {
+                            plan = candidate;
+                            progress.finish(Ok(plan.estimated_tokens));
+                        }
+                        Some(Err(_)) => progress.finish(Err(
+                            talos_core::session::AutomaticCompactFailure::CommitRejected,
+                        )),
+                        None => progress.cancel(),
+                    }
+                } else {
+                    let reason = prepared
+                        .as_ref()
+                        .err()
+                        .map(crate::checkpoint_progress::failure_reason)
+                        .unwrap_or(talos_core::session::AutomaticCompactFailure::Preparation);
+                    progress.finish(Err(reason));
+                }
+            } else if !reused
+                && !source_verified
+                && matches!(
+                    RequestPressure::assess(plan.estimated_tokens, limit),
+                    RequestPressure::Critical | RequestPressure::Emergency
+                )
+                && let Some(observer) = checkpoint_observer
+            {
+                observer.emit(
+                    talos_core::session::AutomaticCompactState::SkippedSourceUnavailable {
+                        before: plan.estimated_tokens,
+                    },
+                );
             }
         }
-        self.recover_request_budget(&mut plan, request_context_limit, 0)?;
+        self.recover_request_budget(&mut plan, request_context_limit)?;
         Ok(plan)
     }
 
@@ -449,7 +534,6 @@ impl Agent {
         &self,
         plan: &mut ProviderRequestPlan,
         limit: Option<u32>,
-        additional_tokens: u32,
     ) -> AgentResult<()> {
         let Some(limit) = limit else {
             return Ok(());
@@ -486,7 +570,7 @@ impl Agent {
             });
             let estimated = self
                 .estimate_provider_request_tokens(&candidate, &plan.tool_definitions)
-                .saturating_add(additional_tokens);
+                .saturating_add(plan.ephemeral_image_tokens);
             omitted += 1;
             if estimated <= limit {
                 plan.messages = candidate;

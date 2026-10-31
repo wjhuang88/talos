@@ -12,6 +12,7 @@ use crate::token::TokenEstimator;
 use crate::transient_text::PrivateTokens;
 
 impl Agent {
+    #[cfg(test)]
     pub(crate) async fn checkpoint_request_once(
         &self,
         plan: &mut ProviderRequestPlan,
@@ -45,6 +46,7 @@ impl Agent {
                 &plan.messages,
                 &definitions,
                 context_limit,
+                plan.ephemeral_image_tokens,
                 source.map(|source| (source.generation(), source.revision())),
                 self.request_budget_spec.requested_output_tokens,
                 self.request_budget_spec.input_safety_margin_bps,
@@ -130,7 +132,11 @@ impl Agent {
             .filter(|message| matches!(message, Message::System { .. }))
             .cloned()
             .collect();
-        if self.estimate_provider_request_tokens(&fixed, &plan.tool_definitions) > context_limit {
+        if self
+            .estimate_provider_request_tokens(&fixed, &plan.tool_definitions)
+            .saturating_add(plan.ephemeral_image_tokens)
+            > context_limit
+        {
             return Err(CompactionError::CompactionFailed(
                 "fixed request overhead exceeds capacity".into(),
             ));
@@ -414,7 +420,9 @@ impl Agent {
                 candidate.push(message.clone());
             }
         }
-        let estimated = self.estimate_provider_request_tokens(&candidate, &plan.tool_definitions);
+        let estimated = self
+            .estimate_provider_request_tokens(&candidate, &plan.tool_definitions)
+            .saturating_add(plan.ephemeral_image_tokens);
         if estimated > context_limit {
             return Err(CompactionError::CompactionFailed(
                 "checkpoint leaves request over capacity".into(),
@@ -648,6 +656,7 @@ mod tests {
                         .collect(),
                 )
                 .as_ref(),
+                None,
             )
             .await
             .expect("valid checkpoint test fixture");
@@ -685,6 +694,7 @@ mod tests {
             messages: original.clone(),
             tool_definitions: vec![],
             estimated_tokens: agent.estimate_provider_request_tokens(&original, &[]),
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -712,6 +722,7 @@ mod tests {
             messages: messages.clone(),
             tool_definitions: vec![],
             estimated_tokens: 100,
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -756,6 +767,7 @@ mod tests {
             estimated_tokens: agent.estimate_provider_request_tokens(&messages, &[]),
             messages,
             tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -805,6 +817,7 @@ mod tests {
             estimated_tokens: agent.estimate_provider_request_tokens(&original, &[]),
             messages: original.clone(),
             tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -875,6 +888,7 @@ mod tests {
             estimated_tokens: agent.estimate_provider_request_tokens(&messages, &[]),
             messages,
             tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -924,6 +938,7 @@ mod tests {
                 description: "x".repeat(100_000),
                 parameters: serde_json::json!({}),
             }],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -958,6 +973,7 @@ mod tests {
             estimated_tokens: agent.estimate_provider_request_tokens(&original, &[]),
             messages: original.clone(),
             tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1014,6 +1030,7 @@ mod tests {
                 messages: raw.clone(),
                 tool_definitions: vec![],
                 estimated_tokens: agent.estimate_provider_request_tokens(&raw, &[]),
+                ephemeral_image_tokens: 0,
                 omitted_tool_exchanges: 0,
                 tool_protocol: ToolProtocol::Native,
             };
@@ -1057,6 +1074,7 @@ mod tests {
             messages: raw,
             tool_definitions: vec![],
             estimated_tokens: limit,
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1119,6 +1137,7 @@ mod tests {
                 Some(limit),
                 &PrivateTokens::default(),
                 Some(&source),
+                None,
             )
             .await
             .expect("first checkpoint");
@@ -1139,6 +1158,7 @@ mod tests {
                 Some(limit),
                 &PrivateTokens::default(),
                 Some(&source),
+                None,
             )
             .await
             .expect("reuse checkpoint");
@@ -1157,6 +1177,7 @@ mod tests {
             messages: raw.clone(),
             tool_definitions: vec![],
             estimated_tokens: agent.estimate_provider_request_tokens(&raw, &[]),
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1197,6 +1218,7 @@ mod tests {
             messages: pressured.clone(),
             tool_definitions: vec![],
             estimated_tokens: agent.estimate_provider_request_tokens(&pressured, &[]),
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1220,6 +1242,7 @@ mod tests {
                 Some(limit),
                 &PrivateTokens::default(),
                 Some(&pressured_source),
+                None,
             )
             .await;
         assert!(provider.requests.lock().expect("capture").len() > calls);
@@ -1263,6 +1286,7 @@ mod tests {
                 messages: raw.clone(),
                 tool_definitions: vec![],
                 estimated_tokens: agent.estimate_provider_request_tokens(&raw, &[]),
+                ephemeral_image_tokens: 0,
                 omitted_tool_exchanges: 0,
                 tool_protocol: ToolProtocol::Native,
             };
@@ -1298,6 +1322,7 @@ mod tests {
             messages: raw.clone(),
             tool_definitions: vec![],
             estimated_tokens: agent.estimate_provider_request_tokens(&raw, &[]),
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1348,6 +1373,7 @@ mod tests {
             messages: original.clone(),
             tool_definitions: vec![],
             estimated_tokens: before,
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1380,6 +1406,7 @@ mod tests {
             estimated_tokens: agent.estimate_provider_request_tokens(&original, &[]),
             messages: original.clone(),
             tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1429,6 +1456,7 @@ mod tests {
                 Some(limit),
                 &PrivateTokens::default(),
                 Some(&source),
+                None,
             )
             .await
             .expect("fitting unchanged request");
@@ -1468,6 +1496,7 @@ mod tests {
             estimated_tokens: agent.estimate_provider_request_tokens(&messages, &[]),
             messages,
             tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1516,6 +1545,7 @@ mod tests {
             estimated_tokens: agent.estimate_provider_request_tokens(&messages, &[]),
             messages,
             tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1577,6 +1607,7 @@ mod tests {
             estimated_tokens: agent.estimate_provider_request_tokens(&messages, &[]),
             messages,
             tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1667,6 +1698,7 @@ mod tests {
             estimated_tokens: agent.estimate_provider_request_tokens(&messages, &[]),
             messages,
             tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1714,6 +1746,7 @@ mod tests {
             estimated_tokens: agent.estimate_provider_request_tokens(&original, &[]),
             messages: original.clone(),
             tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
             omitted_tool_exchanges: 0,
             tool_protocol: ToolProtocol::Native,
         };
@@ -1764,6 +1797,7 @@ mod tests {
                 Some(limit),
                 &PrivateTokens::default(),
                 Some(&source),
+                None,
             )
             .await
             .expect("continuation checkpoint");
@@ -1776,5 +1810,271 @@ mod tests {
         assert!(!captured.contains("UNBOUND_WORKSPACE_CONTEXT"));
         assert!(captured.contains("generation:9:entry:1"));
         assert!(plan.estimated_tokens <= limit);
+    }
+    #[tokio::test]
+    async fn ephemeral_images_trigger_checkpoint_before_final_admission_without_entering_summary() {
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: false,
+            fail_after: None,
+        });
+        let mut agent = Agent::new(provider.clone(), ToolRegistry::new());
+        agent.set_image_input_supported(true);
+        let messages = history();
+        let source = crate::compaction::HistorySource::bind(
+            0,
+            messages.len() as u64,
+            &messages,
+            (0..messages.len())
+                .map(|index| format!("source-{index}"))
+                .collect(),
+        )
+        .expect("raw source");
+        let context = HookContext::new(TurnId::new(), std::path::PathBuf::from("."));
+        let mut plan = agent
+            .observe_provider_request_plan(
+                &context,
+                &messages,
+                &[],
+                &mut vec![],
+                &PrivateTokens::default(),
+            )
+            .await
+            .expect("observe");
+        let limit = plan.estimated_tokens * 100 / 94;
+        assert_eq!(
+            crate::compaction::RequestPressure::assess(plan.estimated_tokens, limit),
+            crate::compaction::RequestPressure::Advisory
+        );
+        let images = vec![
+            talos_core::provider::EphemeralImage::png(
+                b"\x89PNG\r\n\x1a\nprivate-image-must-not-reach-summary".to_vec(),
+                std::time::Instant::now() + Duration::from_secs(120),
+            )
+            .expect("image"),
+        ];
+        agent
+            .reserve_ephemeral_images(&mut plan, &images)
+            .expect("image reserve");
+        let before = plan.estimated_tokens;
+        let reserve = plan.ephemeral_image_tokens;
+        assert!(matches!(
+            crate::compaction::RequestPressure::assess(before, limit),
+            crate::compaction::RequestPressure::Critical
+                | crate::compaction::RequestPressure::Emergency
+        ));
+        let mut compacted = agent
+            .seal_observed_request_plan(
+                plan,
+                Some(limit),
+                &PrivateTokens::default(),
+                Some(&source),
+                None,
+            )
+            .await
+            .expect("whole request admitted");
+        assert!(compacted.estimated_tokens < before);
+        assert_eq!(
+            compacted.estimated_tokens,
+            agent.estimate_provider_request_tokens(&compacted.messages, &[]) + reserve
+        );
+        let after = compacted.estimated_tokens;
+        agent
+            .admit_ephemeral_images(&mut compacted, &images, Some(limit))
+            .expect("dispatch admission");
+        assert_eq!(
+            compacted.estimated_tokens, after,
+            "dispatch must not double count reserve"
+        );
+        let calls = provider.requests.lock().expect("requests");
+        assert!(
+            !calls.is_empty(),
+            "image reserve must participate in automatic trigger"
+        );
+        for call in calls.iter() {
+            assert!(
+                !serde_json::to_string(call)
+                    .expect("serialize")
+                    .contains("private-image-must-not-reach-summary")
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn irreducible_ephemeral_reserve_refuses_without_summary_or_projection_mutation() {
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: false,
+            fail_after: None,
+        });
+        let mut agent = Agent::new(provider.clone(), ToolRegistry::new());
+        agent.set_image_input_supported(true);
+        let messages = history();
+        let original = messages.clone();
+        let mut plan = ProviderRequestPlan {
+            estimated_tokens: agent.estimate_provider_request_tokens(&messages, &[]),
+            messages,
+            tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
+            omitted_tool_exchanges: 0,
+            tool_protocol: ToolProtocol::Native,
+        };
+        let images = vec![
+            talos_core::provider::EphemeralImage::png(
+                b"\x89PNG\r\n\x1a\nprivate-image".to_vec(),
+                std::time::Instant::now() + Duration::from_secs(120),
+            )
+            .expect("image"),
+        ];
+        agent
+            .reserve_ephemeral_images(&mut plan, &images)
+            .expect("reserve");
+        let fixed_without_images = agent.estimate_provider_request_tokens(&[], &[]);
+        let limit = fixed_without_images + plan.ephemeral_image_tokens - 1;
+        assert!(fixed_without_images <= limit);
+        let before = plan.estimated_tokens;
+        let error = agent
+            .checkpoint_request(&mut plan, limit, &PrivateTokens::default())
+            .await
+            .expect_err("irreducible image reserve");
+        assert!(error.to_string().contains("fixed request overhead"));
+        assert!(provider.requests.lock().expect("requests").is_empty());
+        assert_eq!(plan.messages, original);
+        assert_eq!(plan.estimated_tokens, before);
+    }
+    #[tokio::test]
+    async fn automatic_checkpoint_commit_refuses_runtime_interrupt_after_summary() {
+        use talos_core::session::{AutomaticCompactState, SessionEvent};
+        struct InterruptingSummary {
+            inner: SummaryProvider,
+            control: crate::session::RuntimeAdmissionControl,
+        }
+        #[async_trait]
+        impl LanguageModel for InterruptingSummary {
+            async fn stream(
+                &self,
+                messages: &[Message],
+            ) -> ProviderResult<tokio::sync::mpsc::Receiver<AgentEvent>> {
+                let stream = self.inner.stream(messages).await?;
+                self.control.interrupt_active();
+                Ok(stream)
+            }
+        }
+        let control = crate::session::RuntimeAdmissionControl::new();
+        assert!(control.commit_start(tokio_util::sync::CancellationToken::new()));
+        let provider = Arc::new(InterruptingSummary {
+            inner: SummaryProvider {
+                requests: Mutex::new(vec![]),
+                invalid: false,
+                fail_after: None,
+            },
+            control: control.clone(),
+        });
+        let agent = Agent::new(provider.clone(), ToolRegistry::new());
+        let raw = history();
+        let source = crate::compaction::HistorySource::bind(
+            0,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len())
+                .map(|index| format!("entry-{index}"))
+                .collect(),
+        )
+        .expect("source");
+        let before = agent.estimate_provider_request_tokens(&raw, &[]);
+        let limit = before * 100 / 96;
+        let plan = ProviderRequestPlan {
+            messages: raw.clone(),
+            tool_definitions: vec![],
+            estimated_tokens: before,
+            ephemeral_image_tokens: 0,
+            omitted_tool_exchanges: 0,
+            tool_protocol: ToolProtocol::Native,
+        };
+        let (sender, mut events) = tokio::sync::mpsc::unbounded_channel();
+        let observer = crate::checkpoint_progress::CheckpointObserver {
+            sender,
+            session_id: "test".into(),
+            generation: 0,
+            admission: Some(control),
+        };
+        let result = agent
+            .seal_observed_request_plan(
+                plan,
+                Some(limit),
+                &PrivateTokens::default(),
+                Some(&source),
+                Some(&observer),
+            )
+            .await
+            .expect("original request still fits");
+        assert_eq!(result.messages, raw);
+        assert!(
+            agent
+                .checkpoint_projection_state
+                .lock()
+                .expect("cache")
+                .is_none()
+        );
+        assert!(!provider.inner.requests.lock().expect("requests").is_empty());
+        assert!(matches!(
+            events.try_recv().expect("start"),
+            SessionEvent::AutomaticCompactStatus {
+                state: AutomaticCompactState::Started { .. },
+                ..
+            }
+        ));
+        assert!(matches!(
+            events.try_recv().expect("terminal"),
+            SessionEvent::AutomaticCompactStatus {
+                state: AutomaticCompactState::Cancelled { .. },
+                ..
+            }
+        ));
+        assert!(events.try_recv().is_err(), "no duplicate terminal");
+    }
+
+    #[tokio::test]
+    async fn automatic_checkpoint_reports_unavailable_source_without_summary_call() {
+        use talos_core::session::{AutomaticCompactState, SessionEvent};
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: false,
+            fail_after: None,
+        });
+        let agent = Agent::new(provider.clone(), ToolRegistry::new());
+        let raw = history();
+        let before = agent.estimate_provider_request_tokens(&raw, &[]);
+        let plan = ProviderRequestPlan {
+            messages: raw.clone(),
+            tool_definitions: vec![],
+            estimated_tokens: before,
+            ephemeral_image_tokens: 0,
+            omitted_tool_exchanges: 0,
+            tool_protocol: ToolProtocol::Native,
+        };
+        let (sender, mut events) = tokio::sync::mpsc::unbounded_channel();
+        let observer = crate::checkpoint_progress::CheckpointObserver {
+            sender,
+            session_id: "test".into(),
+            generation: 0,
+            admission: None,
+        };
+        let result = agent
+            .seal_observed_request_plan(
+                plan,
+                Some(before * 100 / 96),
+                &PrivateTokens::default(),
+                None,
+                Some(&observer),
+            )
+            .await
+            .expect("fits");
+        assert_eq!(result.messages, raw);
+        assert!(provider.requests.lock().expect("requests").is_empty());
+        assert!(
+            matches!(events.try_recv().expect("skip"), SessionEvent::AutomaticCompactStatus { state: AutomaticCompactState::SkippedSourceUnavailable { before: count }, .. } if count == before)
+        );
+        assert!(events.try_recv().is_err());
     }
 }

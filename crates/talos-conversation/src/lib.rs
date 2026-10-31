@@ -90,3 +90,32 @@ pub fn format_compact_status(id: u64, state: talos_core::session::CompactState) 
     };
     format!("Compaction {id}: {status}")
 }
+
+/// Format automatic checkpoint metadata without revealing derived context.
+pub fn format_automatic_compact_status(
+    state: talos_core::session::AutomaticCompactState,
+) -> String {
+    use talos_core::session::AutomaticCompactState;
+    let status = match state {
+        AutomaticCompactState::Started { before } => format!("started: estimated tokens {before}"),
+        AutomaticCompactState::Applied { before, after } => {
+            format!("applied: estimated tokens {before} → {after}")
+        }
+        AutomaticCompactState::SkippedSourceUnavailable { before } => {
+            format!("skipped: no verified eligible source; estimated tokens {before}")
+        }
+        AutomaticCompactState::Failed { before, reason } => {
+            use talos_core::session::AutomaticCompactFailure;
+            let reason = match reason {
+                AutomaticCompactFailure::Provider => "provider failure",
+                AutomaticCompactFailure::Preparation => "preparation or validation rejected",
+                AutomaticCompactFailure::CommitRejected => "candidate installation rejected",
+            };
+            format!("failed ({reason}): prior context retained; estimated tokens {before}")
+        }
+        AutomaticCompactState::Cancelled { before } => {
+            format!("cancelled: prior context retained; estimated tokens {before}")
+        }
+    };
+    format!("Automatic compaction {status}")
+}

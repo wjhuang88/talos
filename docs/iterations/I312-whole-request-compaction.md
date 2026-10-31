@@ -6,7 +6,55 @@
 > Baseline rule: preserve all parent acceptance; successful trimming alone cannot close this iteration.
 > MVP deliverable: a long-running session compacts complete provider requests safely, exposes numeric outcomes and accepts a typed /compact command while raw history remains recoverable.
 
-## Current local evidence — durable source stage, 2026-10-31
+## Current acceptance increment — 2026-10-31 (uncommitted)
+
+The latest acceptance suite now passes 4/4 in
+`/private/tmp/i312-cli-persistence-acceptance.log`. The additional fixture uses
+the CLI/TUI `set_persistence(Session)` Actor path and verifies manual compaction,
+preserved raw history and explicitly content-bound source IDs. This path does
+not claim atomic durable receipt identities or real CLI binary acceptance.
+
+Independent static follow-up approved the local increment at base `62cb8eed8453ef73ebaf434387fd85aa8ba29af5`,
+tracked diff SHA-256 `7ca61f012429b72c41ff52f4f0a5479a25ccb2651815cb0dfb3435f457238cb3`,
+acceptance file SHA-256 `491413bf61207d509fe9cebf183dc9032bf315bcdb281405be592bb9488b49ce`.
+Reviewer did not run tests and shares the Agent/external account identity.
+Tool-only failure retention is now tested for live verified output; unverified
+recovered tool payload is deliberately excluded after restart, so cross-restart
+retention of that payload is not promised. Fork remains a storage/Actor fixture.
+Standard host preflight is running as session 64989, log
+`/private/tmp/i312-observability-acceptance-preflight.log`; poll this handle rather
+than restarting. Full T4 and merge approval remain outstanding.
+
+The latest deterministic semantic acceptance suite passed 2/2 in
+`/private/tmp/i312-semantic-tool-failure.log`: 50 real Actor tool turns with
+repeated checkpoints, sequential folding, failed-tool evidence retention, raw
+export and durable restart; plus oversized Unicode text with manual compaction
+after restart. The summarizer fixture extracts markers from actual source chunks
+and the preceding checkpoint rather than returning a fixed answer. This proves
+pipeline retention for the fixture, not external model summary quality.
+
+A follow-up fork regression copies raw TLOG bytes to a distinct durable session,
+compacts through the Actor, and checks child-qualified source references and an
+unchanged parent transcript. Its current validation log is
+`/private/tmp/i312-fork-acceptance.log`; all three acceptance tests passed. It exercises the storage/
+Actor boundary, not the real CLI fork command. CLI/legacy end-to-end provenance,
+remaining lifecycle races and final full validation/review/CI/CAS/merge remain
+open. Earlier source-stage full preflight does not certify this increment.
+
+Closure ledger: update this owner then the handoff; preserve published acceptance
+and historical evidence; run both repository governance validators and the skill
+validator. Board/index retain Active/Partial. All residual work stays in I312;
+T5/T1/T6 and the overall goal remain incomplete.
+
+Current increment validation: `cargo test --locked -p talos-agent --lib` passed
+594/594 (`/private/tmp/i312-current-agent.log`); `cargo clippy --locked -p
+talos-agent --all-targets -- -D warnings` passed
+(`/private/tmp/i312-current-clippy.log`). Both repository governance validators
+passed with zero warnings (`/private/tmp/i312-current-governance.log` and
+`/private/tmp/i312-current-claims.log`). These are local component checks, not
+full workspace preflight or remote candidate certification.
+
+## Historical local evidence — durable source stage, 2026-10-31
 
 This section supersedes historical “uncommitted”/missing-manual descriptions below.
 Local implementation commits through `e90e333ca` include bounded checkpoints,
@@ -55,6 +103,46 @@ historical evidence; this owner and handoff receive the current implementation,
 verification and residual state. Board/index already say Active/Partial and need
 no lifecycle transition. Both governance validators and local-link checks are
 required before the local stage commit; residuals remain in this owner.
+
+### Next local increment — ephemeral image budget (uncommitted)
+
+Source stage is committed as `62cb8eed8453ef73ebaf434387fd85aa8ba29af5`.
+The next increment reserves ephemeral image metadata before continuation/manual
+checkpoint policy, carrying it through fixed overhead, final candidate, cache
+reuse, fallback and attempt identity. Dispatch reservation is idempotent; image
+bytes never enter the summarizer. A real prepared-image tool continuation fixture
+proves image pressure triggers checkpointing before the ordinary provider call.
+
+Image-focused tests passed 6/6 and current Agent library passed 588/588;
+Agent all-target warnings-denied Clippy passed (logs
+`/private/tmp/i312-image-runtime-tests.log`, `/private/tmp/i312-image-agent.log`,
+`/private/tmp/i312-image-clippy.log`). Independent static review approved the
+bounded image delta against `62cb8eed8453ef73ebaf434387fd85aa8ba29af5`, diff SHA-256
+`09a7d1273fe2ccddf5937526866daa59cc4155648de5751041ee0e930e355fdb`;
+the reviewer did not run tests or approve full T4. The source-stage full preflight
+does not certify this newer increment. Manual image boundary end-to-end evidence,
+remaining semantic/observability/lifecycle acceptance and final full gates remain
+in this owner. No new implementation PR or remote CI exists yet.
+
+### Automatic feedback and commit gate — current local increment
+
+Automatic initial/continuation checkpoint attempts now emit typed content-free
+Session events: started, applied, unavailable-source skip, failed with bounded
+category, and cancelled. These go directly to TUI/inline transient status and
+Runtime consumers, never through durable Agent-event persistence. A dropped
+preparation future emits one cancelled terminal. Candidate installation now uses
+the same Runtime interrupt/shutdown gate as manual application; rejected commits
+retain the original request projection. No provider error string is displayed.
+
+The real Actor success/invalid-summary/mid-summary-interrupt matrix passed, as did
+post-summary commit refusal and unavailable-source skip tests (3/3 in
+`/private/tmp/i312-auto-outcomes-reviewed.log`). An earlier fixture compile error
+incorrectly treated `interrupt_active` as boolean; corrected to its actual unit
+return. The CLI is a binary target; the first `--lib` command was invalid and the
+correct `--bin talos` bridge test passed. Current full Agent/affected-crate checks,
+independent stage review, full preflight and remaining T4 acceptance are pending.
+This is not completion of manual failure metrics, fork/legacy lineage, semantic
+50-turn/restart acceptance, or the entire I312/whole-handoff scope.
 
 ## Collaboration Claim
 

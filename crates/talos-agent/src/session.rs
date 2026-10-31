@@ -1051,6 +1051,12 @@ impl AppServerSession {
         if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
             let _ = self.try_archive_session(file, dir);
         }
+        let checkpoint_observer = crate::checkpoint_progress::CheckpointObserver {
+            sender: self.eq_tx.clone(),
+            session_id: self.session_id.clone(),
+            generation: self.session_generation,
+            admission: self.runtime_admission.clone(),
+        };
         let runtime_managed = self.runtime_admission.is_some();
         let prepared_before_commit = if runtime_managed {
             None
@@ -1067,6 +1073,7 @@ impl AppServerSession {
                         self.session_generation,
                         self.history.len() as u64,
                         self.recovered_source.as_ref(),
+                        Some(checkpoint_observer.clone()),
                     )
                     .await
                 {
@@ -1194,6 +1201,7 @@ impl AppServerSession {
                     self.session_generation,
                     self.history.len() as u64,
                     self.recovered_source.as_ref(),
+                    Some(checkpoint_observer.clone()),
                 ) => result,
             };
             match prepare_result {

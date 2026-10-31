@@ -130,10 +130,53 @@ pub enum CompactState {
     StaleGeneration,
 }
 
+/// Bounded automatic-checkpoint failure categories, never provider error text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AutomaticCompactFailure {
+    /// The summarizer provider or its bounded stream failed.
+    Provider,
+    /// Preparation, resource/attempt bounds, source/schema validation or reclaim failed.
+    Preparation,
+    /// The final projection installation rejected the prepared candidate.
+    CommitRejected,
+}
+
+/// Content-free automatic checkpoint progress for one sealed request.
+/// Variant tags are bounded outcome/reason codes; no provider error or summary
+/// text is carried. Failed/cancelled outcomes leave the prior projection intact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum AutomaticCompactState {
+    /// Summary preparation began at the reported whole-request estimate.
+    Started { before: u32 },
+    /// A validated projection reduced the request to the reported estimate.
+    Applied { before: u32, after: u32 },
+    /// Pressure was high but no verified eligible raw prefix was available.
+    SkippedSourceUnavailable { before: u32 },
+    /// Preparation/validation or the bounded attempt policy rejected compaction.
+    Failed {
+        before: u32,
+        reason: AutomaticCompactFailure,
+    },
+    /// Preparation was dropped before publishing a successful result.
+    Cancelled { before: u32 },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SessionEvent {
+    /// Automatic checkpoint feedback, including pre-turn request admission.
+    /// This is transient UI state, not an Agent transcript event.
+    AutomaticCompactStatus {
+        /// Owning session identity.
+        session_id: String,
+        /// Owning runtime generation; replaced-session events must be ignored.
+        session_generation: u64,
+        /// Bounded metadata for the automatic attempt.
+        state: AutomaticCompactState,
+    },
     /// Content-free manual checkpoint progress, never persisted as a user turn.
     CompactStatus {
         session_id: String,

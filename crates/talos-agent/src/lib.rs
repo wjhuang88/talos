@@ -59,6 +59,7 @@ pub mod caching;
 mod checkpoint_attempts;
 mod checkpoint_context;
 mod checkpoint_manual;
+mod checkpoint_progress;
 mod checkpoint_projection;
 mod checkpoint_request;
 mod configuration;
@@ -835,6 +836,7 @@ impl Agent {
             initial_plan,
             request_context_limit,
             mut history_source,
+            checkpoint_observer,
         } = prepared;
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
@@ -905,26 +907,36 @@ impl Agent {
                 {
                     history_source = None;
                 }
-                let sealed = if let Some(observed) = boundary_observed_plan.take() {
+                let observed = if let Some(observed) = boundary_observed_plan.take() {
                     pending_continuation_parts.clear();
-                    self.seal_observed_request_plan(
-                        observed,
-                        request_context_limit,
-                        &private_tokens,
-                        history_source.as_ref(),
-                    )
-                    .await
+                    Ok(observed)
                 } else {
-                    self.seal_provider_request_plan(
+                    self.observe_provider_request_plan(
                         &hook_ctx,
                         &messages,
                         &active_tool_definitions,
                         &mut pending_continuation_parts,
-                        request_context_limit,
                         &private_tokens,
-                        history_source.as_ref(),
                     )
                     .await
+                };
+                let sealed = match observed {
+                    Ok(mut observed) => {
+                        match self.reserve_ephemeral_images(&mut observed, &pending_images) {
+                            Ok(()) => {
+                                self.seal_observed_request_plan(
+                                    observed,
+                                    request_context_limit,
+                                    &private_tokens,
+                                    history_source.as_ref(),
+                                    checkpoint_observer.as_ref(),
+                                )
+                                .await
+                            }
+                            Err(error) => Err(error),
+                        }
+                    }
+                    Err(error) => Err(error),
                 };
                 match sealed {
                     Ok(plan) => plan,
@@ -1826,6 +1838,14 @@ impl Agent {
                         // fails or is cancelled. Actor application is a separate decision.
                         boundary_observation_error = None;
                         boundary_observed_plan = Some(plan.clone());
+                        if self
+                            .reserve_ephemeral_images(&mut plan, &pending_images)
+                            .is_err()
+                        {
+                            return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed,
+                            );
+                        }
                         self.prepare_manual_checkpoint(
                             &mut plan,
                             limit,

@@ -240,6 +240,12 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         let mut turn_done = false;
         while let Some(event) = eq_rx.recv().await {
             match event {
+                SessionEvent::AutomaticCompactStatus { state, .. } => {
+                    println!(
+                        "{}",
+                        talos_conversation::format_automatic_compact_status(state)
+                    );
+                }
                 SessionEvent::CompactStatus {
                     operation_id,
                     state,

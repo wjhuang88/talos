@@ -1,4 +1,21 @@
-## Current phase — MODEL-014 closed, T4 implementing — 2026-10-30
+## Current acceptance checkpoint — 2026-10-31
+
+Overall goal remains Active; queue remains I309 → T8/I308 → T2+T3 MODEL-014 →
+T4 → T5 → T1 → T6. T4/I312 has uncommitted semantic acceptance fixtures passing
+2/2 (50 heavy-tool turns with repeated folding/export/restart and text-heavy
+manual restart). Input-derived summaries test pipeline retention, not external
+model quality. The added child-session fork/source-identity regression also passed
+(current acceptance suite 3/3); this is storage/Actor evidence, not CLI fork evidence.
+See I312's current acceptance increment for logs and remaining CLI/legacy,
+lifecycle, full validation, independent review, remote CI and merge gates.
+No implementation PR or T4 completion is claimed. Prior checkpoints are history.
+
+Latest local acceptance is 4/4 after adding the CLI/TUI Session-persistence Actor
+path with content-bound provenance. Independent bounded static review approved
+the increment, not full T4. Standard host preflight session 64989 is running;
+log `/private/tmp/i312-observability-acceptance-preflight.log`. Reuse that handle.
+
+## Historical phase — MODEL-014 closed, T4 implementing — 2026-10-30
 
 Overall goal remains Active. I309, I308/T8 and I311/MODEL-014 T2+T3 are Complete.
 Completion Commit for T2+T3: `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`,
@@ -16,6 +33,9 @@ approved the corrected source API; no implementation PR or remote CI yet. T4 rem
 image parity, automatic visible outcomes, semantic long-session/restart acceptance
 and final review/CI/merge remain open. See I312's current evidence section; earlier
 missing-manual/local-uncommitted statements below are historical.
+Source stage is locally committed at `62cb8eed8`. A subsequent uncommitted image
+budget correction passed 6 focused tests, Agent 588/588 and affected-crate Clippy,
+plus bounded static review; its full preflight/final acceptance remains pending.
 Full queue retained: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
 Earlier checkpoints below are historical; no whole-goal completion is claimed.
 

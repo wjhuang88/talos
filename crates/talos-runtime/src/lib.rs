@@ -867,7 +867,8 @@ pub use talos_core::provider::{
 };
 pub use talos_core::session::TurnCompletionStatus as RuntimeTurnCompletionStatus;
 pub use talos_core::session::{
-    CompactOutcome, CompactState, SessionEvent, TurnCompletionStatus, TurnEventPayload,
+    AutomaticCompactFailure, AutomaticCompactState, CompactOutcome, CompactState, SessionEvent,
+    TurnCompletionStatus, TurnEventPayload,
 };
 pub use talos_core::submission::{
     PendingSubmissionState, StructuredSubmission, SubmissionItem, SubmissionKind,

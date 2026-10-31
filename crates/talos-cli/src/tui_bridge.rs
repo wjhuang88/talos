@@ -653,6 +653,20 @@ async fn handle_session_event(
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
 ) {
     match event {
+        SessionEvent::AutomaticCompactStatus {
+            session_generation,
+            state,
+            ..
+        } => {
+            if authoritative_generation_for_sender(&sq_tx_watch.borrow())
+                == Some(session_generation)
+            {
+                let _ = ui_tx.send(UiOutput::Tip {
+                    text: talos_conversation::format_automatic_compact_status(state),
+                    kind: TipKind::Info,
+                });
+            }
+        }
         SessionEvent::CompactStatus {
             session_generation,
             operation_id,

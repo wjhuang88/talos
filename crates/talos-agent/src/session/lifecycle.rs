@@ -227,7 +227,7 @@ impl RuntimeAdmissionControl {
     }
 
     /// Serialize the Actor's checkpoint swap against runtime shutdown/interrupt.
-    pub(super) fn commit_checkpoint<T>(&self, commit: impl FnOnce() -> T) -> Option<T> {
+    pub(crate) fn commit_checkpoint<T>(&self, commit: impl FnOnce() -> T) -> Option<T> {
         let state = self.lock();
         if !matches!(state.phase, AdmissionPhase::Open)
             || state

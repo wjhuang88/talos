@@ -341,6 +341,33 @@ mod tests {
                 }
             }
         }
+        for generation in [41, 42] {
+            agent_tx
+                .send(SessionEvent::AutomaticCompactStatus {
+                    session_id: "fixture".into(),
+                    session_generation: generation,
+                    state: talos_core::session::AutomaticCompactState::Applied {
+                        before: generation as u32,
+                        after: 12,
+                    },
+                })
+                .expect("automatic status");
+        }
+        loop {
+            let output = tokio::time::timeout(std::time::Duration::from_secs(3), ui_rx.recv())
+                .await
+                .expect("automatic display deadline")
+                .expect("output");
+            if let UiOutput::Tip { text, .. } = output {
+                assert!(
+                    !text.contains("41 →"),
+                    "stale automatic status must not display"
+                );
+                if text.contains("Automatic compaction applied: estimated tokens 42 → 12") {
+                    break;
+                }
+            }
+        }
         user_tx
             .send(UserInput::Message("/compact extra".into()))
             .expect("invalid command");

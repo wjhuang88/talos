@@ -6275,6 +6275,7 @@ fn ephemeral_image_budget_is_admitted_before_dispatch() {
         messages: vec![],
         tool_definitions: vec![],
         estimated_tokens: 100,
+        ephemeral_image_tokens: 0,
         omitted_tool_exchanges: 0,
         tool_protocol: talos_core::tool::ToolProtocol::Native,
     };
@@ -6884,4 +6885,147 @@ async fn checkpoint_receipt_from_live_observation_rejects_tampering_and_same_nam
         !format!("{:?}", agent.checkpoint_projection(&messages, &private))
             .contains("verified output")
     );
+}
+
+#[tokio::test]
+async fn ephemeral_tool_image_drives_real_continuation_checkpoint() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    struct ImagePressureModel {
+        ordinary: EphemeralCapturingModel,
+        summaries: AtomicUsize,
+    }
+    #[async_trait]
+    impl LanguageModel for ImagePressureModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let [Message::User { content }] = messages else {
+                panic!("summary only");
+            };
+            assert!(content.starts_with("Produce only a JSON checkpoint"));
+            assert!(!content.contains("private-image"));
+            self.summaries.fetch_add(1, Ordering::SeqCst);
+            let sources: Vec<Value> =
+                serde_json::from_str(content.split("\nSources: ").last().expect("sources"))
+                    .expect("JSON");
+            let item = serde_json::json!({"text":"retain task constraint", "sources":[sources[0]["source"]]});
+            let payload =
+                serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                "facts":[],"assumptions":[],"resources":[],"open_loops":[]})
+                .to_string();
+            let (tx, rx) = mpsc::channel(4);
+            for event in text_done_events(&payload) {
+                tx.send(event).await.expect("summary stream");
+            }
+            Ok(rx)
+        }
+        async fn stream_with_ephemeral_images(
+            &self,
+            messages: &[Message],
+            definitions: &[ToolDefinition],
+            protocol: talos_core::tool::ToolProtocol,
+            progress: mpsc::UnboundedSender<ProviderProgress>,
+            browser_tools: &[String],
+            images: Vec<talos_core::provider::EphemeralImage>,
+        ) -> ProviderResult<ProviderInvocationStream> {
+            if images.is_empty() {
+                assert_eq!(
+                    self.summaries.load(Ordering::SeqCst),
+                    0,
+                    "initial request is advisory"
+                );
+            } else {
+                assert_eq!(images.len(), 1);
+                assert!(self.summaries.load(Ordering::SeqCst) > 0);
+                assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.starts_with("[Derived checkpoint;"))));
+            }
+            self.ordinary
+                .stream_with_ephemeral_images(
+                    messages,
+                    definitions,
+                    protocol,
+                    progress,
+                    browser_tools,
+                    images,
+                )
+                .await
+        }
+    }
+    let counts = Arc::new(Mutex::new(Vec::new()));
+    let model = Arc::new(ImagePressureModel {
+        ordinary: EphemeralCapturingModel {
+            requests: AtomicUsize::new(0),
+            counts: counts.clone(),
+        },
+        summaries: AtomicUsize::new(0),
+    });
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestEphemeralImageTool));
+    let mut agent =
+        Agent::with_security(model.clone(), registry, None, None, PathBuf::from("/tmp"));
+    agent.set_image_input_supported(true);
+    let raw: Vec<_> = (0..20)
+        .flat_map(|index| {
+            [
+                Message::User {
+                    content: format!("constraint {index}: {}", "a".repeat(4000)),
+                },
+                Message::Assistant {
+                    content: "ack".into(),
+                    tool_calls: vec![],
+                    reasoning: None,
+                },
+            ]
+        })
+        .collect();
+    let input = vec![Message::User {
+        content: "image".into(),
+    }];
+    let probe = agent
+        .prepare_turn_start("image".into(), input.clone(), raw.clone(), Some(u32::MAX))
+        .await
+        .expect("probe");
+    let limit = probe.initial_plan.estimated_tokens * 100 / 94;
+    let mut prepared = agent
+        .prepare_turn_start("image".into(), input, raw, Some(limit))
+        .await
+        .expect("prepare");
+    assert_eq!(model.summaries.load(Ordering::SeqCst), 0);
+    let (status_tx, mut status_rx) = mpsc::unbounded_channel();
+    prepared.checkpoint_observer = Some(crate::checkpoint_progress::CheckpointObserver {
+        sender: status_tx,
+        session_id: "image-continuation".into(),
+        generation: 0,
+        admission: None,
+    });
+    let (events, mut received) = mpsc::unbounded_channel();
+    let (result, persisted) = agent
+        .run_prepared_session_turn(prepared, events, None, None, None)
+        .await;
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(*counts.lock().await, vec![0, 1]);
+    assert!(matches!(
+        status_rx.try_recv().expect("start"),
+        talos_core::session::SessionEvent::AutomaticCompactStatus {
+            state: talos_core::session::AutomaticCompactState::Started { .. },
+            ..
+        }
+    ));
+    assert!(matches!(
+        status_rx.try_recv().expect("applied"),
+        talos_core::session::SessionEvent::AutomaticCompactStatus {
+            state: talos_core::session::AutomaticCompactState::Applied { .. },
+            ..
+        }
+    ));
+    assert!(status_rx.try_recv().is_err());
+    assert!(
+        !serde_json::to_string(&persisted)
+            .expect("history")
+            .contains("private-image")
+    );
+    while let Ok(event) = received.try_recv() {
+        if let AgentEvent::ContextBudget { budget } = event {
+            assert!(budget.estimated_tokens <= limit);
+        }
+    }
 }

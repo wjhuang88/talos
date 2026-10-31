@@ -143,7 +143,9 @@ impl Agent {
                 candidate.push(message.clone());
             }
         }
-        let estimated = self.estimate_provider_request_tokens(&candidate, &plan.tool_definitions);
+        let estimated = self
+            .estimate_provider_request_tokens(&candidate, &plan.tool_definitions)
+            .saturating_add(plan.ephemeral_image_tokens);
         if tokio::time::Instant::now() >= deadline
             || matches!(
                 crate::compaction::RequestPressure::assess(estimated, context_limit),
