@@ -31,8 +31,6 @@ use talos_session::PendingSubmissionStore;
 
 #[doc(hidden)]
 pub use crate::background_jobs::BackgroundJobFinalizerHandle;
-use crate::compaction::Compactor;
-use crate::token::TokenEstimator;
 use crate::{
     ActivatedSkillContext, Agent, SteeringBoundaryAcknowledgement, SteeringBoundaryBatch,
     SteeringBoundaryRequest,
@@ -138,7 +136,6 @@ pub struct AppServerSession {
     sq_rx: tokio::sync::mpsc::Receiver<SessionOp>,
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     history: Vec<Message>,
-    compactor: Compactor,
     session_file: Option<PathBuf>,
     session_dir: Option<PathBuf>,
     persistence: Option<TurnPersistence>,
@@ -165,7 +162,6 @@ impl AppServerSession {
         let (eq_tx, eq_rx) = mpsc::unbounded_channel();
 
         let handle = SessionHandle { sq_tx, eq_rx };
-        let compactor = Compactor::new(TokenEstimator::new(), config.model_context_limit);
         let instance_id = NEXT_RUNTIME_SESSION_ID.fetch_add(1, Ordering::Relaxed);
         let session_id = format!("runtime_{}_{}", std::process::id(), instance_id);
         let background_jobs = crate::background_jobs::BackgroundJobSupervisor::new(
@@ -189,7 +185,6 @@ impl AppServerSession {
             sq_rx,
             eq_tx,
             history: config.initial_history,
-            compactor,
             session_file: None,
             session_dir: None,
             persistence: None,
@@ -971,35 +966,26 @@ impl AppServerSession {
         turn_counter: u64,
         token: CancellationToken,
     ) -> Result<StartedTurn, UnstartedOutcome> {
+        // Durable segment archival retains original records and is independent
+        // of the model request projection. Never replace Actor history here.
+        if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
+            let _ = self.try_archive_session(file, dir);
+        }
         let runtime_managed = self.runtime_admission.is_some();
         let prepared_before_commit = if runtime_managed {
             None
         } else {
-            if self.compactor.should_compact(&self.history) {
-                let compacted = self.compactor.apply_budget(self.history.clone());
-                let compacted = self.compactor.apply_trim(compacted);
-                let compacted = self.compactor.apply_microcompact(compacted);
-                self.history = match self
-                    .compactor
-                    .compact(compacted, self.agent.provider())
-                    .await
-                {
-                    Ok(history) => history,
-                    Err(_) => self.compactor.compact_deterministic(self.history.clone()).0,
-                };
-                if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
-                    let _ = self.try_archive_session(file, dir, &self.history);
-                }
-            }
             if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
                 None
             } else {
                 match self
                     .agent
-                    .prepare_session_turn(
+                    .prepare_session_turn_at_revision(
                         &submission.items,
                         self.history.clone(),
                         self.model_context_limit,
+                        self.session_generation,
+                        self.history.len() as u64,
                     )
                     .await
                 {
@@ -1104,42 +1090,6 @@ impl AppServerSession {
             payload: TurnEventPayload::Started,
         });
 
-        if runtime_managed && self.compactor.should_compact(&self.history) {
-            let compacted = self.compactor.apply_budget(self.history.clone());
-            let compacted = self.compactor.apply_trim(compacted);
-            let compacted = self.compactor.apply_microcompact(compacted);
-            let compact_result = tokio::select! {
-                () = token.cancelled() => {
-                    return Ok(immediate_started_turn(
-                        self.eq_tx.clone(),
-                        self.session_id.clone(),
-                        turn_id,
-                        token,
-                        structured,
-                        TurnCompletionStatus::Cancelled,
-                    ));
-                }
-                result = self.compactor.compact(compacted, self.agent.provider()) => result,
-            };
-            self.history = match compact_result {
-                Ok(history) => history,
-                Err(_) => self.compactor.compact_deterministic(self.history.clone()).0,
-            };
-            if token.is_cancelled() {
-                return Ok(immediate_started_turn(
-                    self.eq_tx.clone(),
-                    self.session_id.clone(),
-                    turn_id,
-                    token,
-                    structured,
-                    TurnCompletionStatus::Cancelled,
-                ));
-            }
-            if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
-                let _ = self.try_archive_session(file, dir, &self.history);
-            }
-        }
-
         let prepared_turn = if !runtime_managed {
             prepared_before_commit
         } else if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
@@ -1156,10 +1106,12 @@ impl AppServerSession {
                         TurnCompletionStatus::Cancelled,
                     ));
                 }
-                result = self.agent.prepare_session_turn(
+                result = self.agent.prepare_session_turn_at_revision(
                     &submission.items,
                     self.history.clone(),
                     self.model_context_limit,
+                    self.session_generation,
+                    self.history.len() as u64,
                 ) => result,
             };
             match prepare_result {
@@ -1363,7 +1315,6 @@ impl AppServerSession {
         &self,
         file: &Path,
         dir: &Path,
-        _compacted: &[Message],
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         use talos_session::CompactTextSessionStore;
         use talos_session::compaction_engine::CompactionEngine;

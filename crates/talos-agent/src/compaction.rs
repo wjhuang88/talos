@@ -27,15 +27,22 @@
 //! subsequent compaction attempts return [`CompactionError::CircuitBreakerTripped`]
 //! immediately.
 
+mod checkpoint;
 mod constants;
 mod engine;
+mod operations;
 mod policy;
+mod source;
 mod types;
 
 #[cfg(test)]
 #[allow(warnings)]
 mod tests;
 
+pub use checkpoint::{Checkpoint, CheckpointError, CheckpointItem, MAX_CHECKPOINT_BYTES};
 pub use engine::Compactor;
-pub use policy::CompactionPolicy;
+pub(crate) use engine::read_summary_stream;
+pub use operations::{CompactAdmission, CompactOperations, CompactOutcome};
+pub use policy::{CompactionPolicy, RequestPressure};
+pub use source::HistorySource;
 pub use types::{CompactionError, CompactionResult, CompactionStatus};

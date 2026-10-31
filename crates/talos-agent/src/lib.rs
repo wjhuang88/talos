@@ -56,6 +56,10 @@ use std::sync::Arc;
 
 pub mod auto_resolver;
 pub mod caching;
+mod checkpoint_attempts;
+mod checkpoint_context;
+mod checkpoint_projection;
+mod checkpoint_request;
 mod configuration;
 pub mod context;
 pub mod evaluator;
@@ -337,6 +341,11 @@ pub struct Agent {
     image_input_supported: bool,
     /// Exact output reserve and conservative input-estimation policy.
     request_budget_spec: RequestBudgetSpec,
+    checkpoint_attempts: std::sync::Mutex<checkpoint_attempts::CheckpointAttempts>,
+    checkpoint_projection_state:
+        std::sync::Mutex<Option<checkpoint_projection::CheckpointProjection>>,
+    checkpoint_result_receipts:
+        std::sync::Mutex<std::collections::VecDeque<checkpoint_context::ResultReceipt>>,
     background_jobs: Option<Arc<dyn talos_core::background_job::BackgroundJobHost>>,
     /// Per-agent cache for endpoint/model protocol capability evidence.
     protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache,
@@ -818,6 +827,7 @@ impl Agent {
             mut active_presented_tool_names,
             initial_plan,
             request_context_limit,
+            mut history_source,
         } = prepared;
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
@@ -878,6 +888,11 @@ impl Agent {
             let plan = if let Some(plan) = initial_plan.take() {
                 plan
             } else {
+                if let Some(source) = &mut history_source
+                    && !source.bind_continuation(&messages, persist_start).await
+                {
+                    history_source = None;
+                }
                 match self
                     .seal_provider_request_plan(
                         &hook_ctx,
@@ -886,6 +901,7 @@ impl Agent {
                         &mut pending_continuation_parts,
                         request_context_limit,
                         &private_tokens,
+                        history_source.as_ref(),
                     )
                     .await
                 {
@@ -1694,6 +1710,9 @@ impl Agent {
                             ..ui_result.clone()
                         }
                     };
+                    if observed.call == *call {
+                        self.record_checkpoint_result(&call.name, &llm_result);
+                    }
                     messages.push(Message::Tool { result: llm_result });
                 }
 

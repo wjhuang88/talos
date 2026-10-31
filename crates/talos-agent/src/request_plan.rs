@@ -32,6 +32,7 @@ pub(crate) struct PreparedSessionTurn {
     pub(super) active_presented_tool_names: HashSet<String>,
     pub(super) initial_plan: ProviderRequestPlan,
     pub(super) request_context_limit: Option<u32>,
+    pub(super) history_source: Option<crate::compaction::HistorySource>,
 }
 
 impl Agent {
@@ -117,6 +118,7 @@ impl Agent {
     }
 
     /// Builds and validates the exact initial request before Actor Turn start.
+    #[cfg(test)]
     pub(crate) async fn prepare_session_turn(
         &self,
         items: &[SubmissionItem],
@@ -158,6 +160,57 @@ impl Agent {
         input_messages: Vec<Message>,
         history: Vec<Message>,
         request_context_limit: Option<u32>,
+    ) -> AgentResult<PreparedSessionTurn> {
+        let source = crate::compaction::HistorySource::bind_content_until(
+            0,
+            history.len() as u64,
+            &history,
+            tokio::time::Instant::now() + std::time::Duration::from_secs(120),
+        )
+        .await;
+        self.prepare_turn_start_with_source(
+            memory_query,
+            input_messages,
+            history,
+            request_context_limit,
+            source,
+        )
+        .await
+    }
+
+    pub(crate) async fn prepare_session_turn_at_revision(
+        &self,
+        items: &[SubmissionItem],
+        history: Vec<Message>,
+        request_context_limit: u32,
+        generation: u64,
+        revision: u64,
+    ) -> AgentResult<PreparedSessionTurn> {
+        let source = crate::compaction::HistorySource::bind_content_until(
+            generation,
+            revision,
+            &history,
+            tokio::time::Instant::now() + std::time::Duration::from_secs(120),
+        )
+        .await;
+        let (query, inputs) = Self::structured_session_inputs(items);
+        self.prepare_turn_start_with_source(
+            query,
+            inputs,
+            history,
+            Some(request_context_limit),
+            source,
+        )
+        .await
+    }
+
+    async fn prepare_turn_start_with_source(
+        &self,
+        memory_query: String,
+        input_messages: Vec<Message>,
+        history: Vec<Message>,
+        request_context_limit: Option<u32>,
+        history_source: Option<crate::compaction::HistorySource>,
     ) -> AgentResult<PreparedSessionTurn> {
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
@@ -208,6 +261,7 @@ impl Agent {
                 &mut continuation_parts,
                 request_context_limit,
                 &PrivateTokens::default(),
+                history_source.as_ref(),
             )
             .await
         {
@@ -227,9 +281,11 @@ impl Agent {
             active_presented_tool_names,
             initial_plan,
             request_context_limit,
+            history_source,
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) async fn seal_provider_request_plan(
         &self,
         hook_ctx: &HookContext,
@@ -238,6 +294,7 @@ impl Agent {
         continuation_parts: &mut Vec<ContentPart>,
         request_context_limit: Option<u32>,
         private_tokens: &PrivateTokens,
+        history_source: Option<&crate::compaction::HistorySource>,
     ) -> AgentResult<ProviderRequestPlan> {
         let hook_messages = self.persistence_projection_with_tokens(messages, private_tokens);
         let observed_provider_messages = match self
@@ -303,6 +360,50 @@ impl Agent {
             omitted_tool_exchanges: 0,
             tool_protocol,
         };
+        if let Some(limit) = request_context_limit {
+            use crate::compaction::RequestPressure;
+            let reused = if let Some(source) = history_source {
+                self.reuse_checkpoint_projection(&mut plan, source, limit, private_tokens)
+                    .await
+            } else {
+                false
+            };
+            let source_verified = !reused
+                && history_source.is_some_and(|source| {
+                    crate::checkpoint_request::eligible_prefix_end(&plan.messages).is_some_and(
+                        |end| {
+                            plan.messages[..end]
+                                .iter()
+                                .enumerate()
+                                .all(|(index, message)| {
+                                    matches!(
+                                        message,
+                                        Message::System { .. } | Message::Context { .. }
+                                    ) || source
+                                        .resolve(
+                                            source.generation(),
+                                            source.revision(),
+                                            index,
+                                            message,
+                                        )
+                                        .is_some()
+                                })
+                        },
+                    )
+                });
+            if source_verified
+                && matches!(
+                    RequestPressure::assess(plan.estimated_tokens, limit),
+                    RequestPressure::Critical | RequestPressure::Emergency
+                )
+            {
+                // Failure leaves the sealed projection intact. Existing bounded
+                // recovery must still admit it or return an explicit refusal.
+                let _ = self
+                    .checkpoint_request_once(&mut plan, limit, private_tokens, history_source)
+                    .await;
+            }
+        }
         self.recover_request_budget(&mut plan, request_context_limit, 0)?;
         Ok(plan)
     }

@@ -6752,3 +6752,136 @@ fn dispatch_recovery_requires_explicit_protocol_evidence() {
 mod edit_auto;
 mod recovery_dispatch;
 mod scheduler_auto;
+
+#[test]
+fn checkpoint_projection_excludes_arguments_reasoning_unknown_and_duplicate_provenance() {
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(ProjectedMockTool));
+    let agent = Agent::new(Arc::new(MockModel::new(vec![])), registry);
+    let messages = vec![
+        Message::Assistant {
+            content: "echo [snapshot:s1]".into(),
+            tool_calls: vec![ToolCall {
+                id: "known".into(),
+                name: "projected_read".into(),
+                input: serde_json::json!({"secret":"PRIVATE_ARGUMENT"}),
+            }],
+            reasoning: Some(AssistantReasoning {
+                provider: "test".into(),
+                model: "fixture".into(),
+                blocks: vec![ReasoningBlock::Plain {
+                    text: "PRIVATE_REASONING".into(),
+                }],
+            }),
+        },
+        Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "known".into(),
+                content: "1:aa|model-visible text".into(),
+                is_error: false,
+            },
+        },
+        Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "unknown".into(),
+                content: "UNKNOWN_PRIVATE".into(),
+                is_error: true,
+            },
+        },
+    ];
+    let recovered =
+        agent.checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default());
+    assert!(!format!("{recovered:?}").contains("model-visible text"));
+    if let Message::Tool { result } = &messages[1] {
+        agent.record_checkpoint_result("projected_read", result);
+    }
+    let raw = messages.clone();
+    let projected =
+        agent.checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default());
+    let text = format!("{projected:?}");
+    for excluded in [
+        "PRIVATE_ARGUMENT",
+        "PRIVATE_REASONING",
+        "UNKNOWN_PRIVATE",
+        "[snapshot:s1]",
+        "1:aa|",
+    ] {
+        assert!(!text.contains(excluded), "must exclude {excluded}");
+    }
+    assert!(text.contains("model-visible text"));
+    assert_eq!(messages, raw);
+    // Recovered history cannot infer a tool result producer from a duplicate ID.
+    let duplicate = [messages.clone(), messages].concat();
+    let projected =
+        agent.checkpoint_projection(&duplicate, &crate::transient_text::PrivateTokens::default());
+    assert!(!format!("{projected:?}").contains("model-visible text"));
+}
+
+#[tokio::test]
+async fn checkpoint_receipt_from_live_observation_rejects_tampering_and_same_name_replacement() {
+    let original_tool = Arc::new(ProjectedMockTool);
+    let mut registry = ToolRegistry::new();
+    registry.register(original_tool.clone());
+    let mut agent = Agent::new(Arc::new(MockModel::new(vec![])), registry);
+    let call = ToolCall {
+        id: "live-checkpoint".into(),
+        name: "projected_read".into(),
+        input: serde_json::json!({}),
+    };
+    let mut messages = vec![Message::Assistant {
+        content: String::new(),
+        tool_calls: vec![call.clone()],
+        reasoning: None,
+    }];
+    let mut private = crate::transient_text::PrivateTokens::default();
+    let context = HookContext::new(TurnId::new(), PathBuf::from("."));
+    let (tx, _rx) = mpsc::unbounded_channel();
+    agent
+        .observe_tool_result(
+            &context,
+            &call,
+            ToolExecutionResult::success("model-visible verified output"),
+            &tx,
+            &mut messages,
+            &mut private,
+        )
+        .await
+        .expect("observe actual result");
+    assert!(
+        format!("{:?}", agent.checkpoint_projection(&messages, &private))
+            .contains("model-visible verified output")
+    );
+    let mut tampered = messages.clone();
+    if let Message::Tool { result } = &mut tampered[1] {
+        result.content.push_str(" altered");
+    }
+    assert!(
+        !format!("{:?}", agent.checkpoint_projection(&tampered, &private))
+            .contains("verified output")
+    );
+    // Weak identity receipts keep allocation identity distinct without retaining
+    // the original tool object after registry replacement.
+    let original_identity = agent
+        .tools
+        .instance_handle("projected_read")
+        .expect("registered identity");
+    drop(original_tool);
+    let replacement = Arc::new(ProjectedMockTool);
+    agent.tools.register(replacement);
+    assert!(
+        original_identity.upgrade().is_none(),
+        "receipt must not retain the old tool"
+    );
+    assert!(
+        !original_identity.ptr_eq(
+            &agent
+                .tools
+                .instance_handle("projected_read")
+                .expect("replacement")
+        )
+    );
+    assert!(
+        !format!("{:?}", agent.checkpoint_projection(&messages, &private))
+            .contains("verified output")
+    );
+}

@@ -3582,3 +3582,108 @@ async fn fresh_actor_admits_submit_without_recovery_sidecar_creation() {
         "shutdown must not initialize an absent pending journal"
     );
 }
+
+#[tokio::test]
+async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
+    struct CheckpointModel {
+        summaries: AtomicUsize,
+        ordinary: AtomicUsize,
+    }
+    #[async_trait]
+    impl LanguageModel for CheckpointModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let summary = match messages {
+                [Message::User { content }]
+                    if content.starts_with("Produce only a JSON checkpoint") =>
+                {
+                    Some(content)
+                }
+                _ => None,
+            };
+            let text = if let Some(prompt) = summary {
+                self.summaries.fetch_add(1, Ordering::SeqCst);
+                assert!(!prompt.contains("WORKSPACE_CONTEXT_MUST_REMAIN_VERBATIM"));
+                let sources: Vec<serde_json::Value> =
+                    serde_json::from_str(prompt.split("\nSources: ").last().expect("sources"))
+                        .expect("JSON");
+                let item = serde_json::json!({"text":"Preserve original task", "sources":[sources[0]["source"]]});
+                serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                    "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                    "facts":[],"assumptions":[],"resources":[],"open_loops":[]})
+                .to_string()
+            } else {
+                self.ordinary.fetch_add(1, Ordering::SeqCst);
+                assert!(
+                    messages
+                        .iter()
+                        .any(|message| matches!(message, Message::System { .. }))
+                );
+                assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content == "WORKSPACE_CONTEXT_MUST_REMAIN_VERBATIM")));
+                assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.contains("Derived checkpoint"))));
+                "continued after checkpoint".into()
+            };
+            let (tx, rx) = mpsc::channel(8);
+            for event in success_events(&text) {
+                tx.send(event).await.expect("fixture stream");
+            }
+            Ok(rx)
+        }
+    }
+    let model = Arc::new(CheckpointModel {
+        summaries: AtomicUsize::new(0),
+        ordinary: AtomicUsize::new(0),
+    });
+    let mut agent = Agent::with_security_and_hooks(
+        model.clone(),
+        ToolRegistry::new(),
+        None,
+        None,
+        "/tmp".into(),
+        Arc::new(talos_plugin::HookRegistry::new()),
+    );
+    agent.workspace_context = Some("WORKSPACE_CONTEXT_MUST_REMAIN_VERBATIM".into());
+    let raw: Vec<_> = (0..50)
+        .flat_map(|index| {
+            [
+                Message::User {
+                    content: format!("task {index}: {}", "x".repeat(4000)),
+                },
+                Message::Assistant {
+                    content: "recorded".into(),
+                    tool_calls: vec![],
+                    reasoning: None,
+                },
+            ]
+        })
+        .collect();
+    let config = SessionConfig {
+        runtime_policy: RuntimePolicy::interactive(),
+        workspace_root: "/tmp".into(),
+        initial_history: raw.clone(),
+        model_context_limit: 20_000,
+    };
+    let (handle, mut actor) = AppServerSession::new(agent, config);
+    let mut eq_rx = handle.eq_rx;
+    let sq_tx = handle.sq_tx;
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor.history.clone()
+    });
+    sq_tx
+        .send(SessionOp::Submit {
+            message: "continue".into(),
+        })
+        .await
+        .expect("submit");
+    let events = collect_until_completions(&mut eq_rx, 1).await;
+    assert!(events.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    sq_tx.send(SessionOp::Shutdown).await.expect("shutdown");
+    let history = task.await.expect("actor exit");
+    assert_eq!(&history[..raw.len()], raw);
+    assert!(history.len() > raw.len());
+    assert!(model.summaries.load(Ordering::SeqCst) > 1);
+    assert_eq!(model.ordinary.load(Ordering::SeqCst), 1);
+}

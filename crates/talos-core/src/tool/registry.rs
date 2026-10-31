@@ -262,6 +262,15 @@ impl ToolRegistry {
         self.tools.get(name).map(|t| t.as_ref())
     }
 
+    /// Returns a weak identity handle for the currently registered instance.
+    ///
+    /// Comparing handles with `Weak::ptr_eq` detects same-name replacement without
+    /// retaining tool resources. A handle is process-local, not durable provenance
+    /// or permission to execute a tool.
+    pub fn instance_handle(&self, name: &str) -> Option<std::sync::Weak<dyn AgentTool>> {
+        self.tools.get(name).map(Arc::downgrade)
+    }
+
     /// Returns a list of all registered tools.
     pub fn list(&self) -> Vec<&dyn AgentTool> {
         self.tools.values().map(|t| t.as_ref()).collect()

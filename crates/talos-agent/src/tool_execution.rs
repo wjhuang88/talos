@@ -490,6 +490,9 @@ impl Agent {
                 ..ui_result.clone()
             }
         };
+        if observed.call == *call {
+            self.record_checkpoint_result(&call.name, &llm_result);
+        }
         messages.push(Message::Tool { result: llm_result });
         let todo_presentation = if !ui_result.is_error
             && observed.call == *call

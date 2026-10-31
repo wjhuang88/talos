@@ -617,3 +617,41 @@ async fn multiple_declared_images_saturate_budget_instead_of_overflowing() {
             .is_empty()
     );
 }
+
+#[tokio::test]
+async fn actor_generation_and_raw_revision_survive_request_preparation() {
+    let agent = budget_test_agent();
+    let raw = vec![Message::User {
+        content: "original task".into(),
+    }];
+    let items = vec![SubmissionItem {
+        id: "next".into(),
+        enqueue_sequence: 0,
+        kind: SubmissionKind::UserTurn,
+        text: "continue".into(),
+        attachments: vec![],
+    }];
+    let prepared = agent
+        .prepare_session_turn_at_revision(&items, raw.clone(), 128_000, 42, 1)
+        .await
+        .expect("prepared source snapshot");
+    let source = prepared.history_source.expect("raw binding");
+    assert_eq!(source.generation(), 42);
+    assert_eq!(source.revision(), 1);
+    assert!(
+        source
+            .resolve(42, 1, 0, &raw[0])
+            .is_some_and(|id| id.starts_with("generation:42:entry:0:"))
+    );
+    assert_eq!(source.resolve(41, 1, 0, &raw[0]), None);
+    assert_eq!(source.resolve(42, 2, 0, &raw[0]), None);
+    assert_eq!(
+        source.resolve(
+            42,
+            1,
+            prepared.messages.len() - 1,
+            prepared.messages.last().expect("current input")
+        ),
+        None
+    );
+}

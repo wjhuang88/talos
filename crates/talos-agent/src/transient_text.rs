@@ -18,6 +18,10 @@ struct TrieNode {
 }
 
 impl PrivateTokens {
+    pub(crate) fn same_tokens(&self, other: &Self) -> bool {
+        self.tokens == other.tokens
+    }
+
     pub(crate) fn extend(&mut self, tokens: impl IntoIterator<Item = String>) {
         for token in tokens {
             if !token.is_empty() && !self.tokens.contains(&token) {
