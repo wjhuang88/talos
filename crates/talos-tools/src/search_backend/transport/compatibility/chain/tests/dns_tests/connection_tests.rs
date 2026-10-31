@@ -169,33 +169,23 @@ async fn injected_network_failure_retries_same_source_before_later_disclosure() 
 }
 
 #[tokio::test]
-async fn truncated_response_body_never_discloses_to_later_source() {
+async fn truncated_response_body_is_terminal_and_never_retried_or_disclosed_later() {
     let server = Server::new(vec![
         "HTTP/1.1 200 OK\r\nContent-Length: 100\r\nConnection: close\r\n\r\nx".into(),
         valid(ORDER[0]),
     ]);
     let (chain, transport, resolver, budget) = setup(&server, vec![], 4, AfterFailure::Continue);
-    match chain.execute(&transport).await {
-        Ok(rows) => {
-            assert_eq!(rows.into_results().len(), 1);
-            assert_eq!(hosts(&resolver), ["source-0.invalid", "source-0.invalid"]);
-            assert_eq!(budget.attempts.load(Ordering::Relaxed), 2);
-            assert_eq!(server.count(), 2);
-        }
-        Err(CompatibilityChainError::Terminal {
-            protocol,
+    assert_eq!(
+        chain
+            .execute(&transport)
+            .await
+            .expect_err("malformed body framing must be terminal"),
+        CompatibilityChainError::Terminal {
+            protocol: ORDER[0],
             error: CompatibilityError::Transport(TransportError::Request),
-        }) => {
-            assert_eq!(protocol, ORDER[0]);
-            assert_eq!(hosts(&resolver), ["source-0.invalid"]);
-            assert_eq!(budget.attempts.load(Ordering::Relaxed), 1);
-            assert_eq!(server.count(), 1);
         }
-        Err(error) => panic!("unexpected truncated-body outcome: {error:?}"),
-    }
-    assert!(
-        hosts(&resolver)
-            .iter()
-            .all(|host| host == "source-0.invalid")
     );
+    assert_eq!(hosts(&resolver), ["source-0.invalid"]);
+    assert_eq!(budget.attempts.load(Ordering::Relaxed), 1);
+    assert_eq!(server.count(), 1);
 }
