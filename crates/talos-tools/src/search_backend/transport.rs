@@ -107,9 +107,14 @@ impl TransportLimits {
         max_requests: usize,
         max_bytes: usize,
     ) -> Result<Self, TransportError> {
+        let standard = duration <= Duration::from_secs(120) && (1..=16).contains(&max_requests);
+        // One exact enlarged envelope is reserved for production legacy-compatibility parity:
+        // four query-free probes, seven fixed-family query attempts and one Wikipedia fallback,
+        // with CONNECT + application-send accounting under HTTPS proxying.
+        let compatibility_parity =
+            duration == Duration::from_secs(135) && max_requests == 24;
         if duration.is_zero()
-            || duration > Duration::from_secs(135)
-            || !(1..=24).contains(&max_requests)
+            || (!standard && !compatibility_parity)
             || !(1..=1_048_576).contains(&max_bytes)
         {
             return Err(TransportError::InvalidRequest);
