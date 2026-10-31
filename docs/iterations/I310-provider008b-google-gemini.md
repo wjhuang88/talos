@@ -118,3 +118,16 @@ ignored or filtered (8.87s). Offline repetition also passed 216 tests (9.54s).
 Local ADC resolves caller-supplied paths only; runtime platform discovery, metadata credentials,
 service-account signing and Gemini native wire remain incomplete. This is library validation,
 not full Gemini acceptance, workspace preflight, or merge authorization. Keep Active.
+
+### Service-account implementation checkpoint — 2026-10-31
+
+Implementation d04c09b89d8d7da28f607f72134984683fe574f7 restores local service-account
+RS256 JWT signing and request-owned token exchange/cache, with a generated test-only RSA key.
+Exact google-cloud-auth 1.18.0 source checksum and feature/native findings are in ADR-094.
+Independent read-only source audit confirmed no network/background work on this signer path,
+and explicitly identified non-preemptible synchronous signing and panic/native limitations.
+Rust 1.99.0: cargo test -p talos-provider --lib --locked: 217 passed, zero failed,
+ignored or filtered (6.43s). Includes mock service-account exchange/cache and invalid-key redaction.
+No full workspace, exact-head CI, implementation security approval or Gemini runtime acceptance
+is claimed. Metadata ADC, platform path discovery, config/factory and native Gemini request/SSE,
+signature isolation and Agent acceptance remain pending. Keep Active; no merge/release.
