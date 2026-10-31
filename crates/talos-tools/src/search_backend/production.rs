@@ -18,16 +18,22 @@ use super::router::SearchRouterPolicy;
 use super::router_tool::GuardedSearchRouterTool;
 use super::transport::{TransportError, TransportLimits};
 
-// Legacy compatibility applies a 15-second timeout per request. Lite, HTML and Bing retry one
-// Timeout/Network failure after 500ms; Instant Answer does not retry. That is at most seven
-// query-bearing attempts across the four fixed destinations and about 106.5 seconds of request +
-// retry-delay envelope, so 120 seconds bounds the invocation without cutting off a legacy-success
-// path. A proxied HTTPS attempt reserves CONNECT + application send, hence fourteen physical units.
-// This does not increase the maximum four query-bearing destinations. Response bytes retain the
-// controlled transport's hard maximum. Auto currently has exactly one candidate, so hedge timing
-// is unobservable; max_in_flight=1 makes that fact explicit.
-const PRODUCTION_SEARCH_BUDGET: Duration = Duration::from_secs(120);
-const PRODUCTION_SEARCH_MAX_REQUESTS: usize = 14;
+// Legacy zero-key compatibility first performs parallel query-free DDG/Bing reachability probes:
+// HEAD, then GET only after a non-success/non-redirection HEAD, with 3 seconds per request and a
+// 30-second cache. Query-bearing Lite/HTML/Bing then retry one Timeout/Network failure after 500ms;
+// Instant Answer does not retry. If the four-source family exhausts, legacy WebSearchTool performs
+// one 10-second Wikipedia OpenSearch last resort. The protected path preserves those services under
+// one prepared authority without returning to the opaque coordinator.
+//
+// Therefore an invocation can perform at most eight query-bearing logical sends across five fixed
+// query destinations, plus four query-free probe sends. Proxied HTTPS reserves CONNECT + application
+// send for each logical request, so the worst physical-unit envelope is twenty-four. The 135-second
+// enclosing budget covers the ~106.5-second four-source request/retry envelope, up to ~6 seconds of
+// sequential HEAD->GET probe time on the slowest parallel probe, and the 10-second Wikipedia window.
+// Response bytes retain the controlled transport's hard maximum. Auto has exactly one candidate, so
+// hedge timing is unobservable; max_in_flight=1 makes that fact explicit.
+const PRODUCTION_SEARCH_BUDGET: Duration = Duration::from_secs(135);
+const PRODUCTION_SEARCH_MAX_REQUESTS: usize = 24;
 const PRODUCTION_SEARCH_MAX_BYTES: usize = 1_048_576;
 const PRODUCTION_SEARCH_MAX_EXAMINED_RESULTS: usize = 20;
 const PRODUCTION_SEARCH_MAX_URL_BYTES: usize = 8192;
@@ -116,8 +122,8 @@ mod tests {
             }))
             .expect("production preparation")
             .expect("protected invocation");
-        assert_eq!(prepared.manifest().scope().endpoints().len(), 4);
-        assert_eq!(prepared.permission_profile().len(), 4);
+        assert_eq!(prepared.manifest().scope().endpoints().len(), 9);
+        assert_eq!(prepared.permission_profile().len(), 6);
     }
 
     #[test]
