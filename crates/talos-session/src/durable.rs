@@ -88,6 +88,27 @@ pub struct TurnCommit {
     pub newly_committed: bool,
 }
 
+/// A storage-issued recovery snapshot with immutable session/entry identities.
+/// Only a durable read can construct it; caller-authored message/ID pairs cannot
+/// be relabeled as provenance from another configured session.
+#[derive(Clone)]
+pub struct DurableHistorySnapshot {
+    session_id: Uuid,
+    entries: Vec<(String, Message)>,
+}
+
+impl DurableHistorySnapshot {
+    /// Identity of the session read to produce this snapshot.
+    pub fn session_id(&self) -> Uuid {
+        self.session_id
+    }
+
+    /// Model messages paired with original entry IDs in recovery order.
+    pub fn entries(&self) -> &[(String, Message)] {
+        &self.entries
+    }
+}
+
 /// A UUID-backed durable session bound to an opaque host external ID.
 #[derive(Debug, Clone)]
 pub struct DurableSession {
@@ -159,6 +180,20 @@ impl DurableSession {
     /// Returns model messages suitable for automatic Runtime history recovery.
     pub fn read_messages(&self) -> Result<Vec<Message>, SessionError> {
         self.session.read_messages()
+    }
+
+    /// Read recovered model messages with their original TLOG entry identities.
+    /// Entries omitted from model history are omitted from this mapping as well.
+    pub fn read_messages_with_entry_ids(&self) -> Result<Vec<(String, Message)>, SessionError> {
+        self.session.read_messages_with_entry_ids()
+    }
+
+    /// Read one immutable session-qualified recovery snapshot.
+    pub fn read_history_snapshot(&self) -> Result<DurableHistorySnapshot, SessionError> {
+        Ok(DurableHistorySnapshot {
+            session_id: self.id(),
+            entries: self.read_messages_with_entry_ids()?,
+        })
     }
 
     /// Returns the underlying session for read-only inspection.

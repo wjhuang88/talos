@@ -117,12 +117,13 @@ impl ManualCompaction {
         let agent = actor.agent.clone();
         let history = actor.history.clone();
         let generation = actor.session_generation;
+        let recovered = actor.recovered_source.clone();
         let limit = actor.model_context_limit;
         let task_token = token.clone();
         let task = tokio::spawn(async move {
             tokio::select! { biased;
                 () = task_token.cancelled() => ManualCheckpointResult::Outcome(CompactOutcome::Cancelled),
-                outcome = agent.compact_session_history(history, generation, limit) => outcome,
+                outcome = agent.compact_session_history(history, generation, limit, recovered.as_ref()) => outcome,
             }
         });
         self.running = Some((id, token, task));
@@ -325,7 +326,7 @@ mod tests {
         for id in 1..=3 {
             let candidate = actor
                 .agent
-                .compact_session_history(raw.clone(), 0, 30_000)
+                .compact_session_history(raw.clone(), 0, 30_000, None)
                 .await;
             assert!(matches!(
                 &candidate,

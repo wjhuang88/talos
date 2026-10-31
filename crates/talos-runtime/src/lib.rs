@@ -1642,8 +1642,17 @@ impl RuntimeBuilder {
         if !self.skill_index.is_empty() {
             agent.set_skill_index(self.skill_index);
         }
-        let initial_history = if let Some((session, _)) = &self.durable_session {
-            session.read_messages()?
+        let recovered_entries = self
+            .durable_session
+            .as_ref()
+            .map(|(session, _)| session.read_history_snapshot())
+            .transpose()?;
+        let initial_history = if let Some(entries) = &recovered_entries {
+            entries
+                .entries()
+                .iter()
+                .map(|(_, message)| message.clone())
+                .collect()
         } else {
             self.initial_history
         };
@@ -1663,6 +1672,9 @@ impl RuntimeBuilder {
         actor.set_runtime_admission(admission.clone());
         if let Some((session, policy)) = self.durable_session {
             actor.set_durable_persistence(session, policy);
+            if let Some(entries) = recovered_entries {
+                actor.set_recovered_history_sources(entries);
+            }
         }
         let runtime = tokio::runtime::Handle::try_current()
             .map_err(|_| RuntimeError::AsyncRuntimeUnavailable)?;

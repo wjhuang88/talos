@@ -2321,12 +2321,13 @@ async fn boundary_injection_targeted_cancel_resumes_uninjected_user_once() {
 }
 
 async fn exercise_boundary_injection(cancel: bool, provider_error: bool, cancel_before: bool) {
-    exercise_boundary_injection_with_gate(cancel, provider_error, cancel_before, false).await;
+    exercise_boundary_injection_with_gate(cancel, provider_error, cancel_before, false, false)
+        .await;
 }
 
 #[tokio::test]
 async fn boundary_cancel_after_agent_ack_before_actor_projection_preserves_once() {
-    exercise_boundary_injection_with_gate(true, false, false, true).await;
+    exercise_boundary_injection_with_gate(true, false, false, true, false).await;
 }
 
 async fn exercise_boundary_injection_with_gate(
@@ -2334,6 +2335,7 @@ async fn exercise_boundary_injection_with_gate(
     provider_error: bool,
     cancel_before: bool,
     handoff_cancel: bool,
+    compact: bool,
 ) {
     use talos_core::session::PendingSubmissionState;
     use talos_session::{SessionManager, SessionMetadata};
@@ -2382,13 +2384,47 @@ async fn exercise_boundary_injection_with_gate(
             success_events("steering received")
         },
     ];
-    #[allow(deprecated)]
-    let agent = Agent::new(
+    struct RejectCompactObservation {
+        calls: AtomicUsize,
+    }
+    #[async_trait]
+    impl talos_plugin::HookHandler for RejectCompactObservation {
+        fn name(&self) -> &str {
+            "reject-compact-with-steering"
+        }
+        fn subscribed(&self) -> &'static [talos_plugin::HookEventKind] {
+            &[talos_plugin::HookEventKind::BeforeProviderCall]
+        }
+        async fn on_event(
+            &self,
+            _: &talos_plugin::HookContext,
+            _: &mut talos_plugin::HookEvent<'_>,
+        ) -> talos_plugin::HookResult {
+            if self.calls.fetch_add(1, Ordering::SeqCst) == 1 {
+                talos_plugin::HookResult::Deny {
+                    reason: "reject pre-steering request".into(),
+                }
+            } else {
+                talos_plugin::HookResult::Continue
+            }
+        }
+    }
+    let mut hooks = talos_plugin::HookRegistry::new();
+    if compact && provider_error {
+        hooks.register(Arc::new(RejectCompactObservation {
+            calls: AtomicUsize::new(0),
+        }));
+    }
+    let agent = Agent::with_security_and_hooks(
         Arc::new(CapturingSequenceModel {
             captured: captured.clone(),
             responses: Arc::new(Mutex::new(responses.into())),
         }),
         registry,
+        None,
+        None,
+        temp.path().to_path_buf(),
+        Arc::new(hooks),
     );
     let (handle, mut actor) = AppServerSession::new(
         agent,
@@ -2495,6 +2531,33 @@ async fn exercise_boundary_injection_with_gate(
         assert_eq!(requests.len(), 2);
         assert!(requests[1].iter().any(|message| matches!(message, Message::User { content } if content == "change the next step")));
         return;
+    }
+    if compact {
+        handle
+            .sq_tx
+            .send(SessionOp::Compact {
+                session_generation: 1,
+                operation_id: 1,
+            })
+            .await
+            .expect("compact with durable steering");
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(5), eq_rx.recv())
+                .await
+                .expect("queued deadline")
+                .expect("event");
+            let queued = matches!(
+                &event,
+                SessionEvent::CompactStatus {
+                    state: talos_core::session::CompactState::Queued,
+                    ..
+                }
+            );
+            events.push(event);
+            if queued {
+                break;
+            }
+        }
     }
     release.notify_one();
     if handoff_cancel {
@@ -2621,6 +2684,32 @@ async fn exercise_boundary_injection_with_gate(
         events.push(event);
     }
 
+    if compact {
+        let outcomes: Vec<_> = events
+            .iter()
+            .filter_map(|event| match event {
+                SessionEvent::CompactStatus {
+                    operation_id: 1,
+                    state:
+                        talos_core::session::CompactState::Completed {
+                            outcome,
+                            replayed: false,
+                        },
+                    ..
+                } => Some(*outcome),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(outcomes.len(), 1, "one terminal for boundary compaction");
+        if provider_error {
+            assert_eq!(outcomes[0], talos_core::session::CompactOutcome::Failed);
+        } else {
+            assert!(matches!(
+                outcomes[0],
+                talos_core::session::CompactOutcome::NotEligible { .. }
+            ));
+        }
+    }
     let requests = captured.lock().expect("captured requests");
     let injected_position = events.iter().position(|event| matches!(event,
         SessionEvent::StructuredSubmissionInjected { submission, .. } if submission.id == "steering"
@@ -4319,6 +4408,7 @@ async fn manual_boundary_applies_checkpoint_before_continuation_and_preserves_ra
             u32::MAX,
             0,
             raw.len() as u64,
+            None,
         )
         .await
         .expect("estimate initial request");
@@ -4417,4 +4507,180 @@ async fn manual_boundary_applies_checkpoint_before_continuation_and_preserves_ra
         "one observation per actual ordinary request, including manual boundary"
     );
     assert!(model.summaries.load(Ordering::SeqCst) > 0);
+}
+
+#[tokio::test]
+async fn manual_compact_with_durable_steering_preserves_cancelled_custody() {
+    exercise_boundary_injection_with_gate(true, false, false, true, true).await;
+}
+
+#[tokio::test]
+async fn failed_manual_compact_with_durable_steering_preserves_error_custody() {
+    exercise_boundary_injection_with_gate(false, true, false, false, true).await;
+}
+
+#[tokio::test]
+async fn recovered_actor_sources_are_session_scoped_and_clear_on_rebinding() {
+    use talos_session::{PersistencePolicy, SessionManager};
+    let directory = tempfile::tempdir().expect("directory");
+    let manager = SessionManager::with_dir(directory.path().to_path_buf());
+    let durable = manager
+        .create_or_open_session("source-original")
+        .expect("durable");
+    let raw = vec![Message::User {
+        content: "retained constraint".into(),
+    }];
+    durable
+        .commit_turn("source-turn", &raw, &PersistencePolicy::default())
+        .expect("commit");
+    let entries = durable.read_history_snapshot().expect("recovery");
+    let expected = format!("tlog:{}:{}", durable.id(), entries.entries()[0].0);
+    #[allow(deprecated)]
+    let agent = Agent::new(Arc::new(ToolCallThenErrorModel::new()), ToolRegistry::new());
+    let (_handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: directory.path().to_path_buf(),
+            initial_history: raw.clone(),
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_durable_persistence(durable, PersistencePolicy::default());
+    let foreign = manager
+        .create_or_open_session("source-foreign")
+        .expect("foreign");
+    foreign
+        .commit_turn("source-turn", &raw, &PersistencePolicy::default())
+        .expect("same contents in foreign session");
+    actor.set_recovered_history_sources(foreign.read_history_snapshot().expect("foreign snapshot"));
+    assert!(
+        actor.recovered_source.is_none(),
+        "same bytes do not authenticate foreign entry IDs"
+    );
+    actor.set_recovered_history_sources(entries.clone());
+    assert_eq!(
+        actor
+            .recovered_source
+            .as_ref()
+            .expect("source")
+            .resolve(0, 1, 0, &raw[0]),
+        Some(expected.as_str())
+    );
+    actor.history[0] = Message::User {
+        content: "replacement".into(),
+    };
+    actor.set_recovered_history_sources(entries.clone());
+    assert!(actor.recovered_source.is_none());
+    actor.history = raw;
+    actor.set_recovered_history_sources(entries);
+    assert!(actor.recovered_source.is_some());
+    let other = manager
+        .create_or_open_session("source-other")
+        .expect("other session");
+    actor.set_durable_persistence(other, PersistencePolicy::default());
+    assert!(actor.recovered_source.is_none());
+}
+
+#[tokio::test]
+async fn durable_turn_receipts_bind_live_actor_history_for_success_error_and_cancel() {
+    use talos_session::{PersistencePolicy, SessionManager};
+    for outcome in ["success", "error", "cancel"] {
+        let directory = tempfile::tempdir().expect("directory");
+        let manager = SessionManager::with_dir(directory.path().to_path_buf());
+        let durable = manager.create_or_open_session(outcome).expect("durable");
+        let model: Arc<dyn LanguageModel> = match outcome {
+            "success" => Arc::new(MockModel::new(vec![vec![
+                AgentEvent::TextDelta {
+                    delta: "retained result".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Default::default(),
+                },
+            ]])),
+            "error" => Arc::new(ToolCallThenErrorModel::new()),
+            _ => Arc::new(ToolCallThenBlockingModel {
+                call_count: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+            }),
+        };
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(EchoTool));
+        #[allow(deprecated)]
+        let agent = Agent::new(model, registry);
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: directory.path().to_path_buf(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_durable_persistence(durable.clone(), PersistencePolicy::default());
+        let task = tokio::spawn(async move {
+            actor.run().await;
+            actor
+        });
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "retain this constraint".into(),
+            })
+            .await
+            .expect("submit");
+        let mut cancelled = false;
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(10), handle.eq_rx.recv())
+                .await
+                .expect("event deadline")
+                .expect("event");
+            if outcome == "cancel"
+                && !cancelled
+                && matches!(progress_event(&event), Some(AgentEvent::ToolResult { .. }))
+            {
+                handle
+                    .sq_tx
+                    .send(SessionOp::Interrupt)
+                    .await
+                    .expect("interrupt");
+                cancelled = true;
+            }
+            if let Some(status) = completed_status(&event) {
+                assert!(
+                    matches!(
+                        (outcome, status),
+                        ("success", TurnCompletionStatus::Success { .. })
+                            | ("error", TurnCompletionStatus::Error { .. })
+                            | ("cancel", TurnCompletionStatus::Cancelled)
+                    ),
+                    "{outcome}: {status:?}"
+                );
+                break;
+            }
+        }
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        let actor = task.await.expect("actor");
+        let recovered = durable.read_messages_with_entry_ids().expect("recovery");
+        assert!(!recovered.is_empty());
+        assert_eq!(actor.history.len(), recovered.len(), "{outcome}");
+        let source = actor.recovered_source.as_ref().expect("committed source");
+        for (index, ((id, _), message)) in recovered.iter().zip(&actor.history).enumerate() {
+            let expected = format!("tlog:{}:{id}", durable.id());
+            assert_eq!(
+                source.resolve(
+                    actor.session_generation,
+                    actor.history.len() as u64,
+                    index,
+                    message
+                ),
+                Some(expected.as_str()),
+                "{outcome}, entry {index}"
+            );
+        }
+    }
 }

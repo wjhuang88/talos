@@ -25,14 +25,16 @@ impl Agent {
         history: Vec<Message>,
         generation: u64,
         limit: u32,
+        recovered: Option<&HistorySource>,
     ) -> ManualCheckpointResult {
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
         // Dropping this entire future cancels preparation as well as provider I/O.
         tokio::time::timeout_at(deadline, async {
-            let source = HistorySource::bind_content_until(
+            let source = HistorySource::bind_recovered_until(
                 generation,
                 history.len() as u64,
                 &history,
+                recovered,
                 deadline,
             )
             .await

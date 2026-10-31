@@ -6,7 +6,16 @@ Completion Commit for T2+T3: `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`,
 `ca4a79961366eba7bc722b90bd449404cc7b07d5`; exact-head CI41032515451 all eight
 jobs passed, full local preflight and independent acceptance review passed, and
 CAS verified new target80b93933. See I311 for test/review limitations and failures.
-I312 T4 is Active/Claimed after #817 merged at `02fee3cc9537e6bf688d167036389b4af3011aeb`. Local stream validation, bounded checkpoint folding, privacy filtering and request-source mapping are implemented with regression coverage, but T4 remains Partial: reusable Actor projection/lineage, manual controls, visible outcomes and full acceptance gates remain outstanding.
+I312 T4 is Active/Claimed after #817 merged at `02fee3cc9537e6bf688d167036389b4af3011aeb`.
+Local commits through `e90e333ca` implement bounded checkpoint folding, privacy
+filtering, manual Actor/CLI/SDK controls and complete-tool-batch boundary execution.
+The local source stage wires authenticated durable recovery snapshots and atomic
+turn-receipt IDs into Actor request preparation. Full standard host preflight
+passed, including both external SDK modes, and independent bounded static review
+approved the corrected source API; no implementation PR or remote CI yet. T4 remains Partial: fork/legacy provenance, complete lineage, ephemeral
+image parity, automatic visible outcomes, semantic long-session/restart acceptance
+and final review/CI/merge remain open. See I312's current evidence section; earlier
+missing-manual/local-uncommitted statements below are historical.
 Full queue retained: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
 Earlier checkpoints below are historical; no whole-goal completion is claimed.
 

@@ -632,7 +632,7 @@ async fn actor_generation_and_raw_revision_survive_request_preparation() {
         attachments: vec![],
     }];
     let prepared = agent
-        .prepare_session_turn_at_revision(&items, raw.clone(), 128_000, 42, 1)
+        .prepare_session_turn_at_revision(&items, raw.clone(), 128_000, 42, 1, None)
         .await
         .expect("prepared source snapshot");
     let source = prepared.history_source.expect("raw binding");

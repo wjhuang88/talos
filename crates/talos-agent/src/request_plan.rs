@@ -185,11 +185,13 @@ impl Agent {
         request_context_limit: u32,
         generation: u64,
         revision: u64,
+        recovered: Option<&crate::compaction::HistorySource>,
     ) -> AgentResult<PreparedSessionTurn> {
-        let source = crate::compaction::HistorySource::bind_content_until(
+        let source = crate::compaction::HistorySource::bind_recovered_until(
             generation,
             revision,
             &history,
+            recovered,
             tokio::time::Instant::now() + std::time::Duration::from_secs(120),
         )
         .await;

@@ -113,6 +113,7 @@ fn immediate_started_turn(
             },
         });
         Some(TurnRecord {
+            persisted_entry_ids: Vec::new(),
             new_messages: Vec::new(),
             status,
             completion,
@@ -137,6 +138,7 @@ pub struct AppServerSession {
     sq_rx: tokio::sync::mpsc::Receiver<SessionOp>,
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     history: Vec<Message>,
+    recovered_source: Option<crate::compaction::HistorySource>,
     session_file: Option<PathBuf>,
     session_dir: Option<PathBuf>,
     persistence: Option<TurnPersistence>,
@@ -190,6 +192,7 @@ impl AppServerSession {
             session_dir: None,
             persistence: None,
             durable_persistence: None,
+            recovered_source: None,
             pending_store,
             session_id,
             session_generation: 0,
@@ -252,6 +255,7 @@ impl AppServerSession {
         metadata: talos_session::SessionMetadata,
     ) {
         self.pending_store = PendingSubmissionStore::for_session(&session);
+        self.recovered_source = None;
         self.session_id = session.id.to_string();
         self.background_jobs
             .set_identity(self.session_id.clone(), self.session_generation);
@@ -264,6 +268,7 @@ impl AppServerSession {
         session: talos_session::DurableSession,
         policy: talos_session::PersistencePolicy,
     ) {
+        self.recovered_source = None;
         let session_id = session.id().to_string();
         self.pending_store =
             PendingSubmissionStore::for_session_file(session.file_path(), &session_id);
@@ -271,6 +276,41 @@ impl AppServerSession {
         self.background_jobs
             .set_identity(self.session_id.clone(), self.session_generation);
         self.durable_persistence = Some(DurableTurnPersistence { session, policy });
+    }
+
+    /// Bind recovered messages to entries in the configured durable session.
+    /// Exact message equality and the current session namespace are required;
+    /// oversized or inconsistent snapshots disable durable source reuse.
+    pub fn set_recovered_history_sources(
+        &mut self,
+        snapshot: talos_session::DurableHistorySnapshot,
+    ) {
+        self.recovered_source = None;
+        let Some(durable) = &self.durable_persistence else {
+            return;
+        };
+        let entries = snapshot.entries();
+        if snapshot.session_id() != durable.session.id()
+            || entries.len() > 8192
+            || entries.len() != self.history.len()
+            || entries
+                .iter()
+                .zip(&self.history)
+                .any(|((_, message), raw)| message != raw)
+        {
+            return;
+        }
+        let namespace = durable.session.id();
+        let ids = entries
+            .iter()
+            .map(|(id, _)| format!("tlog:{namespace}:{id}"))
+            .collect();
+        self.recovered_source = crate::compaction::HistorySource::bind(
+            self.session_generation,
+            self.history.len() as u64,
+            &self.history,
+            ids,
+        );
     }
 
     /// Runs the session actor until shutdown or SQ disconnect.
@@ -985,9 +1025,19 @@ impl AppServerSession {
     }
 
     fn commit_turn_record(&mut self, record: TurnRecord) {
-        for msg in record.new_messages {
-            self.history.push(msg);
-        }
+        let start = self.history.len();
+        self.history.extend(record.new_messages);
+        self.recovered_source = crate::compaction::HistorySource::bind_committed(
+            self.session_generation,
+            &self.history,
+            self.recovered_source.as_ref(),
+            start,
+            self.durable_persistence
+                .as_ref()
+                .map(|durable| durable.session.id().to_string())
+                .as_deref(),
+            &record.persisted_entry_ids,
+        );
     }
 
     async fn start_submission(
@@ -1016,6 +1066,7 @@ impl AppServerSession {
                         self.model_context_limit,
                         self.session_generation,
                         self.history.len() as u64,
+                        self.recovered_source.as_ref(),
                     )
                     .await
                 {
@@ -1142,6 +1193,7 @@ impl AppServerSession {
                     self.model_context_limit,
                     self.session_generation,
                     self.history.len() as u64,
+                    self.recovered_source.as_ref(),
                 ) => result,
             };
             match prepare_result {
@@ -1199,6 +1251,7 @@ impl AppServerSession {
                             },
                         });
                         return Some(TurnRecord {
+                            persisted_entry_ids: Vec::new(),
                             new_messages: Vec::new(),
                             status: TurnRecordStatus::Cancelled,
                             completion,
@@ -1271,6 +1324,7 @@ impl AppServerSession {
                     },
                 });
                 Some(TurnRecord {
+                    persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: record_status,
                     completion,

@@ -1732,3 +1732,55 @@ fn snapshot_bytes_missing_file_returns_error() {
     let result = session.snapshot_bytes();
     assert!(result.is_err(), "missing file must error, not panic");
 }
+
+#[test]
+fn recovered_message_sources_preserve_ids_across_filtered_entries() {
+    let manager = test_manager();
+    let session = manager.create_session("source-map", "").expect("session");
+    let repeated = Message::User {
+        content: "same constraint".into(),
+    };
+    session.append(&repeated).expect("first entry");
+    session.append_event(&AgentEvent::TurnStart).expect("event");
+    session
+        .append(&Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "orphan".into(),
+                content: "not model history".into(),
+                is_error: false,
+            },
+        })
+        .expect("orphan entry");
+    session.append(&repeated).expect("second entry");
+    let entries = session.read_entries().expect("raw entries");
+    let before = session
+        .read_messages_with_entry_ids()
+        .expect("mapped history");
+    assert_eq!(
+        before,
+        vec![
+            (entries[0].id.clone(), repeated.clone()),
+            (entries[3].id.clone(), repeated)
+        ]
+    );
+    assert_ne!(before[0].0, before[1].0);
+    let resumed = manager.get_session(&session.id).expect("resume");
+    assert_eq!(
+        resumed
+            .read_messages_with_entry_ids()
+            .expect("recovered sources"),
+        before
+    );
+    assert_eq!(
+        resumed.read_messages().expect("messages"),
+        before
+            .into_iter()
+            .map(|(_, message)| message)
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        serde_json::to_value(resumed.read_entries().expect("unchanged raw history"))
+            .expect("serialize"),
+        serde_json::to_value(entries).expect("serialize")
+    );
+}

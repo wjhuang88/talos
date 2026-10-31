@@ -6,6 +6,56 @@
 > Baseline rule: preserve all parent acceptance; successful trimming alone cannot close this iteration.
 > MVP deliverable: a long-running session compacts complete provider requests safely, exposes numeric outcomes and accepts a typed /compact command while raw history remains recoverable.
 
+## Current local evidence — durable source stage, 2026-10-31
+
+This section supersedes historical “uncommitted”/missing-manual descriptions below.
+Local implementation commits through `e90e333ca` include bounded checkpoints,
+manual Actor/CLI/SDK operations and complete-tool-batch boundary execution.
+This local source stage is not published; T4 remains Partial.
+
+Session recovery now returns model messages and original entry IDs from the same
+conversion, excluding events/diagnostics/orphan tool results without index drift.
+Runtime binds a storage-issued immutable recovery snapshot to session-qualified
+TLOG IDs after matching its session identity and exact messages. Public callers
+cannot construct or relabel that snapshot. Ordinary and manual request preparation reuse only an
+unchanged prefix in the same generation. Atomic success/error/cancel turn receipts
+advance Actor source mappings; absent receipts retain explicit in-memory IDs.
+Stored redaction may differ from live bytes: the receipt proves record identity,
+while source digests bind current model bytes. Rebinding persistence clears old
+sources. No checkpoint or second transcript store is written to disk.
+
+Current-stage standard host preflight passed (exit 0), including workspace
+check/Clippy/tests and both external Runtime SDK modes:
+`/private/tmp/i312-source-host-preflight.log` (session 41954). Agent library
+585/585 and Session library 215/215 passed. Both repository governance validators
+and the skill validator passed with zero warnings. Staged source/test diff was
+reviewed; no full-T4 or remote CI certification is claimed.
+
+Independent static source-stage follow-up approved the correction at baseline
+`e90e333cac673597a97e4a53e4788004aec328ad`, reviewed diff SHA-256
+`825146a0263e228d6b2acb564e8a513c76e2cd7e7b98f8827e6035283ca1fefb`.
+The reviewer did not execute tests and shares the Agent/external account identity.
+Original review rejected caller-authored source IDs; the opaque storage-issued
+snapshot and same-content/foreign-session rejection regression resolve that defect.
+First preflight was intentionally stopped (143) before correction. The next
+sandboxed run failed (101) solely at real Git Push process observation with
+Operation not permitted; host rerun above passed that same test and the full script.
+Earlier touched-crate all-target Clippy passed before the snapshot correction;
+current standard workspace Clippy is the current-stage evidence.
+
+Remaining within I312: full fork/export and legacy CLI provenance coverage,
+complete repeated-checkpoint lineage/Actor ownership, ephemeral image parity,
+automatic visible outcomes, semantic 50-turn/restart fixtures, remaining shutdown
+races, final full validation/review/CI/CAS/merge and owner closure. Startup still
+uses the existing full transcript read; bounded model-callable history retrieval
+belongs to T5. T5/T1/T6 and the overall handoff remain unfinished.
+
+Governance synchronization for this stage preserves the published acceptance and
+historical evidence; this owner and handoff receive the current implementation,
+verification and residual state. Board/index already say Active/Partial and need
+no lifecycle transition. Both governance validators and local-link checks are
+required before the local stage commit; residuals remain in this owner.
+
 ## Collaboration Claim
 
 | Field | Value |

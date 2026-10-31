@@ -66,6 +66,91 @@ impl HistorySource {
         Some(source)
     }
 
+    /// Advance the Actor snapshot after an atomic turn persistence receipt.
+    /// Durable IDs trace the live message to its stored (possibly redacted)
+    /// representation; digests always bind the current exact model bytes.
+    /// Missing or inconsistent receipts retain explicit in-memory identities.
+    pub(crate) fn bind_committed(
+        generation: u64,
+        raw: &[Message],
+        previous: Option<&Self>,
+        start: usize,
+        namespace: Option<&str>,
+        committed_ids: &[String],
+    ) -> Option<Self> {
+        if raw.len() > 8192 || start > raw.len() {
+            return None;
+        }
+        let mut source = Self::bind(
+            generation,
+            raw.len() as u64,
+            raw,
+            (0..raw.len()).map(|index| index.to_string()).collect(),
+        )?;
+        for (index, digest) in source.digests.iter().enumerate() {
+            source.entry_ids[index] = format!(
+                "generation:{generation}:entry:{index}:{}",
+                digest
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>()
+            );
+        }
+        if let Some(previous) = previous.filter(|old| old.generation == generation) {
+            for index in 0..start.min(previous.digests.len()) {
+                if source.digests[index] != previous.digests[index] {
+                    break;
+                }
+                source.entry_ids[index] = previous.entry_ids[index].clone();
+            }
+        }
+        if let Some(namespace) = namespace
+            && !namespace.is_empty()
+            && committed_ids.len() == raw.len() - start
+            && committed_ids.iter().all(|id| !id.is_empty())
+        {
+            for (index, id) in committed_ids.iter().enumerate() {
+                source.entry_ids[start + index] = format!("tlog:{namespace}:{id}");
+            }
+        }
+        let mut seen = std::collections::HashSet::new();
+        if source
+            .entry_ids
+            .iter()
+            .any(|id| id.len() > 128 || !seen.insert(id))
+        {
+            return None;
+        }
+        Some(source)
+    }
+
+    /// Reuse verified durable identities for the unchanged recovered prefix.
+    /// New or changed entries retain their generation/content identities.
+    pub(crate) async fn bind_recovered_until(
+        generation: u64,
+        revision: u64,
+        raw: &[Message],
+        recovered: Option<&Self>,
+        deadline: tokio::time::Instant,
+    ) -> Option<Self> {
+        let mut source = Self::bind_content_until(generation, revision, raw, deadline).await?;
+        if let Some(recovered) = recovered.filter(|old| old.generation == generation) {
+            for index in 0..source.digests.len().min(recovered.digests.len()) {
+                tokio::task::yield_now().await;
+                if tokio::time::Instant::now() >= deadline {
+                    return None;
+                }
+                // Stop at the first divergence: a matching message after a
+                // changed prefix does not establish the same branch ancestry.
+                if source.digests[index] != recovered.digests[index] {
+                    break;
+                }
+                source.entry_ids[index] = recovered.entry_ids[index].clone();
+            }
+        }
+        Some(source)
+    }
+
     /// Deadline shared by source binding and the subsequent checkpoint attempt.
     /// Synchronous bindings have no execution budget until an attempt begins.
     pub(crate) fn deadline(&self) -> Option<tokio::time::Instant> {
@@ -282,6 +367,109 @@ fn message_digest_bounded(message: &Message, remaining: &mut usize) -> Option<[u
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn committed_sources_do_not_invent_durable_receipts_or_alias_entries() {
+        let first = Message::User {
+            content: "first".into(),
+        };
+        let raw = vec![
+            first.clone(),
+            Message::User {
+                content: "second".into(),
+            },
+        ];
+        let previous = HistorySource::bind(5, 1, &[first], vec!["tlog:session:first".into()])
+            .expect("previous");
+        let bound = HistorySource::bind_committed(
+            5,
+            &raw,
+            Some(&previous),
+            1,
+            Some("session"),
+            &["second".into()],
+        )
+        .expect("receipt");
+        assert_eq!(bound.resolve(5, 2, 0, &raw[0]), Some("tlog:session:first"));
+        assert_eq!(bound.resolve(5, 2, 1, &raw[1]), Some("tlog:session:second"));
+        let missing =
+            HistorySource::bind_committed(5, &raw, Some(&previous), 1, Some("session"), &[])
+                .expect("no receipt");
+        assert!(
+            missing
+                .resolve(5, 2, 1, &raw[1])
+                .expect("memory source")
+                .starts_with("generation:")
+        );
+        assert!(
+            HistorySource::bind_committed(
+                5,
+                &raw,
+                Some(&previous),
+                1,
+                Some("session"),
+                &["first".into()]
+            )
+            .is_none()
+        );
+        assert!(
+            HistorySource::bind_committed(
+                5,
+                &raw,
+                Some(&previous),
+                1,
+                Some("session"),
+                &["x".repeat(129)]
+            )
+            .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn recovered_sources_require_generation_and_unchanged_prefix() {
+        let raw = vec![
+            Message::User {
+                content: "first".into(),
+            },
+            Message::User {
+                content: "second".into(),
+            },
+        ];
+        let recovered = HistorySource::bind(
+            8,
+            2,
+            &raw,
+            vec!["tlog:session:a".into(), "tlog:session:b".into()],
+        )
+        .expect("snapshot");
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        let bound = HistorySource::bind_recovered_until(8, 2, &raw, Some(&recovered), deadline)
+            .await
+            .expect("bind");
+        assert_eq!(bound.resolve(8, 2, 1, &raw[1]), Some("tlog:session:b"));
+        let mut changed = raw.clone();
+        changed[0] = Message::User {
+            content: "different branch".into(),
+        };
+        let bound = HistorySource::bind_recovered_until(8, 2, &changed, Some(&recovered), deadline)
+            .await
+            .expect("bind");
+        assert!(
+            bound
+                .resolve(8, 2, 1, &changed[1])
+                .expect("id")
+                .starts_with("generation:")
+        );
+        let bound = HistorySource::bind_recovered_until(9, 2, &raw, Some(&recovered), deadline)
+            .await
+            .expect("bind");
+        assert!(
+            bound
+                .resolve(9, 2, 0, &raw[0])
+                .expect("id")
+                .starts_with("generation:9:")
+        );
+    }
+
     #[tokio::test]
     async fn content_binding_accepts_full_width_runtime_generation() {
         let raw = vec![Message::User {
