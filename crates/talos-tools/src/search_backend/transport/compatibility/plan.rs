@@ -14,7 +14,7 @@ use super::{
     admission::AdmittedCompatibilityResults,
     chain::{CompatibilityChainError, ORDER, PreparedCompatibilityChain},
     manifest_extends_scope_without_policy_widening,
-    probe::PreparedReachabilityProbes,
+    probe::{PreparedReachabilityProbes, Reachability},
     wikipedia::PreparedWikipediaSearch,
 };
 use crate::search_backend::transport::{
@@ -105,6 +105,8 @@ impl DirectCompatibilityConfiguration {
             proxy: self.proxy.clone(),
             #[cfg(test)]
             dns: Arc::new(SystemSearchDns),
+            #[cfg(test)]
+            reachability: None,
         })
     }
 }
@@ -140,6 +142,8 @@ pub(in crate::search_backend) struct PreparedCompatibilityPlan {
     proxy: Option<Arc<TransportProxy>>,
     #[cfg(test)]
     dns: Arc<dyn crate::search_backend::transport::SearchDns>,
+    #[cfg(test)]
+    reachability: Option<Reachability>,
 }
 
 impl std::fmt::Debug for PreparedCompatibilityPlan {
@@ -184,11 +188,21 @@ impl PreparedCompatibilityPlan {
             self.proxy,
         )
         .map_err(CompatibilityPlanError::Transport)?;
+        #[cfg(not(test))]
         let reachability = self
             .probes
             .execute(&transport)
             .await
             .map_err(CompatibilityPlanError::Transport)?;
+        #[cfg(test)]
+        let reachability = match self.reachability {
+            Some(reachability) => reachability,
+            None => self
+                .probes
+                .execute(&transport)
+                .await
+                .map_err(CompatibilityPlanError::Transport)?,
+        };
         match self
             .chain
             .execute_with_reachability(&transport, reachability)
