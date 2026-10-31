@@ -14,9 +14,11 @@ use super::{
     admission::AdmittedCompatibilityResults,
     chain::{CompatibilityChainError, ORDER, PreparedCompatibilityChain},
     manifest_extends_scope_without_policy_widening,
-    probe::{PreparedReachabilityProbes, Reachability},
+    probe::PreparedReachabilityProbes,
     wikipedia::PreparedWikipediaSearch,
 };
+#[cfg(test)]
+use super::probe::Reachability;
 use crate::search_backend::transport::{
     SearchTransport, SystemSearchDns, TransportBudget, TransportProxy,
 };
