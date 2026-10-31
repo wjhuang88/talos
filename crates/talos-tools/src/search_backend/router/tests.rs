@@ -160,6 +160,36 @@ async fn fast_failure_launches_replacement_and_waits_for_first_valid_success() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn direct_candidate_preserves_wikipedia_fallback_identity() {
+    let counts = SharedCounts::default();
+    let router = SearchRouter::new(
+        vec![backend(
+            SearchBackendId::DuckDuckGo,
+            0,
+            Ok(vec![result(
+                SearchBackendId::Wikipedia,
+                "https://en.wikipedia.org/wiki/Rust",
+            )]),
+            &counts,
+        )],
+        policy(50, 1),
+    )
+    .expect("router");
+    let (_cancel, mut cancellation) = oneshot::channel();
+    let success = router
+        .search(
+            request(1),
+            Instant::now() + Duration::from_secs(1),
+            &mut cancellation,
+        )
+        .await
+        .expect("prepared compatibility fallback");
+
+    assert_eq!(success.backend, SearchBackendId::DuckDuckGo);
+    assert_eq!(success.results[0].backend, SearchBackendId::Wikipedia);
+}
+
+#[tokio::test(start_paused = true)]
 async fn hedge_is_bounded_and_winner_drops_pending_loser_without_starting_third() {
     let counts = SharedCounts::default();
     let router = SearchRouter::new(

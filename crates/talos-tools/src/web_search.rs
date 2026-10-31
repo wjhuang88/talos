@@ -306,6 +306,20 @@ impl WebSearchTool {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn for_legacy_parity_test(proxy_url: &str) -> Self {
+        Self {
+            duckduckgo_config: rust_websearch::SearchConfig::default().with_proxy(proxy_url),
+            tavily_api_key: None,
+            searxng_url: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn execute_legacy_parity_test(&self, query: &str) -> usize {
+        self.execute_search(query, 1, true).await.0.len()
+    }
+
     /// Search DuckDuckGo via rust-websearch crate.
     async fn search_duckduckgo(
         &self,
@@ -403,6 +417,11 @@ impl WebSearchTool {
         query: &str,
         max_results: u32,
     ) -> Result<Vec<WebResult>, SearchBackendError> {
+        #[cfg(test)]
+        if std::env::var_os("TALOS_SEARCH_PARITY_CHILD").is_some() {
+            return Err(SearchBackendError::NotConfigured);
+        }
+
         let encoded = urlencoding(query);
         let url = format!(
             "https://en.wikipedia.org/w/api.php?action=opensearch&search={encoded}&limit={max_results}&namespace=0&format=json"
@@ -550,6 +569,14 @@ pub(crate) fn format_compatibility_results(
     include_snippets: bool,
 ) -> String {
     format_admitted_results(query, results, ResultSource::DuckDuckGo, include_snippets)
+}
+
+pub(crate) fn format_wikipedia_fallback_results(
+    query: &str,
+    results: Vec<SearchBackendResult>,
+    include_snippets: bool,
+) -> String {
+    format_admitted_results(query, results, ResultSource::Wikipedia, include_snippets)
 }
 
 /// Fixed-source display conversion for already-admitted SearXNG rows, not admission.

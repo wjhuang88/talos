@@ -1,5 +1,5 @@
 //! Controlled HTTP transport for the staged search compatibility migration.
-//! No default wiring; proxy support is limited to HTTP CONNECT / HTTPS IPv4 literals.
+//! Production proxy support is an immutable environment snapshot carried through prepared authority.
 
 pub(super) mod compatibility;
 
@@ -30,6 +30,8 @@ pub(super) enum TransportError {
     Dns,
     #[error("search_transport_connection_refused")]
     ConnectionRefused,
+    #[error("search_transport_network_failed")]
+    Network,
     #[error("search_transport_address_denied")]
     Address,
     #[error("search_transport_redirect_denied")]
@@ -46,25 +48,49 @@ pub(super) enum TransportError {
     Request,
 }
 
-// Only the actual send boundary uses this classification. Construction and body-read errors
-// remain Request; an unknown typed chain must not turn a TLS/protocol failure into failover.
+// Only the actual send/body-read boundary uses this classification. Construction errors remain
+// Request. Legacy rust-websearch retries reqwest Timeout/Network once for Lite/HTML/Bing, so the
+// controlled transport preserves only genuinely transient transport failures as typed Network
+// outcomes. TLS/certificate, CONNECT protocol, HTTP protocol and untyped body-framing failures
+// remain terminal Request.
 fn classify_send_error(error: reqwest::Error) -> TransportError {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        if error.is_connect() {
-            let mut current: Option<&(dyn std::error::Error + 'static)> = Some(&error);
-            // This bounds Talos's traversal, not reqwest's own is_connect() implementation.
-            for _ in 0..8 {
-                let Some(cause) = current else { break };
-                if cause
-                    .downcast_ref::<std::io::Error>()
-                    .is_some_and(|io| io.kind() == std::io::ErrorKind::ConnectionRefused)
-                {
-                    return TransportError::ConnectionRefused;
+        let timeout = error.is_timeout();
+        let mut current: Option<&(dyn std::error::Error + 'static)> = Some(&error);
+        // Bound Talos's traversal independently from reqwest's own classification helpers.
+        for _ in 0..8 {
+            let Some(cause) = current else { break };
+            if let Some(io) = cause.downcast_ref::<std::io::Error>() {
+                match io.kind() {
+                    std::io::ErrorKind::ConnectionRefused => {
+                        return TransportError::ConnectionRefused;
+                    }
+                    std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::ConnectionAborted
+                    | std::io::ErrorKind::BrokenPipe
+                    | std::io::ErrorKind::NotConnected
+                    | std::io::ErrorKind::TimedOut => return TransportError::Network,
+                    _ => {}
                 }
-                current = cause.source();
             }
+            current = cause.source();
         }
-        TransportError::Request
+        if timeout {
+            TransportError::Network
+        } else {
+            TransportError::Request
+        }
+    }))
+    .unwrap_or(TransportError::Request)
+}
+
+fn classify_body_read_error(error: reqwest::Error) -> TransportError {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if error.is_timeout() {
+            TransportError::Network
+        } else {
+            TransportError::Request
+        }
     }))
     .unwrap_or(TransportError::Request)
 }
@@ -92,9 +118,13 @@ impl TransportLimits {
         max_requests: usize,
         max_bytes: usize,
     ) -> Result<Self, TransportError> {
+        let standard = duration <= Duration::from_secs(120) && (1..=16).contains(&max_requests);
+        // One exact enlarged envelope is reserved for production legacy-compatibility parity:
+        // four query-free probes, seven fixed-family query attempts and one Wikipedia fallback,
+        // with CONNECT + application-send accounting under HTTPS proxying.
+        let compatibility_parity = duration == Duration::from_secs(135) && max_requests == 24;
         if duration.is_zero()
-            || duration > Duration::from_secs(60)
-            || !(1..=8).contains(&max_requests)
+            || (!standard && !compatibility_parity)
             || !(1..=1_048_576).contains(&max_bytes)
         {
             return Err(TransportError::InvalidRequest);
@@ -184,11 +214,172 @@ impl std::fmt::Debug for TransportResponse {
     }
 }
 
+/// Immutable environment-proxy snapshot for the fixed HTTPS compatibility family.
+///
+/// The URL may contain credentials and is therefore never exposed through Debug or the network
+/// manifest. The manifest receives only the sanitized proxy endpoint. `proxied_hosts` freezes the
+/// NO_PROXY decision at tool construction so later environment mutation cannot change routing.
+pub(super) struct TransportProxy {
+    endpoint: ToolNetworkEndpoint,
+    url: Url,
+    proxied_hosts: Vec<String>,
+}
+
+impl std::fmt::Debug for TransportProxy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("TransportProxy(<redacted>)")
+    }
+}
+
+impl TransportProxy {
+    /// Snapshot the same environment family used by reqwest/hyper-util for HTTPS destinations.
+    /// Uppercase names win because hyper-util's matcher checks them first. A CGI environment does
+    /// not consume proxy variables. Invalid/unsupported selected proxy configuration fails closed
+    /// instead of being silently bypassed by the protected route.
+    pub(super) fn from_environment(
+        endpoints: &[ToolNetworkEndpoint],
+    ) -> Result<Option<Arc<Self>>, TransportError> {
+        if std::env::var_os("REQUEST_METHOD").is_some() {
+            return Ok(None);
+        }
+        let all = first_environment_value(&["ALL_PROXY", "all_proxy"]);
+        let https = first_environment_value(&["HTTPS_PROXY", "https_proxy"]);
+        let no = first_environment_value(&["NO_PROXY", "no_proxy"]);
+
+        let selected = if !https.is_empty() { &https } else { &all };
+        if selected.is_empty() {
+            return Ok(None);
+        }
+        let url = parse_proxy_url(selected).ok_or(TransportError::UnsupportedProxy)?;
+        Self::from_url(url, &no, endpoints).map(|proxy| proxy.map(Arc::new))
+    }
+
+    #[cfg(test)]
+    pub(super) fn from_snapshot(
+        proxy: &str,
+        no_proxy: &str,
+        endpoints: &[ToolNetworkEndpoint],
+    ) -> Result<Option<Arc<Self>>, TransportError> {
+        let url = parse_proxy_url(proxy).ok_or(TransportError::UnsupportedProxy)?;
+        Self::from_url(url, no_proxy, endpoints).map(|proxy| proxy.map(Arc::new))
+    }
+
+    fn from_url(
+        mut url: Url,
+        no_proxy: &str,
+        endpoints: &[ToolNetworkEndpoint],
+    ) -> Result<Option<Self>, TransportError> {
+        if !matches!(url.scheme(), "http" | "https")
+            || url.host_str().is_none()
+            || endpoints.iter().any(|endpoint| {
+                endpoint.scheme() != "https"
+                    || !matches!(endpoint.method(), "GET" | "HEAD" | "POST")
+            })
+        {
+            return Err(TransportError::UnsupportedProxy);
+        }
+
+        // hyper-util normalizes an environment proxy to its authority and root path.
+        url.set_path("/");
+        url.set_query(None);
+        url.set_fragment(None);
+        let host = url.host_str().ok_or(TransportError::UnsupportedProxy)?;
+        let endpoint_host = if host.contains(':') {
+            format!("[{host}]")
+        } else {
+            host.to_owned()
+        };
+        let port = url
+            .port_or_known_default()
+            .ok_or(TransportError::UnsupportedProxy)?;
+        let endpoint = ToolNetworkEndpoint::new(url.scheme(), &endpoint_host, port, "CONNECT", "/")
+            .map_err(|_| TransportError::UnsupportedProxy)?;
+
+        let mut proxied_hosts = endpoints
+            .iter()
+            .filter(|endpoint| !no_proxy_matches(no_proxy, endpoint.host()))
+            .map(|endpoint| endpoint.host().to_ascii_lowercase())
+            .collect::<Vec<_>>();
+        proxied_hosts.sort_unstable();
+        proxied_hosts.dedup();
+        if proxied_hosts.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(Self {
+            endpoint,
+            url,
+            proxied_hosts,
+        }))
+    }
+
+    pub(super) fn endpoint(&self) -> &ToolNetworkEndpoint {
+        &self.endpoint
+    }
+
+    fn applies_to(&self, url: &Url) -> bool {
+        url.host_str().is_some_and(|host| {
+            self.proxied_hosts
+                .binary_search_by(|candidate| candidate.as_str().cmp(&host.to_ascii_lowercase()))
+                .is_ok()
+        })
+    }
+
+    fn reqwest_proxy(&self) -> Result<reqwest::Proxy, TransportError> {
+        reqwest::Proxy::https(self.url.clone()).map_err(|_| TransportError::UnsupportedProxy)
+    }
+}
+
+fn first_environment_value(names: &[&str]) -> String {
+    for name in names {
+        if let Ok(value) = std::env::var(name) {
+            return value;
+        }
+    }
+    String::new()
+}
+
+fn parse_proxy_url(value: &str) -> Option<Url> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    let normalized = if value.contains("://") {
+        value.to_owned()
+    } else {
+        format!("http://{value}")
+    };
+    let url = Url::parse(&normalized).ok()?;
+    matches!(url.scheme(), "http" | "https").then_some(url)
+}
+
+// Fixed compatibility targets are hostnames, so the IP/CIDR NO_PROXY cases cannot match them.
+// This mirrors hyper-util's domain matcher: exact and subdomain matching are case-insensitive,
+// a leading dot is equivalent, and '*' is the sole wildcard.
+fn no_proxy_matches(no_proxy: &str, host: &str) -> bool {
+    let host = host.trim_matches(['[', ']']);
+    no_proxy.split(',').map(str::trim).any(|entry| {
+        if entry.is_empty() {
+            return false;
+        }
+        if entry == "*" {
+            return true;
+        }
+        let entry = entry.trim_start_matches('.');
+        entry.eq_ignore_ascii_case(host)
+            || (host.len() > entry.len()
+                && host
+                    .get(host.len() - entry.len()..)
+                    .is_some_and(|tail| tail.eq_ignore_ascii_case(entry))
+                && host.as_bytes().get(host.len() - entry.len() - 1) == Some(&b'.'))
+    })
+}
+
 pub(super) struct SearchTransport {
     manifest: ToolNetworkManifest,
     authority: Arc<dyn ToolNetworkAuthority>,
     budget: Arc<TransportBudget>,
     dns: Arc<dyn SearchDns>,
+    proxy: Option<Arc<TransportProxy>>,
     #[cfg(test)]
     fixture_roots: Vec<reqwest::Certificate>,
 }
@@ -266,6 +457,7 @@ pub(super) struct PreparedTransportRequest {
     body: Option<Vec<u8>>,
     format: BodyFormat,
     headers: Option<compatibility::headers::CompatibilityHeaders>,
+    status_only: bool,
 }
 
 impl std::fmt::Debug for PreparedTransportRequest {
@@ -319,6 +511,19 @@ impl PreparedTransportRequest {
         )
     }
 
+    pub(super) fn status_only(
+        manifest: &ToolNetworkManifest,
+        url: Url,
+        method: Method,
+    ) -> Result<Self, TransportError> {
+        if !matches!(method, Method::GET | Method::HEAD) {
+            return Err(TransportError::InvalidRequest);
+        }
+        let mut request = Self::new(manifest, url, method, None, BodyFormat::Json)?;
+        request.status_only = true;
+        Ok(request)
+    }
+
     fn new(
         manifest: &ToolNetworkManifest,
         url: Url,
@@ -343,6 +548,7 @@ impl PreparedTransportRequest {
             body,
             format,
             headers: None,
+            status_only: false,
         })
     }
 }
@@ -354,31 +560,64 @@ impl SearchTransport {
         budget: Arc<TransportBudget>,
         dns: Arc<dyn SearchDns>,
     ) -> Result<Self, TransportError> {
-        if let Some(proxy) = manifest.scope().proxy()
-            && (proxy.scheme() != "http"
-                || proxy.method() != "CONNECT"
-                || proxy.path() != "/"
-                || manifest.scope().endpoints().iter().any(|endpoint| {
-                    endpoint.scheme() != "https"
-                        || endpoint
-                            .host()
-                            .trim_matches(['[', ']'])
-                            .parse::<std::net::Ipv4Addr>()
-                            .is_err()
-                        || !matches!(endpoint.method(), "GET" | "HEAD" | "POST")
-                }))
-        {
-            // Hostname CONNECT delegates target DNS to the proxy; it cannot be locally pinned.
-            return Err(TransportError::UnsupportedProxy);
+        Self::new_with_proxy(manifest, authority, budget, dns, None)
+    }
+
+    pub(super) fn new_with_proxy(
+        manifest: ToolNetworkManifest,
+        authority: Arc<dyn ToolNetworkAuthority>,
+        budget: Arc<TransportBudget>,
+        dns: Arc<dyn SearchDns>,
+        proxy: Option<Arc<TransportProxy>>,
+    ) -> Result<Self, TransportError> {
+        match (manifest.scope().proxy(), proxy.as_deref()) {
+            (Some(declared), Some(snapshot)) => {
+                if declared != snapshot.endpoint()
+                    || manifest.scope().endpoints().iter().any(|endpoint| {
+                        endpoint.scheme() != "https"
+                            || !matches!(endpoint.method(), "GET" | "HEAD" | "POST")
+                    })
+                {
+                    return Err(TransportError::UnsupportedProxy);
+                }
+            }
+            (Some(proxy), None)
+                if proxy.scheme() != "http"
+                    || proxy.method() != "CONNECT"
+                    || proxy.path() != "/"
+                    || manifest.scope().endpoints().iter().any(|endpoint| {
+                        endpoint.scheme() != "https"
+                            || endpoint
+                                .host()
+                                .trim_matches(['[', ']'])
+                                .parse::<std::net::Ipv4Addr>()
+                                .is_err()
+                            || !matches!(endpoint.method(), "GET" | "HEAD" | "POST")
+                    }) =>
+            {
+                // The legacy explicit-scope subset retains its stricter literal target contract.
+                return Err(TransportError::UnsupportedProxy);
+            }
+            (None, Some(_)) => return Err(TransportError::InvalidRequest),
+            _ => {}
         }
         Ok(Self {
             manifest,
             authority,
             budget,
             dns,
+            proxy,
             #[cfg(test)]
             fixture_roots: Vec::new(),
         })
+    }
+
+    fn uses_proxy(&self, url: &Url) -> bool {
+        match (&self.proxy, self.manifest.scope().proxy()) {
+            (Some(snapshot), Some(_)) => snapshot.applies_to(url),
+            (None, Some(_)) => true,
+            _ => false,
+        }
     }
 
     fn check(&self, url: &Url, method: &Method) -> Result<ToolNetworkEndpoint, TransportError> {
@@ -390,7 +629,9 @@ impl SearchTransport {
         self.authority
             .check(self.manifest.invocation_id(), &endpoint)
             .map_err(|_| TransportError::Unauthorized)?;
-        if let Some(proxy) = self.manifest.scope().proxy() {
+        if self.uses_proxy(url)
+            && let Some(proxy) = self.manifest.scope().proxy()
+        {
             self.authority
                 .check(self.manifest.invocation_id(), proxy)
                 .map_err(|_| TransportError::Unauthorized)?;
@@ -417,6 +658,7 @@ impl SearchTransport {
                 request.body,
                 request.format,
                 request.headers,
+                request.status_only,
             ),
         )
         .await
@@ -456,43 +698,55 @@ impl SearchTransport {
         body: Option<Vec<u8>>,
         format: BodyFormat,
         headers: Option<compatibility::headers::CompatibilityHeaders>,
+        status_only: bool,
     ) -> Result<TransportResponse, TransportError> {
         let mut redirects = 0;
         loop {
             let endpoint = self.check(&url, &method)?; // Denied hosts never reach DNS.
-            // Bound every hop attempt, including failed DNS or a later denied send.
+            let uses_proxy = self.uses_proxy(&url);
+            // Bound every hop attempt, including failed DNS or a later denied send. A proxied
+            // HTTPS request reserves one CONNECT plus one application send.
             TransportBudget::reserve(
                 &self.budget.attempts,
-                if self.manifest.scope().proxy().is_some() {
-                    2
-                } else {
-                    1
-                },
+                if uses_proxy { 2 } else { 1 },
                 self.budget.max_requests,
                 TransportError::RequestLimit,
             )?;
-            let mut host = endpoint
+            let target_host = endpoint
                 .host()
                 .trim_start_matches('[')
                 .trim_end_matches(']');
-            let mut port = endpoint.port();
-            if let Some(proxy) = self.manifest.scope().proxy() {
-                let target = host
-                    .parse::<IpAddr>()
-                    .map_err(|_| TransportError::UnsupportedProxy)?;
-                self.check_addresses(&[SocketAddr::new(target, port)], port)?;
-                host = proxy.host().trim_matches(['[', ']']);
-                port = proxy.port();
-            }
+            let target_port = endpoint.port();
+            let (host, port) = if uses_proxy {
+                let proxy = self
+                    .manifest
+                    .scope()
+                    .proxy()
+                    .ok_or(TransportError::UnsupportedProxy)?;
+                if self.proxy.is_none() {
+                    let target = target_host
+                        .parse::<IpAddr>()
+                        .map_err(|_| TransportError::UnsupportedProxy)?;
+                    self.check_addresses(&[SocketAddr::new(target, target_port)], target_port)?;
+                }
+                (proxy.host().trim_matches(['[', ']']), proxy.port())
+            } else {
+                (target_host, target_port)
+            };
             let addresses = match host.parse::<IpAddr>() {
                 Ok(ip) => vec![SocketAddr::new(ip, port)],
                 Err(_) => self.dns.resolve(host, port).await?,
             };
             self.budget.check_live()?;
-            self.check_addresses(&addresses, port)?;
+            if uses_proxy && self.proxy.is_some() {
+                self.check_proxy_addresses(&addresses, port)?;
+            } else {
+                self.check_addresses(&addresses, port)?;
+            }
             // A fresh HTTP/1 client cannot reuse another authority's connection, coalesce
-            // origins, follow redirects or consult ambient proxies. Pin the direct target
-            // or explicit proxy peer; TLS still verifies the original target URL identity.
+            // origins, follow redirects or consult ambient proxies. Direct requests pin the
+            // target. Proxied requests pin the frozen proxy peer; the trusted configured proxy
+            // owns remote hostname resolution exactly as the legacy environment-proxy path did.
             let builder = Client::builder()
                 .no_proxy()
                 .redirect(reqwest::redirect::Policy::none())
@@ -505,12 +759,20 @@ impl SearchTransport {
                 .no_deflate()
                 .no_zstd()
                 .resolve_to_addrs(host, &addresses);
-            let builder = if let Some(proxy) = self.manifest.scope().proxy() {
-                let proxy_url = format!("http://{}:{}/", proxy.host(), proxy.port());
-                builder.proxy(
+            let builder = if uses_proxy {
+                let proxy = if let Some(snapshot) = &self.proxy {
+                    snapshot.reqwest_proxy()?
+                } else {
+                    let endpoint = self
+                        .manifest
+                        .scope()
+                        .proxy()
+                        .ok_or(TransportError::UnsupportedProxy)?;
+                    let proxy_url = format!("http://{}:{}/", endpoint.host(), endpoint.port());
                     reqwest::Proxy::https(proxy_url)
-                        .map_err(|_| TransportError::UnsupportedProxy)?,
-                )
+                        .map_err(|_| TransportError::UnsupportedProxy)?
+                };
+                builder.proxy(proxy)
             } else {
                 builder
             };
@@ -549,6 +811,13 @@ impl SearchTransport {
             {
                 return Err(TransportError::ResponseLimit);
             }
+            let status = response.status().as_u16();
+            if status_only {
+                return Ok(TransportResponse {
+                    status,
+                    body: Vec::new(),
+                });
+            }
             if response
                 .headers()
                 .get_all(reqwest::header::CONTENT_ENCODING)
@@ -561,7 +830,6 @@ impl SearchTransport {
                 if redirects >= self.manifest.scope().redirect_limit() {
                     return Err(TransportError::Redirect);
                 }
-                let status = response.status().as_u16();
                 let location = response
                     .headers()
                     .get(reqwest::header::LOCATION)
@@ -581,14 +849,10 @@ impl SearchTransport {
                 url = next;
                 continue;
             }
-            let status = response.status().as_u16();
             let mut result = Vec::new();
             loop {
                 self.budget.check_live()?;
-                let chunk = response
-                    .chunk()
-                    .await
-                    .map_err(|_| TransportError::Request)?;
+                let chunk = response.chunk().await.map_err(classify_body_read_error)?;
                 self.budget.check_live()?;
                 let Some(chunk) = chunk else {
                     break;
@@ -621,6 +885,24 @@ impl SearchTransport {
                             .private_addresses()
                             .contains(&address.ip()))
             })
+        {
+            Err(TransportError::Address)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn check_proxy_addresses(
+        &self,
+        addresses: &[SocketAddr],
+        port: u16,
+    ) -> Result<(), TransportError> {
+        // The proxy endpoint is explicit trusted configuration, so loopback/private peers are
+        // allowed just as they were for the legacy environment proxy. Keep only finite answer and
+        // exact-port bounds; the proxy hostname itself is still pinned for this connection.
+        if addresses.is_empty()
+            || addresses.len() > 16
+            || addresses.iter().any(|address| address.port() != port)
         {
             Err(TransportError::Address)
         } else {
@@ -661,5 +943,7 @@ fn is_global_address(ip: IpAddr) -> bool {
     }
 }
 
+#[cfg(test)]
+mod proxy_snapshot_tests;
 #[cfg(test)]
 mod tests;

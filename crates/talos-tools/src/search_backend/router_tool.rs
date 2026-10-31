@@ -27,6 +27,7 @@ pub(in crate::search_backend) struct GuardedSearchRouterTool {
     configuration: SearchCompositionConfiguration,
     limits: TransportLimits,
     policy: SearchRouterPolicy,
+    preparation_available: bool,
     #[cfg(feature = "search-integration-test")]
     integration_probe: Option<Arc<SearchRouterIntegrationProbe>>,
 }
@@ -47,9 +48,18 @@ impl GuardedSearchRouterTool {
             configuration,
             limits,
             policy,
+            preparation_available: true,
             #[cfg(feature = "search-integration-test")]
             integration_probe: None,
         }
+    }
+
+    /// Marks a locally observed production configuration as unsupported before any invocation can
+    /// be prepared. The reason/value is deliberately not retained in this tool or exposed to the
+    /// model; callers receive only the closed preparation error.
+    pub(in crate::search_backend) fn with_preparation_unavailable(mut self) -> Self {
+        self.preparation_available = false;
+        self
     }
 
     #[cfg(feature = "search-integration-test")]
@@ -65,6 +75,9 @@ impl GuardedSearchRouterTool {
         &self,
         input: &Value,
     ) -> Result<PreparedSearchRouterInvocation, ToolNetworkPreparationError> {
+        if !self.preparation_available {
+            return Err(ToolNetworkPreparationError::Unavailable);
+        }
         let parsed: WebSearchInput = serde_json::from_value(input.clone())
             .map_err(|_| ToolNetworkPreparationError::Invalid)?;
         let prepared = PreparedSearchRouterInvocation::prepare(
@@ -188,9 +201,9 @@ mod tests {
             first.manifest().invocation_id(),
             second.manifest().invocation_id()
         );
-        assert_eq!(first.manifest().scope().endpoints().len(), 4);
+        assert_eq!(first.manifest().scope().endpoints().len(), 9);
         assert_eq!(first.permission_profile(), second.permission_profile());
-        assert_eq!(first.permission_profile().len(), 4);
+        assert_eq!(first.permission_profile().len(), 6);
         assert!(!format!("{:?}", first.manifest()).contains("first private query"));
     }
 
@@ -203,6 +216,15 @@ mod tests {
                 Err(ToolNetworkPreparationError::Invalid)
             ));
         }
+    }
+
+    #[test]
+    fn unavailable_configuration_fails_before_plan_creation() {
+        let tool = tool().with_preparation_unavailable();
+        assert!(matches!(
+            tool.prepare_network_invocation(&input("must stay local")),
+            Err(ToolNetworkPreparationError::Unavailable)
+        ));
     }
 
     #[tokio::test]

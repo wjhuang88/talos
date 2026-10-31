@@ -12,7 +12,9 @@ pub(in crate::search_backend) mod chain;
 pub(super) mod headers;
 pub(in crate::search_backend) mod invocation;
 pub(in crate::search_backend) mod plan;
+pub(in crate::search_backend) mod probe;
 pub(in crate::search_backend) mod searxng;
+pub(in crate::search_backend) mod wikipedia;
 
 use crate::search_backend::{SearchBackendId, bing_parser, ddg_parser, instant_answer};
 use talos_core::tool::ToolNetworkScope;
@@ -52,6 +54,8 @@ pub(super) fn manifest_extends_scope_without_policy_widening(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub(in crate::search_backend) enum CompatibilityError {
+    #[error("search_compatibility_unreachable")]
+    Unreachable,
     #[error(transparent)]
     Transport(#[from] TransportError),
     #[error(transparent)]
@@ -65,6 +69,7 @@ pub(in crate::search_backend) enum CompatibilityError {
 /// Retain this same object across future admission. No Clone or replacement inputs.
 pub(in crate::search_backend) struct PreparedCompatibilitySearch {
     request: PreparedTransportRequest,
+    retry: Option<PreparedTransportRequest>,
     protocol: CompatibilityProtocol,
     query: String,
     max_results: u32,
@@ -81,15 +86,28 @@ impl PreparedCompatibilitySearch {
         self,
         transport: &SearchTransport,
     ) -> Result<AdmittedCompatibilityResults, CompatibilityError> {
-        let response = transport.execute_prepared(self.request).await?;
-        finish_response(
+        execute_request(
             self.protocol,
             &self.query,
             self.max_results,
-            response,
-            || transport.budget.check_live(),
+            self.request,
+            transport,
         )
+        .await
     }
+}
+
+async fn execute_request(
+    protocol: CompatibilityProtocol,
+    query: &str,
+    max_results: u32,
+    request: PreparedTransportRequest,
+    transport: &SearchTransport,
+) -> Result<AdmittedCompatibilityResults, CompatibilityError> {
+    let response = transport.execute_prepared(request).await?;
+    finish_response(protocol, query, max_results, response, || {
+        transport.budget.check_live()
+    })
 }
 
 // The only production caller supplies the existing shared execution-budget checker.
@@ -182,6 +200,7 @@ impl CompatibilityProtocol {
         let request = self.prepare_with(manifest, query, select)?;
         Ok(PreparedCompatibilitySearch {
             request,
+            retry: None,
             protocol: self,
             query: query.to_owned(),
             max_results,
@@ -199,6 +218,10 @@ impl CompatibilityProtocol {
             Url::parse(url).map_err(|_| TransportError::InvalidRequest)?,
             method,
         ))
+    }
+
+    fn retries_network_failure(self) -> bool {
+        matches!(self, Self::Lite | Self::Html | Self::Bing)
     }
 
     /// Query-free canonical destination for planning a trusted configuration scope.
