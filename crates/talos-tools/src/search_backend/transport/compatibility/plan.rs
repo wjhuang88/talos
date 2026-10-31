@@ -14,6 +14,8 @@ use super::{
     admission::AdmittedCompatibilityResults,
     chain::{CompatibilityChainError, ORDER, PreparedCompatibilityChain},
     manifest_extends_scope_without_policy_widening,
+    probe::PreparedReachabilityProbes,
+    wikipedia::PreparedWikipediaSearch,
 };
 use crate::search_backend::transport::{
     SearchTransport, SystemSearchDns, TransportBudget, TransportProxy,
@@ -42,10 +44,12 @@ impl DirectCompatibilityConfiguration {
     }
 
     fn build(snapshot_environment_proxy: bool) -> Result<Self, TransportError> {
-        let endpoints = ORDER
+        let mut endpoints = ORDER
             .iter()
             .map(|protocol| protocol.destination())
             .collect::<Result<Vec<_>, _>>()?;
+        endpoints.extend(super::probe::destinations()?);
+        endpoints.push(super::wikipedia::destination()?);
         let proxy = if snapshot_environment_proxy {
             TransportProxy::from_environment(&endpoints)?
         } else {
@@ -85,11 +89,18 @@ impl DirectCompatibilityConfiguration {
         if !manifest_extends_scope_without_policy_widening(manifest, &self.scope) {
             return Err(TransportError::InvalidRequest.into());
         }
+        // Query-free probes and the fixed migration fallback are frozen before the four-source
+        // chain draws any randomized headers. A late scope/query validation failure therefore
+        // cannot consume entropy and leave a partially prepared invocation.
+        let probes = PreparedReachabilityProbes::prepare(manifest)?;
+        let wikipedia = PreparedWikipediaSearch::prepare(manifest, query, max_results)?;
         let chain = PreparedCompatibilityChain::prepare(manifest, query, max_results)?;
         let facets = facets(manifest);
         Ok(PreparedCompatibilityPlan {
             manifest: manifest.clone(),
+            probes,
             chain,
+            wikipedia,
             facets,
             proxy: self.proxy.clone(),
             #[cfg(test)]
@@ -122,7 +133,9 @@ fn facets(manifest: &ToolNetworkManifest) -> Vec<ToolPermissionFacet> {
 /// Neither this object nor a manifest clone grants permission.
 pub(in crate::search_backend) struct PreparedCompatibilityPlan {
     manifest: ToolNetworkManifest,
+    probes: PreparedReachabilityProbes,
     chain: PreparedCompatibilityChain,
+    wikipedia: PreparedWikipediaSearch,
     facets: Vec<ToolPermissionFacet>,
     proxy: Option<Arc<TransportProxy>>,
     #[cfg(test)]
@@ -141,6 +154,8 @@ pub(in crate::search_backend) enum CompatibilityPlanError {
     Transport(TransportError),
     #[error("search_compatibility_plan_chain")]
     Chain(CompatibilityChainError),
+    #[error("search_compatibility_plan_wikipedia")]
+    Wikipedia(CompatibilityError),
 }
 
 impl PreparedCompatibilityPlan {
@@ -161,13 +176,32 @@ impl PreparedCompatibilityPlan {
         let dns = Arc::new(SystemSearchDns);
         #[cfg(test)]
         let dns = self.dns;
-        let transport =
-            SearchTransport::new_with_proxy(self.manifest, authority, budget, dns, self.proxy)
-                .map_err(CompatibilityPlanError::Transport)?;
-        self.chain
+        let transport = SearchTransport::new_with_proxy(
+            self.manifest,
+            authority,
+            budget,
+            dns,
+            self.proxy,
+        )
+        .map_err(CompatibilityPlanError::Transport)?;
+        let reachability = self
+            .probes
             .execute(&transport)
             .await
-            .map_err(CompatibilityPlanError::Chain)
+            .map_err(CompatibilityPlanError::Transport)?;
+        match self
+            .chain
+            .execute_with_reachability(&transport, reachability)
+            .await
+        {
+            Ok(results) => Ok(results),
+            Err(CompatibilityChainError::Exhausted(_)) => self
+                .wikipedia
+                .execute(&transport)
+                .await
+                .map_err(CompatibilityPlanError::Wikipedia),
+            Err(error) => Err(CompatibilityPlanError::Chain(error)),
+        }
     }
 }
 
@@ -223,14 +257,14 @@ mod shared_manifest_tests {
             direct_plan.permission_profile(),
             searxng_plan.permission_profile()
         );
-        assert_eq!(manifest.scope().endpoints().len(), 5);
-        assert_eq!(direct_plan.permission_profile().len(), 5);
+        assert_eq!(manifest.scope().endpoints().len(), 10);
+        assert_eq!(direct_plan.permission_profile().len(), 7);
         assert!(!format!("{manifest:?}").contains("private query"));
     }
 
     #[test]
     fn shared_manifest_cannot_widen_global_network_policy() {
-        let direct = DirectCompatibilityConfiguration::new().expect("direct");
+        let direct = DirectCompatibilityConfiguration::new().expect("config");
         let searxng = SearXngConfiguration::new("https://search.example/").expect("searxng");
         let proxy =
             ToolNetworkEndpoint::new("http", "proxy.example", 8080, "CONNECT", "/").expect("proxy");
