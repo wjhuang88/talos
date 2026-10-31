@@ -8,6 +8,75 @@
 
 ## Current manual failure increment — 2026-10-31 (uncommitted)
 
+Current recovery validation: real CLI script passes after file restoration.
+The next-turn fixture now also asserts the summary-call count equals a standalone
+manual pass and no automatic-start event appears, excluding extra automatic
+regeneration in this deterministic fixture (`/private/tmp/i312-compact-cli-exact-reuse.log`).
+Current-source standard host preflight is running as session 1696, log
+`/private/tmp/i312-recovered-preflight.log`; this replaces failed startup attempts,
+not the already successful preceding-stage preflight. Do not restart it.
+
+2026-11-01 recovery: new preflight launch failed before validation because the
+active worktree had lost 1700 tracked files plus its .git pointer; cause unknown.
+Restored only missing files from existing HEAD `3f604764f` and restored its pointer,
+preserving all surviving edits. Git status again shows only the expected inline
+fix, owner/handoff edits and new CLI script; diff check passes and the worktree
+is no longer prunable. No worktree or target was removed. Failed launch logs:
+`/private/tmp/i312-cli-current-preflight.log` and
+`/private/tmp/i312-cli-current-preflight-fixed.log`. Current-source validation
+must restart after this recovery; no successful new preflight is claimed.
+
+Latest verification: standard host preflight session 8264 finished exit 0,
+including both external Runtime SDK modes (`/private/tmp/i312-manual-metrics-preflight.log`).
+It compiled the source stage `3f604764f` before the inline fork fix; do not use it
+as final certification of the new CLI delta. The real CLI script now also returns
+an invalid summary over loopback and verifies visible measured failure, no leaked
+summary text and unchanged raw bytes; the complete script passes
+(`/private/tmp/i312-compact-cli-failure.log`). Final script review/current-source
+validation and remaining T4 acceptance are still required.
+The extended real-binary script also runs an ordinary turn after `/compact` in
+the same process. Captured HTTP messages include the installed derived checkpoint,
+the raw transcript retains its original byte prefix, and no derived checkpoint
+is persisted. All script scenarios pass (`/private/tmp/i312-compact-cli-reuse.log`).
+This closes the prior successful-install-without-next-dispatch fixture gap; the
+summary is still fixed and is not semantic-quality evidence.
+
+Update: this stage is committed at `3f604764f`. Standard host preflight runs with
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0`, session
+8264, log `/private/tmp/i312-manual-metrics-preflight.log`; poll rather than restart.
+New `scripts/test_compact_cli.py` prepares isolated real-binary inline command
+acceptance (visible below-threshold result and unchanged raw transcript). Syntax
+check passed; runtime execution awaits the current binary and is not yet evidence.
+
+Real binary trial subsequently passed resume/manual visibility and raw-byte
+preservation but failed the fork assertion (`/private/tmp/i312-compact-cli-smoke.log`):
+inline explicitly disabled fork resolution and silently created a fresh session.
+The entrypoint now enables the existing fork resolver. A fresh binary build is
+running as session 68083; log `/private/tmp/i312-compact-cli-fork-build.log`.
+Preflight 8264 compiled the preceding source before
+this fix and cannot certify the new CLI wiring; its eventual result is stage
+evidence only. The CLI smoke script remains uncommitted and requires rerun.
+The corrected binary build completed exit 0; real CLI smoke then passed exit 0
+(`/private/tmp/i312-compact-cli-smoke-fixed.log`): resume and actual `--fork` both
+show below-threshold manual results, and parent/child raw transcripts are unchanged.
+This verifies command routing and no-op behavior, not successful model-generated
+compression through the binary. That distinction and final gates remain open.
+The real-binary smoke now also creates a legacy JSONL fixture and exercises both
+`--session` and `--fork` with `/compact`; all TLOG/JSONL resume/fork paths pass
+with byte-identical parent/child transcripts (`/private/tmp/i312-compact-cli-legacy.log`).
+This closes legacy command/no-op reachability evidence, not semantic compaction
+success or durable authenticated TLOG provenance for the CLI Session path.
+Real CLI successful application now passes too: the script seeds a large legacy
+history, serves a bounded structured summary via loopback OpenAI-chat HTTP, runs
+`/compact`, asserts visible applied estimates and unchanged raw bytes
+(`/private/tmp/i312-compact-cli-applied.log`). No paid endpoint is used. This
+fixed-summary fixture proves binary/provider/command wiring, not semantic quality;
+input-derived long-session fixtures remain the separate retention evidence.
+CLI warnings-denied Clippy passed (`/private/tmp/i312-cli-fork-clippy.log`).
+Independent static review approved the one-line fork wiring and earlier no-op
+script; the new local HTTP success fixture still requires review. Full T4 remains
+Partial; running preflight 8264 is preceding-CLI-fix stage evidence only.
+
 Prior observability/semantic stage is committed as `102bdab06`.
 Its standard host preflight session 64989 terminated with exit 101: workspace
 test compilation exhausted disk (`/private/tmp/i312-observability-acceptance-preflight.log`).

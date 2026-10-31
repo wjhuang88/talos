@@ -153,7 +153,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         &display_name,
         &cli,
         ResumeSelection::Disabled,
-        false,
+        true,
     )?;
 
     set_todo_prompt_provider(&mut agent, &session_manager, &session);

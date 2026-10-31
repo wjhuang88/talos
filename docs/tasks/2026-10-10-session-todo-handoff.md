@@ -1,5 +1,40 @@
 ## Current acceptance checkpoint — 2026-10-31
 
+2026-11-01: missing worktree files were restored from HEAD without overwriting
+surviving edits; cause remains unknown. Current-source preflight session 1696 is
+running (`/private/tmp/i312-recovered-preflight.log`). Real CLI smoke passes after
+recovery, including unchanged summary-call count for the next ordinary request
+(`/private/tmp/i312-compact-cli-exact-reuse.log`). All final gates remain open.
+
+Newest: preflight 8264 completed exit 0 including both external SDK modes; log
+`/private/tmp/i312-manual-metrics-preflight.log`. It is preceding-inline-fix
+stage evidence. Real CLI no-op/resume/fork/success/invalid-summary failure script
+passes (`/private/tmp/i312-compact-cli-failure.log`), preserving raw bytes and
+excluding private summary text from failure output. T4 remains Partial; current
+CLI final validation/review and remote gates plus later queue remain open.
+The real-binary success fixture now also verifies the next ordinary HTTP request
+uses the derived checkpoint, preserves the original transcript prefix and does
+not persist summary context (`/private/tmp/i312-compact-cli-reuse.log`, exit 0).
+
+Latest: manual failure stage committed as `3f604764f`; low-debug/non-incremental
+standard host preflight session 8264 is running, log
+`/private/tmp/i312-manual-metrics-preflight.log`. Real CLI compact smoke script is
+written but not yet executed. Earlier uncommitted/Clippy-running text is historical.
+
+Real CLI smoke found inline `--fork` silently disabled. The local one-line wiring
+fix and rebuilt binary pass resume/fork `/compact` visible no-op plus raw-byte
+preservation (`/private/tmp/i312-compact-cli-smoke-fixed.log`). This is not binary
+successful-summary evidence. Preflight 8264 compiled before the fix and remains
+preceding-stage evidence; I312 tracks fresh review/validation requirements.
+The extended real-binary smoke passes TLOG and legacy JSONL resume/fork manual
+no-op paths with raw-byte preservation (`/private/tmp/i312-compact-cli-legacy.log`).
+Successful-summary binary acceptance and remaining T4 gates are still open.
+Update: real binary successful `/compact` via loopback HTTP now passes with
+applied estimates and byte-identical raw history (`/private/tmp/i312-compact-cli-applied.log`).
+This fixed-summary fixture proves wiring, not semantic quality. New script review,
+current-source final validation, remaining cancellation/lifecycle acceptance and
+remote review/CI/merge remain required; no task completion is claimed.
+
 Update: observability/semantic stage is committed at `102bdab06`; preflight
 session 64989 is terminal exit 101 from disk exhaustion during test compilation.
 Do not poll or certify it as successful. Authorized active-target cleanup and
