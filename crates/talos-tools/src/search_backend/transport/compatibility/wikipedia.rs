@@ -85,8 +85,10 @@ impl PreparedWikipediaSearch {
         }
         let candidates = parse(&response.body, self.max_results)?;
         transport.budget.check_live()?;
+        // Router candidate identity remains the fixed zero-key compatibility family. Wikipedia is
+        // an internal migration-time last resort, not a separately admitted native backend.
         admission::admit(
-            SearchBackendId::Wikipedia,
+            SearchBackendId::DuckDuckGo,
             candidates,
             self.max_results,
             || transport.budget.check_live(),
@@ -112,7 +114,7 @@ fn parse(body: &[u8], max_results: u32) -> Result<Vec<SearchBackendResult>, Comp
     }
     Ok((0..count)
         .map(|index| SearchBackendResult {
-            backend: SearchBackendId::Wikipedia,
+            backend: SearchBackendId::DuckDuckGo,
             title: titles[index]
                 .as_str()
                 .unwrap_or("Untitled")
@@ -156,14 +158,17 @@ mod tests {
     }
 
     #[test]
-    fn parser_preserves_legacy_shape_before_shared_admission() {
+    fn parser_preserves_legacy_shape_inside_compatibility_identity() {
         let rows = parse(
             br#"["q",["Rust","Tokio"],["Lang","Runtime"],["https://rust-lang.org","https://tokio.rs"]]"#,
             2,
         )
         .expect("rows");
         assert_eq!(rows.len(), 2);
-        assert!(rows.iter().all(|row| row.backend == SearchBackendId::Wikipedia));
+        assert!(
+            rows.iter()
+                .all(|row| row.backend == SearchBackendId::DuckDuckGo)
+        );
         assert_eq!(rows[0].title, "Rust");
         assert_eq!(rows[1].url, "https://tokio.rs");
     }
