@@ -51,10 +51,10 @@ pub(super) enum TransportError {
 // Only the actual send/body-read boundary uses this classification. Construction errors remain
 // Request. Legacy rust-websearch retries reqwest Timeout/Network once for Lite/HTML/Bing, so the
 // controlled transport preserves only genuinely transient transport failures as typed Network
-// outcomes. TLS/certificate, CONNECT protocol and HTTP protocol failures remain terminal Request.
+// outcomes. TLS/certificate, CONNECT protocol, HTTP protocol and untyped body-framing failures
+// remain terminal Request.
 fn classify_send_error(error: reqwest::Error) -> TransportError {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let body = error.is_body();
         let timeout = error.is_timeout();
         let mut current: Option<&(dyn std::error::Error + 'static)> = Some(&error);
         // Bound Talos's traversal independently from reqwest's own classification helpers.
@@ -75,7 +75,7 @@ fn classify_send_error(error: reqwest::Error) -> TransportError {
             }
             current = cause.source();
         }
-        if timeout || body {
+        if timeout {
             TransportError::Network
         } else {
             TransportError::Request
@@ -108,8 +108,8 @@ impl TransportLimits {
         max_bytes: usize,
     ) -> Result<Self, TransportError> {
         if duration.is_zero()
-            || duration > Duration::from_secs(120)
-            || !(1..=16).contains(&max_requests)
+            || duration > Duration::from_secs(135)
+            || !(1..=24).contains(&max_requests)
             || !(1..=1_048_576).contains(&max_bytes)
         {
             return Err(TransportError::InvalidRequest);
@@ -442,6 +442,7 @@ pub(super) struct PreparedTransportRequest {
     body: Option<Vec<u8>>,
     format: BodyFormat,
     headers: Option<compatibility::headers::CompatibilityHeaders>,
+    status_only: bool,
 }
 
 impl std::fmt::Debug for PreparedTransportRequest {
@@ -495,6 +496,19 @@ impl PreparedTransportRequest {
         )
     }
 
+    pub(super) fn status_only(
+        manifest: &ToolNetworkManifest,
+        url: Url,
+        method: Method,
+    ) -> Result<Self, TransportError> {
+        if !matches!(method, Method::GET | Method::HEAD) {
+            return Err(TransportError::InvalidRequest);
+        }
+        let mut request = Self::new(manifest, url, method, None, BodyFormat::Json)?;
+        request.status_only = true;
+        Ok(request)
+    }
+
     fn new(
         manifest: &ToolNetworkManifest,
         url: Url,
@@ -519,6 +533,7 @@ impl PreparedTransportRequest {
             body,
             format,
             headers: None,
+            status_only: false,
         })
     }
 }
@@ -628,6 +643,7 @@ impl SearchTransport {
                 request.body,
                 request.format,
                 request.headers,
+                request.status_only,
             ),
         )
         .await
@@ -667,6 +683,7 @@ impl SearchTransport {
         body: Option<Vec<u8>>,
         format: BodyFormat,
         headers: Option<compatibility::headers::CompatibilityHeaders>,
+        status_only: bool,
     ) -> Result<TransportResponse, TransportError> {
         let mut redirects = 0;
         loop {
@@ -779,6 +796,13 @@ impl SearchTransport {
             {
                 return Err(TransportError::ResponseLimit);
             }
+            let status = response.status().as_u16();
+            if status_only {
+                return Ok(TransportResponse {
+                    status,
+                    body: Vec::new(),
+                });
+            }
             if response
                 .headers()
                 .get_all(reqwest::header::CONTENT_ENCODING)
@@ -791,7 +815,6 @@ impl SearchTransport {
                 if redirects >= self.manifest.scope().redirect_limit() {
                     return Err(TransportError::Redirect);
                 }
-                let status = response.status().as_u16();
                 let location = response
                     .headers()
                     .get(reqwest::header::LOCATION)
@@ -811,7 +834,6 @@ impl SearchTransport {
                 url = next;
                 continue;
             }
-            let status = response.status().as_u16();
             let mut result = Vec::new();
             loop {
                 self.budget.check_live()?;
