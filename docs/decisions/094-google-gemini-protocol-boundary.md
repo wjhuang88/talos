@@ -60,3 +60,29 @@ implementation gates, not evidence of an already delivered feature.
 Pin specific schema/fixture/library revisions during implementation; these current documentation
 links alone are not a stable fixture or a dependency approval. Independent protocol/auth review
 must accept this decision with the finalized claim before implementation begins.
+
+## Auth integration amendment — 2026-10-31 (implementation candidate)
+
+The generic Google credential cache cannot satisfy caller-owned cancellation (see #810).
+Use exact google-cloud-auth 1.18.0, defaults disabled, default-rustls-provider enabled,
+only service_account::Builder::build_signer for local RSA-PKCS1-SHA256. Talos owns
+fixed-endpoint HTTP token acquisition, bounded responses and request-owned cache refresh.
+No generic Credentials/ADC builder, remote signer, or background refresh is used.
+
+Archive SHA256 d563c7b987f40249c274a4e6a671661df6be2d084f08476dda2f0f931576cfcf.
+The resolved graph adds bs58 0.5.1, cmov 0.5.4, ctutils 0.4.7, google-cloud-auth 1.18.0,
+google-cloud-gax 1.15.0, google-cloud-rpc 1.6.0, google-cloud-wkt 1.10.0,
+hashbrown 0.12.3, hmac 0.13.0, indexmap 1.9.3, schemars 0.9.0,
+serde_with/serde_with_macros 3.24.0. No existing package version is replaced.
+Provider feature-tree comparison retains aws-lc-rs 1.17.1 / aws-lc-sys 0.42.0 and
+prebuilt-nasm features; rustls log/logging features become reachable. This does introduce
+new native RSA private-key parsing/signing use, not merely reuse existing TLS behavior.
+
+The dedicated signer has no HTTP/spawn path. Its async sign method performs synchronous
+key parsing and signing in one poll: it cannot be preempted by Tokio timeout or cancellation.
+Bound key input to 16 KiB and credential input to 1 MiB, contain Rust panics at construction
+and signing, discard upstream errors, and check deadline before HTTP exchange. Do not log
+signer Debug/error sources. catch_unwind cannot contain native aborts or suppress panic hooks;
+no such guarantee or private-key zeroization is claimed. Independent read-only source audit
+confirmed these limits. Exact implementation security review and CI remain merge gates;
+this candidate does not establish completed Gemini acceptance.

@@ -9,6 +9,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+google-cloud-auth = { version = "=1.18.0", default-features = false, features = ["default-rustls-provider"] }
 async-trait = "0.1.92"
 futures-util = "0.3.34"
 reqwest = { version = "0.13.4", features = ["json", "stream"] }
