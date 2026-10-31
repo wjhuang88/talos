@@ -18,6 +18,7 @@ mod gemini_auth;
 mod gemini_endpoint;
 mod gemini_request;
 mod gemini_stream;
+mod gemini_sse;
 mod gemini_transport;
 mod image_io;
 pub mod mock;
