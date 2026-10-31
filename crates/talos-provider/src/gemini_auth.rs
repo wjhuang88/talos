@@ -147,6 +147,7 @@ pub(crate) struct VertexTokenSource {
     credentials: std::sync::Arc<Value>,
     cache: std::sync::Arc<tokio::sync::Mutex<Option<CachedToken>>>,
     endpoint: String,
+    metadata: bool,
 }
 
 struct CachedToken {
@@ -206,6 +207,21 @@ impl VertexTokenSource {
             credentials: std::sync::Arc::new(credentials),
             cache: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
             endpoint: "https://oauth2.googleapis.com/token".into(),
+            metadata: false,
+        })
+    }
+
+    /// Construct only after explicit Vertex ADC selection and absent local credentials.
+    /// Ignore metadata host environment overrides and never send this request through proxies.
+    pub(crate) fn metadata() -> ProviderResult<Self> {
+        Ok(Self {
+            client: reqwest::Client::builder().no_proxy()
+                .redirect(reqwest::redirect::Policy::none())
+                .build().map_err(|_| auth_error("Vertex metadata client initialization failed"))?,
+            credentials: std::sync::Arc::new(Value::Null),
+            cache: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
+            endpoint: "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token".into(),
+            metadata: true,
         })
     }
 
@@ -225,7 +241,9 @@ impl VertexTokenSource {
             return Ok(token.token.clone());
         }
         let started = Instant::now();
-        let body = if self.credentials["type"] == "service_account" {
+        let body = if self.metadata {
+            Value::Null
+        } else if self.credentials["type"] == "service_account" {
             serde_json::json!({
                 "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
                 "assertion": service_account_assertion(&self.credentials).await?,
@@ -241,8 +259,17 @@ impl VertexTokenSource {
         if std::time::Instant::now() >= deadline {
             return Err(auth_error("Vertex credential acquisition timed out"));
         }
-        let mut response = self.client.post(&self.endpoint).json(&body).send().await
+        let request = if self.metadata {
+            self.client.get(&self.endpoint).header("Metadata-Flavor", "Google")
+        } else {
+            self.client.post(&self.endpoint).json(&body)
+        };
+        let mut response = request.send().await
             .map_err(|_| auth_error("Vertex token request failed"))?;
+        if self.metadata && response.headers().get("Metadata-Flavor")
+            .is_none_or(|value| value.as_bytes() != b"Google") {
+            return Err(auth_error("invalid Vertex metadata response origin"));
+        }
         if !response.status().is_success() {
             return Err(auth_error("Vertex token request rejected"));
         }
@@ -286,6 +313,47 @@ mod refresh_tests {
         VertexTokenSource::from_bytes(br#"{"type":"authorized_user","client_id":"fixture-client","client_secret":"fixture-secret","refresh_token":"fixture-refresh"}"#).expect("credentials")
     }
     fn deadline() -> Instant { Instant::now() + Duration::from_secs(5) }
+
+    #[tokio::test]
+    async fn metadata_requires_flavor_and_caches_only_valid_response() {
+        for flavor in [None, Some("Other"), Some("Google")] {
+            let mut server = mockito::Server::new_async().await;
+            let mut mock = server.mock("GET", "/").match_header("Metadata-Flavor", "Google")
+                .match_header("authorization", mockito::Matcher::Missing)
+                .with_body(r#"{"access_token":"fixture-metadata","token_type":"Bearer","expires_in":3600}"#)
+                .expect(1);
+            if let Some(value) = flavor { mock = mock.with_header("Metadata-Flavor", value); }
+            let mock = mock.create_async().await;
+            let mut auth = VertexTokenSource::metadata().expect("metadata source");
+            assert!(auth.endpoint.starts_with("http://169.254.169.254/"));
+            auth.endpoint = server.url();
+            let result = auth.token(deadline()).await;
+            if flavor == Some("Google") {
+                assert_eq!(result.expect("token"), "fixture-metadata");
+                assert_eq!(auth.token(deadline()).await.expect("cached"), "fixture-metadata");
+            } else {
+                assert!(result.is_err());
+                assert!(auth.cache.lock().await.is_none());
+            }
+            mock.assert_async().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_redirect_cannot_relocate_request() {
+        let mut server = mockito::Server::new_async().await;
+        let mut target = mockito::Server::new_async().await;
+        let forbidden = target.mock("GET", "/").expect(0).create_async().await;
+        let redirect = server.mock("GET", "/").with_status(302)
+            .with_header("Metadata-Flavor", "Google").with_header("Location", &target.url())
+            .create_async().await;
+        let mut auth = VertexTokenSource::metadata().expect("source");
+        auth.endpoint = server.url();
+        assert!(auth.token(deadline()).await.is_err());
+        assert!(auth.cache.lock().await.is_none());
+        redirect.assert_async().await;
+        forbidden.assert_async().await;
+    }
 
     #[tokio::test]
     async fn service_account_exchanges_signed_assertion_and_caches_token() {
