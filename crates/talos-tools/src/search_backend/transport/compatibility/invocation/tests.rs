@@ -116,7 +116,7 @@ fn trait_object_retains_exact_manifest_profile_and_redacts_captured_input() {
     let object: Box<dyn PreparedNetworkToolInvocation> = Box::new(invocation);
     assert_eq!(object.manifest(), &manifest);
     assert_eq!(object.permission_profile(), profile);
-    assert_eq!(profile.len(), 4);
+    assert_eq!(profile.len(), 6);
 }
 
 #[tokio::test]

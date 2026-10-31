@@ -134,11 +134,37 @@ fn format_routed_results(
     include_snippets: bool,
 ) -> Result<String, &'static str> {
     match success.backend {
-        SearchBackendId::DuckDuckGo => Ok(crate::web_search::format_compatibility_results(
-            query,
-            success.results,
-            include_snippets,
-        )),
+        SearchBackendId::DuckDuckGo => {
+            let result_backend = success
+                .results
+                .first()
+                .map(|result| result.backend)
+                .ok_or("search_router_unexpected_prepared_backend")?;
+            if success
+                .results
+                .iter()
+                .any(|result| result.backend != result_backend)
+            {
+                return Err("search_router_unexpected_prepared_backend");
+            }
+            match result_backend {
+                SearchBackendId::DuckDuckGo => Ok(crate::web_search::format_compatibility_results(
+                    query,
+                    success.results,
+                    include_snippets,
+                )),
+                SearchBackendId::Wikipedia => {
+                    Ok(crate::web_search::format_wikipedia_fallback_results(
+                        query,
+                        success.results,
+                        include_snippets,
+                    ))
+                }
+                SearchBackendId::Tavily | SearchBackendId::SearXng => {
+                    Err("search_router_unexpected_prepared_backend")
+                }
+            }
+        }
         SearchBackendId::SearXng => Ok(crate::web_search::format_searxng_results(
             query,
             success.results,
@@ -199,7 +225,7 @@ mod tests {
         .expect("prepared");
 
         assert_eq!(prepared.manifest().scope(), configuration.scope());
-        assert_eq!(prepared.permission_profile().len(), 4);
+        assert_eq!(prepared.permission_profile().len(), 6);
         assert!(!format!("{prepared:?}").contains("private bridge query"));
     }
 
@@ -227,7 +253,7 @@ mod tests {
                 .contains("all eligible search backends were exhausted")
         );
         assert!(!output.result.content.contains("private bridge query"));
-        assert_eq!(authority.checks.load(Ordering::SeqCst), 1);
+        assert_eq!(authority.checks.load(Ordering::SeqCst), 2);
     }
 
     #[test]
@@ -249,6 +275,24 @@ mod tests {
         )
         .expect("display");
         assert_eq!(actual, expected);
+
+        let wikipedia_rows = vec![SearchBackendResult {
+            backend: SearchBackendId::Wikipedia,
+            title: "Rust".into(),
+            url: "https://en.wikipedia.org/wiki/Rust".into(),
+            snippet: "Wikipedia fallback".into(),
+        }];
+        let wikipedia = format_routed_results(
+            "rust",
+            SearchRouterSuccess {
+                backend: SearchBackendId::DuckDuckGo,
+                results: wikipedia_rows,
+            },
+            true,
+        )
+        .expect("compatibility fallback display");
+        assert!(wikipedia.contains("Source: Wikipedia (fallback)"));
+        assert!(!wikipedia.contains("Source: DuckDuckGo"));
 
         for backend in [SearchBackendId::Tavily, SearchBackendId::Wikipedia] {
             assert_eq!(

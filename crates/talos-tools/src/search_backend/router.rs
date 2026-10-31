@@ -459,10 +459,19 @@ fn admit(
     if results.is_empty() {
         return Err(AdmissionError::NoResults);
     }
+    let result_backend = results.first().map(|result| result.backend);
+    // The prepared direct candidate owns Wikipedia only as its migration-time last resort.
+    let result_identity_allowed = result_backend.is_some_and(|result_backend| {
+        result_backend == backend
+            || (backend == SearchBackendId::DuckDuckGo
+                && result_backend == SearchBackendId::Wikipedia)
+    }) && results
+        .iter()
+        .all(|result| Some(result.backend) == result_backend);
     if results.len() > policy.max_examined_results
+        || !result_identity_allowed
         || results.iter().any(|result| {
-            result.backend != backend
-                || result.title.len() > MAX_FIELD_BYTES
+            result.title.len() > MAX_FIELD_BYTES
                 || result.snippet.len() > MAX_FIELD_BYTES
                 || result.url.len() > policy.max_url_bytes
         })

@@ -194,13 +194,17 @@ api_key = "test-key"
     assert!(
         search["description"]
             .as_str()
-            .is_some_and(|description| description.contains("Talos-owned routed candidate set")
-                && description.contains("complete prepared network plan")),
+            .is_some_and(
+                |description| description.contains("Talos-owned routed candidate set")
+                    && description.contains("complete prepared network plan")
+            ),
         "protected SearchRouter description: {search}"
     );
     let parameters = &search["parameters"];
     assert_eq!(parameters["type"], "object");
-    let properties = parameters["properties"].as_object().expect("schema properties");
+    let properties = parameters["properties"]
+        .as_object()
+        .expect("schema properties");
     assert!(properties.contains_key("query"));
     assert!(properties.contains_key("max_results"));
     assert!(properties.contains_key("include_snippets"));

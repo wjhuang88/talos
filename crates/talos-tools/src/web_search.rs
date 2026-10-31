@@ -552,6 +552,14 @@ pub(crate) fn format_compatibility_results(
     format_admitted_results(query, results, ResultSource::DuckDuckGo, include_snippets)
 }
 
+pub(crate) fn format_wikipedia_fallback_results(
+    query: &str,
+    results: Vec<SearchBackendResult>,
+    include_snippets: bool,
+) -> String {
+    format_admitted_results(query, results, ResultSource::Wikipedia, include_snippets)
+}
+
 /// Fixed-source display conversion for already-admitted SearXNG rows, not admission.
 pub(crate) fn format_searxng_results(
     query: &str,
