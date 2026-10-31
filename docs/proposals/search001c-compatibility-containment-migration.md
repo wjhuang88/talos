@@ -100,7 +100,7 @@ The comparison is behavioral, not merely a comparison of nominal constants.
   divided remaining time among remaining sources. That stricter envelope could abandon a valid
   slow primary after roughly one quarter of the legacy request window, disclose the query to a later
   destination and turn a legacy success into a protected-path failure.
-- **Current candidate timing:** #808 head `eaa8c5cbdad00eb3e8f2bc03fc80e9c181db0a29`
+- **Current candidate timing:** #808 head `ab9c307b6d8ba45143daea8d56e5b6ca701332c1`
   preserves the legacy 15-second timeout **per query-bearing fixed-family request**. Lite, HTML and
   Bing may retry one typed Timeout/Network failure after 500 ms; Instant Answer does not retry. The
   retry remains on the same already-approved destination before any later-destination disclosure.
@@ -152,7 +152,7 @@ candidate also proves availability and query-disclosure non-regression**.
 ## #808 Candidate Mapping
 
 The current #808 implementation candidate at this proposal snapshot is exact head
-`eaa8c5cbdad00eb3e8f2bc03fc80e9c181db0a29`. It is evidence under validation, not part of this
+`ab9c307b6d8ba45143daea8d56e5b6ca701332c1`. It is evidence under validation, not part of this
 documentation change and not activation-ready by declaration alone.
 
 - Production construction moves from legacy `WebSearchTool` to prepared SearchRouter at the shared
@@ -184,10 +184,11 @@ documentation change and not activation-ready by declaration alone.
   compatibility envelope uses 135s/24.
 - A loopback-only hostname CONNECT/TLS fixture admits only fixed witness authorities and checks
   CONNECT metadata, target SNI, proxy-peer resolution and application-query isolation.
-- Retryable transport classification is intentionally narrow: typed transient connection reset/
-  abort/broken-pipe/not-connected/timeout outcomes may retain same-destination retry behavior, while
-  malformed/truncated HTTP body framing, TLS/certificate, CONNECT protocol and HTTP protocol failures
-  remain terminal `Request` outcomes.
+- Retryable transport classification is intentionally narrow: typed transient request-send
+  connection reset/abort/broken-pipe/not-connected outcomes and timeouts may retain same-destination
+  retry behavior. Response-body reads retry only when the body-read error is a timeout; other
+  response-body read failures, malformed/truncated HTTP framing, TLS/certificate, CONNECT protocol
+  and HTTP protocol failures remain terminal `Request` outcomes.
 - The locked legacy `rust-websearch` build uses reqwest without its SOCKS feature, so the current
   HTTP/HTTPS proxy migration does not retire an actually built legacy SOCKS transport capability;
   unsupported selected forms remain fail-closed.
@@ -198,7 +199,7 @@ documentation change and not activation-ready by declaration alone.
   the #808 exact-head validation record is the source of truth. Activation requires those gates to
   be green for the final implementation head.
 - At this snapshot, main is `02fee3cc9537e6bf688d167036389b4af3011aeb` and #808 is directly
-  1 commit ahead / 0 behind with exactly **23 SEARCH-001-C files changed**.
+  **2 commits ahead / 0 behind** with exactly **30 SEARCH-001-C files changed**.
 
 This mapping must be refreshed if #808's implementation head or main advances. A transient CI status
 change alone does not require a documentation commit; final acceptance evidence belongs to #808's
