@@ -67,21 +67,6 @@ fn record(backend: ProbeBackend, reachable: bool, now: StdInstant) {
     });
 }
 
-#[cfg(test)]
-pub(super) fn clear_cache() {
-    if let Ok(mut cache) = cache().lock() {
-        *cache = ProbeCache::default();
-    }
-}
-
-#[cfg(test)]
-pub(super) fn seed_cache(duckduckgo: bool, bing: bool) {
-    clear_cache();
-    let now = StdInstant::now();
-    record(ProbeBackend::DuckDuckGo, duckduckgo, now);
-    record(ProbeBackend::Bing, bing, now);
-}
-
 fn root(backend: ProbeBackend) -> Result<Url, TransportError> {
     Url::parse(match backend {
         ProbeBackend::DuckDuckGo => "https://duckduckgo.com/",
@@ -237,6 +222,91 @@ fn classify_probe_error(error: TransportError) -> Result<Option<u16>, TransportE
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::search_backend::transport::{SearchDns, TransportBudget, tests::Server};
+    use async_trait::async_trait;
+    use std::{
+        net::SocketAddr,
+        sync::{Arc, atomic::AtomicUsize},
+    };
+    use talos_core::tool::{
+        ToolNetworkAuthority, ToolNetworkAuthorizationError, ToolNetworkScope,
+    };
+
+    struct Effects {
+        manifest: ToolNetworkManifest,
+        dns: AtomicUsize,
+    }
+
+    impl ToolNetworkAuthority for Effects {
+        fn check(
+            &self,
+            invocation: uuid::Uuid,
+            endpoint: &ToolNetworkEndpoint,
+        ) -> Result<(), ToolNetworkAuthorizationError> {
+            if invocation == self.manifest.invocation_id()
+                && self.manifest.scope().contains(endpoint)
+            {
+                Ok(())
+            } else {
+                Err(ToolNetworkAuthorizationError::Mismatch)
+            }
+        }
+    }
+
+    #[async_trait]
+    impl SearchDns for Effects {
+        async fn resolve(&self, _: &str, port: u16) -> Result<Vec<SocketAddr>, TransportError> {
+            self.dns.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Ok(vec![SocketAddr::from(([127, 0, 0, 1], port))])
+        }
+    }
+
+    fn local_probe(
+        server: &Server,
+        backend: ProbeBackend,
+    ) -> (PreparedProbe, SearchTransport, Arc<Effects>) {
+        let url = server.url("/probe");
+        let endpoints = [Method::HEAD, Method::GET]
+            .into_iter()
+            .map(|method| request_endpoint(&url, &method).expect("endpoint"))
+            .collect();
+        let manifest = ToolNetworkManifest::new(
+            ToolNetworkScope::new_configuration(
+                endpoints,
+                None,
+                vec!["127.0.0.1".parse().expect("loopback")],
+                0,
+            )
+            .expect("scope"),
+        );
+        let probe = PreparedProbe {
+            backend,
+            head: PreparedTransportRequest::status_only(&manifest, url.clone(), Method::HEAD)
+                .expect("head"),
+            get: PreparedTransportRequest::status_only(&manifest, url, Method::GET).expect("get"),
+        };
+        let effects = Arc::new(Effects {
+            manifest: manifest.clone(),
+            dns: AtomicUsize::new(0),
+        });
+        let transport = SearchTransport::new(
+            manifest,
+            effects.clone(),
+            Arc::new(
+                TransportBudget::new(Duration::from_secs(5), 4, 1024).expect("probe budget"),
+            ),
+            effects.clone(),
+        )
+        .expect("transport");
+        (probe, transport, effects)
+    }
+
+    fn response(status: u16, body: &str) -> String {
+        format!(
+            "HTTP/1.1 {status} Fixture\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
 
     #[test]
     fn fixed_probe_scope_is_query_free_and_matches_legacy_roots() {
@@ -263,14 +333,36 @@ mod tests {
         }
     }
 
-    #[test]
-    fn deterministic_cache_seed_is_query_free_and_bounded_to_both_legacy_families() {
-        seed_cache(false, true);
-        let now = StdInstant::now();
-        assert_eq!(cached(ProbeBackend::DuckDuckGo, now), Some(false));
-        assert_eq!(cached(ProbeBackend::Bing, now), Some(true));
-        clear_cache();
-        assert_eq!(cached(ProbeBackend::DuckDuckGo, now), None);
-        assert_eq!(cached(ProbeBackend::Bing, now), None);
+    #[tokio::test]
+    async fn non_success_head_uses_one_query_free_get_fallback() {
+        let server = Server::new(vec![response(500, "ignored"), response(200, "ignored")]);
+        let (probe, transport, effects) = local_probe(&server, ProbeBackend::DuckDuckGo);
+        assert!(probe_one(probe, &transport).await.expect("probe"));
+        assert_eq!(server.count(), 2);
+        let head = server.request(0);
+        let get = server.request(1);
+        assert!(head.starts_with("HEAD /probe HTTP/1.1"));
+        assert!(get.starts_with("GET /probe HTTP/1.1"));
+        assert!(!head.contains('?') && !get.contains('?'));
+        assert_eq!(
+            effects.dns.load(std::sync::atomic::Ordering::Relaxed),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn redirection_head_is_reachable_without_following_or_get_fallback() {
+        let server = Server::new(vec![
+            "HTTP/1.1 302 Found\r\nLocation: https://elsewhere.invalid/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                .into(),
+        ]);
+        let (probe, transport, effects) = local_probe(&server, ProbeBackend::Bing);
+        assert!(probe_one(probe, &transport).await.expect("probe"));
+        assert_eq!(server.count(), 1);
+        assert!(server.request(0).starts_with("HEAD /probe HTTP/1.1"));
+        assert_eq!(
+            effects.dns.load(std::sync::atomic::Ordering::Relaxed),
+            1
+        );
     }
 }
