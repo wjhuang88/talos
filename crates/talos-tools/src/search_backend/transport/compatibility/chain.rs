@@ -372,4 +372,6 @@ fn may_continue(error: CompatibilityError) -> bool {
 #[cfg(test)]
 pub(super) mod tests;
 #[cfg(test)]
+mod reachability_tests;
+#[cfg(test)]
 mod timeout_tests;
