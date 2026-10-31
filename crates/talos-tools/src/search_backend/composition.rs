@@ -327,6 +327,7 @@ fn transport_backend_error(error: TransportError) -> SearchBackendError {
 
 fn compatibility_backend_error(error: CompatibilityError) -> SearchBackendError {
     match error {
+        CompatibilityError::Unreachable => SearchBackendError::Unreachable,
         CompatibilityError::Transport(error) => transport_backend_error(error),
         CompatibilityError::Ddg(error) => match error {
             DdgParseError::Empty => SearchBackendError::NoResults,
@@ -368,15 +369,16 @@ fn compatibility_plan_backend_error(error: CompatibilityPlanError) -> SearchBack
                 SearchBackendError::RequestFailed("compatibility sources exhausted".into())
             }
         }
+        CompatibilityPlanError::Wikipedia(error) => compatibility_backend_error(error),
     }
 }
 
-fn searxng_backend_error(error: SearXngError) -> SearchBackendError {
+fn searxng_backend_error(error: SearxngError) -> SearchBackendError {
     match error {
-        SearXngError::Transport(error) => transport_backend_error(error),
-        SearXngError::Admission(error) => compatibility_backend_error(error),
-        SearXngError::Status => SearchBackendError::RequestFailed("searxng status failure".into()),
-        SearXngError::Parse | SearXngError::Limit => SearchBackendError::Parse,
+        SearxngError::Transport(error) => transport_backend_error(error),
+        SearxngError::Admission(error) => compatibility_backend_error(error),
+        SearxngError::Status => SearchBackendError::RequestFailed("searxng status failure".into()),
+        SearxngError::Parse | SearxngError::Limit => SearchBackendError::Parse,
     }
 }
 
@@ -405,7 +407,7 @@ mod tests {
 
     #[test]
     fn combined_configuration_identity_is_stable_across_queries() {
-        let searxng = SearXngConfiguration::new("https://search.example/prefix/").expect("searxng");
+        let searxng = SearxngConfiguration::new("https://search.example/prefix/").expect("searxng");
         let configuration = SearchCompositionConfiguration::new(Some(searxng)).expect("config");
         let first = configuration
             .prepare("first private query", 2, limits())
@@ -425,13 +427,13 @@ mod tests {
             second.manifest().invocation_id()
         );
         assert_eq!(first.permission_profile(), second.permission_profile());
-        assert_eq!(first.permission_profile().len(), 5);
+        assert_eq!(first.permission_profile().len(), 7);
         assert!(!format!("{first:?}").contains("first private query"));
     }
 
     #[test]
     fn dispatch_shares_one_budget_deadline_and_requested_count() {
-        let searxng = SearXngConfiguration::new("https://search.example/").expect("searxng");
+        let searxng = SearxngConfiguration::new("https://search.example/").expect("searxng");
         let configuration = SearchCompositionConfiguration::new(Some(searxng)).expect("config");
         let prepared = configuration
             .prepare("private query", 2, limits())
@@ -441,7 +443,7 @@ mod tests {
 
         assert_eq!(running.candidates().len(), 2);
         assert_eq!(running.candidates()[0].id(), SearchBackendId::DuckDuckGo);
-        assert_eq!(running.candidates()[1].id(), SearchBackendId::SearXng);
+        assert_eq!(running.candidates()[1].id(), SearchBackendId::Searxng);
         assert_eq!(running.requested_results(), 2);
         assert_eq!(running.deadline(), shared_budget_deadline(running.budget()));
         for candidate in running.candidates() {
@@ -456,7 +458,7 @@ mod tests {
         let prepared = configuration
             .prepare("private query", 2, limits())
             .expect("prepared");
-        assert_eq!(prepared.manifest().scope().endpoints().len(), 4);
+        assert_eq!(prepared.manifest().scope().endpoints().len(), 9);
         let running = prepared.start(Arc::new(RejectAuthority));
         assert_eq!(running.candidates().len(), 1);
         assert_eq!(running.candidates()[0].id(), SearchBackendId::DuckDuckGo);
@@ -465,26 +467,26 @@ mod tests {
     #[test]
     fn execution_errors_map_without_guessing_router_control() {
         assert_eq!(
-            SearchCandidateExecutionError::SearXng(SearXngError::Transport(
+            SearchCandidateExecutionError::Searxng(SearxngError::Transport(
                 TransportError::Deadline
             ))
             .into_backend_error(),
             SearchBackendError::Timeout
         );
         assert_eq!(
-            SearchCandidateExecutionError::SearXng(SearXngError::Transport(TransportError::Dns))
+            SearchCandidateExecutionError::Searxng(SearxngError::Transport(TransportError::Dns))
                 .into_backend_error(),
             SearchBackendError::Unreachable
         );
         assert_eq!(
-            SearchCandidateExecutionError::SearXng(SearXngError::Transport(
+            SearchCandidateExecutionError::Searxng(SearxngError::Transport(
                 TransportError::Network
             ))
             .into_backend_error(),
             SearchBackendError::Unreachable
         );
         assert_eq!(
-            SearchCandidateExecutionError::SearXng(SearXngError::Parse).into_backend_error(),
+            SearchCandidateExecutionError::Searxng(SearxngError::Parse).into_backend_error(),
             SearchBackendError::Parse
         );
     }
