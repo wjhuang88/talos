@@ -38,18 +38,27 @@ Permit a **containment-only technical migration** from the existing legacy compa
 to the protected SearchRouter even while the route-specific external-use residual remains tracked
 under #644, but only when every condition below is satisfied.
 
-1. **No provider-set expansion.** The migration may use only the compatibility services already
-   exercised by the existing zero-key legacy path. It cannot add another zero-key provider, paid
-   route, self-hosted instance, knowledge source, redirect destination, startup probe or ambient
-   credential-selected route.
+1. **No provider or endpoint-set expansion.** The migration may use only the compatibility services
+   and endpoints exercised by the existing zero-key legacy path. Query-bearing recipients are
+   exactly `POST https://lite.duckduckgo.com/lite/`, `GET https://api.duckduckgo.com/`,
+   `GET https://html.duckduckgo.com/html/`, `GET https://cn.bing.com/search`, and
+   `GET https://en.wikipedia.org/w/api.php`. Query-free reachability endpoints are exactly
+   `HEAD` and `GET https://duckduckgo.com/`, and `HEAD` and `GET https://cn.bing.com/`. A configured
+   proxy CONNECT authority is transport infrastructure, not a query recipient or provider, and
+   remains separately controlled in prepared authority. No other provider, endpoint, paid route,
+   self-hosted instance, knowledge source, redirect destination, startup probe or
+   ambient-credential-selected route may be added.
 2. **No query-content expansion.** The model query is not enriched with identity, account, locale,
    precise location or other new user data before external dispatch. Health state stays query-free.
-3. **Per-invocation query-disclosure non-regression.** Compare query-bearing logical sends separately
-   from query-free reachability probes. For the same deterministic endpoint outcomes, the protected
-   path must not disclose the query to more compatibility destinations merely because it imposes a
-   shorter source slice than the legacy path. Worst-case aggregate request counts are not sufficient
-   evidence. The acceptance matrix must include slow-but-successful primary cases, fast failures and
-   reachable fallbacks and record legacy versus candidate query-bearing destinations.
+3. **Per-invocation query-disclosure non-regression.** Compare the legacy and protected paths for the
+   same deterministic endpoint outcomes and equivalent success or terminal point. Record both the
+   ordered sequence of query-bearing recipients and the logical query-bearing send count for each
+   invocation. Same-destination retries count as additional query-bearing sends. The protected path
+   must not issue a query-bearing send that the legacy path would not have issued, and its
+   query-bearing send count must not exceed the legacy count for that invocation. Record query-free
+   reachability probes separately, including their destinations and counts. Worst-case maximums alone
+   are not acceptance evidence. The acceptance matrix must include slow-but-successful primary cases,
+   fast failures and reachable fallbacks.
 4. **Availability non-regression.** A previously supported compatibility environment must not become
    unusable solely because of the migration. Acceptance must cover direct networks, configured-proxy
    networks that the legacy path supports, slow-but-successful sources, primary failure with reachable
