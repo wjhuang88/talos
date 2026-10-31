@@ -38,6 +38,7 @@ use crate::{
 
 mod custody;
 mod lifecycle;
+mod manual_compaction;
 mod turn;
 
 #[doc(hidden)]
@@ -369,9 +370,17 @@ impl AppServerSession {
             &mut recent_item_ids,
         );
         let mut shutting_down = false;
+        let mut compact = manual_compaction::ManualCompaction::new(self.session_generation);
 
         loop {
+            if shutting_down {
+                compact.cancel(self);
+            }
+            if current_turn.is_none() && !shutting_down {
+                compact.start(self);
+            }
             if current_turn.is_none()
+                && !compact.is_running()
                 && !paused
                 && let Some(submission) = pending.pop_front()
             {
@@ -429,11 +438,18 @@ impl AppServerSession {
                 }
             }
 
-            if shutting_down && current_turn.is_none() && pending.is_empty() {
+            if shutting_down
+                && current_turn.is_none()
+                && !compact.is_running()
+                && pending.is_empty()
+            {
                 break;
             }
 
             tokio::select! {
+                result = compact.wait(), if compact.is_running() => {
+                    compact.complete(self, result);
+                }
                 completed = async {
                     match current_turn.as_mut() {
                         Some(turn) => Some(turn.await),
@@ -558,6 +574,7 @@ impl AppServerSession {
                 op = self.sq_rx.recv(), if !shutting_down => {
                     let Some(op) = op else {
                         shutting_down = true;
+                        compact.cancel(self);
                         let should_interrupt = self.runtime_admission.as_ref().is_none_or(|control| {
                             !matches!(
                                 control.shutdown_policy(),
@@ -583,6 +600,12 @@ impl AppServerSession {
                         continue;
                     };
                     match op {
+                        SessionOp::CancelCompact { session_generation, operation_id } => {
+                            compact.cancel_operation(self, session_generation, operation_id);
+                        }
+                        SessionOp::Compact { session_generation, operation_id } => {
+                            compact.admit(self, session_generation, operation_id);
+                        }
                         SessionOp::Submit { message } => {
                             submission_counter = submission_counter.saturating_add(1);
                             let submission = compatibility_submission(
@@ -701,6 +724,7 @@ impl AppServerSession {
                             self.reconcile_submission(&submission, receipt_tx.as_ref());
                         }
                         SessionOp::Interrupt => {
+                            compact.cancel(self);
                             if let Some(token) = &cancel_token {
                                 token.cancel();
                             } else if !pending.is_empty() {
@@ -742,7 +766,7 @@ impl AppServerSession {
                             }
                         }
                         SessionOp::SetSkillContext { name, content } => {
-                            if current_turn.is_some() || !pending.is_empty() {
+                            if current_turn.is_some() || compact.is_running() || !pending.is_empty() {
                                 let _ = self.eq_tx.send(SessionEvent::Error {
                                     message: "cannot change active skill while a turn is active"
                                         .into(),
@@ -766,6 +790,7 @@ impl AppServerSession {
                         }
                         SessionOp::Shutdown => {
                             shutting_down = true;
+                            compact.cancel(self);
                             let should_interrupt = self.runtime_admission.as_ref().is_none_or(|control| {
                                 !matches!(
                                     control.shutdown_policy(),

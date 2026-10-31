@@ -526,3 +526,22 @@ claimed by this source-development contract.
 Consumers using `talos_config::ModelConfig` directly must account for its new optional
 `reasoning_supported` field. See [the configuration migration](MODEL-CAPABILITY-INFERENCE.md#rust-configuration-migration)
 for source compatibility and the required next pre-1.0 minor release boundary.
+
+## Unreleased I312 manual compaction migration
+
+`SessionOp::Compact { session_generation, operation_id }` and matching
+`CancelCompact` expand the public Rust
+operation enum. Exhaustive consumers must add a handler (or an explicit unsupported
+response). Ship this change only with the next pre-1.0 minor release per ADR-096.
+The Runtime facade exposes `RuntimeHandle::compact(operation_id)` / `cancel_compact(operation_id)` and re-exports
+`CompactState`/`CompactOutcome`. Await transient `SessionEvent::CompactStatus` for
+the result; successful enqueue is not successful compaction. IDs are monotonic per
+runtime generation; one operation may be pending, 64 terminal receipts are retained,
+and duplicate retained IDs return the prior result with `replayed: true`.
+
+Compaction preserves raw history and emits no user/assistant turn. At present an
+active turn defers manual execution until turn completion; intra-turn complete-batch
+execution remains outstanding in I312. Interrupt/shutdown cancel pending work.
+Status contains bounded enums and numeric estimates, never checkpoint text. The
+external SDK fixture exercises below-threshold compaction before an ordinary turn
+in both dependency modes; it does not certify long-history semantic retention.

@@ -1050,7 +1050,7 @@ async fn slash_help_returns_all_commands() {
     assert!(text.contains("/new"));
     assert!(text.contains("/resume"));
     assert!(text.contains("/fork"));
-    assert!(!text.contains("/compact"));
+    assert!(text.contains("/compact"));
     assert!(!text.contains("/mock-request"));
 }
 
@@ -2058,7 +2058,7 @@ fn complete_slash_command_multiple_matches() {
 
     let completions = engine.complete_slash_command("/c");
 
-    assert_eq!(completions, vec!["/copy", "/connect"]);
+    assert_eq!(completions, vec!["/compact", "/copy", "/connect"]);
 }
 
 #[test]
@@ -3773,4 +3773,23 @@ fn status_snapshot_reflects_attachment_count() {
             message.role != MessageRole::Assistant || message.content != "trailing fragment"
         }));
     }
+}
+
+#[test]
+fn compact_command_is_builtin_typed_and_does_not_create_chat_history() {
+    let mut engine = ConversationEngine::new("test".into(), "test".into());
+    let command = crate::command_registry()
+        .find("/compact")
+        .expect("registered");
+    assert_eq!(command.origin, crate::CommandOrigin::Builtin);
+    assert!(matches!(
+        engine.handle_slash_command("/compact").as_slice(),
+        [UiOutput::CompactRequest]
+    ));
+    assert!(
+        !engine
+            .handle_slash_command("/compact extra")
+            .iter()
+            .any(|output| matches!(output, UiOutput::CompactRequest))
+    );
 }

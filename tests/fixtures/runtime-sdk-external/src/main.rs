@@ -90,6 +90,22 @@ async fn run_minimal_runtime() -> Result<()> {
         ))
         .build()?;
 
+    runtime.compact(1).await?;
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), runtime.next_event())
+            .await?.ok_or_else(|| anyhow::anyhow!("runtime ended during compact"))?;
+        match event {
+            talos_runtime::SessionEvent::CompactStatus {
+                operation_id: 1,
+                state: talos_runtime::CompactState::Completed { outcome, replayed: false }, ..
+            } => {
+                assert!(matches!(outcome, talos_runtime::CompactOutcome::NotEligible { .. }));
+                break;
+            }
+            talos_runtime::SessionEvent::TurnEvent { .. } => panic!("compact created a transcript turn"),
+            _ => {},
+        }
+    }
     runtime.submit("run the fixture greeting").await?;
     let status = collect_until_turn_completed(&mut runtime)
         .await

@@ -58,7 +58,7 @@ impl HistorySource {
                     .map(|byte| format!("{byte:02x}"))
                     .collect::<String>()
             );
-            if id.len() > 96 {
+            if id.len() > 128 {
                 return None;
             }
             source.entry_ids[index] = id;
@@ -96,7 +96,7 @@ impl HistorySource {
         let mut seen = std::collections::HashSet::new();
         if entry_ids
             .iter()
-            .any(|id| id.is_empty() || id.len() > 96 || !seen.insert(id))
+            .any(|id| id.is_empty() || id.len() > 128 || !seen.insert(id))
         {
             return None;
         }
@@ -134,7 +134,7 @@ impl HistorySource {
             tokio::task::yield_now().await;
             if tokio::time::Instant::now() >= deadline
                 || id.is_empty()
-                || id.len() > 96
+                || id.len() > 128
                 || !seen.insert(id)
             {
                 return None;
@@ -206,6 +206,22 @@ impl HistorySource {
         true
     }
 
+    /// Compare already-bound identities without copying or rehashing raw history.
+    pub(crate) fn same_entry(&self, other: &Self, index: usize) -> bool {
+        fn entry(source: &HistorySource, index: usize) -> Option<(&str, &[u8; 32])> {
+            if let Some((id, digest)) = source.continuation.get(&index) {
+                Some((id.as_str(), digest))
+            } else {
+                Some((
+                    source.entry_ids.get(index)?.as_str(),
+                    source.digests.get(index)?,
+                ))
+            }
+        }
+        self.generation == other.generation
+            && entry(self, index).is_some_and(|left| Some(left) == entry(other, index))
+    }
+
     /// Return a source ID only when generation, revision, position and bytes match.
     /// Hook replacement, reordering and synthetic request entries fail closed.
     pub fn resolve(
@@ -266,6 +282,24 @@ fn message_digest_bounded(message: &Message, remaining: &mut usize) -> Option<[u
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn content_binding_accepts_full_width_runtime_generation() {
+        let raw = vec![Message::User {
+            content: "retained constraint".into(),
+        }];
+        let source = HistorySource::bind_content_until(
+            u64::MAX,
+            1,
+            &raw,
+            tokio::time::Instant::now() + std::time::Duration::from_secs(1),
+        )
+        .await
+        .expect("full-width generation must fit schema source reference");
+        let id = source.resolve(u64::MAX, 1, 0, &raw[0]).expect("source");
+        assert!(id.len() <= 128);
+        assert!(id.contains(&u64::MAX.to_string()));
+    }
+
     #[test]
     fn synthetic_reordered_changed_and_stale_messages_have_no_raw_authority() {
         let raw = vec![

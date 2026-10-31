@@ -2,18 +2,7 @@
 
 use std::collections::VecDeque;
 
-/// Content-free terminal facts retained for duplicate manual requests.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CompactOutcome {
-    /// A validated projection was atomically installed.
-    Applied { before: u32, after: u32 },
-    /// Whole-request pressure was below the manual eligibility threshold.
-    NotEligible,
-    /// Checkpoint generation or validation failed without changing context.
-    Failed,
-    /// Cancellation won before atomic application.
-    Cancelled,
-}
+pub use talos_core::session::CompactOutcome;
 
 /// Result of admitting a generation-qualified monotonic operation ID.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +66,21 @@ impl CompactOperations {
         CompactAdmission::Accepted
     }
 
+    /// Observe an existing operation without admitting or consuming a new ID.
+    pub(crate) fn observe(&self, generation: u64, id: u64) -> CompactAdmission {
+        if generation != self.generation {
+            return CompactAdmission::StaleGeneration;
+        }
+        if let Some((_, outcome)) = self.receipts.iter().find(|(receipt, _)| *receipt == id) {
+            return CompactAdmission::Completed(*outcome);
+        }
+        if self.pending == Some(id) {
+            CompactAdmission::Pending
+        } else {
+            CompactAdmission::Expired
+        }
+    }
+
     /// Record the unique terminal result. Late or mismatched completions fail.
     /// The caller must not mutate projection state if this returns false.
     pub fn finish(&mut self, generation: u64, id: u64, outcome: CompactOutcome) -> bool {
@@ -136,13 +140,13 @@ mod tests {
         let mut ledger = CompactOperations::new(1);
         for id in 0..65 {
             assert_eq!(ledger.admit(1, id), CompactAdmission::Accepted);
-            assert!(ledger.finish(1, id, CompactOutcome::NotEligible));
+            assert!(ledger.finish(1, id, CompactOutcome::NotEligible { before: 0 }));
         }
         assert_eq!(ledger.receipts.len(), 64);
         assert_eq!(ledger.admit(1, 0), CompactAdmission::Expired);
         assert_eq!(
             ledger.admit(1, 1),
-            CompactAdmission::Completed(CompactOutcome::NotEligible)
+            CompactAdmission::Completed(CompactOutcome::NotEligible { before: 0 })
         );
         assert_eq!(ledger.admit(1, u64::MAX), CompactAdmission::Accepted);
         assert!(ledger.finish(1, u64::MAX, CompactOutcome::Failed));

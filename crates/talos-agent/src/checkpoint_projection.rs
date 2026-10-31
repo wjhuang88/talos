@@ -9,6 +9,10 @@ use crate::transient_text::PrivateTokens;
 
 #[derive(Clone)]
 pub(crate) struct CheckpointProjection {
+    /// Unique within this Agent; invalidation never recycles a sequence.
+    pub(crate) sequence: u64,
+    /// Predecessor whose entire covered source set is retained by this checkpoint.
+    pub(crate) parent_sequence: Option<u64>,
     pub(crate) source: HistorySource,
     pub(crate) covered: Vec<usize>,
     pub(crate) content: String,
@@ -17,6 +21,46 @@ pub(crate) struct CheckpointProjection {
 }
 
 impl Agent {
+    /// Called by automatic request sealing or the Actor's manual commit gate.
+    pub(crate) fn install_checkpoint_projection(
+        &self,
+        mut projection: CheckpointProjection,
+        deadline: tokio::time::Instant,
+    ) -> crate::compaction::CompactionResult<()> {
+        use crate::compaction::CompactionError;
+        let mut cached = self.checkpoint_projection_state.lock().map_err(|_| {
+            CompactionError::CompactionFailed("checkpoint state unavailable".into())
+        })?;
+        projection.parent_sequence = cached
+            .as_ref()
+            .filter(|previous| {
+                previous.source.revision() <= projection.source.revision()
+                    && previous.covered.iter().all(|index| {
+                        projection.covered.binary_search(index).is_ok()
+                            && previous.source.same_entry(&projection.source, *index)
+                    })
+            })
+            .map(|previous| previous.sequence);
+        projection.sequence = self
+            .checkpoint_sequence
+            .try_update(
+                std::sync::atomic::Ordering::Relaxed,
+                std::sync::atomic::Ordering::Relaxed,
+                |current| current.checked_add(1),
+            )
+            .map_err(|_| {
+                CompactionError::CompactionFailed("checkpoint sequence exhausted".into())
+            })?
+            + 1;
+        if tokio::time::Instant::now() >= deadline {
+            return Err(CompactionError::CompactionFailed(
+                "checkpoint deadline exceeded".into(),
+            ));
+        }
+        *cached = Some(projection);
+        Ok(())
+    }
+
     pub(crate) fn invalidate_checkpoint_projection(&mut self) {
         let slot = self
             .checkpoint_projection_state
@@ -68,7 +112,11 @@ impl Agent {
                 return false;
             }
         }
-        let valid = projection.source.generation() == source.generation()
+        let valid = projection.sequence != 0
+            && projection
+                .parent_sequence
+                .is_none_or(|parent| parent < projection.sequence)
+            && projection.source.generation() == source.generation()
             && projection.source.revision() <= source.revision()
             && projection.context_limit == context_limit
             && projection.private.same_tokens(private)

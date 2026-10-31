@@ -3670,6 +3670,51 @@ async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
         actor.history.clone()
     });
     sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 1,
+        })
+        .await
+        .expect("manual compact");
+    let outcome = loop {
+        let event = tokio::time::timeout(Duration::from_secs(10), eq_rx.recv())
+            .await
+            .expect("manual deadline")
+            .expect("event");
+        assert!(
+            !is_turn_started(&event),
+            "compaction must not create a Turn"
+        );
+        if let SessionEvent::CompactStatus {
+            state:
+                talos_core::session::CompactState::Completed {
+                    outcome,
+                    replayed: false,
+                },
+            ..
+        } = event
+        {
+            break outcome;
+        }
+    };
+    assert!(
+        matches!(outcome, talos_core::session::CompactOutcome::Applied { before, after } if after < before && after <= 20_000)
+    );
+    let summary_calls = model.summaries.load(Ordering::SeqCst);
+    sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 1,
+        })
+        .await
+        .expect("duplicate");
+    assert!(
+        matches!(eq_rx.recv().await, Some(SessionEvent::CompactStatus {
+        state: talos_core::session::CompactState::Completed { outcome: repeated, replayed: true }, ..
+    }) if repeated == outcome)
+    );
+    assert_eq!(model.summaries.load(Ordering::SeqCst), summary_calls);
+    sq_tx
         .send(SessionOp::Submit {
             message: "continue".into(),
         })
@@ -3686,4 +3731,171 @@ async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
     assert!(history.len() > raw.len());
     assert!(model.summaries.load(Ordering::SeqCst) > 1);
     assert_eq!(model.ordinary.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn manual_compact_below_threshold_is_visible_and_never_dispatches_a_turn() {
+    use talos_core::session::{CompactOutcome, CompactState};
+    let model = Arc::new(MockModel::new(vec![]));
+    let agent = Agent::new(model, ToolRegistry::new());
+    let config = SessionConfig {
+        workspace_root: std::env::temp_dir(),
+        runtime_policy: RuntimePolicy::interactive(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (mut handle, mut actor) = AppServerSession::new(agent, config);
+    actor.set_generation(3);
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor.history.clone()
+    });
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 2,
+            operation_id: 1,
+        })
+        .await
+        .expect("stale");
+    assert!(matches!(
+        handle.eq_rx.recv().await,
+        Some(SessionEvent::CompactStatus {
+            state: CompactState::StaleGeneration,
+            ..
+        })
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 3,
+            operation_id: 1,
+        })
+        .await
+        .expect("compact");
+    let mut states = vec![];
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), handle.eq_rx.recv())
+            .await
+            .expect("deadline")
+            .expect("event");
+        assert!(!is_turn_started(&event));
+        if let SessionEvent::CompactStatus { state, .. } = event {
+            states.push(state);
+            if matches!(state, CompactState::Completed { .. }) {
+                break;
+            }
+        }
+    }
+    assert_eq!(states.len(), 3);
+    assert_eq!(states[0], CompactState::Queued);
+    assert_eq!(states[1], CompactState::Started);
+    assert!(matches!(
+        states[2],
+        CompactState::Completed {
+            outcome: CompactOutcome::NotEligible { .. },
+            replayed: false
+        }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    assert!(task.await.expect("actor").is_empty());
+}
+
+#[tokio::test]
+async fn manual_compact_shutdown_cancels_queued_work_once_at_active_turn() {
+    use talos_core::session::{CompactOutcome, CompactState};
+    let model = Arc::new(SlowModel {
+        delay: Duration::from_secs(60),
+        events: success_events("late"),
+    });
+    let agent = Agent::new(model, ToolRegistry::new());
+    let config = SessionConfig {
+        workspace_root: std::env::temp_dir(),
+        runtime_policy: RuntimePolicy::interactive(),
+        initial_history: vec![],
+        model_context_limit: 128_000,
+    };
+    let (mut handle, mut actor) = AppServerSession::new(agent, config);
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor.history.clone()
+    });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "active".into(),
+        })
+        .await
+        .expect("submit");
+    while let Some(event) = handle.eq_rx.recv().await {
+        if is_turn_started(&event) {
+            break;
+        }
+    }
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 1,
+        })
+        .await
+        .expect("compact");
+    loop {
+        if matches!(
+            handle.eq_rx.recv().await,
+            Some(SessionEvent::CompactStatus {
+                state: CompactState::Queued,
+                ..
+            })
+        ) {
+            break;
+        }
+    }
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 2,
+        })
+        .await
+        .expect("busy request");
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    let mut terminals = 0;
+    let mut busy = 0;
+    while let Some(event) = tokio::time::timeout(Duration::from_secs(5), handle.eq_rx.recv())
+        .await
+        .expect("shutdown deadline")
+    {
+        match event {
+            SessionEvent::CompactStatus {
+                state:
+                    CompactState::Completed {
+                        outcome: CompactOutcome::Cancelled,
+                        replayed: false,
+                    },
+                operation_id: 1,
+                ..
+            } => terminals += 1,
+            SessionEvent::CompactStatus {
+                state: CompactState::Busy,
+                operation_id: 2,
+                ..
+            } => busy += 1,
+            SessionEvent::CompactStatus {
+                state: CompactState::Started,
+                ..
+            } => panic!("must not compact an incomplete turn"),
+            _ => {}
+        }
+    }
+    assert_eq!((terminals, busy), (1, 1));
+    let _ = task.await.expect("actor");
 }

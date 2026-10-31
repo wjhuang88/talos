@@ -58,6 +58,7 @@ pub mod auto_resolver;
 pub mod caching;
 mod checkpoint_attempts;
 mod checkpoint_context;
+mod checkpoint_manual;
 mod checkpoint_projection;
 mod checkpoint_request;
 mod configuration;
@@ -341,6 +342,7 @@ pub struct Agent {
     image_input_supported: bool,
     /// Exact output reserve and conservative input-estimation policy.
     request_budget_spec: RequestBudgetSpec,
+    checkpoint_sequence: std::sync::atomic::AtomicU64,
     checkpoint_attempts: std::sync::Mutex<checkpoint_attempts::CheckpointAttempts>,
     checkpoint_projection_state:
         std::sync::Mutex<Option<checkpoint_projection::CheckpointProjection>>,

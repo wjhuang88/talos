@@ -452,6 +452,25 @@ pub(crate) fn apply_mcp_fixture_config(config: &mut Config, cli: &Cli) {
     let _ = (config, cli);
 }
 
+/// Allocate an operation identity without recycling IDs on session transitions.
+pub(crate) fn manual_compact_operation(
+    generation: u64,
+) -> anyhow::Result<talos_core::session::SessionOp> {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let operation_id = NEXT
+        .try_update(
+            std::sync::atomic::Ordering::Relaxed,
+            std::sync::atomic::Ordering::Relaxed,
+            |id| id.checked_add(1),
+        )
+        .map_err(|_| anyhow::anyhow!("manual compaction operation IDs exhausted"))?
+        + 1;
+    Ok(talos_core::session::SessionOp::Compact {
+        session_generation: generation,
+        operation_id,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

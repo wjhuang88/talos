@@ -60,3 +60,33 @@ pub use validation::{
     project_type_detector_descriptors, render_json_evidence, render_json_plan,
     render_text_evidence, render_text_plan, run_validation_plan,
 };
+
+/// Format content-free checkpoint facts for transient user-visible status.
+pub fn format_compact_status(id: u64, state: talos_core::session::CompactState) -> String {
+    use talos_core::session::{CompactOutcome, CompactState};
+    let status = match state {
+        CompactState::Queued => "queued until a safe boundary".into(),
+        CompactState::Started => "started".into(),
+        CompactState::Busy => "busy: another compaction is pending".into(),
+        CompactState::Expired => "expired operation ID".into(),
+        CompactState::StaleGeneration => "rejected: session generation changed".into(),
+        CompactState::Completed { outcome, replayed } => {
+            let result = match outcome {
+                CompactOutcome::Applied { before, after } => {
+                    format!("applied: estimated tokens {before} → {after}")
+                }
+                CompactOutcome::NotEligible { before } => {
+                    format!("skipped: estimated tokens {before}, below threshold")
+                }
+                CompactOutcome::Failed => "failed: prior context retained".into(),
+                CompactOutcome::Cancelled => "cancelled: prior context retained".into(),
+            };
+            if replayed {
+                format!("{result} (previous result)")
+            } else {
+                result
+            }
+        }
+    };
+    format!("Compaction {id}: {status}")
+}

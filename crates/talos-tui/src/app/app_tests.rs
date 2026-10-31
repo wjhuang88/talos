@@ -4109,3 +4109,16 @@ fn entry_point_ctrl_c_approval_denies_without_cancel_or_exit() {
         "Ctrl+C in approval must not change processing state"
     );
 }
+
+#[test]
+fn escape_cancels_manual_compaction_without_a_fake_processing_turn() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(tx));
+    tui.handle_ui_output(talos_conversation::UiOutput::CompactionPending(true));
+    assert!(!tui.state.status.is_processing);
+    tui.handle_input_event(&key_press(KeyCode::Esc));
+    assert!(matches!(rx.try_recv(), Ok(UserInput::Cancel)));
+    tui.handle_ui_output(talos_conversation::UiOutput::CompactionPending(false));
+    tui.handle_input_event(&key_press(KeyCode::Esc));
+    assert!(rx.try_recv().is_err());
+}

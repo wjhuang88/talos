@@ -19,6 +19,18 @@ impl Agent {
         private: &PrivateTokens,
         source: Option<&crate::compaction::HistorySource>,
     ) -> CompactionResult<()> {
+        self.checkpoint_request_once_deferred(plan, context_limit, private, source, None)
+            .await
+    }
+
+    pub(crate) async fn checkpoint_request_once_deferred(
+        &self,
+        plan: &mut ProviderRequestPlan,
+        context_limit: u32,
+        private: &PrivateTokens,
+        source: Option<&crate::compaction::HistorySource>,
+        deferred: Option<&mut Option<crate::checkpoint_projection::CheckpointProjection>>,
+    ) -> CompactionResult<()> {
         let deadline = source
             .and_then(crate::compaction::HistorySource::deadline)
             .unwrap_or_else(|| tokio::time::Instant::now() + Duration::from_secs(120));
@@ -49,7 +61,14 @@ impl Agent {
                     CompactionError::CompactionFailed("checkpoint retry suppressed".into())
                 })?;
         let result = self
-            .checkpoint_request_bound(plan, context_limit, private, source, deadline)
+            .checkpoint_request_bound_deferred(
+                plan,
+                context_limit,
+                private,
+                source,
+                deadline,
+                deferred,
+            )
             .await;
         if result.is_ok() {
             attempt.succeed();
@@ -74,6 +93,7 @@ impl Agent {
         .await
     }
 
+    #[cfg(test)]
     async fn checkpoint_request_bound(
         &self,
         plan: &mut ProviderRequestPlan,
@@ -81,6 +101,20 @@ impl Agent {
         private: &PrivateTokens,
         source: Option<&crate::compaction::HistorySource>,
         deadline: tokio::time::Instant,
+    ) -> CompactionResult<()> {
+        self.checkpoint_request_bound_deferred(plan, context_limit, private, source, deadline, None)
+            .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn checkpoint_request_bound_deferred(
+        &self,
+        plan: &mut ProviderRequestPlan,
+        context_limit: u32,
+        private: &PrivateTokens,
+        source: Option<&crate::compaction::HistorySource>,
+        deadline: tokio::time::Instant,
+        deferred: Option<&mut Option<crate::checkpoint_projection::CheckpointProjection>>,
     ) -> CompactionResult<()> {
         check_checkpoint_deadline(deadline)?;
         if plan.messages.len() > 8192 {
@@ -387,10 +421,10 @@ impl Agent {
             ));
         }
         check_checkpoint_deadline(deadline)?;
-        if let Some(source) = source
-            && let Ok(mut cached) = self.checkpoint_projection_state.lock()
-        {
-            *cached = Some(crate::checkpoint_projection::CheckpointProjection {
+        if let Some(source) = source {
+            let projection = crate::checkpoint_projection::CheckpointProjection {
+                sequence: 0,
+                parent_sequence: None,
                 source: source.clone(),
                 covered: eligible,
                 content: format!(
@@ -398,7 +432,12 @@ impl Agent {
                 ),
                 context_limit,
                 private: private.clone(),
-            });
+            };
+            if let Some(deferred) = deferred {
+                *deferred = Some(projection);
+            } else {
+                self.install_checkpoint_projection(projection, deadline)?;
+            }
         }
         // Only this final swap changes derived request state. Raw Actor messages
         // and persistence start indices are never touched.
@@ -936,6 +975,119 @@ mod tests {
         assert_eq!(plan.messages, original);
         assert_eq!(plan.estimated_tokens, before);
     }
+    #[tokio::test]
+    async fn checkpoint_lineage_tracks_only_matching_sources_and_survives_failure() {
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: false,
+            fail_after: None,
+        });
+        let mut agent = Agent::new(provider, ToolRegistry::new());
+        let mut raw = history();
+        let limit = agent.estimate_provider_request_tokens(&raw, &[]);
+        for (step, generation, revision, expected_parent) in [
+            (1, 7, 40, None),
+            (2, 7, 41, Some(1)),
+            (3, 7, 42, None), // Same IDs with replaced bytes cannot inherit lineage.
+            (4, 8, 43, None), // Generation replacement cannot inherit lineage.
+            (5, 8, 42, None), // Rewinding the source revision starts a new root.
+            (6, 8, 44, None), // Model/config invalidation does not recycle sequence IDs.
+        ] {
+            if step == 3 {
+                raw[0] = Message::User {
+                    content: "replaced constraint ".repeat(250),
+                };
+            }
+            if step == 6 {
+                agent.invalidate_checkpoint_projection();
+            }
+            let source = crate::compaction::HistorySource::bind(
+                generation,
+                revision,
+                &raw,
+                (0..raw.len())
+                    .map(|index| format!("entry:{index}"))
+                    .collect(),
+            )
+            .expect("source");
+            let mut plan = ProviderRequestPlan {
+                messages: raw.clone(),
+                tool_definitions: vec![],
+                estimated_tokens: agent.estimate_provider_request_tokens(&raw, &[]),
+                omitted_tool_exchanges: 0,
+                tool_protocol: ToolProtocol::Native,
+            };
+            agent
+                .checkpoint_request_bound(
+                    &mut plan,
+                    limit,
+                    &PrivateTokens::default(),
+                    Some(&source),
+                    tokio::time::Instant::now() + Duration::from_secs(120),
+                )
+                .await
+                .expect("checkpoint");
+            let saved = agent
+                .checkpoint_projection_state
+                .lock()
+                .expect("cache")
+                .clone()
+                .expect("projection");
+            assert_eq!(saved.sequence, step);
+            assert_eq!(saved.parent_sequence, expected_parent);
+            assert!(
+                saved
+                    .covered
+                    .iter()
+                    .all(|index| saved.source.same_entry(&source, *index))
+            );
+            assert!(plan.messages.len() < raw.len());
+        }
+        let original = raw.clone();
+        let source = crate::compaction::HistorySource::bind(
+            8,
+            45,
+            &raw,
+            (0..raw.len())
+                .map(|index| format!("entry:{index}"))
+                .collect(),
+        )
+        .expect("source");
+        let mut plan = ProviderRequestPlan {
+            messages: raw,
+            tool_definitions: vec![],
+            estimated_tokens: limit,
+            omitted_tool_exchanges: 0,
+            tool_protocol: ToolProtocol::Native,
+        };
+        agent
+            .checkpoint_sequence
+            .store(u64::MAX, std::sync::atomic::Ordering::Relaxed);
+        assert!(
+            agent
+                .checkpoint_request_bound(
+                    &mut plan,
+                    limit,
+                    &PrivateTokens::default(),
+                    Some(&source),
+                    tokio::time::Instant::now() + Duration::from_secs(120),
+                )
+                .await
+                .is_err()
+        );
+        assert_eq!(plan.messages, original);
+        assert_eq!(
+            agent
+                .checkpoint_projection_state
+                .lock()
+                .expect("cache")
+                .as_ref()
+                .expect("previous projection")
+                .sequence,
+            6
+        );
+    }
+
     #[tokio::test]
     async fn later_request_reuses_verified_projection_and_invalidates_changed_raw_history() {
         let provider = Arc::new(SummaryProvider {

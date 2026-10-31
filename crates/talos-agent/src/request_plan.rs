@@ -286,15 +286,13 @@ impl Agent {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(super) async fn seal_provider_request_plan(
+    pub(super) async fn observe_provider_request_plan(
         &self,
         hook_ctx: &HookContext,
         messages: &[Message],
         tool_definitions: &[ToolDefinition],
         continuation_parts: &mut Vec<ContentPart>,
-        request_context_limit: Option<u32>,
         private_tokens: &PrivateTokens,
-        history_source: Option<&crate::compaction::HistorySource>,
     ) -> AgentResult<ProviderRequestPlan> {
         let hook_messages = self.persistence_projection_with_tokens(messages, private_tokens);
         let observed_provider_messages = match self
@@ -353,13 +351,36 @@ impl Agent {
         // resolves `Auto` eagerly; resolve defensively here so a plan can never dispatch an
         // ambiguous protocol if a caller constructed an agent before configuration settled.
         let tool_protocol = self.resolve_tool_protocol(self.tool_protocol);
-        let mut plan = ProviderRequestPlan {
+        let plan = ProviderRequestPlan {
             messages: owned_messages,
             tool_definitions,
             estimated_tokens,
             omitted_tool_exchanges: 0,
             tool_protocol,
         };
+        Ok(plan)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn seal_provider_request_plan(
+        &self,
+        hook_ctx: &HookContext,
+        messages: &[Message],
+        tool_definitions: &[ToolDefinition],
+        continuation_parts: &mut Vec<ContentPart>,
+        request_context_limit: Option<u32>,
+        private_tokens: &PrivateTokens,
+        history_source: Option<&crate::compaction::HistorySource>,
+    ) -> AgentResult<ProviderRequestPlan> {
+        let mut plan = self
+            .observe_provider_request_plan(
+                hook_ctx,
+                messages,
+                tool_definitions,
+                continuation_parts,
+                private_tokens,
+            )
+            .await?;
         if let Some(limit) = request_context_limit {
             use crate::compaction::RequestPressure;
             let reused = if let Some(source) = history_source {

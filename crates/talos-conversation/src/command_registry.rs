@@ -134,6 +134,15 @@ impl CommandRegistry {
 static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyLock::new(|| {
     CommandRegistry::new(vec![
         CommandDefinition {
+            name: "/compact",
+            aliases: &[],
+            usage: "/compact",
+            description: "Compact model context while preserving original history",
+            arg_hint: None,
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
             name: "/help",
             aliases: &[],
             usage: "/help",

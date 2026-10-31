@@ -452,13 +452,13 @@ impl Tui {
                     }
                     KeyCode::Esc => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
-                        if self.state.status.is_processing {
+                        if self.state.status.is_processing || self.state.compaction_pending {
                             if let Some(ref tx) = self.user_input_tx {
                                 let _ = tx.send(UserInput::Cancel);
                             }
                             self.state.tip = Some(Tip {
                                 kind: TipKind::ExitHint,
-                                text: "Turn cancellation requested.".to_string(),
+                                text: "Cancellation requested.".to_string(),
                                 ttl: Duration::from_secs(2),
                                 created_at: Instant::now(),
                             });

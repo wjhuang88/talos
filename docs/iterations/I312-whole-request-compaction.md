@@ -697,3 +697,55 @@ read-only staged review found no blocker to a local partial checkpoint commit;
 it did not run tests and retains REQUEST CHANGES for full T4 acceptance.
 Manual execution, visible outcomes, durable branch identity and repeated
 checkpoint lineage remain outstanding; this evidence does not authorize merge.
+
+### Runtime source-lineage increment — 2026-10-31
+
+The local projection now records a monotonic Agent-owned sequence and an optional
+parent sequence only when all predecessor covered entries remain covered with
+matching generation, IDs and digests and nondecreasing source revision. Cache
+invalidation does not recycle sequences; sequence exhaustion preserves both the
+previous projection and caller plan. The focused regression passed, followed by
+warnings-denied Agent all-target Clippy (`/private/tmp/i312-lineage-clippy.log`).
+Independent static review accepted this bounded increment without running tests.
+This parent link describes source coverage, not semantic inheritance; only the
+current projection and parent number are retained. Durable branch mapping,
+ancestry recovery, Actor-owned lifecycle and manual execution remain unimplemented.
+The full Agent library suite passed 568/568 (exit 0), recorded in
+`/private/tmp/i312-lineage-agent.log`. This increment is uncommitted
+and is not certified by the preceding checkpoint's workspace preflight.
+
+### Manual Actor/command increment — 2026-10-31 (uncommitted)
+
+Typed Compact/CancelCompact operations, an Actor-owned single pending slot and
+transient numeric outcomes are now wired to TUI/inline `/compact` and the Runtime
+facade. Manual preparation shares ordinary prompt/tool-definition/hook estimation,
+returns a candidate without installing it, and leaves the Actor to apply under a
+commit gate serialized with runtime shutdown/interrupt. Duplicate receipts do not
+rerun summaries; source generation/revision are checked before application. Full-width
+runtime generation IDs now fit the checkpoint schema's 128-byte reference bound.
+
+Agent 573/573 and Conversation 180/180 passed before the latest targeted-cancel
+wiring. The first bridge route/status regression passed; cancellation extension,
+current full preflight and both external SDK modes still require verification.
+Independent review initially rejected the worker-side cancellation race; the
+Actor commit-gate correction and targeted cancellation received independent static
+follow-up approval for this partial stage (no test certification or full-T4 approval).
+Current execution waits for the entire active turn, so intra-turn safe-boundary
+compaction remains missing. Durable branch identity/recovery, complete lineage,
+semantic-retention fixtures and final acceptance/review/CI/merge remain open.
+No completion or release is claimed by the new command entry.
+
+The optional workspace all-target Clippy pass also found two pre-existing
+`unwrap_err` test warnings in `talos-tools/src/search_backend/health.rs` (present
+on origin/main). Our new test constructor/declaration-order warnings were corrected;
+this is not a claim that workspace all-target Clippy is clean. Standard preflight
+and touched-crate all-target checks remain the candidate validation gates.
+
+Current manual-stage candidate passed standard host preflight (exit 0), including
+both external SDK dependency modes: `/private/tmp/i312-manual-stage-preflight.log`.
+Touched Agent/CLI/Conversation/Runtime/TUI all-target warnings-denied Clippy passed
+(`/private/tmp/i312-manual-touched-clippy.log`). Independent read-only follow-up
+accepted the targeted cancellation/receipt and TUI activity corrections, without
+running tests or approving complete T4. The command now has real Actor execution
+and current-candidate regression evidence; the outstanding intra-turn boundary,
+durable identity/recovery and semantic acceptance items above remain open.
