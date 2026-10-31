@@ -381,6 +381,8 @@ fn may_continue(error: CompatibilityError) -> bool {
 }
 
 #[cfg(test)]
+mod legacy_parity_tests;
+#[cfg(test)]
 mod reachability_tests;
 #[cfg(test)]
 pub(super) mod tests;

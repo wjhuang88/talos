@@ -252,11 +252,16 @@ pub(super) struct Server {
     read_errors: Arc<Mutex<Vec<std::io::ErrorKind>>>,
     read_error_count: Arc<AtomicUsize>,
     requests: Arc<Mutex<Vec<Vec<u8>>>>,
+    request_times: Arc<Mutex<Vec<std::time::Instant>>>,
     worker: Mutex<Option<thread::JoinHandle<()>>>,
 }
 
 impl Server {
     pub(super) fn new(responses: Vec<String>) -> Self {
+        Self::new_with_delays(responses, Vec::new())
+    }
+
+    pub(super) fn new_with_delays(responses: Vec<String>, response_delays: Vec<Duration>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("loopback fixture");
         listener.set_nonblocking(true).expect("nonblocking");
         let port = listener.local_addr().expect("address").port();
@@ -266,16 +271,19 @@ impl Server {
         let read_errors = Arc::new(Mutex::new(Vec::with_capacity(4)));
         let read_error_count = Arc::new(AtomicUsize::new(0));
         let requests = Arc::new(Mutex::new(Vec::new()));
-        let (s, a, c, r, errors, error_count) = (
+        let request_times = Arc::new(Mutex::new(Vec::new()));
+        let (s, a, c, r, times, errors, error_count) = (
             stop.clone(),
             accepted.clone(),
             closed.clone(),
             requests.clone(),
+            request_times.clone(),
             read_errors.clone(),
             read_error_count.clone(),
         );
         let worker = thread::spawn(move || {
             let mut responses: VecDeque<_> = responses.into();
+            let mut response_delays: VecDeque<_> = response_delays.into();
             let limit = std::time::Instant::now() + Duration::from_secs(10);
             while !s.load(Ordering::Relaxed) && std::time::Instant::now() < limit {
                 let (mut socket, _) = match listener.accept() {
@@ -335,8 +343,17 @@ impl Server {
                         }
                     }
                 }
+                times
+                    .lock()
+                    .expect("request times")
+                    .push(std::time::Instant::now());
                 r.lock().expect("requests").push(bytes);
                 if let Some(response) = responses.pop_front() {
+                    if let Some(delay) = response_delays.pop_front()
+                        && !delay.is_zero()
+                    {
+                        thread::sleep(delay);
+                    }
                     let _ = socket.write_all(response.as_bytes());
                 } else {
                     // Hold the response open and observe peer EOF on deadline/caller drop.
@@ -378,6 +395,7 @@ impl Server {
             read_errors,
             read_error_count,
             requests,
+            request_times,
             worker: Mutex::new(Some(worker)),
         }
     }
@@ -401,6 +419,9 @@ impl Server {
     pub(super) fn request(&self, index: usize) -> String {
         String::from_utf8(self.requests.lock().expect("requests")[index].clone())
             .expect("http bytes")
+    }
+    pub(super) fn request_time(&self, index: usize) -> std::time::Instant {
+        self.request_times.lock().expect("request times")[index]
     }
 }
 
