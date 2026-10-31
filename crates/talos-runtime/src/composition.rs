@@ -303,7 +303,7 @@ mod tests {
                 }))
                 .expect("protected preparation")
                 .expect("prepared invocation");
-            assert_eq!(prepared.manifest().scope().endpoints().len(), 4);
+            assert_eq!(prepared.manifest().scope().endpoints().len(), 9);
         }
     }
 }
