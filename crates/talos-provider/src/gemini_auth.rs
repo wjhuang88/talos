@@ -199,7 +199,10 @@ async fn service_account_assertion(credentials: &Value) -> ProviderResult<String
 
 impl VertexTokenSource {
     pub(crate) fn from_bytes(bytes: &[u8]) -> ProviderResult<Self> {
-        let credentials = parse_credentials(bytes)?;
+        Self::from_validated_credentials(parse_credentials(bytes)?)
+    }
+
+    fn from_validated_credentials(credentials: Value) -> ProviderResult<Self> {
         Ok(Self {
             client: reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
@@ -209,6 +212,25 @@ impl VertexTokenSource {
             endpoint: "https://oauth2.googleapis.com/token".into(),
             metadata: false,
         })
+    }
+
+    /// Resolve local credentials before explicitly allowed metadata credentials.
+    /// The caller must first select the validated standard Vertex transport.
+    pub(crate) async fn from_adc(
+        explicit: Option<&std::path::Path>,
+        well_known: &std::path::Path,
+        allow_metadata: bool,
+        deadline: std::time::Instant,
+    ) -> ProviderResult<Self> {
+        let credentials = read_local_adc(explicit, well_known, deadline).await?;
+        if std::time::Instant::now() >= deadline {
+            return Err(auth_error("Vertex credential acquisition timed out"));
+        }
+        match credentials {
+            Some(credentials) => Self::from_validated_credentials(credentials),
+            None if allow_metadata => Self::metadata(),
+            None => Err(auth_error("Vertex ADC credentials unavailable; metadata is disabled")),
+        }
     }
 
     /// Construct only after explicit Vertex ADC selection and absent local credentials.
@@ -313,6 +335,31 @@ mod refresh_tests {
         VertexTokenSource::from_bytes(br#"{"type":"authorized_user","client_id":"fixture-client","client_secret":"fixture-secret","refresh_token":"fixture-refresh"}"#).expect("credentials")
     }
     fn deadline() -> Instant { Instant::now() + Duration::from_secs(5) }
+
+    #[tokio::test]
+    async fn adc_selection_requires_opt_in_and_never_masks_invalid_files() {
+        let dir = tempfile::tempdir().expect("directory");
+        let default = dir.path().join("default.json");
+        let explicit = dir.path().join("explicit.json");
+        assert!(VertexTokenSource::from_adc(None, &default, false, deadline()).await.is_err());
+        assert!(VertexTokenSource::from_adc(None, &default, true, deadline()).await.expect("metadata").metadata);
+        assert!(VertexTokenSource::from_adc(Some(&explicit), &default, true, deadline()).await.is_err());
+        let credentials = |client: &str| serde_json::json!({"type":"authorized_user",
+            "client_id":client,"client_secret":"fixture-secret","refresh_token":"fixture-refresh"});
+        std::fs::write(&default, credentials("default-client").to_string()).expect("default");
+        std::fs::write(&explicit, credentials("explicit-client").to_string()).expect("explicit");
+        let selected = VertexTokenSource::from_adc(Some(&explicit), &default, true, deadline()).await.expect("explicit source");
+        assert!(!selected.metadata);
+        assert_eq!(selected.credentials["client_id"], "explicit-client");
+        let fallback = VertexTokenSource::from_adc(None, &default, true, deadline()).await.expect("local ADC");
+        assert!(!fallback.metadata);
+        assert_eq!(fallback.credentials["client_id"], "default-client");
+        std::fs::write(&explicit, b"invalid").expect("corrupt explicit");
+        assert!(VertexTokenSource::from_adc(Some(&explicit), &default, true, deadline()).await.is_err());
+        std::fs::write(&default, b"invalid").expect("corrupt default");
+        assert!(VertexTokenSource::from_adc(None, &default, true, deadline()).await.is_err());
+        assert!(VertexTokenSource::from_adc(None, &default, true, Instant::now() - Duration::from_secs(1)).await.is_err());
+    }
 
     #[tokio::test]
     async fn metadata_requires_flavor_and_caches_only_valid_response() {
