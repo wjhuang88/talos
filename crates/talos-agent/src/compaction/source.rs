@@ -163,7 +163,7 @@ impl HistorySource {
             .await
     }
 
-    async fn bind_continuation_until(
+    pub(crate) async fn bind_continuation_until(
         &mut self,
         messages: &[Message],
         persist_start: usize,

@@ -8,6 +8,10 @@ use talos_core::session::{CompactOutcome, CompactState};
 pub(super) struct ManualCompaction {
     ledger: CompactOperations,
     queued: Option<u64>,
+    boundary_resume: Option<(
+        tokio::sync::oneshot::Sender<Option<crate::SteeringBoundaryBatch>>,
+        Option<crate::SteeringBoundaryBatch>,
+    )>,
     running: Option<(u64, CancellationToken, JoinHandle<ManualCheckpointResult>)>,
 }
 
@@ -16,6 +20,7 @@ impl ManualCompaction {
         Self {
             ledger: CompactOperations::new(generation),
             queued: None,
+            boundary_resume: None,
             running: None,
         }
     }
@@ -55,6 +60,41 @@ impl ManualCompaction {
 
     pub(super) fn is_running(&self) -> bool {
         self.running.is_some()
+    }
+
+    pub(super) fn start_boundary(
+        &mut self,
+        actor: &AppServerSession,
+        request: crate::SteeringBoundaryRequest,
+        injected: Option<crate::SteeringBoundaryBatch>,
+        turn_token: &CancellationToken,
+    ) {
+        let Some(id) = self.queued.take() else {
+            let _ = request.compact.send(None);
+            let _ = request.response.send(injected);
+            return;
+        };
+        let (result, received) = tokio::sync::oneshot::channel();
+        if request
+            .compact
+            .send(Some(crate::BoundaryCompactJob { result }))
+            .is_err()
+        {
+            self.finish(actor, id, CompactOutcome::Cancelled);
+            let _ = request.response.send(injected);
+            return;
+        }
+        let token = turn_token.child_token();
+        let waiting_token = token.clone();
+        let task = tokio::spawn(async move {
+            tokio::select! { biased;
+                () = waiting_token.cancelled() => ManualCheckpointResult::Outcome(CompactOutcome::Cancelled),
+                result = received => result.unwrap_or(ManualCheckpointResult::Outcome(CompactOutcome::Failed)),
+            }
+        });
+        self.boundary_resume = Some((request.response, injected));
+        self.running = Some((id, token, task));
+        Self::emit(actor, id, CompactState::Started);
     }
 
     pub(super) fn start(&mut self, actor: &AppServerSession) {
@@ -135,7 +175,9 @@ impl ManualCompaction {
         } else {
             commit()
         };
-        if let Some(control) = &actor.runtime_admission {
+        if self.boundary_resume.is_none()
+            && let Some(control) = &actor.runtime_admission
+        {
             let status = match outcome {
                 CompactOutcome::Applied { .. } | CompactOutcome::NotEligible { .. } => {
                     TurnCompletionStatus::Success {
@@ -151,6 +193,9 @@ impl ManualCompaction {
             control.finish_active(Some(&status));
         }
         self.finish(actor, id, outcome);
+        if let Some((response, injected)) = self.boundary_resume.take() {
+            let _ = response.send(injected);
+        }
     }
 
     fn finish(&mut self, actor: &AppServerSession, id: u64, outcome: CompactOutcome) {

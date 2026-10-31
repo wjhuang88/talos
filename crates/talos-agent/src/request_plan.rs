@@ -372,7 +372,7 @@ impl Agent {
         private_tokens: &PrivateTokens,
         history_source: Option<&crate::compaction::HistorySource>,
     ) -> AgentResult<ProviderRequestPlan> {
-        let mut plan = self
+        let plan = self
             .observe_provider_request_plan(
                 hook_ctx,
                 messages,
@@ -381,6 +381,18 @@ impl Agent {
                 private_tokens,
             )
             .await?;
+        self.seal_observed_request_plan(plan, request_context_limit, private_tokens, history_source)
+            .await
+    }
+
+    /// Complete budget/projection admission without invoking the request hook again.
+    pub(super) async fn seal_observed_request_plan(
+        &self,
+        mut plan: ProviderRequestPlan,
+        request_context_limit: Option<u32>,
+        private_tokens: &PrivateTokens,
+        history_source: Option<&crate::compaction::HistorySource>,
+    ) -> AgentResult<ProviderRequestPlan> {
         if let Some(limit) = request_context_limit {
             use crate::compaction::RequestPressure;
             let reused = if let Some(source) = history_source {

@@ -975,7 +975,7 @@ mode.
 | `/help` | Show available commands |
 | `/quit`, `/exit` | Exit Talos |
 | `/status` | Show session info (model, token usage) |
-| `/compact` | Unreleased TUI/inline: compact model context without rewriting original history; active turns defer until completion |
+| `/compact` | Unreleased TUI/inline: compact model context without rewriting original history; active turns defer until a complete tool-batch boundary or turn completion |
 | `/auto`, `/auto on`, `/auto off` | Show or change bounded auto-assistance for this session only |
 | `/plugins` | Show explicitly loaded local plugin packages and registered capabilities |
 | `/mcp` | Show MCP server status and observed tool provenance |

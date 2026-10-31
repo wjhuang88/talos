@@ -3899,3 +3899,522 @@ async fn manual_compact_shutdown_cancels_queued_work_once_at_active_turn() {
     assert_eq!((terminals, busy), (1, 1));
     let _ = task.await.expect("actor");
 }
+
+#[tokio::test]
+async fn targeted_compact_cancel_preserves_active_turn_and_replays_terminal_receipt() {
+    use talos_core::session::{CompactOutcome, CompactState};
+    let model = Arc::new(SlowModel {
+        delay: Duration::from_millis(300),
+        events: success_events("active turn survives compact cancellation"),
+    });
+    let agent = Agent::new(model, ToolRegistry::new());
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            workspace_root: std::env::temp_dir(),
+            runtime_policy: RuntimePolicy::interactive(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor.history.clone()
+    });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "continue current work".into(),
+        })
+        .await
+        .expect("submit");
+    while let Some(event) = handle.eq_rx.recv().await {
+        if is_turn_started(&event) {
+            break;
+        }
+    }
+    for operation in [
+        SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 10,
+        },
+        SessionOp::CancelCompact {
+            session_generation: 0,
+            operation_id: 10,
+        },
+        SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 10,
+        },
+    ] {
+        handle.sq_tx.send(operation).await.expect("operation");
+    }
+    let mut completed = false;
+    let mut terminals = Vec::new();
+    while !completed || terminals.len() < 2 {
+        let event = tokio::time::timeout(Duration::from_secs(5), handle.eq_rx.recv())
+            .await
+            .expect("bounded completion")
+            .expect("event");
+        match event {
+            SessionEvent::CompactStatus {
+                operation_id: 10,
+                state: CompactState::Completed { outcome, replayed },
+                ..
+            } => {
+                assert_eq!(outcome, CompactOutcome::Cancelled);
+                terminals.push(replayed);
+            }
+            SessionEvent::CompactStatus {
+                state: CompactState::Started,
+                ..
+            } => panic!("cancelled queued compact must never run"),
+            SessionEvent::TurnEvent {
+                payload: TurnEventPayload::Completed { status },
+                ..
+            } => {
+                assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+                completed = true;
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(terminals, vec![false, true]);
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    let history = task.await.expect("actor");
+    assert!(history.iter().any(
+        |message| matches!(message, Message::Assistant { content, .. }
+        if content == "active turn survives compact cancellation")
+    ));
+}
+
+#[tokio::test]
+async fn manual_compact_runs_at_completed_tool_batch_before_turn_completion() {
+    exercise_manual_boundary_hook_timeout(false, false, false).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn hanging_manual_boundary_hook_times_out_without_retrying_observation() {
+    exercise_manual_boundary_hook_timeout(true, false, false).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn cancelling_incomplete_boundary_observation_does_not_retry_hook() {
+    exercise_manual_boundary_hook_timeout(true, true, false).await;
+}
+
+#[tokio::test]
+async fn denied_boundary_observation_is_not_retried_as_allowed() {
+    exercise_manual_boundary_hook_timeout(false, false, true).await;
+}
+
+async fn exercise_manual_boundary_hook_timeout(hang: bool, cancel: bool, deny: bool) {
+    use talos_core::session::{CompactOutcome, CompactState};
+    struct BoundaryHook {
+        calls: AtomicUsize,
+        hang: bool,
+        deny: bool,
+        entered: Arc<tokio::sync::Notify>,
+    }
+    #[async_trait]
+    impl talos_plugin::HookHandler for BoundaryHook {
+        fn name(&self) -> &str {
+            "boundary-hanging-hook"
+        }
+        fn subscribed(&self) -> &'static [talos_plugin::HookEventKind] {
+            &[talos_plugin::HookEventKind::BeforeProviderCall]
+        }
+        fn timeout(&self) -> Duration {
+            Duration::from_secs(360)
+        }
+        async fn on_event(
+            &self,
+            _: &talos_plugin::HookContext,
+            _: &mut talos_plugin::HookEvent<'_>,
+        ) -> talos_plugin::HookResult {
+            if self.calls.fetch_add(1, Ordering::SeqCst) == 1 {
+                if self.deny {
+                    return talos_plugin::HookResult::Deny {
+                        reason: "reject this continuation once".into(),
+                    };
+                }
+                if self.hang {
+                    self.entered.notify_one();
+                    std::future::pending::<()>().await;
+                }
+            }
+            talos_plugin::HookResult::Continue
+        }
+    }
+    let hook_entered = Arc::new(tokio::sync::Notify::new());
+    let mut hooks = talos_plugin::HookRegistry::new();
+    let hook = Arc::new(BoundaryHook {
+        calls: AtomicUsize::new(0),
+        hang,
+        deny,
+        entered: hook_entered.clone(),
+    });
+    hooks.register(hook.clone());
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let mut tools = ToolRegistry::new();
+    tools.register(Arc::new(BoundaryBlockingTool {
+        entered: entered.clone(),
+        release: release.clone(),
+    }));
+    let model = MockModel::new(vec![
+        vec![
+            AgentEvent::ToolCall {
+                call: talos_core::message::ToolCall {
+                    id: "boundary".into(),
+                    name: "boundary_probe".into(),
+                    input: serde_json::json!({}),
+                },
+                provenance: talos_core::tool::ToolProvenance::Native,
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Default::default(),
+            },
+        ],
+        success_events("continued after manual boundary"),
+    ]);
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        tools,
+        None,
+        None,
+        std::env::temp_dir(),
+        Arc::new(hooks),
+    );
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: std::env::temp_dir(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor.history.clone()
+    });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "run tool".into(),
+        })
+        .await
+        .expect("submit");
+    tokio::time::timeout(Duration::from_secs(5), entered.notified())
+        .await
+        .expect("tool entered");
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 1,
+        })
+        .await
+        .expect("compact");
+    loop {
+        if matches!(
+            handle.eq_rx.recv().await,
+            Some(SessionEvent::CompactStatus {
+                state: CompactState::Queued,
+                ..
+            })
+        ) {
+            break;
+        }
+    }
+    release.notify_one();
+    if hang {
+        hook_entered.notified().await;
+        if cancel {
+            handle
+                .sq_tx
+                .send(SessionOp::CancelCompact {
+                    session_generation: 0,
+                    operation_id: 1,
+                })
+                .await
+                .expect("targeted cancellation");
+        } else {
+            tokio::time::advance(Duration::from_secs(121)).await;
+        }
+    }
+    let mut compact_finished = false;
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(5), handle.eq_rx.recv())
+            .await
+            .expect("boundary deadline")
+            .expect("event");
+        match event {
+            SessionEvent::CompactStatus {
+                state:
+                    CompactState::Completed {
+                        outcome,
+                        replayed: false,
+                    },
+                ..
+            } => {
+                if cancel {
+                    assert_eq!(outcome, CompactOutcome::Cancelled);
+                } else if hang || deny {
+                    assert_eq!(outcome, CompactOutcome::Failed);
+                } else {
+                    assert!(matches!(outcome, CompactOutcome::NotEligible { .. }));
+                }
+                compact_finished = true;
+            }
+            SessionEvent::TurnEvent {
+                payload: TurnEventPayload::Completed { status },
+                ..
+            } => {
+                assert!(
+                    compact_finished,
+                    "manual compaction must finish before ordinary continuation completes"
+                );
+                if hang || deny {
+                    assert!(matches!(status, TurnCompletionStatus::Error { .. }));
+                } else {
+                    assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+                }
+                break;
+            }
+            _ => {}
+        }
+    }
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    let history = task.await.expect("actor");
+    assert_eq!(
+        hook.calls.load(Ordering::SeqCst),
+        2,
+        "failed observation must not be retried"
+    );
+    assert!(
+        history
+            .iter()
+            .any(|message| matches!(message, Message::Tool { .. }))
+    );
+}
+
+#[tokio::test]
+async fn manual_boundary_applies_checkpoint_before_continuation_and_preserves_raw_history() {
+    struct BoundaryHookCounter(Arc<AtomicUsize>);
+    #[async_trait]
+    impl talos_plugin::HookHandler for BoundaryHookCounter {
+        fn name(&self) -> &str {
+            "boundary-provider-counter"
+        }
+        fn subscribed(&self) -> &'static [talos_plugin::HookEventKind] {
+            &[talos_plugin::HookEventKind::BeforeProviderCall]
+        }
+        async fn on_event(
+            &self,
+            _: &talos_plugin::HookContext,
+            _: &mut talos_plugin::HookEvent<'_>,
+        ) -> talos_plugin::HookResult {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            talos_plugin::HookResult::Continue
+        }
+    }
+    let hook_calls = Arc::new(AtomicUsize::new(0));
+    let mut hooks = talos_plugin::HookRegistry::new();
+    hooks.register(Arc::new(BoundaryHookCounter(hook_calls.clone())));
+    struct BoundarySummaryModel {
+        ordinary: AtomicUsize,
+        summaries: AtomicUsize,
+    }
+    #[async_trait]
+    impl LanguageModel for BoundarySummaryModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let events = if let [Message::User { content }] = messages
+                && content.starts_with("Produce only a JSON checkpoint")
+            {
+                self.summaries.fetch_add(1, Ordering::SeqCst);
+                let sources: Vec<serde_json::Value> =
+                    serde_json::from_str(content.split("\nSources: ").last().expect("sources"))
+                        .expect("JSON");
+                let item = serde_json::json!({"text":"retain original task", "sources":[sources[0]["source"]]});
+                success_events(&serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                    "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                    "facts":[],"assumptions":[],"resources":[],"open_loops":[]}).to_string())
+            } else if self.ordinary.fetch_add(1, Ordering::SeqCst) == 0 {
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "boundary".into(),
+                            name: "boundary_probe".into(),
+                            input: serde_json::json!({}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else {
+                assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.starts_with("[Derived checkpoint;"))));
+                success_events("continued with checkpoint")
+            };
+            let (tx, rx) = mpsc::channel(8);
+            for event in events {
+                tx.send(event).await.expect("fixture event");
+            }
+            Ok(rx)
+        }
+    }
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let model = Arc::new(BoundarySummaryModel {
+        ordinary: AtomicUsize::new(0),
+        summaries: AtomicUsize::new(0),
+    });
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(BoundaryBlockingTool {
+        entered: entered.clone(),
+        release: release.clone(),
+    }));
+    let agent = Agent::with_security_and_hooks(
+        model.clone(),
+        registry,
+        None,
+        None,
+        std::env::temp_dir(),
+        Arc::new(hooks),
+    );
+    let raw: Vec<_> = (0..30)
+        .flat_map(|index| {
+            [
+                Message::User {
+                    content: format!("task {index}: {}", "x".repeat(4000)),
+                },
+                Message::Assistant {
+                    content: "recorded".into(),
+                    tool_calls: vec![],
+                    reasoning: None,
+                },
+            ]
+        })
+        .collect();
+    let prepared = agent
+        .prepare_session_turn_at_revision(
+            &structured_submission("probe", "probe-item", 0, "run tool", SubmissionSource::User)
+                .items,
+            raw.clone(),
+            u32::MAX,
+            0,
+            raw.len() as u64,
+        )
+        .await
+        .expect("estimate initial request");
+    let limit = prepared.initial_plan.estimated_tokens * 100 / 85;
+    hook_calls.store(0, Ordering::SeqCst);
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: std::env::temp_dir(),
+            initial_history: raw.clone(),
+            model_context_limit: limit,
+        },
+    );
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor.history.clone()
+    });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "run tool".into(),
+        })
+        .await
+        .expect("submit");
+    tokio::time::timeout(Duration::from_secs(5), entered.notified())
+        .await
+        .expect("tool boundary");
+    assert_eq!(
+        model.summaries.load(Ordering::SeqCst),
+        0,
+        "initial advisory pressure must not auto-compact"
+    );
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 1,
+        })
+        .await
+        .expect("compact");
+    loop {
+        if matches!(
+            handle.eq_rx.recv().await,
+            Some(SessionEvent::CompactStatus {
+                state: talos_core::session::CompactState::Queued,
+                ..
+            })
+        ) {
+            break;
+        }
+    }
+    release.notify_one();
+    let mut applied = false;
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(10), handle.eq_rx.recv())
+            .await
+            .expect("completion deadline")
+            .expect("event");
+        match event {
+            SessionEvent::CompactStatus {
+                state: talos_core::session::CompactState::Completed { outcome, .. },
+                ..
+            } => {
+                assert!(
+                    matches!(outcome, talos_core::session::CompactOutcome::Applied { before, after } if after < before && after <= limit),
+                    "{outcome:?}"
+                );
+                applied = true;
+            }
+            SessionEvent::TurnEvent {
+                payload: TurnEventPayload::Completed { status },
+                ..
+            } => {
+                assert!(
+                    applied,
+                    "checkpoint must be applied before continuation completes"
+                );
+                assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+                break;
+            }
+            _ => {}
+        }
+    }
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    let history = task.await.expect("actor");
+    assert_eq!(&history[..raw.len()], raw);
+    assert_eq!(model.ordinary.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        hook_calls.load(Ordering::SeqCst),
+        2,
+        "one observation per actual ordinary request, including manual boundary"
+    );
+    assert!(model.summaries.load(Ordering::SeqCst) > 0);
+}

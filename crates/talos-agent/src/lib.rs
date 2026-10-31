@@ -101,7 +101,12 @@ pub use compression::{CompressionMetrics, RetrievalMetrics};
 pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
 pub(crate) use request_plan::PreparedSessionTurn;
 
+pub(crate) struct BoundaryCompactJob {
+    pub(crate) result: tokio::sync::oneshot::Sender<checkpoint_manual::ManualCheckpointResult>,
+}
+
 pub(crate) struct SteeringBoundaryRequest {
+    pub(crate) compact: tokio::sync::oneshot::Sender<Option<BoundaryCompactJob>>,
     pub(crate) response: tokio::sync::oneshot::Sender<Option<SteeringBoundaryBatch>>,
 }
 
@@ -886,7 +891,12 @@ impl Agent {
                 ));
         }
 
+        let mut boundary_observed_plan = None;
+        let mut boundary_observation_error = None;
         let (result, final_status) = 'turn_loop: loop {
+            if let Some(error) = boundary_observation_error.take() {
+                break (Err(error), TurnStatus::Denied);
+            }
             let plan = if let Some(plan) = initial_plan.take() {
                 plan
             } else {
@@ -895,8 +905,17 @@ impl Agent {
                 {
                     history_source = None;
                 }
-                match self
-                    .seal_provider_request_plan(
+                let sealed = if let Some(observed) = boundary_observed_plan.take() {
+                    pending_continuation_parts.clear();
+                    self.seal_observed_request_plan(
+                        observed,
+                        request_context_limit,
+                        &private_tokens,
+                        history_source.as_ref(),
+                    )
+                    .await
+                } else {
+                    self.seal_provider_request_plan(
                         &hook_ctx,
                         &messages,
                         &active_tool_definitions,
@@ -906,7 +925,8 @@ impl Agent {
                         history_source.as_ref(),
                     )
                     .await
-                {
+                };
+                match sealed {
                     Ok(plan) => plan,
                     Err(error) => {
                         self.emit_budget_rejection(&error, event_tx.as_ref());
@@ -1755,11 +1775,79 @@ impl Agent {
             }
             if let Some(boundary_tx) = &boundary_tx {
                 let (response, injected) = tokio::sync::oneshot::channel();
+                let (compact, compact_job) = tokio::sync::oneshot::channel();
                 if boundary_tx
-                    .send(SteeringBoundaryRequest { response })
+                    .send(SteeringBoundaryRequest { response, compact })
                     .is_ok()
-                    && let Ok(Some(batch)) = injected.await
+                    && let Ok(Some(mut job)) = compact_job.await
                 {
+                    let deadline =
+                        tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+                    let preparation = async {
+                        let Some(limit) = request_context_limit else {
+                            return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed,
+                            );
+                        };
+                        let Some(source) = history_source.as_mut() else {
+                            return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed,
+                            );
+                        };
+                        if !source
+                            .bind_continuation_until(&messages, persist_start, deadline)
+                            .await
+                        {
+                            return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed,
+                            );
+                        }
+                        let mut parts = pending_continuation_parts.clone();
+                        // Once observation starts, failure/cancellation must not retry
+                        // a potentially effectful or explicitly denying hook.
+                        boundary_observation_error = Some(AgentError::ToolError(
+                            "continuation request observation did not complete".into(),
+                        ));
+                        let Ok(mut plan) = self
+                            .observe_provider_request_plan(
+                                &hook_ctx,
+                                &messages,
+                                &active_tool_definitions,
+                                &mut parts,
+                                &private_tokens,
+                            )
+                            .await
+                        else {
+                            return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed,
+                            );
+                        };
+                        // Preserve exactly the hook-observed request even when folding
+                        // fails or is cancelled. Actor application is a separate decision.
+                        boundary_observation_error = None;
+                        boundary_observed_plan = Some(plan.clone());
+                        self.prepare_manual_checkpoint(
+                            &mut plan,
+                            limit,
+                            &private_tokens,
+                            source,
+                            deadline,
+                        )
+                        .await
+                    };
+                    tokio::select! { biased;
+                        () = job.result.closed() => {},
+                        result = tokio::time::timeout_at(deadline, preparation) => {
+                            let result = result.unwrap_or(checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed));
+                            let _ = job.result.send(result);
+                        },
+                    }
+                }
+                if let Ok(Some(batch)) = injected.await {
+                    // New steering input creates a different request and must be observed.
+                    boundary_observed_plan = None;
+                    boundary_observation_error = None;
                     let (_, injected_messages) = Self::structured_session_inputs(&batch.items);
                     messages.extend(injected_messages);
                     if let Some(snapshot_tx) = &snapshot_tx {

@@ -62,32 +62,59 @@ impl Agent {
                 )
                 .await
                 .map_err(|_| ())?;
-            let before = plan.estimated_tokens;
-            if RequestPressure::assess(before, limit) == RequestPressure::Normal {
-                return Ok(ManualCheckpointResult::Outcome(
-                    CompactOutcome::NotEligible { before },
-                ));
-            }
-            let mut projection = None;
-            self.checkpoint_request_once_deferred(
-                &mut plan,
-                limit,
-                &PrivateTokens::default(),
-                Some(&source),
-                Some(&mut projection),
+            Ok::<_, ()>(
+                self.prepare_manual_checkpoint(
+                    &mut plan,
+                    limit,
+                    &PrivateTokens::default(),
+                    &source,
+                    deadline,
+                )
+                .await,
             )
-            .await
-            .map_err(|_| ())?;
-            Ok::<_, ()>(ManualCheckpointResult::Candidate {
-                projection: Box::new(projection.ok_or(())?),
-                before,
-                after: plan.estimated_tokens,
-                deadline,
-            })
         })
         .await
         .ok()
         .and_then(Result::ok)
         .unwrap_or(ManualCheckpointResult::Outcome(CompactOutcome::Failed))
+    }
+    /// Prepare against the exact request at a safe boundary. This does not rebuild
+    /// prompts, replace raw history, or publish the candidate into shared state.
+    pub(crate) async fn prepare_manual_checkpoint(
+        &self,
+        plan: &mut crate::request_plan::ProviderRequestPlan,
+        limit: u32,
+        private: &PrivateTokens,
+        source: &HistorySource,
+        deadline: tokio::time::Instant,
+    ) -> ManualCheckpointResult {
+        if tokio::time::Instant::now() >= deadline {
+            return ManualCheckpointResult::Outcome(CompactOutcome::Failed);
+        }
+        let before = plan.estimated_tokens;
+        if RequestPressure::assess(before, limit) == RequestPressure::Normal {
+            return ManualCheckpointResult::Outcome(CompactOutcome::NotEligible { before });
+        }
+        let mut projection = None;
+        let result = tokio::time::timeout_at(
+            deadline,
+            self.checkpoint_request_once_deferred(
+                plan,
+                limit,
+                private,
+                Some(source),
+                Some(&mut projection),
+            ),
+        )
+        .await;
+        match (result, projection) {
+            (Ok(Ok(())), Some(projection)) => ManualCheckpointResult::Candidate {
+                projection: Box::new(projection),
+                before,
+                after: plan.estimated_tokens,
+                deadline,
+            },
+            _ => ManualCheckpointResult::Outcome(CompactOutcome::Failed),
+        }
     }
 }

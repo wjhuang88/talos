@@ -853,7 +853,12 @@ impl AppServerSession {
                                 &mut delivered_boundary,
                             )
                         };
-                        let _ = request.response.send(injected);
+                        if !shutting_down && let Some(token) = cancel_token.as_ref().filter(|token| !token.is_cancelled()) {
+                            compact.start_boundary(self, request, injected, token);
+                        } else {
+                            let _ = request.compact.send(None);
+                            let _ = request.response.send(injected);
+                        }
                     } else {
                         current_boundary_rx = None;
                     }

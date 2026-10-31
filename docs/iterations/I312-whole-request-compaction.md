@@ -749,3 +749,32 @@ accepted the targeted cancellation/receipt and TUI activity corrections, without
 running tests or approving complete T4. The command now has real Actor execution
 and current-candidate regression evidence; the outstanding intra-turn boundary,
 durable identity/recovery and semantic acceptance items above remain open.
+
+### Intra-turn boundary implementation — local uncommitted increment
+
+Manual requests now start after a complete tool batch through the existing
+Actor/Agent boundary handshake. The Actor retains continuation permission while
+Agent prepares a candidate from the current messages, tools, source mapping and
+private-token set. A child cancellation token does not cancel the parent turn;
+application retains the Actor/runtime commit gate and does not release the active
+turn's lifecycle slot. Raw history remains unchanged by projection application.
+
+A real tool fixture proves Applied precedes ordinary continuation, the next
+provider request contains the checkpoint, and original raw history is retained.
+The observation is reused for the unchanged request, avoiding duplicate hooks;
+new steering creates a different request. Observation denial/incompletion aborts
+that continuation rather than retrying a potentially denying/effectful hook.
+The outer 120-second deadline covers binding, observation and folding. Focused
+paused-time timeout and targeted-cancellation tests passed; complete latest-suite
+and independent follow-up results must be checked before stage certification.
+These fixtures do not prove semantic summary accuracy, durable branch identity,
+restart/fork recovery, ephemeral-image parity or all steering-custody races.
+Full T4 remains Active/Partial and the complete downstream queue is unchanged.
+
+Boundary-stage validation: Agent library 579/579 passed, warnings-denied Agent
+all-target Clippy passed, both governance validators passed with zero warnings,
+and standard host preflight exited 0 including both external SDK modes
+(`/private/tmp/i312-boundary-stage-preflight.log`, session 29277). Independent
+static review accepted the observation-reuse/failure/deadline corrections without
+running tests or approving full T4. Latest fetched main is `3c748a11576af6ca16301edecb35d8a234eef923`,
+adding only the independent I293 migration proposal; this run precedes base update.

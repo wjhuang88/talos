@@ -539,9 +539,12 @@ the result; successful enqueue is not successful compaction. IDs are monotonic p
 runtime generation; one operation may be pending, 64 terminal receipts are retained,
 and duplicate retained IDs return the prior result with `replayed: true`.
 
-Compaction preserves raw history and emits no user/assistant turn. At present an
-active turn defers manual execution until turn completion; intra-turn complete-batch
-execution remains outstanding in I312. Interrupt/shutdown cancel pending work.
+Compaction preserves raw history and emits no user/assistant turn. An active turn
+defers manual execution until a complete tool-batch boundary or turn completion.
+The Actor holds continuation permission while preparing and applying the candidate.
+An unchanged continuation reuses its observed request; new steering input creates
+a different request. Observation denial or interruption aborts that continuation
+without retrying its hook. Interrupt/shutdown cancel pending work.
 Status contains bounded enums and numeric estimates, never checkpoint text. The
 external SDK fixture exercises below-threshold compaction before an ordinary turn
 in both dependency modes; it does not certify long-history semantic retention.
