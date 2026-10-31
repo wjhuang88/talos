@@ -201,9 +201,9 @@ mod tests {
             first.manifest().invocation_id(),
             second.manifest().invocation_id()
         );
-        assert_eq!(first.manifest().scope().endpoints().len(), 4);
+        assert_eq!(first.manifest().scope().endpoints().len(), 9);
         assert_eq!(first.permission_profile(), second.permission_profile());
-        assert_eq!(first.permission_profile().len(), 4);
+        assert_eq!(first.permission_profile().len(), 6);
         assert!(!format!("{:?}", first.manifest()).contains("first private query"));
     }
 
