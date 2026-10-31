@@ -12,7 +12,9 @@ pub(in crate::search_backend) mod chain;
 pub(super) mod headers;
 pub(in crate::search_backend) mod invocation;
 pub(in crate::search_backend) mod plan;
+pub(in crate::search_backend) mod probe;
 pub(in crate::search_backend) mod searxng;
+pub(in crate::search_backend) mod wikipedia;
 
 use crate::search_backend::{SearchBackendId, bing_parser, ddg_parser, instant_answer};
 use talos_core::tool::ToolNetworkScope;
@@ -52,6 +54,8 @@ pub(super) fn manifest_extends_scope_without_policy_widening(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub(in crate::search_backend) enum CompatibilityError {
+    #[error("search_compatibility_unreachable")]
+    Unreachable,
     #[error(transparent)]
     Transport(#[from] TransportError),
     #[error(transparent)]
