@@ -15,6 +15,7 @@
 
 mod copilot;
 mod gemini_auth;
+mod gemini_endpoint;
 mod image_io;
 pub mod mock;
 pub mod openai;
