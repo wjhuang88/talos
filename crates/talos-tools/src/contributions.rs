@@ -32,7 +32,7 @@ use crate::{BashTool, ExecTool};
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
 use crate::{DiffTool, StatTool};
 #[cfg(feature = "network")]
-use crate::{FetchUrlTool, HttpRequestTool, WebSearchTool};
+use crate::{FetchUrlTool, HttpRequestTool};
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
 use crate::{GlobTool, GrepTool};
 
@@ -172,7 +172,8 @@ pub fn workspace_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribu
 
 /// Builds the network/web tool group.
 ///
-/// Selection and permission wrapping remain explicit product decisions.
+/// The production `web_search` contribution is the ADR-090 prepared SearchRouter composition.
+/// Permission wrapping remains an explicit outer-product decision.
 #[must_use]
 #[cfg(feature = "network")]
 pub fn network_tool_contributions() -> Vec<ToolContribution> {
@@ -188,7 +189,10 @@ pub fn network_tool_contributions() -> Vec<ToolContribution> {
             NETWORK_CONTRIBUTION_SOURCE,
             Arc::new(HttpRequestTool::new()),
         ),
-        contribution(NETWORK_CONTRIBUTION_SOURCE, Arc::new(WebSearchTool::new())),
+        contribution(
+            NETWORK_CONTRIBUTION_SOURCE,
+            crate::search_backend::production_search_router_tool(),
+        ),
     ]);
     contributions
 }
@@ -394,6 +398,11 @@ mod tests {
             ["save_url", "fetch_url", "http_request", "web_search"]
         );
         assert_source(&contributions, NETWORK_CONTRIBUTION_SOURCE);
+        let search = contributions
+            .iter()
+            .find(|contribution| contribution.name() == "web_search")
+            .expect("web_search contribution");
+        assert!(search.tool().requires_network_invocation());
     }
 
     #[test]

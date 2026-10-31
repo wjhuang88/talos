@@ -63,13 +63,19 @@ impl SearchDns for Effects {
     }
 }
 
-// Only this cfg(test) module can relocate the fixed requests or inject DNS.
+// Only this cfg(test) module can relocate the fixed query chain or inject DNS. Existing plan
+// fixtures predate reachability parity, so use a plan-local reachability override and keep these
+// tests focused on query-chain authority/budget/drop behavior. Probe execution has its own fixtures.
 pub(in crate::search_backend::transport::compatibility) fn controlled(
     mut plan: PreparedCompatibilityPlan,
     server: &Server,
     allowed: usize,
     mismatch: bool,
 ) -> (PreparedCompatibilityPlan, Arc<Effects>) {
+    plan.reachability = Some(Reachability {
+        duckduckgo: true,
+        bing: true,
+    });
     let (chain, manifest) = super::super::chain::tests::relocate(plan.chain, server);
     plan.chain = chain;
     plan.manifest = manifest;
@@ -124,7 +130,7 @@ fn manifest_and_domain_facets_are_complete_fixed_query_free_and_redacted() {
     let config = DirectCompatibilityConfiguration::new().expect("config");
     let plan = config.prepare("toy-private-query", 1).expect("plan");
     let scope = plan.manifest().scope();
-    assert_eq!(scope.endpoints().len(), 4);
+    assert_eq!(scope.endpoints().len(), 9);
     for protocol in ORDER {
         assert!(
             scope
@@ -132,15 +138,25 @@ fn manifest_and_domain_facets_are_complete_fixed_query_free_and_redacted() {
                 .contains(&protocol.destination().expect("endpoint"))
         );
     }
+    for endpoint in super::super::probe::destinations().expect("probe destinations") {
+        assert!(scope.endpoints().contains(&endpoint));
+    }
+    assert!(
+        scope
+            .endpoints()
+            .contains(&super::super::wikipedia::destination().expect("wikipedia endpoint"))
+    );
     assert!(scope.proxy().is_none());
     assert!(scope.private_addresses().is_empty());
     assert_eq!(scope.redirect_limit(), 0);
     assert_eq!(scope.configuration_revision(), 0);
     let profile = plan.permission_profile();
-    assert_eq!(profile.len(), 4);
+    assert_eq!(profile.len(), 6);
     for (facet, host) in profile.iter().zip([
         "api.duckduckgo.com",
         "cn.bing.com",
+        "duckduckgo.com",
+        "en.wikipedia.org",
         "html.duckduckgo.com",
         "lite.duckduckgo.com",
     ]) {

@@ -1,5 +1,5 @@
-//! Dormant direct-only configuration and its owned approval/execution plan.
-//! No ambient proxy selection or official tool/root activation.
+//! Dormant compatibility configuration and its owned approval/execution plan.
+//! Production may freeze one environment proxy at construction; no runtime ambient selection.
 
 use std::sync::Arc;
 
@@ -9,17 +9,25 @@ use talos_core::tool::{
 };
 use thiserror::Error;
 
+#[cfg(test)]
+use super::probe::Reachability;
 use super::{
     CompatibilityError, TransportError,
     admission::AdmittedCompatibilityResults,
     chain::{CompatibilityChainError, ORDER, PreparedCompatibilityChain},
     manifest_extends_scope_without_policy_widening,
+    probe::PreparedReachabilityProbes,
+    wikipedia::PreparedWikipediaSearch,
 };
-use crate::search_backend::transport::{SearchTransport, SystemSearchDns, TransportBudget};
+use crate::search_backend::transport::{
+    SearchTransport, SystemSearchDns, TransportBudget, TransportProxy,
+};
 
-/// Store once per direct-only configuration; never infer this from proxy availability.
+/// Store once per compatibility configuration. Production freezes ambient proxy state here rather
+/// than consulting environment variables while preparing or executing a query.
 pub(in crate::search_backend) struct DirectCompatibilityConfiguration {
     scope: ToolNetworkScope,
+    proxy: Option<Arc<TransportProxy>>,
 }
 
 impl std::fmt::Debug for DirectCompatibilityConfiguration {
@@ -30,13 +38,33 @@ impl std::fmt::Debug for DirectCompatibilityConfiguration {
 
 impl DirectCompatibilityConfiguration {
     pub(in crate::search_backend) fn new() -> Result<Self, TransportError> {
-        let endpoints = ORDER
+        Self::build(false)
+    }
+
+    pub(in crate::search_backend) fn new_with_environment_proxy() -> Result<Self, TransportError> {
+        Self::build(true)
+    }
+
+    fn build(snapshot_environment_proxy: bool) -> Result<Self, TransportError> {
+        let mut endpoints = ORDER
             .iter()
             .map(|protocol| protocol.destination())
             .collect::<Result<Vec<_>, _>>()?;
-        let scope = ToolNetworkScope::new_configuration(endpoints, None, vec![], 0)
-            .map_err(|_| TransportError::InvalidRequest)?;
-        Ok(Self { scope })
+        endpoints.extend(super::probe::destinations()?);
+        endpoints.push(super::wikipedia::destination()?);
+        let proxy = if snapshot_environment_proxy {
+            TransportProxy::from_environment(&endpoints)?
+        } else {
+            None
+        };
+        let scope = ToolNetworkScope::new_configuration(
+            endpoints,
+            proxy.as_ref().map(|proxy| proxy.endpoint().clone()),
+            vec![],
+            0,
+        )
+        .map_err(|_| TransportError::InvalidRequest)?;
+        Ok(Self { scope, proxy })
     }
 
     pub(in crate::search_backend) fn scope(&self) -> &ToolNetworkScope {
@@ -63,14 +91,24 @@ impl DirectCompatibilityConfiguration {
         if !manifest_extends_scope_without_policy_widening(manifest, &self.scope) {
             return Err(TransportError::InvalidRequest.into());
         }
+        // Query-free probes and the fixed migration fallback are frozen before the four-source
+        // chain draws any randomized headers. A late scope/query validation failure therefore
+        // cannot consume entropy and leave a partially prepared invocation.
+        let probes = PreparedReachabilityProbes::prepare(manifest)?;
+        let wikipedia = PreparedWikipediaSearch::prepare(manifest, query, max_results)?;
         let chain = PreparedCompatibilityChain::prepare(manifest, query, max_results)?;
         let facets = facets(manifest);
         Ok(PreparedCompatibilityPlan {
             manifest: manifest.clone(),
+            probes,
             chain,
+            wikipedia,
             facets,
+            proxy: self.proxy.clone(),
             #[cfg(test)]
             dns: Arc::new(SystemSearchDns),
+            #[cfg(test)]
+            reachability: None,
         })
     }
 }
@@ -82,6 +120,9 @@ fn facets(manifest: &ToolNetworkManifest) -> Vec<ToolPermissionFacet> {
         .iter()
         .map(|endpoint| endpoint.host())
         .collect();
+    if let Some(proxy) = manifest.scope().proxy() {
+        hosts.push(proxy.host());
+    }
     hosts.sort_unstable();
     hosts.dedup();
     hosts
@@ -96,10 +137,15 @@ fn facets(manifest: &ToolNetworkManifest) -> Vec<ToolPermissionFacet> {
 /// Neither this object nor a manifest clone grants permission.
 pub(in crate::search_backend) struct PreparedCompatibilityPlan {
     manifest: ToolNetworkManifest,
+    probes: PreparedReachabilityProbes,
     chain: PreparedCompatibilityChain,
+    wikipedia: PreparedWikipediaSearch,
     facets: Vec<ToolPermissionFacet>,
+    proxy: Option<Arc<TransportProxy>>,
     #[cfg(test)]
     dns: Arc<dyn crate::search_backend::transport::SearchDns>,
+    #[cfg(test)]
+    reachability: Option<Reachability>,
 }
 
 impl std::fmt::Debug for PreparedCompatibilityPlan {
@@ -114,6 +160,8 @@ pub(in crate::search_backend) enum CompatibilityPlanError {
     Transport(TransportError),
     #[error("search_compatibility_plan_chain")]
     Chain(CompatibilityChainError),
+    #[error("search_compatibility_plan_wikipedia")]
+    Wikipedia(CompatibilityError),
 }
 
 impl PreparedCompatibilityPlan {
@@ -134,12 +182,37 @@ impl PreparedCompatibilityPlan {
         let dns = Arc::new(SystemSearchDns);
         #[cfg(test)]
         let dns = self.dns;
-        let transport = SearchTransport::new(self.manifest, authority, budget, dns)
-            .map_err(CompatibilityPlanError::Transport)?;
-        self.chain
+        let transport =
+            SearchTransport::new_with_proxy(self.manifest, authority, budget, dns, self.proxy)
+                .map_err(CompatibilityPlanError::Transport)?;
+        #[cfg(not(test))]
+        let reachability = self
+            .probes
             .execute(&transport)
             .await
-            .map_err(CompatibilityPlanError::Chain)
+            .map_err(CompatibilityPlanError::Transport)?;
+        #[cfg(test)]
+        let reachability = match self.reachability {
+            Some(reachability) => reachability,
+            None => self
+                .probes
+                .execute(&transport)
+                .await
+                .map_err(CompatibilityPlanError::Transport)?,
+        };
+        match self
+            .chain
+            .execute_with_reachability(&transport, reachability)
+            .await
+        {
+            Ok(results) => Ok(results),
+            Err(CompatibilityChainError::Exhausted(_)) => self
+                .wikipedia
+                .execute(&transport)
+                .await
+                .map_err(CompatibilityPlanError::Wikipedia),
+            Err(error) => Err(CompatibilityPlanError::Chain(error)),
+        }
     }
 }
 
@@ -195,14 +268,14 @@ mod shared_manifest_tests {
             direct_plan.permission_profile(),
             searxng_plan.permission_profile()
         );
-        assert_eq!(manifest.scope().endpoints().len(), 5);
-        assert_eq!(direct_plan.permission_profile().len(), 5);
+        assert_eq!(manifest.scope().endpoints().len(), 10);
+        assert_eq!(direct_plan.permission_profile().len(), 7);
         assert!(!format!("{manifest:?}").contains("private query"));
     }
 
     #[test]
     fn shared_manifest_cannot_widen_global_network_policy() {
-        let direct = DirectCompatibilityConfiguration::new().expect("direct");
+        let direct = DirectCompatibilityConfiguration::new().expect("config");
         let searxng = SearXngConfiguration::new("https://search.example/").expect("searxng");
         let proxy =
             ToolNetworkEndpoint::new("http", "proxy.example", 8080, "CONNECT", "/").expect("proxy");
