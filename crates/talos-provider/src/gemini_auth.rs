@@ -358,7 +358,14 @@ mod refresh_tests {
         assert!(VertexTokenSource::from_adc(Some(&explicit), &default, true, deadline()).await.is_err());
         std::fs::write(&default, b"invalid").expect("corrupt default");
         assert!(VertexTokenSource::from_adc(None, &default, true, deadline()).await.is_err());
-        assert!(VertexTokenSource::from_adc(None, &default, true, Instant::now() - Duration::from_secs(1)).await.is_err());
+        // A corrupt fixture would mask a missing deadline check with a parse error.
+        std::fs::write(&default, credentials("valid-client").to_string()).expect("valid default");
+        for present in [true, false] {
+            if !present { std::fs::remove_file(&default).expect("remove default"); }
+            let error = VertexTokenSource::from_adc(None, &default, true,
+                Instant::now() - Duration::from_secs(1)).await.expect_err("expired deadline");
+            assert!(error.to_string().contains("timed out"));
+        }
     }
 
     #[tokio::test]
