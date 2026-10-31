@@ -154,3 +154,14 @@ remain separate and unimplemented. Formatted recovered gemini_auth.rs with pinne
 Pinned rustc --edition 2024 --test gemini_endpoint.rs: 2 passed, zero failed; this standalone
 check validates endpoint logic only. Full locked Provider tests are compiling dependencies;
 no fresh Provider/workspace pass or Gemini acceptance is claimed.
+
+### Credential-isolated HTTP transport checkpoint — 2026-11-01
+
+Added GeminiTransport composition: official AI Studio key-header profile and validated standard
+Vertex ADC profile; destination validation precedes ADC discovery. Secret headers are sensitive,
+redirects are disabled, token acquisition and HTTP dispatch share the supplied deadline, upstream
+error bodies are not exposed. Body streaming/retry/progress and public factory remain pending.
+Rust 1.99.0 cargo test -p talos-provider --lib --locked: 226 passed, zero failed/ignored/filtered
+(6.55s). This validates latest ADC selection/path tests, endpoint tests and three HTTP transport
+mocks. No live vendor/metadata request, full workspace validation or Gemini acceptance is claimed.
+Independent transport source review requested. Next: native request mapping and SSE/Agent wiring.
