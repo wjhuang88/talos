@@ -100,3 +100,11 @@ Recovered authorized-user token refresh, bounded response validation, shared on-
 request deadline and redirect rejection, with regression tests. No new dependency introduced.
 This checkpoint remains unwired and unverified; service-account signer, explicit ADC discovery,
 metadata isolation, in-flight cancellation tests and Gemini adapter remain outstanding.
+
+### Verified recovery checkpoint — 2026-10-31
+
+Pinned Rust 1.99.0: cargo test --locked -p talos-provider --lib completed with
+214 passed, zero failed/ignored/filtered. Includes eight Gemini auth tests; malformed, oversized,
+invalid expiry/type/header responses cannot enter cache or leak response secrets through errors.
+This validates the library checkpoint only: no Gemini runtime integration or whole-workspace
+acceptance is claimed. Service-account signing, ADC and native wire remain outstanding.

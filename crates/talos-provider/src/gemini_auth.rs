@@ -271,6 +271,27 @@ mod refresh_tests {
     }
 
     #[tokio::test]
+    async fn invalid_token_responses_never_enter_cache_or_errors() {
+        for body in [
+            r#"{"access_token":"fixture-secret","token_type":"Bearer","expires_in":0}"#.to_owned(),
+            r#"{"access_token":"fixture-secret","token_type":"Other","expires_in":3600}"#.to_owned(),
+            r#"{"access_token":"bad\r\nheader","token_type":"Bearer","expires_in":3600}"#.to_owned(),
+            r#"{"access_token":"fixture-secret","token_type":"Bearer","expires_in":86401}"#.to_owned(),
+            "x".repeat(64 * 1024 + 1),
+            "not JSON fixture-secret".into(),
+        ] {
+            let mut server = mockito::Server::new_async().await;
+            let mock = server.mock("POST", "/").with_body(body).create_async().await;
+            let mut auth = source();
+            auth.endpoint = server.url();
+            let error = auth.token(deadline()).await.expect_err("invalid response").to_string();
+            assert!(!error.contains("fixture-secret"));
+            assert!(auth.cache.lock().await.is_none());
+            mock.assert_async().await;
+        }
+    }
+
+    #[tokio::test]
     async fn deadline_bounds_cache_lock_wait() {
         let auth = source();
         let guard = auth.cache.lock().await;
