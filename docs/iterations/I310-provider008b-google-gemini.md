@@ -108,3 +108,13 @@ Pinned Rust 1.99.0: cargo test --locked -p talos-provider --lib completed with
 invalid expiry/type/header responses cannot enter cache or leak response secrets through errors.
 This validates the library checkpoint only: no Gemini runtime integration or whole-workspace
 acceptance is claimed. Service-account signing, ADC and native wire remain outstanding.
+
+### Local ADC checkpoint validation — 2026-10-31
+
+Implementation 017cca1f0d41ac9b719608d96ff400f4e974c78c includes deadline admission
+and bounded local ADC selection. Verified source blob 27936bb1af61003ac895e764495b0e666fcb80c2.
+Rust 1.99.0, cargo test -p talos-provider --lib --locked: 216 passed, zero failed,
+ignored or filtered (8.87s). Offline repetition also passed 216 tests (9.54s).
+Local ADC resolves caller-supplied paths only; runtime platform discovery, metadata credentials,
+service-account signing and Gemini native wire remain incomplete. This is library validation,
+not full Gemini acceptance, workspace preflight, or merge authorization. Keep Active.
