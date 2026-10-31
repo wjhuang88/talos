@@ -12,6 +12,7 @@ use super::{
     bing_parser::BingParseError,
     ddg_parser::DdgParseError,
     headers::CompatibilityHeaders,
+    probe::Reachability,
 };
 use thiserror::Error;
 use tokio::time::{Instant, sleep, timeout_at};
@@ -132,8 +133,24 @@ impl PreparedCompatibilityChain {
         self,
         transport: &SearchTransport,
     ) -> Result<AdmittedCompatibilityResults, CompatibilityChainError> {
+        self.execute_with_reachability(
+            transport,
+            Reachability {
+                duckduckgo: true,
+                bing: true,
+            },
+        )
+        .await
+    }
+
+    pub(in crate::search_backend) async fn execute_with_reachability(
+        self,
+        transport: &SearchTransport,
+        reachability: Reachability,
+    ) -> Result<AdmittedCompatibilityResults, CompatibilityChainError> {
         self.execute_with_policy(
             transport,
+            reachability,
             LEGACY_COMPATIBILITY_REQUEST_TIMEOUT,
             LEGACY_COMPATIBILITY_RETRY_DELAY,
         )
@@ -146,18 +163,27 @@ impl PreparedCompatibilityChain {
         transport: &SearchTransport,
         source_timeout: Duration,
     ) -> Result<AdmittedCompatibilityResults, CompatibilityChainError> {
-        self.execute_with_policy(transport, source_timeout, LEGACY_COMPATIBILITY_RETRY_DELAY)
-            .await
+        self.execute_with_policy(
+            transport,
+            Reachability {
+                duckduckgo: true,
+                bing: true,
+            },
+            source_timeout,
+            LEGACY_COMPATIBILITY_RETRY_DELAY,
+        )
+        .await
     }
 
     async fn execute_with_policy(
         self,
         transport: &SearchTransport,
+        reachability: Reachability,
         source_timeout: Duration,
         retry_delay: Duration,
     ) -> Result<AdmittedCompatibilityResults, CompatibilityChainError> {
-        // Sentinels cannot escape: exhaustion is reached only after all four slots
-        // are replaced with observed typed availability or semantic failures in the fixed order.
+        // Sentinels cannot escape: exhaustion is reached only after all four slots are replaced
+        // with an observed typed result or an explicit query-free probe Unreachable decision.
         let mut failures = [CompatibilityError::Transport(TransportError::InvalidRequest); 4];
         for (index, source) in self.sources.into_iter().enumerate() {
             let PreparedCompatibilitySearch {
@@ -172,6 +198,17 @@ impl PreparedCompatibilityChain {
                 .budget
                 .check_live()
                 .map_err(|e| terminal(e.into()))?;
+
+            let source_reachable = match protocol {
+                CompatibilityProtocol::Lite
+                | CompatibilityProtocol::InstantAnswer
+                | CompatibilityProtocol::Html => reachability.duckduckgo,
+                CompatibilityProtocol::Bing => reachability.bing,
+            };
+            if !source_reachable {
+                failures[index] = CompatibilityError::Unreachable;
+                continue;
+            }
 
             let first = execute_attempt(
                 protocol,
@@ -296,6 +333,7 @@ fn may_retry_network(error: CompatibilityError) -> bool {
 
 fn may_continue(error: CompatibilityError) -> bool {
     match error {
+        CompatibilityError::Unreachable => true,
         CompatibilityError::Transport(error) => match error {
             TransportError::InvalidRequest
             | TransportError::Unauthorized
