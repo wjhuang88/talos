@@ -19,7 +19,7 @@ jobs:
   # ── Gate: fmt + check + clippy + test ───────────────────────────────────
   gate:
     name: Release preflight
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,7 +38,7 @@ jobs:
   build-macos-arm:
     name: Build macOS ARM64
     needs: gate
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -62,7 +62,7 @@ jobs:
   build-macos-intel:
     name: Build macOS x86_64
     needs: gate
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
