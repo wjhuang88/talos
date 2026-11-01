@@ -1056,8 +1056,8 @@ fn explicit_proxy_and_invalid_bounds_are_closed_errors_not_direct_fallback() {
     ));
     for (duration, requests, bytes) in [
         (Duration::ZERO, 1, 1),
-        (Duration::from_secs(61), 1, 1),
-        (Duration::from_secs(1), 9, 1),
+        (Duration::from_secs(121), 1, 1),
+        (Duration::from_secs(1), 17, 1),
         (Duration::from_secs(1), 1, 1_048_577),
     ] {
         assert!(TransportBudget::new(duration, requests, bytes).is_err());

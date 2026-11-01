@@ -124,10 +124,10 @@ fn hosts(resolver: &Resolver) -> Vec<String> {
 }
 
 #[tokio::test]
-async fn first_dns_failure_reaches_only_next_admitted_source_without_replay() {
-    let server = Server::new(vec![valid(ORDER[1])]);
+async fn first_dns_failure_retries_same_admitted_source_before_later_disclosure() {
+    let server = Server::new(vec![valid(ORDER[0])]);
     let (chain, transport, resolver, budget) = setup(&server, vec![0], 4, AfterFailure::Continue);
-    let expected_ua = chain.sources[1]
+    let expected_ua = chain.sources[0]
         .request
         .headers
         .expect("snapshot")
@@ -135,19 +135,19 @@ async fn first_dns_failure_reaches_only_next_admitted_source_without_replay() {
     let results = chain
         .execute(&transport)
         .await
-        .expect("later admitted winner")
+        .expect("same-source retry winner")
         .into_results();
     assert_eq!(results.len(), 1);
-    assert!(results[0].url.starts_with("https://duckduckgo.com/"));
-    assert_eq!(hosts(&resolver), ["source-0.invalid", "source-1.invalid"]);
+    assert!(results[0].url.starts_with("https://first.invalid/"));
+    assert_eq!(hosts(&resolver), ["source-0.invalid", "source-0.invalid"]);
     assert_eq!(budget.attempts.load(Ordering::Relaxed), 2);
     assert_eq!(server.count(), 1);
     let wire = server.request(0);
-    assert!(wire.starts_with("GET /?q="));
+    assert!(wire.starts_with("POST /lite/"));
     assert!(wire.contains("%E4%B8%AD+%2B%26%7E+"));
     assert!(
         wire.to_ascii_lowercase()
-            .contains("host: source-1.invalid:")
+            .contains("host: source-0.invalid:")
     );
     assert!(
         wire.lines()
@@ -156,10 +156,10 @@ async fn first_dns_failure_reaches_only_next_admitted_source_without_replay() {
 }
 
 #[tokio::test]
-async fn all_dns_failures_exhaust_exactly_four_prepared_sources_without_http() {
+async fn all_dns_failures_exhaust_legacy_seven_attempts_without_http() {
     let server = Server::new(vec![]);
     let (chain, transport, resolver, budget) =
-        setup(&server, vec![0, 1, 2, 3], 4, AfterFailure::Continue);
+        setup(&server, (0..7).collect(), 7, AfterFailure::Continue);
     let error = chain
         .execute(&transport)
         .await
@@ -173,12 +173,15 @@ async fn all_dns_failures_exhaust_exactly_four_prepared_sources_without_http() {
         hosts(&resolver),
         [
             "source-0.invalid",
+            "source-0.invalid",
             "source-1.invalid",
             "source-2.invalid",
+            "source-2.invalid",
+            "source-3.invalid",
             "source-3.invalid"
         ]
     );
-    assert_eq!(budget.attempts.load(Ordering::Relaxed), 4);
+    assert_eq!(budget.attempts.load(Ordering::Relaxed), 7);
     assert_eq!(budget.bytes.load(Ordering::Relaxed), 0);
     assert_eq!(server.count(), 0);
 }
@@ -204,7 +207,7 @@ async fn dns_failure_does_not_bypass_revocation_spent_budget_or_denied_addresses
                 .await
                 .expect_err("terminal boundary"),
             CompatibilityChainError::Terminal {
-                protocol: ORDER[1],
+                protocol: ORDER[0],
                 error: CompatibilityError::Transport(expected)
             }
         );
@@ -216,7 +219,7 @@ async fn dns_failure_does_not_bypass_revocation_spent_budget_or_denied_addresses
 }
 
 #[tokio::test]
-async fn expired_dns_failure_cannot_launch_another_source() {
+async fn expired_dns_failure_cannot_launch_retry_or_another_source() {
     let server = Server::new(vec![]);
     let (chain, transport, resolver, budget) = setup(&server, vec![0], 4, AfterFailure::Expire);
     tokio::time::pause();
@@ -261,17 +264,17 @@ async fn semantic_and_dns_failures_share_existing_bytes_and_attempts() {
 }
 
 #[tokio::test]
-async fn actual_http_protocol_failure_remains_terminal_without_later_source() {
-    let server = Server::new(vec!["not an HTTP response\r\n\r\n".into(), valid(ORDER[1])]);
+async fn actual_http_protocol_failure_is_terminal_without_retry_or_later_disclosure() {
+    let server = Server::new(vec!["not an HTTP response\r\n\r\n".into(), valid(ORDER[0])]);
     let (chain, transport, resolver, budget) = setup(&server, vec![], 4, AfterFailure::Continue);
     assert_eq!(
         chain
             .execute(&transport)
             .await
-            .expect_err("coarse Request stays terminal"),
+            .expect_err("HTTP protocol failure is terminal"),
         CompatibilityChainError::Terminal {
             protocol: ORDER[0],
-            error: CompatibilityError::Transport(TransportError::Request)
+            error: CompatibilityError::Transport(TransportError::Request),
         }
     );
     assert_eq!(hosts(&resolver), ["source-0.invalid"]);

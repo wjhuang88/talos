@@ -155,6 +155,38 @@ pub fn runtime_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContributi
 mod tests {
     use super::*;
 
+    const DIRECT_ROUTE_CHILD: &str = "TALOS_SEARCH_DIRECT_ROUTE_CHILD";
+    const PROXY_ENVIRONMENT: [&str; 6] = [
+        "HTTPS_PROXY",
+        "https_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+    ];
+
+    fn rerun_without_proxy(filter: &str) -> bool {
+        if std::env::var_os(DIRECT_ROUTE_CHILD).is_some() {
+            return false;
+        }
+        let mut command = std::process::Command::new(std::env::current_exe().expect("test binary"));
+        command
+            .arg(filter)
+            .arg("--nocapture")
+            .env(DIRECT_ROUTE_CHILD, "1");
+        for name in PROXY_ENVIRONMENT {
+            command.env_remove(name);
+        }
+        let output = command.output().expect("isolated direct-route child");
+        assert!(
+            output.status.success(),
+            "direct-route child failed:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        true
+    }
+
     fn names(profile: SharedToolProfile) -> Vec<String> {
         tool_contributions(profile, PathBuf::from("workspace"))
             .into_iter()
@@ -237,5 +269,41 @@ mod tests {
         assert!(mcp.iter().any(|name| name == "read"));
         assert!(mcp.iter().any(|name| name == "write"));
         assert!(mcp.iter().any(|name| name == "document_extract"));
+    }
+
+    #[test]
+    fn every_shared_product_root_receives_prepared_web_search() {
+        if rerun_without_proxy("every_shared_product_root_receives_prepared_web_search") {
+            return;
+        }
+        for name in PROXY_ENVIRONMENT {
+            assert!(std::env::var_os(name).is_none(), "{name} must be isolated");
+        }
+        for profile in [
+            SharedToolProfile::Product,
+            SharedToolProfile::Mcp,
+            SharedToolProfile::Runtime,
+        ] {
+            let groups = contribution_groups(profile, PathBuf::from("workspace"));
+            let search = groups
+                .network
+                .iter()
+                .find(|contribution| contribution.name() == "web_search")
+                .expect("web_search contribution");
+            assert!(
+                search.tool().requires_network_invocation(),
+                "{profile:?} must receive the ADR-090 protected route"
+            );
+            let prepared = search
+                .tool()
+                .prepare_network_invocation(&serde_json::json!({
+                    "query": "shared root evidence",
+                    "max_results": 1,
+                    "include_snippets": false
+                }))
+                .expect("protected preparation")
+                .expect("prepared invocation");
+            assert_eq!(prepared.manifest().scope().endpoints().len(), 9);
+        }
     }
 }

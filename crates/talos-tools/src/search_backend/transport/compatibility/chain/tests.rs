@@ -73,6 +73,30 @@ fn relocate_with_hosts(
     relocate_with_ports(chain, server, distinct, None)
 }
 
+fn relocate_request(
+    request: &mut PreparedTransportRequest,
+    manifest: &ToolNetworkManifest,
+    url: reqwest::Url,
+) {
+    let body = request.body.clone();
+    let query = request.url.query().map(str::to_owned);
+    let headers = request.headers;
+    let mut relocated = PreparedTransportRequest::new(
+        manifest,
+        url,
+        request.method.clone(),
+        request.body.take(),
+        BodyFormat::Form,
+    )
+    .expect("relocated request");
+    relocated.headers = headers;
+    assert_eq!(relocated.body, body);
+    assert_eq!(relocated.url.query(), query.as_deref());
+    assert_eq!(relocated.headers, headers);
+    assert_eq!(relocated.invocation_id, manifest.invocation_id());
+    *request = relocated;
+}
+
 fn relocate_with_ports(
     mut chain: PreparedCompatibilityChain,
     server: &Server,
@@ -113,23 +137,10 @@ fn relocate_with_ports(
     .expect("loopback scope");
     let manifest = ToolNetworkManifest::new(scope);
     for (source, url) in chain.sources.iter_mut().zip(urls) {
-        let body = source.request.body.clone();
-        let query = source.request.url.query().map(str::to_owned);
-        let headers = source.request.headers;
-        let mut request = PreparedTransportRequest::new(
-            &manifest,
-            url,
-            source.request.method.clone(),
-            source.request.body.take(),
-            BodyFormat::Form,
-        )
-        .expect("relocated request");
-        request.headers = headers;
-        assert_eq!(request.body, body);
-        assert_eq!(request.url.query(), query.as_deref());
-        assert_eq!(request.headers, headers);
-        assert_eq!(request.invocation_id, manifest.invocation_id());
-        source.request = request;
+        relocate_request(&mut source.request, &manifest, url.clone());
+        if let Some(retry) = source.retry.as_mut() {
+            relocate_request(retry, &manifest, url);
+        }
     }
     (chain, manifest)
 }
@@ -219,7 +230,7 @@ fn all_payload_validation_precedes_any_draw_including_late_get_bounds_and_scope(
 }
 
 #[test]
-fn frozen_chain_owns_four_headers_query_and_count_and_stops_capture_on_error() {
+fn frozen_chain_owns_four_headers_query_count_and_three_prepared_retries() {
     let draws = AtomicUsize::new(0);
     let mut query = "toy-secret".to_owned();
     let chain = PreparedCompatibilityChain::prepare_with(&manifest(), &query, 2, || {
@@ -236,10 +247,17 @@ fn frozen_chain_owns_four_headers_query_and_count_and_stops_capture_on_error() {
         assert_eq!(source.protocol, ORDER[index]);
         assert_eq!(source.query, "toy-secret");
         assert_eq!(source.max_results, 2);
+        let headers = source.request.headers.expect("headers");
         assert_eq!(
-            source.request.headers.expect("headers").user_agent(),
+            headers.user_agent(),
             ["ua-lite", "ua-instant", "ua-html", "ua-bing"][index]
         );
+        assert_eq!(source.retry.is_some(), matches!(index, 0 | 2 | 3));
+        if let Some(retry) = &source.retry {
+            assert_eq!(retry.headers, Some(headers));
+            assert_eq!(retry.url, source.request.url);
+            assert_eq!(retry.body, source.request.body);
+        }
     }
     for panic in [false, true] {
         let draws = AtomicUsize::new(0);
@@ -262,7 +280,11 @@ fn frozen_chain_owns_four_headers_query_and_count_and_stops_capture_on_error() {
 
 #[test]
 fn continuation_table_allows_only_typed_availability_and_semantic_failures() {
-    for error in [TransportError::Dns, TransportError::ConnectionRefused] {
+    for error in [
+        TransportError::Dns,
+        TransportError::ConnectionRefused,
+        TransportError::Network,
+    ] {
         assert!(may_continue(CompatibilityError::Transport(error)));
     }
     for error in [
