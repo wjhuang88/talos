@@ -168,6 +168,13 @@ def bounded_content_type(value: str | None) -> str | None:
     return media_type if MEDIA_TYPE_RE.fullmatch(media_type) else "other"
 
 
+def body_is_complete(body: bytes, remaining_length: int | None) -> bool:
+    """Return whether a bounded read can represent a complete response body."""
+    if len(body) > MAX_BODY_BYTES:
+        return False
+    return remaining_length is None or remaining_length == 0
+
+
 def perform_direct_observation(
     provider: str,
     query: bytes,
@@ -202,6 +209,20 @@ def perform_direct_observation(
         if len(body) > MAX_BODY_BYTES:
             return {
                 "network_classification": "body-too-large",
+                "http_status": response.status,
+                "content_type": bounded_content_type(response.getheader("Content-Type")),
+                "body_complete": False,
+                "body_bytes": len(body),
+                "body_sha256": None,
+                **parse_summary("not-parsed"),
+            }
+
+        # For a Content-Length response, http.client decrements response.length
+        # as bytes are read. A positive remainder means EOF arrived before the
+        # declared body completed; never hash or parse those partial bytes.
+        if not body_is_complete(body, response.length):
+            return {
+                "network_classification": "network",
                 "http_status": response.status,
                 "content_type": bounded_content_type(response.getheader("Content-Type")),
                 "body_complete": False,
