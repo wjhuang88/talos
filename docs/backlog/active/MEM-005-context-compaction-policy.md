@@ -4,9 +4,20 @@
 |-------|-------|
 | Story ID | MEM-005 |
 | Priority | P2 |
-| Status | In Progress / Partial (T4 delegated to I312; #817 merged and effective) |
+| Status | In Progress / Partial (T4 complete via I312; T5 proposed in I313) |
 | Depends On | MEM-002; MEM-003 for full LLM layers |
 | Origin | User feedback 2026-06-18 — context compaction needs explicit trigger and runtime logic |
+
+## Merged T4 acceptance and remaining T5 — 2026-11-01
+
+Completion Commit: `65500a86931cfbadf8bef5e97e45321c20b62e7a` (T4 policy/manual subset only).
+All eleven policy acceptance rows passed I312 final validation: eight exact-head
+CI jobs `41271309341`, full standard preflight, independent API/privacy/security
+review, merge CAS and recorded real CLI/TUI walkthroughs. The parent remains
+In Progress because Issue #390's model-directed tools and bounded history recovery
+are T5, selected by I313's proposed claim. That claim is ineffective until merge.
+Original research notes remain preserved; unimplemented strategies are not claimed
+complete. Earlier T4 pending/local-only evidence below is historical.
 
 ## Current acceptance disposition — 2026-11-01
 
@@ -102,28 +113,28 @@ are available.
 
 ## Acceptance Criteria
 
-- [ ] Compaction trigger thresholds are documented and configurable through
+- [x] Compaction trigger thresholds are documented and configurable through
       provider/model limits where available.
-- [ ] Trigger calculation reserves output budget and reasoning/thinking budget
+- [x] Trigger calculation reserves output budget and reasoning/thinking budget
       when the active model requires it.
-- [ ] Limit source precedence is documented: user config, refreshed catalog,
+- [x] Limit source precedence is documented: user config, refreshed catalog,
       built-in model dataset, then fallback.
-- [ ] Pre-turn compaction runs before provider calls when context pressure
+- [x] Pre-turn compaction runs before provider calls when context pressure
       exceeds the threshold.
-- [ ] Post-turn maintenance can mark the session as needing compaction after
+- [x] Post-turn maintenance can mark the session as needing compaction after
       large tool outputs or long responses.
-- [ ] Manual compaction is exposed through a user command or equivalent UI
+- [x] Manual compaction is exposed through a user command or equivalent UI
       action.
-- [ ] The TUI displays a compact, non-persistent status line when compaction
+- [x] The TUI displays a compact, non-persistent status line when compaction
       runs, succeeds, is skipped, or fails.
-- [ ] Raw session history remains recoverable; compacted provider context does
+- [x] Raw session history remains recoverable; compacted provider context does
       not replace the durable source of truth unless an explicit future ADR
       changes that boundary.
-- [ ] Hidden tool output is never printed into history as a side effect of
+- [x] Hidden tool output is never printed into history as a side effect of
       compaction.
-- [ ] Compaction failures do not abort the user turn; the session continues
+- [x] Compaction failures do not abort the user turn; the session continues
       with a safe fallback or a clear refusal if the context cannot fit.
-- [ ] Tests cover threshold decisions, pre-turn ordering, manual compaction,
+- [x] Tests cover threshold decisions, pre-turn ordering, manual compaction,
       skipped compaction, and failure fallback.
 
 ## Smart Compaction Strategy (Research 2026-06-20)

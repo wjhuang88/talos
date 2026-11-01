@@ -1,3 +1,16 @@
+## T4 merged; T5 activation proposal — 2026-11-01
+
+I312 is Complete/Closed with Completion Commit:
+`65500a86931cfbadf8bef5e97e45321c20b62e7a` (#818). All eight exact-head CI jobs
+`41271309341`, independent static API/privacy/security review, both governance
+validators and CAS passed. MEM-003's ADR-096 replacement and MEM-005's eleven T4
+rows are accepted; MEM-005/#390 remains In Progress for T5.
+I313 proposes the full T5 delivery and all thirty Issue #390 regression rows;
+claim/Active state proposed in #819 are ineffective until its finalized head merges.
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+The first four stages are merged; T5/T1/T6 remain unimplemented. Earlier snapshots
+below are historical and do not override current owner evidence.
+
 ## MODEL-014 complete; T4 implementation — 2026-10-30
 
 [I311](iterations/I311-model014-capability-inference.md) and MODEL-014 are Complete/Closed. Completion Commit:
@@ -81,6 +94,8 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| Whole-request compaction / T4 | Complete / Closed | [I312](iterations/I312-whole-request-compaction.md) | #818 merged `65500a869`; eight CI jobs, independent review and CAS passed. |
+| Actor checkpoint/history / T5 | Active / Claimed (proposed) | [I313](iterations/I313-model-checkpoint-history.md) | Proposed #819 atomic claim; ineffective before target-branch merge. |
 | Protocol architecture / OpenAI Responses | Complete / Closed | [PROVIDER-008-A](backlog/active/PROVIDER-008-A-openai-responses-protocol.md) / [I306](iterations/I306-provider008a-openai-responses.md) / #748 | Implementation through #803 `dd6c5f8`; all 52 reviewed HTTP pairs active. CI3570 8/8 and technical acceptance review passed. #748 closes after owner closure merge; #724 stays open for unimplemented B/C/D. |
 | Windows known-resource acceptance | Complete / Closed | [TEST-004](backlog/active/TEST-004-windows-known-resource-acceptance.md) / [I305](iterations/I305-windows-known-resource-acceptance.md) / #729 | #716 merged `b5b8241e`; I305/TEST004 cite existing Completion Commit. CI3221 all6jobs and protected review/CAS passed; only known-resource criterion closed, #717 residual open. |
 | Absent-journal pause without initialization | Complete / Closed | [RUNTIME-011](backlog/active/RUNTIME-011-absent-journal-pause.md) / [I304](iterations/I304-absent-journal-pause.md) | #726 implementation `aa1c477f` merged `c869a9af`; CI3203/review/CAS and CI3206 post-repair2220/2220 passed. I304 retains local failures; #705 retains broader timeout residuals. |
@@ -88,7 +103,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 | Windows self-only handle evidence | Review / Claimed | [TEST-003](backlog/active/TEST-003-windows-owned-handle-evidence.md) / [I302](iterations/I302-windows-owned-handle-evidence.md) / #717 | #718 merged f4313237; CI3213 failed cold73→76 while modes1–7 passed, direct mode7 counts73/74/76/76. #716 mergedb5b8241e; CI3221 known-resource gate passed. I305 narrow criterion closed; unexplained resources remain OPEN. |
 | Missing pending-sidecar startup recovery | Complete / Closed | [RUNTIME-010](backlog/active/RUNTIME-010-missing-pending-sidecar-startup.md) / [I301](iterations/I301-missing-pending-sidecar-startup.md) | #711 implementation98fa04cb merged9cad344b after CI3161/review/CAS; post-merge startup comparisons recorded in I301. Broader timeout residuals remain#705. |
 | I300 structured Git repair / T7 | Complete / Closed | [I300](iterations/I300-structured-git-repair.md) | #735 merged `ee84889fd`; existing Completion Commit, final all-success CI 40251434249, full locked preflight and independent exact-head/base review recorded in owner. |
-| All-built-in Auto review | Active / I308 | [I308](iterations/I308-builtin-auto-review.md) | #765 activation merged at `8f0ce2340`; H/G implementation partial, default network Auto and recovery remain open. |
+| All-built-in Auto review | Complete / Closed | [I308](iterations/I308-builtin-auto-review.md) | Completion Commit `5dea4925a143151071ea231779c100a75734e6fe`; #809 CI/review and seven-row acceptance closed. |
 | I299 preserved presentation recovery / C0 | Complete / Closed | [I299](iterations/I299-preserved-presentation-recovery.md) | #701 merged as `69092675`; full preflight, independent API/privacy review, all four native observations, exact-head CI and CAS passed. Seven handoff requirements remain incomplete and separately scheduled. |
 | I298 context budget recovery / MEM-005-A | Complete / Closed | [I298](iterations/I298-context-budget-recovery.md) | #691 merged as `8d4ad50e`; full preflight, six CI jobs, independent Agent review and CAS passed; next-minor only, no parent MEM-005 completion. |
 | I292 Search compatible backend boundary / SEARCH-001-B | Complete / Claimed | [I292](iterations/I292-search-compatible-backend-boundary.md) / [SEARCH-001-B](backlog/active/SEARCH-001-B-compatible-search-backends.md) / #642 | PR #660 merged as `7728f7681df11a9d715a0e479590c1002c53a26f`; exact-head CI run `37409618084`; no production routing change. |

@@ -1,3 +1,16 @@
+## T4 merged; T5 activation proposal — 2026-11-01
+
+I312 is Complete/Closed with Completion Commit:
+`65500a86931cfbadf8bef5e97e45321c20b62e7a` (#818). All eight exact-head CI jobs
+`41271309341`, independent static API/privacy/security review, both governance
+validators and CAS passed. MEM-003's ADR-096 replacement and MEM-005's eleven T4
+rows are accepted; MEM-005/#390 remains In Progress for T5.
+I313 proposes the full T5 delivery and all thirty Issue #390 regression rows;
+claim/Active state proposed in #819 are ineffective until its finalized head merges.
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+The first four stages are merged; T5/T1/T6 remain unimplemented. Earlier snapshots
+below are historical and do not override current owner evidence.
+
 ## MODEL-014 complete; T4 implementation — 2026-10-30
 
 [I311](I311-model014-capability-inference.md) and MODEL-014 are Complete/Closed. Completion Commit:
