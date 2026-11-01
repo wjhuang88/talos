@@ -20,12 +20,25 @@ pub(crate) enum ManualCheckpointResult {
 }
 
 impl Agent {
+    #[cfg(test)]
     pub(crate) async fn compact_session_history(
         &self,
         history: Vec<Message>,
         generation: u64,
         limit: u32,
         recovered: Option<&HistorySource>,
+    ) -> ManualCheckpointResult {
+        self.compact_session_history_measured(history, generation, limit, recovered, None)
+            .await
+    }
+
+    pub(crate) async fn compact_session_history_measured(
+        &self,
+        history: Vec<Message>,
+        generation: u64,
+        limit: u32,
+        recovered: Option<&HistorySource>,
+        measurement: Option<&std::sync::Mutex<Option<u32>>>,
     ) -> ManualCheckpointResult {
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
         let mut measured_before = None;
@@ -66,6 +79,11 @@ impl Agent {
                 .await
                 .map_err(|_| ())?;
             measured_before = Some(plan.estimated_tokens);
+            if let Some(measurement) = measurement
+                && let Ok(mut value) = measurement.lock()
+            {
+                *value = measured_before;
+            }
             Ok::<_, ()>(
                 self.prepare_manual_checkpoint(
                     &mut plan,

@@ -6,6 +6,7 @@ use crate::compaction::{CompactAdmission, CompactOperations};
 use talos_core::session::{CompactOutcome, CompactState};
 
 pub(super) struct ManualCompaction {
+    measurement: Arc<std::sync::Mutex<Option<u32>>>,
     ledger: CompactOperations,
     queued: Option<u64>,
     boundary_resume: Option<(
@@ -18,6 +19,7 @@ pub(super) struct ManualCompaction {
 impl ManualCompaction {
     pub(super) fn new(generation: u64) -> Self {
         Self {
+            measurement: Arc::new(std::sync::Mutex::new(None)),
             ledger: CompactOperations::new(generation),
             queued: None,
             boundary_resume: None,
@@ -37,6 +39,7 @@ impl ManualCompaction {
     pub(super) fn admit(&mut self, actor: &AppServerSession, generation: u64, id: u64) {
         let state = match self.ledger.admit(generation, id) {
             CompactAdmission::Accepted => {
+                self.measurement = Arc::new(std::sync::Mutex::new(None));
                 self.queued = Some(id);
                 CompactState::Queued
             }
@@ -75,9 +78,13 @@ impl ManualCompaction {
             return;
         };
         let (result, received) = tokio::sync::oneshot::channel();
+        self.measurement = Arc::new(std::sync::Mutex::new(None));
         if request
             .compact
-            .send(Some(crate::BoundaryCompactJob { result }))
+            .send(Some(crate::BoundaryCompactJob {
+                result,
+                measurement: self.measurement.clone(),
+            }))
             .is_err()
         {
             self.finish(actor, id, CompactOutcome::Cancelled);
@@ -120,10 +127,12 @@ impl ManualCompaction {
         let recovered = actor.recovered_source.clone();
         let limit = actor.model_context_limit;
         let task_token = token.clone();
+        self.measurement = Arc::new(std::sync::Mutex::new(None));
+        let measurement = self.measurement.clone();
         let task = tokio::spawn(async move {
             tokio::select! { biased;
                 () = task_token.cancelled() => ManualCheckpointResult::Outcome(CompactOutcome::Cancelled),
-                outcome = agent.compact_session_history(history, generation, limit, recovered.as_ref()) => outcome,
+                outcome = agent.compact_session_history_measured(history, generation, limit, recovered.as_ref(), Some(&measurement)) => outcome,
             }
         });
         self.running = Some((id, token, task));
@@ -189,7 +198,9 @@ impl ManualCompaction {
                         new_messages: vec![],
                     }
                 }
-                CompactOutcome::Cancelled => TurnCompletionStatus::Cancelled,
+                CompactOutcome::Cancelled | CompactOutcome::CancelledWithEstimate { .. } => {
+                    TurnCompletionStatus::Cancelled
+                }
                 CompactOutcome::Failed | CompactOutcome::FailedWithEstimate { .. } => {
                     TurnCompletionStatus::Error {
                         message: "checkpoint failed".into(),
@@ -205,6 +216,16 @@ impl ManualCompaction {
     }
 
     fn finish(&mut self, actor: &AppServerSession, id: u64, outcome: CompactOutcome) {
+        let outcome = if outcome == CompactOutcome::Cancelled {
+            self.measurement
+                .lock()
+                .ok()
+                .and_then(|value| *value)
+                .map(|before| CompactOutcome::CancelledWithEstimate { before })
+                .unwrap_or(outcome)
+        } else {
+            outcome
+        };
         if self.ledger.finish(actor.session_generation, id, outcome) {
             Self::emit(
                 actor,
@@ -257,6 +278,52 @@ impl Drop for ManualCompaction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn cancelled_measurement_is_receipted_and_never_leaks_to_next_operation() {
+        let agent = Agent::with_security(
+            Arc::new(SummaryModel),
+            ToolRegistry::new(),
+            None,
+            None,
+            std::env::temp_dir(),
+        );
+        let (mut handle, actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: std::env::temp_dir(),
+                initial_history: vec![],
+                model_context_limit: 30_000,
+            },
+        );
+        let mut manual = ManualCompaction::new(0);
+        manual.admit(&actor, 0, 1);
+        *manual.measurement.lock().expect("measurement") = Some(12345);
+        manual.cancel(&actor);
+        manual.admit(&actor, 0, 1);
+        manual.admit(&actor, 0, 2);
+        manual.cancel(&actor);
+        let mut outcomes = vec![];
+        while let Ok(SessionEvent::CompactStatus { state, .. }) = handle.eq_rx.try_recv() {
+            if let CompactState::Completed { outcome, replayed } = state {
+                outcomes.push((outcome, replayed));
+            }
+        }
+        assert_eq!(
+            outcomes,
+            vec![
+                (
+                    CompactOutcome::CancelledWithEstimate { before: 12345 },
+                    false
+                ),
+                (
+                    CompactOutcome::CancelledWithEstimate { before: 12345 },
+                    true
+                ),
+                (CompactOutcome::Cancelled, false),
+            ]
+        );
+    }
     use async_trait::async_trait;
     use talos_core::message::{AgentEvent, Message, StopReason, Usage};
     use talos_core::provider::{LanguageModel, ProviderResult};

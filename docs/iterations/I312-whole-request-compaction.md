@@ -8,6 +8,38 @@
 
 ## Current manual failure increment — 2026-10-31 (uncommitted)
 
+Current cancellation-stage standard host preflight runs as session 9076, log
+`/private/tmp/i312-cancel-final-preflight.log`. The prior 1696 success predates
+this runtime delta. Source inspection identifies a concrete request-variation
+mechanism: PromptBuilder adds current datetime on assembly, and checkpoint attempt
+fingerprints include full plan messages. Identical raw history therefore does not
+prove identical attempt keys. The failed run's exact key was not captured, so
+this is not a proven exclusive root cause of that historical retry difference.
+
+Latest cancellation increment: Agent 599/599, affected Agent/Conversation/CLI
+all-target warnings-denied Clippy, and rebuilt real CLI numeric cancellation plus
+same-process continuation pass. Logs: `/private/tmp/i312-cancel-current-agent.log`,
+`/private/tmp/i312-cancel-clippy.log`, `/private/tmp/i312-cancel-metrics-cli-fixed.log`.
+Independent static review approved runtime diff
+`0423316af3d4eb69d04ea8f08d176f53c09e0f0ec1339fde61045e4131c2e2ec` against
+`02d089c8a`; reviewer did not run tests. Latest full preflight remains due.
+
+Evidence correction: prior CLI repeated-failure single-call assertion is unstable.
+Rebuilt binary allowed the second command to succeed (`/private/tmp/i312-cancel-metrics-cli.log`).
+Fingerprint variation is a hypothesis, not established cause. The script now
+claims only both commands terminate with raw history unchanged. Exact same-key
+suppression is covered by CheckpointAttempts unit tests, not this CLI scenario.
+Earlier stronger CLI suppression claims are superseded; no runtime policy changed.
+
+CLI cancellation/recovery fixtures committed at `02d089c8a`. The next uncommitted
+increment adds `CancelledWithEstimate` with operation-local shared measurement
+for idle and boundary execution; new admission clears stale measurements and
+receipt replay retains the completed value. Existing manual matrix passed 18/18
+(`/private/tmp/i312-cancel-metrics.log`). The added isolation/replay regression
+is running (`/private/tmp/i312-cancel-measurement-isolation.log`); independent
+API review and current full checks are pending. Previous preflight does not
+certify this new runtime change.
+
 2026-11-01 current validation: preflight 1696 completed exit 0, including both
 external SDK modes (`/private/tmp/i312-recovered-preflight.log`), for the current
 Rust source including inline fork repair. Subsequent edits are acceptance-script

@@ -546,6 +546,9 @@ An unchanged continuation reuses its observed request; new steering input create
 a different request. Observation denial or interruption aborts that continuation
 without retrying its hook. Interrupt/shutdown cancel pending work.
 Status contains bounded enums and numeric estimates, never checkpoint text. The
+`CancelledWithEstimate` outcome retains an already measured request count;
+`Cancelled` means no count is available. New operations never inherit a previous
+operation's measurement; receipt replay retains the original completed value. The
 external SDK fixture exercises below-threshold compaction before an ordinary turn
 in both dependency modes; it does not certify long-history semantic retention.
 

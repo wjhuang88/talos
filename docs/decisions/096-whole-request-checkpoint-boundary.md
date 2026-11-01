@@ -64,6 +64,11 @@ fabricated zero. Outer preparation timeouts preserve an already measured estimat
 task join or response loss may still lose it. Neither outcome carries
 provider strings or checkpoint content; prior context remains unchanged.
 
+Manual `CancelledWithEstimate` preserves a measured request count across idle or
+tool-boundary cancellation. Per-operation measurement is reset on admission and
+terminal receipt replay retains the original value. Cancellation before measurement
+uses `Cancelled`; consumers handle the new variant in the next-minor migration.
+
 Ship only in the next pre-1.0 minor release, never as an existing-minor patch.
 Consumers must add the typed compact handling or explicit unsupported response to
 exhaustive matches, rebuild against the new minor, and preserve target-generation

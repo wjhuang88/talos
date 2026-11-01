@@ -114,6 +114,8 @@ pub enum CompactOutcome {
     },
     /// Cancellation won before application.
     Cancelled,
+    /// Cancellation won after the whole request had been measured.
+    CancelledWithEstimate { before: u32 },
 }
 
 /// Content-free failure categories for manual checkpoint attempts.

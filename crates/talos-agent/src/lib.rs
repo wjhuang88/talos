@@ -103,6 +103,7 @@ pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDe
 pub(crate) use request_plan::PreparedSessionTurn;
 
 pub(crate) struct BoundaryCompactJob {
+    pub(crate) measurement: Arc<std::sync::Mutex<Option<u32>>>,
     pub(crate) result: tokio::sync::oneshot::Sender<checkpoint_manual::ManualCheckpointResult>,
 }
 
@@ -1848,6 +1849,9 @@ impl Agent {
                             );
                         }
                         measured_before = Some(plan.estimated_tokens);
+                        if let Ok(mut value) = job.measurement.lock() {
+                            *value = measured_before;
+                        }
                         self.prepare_manual_checkpoint(
                             &mut plan,
                             limit,

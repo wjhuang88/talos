@@ -92,6 +92,9 @@ pub fn format_compact_status(id: u64, state: talos_core::session::CompactState) 
                     format!("failed ({reason}): estimated tokens {before}; prior context retained")
                 }
                 CompactOutcome::Cancelled => "cancelled: prior context retained".into(),
+                CompactOutcome::CancelledWithEstimate { before } => {
+                    format!("cancelled: prior context retained; estimated tokens {before}")
+                }
             };
             if replayed {
                 format!("{result} (previous result)")

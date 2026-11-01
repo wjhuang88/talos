@@ -1,5 +1,12 @@
 ## Current acceptance checkpoint — 2026-10-31
 
+Latest: uncommitted numeric cancellation passes Agent 599/599, affected-crate
+Clippy and real CLI signal/cancel/ordinary-continuation checks; see I312 logs.
+The earlier CLI claim of guaranteed same-request retry suppression is withdrawn:
+a repeat succeeded in another run, cause unproven. Exact same-key suppression
+remains unit-tested; CLI fixture now certifies only terminal outcomes/raw integrity.
+Current full preflight and all remote closure gates remain outstanding.
+
 2026-11-01 latest: current Rust preflight 1696 completed exit 0 with both SDK
 modes (`/private/tmp/i312-recovered-preflight.log`). Real POSIX CLI cancellation
 followed by an ordinary turn in the same process passes, with original transcript
