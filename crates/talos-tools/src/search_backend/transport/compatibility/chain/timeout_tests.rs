@@ -322,12 +322,12 @@ async fn source_timeout_retry_can_recover_without_later_query_disclosure() {
 
 #[tokio::test]
 async fn slow_successful_primary_does_not_disclose_query_to_later_source() {
-    // The first request is fully received before its response is delayed. Its response arrives
-    // after one quarter of the enclosing budget (the old equal-share cutoff) but before the
-    // configured per-source window. A correct protected chain therefore returns the primary result
-    // without opening a second query-bearing connection.
+    // The first request is fully received before its response is delayed. With a 2s enclosing
+    // budget, the old equal-share cutoff would be 500ms; the 700ms response is after that cutoff
+    // but before the configured 1500ms per-source window. A correct protected chain therefore
+    // returns the primary result without opening a second query-bearing connection.
     let server = DelayedServer::new(
-        Duration::from_millis(350),
+        Duration::from_millis(700),
         vec![
             valid(CompatibilityProtocol::Lite),
             valid(CompatibilityProtocol::InstantAnswer),
@@ -341,14 +341,14 @@ async fn slow_successful_primary_does_not_disclose_query_to_later_source() {
         manifest.clone(),
         Arc::new(AllowAuthority(manifest)),
         Arc::new(
-            TransportBudget::new(Duration::from_secs(1), 4, 1_048_576).expect("shared budget"),
+            TransportBudget::new(Duration::from_secs(2), 4, 1_048_576).expect("shared budget"),
         ),
         dns.clone(),
     )
     .expect("transport");
 
     let rows = chain
-        .execute_with_source_timeout(&transport, Duration::from_millis(500))
+        .execute_with_source_timeout(&transport, Duration::from_millis(1500))
         .await
         .expect("slow primary success")
         .into_results();
