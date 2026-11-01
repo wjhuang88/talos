@@ -1,8 +1,10 @@
 # SEARCH-001-D: Native Provider Admission And Regional Evidence
 
-**Status**: Active / Claimed; selected in I294
+**Status**: Complete / Closed — research gate completed with BLOCKED / ZERO-ADMISSION outcome
 **Type**: Research / Evidence Gate
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
+
+Completion Commit: `0afeb5b1a0d228d414a53ca2947bfd835c3f598b`
 
 | Field | Value |
 |---|---|
@@ -10,14 +12,14 @@
 | Source Issue | [#644](https://github.com/wjhuang88/talos/issues/644) |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 merged as `4567bf85` |
 | Selected Iteration | [I294](../../iterations/I294-search-provider-evidence.md) |
-| Implementation PR | #668, #673, #676, #686, #687 and #693 (merged); #825 (Draft evidence refresh) |
+| Implementation PR | #668, #673, #676, #686, #687, #693, #825, #826, #827, #828, #829 and #830 (merged) |
 | Last Updated | 2026-11-01 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-6 Sol / talos开发 session |
 | Work Slice | SEARCH-001-D native provider admission and regional evidence only |
@@ -26,7 +28,7 @@
 | Governance Claim PR | #665 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
-| Handoff / Release Condition | E/F remain blocked until the candidate matrix and regional evidence gate are accepted. |
+| Handoff / Release Condition | Research gate closed with zero providers admitted. Mwmbl/Purili remain outside the default distribution; SEARCH-001-E/F remain unauthorized because D admission did not occur; parent #624 remains open. Material new evidence requires reopening #644 or a separately governed D follow-up. |
 
 ## Goal
 
@@ -35,7 +37,7 @@ maintainability, parser fixtures, endpoint and failure-domain independence, priv
 DNS/TLS/HTTP/parser observations, challenge interpretation and provenance-backed regional evidence.
 
 Working evidence register: [SEARCH-001-D provider evidence register](../../reference/SEARCH-001-D-PROVIDER-EVIDENCE-2026-10-06.md).
-Latest bounded refresh candidate: [2026-11-01 provider refresh](../../reference/SEARCH-001-D-PROVIDER-REFRESH-2026-11-01.md).
+Accepted 2026-11-01 status: [SEARCH-001-D final disposition](../../reference/SEARCH-001-D-FINAL-DISPOSITION-2026-11-01.md).
 
 ## Constraints
 
@@ -128,3 +130,17 @@ Purili offline fixture/parser packet; obtain permitted valid-query observations 
 candidates from a network with working DNS/HTTPS; compare native provenance/failure domains; and
 obtain paired controlled regional observations including genuine mainland-China evidence. Until
 those gates close, E/F remain unauthorized and #644/#624 remain open.
+
+## Final Closeout — 2026-11-01
+
+The accepted [SEARCH-001-D final disposition](../../reference/SEARCH-001-D-FINAL-DISPOSITION-2026-11-01.md)
+closes the research/evidence gate with a **BLOCKED / ZERO-ADMISSION** result. Mwmbl and Purili are
+both explicitly not admitted: live valid-query evidence, hosted failure-domain independence,
+genuine mainland-China regional evidence and material result-use/service-term questions remain
+insufficient for default admission. #827 supplies the reproducible bounded acquisition path without
+turning missing measurements into positive regional evidence.
+
+The completion evidence boundary is pre-existing merge
+`0afeb5b1a0d228d414a53ca2947bfd835c3f598b`; this governance closeout is not its own evidence.
+SEARCH-001-E/F remain unauthorized because D admission did not occur, and parent #624 remains open.
+Future material evidence requires reopening #644 or a separately governed D follow-up.
