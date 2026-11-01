@@ -84,7 +84,78 @@ pub struct RecoveryIndexSource<'a> {
     pub ordinal: u64,
 }
 
+/// Untrusted cache candidate requiring authoritative source and scope revalidation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryCandidate {
+    /// Original entry identity; never an authorization capability by itself.
+    pub entry_id: String,
+    /// Snapshot order used for bounded keyset pagination.
+    pub ordinal: u64,
+}
+
 impl SessionIndex {
+    /// Find at most twenty candidates in a host-selected snapshot scope.
+    /// An empty query discovers entries in source order. Nonempty queries use FTS
+    /// only over eligible projection text, without global rank/statistics.
+    /// This never initializes/repairs storage or returns raw text. The caller
+    /// must verify index completeness and reread authorized sources before use.
+    pub fn recovery_candidates(
+        &self,
+        scope: &str,
+        query: &str,
+        after: Option<u64>,
+        limit: usize,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<Vec<RecoveryCandidate>, IndexError> {
+        native_boundary(|| {
+            if scope.is_empty()
+                || scope.len() > 128
+                || query.len() > 1024
+                || limit == 0
+                || limit > 20
+                || after.is_some_and(|n| n > i64::MAX as u64)
+            {
+                return Err(IndexError::Store(IndexStoreError::Database(
+                    "invalid recovery query bounds".into(),
+                )));
+            }
+            let local = RecoveryWorkBudget {
+                cancelled: budget.cancelled.clone(),
+                deadline: budget.deadline.min(Instant::now() + Duration::from_secs(2)),
+            };
+            let _guard = install_budget(&self.conn, &local)?;
+            let sql = if query.is_empty() {
+                "SELECT entry_id,ordinal FROM recovery_sources WHERE scope=?1 AND ordinal>?2 ORDER BY ordinal LIMIT ?3"
+            } else {
+                "SELECT s.entry_id,s.ordinal FROM recovery_sources s JOIN recovery_projection_fts f ON f.rowid=s.id WHERE s.scope=?1 AND s.ordinal>?2 AND recovery_projection_fts MATCH ?4 ORDER BY s.ordinal LIMIT ?3"
+            };
+            let mut statement = self.conn.prepare(sql)?;
+            let cursor = after.map_or(-1, |n| n as i64);
+            let mut rows = if query.is_empty() {
+                statement.query(params![scope, cursor, limit as i64])?
+            } else {
+                statement.query(params![scope, cursor, limit as i64, query])?
+            };
+            let mut candidates = Vec::with_capacity(limit);
+            while let Some(row) = rows.next()? {
+                local.check()?;
+                let id: String = row.get(0)?;
+                let ordinal: i64 = row.get(1)?;
+                if id.len() > 1024 || ordinal < 0 {
+                    return Err(IndexError::Store(IndexStoreError::Database(
+                        "invalid recovery cache row".into(),
+                    )));
+                }
+                candidates.push(RecoveryCandidate {
+                    entry_id: id,
+                    ordinal: ordinal as u64,
+                });
+            }
+            local.check()?;
+            Ok(candidates)
+        })
+    }
+
     /// Initialize the additive recovery cache schema during authorized host maintenance.
     /// Model queries must never call this method implicitly.
     pub fn init_recovery_schema(&self) -> Result<(), IndexError> {
@@ -295,6 +366,135 @@ mod tests {
                 )
                 .expect("tables"),
             0
+        );
+    }
+
+    #[test]
+    fn scoped_query_filters_before_limit_and_ignores_sibling_rank() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
+        index.init_recovery_schema().expect("schema");
+        let source = |id: &str, content: &str| SessionEntry {
+            id: id.into(),
+            parent_id: None,
+            timestamp: chrono::Utc::now(),
+            role: "user".into(),
+            content: content.into(),
+            metadata: Default::default(),
+        };
+        let first = source("first", "needle");
+        let second = source("second", "needle needle");
+        index
+            .cache_recovery_page(
+                "current",
+                &[
+                    RecoveryIndexSource {
+                        entry: &first,
+                        terminal: None,
+                        ordinal: 1,
+                    },
+                    RecoveryIndexSource {
+                        entry: &second,
+                        terminal: None,
+                        ordinal: 2,
+                    },
+                ],
+            )
+            .expect("current");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+        let before = index
+            .recovery_candidates("current", "needle", None, 1, &budget)
+            .expect("query");
+        let sibling = source("foreign", "needle ".repeat(100).as_str());
+        index
+            .cache_recovery_page(
+                "sibling",
+                &[RecoveryIndexSource {
+                    entry: &sibling,
+                    terminal: None,
+                    ordinal: 0,
+                }],
+            )
+            .expect("sibling");
+        assert_eq!(
+            index
+                .recovery_candidates("current", "needle", None, 1, &budget)
+                .expect("query"),
+            before
+        );
+        assert_eq!(before[0].entry_id, "first");
+        let page = index
+            .recovery_candidates("current", "needle", Some(1), 1, &budget)
+            .expect("next");
+        assert_eq!(page[0].entry_id, "second");
+        assert_eq!(
+            index
+                .recovery_candidates("current", "", None, 20, &budget)
+                .expect("discover")
+                .len(),
+            2
+        );
+        let changes = index.conn.total_changes();
+        assert!(
+            index
+                .recovery_candidates("current", "needle", None, 21, &budget)
+                .is_err()
+        );
+        assert_eq!(index.conn.total_changes(), changes);
+    }
+
+    #[test]
+    fn queries_do_not_repair_missing_schema_or_mutate_on_failure() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+        assert!(
+            index
+                .recovery_candidates("scope", "", None, 1, &budget)
+                .is_err()
+        );
+        let tables: i64 = index
+            .conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE name LIKE 'recovery_%'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("tables");
+        assert_eq!(tables, 0);
+        index.init_recovery_schema().expect("host maintenance");
+        // Populate the selected scope so SQLite evaluates MATCH rather than
+        // short-circuiting the join on an empty source table.
+        index.conn.execute("INSERT INTO recovery_sources(id,scope,entry_id,ordinal) VALUES(1,'scope','entry',0)", []).expect("source");
+        index
+            .conn
+            .execute(
+                "INSERT INTO recovery_projection_fts(rowid,content) VALUES(1,'public')",
+                [],
+            )
+            .expect("projection");
+        let changes = index.conn.total_changes();
+        let cancelled = RecoveryWorkBudget::new(Duration::from_secs(2));
+        cancelled.cancel();
+        for stopped in [cancelled, RecoveryWorkBudget::new(Duration::ZERO)] {
+            assert!(
+                index
+                    .recovery_candidates("scope", "", None, 1, &stopped)
+                    .is_err()
+            );
+        }
+        assert!(
+            index
+                .recovery_candidates("scope", "\"", None, 1, &budget)
+                .is_err()
+        );
+        assert_eq!(index.conn.total_changes(), changes);
+        assert!(
+            index
+                .recovery_candidates("scope", "", None, 1, &budget)
+                .expect("connection usable after failure")
+                .len()
+                == 1
         );
     }
 

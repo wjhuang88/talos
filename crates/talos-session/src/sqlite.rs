@@ -11,7 +11,7 @@
 //! - `messages_fts` FTS5 virtual table: full-text searchable message content
 
 mod recovery;
-pub use recovery::{RecoveryIndexSource, RecoveryWorkBudget};
+pub use recovery::{RecoveryCandidate, RecoveryIndexSource, RecoveryWorkBudget};
 
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OptionalExtension, Result as RusqliteResult, params};

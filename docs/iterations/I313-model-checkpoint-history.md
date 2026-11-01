@@ -423,3 +423,24 @@ typed database-busy error; the existing IndexError retains string-backed details
 Injected panic after a write proves rollback and restored busy_timeout; an expired
 schema budget creates no tables. Session 235/235 and all-target Clippy pass.
 Follow-up independent review and workspace/native verification remain outstanding.
+
+### Read-only scoped candidates — local, unmerged
+
+The query API now returns at most twenty entry IDs/ordinals from a host-selected
+scope, in source order with keyset pagination. Empty query supports discovery;
+FTS searches only recovery projections, filters scope before LIMIT, and uses no
+global BM25 statistics. It shares cancellation and caps query work at two seconds.
+It never creates/repairs schema or returns source text. Missing schema remains an
+IndexError at this layer; typed model-facing unavailable mapping is still required.
+
+Seven focused recovery tests pass, including sibling corpus independence, paging,
+missing-schema refusal, cancellation/expiry, malformed MATCH with an actual source
+row, no mutation and connection reuse. An initial malformed-query fixture had an
+empty table and SQLite skipped MATCH evaluation; the populated fixture corrects
+that test assumption. All-target Session Clippy with warnings denied passes.
+Logs: `/private/tmp/i313-query-boundaries.log`, `/private/tmp/i313-query-clippy.log`.
+Independent incremental static review APPROVE against `6f3cc9e3e` with two-file
+diff SHA256 `dbfbb9f0951ff379cf622d7263766c743233b8fec27a8d144b66572207873b3f`.
+Reviewer did not run tests and shares Agent/GitHub identity. Host snapshot/branch
+authority, complete incremental rebuild and source revalidation, model tools and
+Actor integration remain required; no full T5 acceptance is claimed.

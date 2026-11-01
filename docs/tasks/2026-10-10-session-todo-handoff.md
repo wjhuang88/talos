@@ -1,3 +1,16 @@
+## T5 local implementation checkpoint — 2026-11-01
+
+T4 closure and T5 activation PR #819 merged at
+`8b11e5f49794ea17f09c96eff8d59a6bf8f9a3d6`; I313 is Active/Partial.
+Local implementation includes bounded source pages, atomic recovery receipts,
+execution-scoped snapshots, privacy-safe projections and cancellable recovery
+cache maintenance. Read-only scoped candidate queries pass seven focused tests
+and affected Clippy plus incremental static review. See I313 owner for exact
+logs, limitations and remaining acceptance. These local increments are unmerged;
+model-facing recovery/compaction and Actor integration remain unimplemented.
+The first four queue stages are merged; T5 remains Partial, T1/T6 unimplemented.
+Earlier activation and implementation snapshots below are historical.
+
 ## T4 merged; T5 activation proposal — 2026-11-01
 
 I312 is Complete/Closed with Completion Commit:
