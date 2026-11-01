@@ -185,7 +185,19 @@ and #688's governance-only I296 activation. Rust remained pinned at 1.97.0; the 
 implementation was not part of this slice. No Search claim, acceptance, dependency/lockfile,
 production search or test semantics change.
 
-#693 merged as `e63e0ee3793e2e8fd914f676224f982c6cae5593`. Exact head
+### Retained pre-merge local checkpoint
+
+Before the final remote gate, pinned Rust 1.97.0 and locked dependencies were used with local
+`dev/test debug=0`, incremental disabled and four jobs. Standard preflight passed site/installers,
+both governance validators, text boundary, classifier, formatting, workspace check and Clippy,
+then stopped at the unchanged runtime Unix-socket fixture after 64 runtime tests passed and one
+local `PermissionDenied` / OS error 1; no full local preflight pass was claimed. With only the
+previously authorized local socket deferral, locked workspace tests passed 3,576 tests with zero
+failures/ignored and one filtered, including all nine I294 tests. Independent SDK default/coding
+validator runs, target Clippy `-D warnings`, final governance/claim validators, changed-file links
+and diff checks passed. The earlier Windows cap history above remains part of the evidence record.
+
+#693 then merged as `e63e0ee3793e2e8fd914f676224f982c6cae5593`. Exact head
 `e8683d99bb04e4a823e547358e9ba0dbb68625ff` passed full unskipped CI3097 / run
 `38024072972`; independent Agent review `6093757461` approved the candidate and final CAS
 `6094343503` was recorded. The nine tests remain partial offline M-Q02..M-Q05 evidence only;
