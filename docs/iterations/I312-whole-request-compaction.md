@@ -8,6 +8,25 @@
 
 ## Stable candidate validation — 2026-11-01
 
+PR #818 publishes `4fd7c0eae68a9184970011bdce82536252a9265d`; exact-head CI
+`41270759995` is not green. Windows Desktop job `124742899253` failed its
+`interrupt_during_history_compaction_reaches_cancelled_terminal` fixture waiting
+for provider entry. Its legacy 1024-token context cannot admit the new complete
+checkpoint request, so the expected provider wait is no longer reachable.
+Local correction supplies a 100000-token limit and larger history, and asserts
+the paused provider received the structured checkpoint prompt rather than an
+ordinary request. The cancellation terminal assertion remains unchanged.
+Focused macOS `desktop-ui` verification session 38434 passed 1/1, log
+`/private/tmp/i312-desktop-checkpoint-cancel.log`. Independent static review
+approved fixture diff `a95679fe5b6cce987ff21e550a8e98e8164600893112817f95e5db6f3ba31713`
+against `4fd7c0eae`, without running tests. Full macOS Desktop tests passed 114/114
+and all-target warnings-denied Clippy passed (session 3352;
+`/private/tmp/i312-desktop-all.log`, `/private/tmp/i312-desktop-clippy.log`).
+Linux Desktop job `124742899287` failed the same original fixture (113 other
+tests passed). Refreshed exact-head Linux/Windows evidence remains required.
+No production code changed in this correction; preceding workspace preflight
+does not certify the new Desktop fixture or final remote head.
+
 Standard host `release_preflight.sh` session 66565 exited 0, including both
 external Runtime SDK dependency modes; log
 `/private/tmp/i312-converged-preflight-host.log`. This supersedes its running
