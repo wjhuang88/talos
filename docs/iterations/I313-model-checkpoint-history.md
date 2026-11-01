@@ -530,3 +530,35 @@ passes; full Agent 590/590 and Session 241/241 library tests pass. Logs:
 `/private/tmp/i313-read-recovery-full-tests.log`; focused log
 `/private/tmp/i313-read-recovery-tests.log`. Full workspace preflight, native
 platform evidence and complete I313 review/CI/merge remain required.
+
+### Shared operation identity and submitted checkpoint preparation — local
+
+CompactOperations now distinguishes runtime-selected Manual/Model origins while
+retaining one pending slot and one 64-receipt window. Each origin has its own
+monotonic sequence; model requests cannot consume manual IDs or complete/replay
+a manual receipt with the same number. Existing manual APIs remain wrappers.
+Mixed-origin Actor integration must use replace_generation_with_origin so its
+cancellation retains origin; this integration is not yet implemented.
+
+The existing complete-tool-batch checkpoint job can carry a submitted structured
+payload. Preparation uses the same runtime-selected eligible prefix, source
+binding, recent-window preservation, reclamation check, whole-request estimate
+and deferred projection candidate. Submitted payloads do not invoke the summary
+provider and may voluntarily compact below pressure. The current manual producer
+still supplies no payload: model registry, discovery snapshot authorization,
+Actor admission/receipt routing and installation composition remain unimplemented.
+The new preparation path alone is not model-compaction delivery.
+
+Independent review initially rejected a privacy check against JSON text: quoted,
+backslash and newline tokens remain escaped after rendering. The corrected path
+checks decoded JSON string values before render, with regressions for all three
+plus escaped Unicode. Submitted preparation and its deferred installation candidate cannot renew a source deadline.
+Final Agent 593/593 and all-target warnings-denied Clippy pass; logs:
+`/private/tmp/i313-submitted-install-deadline-tests.log`,
+`/private/tmp/i313-submitted-install-deadline-clippy.log`. The shared-ledger focused tests
+passed 5/5, and checkpoint regression group passed 28/28 before the final deadline
+assertion; the final full test run includes it. Final independent static APPROVE
+covers five-file diff SHA256
+`e5a24e0204e68e1e23e98068f52a4b09855625fd90321244ba1cd5fde255595d`.
+Reviewer did not run tests and shares Agent/GitHub identity. Full T5, remote
+preflight/platform/CI/merge and later T1/T6 acceptance remain outstanding.

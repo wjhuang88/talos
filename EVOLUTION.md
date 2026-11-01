@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-01 - Check decoded strings before privacy-sensitive rendering
+
+- Trigger: Independent I313 review of model-submitted checkpoint preparation.
+- Symptom: Private tokens containing quotes, backslashes or newlines bypassed checks against both incoming and rendered JSON text.
+- Root cause: JSON serialization escapes these characters; rendering a parsed object does not expose its actual string values for literal matching.
+- Fix: Compare decoded JSON values before and after the existing recursive private-token projection, before rendering or preparing a candidate.
+- Prevention: Cover serialization-sensitive token characters as well as Unicode escapes, and assert rejection leaves the request and installed projection unchanged.
+- Promoted to rule/check: `crates/talos-agent/src/checkpoint_request.rs`, submitted checkpoint privacy and deferred-installation regression.
+
 ## 2026-10-28 - Automatic continuation is not a permission response
 
 - Trigger: Disk exhaustion during I309 all-feature validation after a pending request to clean a protected active worktree build cache.

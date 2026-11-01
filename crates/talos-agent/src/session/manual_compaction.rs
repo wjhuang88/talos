@@ -82,6 +82,7 @@ impl ManualCompaction {
         if request
             .compact
             .send(Some(crate::BoundaryCompactJob {
+                submitted_checkpoint: None,
                 result,
                 measurement: self.measurement.clone(),
             }))

@@ -104,6 +104,7 @@ pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDe
 pub(crate) use request_plan::PreparedSessionTurn;
 
 pub(crate) struct BoundaryCompactJob {
+    pub(crate) submitted_checkpoint: Option<String>,
     pub(crate) measurement: Arc<std::sync::Mutex<Option<u32>>>,
     pub(crate) result: tokio::sync::oneshot::Sender<checkpoint_manual::ManualCheckpointResult>,
 }
@@ -1874,14 +1875,50 @@ impl Agent {
                         if let Ok(mut value) = job.measurement.lock() {
                             *value = measured_before;
                         }
-                        self.prepare_manual_checkpoint(
-                            &mut plan,
-                            limit,
-                            &private_tokens,
-                            source,
-                            deadline,
-                        )
-                        .await
+                        if let Some(payload) = &job.submitted_checkpoint {
+                            let deadline = source
+                                .deadline()
+                                .map_or(deadline, |bound| bound.min(deadline));
+                            let before = plan.estimated_tokens;
+                            let mut projection = None;
+                            let result = self
+                                .checkpoint_submitted_deferred(
+                                    &mut plan,
+                                    limit,
+                                    &private_tokens,
+                                    source,
+                                    deadline,
+                                    payload,
+                                    &mut projection,
+                                )
+                                .await;
+                            match (result, projection) {
+                                (Ok(()), Some(projection)) => {
+                                    checkpoint_manual::ManualCheckpointResult::Candidate {
+                                        projection: Box::new(projection),
+                                        before,
+                                        after: plan.estimated_tokens,
+                                        deadline,
+                                    }
+                                }
+                                _ => checkpoint_manual::ManualCheckpointResult::Outcome(
+                                    talos_core::session::CompactOutcome::FailedWithEstimate {
+                                        before,
+                                        reason:
+                                            talos_core::session::CompactFailureReason::Preparation,
+                                    },
+                                ),
+                            }
+                        } else {
+                            self.prepare_manual_checkpoint(
+                                &mut plan,
+                                limit,
+                                &private_tokens,
+                                source,
+                                deadline,
+                            )
+                            .await
+                        }
                     };
                     tokio::select! { biased;
                         () = job.result.closed() => {},
