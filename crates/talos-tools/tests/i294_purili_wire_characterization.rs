@@ -278,10 +278,21 @@ fn unsafe_or_relative_urls_do_not_consume_valid_result_slots() {
 
 #[test]
 fn required_fields_and_wrong_types_are_detected_at_both_levels() {
-    for field in ["results", "total", "timeMs", "hasNext", "totalPages", "page"] {
+    for field in [
+        "results",
+        "total",
+        "timeMs",
+        "hasNext",
+        "totalPages",
+        "page",
+    ] {
         let mut value = fixture();
         value.as_object_mut().expect("fixture object").remove(field);
-        assert_eq!(inspect(&value, 3), Err(DecodeFailure::InvalidWire), "{field}");
+        assert_eq!(
+            inspect(&value, 3),
+            Err(DecodeFailure::InvalidWire),
+            "{field}"
+        );
     }
 
     for field in ["id", "title", "url", "displayUrl", "description", "source"] {
@@ -293,7 +304,11 @@ fn required_fields_and_wrong_types_are_detected_at_both_levels() {
             } else {
                 hit.remove(field);
             }
-            assert_eq!(inspect(&value, 3), Err(DecodeFailure::InvalidWire), "{field}");
+            assert_eq!(
+                inspect(&value, 3),
+                Err(DecodeFailure::InvalidWire),
+                "{field}"
+            );
         }
     }
 
@@ -307,7 +322,11 @@ fn required_fields_and_wrong_types_are_detected_at_both_levels() {
     ] {
         let mut value = fixture();
         value[field] = replacement;
-        assert_eq!(inspect(&value, 3), Err(DecodeFailure::InvalidWire), "{field}");
+        assert_eq!(
+            inspect(&value, 3),
+            Err(DecodeFailure::InvalidWire),
+            "{field}"
+        );
     }
 }
 
