@@ -153,7 +153,7 @@ impl Agent {
         snapshot_tx: Option<
             mpsc::UnboundedSender<crate::persistence_snapshot::PersistenceSnapshot>,
         >,
-        boundary_tx: Option<mpsc::UnboundedSender<crate::SteeringBoundaryRequest>>,
+        boundary_tx: Option<mpsc::UnboundedSender<crate::AgentActorRequest>>,
         boundary_ack_tx: Option<mpsc::UnboundedSender<crate::SteeringBoundaryAcknowledgement>>,
     ) -> (AgentResult<String>, Vec<Message>) {
         self.run_prepared_inner(

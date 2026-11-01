@@ -6736,3 +6736,12 @@ MODEL-014 local checkpoint (2026-10-30): I311 claim #813 is merged at
 reasoning-negative requests and preserved tool pairing across three protocols.
 See I311 owner for exact commands/logs and unimplemented/unverified acceptance.
 Overall handoff remains Active; retain I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
+I313 local execution checkpoint: the explicitly enabled registered model tools now
+exercise discovery → Actor admission → complete-batch checkpoint installation →
+actual terminal metadata in provider continuation. Agent 606/606 and Permission
+169/169 pass, with two-crate Clippy and independent static review; see I313 owner
+for logs, discovered defects and validation boundaries. This remains local/unmerged
+Partial work: history_search search/detail/pagination, durable branch recovery,
+CLI/Runtime default activation and full gates are not delivered. T5 → T1 → T6
+remain the outstanding queue; the whole goal remains Active.

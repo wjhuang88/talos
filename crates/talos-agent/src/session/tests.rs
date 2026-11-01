@@ -4954,3 +4954,197 @@ fn assert_recovery_receipts_verify(durable: &talos_session::DurableSession, expe
         assert!(receipt.verified_content(entry).is_some());
     }
 }
+
+#[tokio::test]
+async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor() {
+    use talos_core::tool::ToolNature;
+    use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+    struct CheckpointModel {
+        step: AtomicUsize,
+    }
+    #[async_trait]
+    impl LanguageModel for CheckpointModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let step = self.step.fetch_add(1, Ordering::SeqCst);
+            let events = match step {
+                0 | 1 => {
+                    let (name, input) = if step == 0 {
+                        ("history_search", serde_json::json!({"mode":"discover"}))
+                    } else {
+                        let result = messages
+                            .iter()
+                            .rev()
+                            .find_map(|message| match message {
+                                Message::Tool { result }
+                                    if result.tool_use_id == "checkpoint-0" =>
+                                {
+                                    Some(result)
+                                }
+                                _ => None,
+                            })
+                            .expect("discovery result in real continuation");
+                        assert!(!result.is_error, "{}", result.content);
+                        let discovery: serde_json::Value =
+                            serde_json::from_str(&result.content).expect("discovery JSON");
+                        let item = serde_json::json!({"text":"Keep the constraint and proceed", "sources":[discovery["sources"][0]]});
+                        (
+                            "compact_context",
+                            serde_json::json!({"snapshot":discovery["snapshot"], "checkpoint": {
+                                "schema_version":1,"summary":item,"goal":item,"next_step":item,
+                                "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                                "facts":[],"assumptions":[],"resources":[],"open_loops":[]
+                            }}),
+                        )
+                    };
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: format!("checkpoint-{step}"),
+                                name: name.into(),
+                                input,
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                2 => {
+                    let request = serde_json::to_string(messages).expect("request");
+                    assert!(
+                        request.contains("Admitted"),
+                        "admission must remain in paired batch: {request}"
+                    );
+                    let terminal = messages
+                        .iter()
+                        .find_map(|message| match message {
+                            Message::Multimodal { parts } => {
+                                parts.iter().find_map(|part| match part {
+                                    talos_core::message::ContentPart::Text { text } => {
+                                        serde_json::from_str::<serde_json::Value>(text).ok().filter(
+                                            |value| value.get("checkpoint_operation").is_some(),
+                                        )
+                                    }
+                                    _ => None,
+                                })
+                            }
+                            _ => None,
+                        })
+                        .expect("actual terminal metadata, not tool description");
+                    assert_eq!(terminal["checkpoint_operation"], 0);
+                    assert!(
+                        terminal["outcome"]
+                            .as_str()
+                            .expect("outcome")
+                            .starts_with("Applied {"),
+                        "{terminal}"
+                    );
+                    success_events("checkpoint complete")
+                }
+                _ => panic!("unexpected extra provider request"),
+            };
+            let (tx, rx) = mpsc::channel(16);
+            for event in events {
+                tx.send(event).await.expect("receiver");
+            }
+            Ok(rx)
+        }
+    }
+    let root = tempfile::tempdir().expect("workspace");
+    let mut engine = PermissionEngine::empty();
+    engine.set_workspace_root(root.path().into());
+    for nature in [ToolNature::Read, ToolNature::Write] {
+        engine.add_rule(PermissionRule::new_nature(
+            nature,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ));
+    }
+    let raw: Vec<_> = (0..30)
+        .flat_map(|_| {
+            [
+                Message::User {
+                    content: "constraint ".repeat(400),
+                },
+                Message::Assistant {
+                    content: "recorded".into(),
+                    tool_calls: vec![],
+                    reasoning: None,
+                },
+            ]
+        })
+        .collect();
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(CheckpointModel {
+            step: AtomicUsize::new(0),
+        }),
+        ToolRegistry::new(),
+        Some(Arc::new(engine)),
+        None,
+        root.path().into(),
+        Arc::new(talos_plugin::HookRegistry::new()),
+    );
+    agent
+        .enable_model_checkpoint_tools()
+        .expect("enable model tools");
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: raw.clone(),
+            model_context_limit: 128_000,
+        },
+    );
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor
+    });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "checkpoint and continue".into(),
+        })
+        .await
+        .expect("submit");
+    let captured = tokio::time::timeout(
+        Duration::from_secs(10),
+        collect_until_completions(&mut handle.eq_rx, 1),
+    )
+    .await
+    .expect("no circular admission/batch wait");
+    assert!(captured.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    let actor = task.await.expect("actor");
+    assert_eq!(&actor.history[..raw.len()], raw.as_slice());
+    assert!(
+        actor
+            .agent
+            .checkpoint_projection_state
+            .lock()
+            .expect("projection")
+            .is_some()
+    );
+}
+
+#[test]
+fn model_checkpoint_enable_reports_collision_without_partial_registration() {
+    let mut tools = ToolRegistry::new();
+    tools.register(Arc::new(crate::checkpoint_tools::HistorySearchTool));
+    let mut agent = Agent::new(Arc::new(MockModel::new(vec![])), tools);
+    assert!(agent.enable_model_checkpoint_tools().is_err());
+    assert!(agent.tools.get("history_search").is_some());
+    assert!(!agent.tools.is_builtin_instance("history_search"));
+    assert!(agent.tools.get("compact_context").is_none());
+}

@@ -40,6 +40,7 @@
 
 mod background_jobs;
 pub(crate) mod bounded_model;
+mod checkpoint_tools;
 pub mod compaction;
 pub mod compression;
 mod execution_ledger;
@@ -129,8 +130,17 @@ pub(crate) struct BoundaryCompactJob {
 }
 
 pub(crate) struct ModelBoundarySubmission {
+    pub(crate) authority: Option<checkpoint_tools::PermissionLease>,
     pub(crate) checkpoint: SubmittedCheckpoint,
     pub(crate) receipt: tokio::sync::oneshot::Sender<talos_core::session::CompactOutcome>,
+}
+
+pub(crate) enum AgentActorRequest {
+    Boundary(SteeringBoundaryRequest),
+    AdmitModel {
+        submission: ModelBoundarySubmission,
+        response: tokio::sync::oneshot::Sender<Result<u64, talos_core::session::CompactOutcome>>,
+    },
 }
 
 pub(crate) struct SteeringBoundaryRequest {
@@ -446,6 +456,34 @@ impl Agent {
         host: Arc<dyn talos_core::background_job::BackgroundJobHost>,
     ) {
         self.background_jobs = Some(host);
+    }
+
+    /// Enable stable model checkpoint/discovery tools for an Actor-hosted Agent.
+    ///
+    /// Checkpoint admission requires the Actor and a permission pipeline. History
+    /// discovery currently exposes bounded opaque references only; durable search
+    /// and detail are unavailable. Standalone execution fails closed.
+    pub fn enable_model_checkpoint_tools(
+        &mut self,
+    ) -> Result<(), talos_core::tool::ToolRegistrationError> {
+        self.tools.register_builtin_contributions([
+            talos_core::tool::ToolContribution::new(
+                talos_core::tool::ToolContributionSource::new("talos-agent:checkpoint"),
+                Arc::new(crate::checkpoint_tools::CompactContextTool),
+            ),
+            talos_core::tool::ToolContribution::new(
+                talos_core::tool::ToolContributionSource::new("talos-agent:history"),
+                Arc::new(crate::checkpoint_tools::HistorySearchTool),
+            ),
+        ])?;
+        let (descriptions, definitions, names) = crate::configuration::describe_presented_tools(
+            &self.tools,
+            &self.tool_presentation_policy,
+        );
+        self.tool_definitions = definitions;
+        self.presented_tool_names = names;
+        self.update_prompt_builder(true, |builder| builder.with_tools(descriptions));
+        Ok(())
     }
 
     pub(crate) fn register_process_tool(
@@ -851,21 +889,35 @@ impl Agent {
         prepared: PreparedSessionTurn,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
         snapshot_tx: Option<mpsc::UnboundedSender<persistence_snapshot::PersistenceSnapshot>>,
-        boundary_tx: Option<mpsc::UnboundedSender<SteeringBoundaryRequest>>,
+        boundary_tx: Option<mpsc::UnboundedSender<crate::AgentActorRequest>>,
         boundary_ack_tx: Option<mpsc::UnboundedSender<SteeringBoundaryAcknowledgement>>,
     ) -> (AgentResult<String>, Vec<Message>) {
-        persistence_snapshot::RECOVERY_EXECUTION
-            .scope(
-                uuid::Uuid::new_v4(),
-                self.run_prepared_inner_scoped(
-                    prepared,
-                    event_tx,
-                    snapshot_tx,
-                    boundary_tx,
-                    boundary_ack_tx,
-                ),
-            )
-            .await
+        let checkpoint_execution = boundary_tx
+            .clone()
+            .filter(|_| self.tools.is_builtin_instance("compact_context"))
+            .map(|sender| {
+                checkpoint_tools::Execution::new(
+                    sender,
+                    self.permission_pipeline
+                        .as_ref()
+                        .map(|pipeline| pipeline.state()),
+                )
+            });
+        let run = persistence_snapshot::RECOVERY_EXECUTION.scope(
+            uuid::Uuid::new_v4(),
+            self.run_prepared_inner_scoped(
+                prepared,
+                event_tx,
+                snapshot_tx,
+                boundary_tx,
+                boundary_ack_tx,
+            ),
+        );
+        if let Some(execution) = checkpoint_execution {
+            checkpoint_tools::EXECUTION.scope(execution, run).await
+        } else {
+            run.await
+        }
     }
 
     async fn run_prepared_inner_scoped(
@@ -873,7 +925,7 @@ impl Agent {
         prepared: PreparedSessionTurn,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
         snapshot_tx: Option<mpsc::UnboundedSender<persistence_snapshot::PersistenceSnapshot>>,
-        boundary_tx: Option<mpsc::UnboundedSender<SteeringBoundaryRequest>>,
+        boundary_tx: Option<mpsc::UnboundedSender<crate::AgentActorRequest>>,
         boundary_ack_tx: Option<mpsc::UnboundedSender<SteeringBoundaryAcknowledgement>>,
     ) -> (AgentResult<String>, Vec<Message>) {
         let PreparedSessionTurn {
@@ -942,6 +994,7 @@ impl Agent {
         }
 
         let mut boundary_observed_plan = None;
+        let mut pending_checkpoint_receipt = None;
         let mut boundary_observation_error = None;
         let (result, final_status) = 'turn_loop: loop {
             if let Some(error) = boundary_observation_error.take() {
@@ -970,6 +1023,15 @@ impl Agent {
                 };
                 let sealed = match observed {
                     Ok(mut observed) => {
+                        if let Some(text) = pending_checkpoint_receipt.take() {
+                            observed.messages.push(Message::Multimodal {
+                                parts: vec![talos_core::message::ContentPart::Text { text }],
+                            });
+                            observed.estimated_tokens = self.estimate_provider_request_tokens(
+                                &observed.messages,
+                                &observed.tool_definitions,
+                            );
+                        }
                         match self.reserve_ephemeral_images(&mut observed, &pending_images) {
                             Ok(()) => {
                                 self.seal_observed_request_plan(
@@ -1570,6 +1632,20 @@ impl Agent {
                 tool_calls: effective_tool_calls.clone(),
                 reasoning,
             };
+            if checkpoint_tools::EXECUTION.try_with(|_| ()).is_ok()
+                && let Some(source) = history_source.as_mut()
+            {
+                let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+                let valid = tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    source.bind_continuation_until(&messages, persist_start, deadline),
+                )
+                .await
+                .unwrap_or(false);
+                let _ = checkpoint_tools::EXECUTION.try_with(|execution| {
+                    execution.refresh(valid.then_some(&*source), &messages);
+                });
+            }
             messages.push(assistant_msg);
 
             let tool_results = if !original_calls.is_empty() {
@@ -1838,11 +1914,11 @@ impl Agent {
                 let (response, injected) = tokio::sync::oneshot::channel();
                 let (compact, compact_job) = tokio::sync::oneshot::channel();
                 if boundary_tx
-                    .send(SteeringBoundaryRequest {
+                    .send(AgentActorRequest::Boundary(SteeringBoundaryRequest {
                         response,
                         compact,
                         submitted: None,
-                    })
+                    }))
                     .is_ok()
                     && let Ok(Some(mut job)) = compact_job.await
                 {
@@ -2002,6 +2078,11 @@ impl Agent {
                         }
                     }
                 }
+            }
+            if let Ok(execution) = checkpoint_tools::EXECUTION.try_with(Clone::clone)
+                && let Some(receipt) = execution.terminal().await
+            {
+                pending_checkpoint_receipt = Some(receipt);
             }
         };
 

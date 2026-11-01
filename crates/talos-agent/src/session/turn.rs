@@ -11,7 +11,7 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
 use talos_session::{TurnTranscriptOutcome, TurnTranscriptOutcomeRecord};
 
-use crate::{Agent, PreparedSessionTurn, SteeringBoundaryAcknowledgement, SteeringBoundaryRequest};
+use crate::{Agent, PreparedSessionTurn, SteeringBoundaryAcknowledgement};
 
 #[derive(Clone)]
 pub(super) struct TurnPersistence {
@@ -52,7 +52,7 @@ pub(super) struct TurnForwarding {
     pub(super) persistence: Option<TurnPersistence>,
     pub(super) durable_persistence: Option<DurableTurnPersistence>,
     pub(super) result_tx: tokio::sync::oneshot::Sender<TurnRecord>,
-    pub(super) boundary_tx: mpsc::UnboundedSender<SteeringBoundaryRequest>,
+    pub(super) boundary_tx: mpsc::UnboundedSender<crate::AgentActorRequest>,
     pub(super) boundary_ack_tx: mpsc::UnboundedSender<SteeringBoundaryAcknowledgement>,
     #[cfg(test)]
     pub(super) boundary_ack_cancel_gate: Option<Arc<tokio::sync::Notify>>,

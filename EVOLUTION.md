@@ -1634,3 +1634,17 @@ visible; distinguish passed assertions from independently emitted evidence.
 - Fix: Reuse the locked Rust URL parser across catalog/runtime validation, reject userinfo and unsupported destinations, and propagate provider construction errors through every CLI/TUI entry point.
 - Prevention: Test hostile authority syntax, manual invalid configuration through the real binary, environment-template persistence, and failed model activation without changing config/session/generation.
 - Promoted to rule/check: `endpoint_authority_cannot_disguise_remote_http_as_loopback`, `invalid_manual_model_endpoint_returns_an_error_without_panicking`, and the extended `p1fix3_handle_session_model_failure_no_rebuild` regression.
+
+## 2026-11-01 - Assert actual continuation receipts and fence permission commits
+
+- Trigger: independent I313 review found a terminal receipt discarded by reuse of
+  an already-observed request, while a test matched "Applied" in tool descriptions.
+- Repair: keep runtime terminal metadata separate from previously consumed tool
+  parts, append it to the actual observed request and re-estimate/seal without
+  rerunning effectful hooks. Parse the receipt and assert operation ID/outcome;
+  substring presence in serialized prompts is not receipt evidence.
+- Permission lesson: checking a revision snapshot then releasing its lock before
+  installation permits reset/rebind to race. Compare and perform the short synchronous
+  commit under one fence; acquire the inner permission lock nonblockingly under the
+  runtime lock, forbid callback reentry, and test both reset-before and reset-after
+  commit orderings. Narrow helper success does not prove the model-visible path.

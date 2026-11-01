@@ -10,6 +10,7 @@ pub(super) struct ManualCompaction {
     ledger: CompactOperations,
     queued: Option<u64>,
     next_model_id: Option<u64>,
+    model_authority: Option<crate::checkpoint_tools::PermissionLease>,
     queued_model: Option<(u64, crate::SubmittedCheckpoint)>,
     model_receipt: Option<tokio::sync::oneshot::Sender<CompactOutcome>>,
     boundary_resume: Option<(
@@ -26,6 +27,7 @@ impl ManualCompaction {
             ledger: CompactOperations::new(generation),
             queued: None,
             next_model_id: Some(0),
+            model_authority: None,
             queued_model: None,
             model_receipt: None,
             boundary_resume: None,
@@ -83,7 +85,13 @@ impl ManualCompaction {
         submission: crate::ModelBoundarySubmission,
         turn_token: &CancellationToken,
     ) -> Result<u64, CompactOutcome> {
-        let rejection = if turn_token.is_cancelled() || submission.receipt.is_closed() {
+        let rejection = if turn_token.is_cancelled()
+            || submission.receipt.is_closed()
+            || submission
+                .authority
+                .as_ref()
+                .is_some_and(|lease| !lease.valid())
+        {
             Some(CompactOutcome::Cancelled)
         } else if self.next_model_id.is_none() {
             Some(CompactOutcome::Failed)
@@ -107,6 +115,7 @@ impl ManualCompaction {
         }
         self.next_model_id = id.checked_add(1);
         self.measurement = Arc::new(std::sync::Mutex::new(None));
+        self.model_authority = submission.authority;
         self.model_receipt = Some(submission.receipt);
         self.queued_model = Some((id, submission.checkpoint));
         Ok(id)
@@ -278,12 +287,21 @@ impl ManualCompaction {
                 }
             }
         };
+        // Runtime admission is acquired first. The inner permission acquisition
+        // is nonblocking, so an inverse owner cannot deadlock this commit.
+        let authorized_commit = || {
+            if let Some(lease) = &self.model_authority {
+                lease.commit(commit).unwrap_or(CompactOutcome::Cancelled)
+            } else {
+                commit()
+            }
+        };
         let outcome = if let Some(control) = &actor.runtime_admission {
             control
-                .commit_checkpoint(commit)
+                .commit_checkpoint(authorized_commit)
                 .unwrap_or(CompactOutcome::Cancelled)
         } else {
-            commit()
+            authorized_commit()
         };
         if self.boundary_resume.is_none()
             && let Some(control) = &actor.runtime_admission
@@ -332,6 +350,7 @@ impl ManualCompaction {
             .ledger
             .finish_from(actor.session_generation, origin, id, outcome)
         {
+            self.model_authority = None;
             if let Some(receipt) = self.model_receipt.take() {
                 let _ = receipt.send(outcome);
                 return;
@@ -430,6 +449,7 @@ mod tests {
                             covered_end: 0,
                         },
                         receipt,
+                        authority: None,
                     }),
                 },
                 job,
@@ -516,6 +536,7 @@ mod tests {
                             .expect("source"),
                     },
                     receipt,
+                    authority: None,
                 },
                 &token
             ),
@@ -578,6 +599,7 @@ mod tests {
                             .expect("source"),
                     },
                     receipt,
+                    authority: None,
                 },
                 &token
             ),
@@ -648,6 +670,7 @@ mod tests {
                             covered_end: 0,
                         },
                         receipt,
+                        authority: None,
                     }),
                 },
                 None,
@@ -699,6 +722,7 @@ mod tests {
                         covered_end: 0,
                     },
                     receipt,
+                    authority: None,
                 }),
             };
             let token = CancellationToken::new();
@@ -766,6 +790,7 @@ mod tests {
                             covered_end: 0,
                         },
                         receipt,
+                        authority: None,
                     }),
                 },
                 None,
@@ -961,6 +986,7 @@ mod tests {
                         covered_end: 20
                     },
                     receipt,
+                    authority: None,
                 },
                 &token
             ),

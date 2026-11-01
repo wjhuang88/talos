@@ -665,3 +665,55 @@ Independent static review approved the two-file diff SHA256
 Reviewer did not run tests and shares Agent/GitHub identity. This is a lifecycle
 repair, not production model-tool admission transport or T5 delivery. Those entry
 points, full workspace/remote validation, T1 and T6 remain outstanding.
+
+### Explicit model-tool Actor path — local, unmerged / Partial
+
+The lower-level Agent now exposes fallible `enable_model_checkpoint_tools(&mut self)`.
+The host must opt in before Actor composition; registration is atomic and reports
+same-name collisions without replacing existing tools. Definitions remain stable
+through pressure changes. CLI and RuntimeBuilder do not yet enable this capability.
+The default Actor tool inventory and request budgets remain unchanged.
+
+`history_search({"mode":"discover"})` currently returns an execution-local opaque
+snapshot and at most 20 opaque source references, without source content. More than
+20 references are explicitly incomplete; pagination, search and detail remain
+unimplemented. `compact_context` accepts the structured checkpoint plus snapshot,
+translates issued references, checks source/permission freshness and asks the live
+Actor to admit the operation before returning Admitted. One execution-scoped receipt
+is retained until the complete paired batch reaches the shared preparation/install
+path. The actual terminal metadata is appended to the next observed request and
+re-estimated/sealed without rerunning observation hooks. This is distinct from the
+still-missing durable branch authority, authoritative history queries and terminal
+Session receipt when there is no continuation.
+
+Permission Session identity and all revision counters are captured with discovery.
+The installation gate now uses additive `PermissionSessionState::with_current_snapshot`
+to compare and commit under one state lock. Lock order is runtime admission then
+nonblocking permission acquisition; contention refuses the commit. Callbacks must
+not await, perform blocking I/O or reenter that permission state. Existing CLI
+publication/rebind holds permission only while publishing synchronous routes; the
+new nonblocking inner acquisition avoids reverse lock waiting.
+
+The real registered-tool Actor regression observes discovery, a subsequent model
+compact call, Admitted in its paired tool result, operation 0's actual Applied
+metadata in the following provider request, successful continuation and unchanged
+raw prefix. Additional regressions cover cross-execution token refusal, covered
+prefix mutation, permission reset, standalone unavailability, registration collision
+and concurrent permission reset vs installation fence. These deterministic fixtures
+prove execution behavior, not semantic checkpoint quality or restart/fork recovery.
+
+Review found and fixed three defects: a cached observed plan dropped terminal parts;
+a substring assertion could falsely match Applied in tool descriptions; and the
+initial enable API swallowed registration errors. A second security finding replaced
+check-then-install permission snapshots with the atomic fence described above.
+The initial always-on registration failed three baseline inventory/budget tests;
+explicit host opt-in preserves the default path while full composition is unfinished.
+
+Final locked tests: Agent 606/606 and Permission 169/169. Both crates' all-target
+warnings-denied Clippy passes. Logs: `/private/tmp/i313-tools-fenced-tests.log`,
+`/private/tmp/i313-tools-fenced-clippy.log`. Independent static security/API APPROVE:
+tracked-code diff SHA256 `d0b9f2306dbeb6df2012179b70ea74cc8427764ddc0ab493bd1f8268805fef41`;
+new checkpoint_tools.rs SHA256 `777a8ed30e80dc3b6fd010de4bf691a7382187a5a2e7b63b646ee0d8d454113d`.
+Reviewer did not run tests and shares Agent/GitHub identity. Full workspace preflight,
+SDK/platform/remote CI, final API/docs migration, default host activation and all
+remaining 30-row acceptance stay required. T5, T1, T6 and the whole goal remain open.

@@ -31,10 +31,7 @@ use talos_session::PendingSubmissionStore;
 
 #[doc(hidden)]
 pub use crate::background_jobs::BackgroundJobFinalizerHandle;
-use crate::{
-    ActivatedSkillContext, Agent, SteeringBoundaryAcknowledgement, SteeringBoundaryBatch,
-    SteeringBoundaryRequest,
-};
+use crate::{ActivatedSkillContext, Agent, SteeringBoundaryAcknowledgement, SteeringBoundaryBatch};
 
 mod custody;
 mod lifecycle;
@@ -79,7 +76,7 @@ struct StartedTurn {
     handle: JoinHandle<Option<TurnRecord>>,
     token: CancellationToken,
     structured: Option<ActiveStructuredTurn>,
-    boundary_rx: mpsc::UnboundedReceiver<SteeringBoundaryRequest>,
+    boundary_rx: mpsc::UnboundedReceiver<crate::AgentActorRequest>,
     boundary_ack_rx: mpsc::UnboundedReceiver<SteeringBoundaryAcknowledgement>,
 }
 
@@ -396,7 +393,7 @@ impl AppServerSession {
         let mut current_structured: Option<ActiveStructuredTurn> = None;
         let mut injected_structured = Vec::<BoundaryStructuredTurn>::new();
         let mut delivered_boundary: Option<BoundaryStructuredTurn> = None;
-        let mut current_boundary_rx: Option<mpsc::UnboundedReceiver<SteeringBoundaryRequest>> =
+        let mut current_boundary_rx: Option<mpsc::UnboundedReceiver<crate::AgentActorRequest>> =
             None;
         let mut current_boundary_ack_rx: Option<
             mpsc::UnboundedReceiver<SteeringBoundaryAcknowledgement>,
@@ -873,6 +870,22 @@ impl AppServerSession {
                     }
                 }, if current_boundary_rx.is_some() => {
                     if let Some(request) = request {
+                        let request = match request {
+                            crate::AgentActorRequest::AdmitModel { submission, response } => {
+                                if response.is_closed() || shutting_down {
+                                    let _ = submission.receipt.send(talos_core::session::CompactOutcome::Cancelled);
+                                } else if let Some(token) = cancel_token.as_ref() {
+                                    let admitted = compact.admit_model(self, submission, token);
+                                    if response.send(admitted).is_err() && admitted.is_ok() {
+                                        compact.cancel_queued_model(self);
+                                    }
+                                } else {
+                                    let _ = submission.receipt.send(talos_core::session::CompactOutcome::Cancelled);
+                                }
+                                continue;
+                            }
+                            crate::AgentActorRequest::Boundary(request) => request,
+                        };
                         // The previous acknowledgement precedes this request in
                         // Agent execution, but the two channels can be selected
                         // in either order by the Actor.
