@@ -4622,6 +4622,25 @@ async fn recovered_actor_sources_are_session_scoped_and_clear_on_rebinding() {
             model_context_limit: 128_000,
         },
     );
+    actor.set_durable_persistence(durable.clone(), PersistencePolicy::default());
+    let reopened =
+        talos_session::DurableSession::open_existing(directory.path(), "source-original")
+            .expect("open")
+            .expect("existing");
+    let reopened_snapshot = reopened.read_history_snapshot().expect("reopened snapshot");
+    assert_eq!(reopened_snapshot.session_id(), entries.session_id());
+    assert_eq!(reopened_snapshot.entries(), entries.entries());
+    actor.set_recovered_history_sources(reopened_snapshot.clone());
+    assert!(
+        actor.recovered_source.is_none(),
+        "equal IDs, entries and path are not configured-owner provenance"
+    );
+    actor.set_durable_persistence(reopened, PersistencePolicy::default());
+    actor.set_recovered_history_sources(reopened_snapshot);
+    assert!(
+        actor.recovered_source.is_some(),
+        "restart works when snapshot and configured owner agree"
+    );
     actor.set_durable_persistence(durable, PersistencePolicy::default());
     let foreign = manager
         .create_or_open_session("source-foreign")

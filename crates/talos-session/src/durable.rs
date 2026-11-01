@@ -93,6 +93,7 @@ pub struct TurnCommit {
 /// be relabeled as provenance from another configured session.
 #[derive(Clone)]
 pub struct DurableHistorySnapshot {
+    owner: Arc<()>,
     session_id: Uuid,
     entries: Vec<(String, Message)>,
 }
@@ -119,6 +120,7 @@ pub struct DurableRecoverySource {
 }
 
 struct RecoverySourceDescriptor {
+    owner: Arc<()>,
     session_id: Uuid,
     branch_id: String,
     path: std::path::PathBuf,
@@ -334,6 +336,7 @@ impl DurableRecoverySource {
 /// A UUID-backed durable session bound to an opaque host external ID.
 #[derive(Debug, Clone)]
 pub struct DurableSession {
+    recovery_owner: Arc<()>,
     external_id: String,
     session: Session,
     bindings_path: std::path::PathBuf,
@@ -375,10 +378,27 @@ impl DurableSession {
         bindings_path: std::path::PathBuf,
     ) -> Self {
         Self {
+            recovery_owner: Arc::new(()),
             external_id,
             session,
             bindings_path,
         }
+    }
+
+    /// Whether this snapshot was issued by this configured durable owner or a
+    /// clone of its handle. Independently reopened handles must issue new snapshots
+    /// after rebinding; equal IDs, paths or copied files are not owner authority.
+    pub fn owns_history_snapshot(&self, snapshot: &DurableHistorySnapshot) -> bool {
+        Arc::ptr_eq(&self.recovery_owner, &snapshot.owner) && self.id() == snapshot.session_id
+    }
+
+    /// Whether a bounded source was captured by this configured owner/branch.
+    /// This proves handle provenance only; current permission and prefix checks
+    /// remain mandatory before disclosure. A reopened owner needs a fresh source.
+    pub fn owns_recovery_source(&self, source: &DurableRecoverySource) -> bool {
+        Arc::ptr_eq(&self.recovery_owner, &source.descriptor.owner)
+            && self.id() == source.session_id()
+            && self.session.current_branch == source.branch_id()
     }
 
     /// Returns Talos's UUID identity used for the safe TLOG filename.
@@ -413,6 +433,7 @@ impl DurableSession {
     /// Read one immutable session-qualified recovery snapshot.
     pub fn read_history_snapshot(&self) -> Result<DurableHistorySnapshot, SessionError> {
         Ok(DurableHistorySnapshot {
+            owner: self.recovery_owner.clone(),
             session_id: self.id(),
             entries: self.read_messages_with_entry_ids()?,
         })
@@ -433,6 +454,7 @@ impl DurableSession {
         }
         Ok(DurableRecoverySource {
             descriptor: Arc::new(RecoverySourceDescriptor {
+                owner: self.recovery_owner.clone(),
                 session_id: self.id(),
                 branch_id: self.session.current_branch.clone(),
                 path: self.file_path().to_path_buf(),
@@ -1091,6 +1113,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn configured_owner_refuses_copied_identity_and_allows_handle_clones() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "owner").expect("owner");
+        owner
+            .commit_turn(
+                "turn",
+                &[Message::User {
+                    content: "same fact".into(),
+                }],
+                &PersistencePolicy::default(),
+            )
+            .expect("commit");
+        let snapshot = owner.read_history_snapshot().expect("snapshot");
+        let source = owner.capture_recovery_source().expect("source");
+        assert!(owner.clone().owns_history_snapshot(&snapshot));
+        assert!(owner.clone().owns_recovery_source(&source));
+        let copied_path = root.path().join("copied.tlog");
+        std::fs::copy(owner.file_path(), &copied_path).expect("copy actual source");
+        let mut copied_session = owner.session.clone();
+        copied_session.file_path = copied_path;
+        let copied =
+            DurableSession::new("copied".into(), copied_session, owner.bindings_path.clone());
+        let copied_snapshot = copied.read_history_snapshot().expect("copy snapshot");
+        assert_eq!(snapshot.session_id(), copied_snapshot.session_id());
+        assert_eq!(snapshot.entries(), copied_snapshot.entries());
+        assert!(!owner.owns_history_snapshot(&copied_snapshot));
+        assert!(
+            !owner.owns_recovery_source(&copied.capture_recovery_source().expect("copy source"))
+        );
+        assert!(!copied.owns_history_snapshot(&snapshot));
+        assert!(!copied.owns_recovery_source(&source));
+    }
+
+    #[test]
     fn captured_recovery_source_excludes_append_and_is_owned_by_durable_session() {
         let directory = tempfile::tempdir().expect("root");
         let session = DurableSession::open_or_create(directory.path(), "owner").expect("session");
@@ -1187,6 +1243,7 @@ mod tests {
     fn composed_recovery_enforces_combined_source_budget_before_io() {
         let source = DurableRecoverySource {
             descriptor: Arc::new(RecoverySourceDescriptor {
+                owner: Arc::new(()),
                 session_id: Uuid::new_v4(),
                 branch_id: "test".into(),
                 path: std::path::PathBuf::from("nonexistent-recovery-budget-fixture"),

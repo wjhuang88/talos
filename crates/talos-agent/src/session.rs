@@ -290,7 +290,7 @@ impl AppServerSession {
             return;
         };
         let entries = snapshot.entries();
-        if snapshot.session_id() != durable.session.id()
+        if !durable.session.owns_history_snapshot(&snapshot)
             || entries.len() > 8192
             || entries.len() != self.history.len()
             || entries

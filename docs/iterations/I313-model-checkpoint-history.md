@@ -941,3 +941,23 @@ opener. The fix and actual FIFO/directory/symlink quick-refusal regression pass;
 no temporary file is created and the linked target stays unchanged. Windows
 local absolute-drive path restrictions of that opener remain applicable; native
 platform CI has not yet certified this storage change.
+
+### Configured durable owner provenance in Actor recovery — local, unmerged
+
+DurableSession now carries a private shared owner capability. Handle clones retain
+it; independently opened handles and copied TLOG identities do not. Storage-issued
+history snapshots and bounded source descriptors retain this capability. Actor
+recovered-source binding now checks configured-owner provenance as well as exact
+message equality, replacing the previous UUID-only ownership check. Rebinding an
+Actor requires a freshly issued snapshot from the new configured owner; ordinary
+Runtime construction reads from that same handle and remains compatible.
+
+Regression coverage includes same-ID/path/content independent reopen refusal,
+explicit rebind then successful restoration, actual copied TLOG refusal despite
+equal entry IDs/bytes, and legitimate handle-clone acceptance. This proves handle
+provenance only: source mutation, generation, current permissions and authorized
+branch prefix still require their own validation. No model search/detail dispatch
+or complete T5 behavior is claimed. Locked Agent 610/610 and Session 253/253
+library tests plus warnings-denied all-target Clippy pass. Validation logs are
+`/private/tmp/i313-owner-tests.log` and `/private/tmp/i313-owner-clippy.log`;
+final workspace/SDK/platform/remote gates and T1/T6 remain outstanding.
