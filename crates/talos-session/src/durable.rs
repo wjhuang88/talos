@@ -247,6 +247,26 @@ impl DurableRecoverySource {
         })
     }
 
+    /// Read an original record within this captured cutoff for host maintenance.
+    /// The locator and returned entry do not establish branch or prefix authority.
+    pub fn read_record(
+        &self,
+        range: std::ops::Range<u64>,
+        deadline: std::time::Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<SessionEntry, crate::history_page::HistoryPageError> {
+        if range.end > self.source_end {
+            return Err(crate::history_page::HistoryPageError::Stale);
+        }
+        crate::history_page::read_history_record(
+            &self.descriptor.path,
+            crate::history_page::HistoryEncoding::Tlog,
+            range,
+            deadline,
+            stopped,
+        )
+    }
+
     /// Read one bounded original page. Offsets are host maintenance cursors,
     /// never model-controlled paths or authorization capabilities.
     pub fn read_page(

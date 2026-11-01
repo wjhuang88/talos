@@ -233,6 +233,163 @@ impl SessionIndex {
         })
     }
 
+    /// Run one bounded host maintenance step for an already initialized scope.
+    /// First scan all source pages, then resolve persisted tool/receipt pairs.
+    /// Reopening the index resumes from committed progress; true means both
+    /// phases completed, not that branch/prefix or disclosure authority is valid.
+    /// The host must authorize this source and scope before every call.
+    pub fn maintain_recovery_source(
+        &mut self,
+        scope: &str,
+        source: &crate::DurableRecoverySource,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<bool, IndexError> {
+        let cursor = self
+            .recovery_build_cursor(scope, budget)?
+            .ok_or_else(invalid_build)?;
+        if cursor.source_end() != source.source_end() {
+            return Err(invalid_build());
+        }
+        if cursor.complete() {
+            return self.resolve_recovery_pending(scope, source, budget);
+        }
+        let page = source
+            .read_page(cursor.next_offset(), budget.deadline, || budget.stopped())
+            .map_err(|_| invalid_build())?;
+        let sources: Vec<_> = page
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(i, entry)| RecoveryIndexSource {
+                entry,
+                terminal: None,
+                ordinal: cursor.next_ordinal() + i as u64,
+                record_range: Some(page.record_ranges[i].clone()),
+            })
+            .collect();
+        self.advance_recovery_build(
+            scope,
+            &cursor,
+            RecoveryBuildPage {
+                next_offset: page.next_offset,
+                scanned_entries: page.entries.len() as u64,
+                sources: &sources,
+            },
+            budget,
+        )?;
+        // The next step resolves pending receipts (if any) before reporting done.
+        Ok(false)
+    }
+
+    /// Resolve one persisted cross-page tool candidate after the source scan.
+    /// Returns true when no candidates remain. Work is host-only and bounded by
+    /// two original records totaling at most 2 MiB. Source and branch authority
+    /// must be established by the host; matching cutoffs alone are not authority.
+    /// Failed reads, cancellation and transaction failure leave progress intact.
+    pub fn resolve_recovery_pending(
+        &mut self,
+        scope: &str,
+        source: &crate::DurableRecoverySource,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<bool, IndexError> {
+        native_boundary(|| {
+            let cursor = self
+                .recovery_build_cursor(scope, budget)?
+                .ok_or_else(invalid_build)?;
+            if !cursor.complete() || cursor.source_end() != source.source_end() {
+                return Err(invalid_build());
+            }
+            let _guard = install_budget(&self.conn, budget)?;
+            let tx = self.conn.unchecked_transaction()?;
+            let row: Option<(String,String,i64,i64,i64)> = tx.query_row(
+                "SELECT entry_id,turn_id,ordinal,start,end FROM recovery_pending WHERE scope=?1 ORDER BY ordinal LIMIT 1",
+                [scope], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+            ).optional()?;
+            let Some((id, turn, ordinal, start, end)) = row else {
+                return Ok(true);
+            };
+            if id.len() > 1024
+                || turn.len() > 1024
+                || ordinal < 0
+                || start < 0
+                || end <= start
+                || end as u64 > source.source_end()
+            {
+                return Err(invalid_build());
+            }
+            let marker: Option<(String,i64,i64)> = tx.query_row(
+                "SELECT entry_id,start,end FROM recovery_terminals WHERE scope=?1 AND turn_id=?2",
+                params![scope,turn], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+            ).optional()?;
+            let mut bytes = (end - start) as u64;
+            if let Some((marker_id, a, b)) = &marker {
+                if marker_id.len() > 1024 || *a < 0 || b <= a || *b as u64 > source.source_end() {
+                    return Err(invalid_build());
+                }
+                bytes = bytes
+                    .checked_add((b - a) as u64)
+                    .ok_or_else(invalid_build)?;
+            }
+            if bytes > crate::history_page::HISTORY_PAGE_BYTES as u64 {
+                return Err(invalid_build());
+            }
+            let entry = source
+                .read_record(start as u64..end as u64, budget.deadline, || {
+                    budget.stopped()
+                })
+                .map_err(|_| invalid_build())?;
+            if entry.role != "system"
+                || entry.id != id
+                || entry.metadata.turn_id.as_deref() != Some(turn.as_str())
+            {
+                return Err(invalid_build());
+            }
+            let terminal = marker
+                .map(|(id, a, b)| {
+                    let entry = source
+                        .read_record(a as u64..b as u64, budget.deadline, || budget.stopped())
+                        .map_err(|_| invalid_build())?;
+                    if entry.role != "system"
+                        || entry.id != id
+                        || entry.metadata.turn_id.as_deref() != Some(turn.as_str())
+                    {
+                        return Err(invalid_build());
+                    }
+                    Ok(entry)
+                })
+                .transpose()?;
+            if let Some(text) =
+                recovery_index_text(&entry, terminal.as_ref()).filter(|text| !text.is_empty())
+            {
+                tx.execute(
+                    "INSERT INTO recovery_sources(scope,entry_id,ordinal) VALUES(?1,?2,?3)",
+                    params![scope, id, ordinal],
+                )?;
+                let rowid = tx.last_insert_rowid();
+                tx.execute(
+                    "INSERT INTO recovery_locations(source_id,start,end) VALUES(?1,?2,?3)",
+                    params![rowid, start, end],
+                )?;
+                tx.execute(
+                    "INSERT INTO recovery_projection_fts(rowid,content) VALUES(?1,?2)",
+                    params![rowid, text],
+                )?;
+            }
+            tx.execute(
+                "DELETE FROM recovery_pending WHERE scope=?1 AND entry_id=?2",
+                params![scope, id],
+            )?;
+            let remaining: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM recovery_pending WHERE scope=?1)",
+                [scope],
+                |r| r.get(0),
+            )?;
+            budget.check()?;
+            tx.commit()?;
+            Ok(!remaining)
+        })
+    }
+
     /// Find at most twenty candidates in a host-selected snapshot scope.
     /// An empty query discovers entries in source order. Nonempty queries use FTS
     /// only over eligible projection text, without global rank/statistics.
@@ -264,7 +421,7 @@ impl SessionIndex {
             };
             let _guard = install_budget(&self.conn, &local)?;
             let building: bool = self.conn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM recovery_builds WHERE scope=?1 AND next_offset<>source_end)",
+                "SELECT EXISTS(SELECT 1 FROM recovery_builds WHERE scope=?1 AND next_offset<>source_end) OR EXISTS(SELECT 1 FROM recovery_pending WHERE scope=?1)",
                 [scope], |r| r.get(0),
             )?;
             if building {
@@ -382,7 +539,11 @@ impl SessionIndex {
                  CREATE TABLE IF NOT EXISTS recovery_terminals (
                     scope TEXT NOT NULL, turn_id TEXT NOT NULL, entry_id TEXT NOT NULL,
                     ordinal INTEGER NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL,
-                    PRIMARY KEY(scope, turn_id), UNIQUE(scope, entry_id));",
+                    PRIMARY KEY(scope, turn_id), UNIQUE(scope, entry_id));
+                 CREATE TABLE IF NOT EXISTS recovery_pending (
+                    scope TEXT NOT NULL, entry_id TEXT NOT NULL, turn_id TEXT NOT NULL,
+                    ordinal INTEGER NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL,
+                    PRIMARY KEY(scope,entry_id));",
             )?;
             budget.check()?;
             tx.commit()?;
@@ -524,6 +685,20 @@ impl SessionIndex {
                 tx.execute("INSERT INTO recovery_terminals(scope,turn_id,entry_id,ordinal,start,end) VALUES(?1,?2,?3,?4,?5,?6)",
                     params![scope,marker.turn_id,source.entry.id,source.ordinal as i64,range.start as i64,range.end as i64])?;
             }
+            if append_only
+                && source.entry.role == "system"
+                && crate::turn_outcome::decode_turn_transcript_outcome(&source.entry.content)
+                    .is_none()
+                && source.terminal.is_none()
+                && let Some(turn) = &source.entry.metadata.turn_id
+                && let Some(range) = &source.record_range
+            {
+                if turn.len() > 1024 {
+                    return Err(invalid_build());
+                }
+                tx.execute("INSERT INTO recovery_pending(scope,entry_id,turn_id,ordinal,start,end) VALUES(?1,?2,?3,?4,?5,?6)",
+                    params![scope,source.entry.id,turn,source.ordinal as i64,range.start as i64,range.end as i64])?;
+            }
             let old: Option<i64> = tx
                 .query_row(
                     "SELECT id FROM recovery_sources WHERE scope=?1 AND entry_id=?2",
@@ -641,28 +816,11 @@ mod tests {
                     );
                 }
             }
-            let sources: Vec<_> = page
-                .entries
-                .iter()
-                .enumerate()
-                .map(|(i, entry)| RecoveryIndexSource {
-                    entry,
-                    terminal: None,
-                    ordinal: cursor.next_ordinal() + i as u64,
-                    record_range: Some(page.record_ranges[i].clone()),
-                })
-                .collect();
-            host.advance_recovery_build(
-                "scope",
-                &cursor,
-                RecoveryBuildPage {
-                    next_offset: page.next_offset,
-                    scanned_entries: page.entries.len() as u64,
-                    sources: &sources,
-                },
-                &budget,
-            )
-            .expect("page commit");
+            assert!(
+                !host
+                    .maintain_recovery_source("scope", &source, &budget)
+                    .expect("host scan step")
+            );
             cursor = host
                 .recovery_build_cursor("scope", &budget)
                 .expect("cursor")
@@ -677,8 +835,81 @@ mod tests {
             }
         }
         assert!(pages > 1);
+        assert!(
+            host.recovery_candidates("scope", "original", None, 20, &budget)
+                .is_err()
+        );
+        drop(host);
+        // A fresh host recovers pending work from SQLite, without the early tool
+        // record retained by the separate source-reread assertion below.
+        let mut host = SessionIndex::new(&path).expect("host restart");
+        let cancelled = RecoveryWorkBudget::new(Duration::from_secs(10));
+        cancelled.cancel();
+        assert!(
+            host.resolve_recovery_pending("scope", &source, &cancelled)
+                .is_err()
+        );
+        assert!(
+            host.recovery_candidates("scope", "original", None, 20, &budget)
+                .is_err()
+        );
+        let raw = std::fs::read(session.file_path()).expect("raw source");
+        let pending_start: i64 = host
+            .conn
+            .query_row(
+                "SELECT start FROM recovery_pending WHERE scope='scope' ORDER BY ordinal LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("pending tool range");
+        for &role in b"01" {
+            let mut replaced = raw.clone();
+            assert_eq!(replaced[pending_start as usize + 2], b'2');
+            replaced[pending_start as usize + 2] = role;
+            std::fs::write(session.file_path(), replaced).expect("replace role");
+            assert!(
+                host.maintain_recovery_source("scope", &source, &budget)
+                    .is_err()
+            );
+            let pending: i64 = host
+                .conn
+                .query_row(
+                    "SELECT count(*) FROM recovery_pending WHERE scope='scope'",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("pending retained");
+            assert_eq!(pending, 1);
+            let inserted: i64 = host
+                .conn
+                .query_row(
+                    "SELECT count(*) FROM recovery_sources WHERE scope='scope' AND entry_id=?1",
+                    [&commit.entry_ids[1]],
+                    |row| row.get(0),
+                )
+                .expect("no index insertion");
+            assert_eq!(inserted, 0);
+        }
+        std::fs::write(session.file_path(), raw).expect("restore original source");
+        while !host
+            .maintain_recovery_source("scope", &source, &budget)
+            .expect("resolve persisted work")
+        {}
         drop(host);
         let reader = SessionIndex::open_read_only(&path).expect("read-only reopen");
+        let hits = reader
+            .recovery_candidates("scope", "original", None, 20, &budget)
+            .expect("search backfilled text");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].entry_id, commit.entry_ids[1]);
+        let original = source
+            .read_record(
+                hits[0].record_range.clone().expect("locator"),
+                budget.deadline,
+                || budget.stopped(),
+            )
+            .expect("original search hit");
+        assert!(original.content.contains("original tool fact"));
         let marker = reader
             .recovery_terminal_candidate("scope", "turn", &budget)
             .expect("lookup")

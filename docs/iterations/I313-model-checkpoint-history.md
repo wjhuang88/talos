@@ -1,6 +1,6 @@
 # Iteration I313: Actor Model Checkpoints And Bounded History Recovery
 
-> Document status: Active (proposed in #819; ineffective until target-branch merge)
+> Document status: Active / Partial (#819 merged; implementation remains local and unmerged)
 > Published plan date: 2026-11-01
 > Baseline rule: preserve all T5 and Issue #390 acceptance; preparation is not implementation.
 > Planned objective: complete handoff T5 and remaining Issue #390 model-directed checkpoint/recovery acceptance, consuming I312 without creating another compaction or history authority.
@@ -845,3 +845,25 @@ Independent static APPROVE, diff SHA256
 reviewer did not run tests and shares Agent/GitHub identity. Existing indexes need
 host schema initialization before terminal lookup; model queries never migrate.
 T5/T1/T6 and the whole goal remain incomplete; final workspace/remote gates remain.
+
+### Host recovery scan and cross-page backfill — local, unmerged
+
+Host `maintain_recovery_source` composes bounded durable page reads, persisted
+scan progress and a second phase resolving original tool/terminal records. Scan
+transactions retain pending locators without copying private text. Query refuses
+scopes with pending resolution even after the byte scan completes. Resolution
+atomically inserts eligible FTS text and removes its pending locator; missing
+receipts produce no text. Cancellation or read/transaction failure retains work.
+Each resolution reads at most two records totaling 2 MiB under the same deadline.
+Existing pre-backfill caches must be rebuilt under a fresh scope; schema creation
+does not retroactively certify their coverage.
+
+The real >2 MiB TLOG regression now runs the host maintenance entrypoint, reopens
+the database, verifies pending-query refusal and cancellation, resolves persisted
+work and finds the early tool fact through read-only FTS with an original locator.
+Session 248/248 and all-target warnings-denied Session Clippy pass:
+`/private/tmp/i313-backfill-session.log`, `/private/tmp/i313-backfill-clippy.log`.
+This is explicit host maintenance, not automatic Runtime scheduling or model
+search/detail dispatch. Current source/branch/full-prefix authority, product
+activation and remaining acceptance still require implementation. T5 stays
+Partial; T1/T6 and full workspace/remote closure remain outstanding.

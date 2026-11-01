@@ -7,7 +7,11 @@ execution-scoped snapshots, privacy-safe projections and cancellable recovery
 cache maintenance. Read-only scoped candidate queries pass seven focused tests
 and affected Clippy plus incremental static review. See I313 owner for exact
 logs, limitations and remaining acceptance. These local increments are unmerged;
-model-facing recovery/compaction and Actor integration remain unimplemented.
+opt-in model checkpoint admission/Actor installation and terminal continuation
+receipts are locally implemented. Host bounded recovery scan/backfill is now
+implemented and tested across restart and pages; model search/detail dispatch,
+full durable scope authority and default Runtime/CLI activation remain unfinished.
+Latest Session tests pass 248/248; final workspace and remote gates remain open.
 The first four queue stages are merged; T5 remains Partial, T1/T6 unimplemented.
 Earlier activation and implementation snapshots below are historical.
 
