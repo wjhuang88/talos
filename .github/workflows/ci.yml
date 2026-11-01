@@ -68,7 +68,7 @@ jobs:
     name: Format + Check + Clippy + Test
     needs: classify-changes
     if: always()
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - uses: actions/checkout@v4
