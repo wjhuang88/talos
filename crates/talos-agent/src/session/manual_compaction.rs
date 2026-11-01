@@ -71,6 +71,10 @@ impl ManualCompaction {
         self.running.is_some()
     }
 
+    pub(super) fn has_pending_work(&self) -> bool {
+        self.running.is_some() || self.queued_model.is_some()
+    }
+
     /// Reserve shared capacity before returning tool admission. Preparation and
     /// installation remain deferred until the complete paired batch boundary.
     pub(super) fn admit_model(
@@ -213,12 +217,29 @@ impl ManualCompaction {
                         .unwrap_or(ManualCheckpointResult::Outcome(CompactOutcome::Failed))
                 }
             }
-            None => std::future::pending().await,
+            None => {
+                if self.queued_model.is_some()
+                    && let Some(receipt) = self.model_receipt.as_mut()
+                {
+                    receipt.closed().await;
+                    ManualCheckpointResult::Outcome(CompactOutcome::Cancelled)
+                } else {
+                    std::future::pending().await
+                }
+            }
         }
     }
 
     pub(super) fn complete(&mut self, actor: &AppServerSession, result: ManualCheckpointResult) {
         let Some((id, token, task)) = self.running.take() else {
+            // wait() may be woken by an abandoned admission before any batch.
+            if self
+                .model_receipt
+                .as_ref()
+                .is_some_and(|receipt| receipt.is_closed())
+            {
+                self.cancel_queued_model(actor);
+            }
             return;
         };
         task.abort();
@@ -523,6 +544,65 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[tokio::test]
+    async fn abandoned_admission_wakes_actor_without_waiting_for_batch_or_turn_end() {
+        let agent = Agent::with_security(
+            Arc::new(SummaryModel),
+            ToolRegistry::new(),
+            None,
+            None,
+            std::env::temp_dir(),
+        );
+        let (mut handle, actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: std::env::temp_dir(),
+                initial_history: vec![],
+                model_context_limit: 30_000,
+            },
+        );
+        let mut coordinator = ManualCompaction::new(0);
+        let (receipt, outcome) = tokio::sync::oneshot::channel();
+        let token = CancellationToken::new();
+        assert_eq!(
+            coordinator.admit_model(
+                &actor,
+                crate::ModelBoundarySubmission {
+                    checkpoint: crate::SubmittedCheckpoint {
+                        payload: "{}".into(),
+                        covered_end: 0,
+                        source: crate::compaction::HistorySource::bind(0, 0, &[], vec![])
+                            .expect("source"),
+                    },
+                    receipt,
+                },
+                &token
+            ),
+            Ok(0)
+        );
+        assert!(coordinator.has_pending_work());
+        assert!(!coordinator.is_running());
+        drop(outcome);
+        let terminal = tokio::time::timeout(std::time::Duration::from_secs(1), coordinator.wait())
+            .await
+            .expect("receipt closure wakes Actor");
+        coordinator.complete(&actor, terminal);
+        assert!(!coordinator.has_pending_work());
+        coordinator.admit(&actor, 0, 1);
+        assert!(matches!(
+            handle.eq_rx.try_recv().expect("released slot"),
+            SessionEvent::CompactStatus {
+                state: CompactState::Queued,
+                ..
+            }
+        ));
+        assert!(
+            !token.is_cancelled(),
+            "abandonment does not cancel the turn"
+        );
     }
 
     #[tokio::test]

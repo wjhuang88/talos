@@ -648,3 +648,20 @@ reviewer did not run tests and shares Agent/GitHub identity. A queued receipt cl
 is cleaned up at boundary or turn terminal, not by an immediate wakeup; installation
 still checks closure. This does not establish model-tool delivery, full workspace
 validation, remote CI or T5 completion. T1/T6 and the overall goal remain open.
+
+### Abandoned admission wakeup — local, unmerged
+
+Superseding the queued-receipt cleanup limitation above, receipt closure now wakes
+Actor selection before batch arrival or turn termination. The coordinator releases
+the abandoned model slot without cancelling the active turn. Running-work scheduling
+retains its existing predicate; only the completion wait includes queued model work.
+A regression drops the receiver, awaits the real coordinator wakeup with a deadline,
+and verifies manual admission succeeds while the turn token remains uncancelled.
+
+Locked Agent tests pass 602/602; all-target warnings-denied Agent Clippy passes.
+Logs: `/private/tmp/i313-abandon-agent.log`, `/private/tmp/i313-abandon-clippy.log`.
+Independent static review approved the two-file diff SHA256
+`40ca650e6ceaf8de0467866f6249959922e550e0c6de15718f6ebc2c624d6712`.
+Reviewer did not run tests and shares Agent/GitHub identity. This is a lifecycle
+repair, not production model-tool admission transport or T5 delivery. Those entry
+points, full workspace/remote validation, T1 and T6 remain outstanding.

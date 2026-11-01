@@ -490,7 +490,7 @@ impl AppServerSession {
             }
 
             tokio::select! {
-                result = compact.wait(), if compact.is_running() => {
+                result = compact.wait(), if compact.has_pending_work() => {
                     compact.complete(self, result);
                 }
                 completed = async {
