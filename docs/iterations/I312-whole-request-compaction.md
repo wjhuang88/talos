@@ -1,10 +1,32 @@
 # Iteration I312: Whole-Request Compaction And Manual Controls
 
-> Document status: Active / Partial (claim #817 merged; implementation in progress)
+> Document status: Complete (implementation #818 merged; owner closeout recorded)
 > Published plan date: 2026-10-30
 > Planned objective: deliver full handoff T4 through MEM-005 policy and MEM-003 convergence, preserving the later T5 Actor recovery deliverable.
 > Baseline rule: preserve all parent acceptance; successful trimming alone cannot close this iteration.
 > MVP deliverable: a long-running session compacts complete provider requests safely, exposes numeric outcomes and accepts a typed /compact command while raw history remains recoverable.
+
+## Completion evidence — 2026-11-01
+
+Completion Commit: `65500a86931cfbadf8bef5e97e45321c20b62e7a` (PR #818).
+Exact implementation head `b3eab8fba7840b6292439f67d98158737dae21bd` passed
+all eight CI jobs in `41271309341`, including full standard locked preflight,
+Windows workspace and Linux/Windows Desktop. Local Agent 587/587, macOS Desktop
+114/114 and real inline/PTY compact walkthroughs are recorded below. Both
+merge-time governance validators passed with zero warnings. Exact-head independent
+static API/privacy/security review approved against base `3c748a11576af6ca16301edecb35d8a234eef923`,
+diff SHA-256 `478d64593a9be59010a21b9bed710b0311bb93ac8f2d26c544098d8037c3c334`.
+The reviewer did not independently run tests and shares the Agent/GitHub identity;
+this is not a separate human review. Merge-time CAS confirmed effective claim
+#817, unchanged target, no overlapping claim/PR and no blocking review threads.
+
+All eleven published I312 rows and the mapped MEM-003/MEM-005 T4 criteria are
+accepted on this merged implementation. ADR-096 explicitly replaces the legacy
+raw-history mutation architecture; its literal old API call is not claimed
+implemented. Fixed-provider fixtures do not certify real-model semantic quality;
+PTY evidence covers emitted text, not pixel layout. Legacy unverifiable tool
+payload recovery and model-directed tools remain T5, not T4 delivery claims.
+Issue #390 remains open. Earlier pending/partial checkpoints below are historical.
 
 ## Stable candidate validation — 2026-11-01
 
@@ -468,7 +490,7 @@ This is not completion of manual failure metrics, fork/legacy lineage, semantic
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | Handoff T4: whole-request pressure/admission, shared structured checkpoint generation, raw-history-preserving projection, manual command, observable outcomes and long-session regression |
@@ -477,8 +499,8 @@ This is not completion of manual failure metrics, fork/legacy lineage, semantic
 | Governance Claim PR | #817 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Independent exact-head governance/API/privacy review, CI, both validators and merge CAS required; no implementation before merge |
-| Implementation PR | Not started |
-| Last Updated | 2026-10-30 |
+| Implementation PR | #818 |
+| Last Updated | 2026-11-01 |
 | Handoff / Release Condition | MODEL-014 acceptance closeout and effective target-branch claim before implementation |
 
 ## Published Baseline

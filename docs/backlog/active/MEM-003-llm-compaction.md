@@ -4,10 +4,19 @@
 |-------|-------|
 | Story ID | MEM-003 |
 | Priority | P3 |
-| Status | In Progress / Partial (T4 delegated to I312; #817 merged and effective) |
+| Status | Complete (ADR-096 replacement accepted through I312/#818) |
 | Depends On | MEM-002/I024 completed lower-layer baseline; higher-layer residuals remain here |
 | Blocks | None |
 | Origin | I024 Day 4 audit gap |
+
+## Merged acceptance — 2026-11-01
+
+Completion Commit: `65500a86931cfbadf8bef5e97e45321c20b62e7a`.
+I312 records all-eight-success exact-head CI `41271309341`, standard preflight,
+independent API/privacy/security approval and CAS. All five original criteria
+are reconciled by the replacement mapping below; the literal old API architecture
+is superseded by ADR-096, not retroactively claimed satisfied. Long-session and
+failure behavior use the one checkpoint pipeline. Earlier Partial text is historical.
 
 ## Current implementation and acceptance mapping — 2026-11-01
 
