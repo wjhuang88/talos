@@ -40,6 +40,11 @@ ambient proxy inheritance, no credentials/cookies/Auth header, system TLS verifi
 query/body/timeout handling, and evidence output limited to digests and summarized metadata. It does
 not certify geography, infer public IP/GeoIP, prove failure-domain independence or admit a provider.
 
+The current source/published-service independence classification is maintained in
+[SEARCH-001-D Failure-Domain Checkpoint — 2026-11-01](SEARCH-001-D-FAILURE-DOMAIN-2026-11-01.md).
+It supports distinct project/implementation and native-index origins while explicitly leaving
+runtime hosting/network independence and regional reachability unproved.
+
 ## Current blockers
 
 SEARCH-001-D / I294 remains incomplete. The shortest remaining closure path is:
