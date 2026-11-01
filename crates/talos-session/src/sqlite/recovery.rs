@@ -9,6 +9,17 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 
+/// Failure to read one recovery candidate within a shared page allowance.
+#[derive(Debug, thiserror::Error)]
+pub enum RecoveryReadError {
+    /// Retry this candidate on a fresh page; no candidate may be skipped.
+    #[error("recovery page source allowance exhausted")]
+    PageBudgetExhausted,
+    /// Invalid, stale, cancelled or unavailable source/index evidence.
+    #[error(transparent)]
+    Index(#[from] IndexError),
+}
+
 /// Cooperative cancellation and deadline for one recovery database operation.
 #[derive(Clone)]
 pub struct RecoveryWorkBudget {
@@ -572,6 +583,10 @@ impl SessionIndex {
             budget,
             &mut (crate::history_page::HISTORY_PAGE_BYTES as u64),
         )
+        .map_err(|error| match error {
+            RecoveryReadError::Index(error) => error,
+            RecoveryReadError::PageBudgetExhausted => invalid_build(),
+        })
     }
 
     /// As candidate_text, sharing a source-byte allowance across one result page.
@@ -584,7 +599,7 @@ impl SessionIndex {
         kind: crate::history_projection::RecoveryTextKind,
         budget: &RecoveryWorkBudget,
         remaining: &mut u64,
-    ) -> Result<Option<crate::history_projection::RecoveryText>, IndexError> {
+    ) -> Result<Option<crate::history_projection::RecoveryText>, RecoveryReadError> {
         let local = RecoveryWorkBudget {
             cancelled: budget.cancelled.clone(),
             external_stop: budget.external_stop.clone(),
@@ -594,7 +609,7 @@ impl SessionIndex {
         let indexed =
             self.recovery_candidates(scope, "", candidate.ordinal.checked_sub(1), 1, &local)?;
         if indexed.first() != Some(candidate) {
-            return Err(invalid_build());
+            return Err(invalid_build().into());
         }
         let range = candidate.record_range.clone().ok_or_else(invalid_build)?;
         let source_bytes = range
@@ -603,12 +618,12 @@ impl SessionIndex {
             .ok_or_else(invalid_build)?;
         *remaining = remaining
             .checked_sub(source_bytes)
-            .ok_or_else(invalid_build)?;
+            .ok_or(RecoveryReadError::PageBudgetExhausted)?;
         let entry = seal
             .read_record(range, local.deadline, || local.stopped())
             .map_err(|_| invalid_build())?;
         if entry.id != candidate.entry_id {
-            return Err(invalid_build());
+            return Err(invalid_build().into());
         }
         let terminal = if entry.role == "system" {
             if let Some(turn) = &entry.metadata.turn_id {
@@ -620,30 +635,32 @@ impl SessionIndex {
             None
         };
         let terminal = terminal
-            .map(|candidate| {
-                let range = candidate.record_range.ok_or_else(invalid_build)?;
-                let total = source_bytes
-                    .checked_add(
-                        range
-                            .end
-                            .checked_sub(range.start)
-                            .ok_or_else(invalid_build)?,
-                    )
-                    .ok_or_else(invalid_build)?;
-                if total > crate::history_page::HISTORY_PAGE_BYTES as u64 {
-                    return Err(invalid_build());
-                }
-                *remaining = remaining
-                    .checked_sub(range.end - range.start)
-                    .ok_or_else(invalid_build)?;
-                let entry = seal
-                    .read_record(range, local.deadline, || local.stopped())
-                    .map_err(|_| invalid_build())?;
-                if entry.id != candidate.entry_id || entry.role != "system" {
-                    return Err(invalid_build());
-                }
-                Ok(entry)
-            })
+            .map(
+                |candidate| -> Result<crate::SessionEntry, RecoveryReadError> {
+                    let range = candidate.record_range.ok_or_else(invalid_build)?;
+                    let total = source_bytes
+                        .checked_add(
+                            range
+                                .end
+                                .checked_sub(range.start)
+                                .ok_or_else(invalid_build)?,
+                        )
+                        .ok_or_else(invalid_build)?;
+                    if total > crate::history_page::HISTORY_PAGE_BYTES as u64 {
+                        return Err(invalid_build().into());
+                    }
+                    *remaining = remaining
+                        .checked_sub(range.end - range.start)
+                        .ok_or(RecoveryReadError::PageBudgetExhausted)?;
+                    let entry = seal
+                        .read_record(range, local.deadline, || local.stopped())
+                        .map_err(|_| invalid_build())?;
+                    if entry.id != candidate.entry_id || entry.role != "system" {
+                        return Err(invalid_build().into());
+                    }
+                    Ok(entry)
+                },
+            )
             .transpose()?;
         let result =
             crate::history_projection::recovery_response_text(&entry, terminal.as_ref(), kind);
@@ -1100,6 +1117,38 @@ mod tests {
                 .expect("eligible fact");
             assert_eq!(recovered.text, "original tool fact");
             assert!(!recovered.truncated);
+            // The original record fits, but its authorization terminal does not.
+            // Exhaustion must remain retryable and charge the original read.
+            let range = hits[0].record_range.as_ref().expect("record range");
+            let mut allowance = range.end - range.start;
+            assert!(matches!(
+                reader.recovery_candidate_text_with_source_budget(
+                    "scope",
+                    &hits[0],
+                    &seal,
+                    crate::history_projection::RecoveryTextKind::Detail,
+                    &budget,
+                    &mut allowance,
+                ),
+                Err(RecoveryReadError::PageBudgetExhausted)
+            ));
+            assert_eq!(allowance, 0);
+            let mut allowance = crate::history_page::HISTORY_PAGE_BYTES as u64;
+            assert_eq!(
+                reader
+                    .recovery_candidate_text_with_source_budget(
+                        "scope",
+                        &hits[0],
+                        &seal,
+                        crate::history_projection::RecoveryTextKind::Detail,
+                        &budget,
+                        &mut allowance,
+                    )
+                    .expect("fresh page retry")
+                    .expect("authorized text")
+                    .text,
+                "original tool fact"
+            );
             assert!(
                 reader
                     .recovery_candidate_text(

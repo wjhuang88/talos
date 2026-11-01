@@ -1084,3 +1084,26 @@ Logs: `/private/tmp/i313-stable-refs-agent.log`,
 `/private/tmp/i313-stable-refs-clippy.log`. This supersedes the latest-page-only
 reference limitation above; byte-budget continuation, long discovery, resumable
 host preparation and all remaining T5/platform/remote gates remain open.
+
+### Source-byte pagination — local, unmerged
+
+The shared candidate reader now distinguishes page allowance exhaustion from
+invalid/stale/cancelled evidence through RecoveryReadError. Search returns a
+partial page and continuation without advancing past the unread candidate;
+errors still refuse disclosure. A candidate that cannot fit even a fresh page
+remains unavailable rather than issuing a nonadvancing cursor. The changed
+shared-budget API is new and unpublished within this I313 branch; existing
+single-candidate API behavior is preserved.
+
+A real durable ten-record, approximately 3 MB fixture requires multiple pages
+and verifies all ten results in order without duplication or omission. All four
+checkpoint_history tests pass (`/private/tmp/i313-budget-tests.log`). Broader
+validation and independent review remain pending; this is not T5 completion.
+
+Budget pagination validation: locked Agent 616/616, Session 253/253 and affected
+all-target warnings-denied Clippy pass (`/private/tmp/i313-budget-full-tests.log`,
+`/private/tmp/i313-budget-clippy.log`). Both governance validators pass. Independent
+static review approves the source-budget increment (reviewer did not run tests).
+An additional actual tool/terminal regression confirms allowance exhaustion after
+the original read, zero remaining allowance and successful fresh-page retry
+(`/private/tmp/i313-budget-terminal.log`).

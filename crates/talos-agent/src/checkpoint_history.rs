@@ -233,19 +233,24 @@ impl History {
             // Bound all source/terminal record reads for this query together.
             let mut remaining = talos_session::history_page::HISTORY_PAGE_BYTES as u64;
             for candidate in candidates {
-                let Some(text) = index
-                    .recovery_candidate_text_with_source_budget(
-                        &self.scope,
-                        &candidate,
-                        &self.seal,
-                        talos_session::history_projection::RecoveryTextKind::Snippet,
-                        &budget,
-                        &mut remaining,
-                    )
-                    .ok()?
-                else {
-                    last = Some(candidate.ordinal);
-                    continue;
+                let text = match index.recovery_candidate_text_with_source_budget(
+                    &self.scope,
+                    &candidate,
+                    &self.seal,
+                    talos_session::history_projection::RecoveryTextKind::Snippet,
+                    &budget,
+                    &mut remaining,
+                ) {
+                    Ok(Some(text)) => text,
+                    Ok(None) => {
+                        last = Some(candidate.ordinal);
+                        continue;
+                    }
+                    Err(talos_session::sqlite::RecoveryReadError::PageBudgetExhausted) => {
+                        incomplete = true;
+                        break;
+                    }
+                    Err(_) => return None,
                 };
                 let reference = state.reference(candidate.ordinal);
                 results.push(
@@ -295,6 +300,51 @@ mod tests {
         ] {
             assert_eq!(state.ordinal(&malformed), None);
         }
+    }
+
+    #[tokio::test]
+    async fn source_budget_pages_retry_unread_candidate_without_skipping() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "byte-pages").expect("session");
+        let raw: Vec<_> = (0..10)
+            .map(|i| talos_core::message::Message::User {
+                content: format!("budgetfact {i} {}", "x".repeat(300_000)),
+            })
+            .collect();
+        session
+            .commit_turn("turn", &raw, &Default::default())
+            .expect("commit");
+        let history = History::prepare(&session, &CancellationToken::new())
+            .await
+            .expect("host");
+        let mut cursor = None;
+        let mut seen = Vec::new();
+        let mut pages = 0;
+        loop {
+            let page = history
+                .query(Some("budgetfact"), None, cursor.as_deref())
+                .expect("page");
+            let results = page["results"].as_array().expect("results");
+            assert!(!results.is_empty());
+            for result in results {
+                let text = result["text"].as_str().expect("text");
+                seen.push(
+                    text.split_whitespace()
+                        .nth(1)
+                        .expect("ordinal")
+                        .parse::<usize>()
+                        .expect("number"),
+                );
+            }
+            pages += 1;
+            assert!(pages <= 10, "cursor must advance");
+            if page["complete"] == true {
+                break;
+            }
+            cursor = Some(page["next_cursor"].as_str().expect("cursor").to_owned());
+        }
+        assert!(pages > 1, "source allowance must split the result page");
+        assert_eq!(seen, (0..10).collect::<Vec<_>>());
     }
 
     #[tokio::test]
