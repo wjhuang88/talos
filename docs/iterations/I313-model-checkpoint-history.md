@@ -733,3 +733,21 @@ static review approved the pagination delta; reviewer did not run tests. Clippy
 initially flagged a test lock lifetime; an explicit lexical scope releases it
 before the final await. Final Clippy evidence: `/private/tmp/i313-pages-clippy.log`.
 This stage remains local and does not close T5, T1, T6 or the whole handoff goal.
+
+### Bounded recovery response projection — local, unmerged
+
+Authoritative rereads can now use recovery_response_text with an explicit
+RecoveryTextKind: Snippet has a fixed 512-byte ceiling and Detail 8192 bytes.
+The helper reuses index eligibility/terminal receipt verification, never falls back
+to raw unverified tool content, preserves UTF-8 boundaries and reports truncation.
+A truncated detail is not full-fact recovery. The existing real 10,000-record
+resumable-build test now follows its cache candidate through original-record reread
+and snippet/detail projection; Unicode/private/unverified-output regressions cover
+the response boundary. This does not establish host branch authority or source
+freshness, cross-page terminal lookup, or model search/detail dispatch. Those remain
+required within T5, alongside host activation and the remaining published acceptance.
+
+Validation logs: `/private/tmp/i313-response-final-tests.log` and
+`/private/tmp/i313-response-final-clippy.log` (locked Session library tests and
+warnings-denied all-target Session Clippy). No full workspace or remote CI evidence
+is claimed for this local increment; T5/T1/T6 and the overall goal stay Active.

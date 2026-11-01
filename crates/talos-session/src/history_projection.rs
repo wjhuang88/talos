@@ -43,6 +43,52 @@ pub fn recovery_index_text(
     }
 }
 
+/// Bounded eligible text for a recovery snippet or explicit detail response.
+/// Branch authority and source freshness must be verified by the query host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryText {
+    /// UTF-8 text with hidden tool syntax and unverified tool output excluded.
+    pub text: String,
+    /// Whether eligible text exceeded the requested byte limit.
+    pub truncated: bool,
+}
+
+/// Requested disclosure shape, with fixed byte ceilings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryTextKind {
+    /// Search result preview, at most 512 UTF-8 bytes.
+    Snippet,
+    /// Explicit original-entry detail, at most 8192 UTF-8 bytes.
+    Detail,
+}
+
+/// Project an authoritative reread into a bounded snippet (up to 512 bytes) or
+/// detail (up to 8192 bytes). The source/receipt rules are identical to indexing;
+/// callers must never fall back to raw text when this returns None.
+///
+/// The kind selects a fixed ceiling. Truncation preserves UTF-8 boundaries and is
+/// explicit; it does not claim that a truncated detail is the full original fact.
+pub fn recovery_response_text(
+    source: &SessionEntry,
+    terminal: Option<&SessionEntry>,
+    kind: RecoveryTextKind,
+) -> Option<RecoveryText> {
+    let max_bytes = match kind {
+        RecoveryTextKind::Snippet => 512,
+        RecoveryTextKind::Detail => 8192,
+    };
+    let mut text = recovery_index_text(source, terminal)?;
+    let truncated = text.len() > max_bytes;
+    if truncated {
+        let mut end = max_bytes;
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text.truncate(end);
+    }
+    Some(RecoveryText { text, truncated })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -59,6 +105,37 @@ mod tests {
             },
         }
     }
+    #[test]
+    fn response_projection_bounds_utf8_and_never_falls_back_to_unverified_tool_text() {
+        let source = entry("user", &"汉字".repeat(2000));
+        for (kind, limit) in [
+            (RecoveryTextKind::Snippet, 512),
+            (RecoveryTextKind::Detail, 8192),
+        ] {
+            let response = recovery_response_text(&source, None, kind).expect("eligible");
+            assert!(response.text.len() <= limit);
+            assert!(response.truncated);
+            assert!(source.content.starts_with(&response.text));
+        }
+        assert!(
+            recovery_response_text(
+                &entry("system", "unverified tool secret"),
+                None,
+                RecoveryTextKind::Snippet
+            )
+            .is_none()
+        );
+        let response = recovery_response_text(
+            &entry("assistant", "visible decision"),
+            None,
+            RecoveryTextKind::Snippet,
+        )
+        .expect("assistant");
+        assert_eq!(response.text, "visible decision");
+        assert!(!response.truncated);
+        assert!(!response.text.contains("HIDDEN_RAW"));
+    }
+
     #[test]
     fn serialized_tool_arguments_with_fences_and_quotes_never_enter_index() {
         use talos_core::message::{Message, ToolCall};

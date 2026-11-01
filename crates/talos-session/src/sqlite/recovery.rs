@@ -722,6 +722,22 @@ mod tests {
             .expect("bounded authoritative reread");
             assert_eq!(recovered.id, tail[0].entry_id);
             assert_eq!(recovered.content, content);
+            let detail = crate::history_projection::recovery_response_text(
+                &recovered,
+                None,
+                crate::history_projection::RecoveryTextKind::Detail,
+            )
+            .expect("eligible reread detail");
+            assert_eq!(detail.text, content);
+            assert!(!detail.truncated);
+            let snippet = crate::history_projection::recovery_response_text(
+                &recovered,
+                None,
+                crate::history_projection::RecoveryTextKind::Snippet,
+            )
+            .expect("bounded snippet");
+            assert!(snippet.text.len() <= 512);
+            assert_eq!(snippet.truncated, content.len() > 512);
         }
     }
 
