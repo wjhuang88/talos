@@ -6,7 +6,7 @@ I312 is Complete/Closed with Completion Commit:
 validators and CAS passed. MEM-003's ADR-096 replacement and MEM-005's eleven T4
 rows are accepted; MEM-005/#390 remains In Progress for T5.
 I313 proposes the full T5 delivery and all thirty Issue #390 regression rows;
-claim and activation are ineffective until the finalized governance PR merges.
+claim/Active state proposed in #819 are ineffective until its finalized head merges.
 Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
 The first four stages are merged; T5/T1/T6 remain unimplemented. Earlier snapshots
 below are historical and do not override current owner evidence.

@@ -1,6 +1,6 @@
 # Iteration I313: Actor Model Checkpoints And Bounded History Recovery
 
-> Document status: Planned / Unclaimed (atomic activation draft; ineffective until merge)
+> Document status: Active (proposed in #819; ineffective until target-branch merge)
 > Published plan date: 2026-11-01
 > Baseline rule: preserve all T5 and Issue #390 acceptance; preparation is not implementation.
 > Planned objective: complete handoff T5 and remaining Issue #390 model-directed checkpoint/recovery acceptance, consuming I312 without creating another compaction or history authority.
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | Handoff T5: Actor model checkpoints, stable tool discovery, bounded branch-scoped authoritative history recovery and persistence/privacy regressions |
 | Claimed At | 2026-11-01 |
 | Source Issue | #390 (remaining T5 acceptance) |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #819 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Exact-head independent governance/API/privacy review, CI, validators and CAS required before activation |
 | Implementation PR | Not started |
@@ -110,7 +110,7 @@ Preserve distinct natural-boundary and unsafe-boundary regression scenarios.
 
 ## Acceptance and validation
 
-Preserve all 30 numbered requirements from Issue #390 verbatim in activation,
+The following allocation preserves all 30 numbered requirements from Issue #390;
 using the allocation below as the published baseline, not implementation evidence.
 Also cover bounded full detail; raw-only FTS hits yielding no model ref/count/rank;
 policy-denied persistence; manual/model contention; generation reset/cancel/stale
