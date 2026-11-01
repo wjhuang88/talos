@@ -1063,3 +1063,24 @@ and warnings-denied all-target Clippy pass: `/private/tmp/i313-pagination-agent.
 `/private/tmp/i313-pagination-clippy.log`. Source-byte exhaustion still returns
 Unavailable rather than a continuation page; long discovery, resumed preparation,
 platform/default activation and final T5/workspace/remote closure remain open.
+
+### Stable cross-page detail references — local, unmerged
+
+History query state no longer retains a latest-page reference map. A fresh
+per-discovery secret derives fixed-format ordinal references, allowing detail
+lookup from older pages without memory proportional to searched history. The
+reference is checked before scoped ordinal lookup; current index/source/permission
+checks remain unchanged. Rediscovery rotates the secret, invalidating every prior
+reference without retaining a revocation list. Source order is encoded in the
+reference; it is client-uninterpreted, not encrypted or fully opaque.
+
+The construction hashes a fixed domain, fixed-width ordinal and a private 32-byte
+suffix from two random v4 UUIDs. Independent review approved this fixed-input use,
+not a general MAC or signature. It does not provide constant-time comparison;
+format/purpose expansion requires a standard keyed primitive. No new dependency
+was added. Regression covers earlier-page detail after three pages, ordinal
+modification, another discovery secret, noncanonical forms and rediscovery.
+Logs: `/private/tmp/i313-stable-refs-agent.log`,
+`/private/tmp/i313-stable-refs-clippy.log`. This supersedes the latest-page-only
+reference limitation above; byte-budget continuation, long discovery, resumable
+host preparation and all remaining T5/platform/remote gates remain open.

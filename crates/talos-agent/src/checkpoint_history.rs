@@ -1,13 +1,10 @@
 //! Host-prepared durable history queries, scoped to one configured execution.
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeMap,
     sync::Mutex,
     time::{Duration, Instant},
 };
-use talos_session::sqlite::{
-    RecoveryBuildPage, RecoveryCandidate, RecoveryIndexSource, RecoveryWorkBudget,
-};
+use talos_session::sqlite::{RecoveryBuildPage, RecoveryIndexSource, RecoveryWorkBudget};
 use talos_session::{DurableSession, RecoveryPrefixSeal, SessionIndex};
 use tokio_util::sync::CancellationToken;
 
@@ -19,11 +16,46 @@ pub(crate) struct History {
     seal: RecoveryPrefixSeal,
     state: Mutex<QueryState>,
 }
-#[derive(Default)]
 struct QueryState {
-    refs: BTreeMap<String, RecoveryCandidate>,
+    secret: [u8; 32],
     cursor: Option<(String, String, Option<u64>)>,
 }
+impl Default for QueryState {
+    fn default() -> Self {
+        let mut secret = [0; 32];
+        secret[..16].copy_from_slice(uuid::Uuid::new_v4().as_bytes());
+        secret[16..].copy_from_slice(uuid::Uuid::new_v4().as_bytes());
+        Self {
+            secret,
+            cursor: None,
+        }
+    }
+}
+impl QueryState {
+    // Fixed-size domain/ordinal/secret input; not a general variable-length MAC.
+    // The per-discovery secret is never persisted or exposed to the model.
+    fn reference(&self, ordinal: u64) -> String {
+        use sha2::{Digest, Sha256};
+        let mut digest = Sha256::new();
+        digest.update(b"talos-history-reference-v1");
+        digest.update(ordinal.to_le_bytes());
+        digest.update(self.secret);
+        let tag = digest
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>();
+        format!("{ordinal:016x}.{tag}")
+    }
+    fn ordinal(&self, reference: &str) -> Option<u64> {
+        if reference.len() != 81 || !reference.is_ascii() {
+            return None;
+        }
+        let ordinal = u64::from_str_radix(reference.get(..16)?, 16).ok()?;
+        (self.reference(ordinal) == reference).then_some(ordinal)
+    }
+}
+
 tokio::task_local! {
     pub(crate) static HISTORY: Option<History>;
 }
@@ -164,7 +196,13 @@ impl History {
             if cursor.is_some() {
                 return None;
             }
-            let candidate = state.refs.get(reference)?;
+            let ordinal = state.ordinal(reference)?;
+            let candidates = index
+                .recovery_candidates(&self.scope, "", ordinal.checked_sub(1), 1, &budget)
+                .ok()?;
+            let candidate = candidates
+                .first()
+                .filter(|candidate| candidate.ordinal == ordinal)?;
             let text = index
                 .recovery_candidate_text(
                     &self.scope,
@@ -191,7 +229,6 @@ impl History {
                 .ok()?;
             let mut incomplete = candidates.len() == 20;
             let mut results = Vec::new();
-            let mut next_refs = BTreeMap::new();
             let mut last = after;
             // Bound all source/terminal record reads for this query together.
             let mut remaining = talos_session::history_page::HISTORY_PAGE_BYTES as u64;
@@ -210,7 +247,7 @@ impl History {
                     last = Some(candidate.ordinal);
                     continue;
                 };
-                let reference = uuid::Uuid::new_v4().to_string();
+                let reference = state.reference(candidate.ordinal);
                 results.push(
                     json!({"reference":reference,"text":text.text,"truncated":text.truncated}),
                 );
@@ -220,13 +257,11 @@ impl History {
                     break;
                 }
                 last = Some(candidate.ordinal);
-                next_refs.insert(reference, candidate);
             }
             if incomplete && last == after {
                 return None;
             }
             let next = incomplete.then(|| uuid::Uuid::new_v4().to_string());
-            state.refs = next_refs;
             state.cursor = next
                 .as_ref()
                 .map(|token| (token.clone(), query.to_owned(), last));
@@ -246,6 +281,22 @@ impl History {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    #[test]
+    fn references_require_canonical_format_and_current_discovery_secret() {
+        let state = QueryState::default();
+        let reference = state.reference(23);
+        assert_eq!(state.ordinal(&reference), Some(23));
+        assert_eq!(QueryState::default().ordinal(&reference), None);
+        for malformed in [
+            reference.to_uppercase(),
+            format!("{reference}x"),
+            reference[1..].into(),
+            "é".repeat(41),
+        ] {
+            assert_eq!(state.ordinal(&malformed), None);
+        }
+    }
+
     #[tokio::test]
     async fn search_pages_preserve_order_and_reject_query_changes_and_replay() {
         let root = tempfile::tempdir().expect("root");
@@ -289,6 +340,26 @@ mod tests {
             .query(None, third["results"][4]["reference"].as_str(), None)
             .expect("detail");
         assert_eq!(detail["text"], "paginated fact 44");
+        let old_ref = first["results"][0]["reference"].as_str().expect("old ref");
+        assert_eq!(
+            history
+                .query(None, Some(old_ref), None)
+                .expect("old page detail")["text"],
+            "paginated fact 0"
+        );
+        let mut forged = old_ref.as_bytes().to_vec();
+        forged[15] = if forged[15] == b'0' { b'1' } else { b'0' };
+        assert!(
+            history
+                .query(
+                    None,
+                    Some(std::str::from_utf8(&forged).expect("ascii")),
+                    None
+                )
+                .is_none()
+        );
+        history.reset_queries().expect("rediscovery");
+        assert!(history.query(None, Some(old_ref), None).is_none());
     }
 
     #[tokio::test]
