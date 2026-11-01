@@ -717,3 +717,19 @@ new checkpoint_tools.rs SHA256 `777a8ed30e80dc3b6fd010de4bf691a7382187a5a2e7b63b
 Reviewer did not run tests and shares Agent/GitHub identity. Full workspace preflight,
 SDK/platform/remote CI, final API/docs migration, default host activation and all
 remaining 30-row acceptance stay required. T5, T1, T6 and the whole goal remain open.
+
+### Execution-local discovery pagination — local, unmerged
+
+Discovery now returns a single-use opaque next_cursor, at most 20 references per
+page in original source order, and the same issued snapshot across pages. Append
+and refresh do not expand that snapshot. Rediscovery replaces the cursor;
+cross-execution, permission reset, generation change and covered-prefix mutation
+refuse continuation. State retains only current/issued snapshots and one cursor,
+not a growing page cache. This supersedes the discovery-only pagination gap above;
+durable index search/detail and their paging/branch authority remain unimplemented.
+
+Locked Agent tests pass 608/608 (`/private/tmp/i313-pages-agent.log`). Independent
+static review approved the pagination delta; reviewer did not run tests. Clippy
+initially flagged a test lock lifetime; an explicit lexical scope releases it
+before the final await. Final Clippy evidence: `/private/tmp/i313-pages-clippy.log`.
+This stage remains local and does not close T5, T1, T6 or the whole handoff goal.

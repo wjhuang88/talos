@@ -22,6 +22,7 @@ pub(crate) struct Execution {
 struct State {
     current: Option<Snapshot>,
     issued: Option<Snapshot>,
+    cursor: Option<(String, usize)>,
     receipt: Option<(u64, oneshot::Receiver<CompactOutcome>)>,
 }
 #[derive(Clone)]
@@ -30,6 +31,7 @@ struct Snapshot {
     source: HistorySource,
     end: usize,
     refs: BTreeMap<String, String>,
+    order: Vec<String>,
     authority: PermissionLease,
 }
 #[derive(Clone)]
@@ -76,6 +78,7 @@ impl Execution {
                 return None;
             }
             let mut refs = BTreeMap::new();
+            let mut order = Vec::new();
             for (index, message) in messages[..end].iter().enumerate() {
                 if matches!(message, Message::System { .. }) {
                     continue;
@@ -83,7 +86,9 @@ impl Execution {
                 if let Some(id) =
                     source.resolve(source.generation(), source.revision(), index, message)
                 {
-                    refs.insert(uuid::Uuid::new_v4().to_string(), id.to_owned());
+                    let reference = uuid::Uuid::new_v4().to_string();
+                    refs.insert(reference.clone(), id.to_owned());
+                    order.push(reference);
                 }
             }
             (!refs.is_empty()).then(|| Snapshot {
@@ -91,6 +96,7 @@ impl Execution {
                 source: source.clone(),
                 end,
                 refs,
+                order,
                 authority,
             })
         });
@@ -116,6 +122,8 @@ struct CompactInput {
 #[serde(deny_unknown_fields)]
 struct HistoryInput {
     mode: String,
+    #[serde(default)]
+    cursor: Option<String>,
 }
 
 pub(crate) struct CompactContextTool;
@@ -158,18 +166,49 @@ impl AgentTool for HistorySearchTool {
         let Ok(mut state) = execution.state.lock() else {
             return unavailable();
         };
-        let Some(snapshot) = state.current.clone() else {
-            return unavailable();
+        let (snapshot, start) = if let Some(cursor) = input.cursor {
+            let Some((expected, start)) = state.cursor.as_ref() else {
+                return ToolResult::error("stale discovery cursor");
+            };
+            if cursor != *expected {
+                return ToolResult::error("stale discovery cursor");
+            }
+            let Some(snapshot) = state.issued.clone() else {
+                return unavailable();
+            };
+            let Some(current) = &state.current else {
+                return unavailable();
+            };
+            if current.end < snapshot.end
+                || !(0..snapshot.end).all(|i| snapshot.source.same_entry(&current.source, i))
+            {
+                return ToolResult::error("stale discovery source");
+            }
+            (snapshot, *start)
+        } else {
+            let Some(snapshot) = state.current.clone() else {
+                return unavailable();
+            };
+            (snapshot, 0)
         };
-        // This bounded discovery emits opaque references, never source contents.
         if !snapshot.authority.valid() {
             return unavailable();
         }
-        let refs: Vec<_> = snapshot.refs.keys().take(20).cloned().collect();
+        let refs: Vec<_> = snapshot
+            .order
+            .iter()
+            .skip(start)
+            .take(20)
+            .cloned()
+            .collect();
+        let end = start + refs.len();
+        let next = (end < snapshot.order.len()).then(|| uuid::Uuid::new_v4().to_string());
         let result = ToolResult::success(
-            json!({"snapshot":snapshot.token,"sources":refs,"complete":snapshot.refs.len() <= 20})
-                .to_string(),
+            json!({"snapshot":snapshot.token,"sources":refs,
+            "complete":next.is_none(),"next_cursor":next})
+            .to_string(),
         );
+        state.cursor = next.map(|cursor| (cursor, end));
         state.issued = Some(snapshot);
         result
     }
@@ -374,6 +413,147 @@ mod tests {
                 .is_error
         );
     }
+    #[tokio::test]
+    async fn discovery_pages_preserve_snapshot_source_order_and_reject_replayed_cursor() {
+        let (execution, _, mut raw) = fixture();
+        raw.push(Message::User {
+            content: "later input".into(),
+        });
+        let source = HistorySource::bind(
+            0,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
+        )
+        .expect("source");
+        execution.refresh(Some(&source), &raw);
+        let first = EXECUTION
+            .scope(
+                execution.clone(),
+                HistorySearchTool.execute(json!({"mode":"discover"})),
+            )
+            .await;
+        let first: Value = serde_json::from_str(&first.content).expect("first page");
+        let cursor = first["next_cursor"].as_str().expect("next page");
+        let (other, _, _) = fixture();
+        assert!(
+            EXECUTION
+                .scope(
+                    other,
+                    HistorySearchTool.execute(json!({"mode":"discover","cursor":cursor}))
+                )
+                .await
+                .is_error
+        );
+        // Appending history cannot expand or replace the issued snapshot.
+        raw.push(Message::User {
+            content: "appended after discovery".into(),
+        });
+        let source = HistorySource::bind(
+            0,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
+        )
+        .expect("source");
+        execution.refresh(Some(&source), &raw);
+        let second = EXECUTION
+            .scope(
+                execution.clone(),
+                HistorySearchTool.execute(json!({"mode":"discover","cursor":cursor})),
+            )
+            .await;
+        assert!(!second.is_error);
+        let second: Value = serde_json::from_str(&second.content).expect("second page");
+        assert_eq!(second["snapshot"], first["snapshot"]);
+        assert_eq!(second["complete"], true);
+        assert_eq!(second["sources"].as_array().expect("sources").len(), 1);
+        {
+            let state = execution.state.lock().expect("state");
+            let issued = state.issued.as_ref().expect("issued");
+            let refs: Vec<_> = first["sources"]
+                .as_array()
+                .expect("first")
+                .iter()
+                .chain(second["sources"].as_array().expect("second"))
+                .collect();
+            for (i, reference) in refs.iter().enumerate() {
+                assert_eq!(
+                    issued.refs.get(reference.as_str().expect("ref")),
+                    Some(&format!("raw-{i}"))
+                );
+            }
+        }
+        assert!(
+            EXECUTION
+                .scope(
+                    execution,
+                    HistorySearchTool.execute(json!({"mode":"discover","cursor":cursor}))
+                )
+                .await
+                .is_error
+        );
+    }
+
+    #[tokio::test]
+    async fn discovery_cursor_revalidates_permission_generation_and_prefix() {
+        for change in ["permission", "generation", "prefix", "rediscovery"] {
+            let (execution, _, mut raw) = fixture();
+            raw.push(Message::User {
+                content: "extra".into(),
+            });
+            let bind = |generation, raw: &[Message]| {
+                HistorySource::bind(
+                    generation,
+                    raw.len() as u64,
+                    raw,
+                    (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
+                )
+                .expect("source")
+            };
+            execution.refresh(Some(&bind(0, &raw)), &raw);
+            let first = EXECUTION
+                .scope(
+                    execution.clone(),
+                    HistorySearchTool.execute(json!({"mode":"discover"})),
+                )
+                .await;
+            let first: Value = serde_json::from_str(&first.content).expect("page");
+            let cursor = first["next_cursor"].as_str().expect("cursor");
+            match change {
+                "permission" => execution
+                    .permission
+                    .as_ref()
+                    .expect("permission")
+                    .clear()
+                    .expect("reset"),
+                "generation" => execution.refresh(Some(&bind(1, &raw)), &raw),
+                "prefix" => {
+                    raw[0] = Message::User {
+                        content: "changed".into(),
+                    };
+                    execution.refresh(Some(&bind(0, &raw)), &raw);
+                }
+                _ => {
+                    let replacement = EXECUTION
+                        .scope(
+                            execution.clone(),
+                            HistorySearchTool.execute(json!({"mode":"discover"})),
+                        )
+                        .await;
+                    assert!(!replacement.is_error);
+                }
+            }
+            let refused = EXECUTION
+                .scope(
+                    execution,
+                    HistorySearchTool.execute(json!({"mode":"discover","cursor":cursor})),
+                )
+                .await;
+            assert!(refused.is_error, "{change} must invalidate cursor");
+        }
+    }
+
     #[tokio::test]
     async fn prefix_mutation_invalidates_discovered_checkpoint_before_admission() {
         let (execution, mut receiver, mut raw) = fixture();
