@@ -95,22 +95,20 @@ after exact-head CI, independent security/API review and CAS.
 is Review/Claimed after diagnostic #716 mergedb5b8241e. CI3221 all6jobs pass; TEST004/I305 closes
 only known-resource acceptance. Prior cold73→76, static mechanism candidates and unknown/native
 lifetime remain an OPEN#717 residual.
-I293/I294/I300 remain Active; I277 retains Review, I249 Planned and I164 Paused.
+I294/I300 remain Active; I277 retains Review, I249 Planned and I164 Paused.
 I301 bounded startup closeout is recorded below.
 I302 records the full inventory/non-overlap and workspace-recovery receipts; separate I302 commits
 in #716 do not close original global-resource questions or authorize Search activation.
 
-[I293](I293-search-router.md) retains SEARCH-001-C ownership. The maintainer accepted bounded
-production endpoint-authority/search wiring on 2026-10-13; [ADR-090](../decisions/090-invocation-bound-search-endpoint-authority.md)
-and the existing C claim's scope amendment became effective in #712 (989fec2e), after protected
-review, CI and CAS. #713 carrier merged69e1e116 after exact-head review/CI/CAS. The private
-controlled direct transport merged in #714 (d78dc75c); TLS/CONNECT subset merged under the same
-claim in #715 (d66e380a) after protected review/full CI3173/CAS and native TLS recovery.
-Bounded form transport #716 mergedb5b8241e after all6CI3221/protectedreview/CAS. Its reviewed
-PSS/direct controls and TEST004 real-resource gate pass; prior first-use/global-count failures
-remain historical evidence, with #717 lifetime/attribution residual open. Complete parity remains.
-WebSearch default activation and full C/EP acceptance remain Pending, #643/#624 open. I300 and
-PERM-007-H retain their separate scopes.
+[I293](I293-search-router.md) / SEARCH-001-C is Complete / Closed with Completion Commit
+`eb870cdf0a63f45f20d89f1a50eba276f9198643` (#808 merge). CI3676 / run `41281303499`
+finished green, including Windows Desktop rerun job `124783776313` and dependent Windows Rust
+workspace job `124784491542`; all other applicable jobs succeeded. Independent exact-head review
+comment `6554584202` found no remaining security, API or #814 parity blocker. The final CAS
+comparison was 7 ahead / 0 behind pre-merge `main` at `8b11e5f49794ea17f09c96eff8d59a6bf8f9a3d6`.
+The owner preserves the historical stage records. SEARCH-001-D / #644 remains OPEN for
+research/admission only; #808/#814 establish no provider permission, legal authorization or
+native-provider admission.
 
 [I301](I301-missing-pending-sidecar-startup.md) / RUNTIME-010 is Complete / Closed.
 #711 implementation `98fa04cb` merged `9cad344b` after CI3161/review/CAS; post-merge startup

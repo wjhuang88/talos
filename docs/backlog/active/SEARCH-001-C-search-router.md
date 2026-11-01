@@ -1,6 +1,7 @@
 # SEARCH-001-C: Talos-Owned SearchRouter
 
-**Status**: Active / Claimed; selected in I293
+**Status**: Complete / Closed
+Completion Commit: `eb870cdf0a63f45f20d89f1a50eba276f9198643` (#808 merge)
 **Type**: Implementation Child
 **Source Issue**: #643
 
@@ -11,12 +12,13 @@ existing paid-provider/Wikipedia compatibility constraints.
 Iteration: [I293](../../iterations/I293-search-router.md). Effective governance claim: #664,
 merged at `d801790454e252699684253166984662ea9dab6a`.
 
-## Current Execution Boundary
+## Historical Execution Boundary — Pre-#808
 
-The current session permits architecture/evidence and test-only characterization, not production
-search behavior changes. The merged #681 test-only stage records the existing first-completion race;
-it does not implement or complete SearchRouter. Runtime routing, typed failures, bounded hedging,
-deadline/cancellation, health state and binary acceptance remain pending. Keep #643 and #624 open.
+At the time of this earlier stage, the session permitted architecture/evidence and test-only
+characterization, not production search behavior changes. The merged #681 test-only stage recorded
+the existing first-completion race; it did not implement SearchRouter. Runtime routing, typed
+failures, bounded hedging, deadline/cancellation, health state and binary acceptance were pending.
+At that point, #643 and #624 were to remain open.
 
 Existing test evidence: #681 merge `41381f8055b66d54de42988e2b936a12e5af3ac3`.
 The [router integration plan](../../reference/SEARCH-001-C-ROUTER-INTEGRATION-PLAN.md)
@@ -185,3 +187,18 @@ The next dormant prerequisite internalizes existing Bing CN response parsing, pr
 per-row selectors, trim/cleanup/skip/dedup order and status/challenge classification with explicit
 encoding/bounds/scraper differences. This retains compound compatibility family identity only;
 I293 records source/license and validation. All request/integration/D/privacy/activation gates remain.
+
+## Final Closeout — 2026-11-01
+
+I293 / SEARCH-001-C is Complete / Closed.
+Completion Commit: `eb870cdf0a63f45f20d89f1a50eba276f9198643` (#808 merge).
+CI3676 / run `41281303499` finished green, including successful Windows Desktop rerun job
+`124783776313` and dependent
+Windows Rust workspace job `124784491542`; all other applicable jobs succeeded. Independent
+exact-head review comment `6554584202` found no remaining security, API or #814 parity blocker.
+The terminal comparison was 7 ahead / 0 behind pre-merge `main` at
+`8b11e5f49794ea17f09c96eff8d59a6bf8f9a3d6`, followed by the #808 merge at the Completion Commit.
+
+SEARCH-001-D / #644 remains OPEN for research/admission only. #808/#814 do not establish provider
+permission, legal authorization or native-provider admission. This closeout does not change #624
+or admit D/E/F.

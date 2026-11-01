@@ -1,6 +1,6 @@
 # Iteration I293: Talos-Owned SearchRouter
 
-> Document status: Active
+> Document status: Complete
 > Parent: SEARCH-001-C / #643 / SEARCH-001 / #624
 > Objective: implement the accepted ADR-085 first-valid-success router after B, without changing the model-facing contract.
 
@@ -9,15 +9,16 @@
 | Story | SEARCH-001-C |
 | Source Issue | #643 |
 | Depends on | Accepted ADR-085; SEARCH-001-B / #642 complete in #656; NET-001 boundary coordination |
-| Claim State | Claimed |
-| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; #744 merged prepared invocation at `032cce61`; #745 merged private tool at `ba93193f`; #746 merged DNS failover at `0caaf832`; typed refusal #750 merged at `ec9ade0f`; #753 merged explicit SearXNG at `444c8ff1`; #754 merged SearXNG invocation at `56aed583`; full C/EP and default activation Pending |
-| Completion | Pending |
+| Claim State | Closed |
+| Implementation PR | #681 / #685 / #696 / #706 / #707 / #708 / #709 (merged partial evidence); #712 governance amendment; #713 merged carrier; #714 merged direct transport; #715 merged TLS/CONNECT subset; #716 merged bounded form/diagnostic stage at `b5b8241e`; #732 merged owned payload at `8fa2a50`; #733 merged Lite/HTML parsing at `dea3edc`; #734 merged Instant Answer at `45cf9eb9`; #736 merged Bing parsing at `2b015a6b`; #737 merged fixed requests at `ae6a0791`; #738 merged bound execution at `2d7f4b36`; #739 merged fixed headers at `91c330ba`; #741 merged result admission at `4e20ee95`; #742 merged fixed chain at `9f998392`; #743 merged direct plan at `181d7584`; #744 merged prepared invocation at `032cce61`; #745 merged private tool at `ba93193f`; #746 merged DNS failover at `0caaf832`; typed refusal #750 merged at `ec9ade0f`; #753 merged explicit SearXNG at `444c8ff1`; #754 merged SearXNG invocation at `56aed583`; #808 merged implementation at `eb870cdf0a63f45f20d89f1a50eba276f9198643` |
+| Completion | Complete |
+| Completion Commit | `eb870cdf0a63f45f20d89f1a50eba276f9198643` |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex (GPT-6) / SEARCH-001 continuation of talos开发 session |
 | Work Slice | SEARCH-001-C SearchRouter; search-specific core/permission/Agent prepared invocation and endpoint authority; controlled existing-protocol compatibility internalization and optional-adapter transport; CLI/SDK/MCP dispositions, migration and validation under ADR-085/090 |
@@ -26,8 +27,8 @@
 | Governance Claim PR | #712 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer accepted bounded production scope 2026-10-13; independent protected security/API contract review, exact-head CI, governance validators, Issue reconciliation and final CAS required for #712 merge. No release or native admission authorized. |
-| Last Updated | 2026-10-23 |
-| Handoff / Release Condition | Original #664 claim effective at `d801790454e252699684253166984662ea9dab6a`; expanded scope effective only after #712 accepted-contract merge. Start implementation from that merge or later main; activation requires ADR-090 transport/parity/D gates. |
+| Last Updated | 2026-11-01 |
+| Handoff / Release Condition | Closed after #808 merged at the Completion Commit recorded above; #644 / SEARCH-001-D remains separately open for research/admission only. No provider permission, legal authorization or native-provider admission is established. |
 
 ## Scope
 
@@ -2258,3 +2259,21 @@ Predecessor #754 merged at the base above, source head `d319872455f7021ebf553951
 Initial focused run passed155 and failed one new default-count assertion: the test expected5, while unchanged `WebSearchInput` defaults to10. Corrected only that test expectation to the documented legacy default10; no production behavior or acceptance was relaxed. Raw failure is retained in `searxng-tool-focused-initial-failed.log`. Corrected focused, strict network Clippy and standard preflight are running before stable publication.
 
 Final local validation: pinned Rust1.99.0, locked dependencies, two jobs and debug/incremental disabled. Corrected focused transport156/0 plus isolated child1 and strict network-feature test Clippy exited0. Standard `./scripts/release_preflight.sh` exited0 (`searxng-tool-preflight.log`, `TALOS_STAGE_TERMINAL_EXIT=0`), including workspace check/Clippy/tests, tools615/0/all seven new wrapper tests, governance/claims0warnings, and both independently resolved external Runtime SDK modes printing `talos-runtime external fixture passed`. Target symlink remains shared with the external SDK fixture. The existing sole authorized local runtime socket-fixture filter remained local, alongside normal isolated-child selectors; native CI must retain original complete parent suites. Source review APPROVE found no blockers. Initial test assertion failure remains disclosed; this success does not explain #750's historical artifact failure. Final staged/remote exact-head review, native CI and fresh ownership/scope/head/base CAS remain required before merge.
+
+## Final Closeout — 2026-11-01
+
+I293 / SEARCH-001-C is Complete / Closed.
+Completion Commit: `eb870cdf0a63f45f20d89f1a50eba276f9198643` (#808 merge). This is the implementation
+completion evidence; this later documentation-only closeout is not the Completion Commit.
+
+PR #808's implementation candidate head was `712dddcbc519b0f45e0f49b582595e8832643c6a`.
+CI3676 / run `41281303499` finished green: targeted Windows Desktop rerun job
+`124783776313` succeeded, its dependent Windows Rust workspace job `124784491542` succeeded,
+and all other applicable jobs succeeded. Independent exact-head review comment `6554584202`
+found no remaining security, API or #814 parity blocker. The final merge-time CAS recorded a
+terminal comparison of 7 ahead / 0 behind pre-merge `main` at
+`8b11e5f49794ea17f09c96eff8d59a6bf8f9a3d6`; #808 then merged at the Completion Commit above.
+
+SEARCH-001-D / #644 remains OPEN for research/admission only. #808/#814 do not establish provider
+permission, legal authorization or native-provider admission. No D/E/F admission or #624 state
+change is included in this closeout.
