@@ -208,13 +208,14 @@ impl DurableRecoverySource {
     pub(crate) fn read_recovery_bytes(
         &self,
         offset: u64,
+        end: u64,
         expected: &std::fs::Metadata,
         deadline: std::time::Instant,
         stopped: impl Fn() -> bool,
     ) -> Result<Vec<u8>, crate::history_page::HistoryPageError> {
         use crate::history_page::{HISTORY_PAGE_BYTES, HistoryPageError};
         use std::io::{Read, Seek, SeekFrom};
-        if offset > self.source_end {
+        if offset > end || end > self.source_end {
             return Err(HistoryPageError::Stale);
         }
         let mut file = crate::history_page::open_source(&self.descriptor.path)?;
@@ -222,7 +223,7 @@ impl DurableRecoverySource {
             return Err(HistoryPageError::Stale);
         }
         file.seek(SeekFrom::Start(offset))?;
-        let size = (self.source_end - offset).min(HISTORY_PAGE_BYTES as u64) as usize;
+        let size = (end - offset).min(HISTORY_PAGE_BYTES as u64) as usize;
         let mut bytes = vec![0; size];
         for chunk in bytes.chunks_mut(8192) {
             if stopped() || std::time::Instant::now() >= deadline {

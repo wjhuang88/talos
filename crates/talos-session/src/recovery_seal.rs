@@ -19,6 +19,7 @@ pub struct RecoveryPrefixScan {
 #[derive(Clone)]
 pub struct RecoveryPrefixSeal {
     source: DurableRecoverySource,
+    stamp: std::fs::Metadata,
     digest: [u8; 32],
 }
 
@@ -45,6 +46,50 @@ impl RecoveryPrefixSeal {
         Ok(scan)
     }
 
+    /// Read one exact original record only while the fully verified file version
+    /// remains current. Appends/replacements require another completed verification.
+    /// Neither the seal nor a record locator establishes branch/permission authority.
+    pub fn read_record(
+        &self,
+        range: std::ops::Range<u64>,
+        deadline: Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<crate::SessionEntry, HistoryPageError> {
+        if range.start >= range.end || range.end > self.source.source_end() {
+            return Err(HistoryPageError::Stale);
+        }
+        if range.end - range.start > crate::history_page::HISTORY_PAGE_BYTES as u64 {
+            return Err(HistoryPageError::RecordTooLarge);
+        }
+        self.check_current()?;
+        let bytes = self.source.read_recovery_bytes(
+            range.start,
+            range.end,
+            &self.stamp,
+            deadline,
+            &stopped,
+        )?;
+        let (entry, consumed) =
+            crate::history_page::tlog_record(&bytes)?.ok_or(HistoryPageError::InvalidRecord)?;
+        if consumed != bytes.len() {
+            return Err(HistoryPageError::InvalidRecord);
+        }
+        self.check_current()?;
+        if stopped() || Instant::now() >= deadline {
+            return Err(HistoryPageError::Stopped);
+        }
+        Ok(entry)
+    }
+
+    /// Check that the verified file version has not changed. Call again inside
+    /// the host's final permission/generation delivery fence.
+    pub fn check_current(&self) -> Result<(), HistoryPageError> {
+        if !same_file_version(&self.source.recovery_metadata()?, &self.stamp)? {
+            return Err(HistoryPageError::Stale);
+        }
+        Ok(())
+    }
+
     /// Captured source cutoff, unaffected by later append-only writes.
     pub fn source_end(&self) -> u64 {
         self.source.source_end()
@@ -68,9 +113,13 @@ impl RecoveryPrefixScan {
         if self.offset == self.source.source_end() {
             return Ok(true);
         }
-        let bytes =
-            self.source
-                .read_recovery_bytes(self.offset, &self.stamp, deadline, &stopped)?;
+        let bytes = self.source.read_recovery_bytes(
+            self.offset,
+            self.source.source_end(),
+            &self.stamp,
+            deadline,
+            &stopped,
+        )?;
         let next_offset = self.offset + bytes.len() as u64;
         let mut hash = Sha256::new();
         hash.update(self.digest);
@@ -105,6 +154,7 @@ impl RecoveryPrefixScan {
         }
         Ok(RecoveryPrefixSeal {
             source: self.source,
+            stamp: self.stamp,
             digest: self.digest,
         })
     }
@@ -190,6 +240,7 @@ mod tests {
             matches!(
                 source.read_recovery_bytes(
                     0,
+                    source.source_end(),
                     &original_meta,
                     Instant::now() + Duration::from_secs(2),
                     || false

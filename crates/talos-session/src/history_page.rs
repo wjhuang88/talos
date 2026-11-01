@@ -238,7 +238,7 @@ fn json_record(
     Ok(Some((entry, end + usize::from(newline.is_some()))))
 }
 
-fn tlog_record(bytes: &[u8]) -> Result<Option<(SessionEntry, usize)>, HistoryPageError> {
+pub(crate) fn tlog_record(bytes: &[u8]) -> Result<Option<(SessionEntry, usize)>, HistoryPageError> {
     let mut fields = Vec::with_capacity(5);
     let mut pos = 0;
     for _ in 0..5 {

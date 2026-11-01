@@ -475,6 +475,78 @@ impl SessionIndex {
         })
     }
 
+    /// Reread a scoped index candidate and its terminal receipt through a fully
+    /// verified source. Returns bounded eligible text, never raw cache text.
+    /// The caller must authorize scope/branch before calling and recheck the
+    /// seal, generation and permission inside its final result-delivery fence.
+    pub fn recovery_candidate_text(
+        &self,
+        scope: &str,
+        candidate: &RecoveryCandidate,
+        seal: &crate::RecoveryPrefixSeal,
+        kind: crate::history_projection::RecoveryTextKind,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<Option<crate::history_projection::RecoveryText>, IndexError> {
+        let local = RecoveryWorkBudget {
+            cancelled: budget.cancelled.clone(),
+            deadline: budget.deadline.min(Instant::now() + Duration::from_secs(2)),
+        };
+        local.check()?;
+        let indexed =
+            self.recovery_candidates(scope, "", candidate.ordinal.checked_sub(1), 1, &local)?;
+        if indexed.first() != Some(candidate) {
+            return Err(invalid_build());
+        }
+        let range = candidate.record_range.clone().ok_or_else(invalid_build)?;
+        let source_bytes = range
+            .end
+            .checked_sub(range.start)
+            .ok_or_else(invalid_build)?;
+        let entry = seal
+            .read_record(range, local.deadline, || local.stopped())
+            .map_err(|_| invalid_build())?;
+        if entry.id != candidate.entry_id {
+            return Err(invalid_build());
+        }
+        let terminal = if entry.role == "system" {
+            if let Some(turn) = &entry.metadata.turn_id {
+                self.recovery_terminal_candidate(scope, turn, &local)?
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let terminal = terminal
+            .map(|candidate| {
+                let range = candidate.record_range.ok_or_else(invalid_build)?;
+                let total = source_bytes
+                    .checked_add(
+                        range
+                            .end
+                            .checked_sub(range.start)
+                            .ok_or_else(invalid_build)?,
+                    )
+                    .ok_or_else(invalid_build)?;
+                if total > crate::history_page::HISTORY_PAGE_BYTES as u64 {
+                    return Err(invalid_build());
+                }
+                let entry = seal
+                    .read_record(range, local.deadline, || local.stopped())
+                    .map_err(|_| invalid_build())?;
+                if entry.id != candidate.entry_id || entry.role != "system" {
+                    return Err(invalid_build());
+                }
+                Ok(entry)
+            })
+            .transpose()?;
+        let result =
+            crate::history_projection::recovery_response_text(&entry, terminal.as_ref(), kind);
+        seal.check_current().map_err(|_| invalid_build())?;
+        local.check()?;
+        Ok(result)
+    }
+
     /// Locate an original terminal marker during host maintenance, including one
     /// encountered on a later scan page. This returns an untrusted locator only;
     /// reread and verify the original marker and branch scope before disclosure.
@@ -902,6 +974,72 @@ mod tests {
             .expect("search backfilled text");
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].entry_id, commit.entry_ids[1]);
+        #[cfg(unix)]
+        {
+            let mut scan = source.begin_prefix_seal().expect("seal source");
+            while !scan
+                .step(budget.deadline, || budget.stopped())
+                .expect("prefix chunk")
+            {}
+            let seal = scan.finish().expect("verified prefix");
+            let recovered = reader
+                .recovery_candidate_text(
+                    "scope",
+                    &hits[0],
+                    &seal,
+                    crate::history_projection::RecoveryTextKind::Detail,
+                    &budget,
+                )
+                .expect("composed read")
+                .expect("eligible fact");
+            assert_eq!(recovered.text, "original tool fact");
+            assert!(!recovered.truncated);
+            assert!(
+                reader
+                    .recovery_candidate_text(
+                        "other-scope",
+                        &hits[0],
+                        &seal,
+                        crate::history_projection::RecoveryTextKind::Detail,
+                        &budget
+                    )
+                    .is_err()
+            );
+            let stopped = RecoveryWorkBudget::new(Duration::from_secs(2));
+            stopped.cancel();
+            assert!(
+                reader
+                    .recovery_candidate_text(
+                        "scope",
+                        &hits[0],
+                        &seal,
+                        crate::history_projection::RecoveryTextKind::Detail,
+                        &stopped
+                    )
+                    .is_err()
+            );
+
+            let mut raw = std::fs::read(session.file_path()).expect("source");
+            let original_bytes = raw.clone();
+            let offset = raw
+                .windows(b"original tool fact".len())
+                .position(|bytes| bytes == b"original tool fact")
+                .expect("fact");
+            raw[offset] = b'X';
+            std::fs::write(session.file_path(), raw).expect("replace after seal");
+            assert!(
+                reader
+                    .recovery_candidate_text(
+                        "scope",
+                        &hits[0],
+                        &seal,
+                        crate::history_projection::RecoveryTextKind::Detail,
+                        &budget
+                    )
+                    .is_err()
+            );
+            std::fs::write(session.file_path(), original_bytes).expect("restore source");
+        }
         let original = source
             .read_record(
                 hits[0].record_range.clone().expect("locator"),

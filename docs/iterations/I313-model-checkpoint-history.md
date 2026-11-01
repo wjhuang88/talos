@@ -961,3 +961,26 @@ or complete T5 behavior is claimed. Locked Agent 610/610 and Session 253/253
 library tests plus warnings-denied all-target Clippy pass. Validation logs are
 `/private/tmp/i313-owner-tests.log` and `/private/tmp/i313-owner-clippy.log`;
 final workspace/SDK/platform/remote gates and T1/T6 remain outstanding.
+
+### Composed index candidate disclosure backend — local, unmerged
+
+RecoveryPrefixSeal retains the verified file stamp and can read one exact record
+through an opened-handle before/after version fence. SessionIndex candidate-text
+lookup first matches the candidate against the scoped complete index, then reads
+original source and terminal receipt through the seal, enforces their combined
+2 MiB bound and a two-second operation budget, and returns the existing bounded
+snippet/detail projection. It rechecks the verified file version before return.
+Append/replacement after verification requires completing a fresh verification;
+no unchecked reread follows a discarded consistency result.
+
+The actual >2 MiB cross-page fixture now queries read-only FTS, seals the full
+source, recovers the committed tool fact through this composed API, and refuses
+wrong scope, cancellation and source replacement. Seal assertions are Unix-only;
+existing portable index/reread assertions remain active. Locked Session 253/253
+and all-target warnings-denied Session Clippy pass. Logs:
+`/private/tmp/i313-query-composed-tests.log`,
+`/private/tmp/i313-query-composed-clippy.log`.
+This API is a host backend, not model tool dispatch. Scope ownership/branch,
+generation and permission must still be bound and rechecked inside the final
+result-delivery fence; Windows seal support and Runtime/CLI integration remain
+unfinished. No completion or workspace/remote certification is claimed.
