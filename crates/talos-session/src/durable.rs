@@ -109,6 +109,122 @@ impl DurableHistorySnapshot {
     }
 }
 
+/// Storage-issued byte cutoff for bounded host recovery maintenance.
+/// This binds the configured durable source, not permission or content freshness.
+/// Hosts must still verify prefix digests and current branch before disclosure.
+#[derive(Clone)]
+pub struct DurableRecoverySource {
+    descriptor: Arc<RecoverySourceDescriptor>,
+    source_end: u64,
+}
+
+struct RecoverySourceDescriptor {
+    session_id: Uuid,
+    branch_id: String,
+    path: std::path::PathBuf,
+}
+
+/// A bounded original record retained from a storage-owned source read.
+/// This detects record replacement; it does not grant branch or permission authority.
+#[derive(Clone)]
+pub struct DurableRecoveryRecord {
+    source: DurableRecoverySource,
+    range: std::ops::Range<u64>,
+    digest: [u8; 32],
+}
+
+impl DurableRecoveryRecord {
+    /// Reread and compare the original serialized entry before projection.
+    pub fn reread(
+        &self,
+        deadline: std::time::Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<SessionEntry, crate::history_page::HistoryPageError> {
+        use sha2::{Digest, Sha256};
+        let entry = crate::history_page::read_history_record(
+            &self.source.descriptor.path,
+            crate::history_page::HistoryEncoding::Tlog,
+            self.range.clone(),
+            deadline,
+            &stopped,
+        )?;
+        let encoded = serde_json::to_vec(&entry)
+            .map_err(|_| crate::history_page::HistoryPageError::InvalidRecord)?;
+        let digest: [u8; 32] = Sha256::digest(encoded).into();
+        if digest != self.digest {
+            return Err(crate::history_page::HistoryPageError::Stale);
+        }
+        if stopped() || std::time::Instant::now() >= deadline {
+            return Err(crate::history_page::HistoryPageError::Stopped);
+        }
+        Ok(entry)
+    }
+}
+
+impl DurableRecoverySource {
+    /// Durable owner of the captured source; callers cannot supply another path.
+    pub fn session_id(&self) -> Uuid {
+        self.descriptor.session_id
+    }
+    /// Branch identity selected by the configured durable owner.
+    pub fn branch_id(&self) -> &str {
+        &self.descriptor.branch_id
+    }
+    /// Captured byte cutoff, excluding future appended turns.
+    pub fn source_end(&self) -> u64 {
+        self.source_end
+    }
+    /// Capture one original record within this source cutoff. The locator must
+    /// come from host pagination; neither locator nor returned record grants scope.
+    pub fn capture_record(
+        &self,
+        range: std::ops::Range<u64>,
+        deadline: std::time::Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<DurableRecoveryRecord, crate::history_page::HistoryPageError> {
+        use sha2::{Digest, Sha256};
+        if range.end > self.source_end {
+            return Err(crate::history_page::HistoryPageError::Stale);
+        }
+        let entry = crate::history_page::read_history_record(
+            &self.descriptor.path,
+            crate::history_page::HistoryEncoding::Tlog,
+            range.clone(),
+            deadline,
+            &stopped,
+        )?;
+        let encoded = serde_json::to_vec(&entry)
+            .map_err(|_| crate::history_page::HistoryPageError::InvalidRecord)?;
+        let digest = Sha256::digest(encoded).into();
+        if stopped() || std::time::Instant::now() >= deadline {
+            return Err(crate::history_page::HistoryPageError::Stopped);
+        }
+        Ok(DurableRecoveryRecord {
+            source: self.clone(),
+            range,
+            digest,
+        })
+    }
+
+    /// Read one bounded original page. Offsets are host maintenance cursors,
+    /// never model-controlled paths or authorization capabilities.
+    pub fn read_page(
+        &self,
+        offset: u64,
+        deadline: std::time::Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<crate::history_page::HistoryPage, crate::history_page::HistoryPageError> {
+        crate::history_page::read_history_page(
+            &self.descriptor.path,
+            crate::history_page::HistoryEncoding::Tlog,
+            offset,
+            self.source_end,
+            deadline,
+            stopped,
+        )
+    }
+}
+
 /// A UUID-backed durable session bound to an opaque host external ID.
 #[derive(Debug, Clone)]
 pub struct DurableSession {
@@ -193,6 +309,29 @@ impl DurableSession {
         Ok(DurableHistorySnapshot {
             session_id: self.id(),
             entries: self.read_messages_with_entry_ids()?,
+        })
+    }
+
+    /// Capture the configured durable source for incremental bounded maintenance.
+    /// Capturing a cutoff does not authorize raw disclosure or prove immutability.
+    pub fn capture_recovery_source(&self) -> Result<DurableRecoverySource, SessionError> {
+        let _guard =
+            self.session.write_lock.lock().map_err(|_| {
+                SessionError::DurableTurn("recovery source lock unavailable".into())
+            })?;
+        let metadata = fs::symlink_metadata(self.file_path())?;
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err(SessionError::DurableTurn(
+                "recovery source is not a regular file".into(),
+            ));
+        }
+        Ok(DurableRecoverySource {
+            descriptor: Arc::new(RecoverySourceDescriptor {
+                session_id: self.id(),
+                branch_id: self.session.current_branch.clone(),
+                path: self.file_path().to_path_buf(),
+            }),
+            source_end: metadata.len(),
         })
     }
 
@@ -844,6 +983,99 @@ fn is_sensitive_key(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn captured_recovery_source_excludes_append_and_is_owned_by_durable_session() {
+        let directory = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(directory.path(), "owner").expect("session");
+        session
+            .commit_turn(
+                "first",
+                &[Message::User {
+                    content: "original fact".into(),
+                }],
+                &PersistencePolicy::default(),
+            )
+            .expect("first commit");
+        let source = session.capture_recovery_source().expect("source");
+        assert_eq!(source.session_id(), session.id());
+        assert_eq!(source.branch_id(), session.session().current_branch);
+        session
+            .commit_turn(
+                "second",
+                &[Message::User {
+                    content: "later fact".into(),
+                }],
+                &PersistencePolicy::default(),
+            )
+            .expect("append");
+        assert!(
+            session
+                .capture_recovery_source()
+                .expect("new cutoff")
+                .source_end()
+                > source.source_end()
+        );
+        let page = source
+            .read_page(
+                0,
+                std::time::Instant::now() + std::time::Duration::from_secs(2),
+                || false,
+            )
+            .expect("page");
+        assert!(page.complete);
+        let range = page.record_ranges[0].clone();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let record = source
+            .capture_record(range, deadline, || false)
+            .expect("capture record");
+        assert_eq!(
+            record.reread(deadline, || false).expect("unchanged").id,
+            page.entries[0].id
+        );
+        assert!(
+            source
+                .capture_record(
+                    source.source_end()..source.source_end() + 1,
+                    deadline,
+                    || false
+                )
+                .is_err()
+        );
+        assert!(record.reread(deadline, || true).is_err());
+        assert!(record.reread(std::time::Instant::now(), || false).is_err());
+        let mut bytes = fs::read(session.file_path()).expect("bytes");
+        let offset = bytes
+            .windows(b"original fact".len())
+            .position(|value| value == b"original fact")
+            .expect("content bytes");
+        bytes[offset..offset + b"original fact".len()].copy_from_slice(b"modified fact");
+        fs::write(session.file_path(), bytes).expect("same length replacement");
+        assert!(matches!(
+            record.reread(deadline, || false),
+            Err(crate::history_page::HistoryPageError::Stale)
+        ));
+        assert!(
+            page.entries
+                .iter()
+                .any(|entry| entry.content == "original fact")
+        );
+        assert!(
+            !page
+                .entries
+                .iter()
+                .any(|entry| entry.content == "later fact")
+        );
+        assert!(
+            source
+                .read_page(
+                    0,
+                    std::time::Instant::now() + std::time::Duration::from_secs(2),
+                    || true
+                )
+                .is_err()
+        );
+    }
 
     #[test]
     fn colon_external_id_maps_to_uuid_tlog_and_is_idempotent() {

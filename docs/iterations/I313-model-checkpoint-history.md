@@ -771,3 +771,28 @@ tests pass 244/244 and all-target warnings-denied Session Clippy passes; logs:
 Model search/detail dispatch, authoritative source scope, cross-page receipt lookup
 and host rebuild scheduling are still unimplemented. This connection prerequisite
 does not close T5, T1, T6 or the full goal; final workspace/remote gates remain open.
+
+### Durable recovery source binding and record reread — local, unmerged
+
+DurableSession can capture a storage-issued fixed path/session/branch descriptor
+and byte cutoff, then read bounded original pages. DurableRecoveryRecord binds one
+captured original record's serialized-entry digest and refuses changed rereads,
+including same-length text replacement. Later appended turns remain outside the
+captured cutoff. Source and record share an Arc-backed lightweight descriptor;
+review rejected the initial full Session clone because its branch history was not
+bounded by a page. No full Session or branch entries are retained by this descriptor.
+
+Capture still uses synchronous locking/metadata I/O. The record digest proves
+consistency only after capture_record, not between the prior page read and record
+capture, nor the entire prefix. These objects do not establish current permission,
+branch membership, cloned-file refusal or model disclosure authority. Host query
+integration must supply those checks and cross-page terminal receipt lookup.
+
+Locked Session tests pass 245/245 and all-target warnings-denied Clippy passes:
+`/private/tmp/i313-source-final-tests.log`, `/private/tmp/i313-source-final-clippy.log`.
+The real durable fixture covers cutoff exclusion, identity, cancellation/deadline,
+out-of-cutoff locators and same-length replacement. Independent static APPROVE:
+code diff SHA256 `7774833978b9eedcb7f863ecd0f03a385821eaca8e670f139a1074c7c2221c13`.
+Reviewer did not run tests and shares Agent/GitHub identity. Model search/detail,
+full T5 acceptance and final workspace/remote validation remain unfinished; T1/T6
+and the overall handoff remain open.
