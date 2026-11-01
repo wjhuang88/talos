@@ -45,6 +45,11 @@ The current source/published-service independence classification is maintained i
 It supports distinct project/implementation and native-index origins while explicitly leaving
 runtime hosting/network independence and regional reachability unproved.
 
+The current terms split is maintained in
+[SEARCH-001-D Terms And Result-Use Checkpoint — 2026-11-01](SEARCH-001-D-TERMS-RESULT-USE-2026-11-01.md).
+It distinguishes permission to automate/call an API from rights to reuse returned result/page
+material; both providers advance on interface evidence but neither closes the default result-use gate.
+
 ## Current blockers
 
 SEARCH-001-D / I294 remains incomplete. The shortest remaining closure path is:
@@ -55,8 +60,7 @@ SEARCH-001-D / I294 remains incomplete. The shortest remaining closure path is:
    labels as a second independent route;
 3. compare actual endpoint/downstream failure domains rather than inferring independence from
    different hostnames or documentation;
-4. reconcile remaining applicable service/result-use conditions, especially Purili's current
-   distributed-client/result-use permission and Mwmbl result-license applicability;
+4. close the remaining result-use/service-terms disposition documented in the terms checkpoint;
 5. collect paired controlled regional observations, including genuine mainland-China provenance.
 
 Until those gates close, #644 and #624 remain open, Mwmbl/Purili remain unadmitted, and
