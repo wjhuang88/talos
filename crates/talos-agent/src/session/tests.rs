@@ -3426,6 +3426,7 @@ async fn fixture_durable_failed_turn_replays_closed_prefix_and_error_outcome() {
             talos_session::TurnTranscriptOutcome::Error,
         )]
     );
+    assert_recovery_receipts_verify(&durable_session, 1);
 }
 
 #[tokio::test]
@@ -3524,6 +3525,7 @@ async fn fixture_durable_cancelled_turn_replays_latest_closed_prefix() {
             talos_session::TurnTranscriptOutcome::Cancelled,
         )]
     );
+    assert_recovery_receipts_verify(&reopened, 1);
 }
 
 #[cfg(unix)]
@@ -4932,3 +4934,23 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
 
 #[path = "checkpoint_acceptance_tests.rs"]
 mod checkpoint_acceptance;
+
+fn assert_recovery_receipts_verify(durable: &talos_session::DurableSession, expected: usize) {
+    let entries = durable
+        .session()
+        .read_entries()
+        .expect("read receipt source");
+    let receipts = entries
+        .iter()
+        .filter_map(talos_session::HistoryRecoveryReceipt::from_terminal_entry)
+        .flatten()
+        .collect::<Vec<_>>();
+    assert_eq!(receipts.len(), expected);
+    for receipt in receipts {
+        let entry = entries
+            .iter()
+            .find(|entry| entry.id == receipt.entry_id())
+            .expect("original entry");
+        assert!(receipt.verified_content(entry).is_some());
+    }
+}

@@ -89,7 +89,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let diagnostic_failures = Arc::new(Mutex::new(Vec::<String>::new()));
     let progress_diagnostic_failures = diagnostic_failures.clone();
     let diagnostic_turn_id = turn_id.clone();
-    let (snapshot_tx, mut snapshot_rx) = mpsc::unbounded_channel::<Vec<Message>>();
+    let (snapshot_tx, mut snapshot_rx) =
+        mpsc::unbounded_channel::<crate::persistence_snapshot::PersistenceSnapshot>();
     let (agent_ack_tx, mut agent_ack_rx) =
         mpsc::unbounded_channel::<SteeringBoundaryAcknowledgement>();
 
@@ -208,8 +209,10 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             let tool_cleanup_error = tool_cleanup.wait(cleanup_turn_id, cleanup_deadline.saturating_duration_since(tokio::time::Instant::now())).await.err();
             let _ = forwarder.await;
             let mut stable_prefix = Vec::new();
+            let mut recovery = Vec::new();
             while let Ok(snapshot) = snapshot_rx.try_recv() {
-                stable_prefix = snapshot;
+                stable_prefix = snapshot.messages;
+                recovery = snapshot.recovery;
             }
             if !stable_prefix.is_empty() {
                 // Preserve completed effects, but close the cancelled request before
@@ -243,10 +246,11 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             }
             let mut persisted_entry_ids = Vec::new();
             if let Some(durable) = &durable_persistence {
-                match durable.session.finalize_turn(
+                match durable.session.finalize_turn_with_recovery(
                     &turn_id, &stable_prefix, &durable.policy,
                     if cancellation_error.is_some() { TurnTranscriptOutcome::Error }
                     else { TurnTranscriptOutcome::Cancelled },
+                    &recovery,
                 ) {
                     Ok(commit) => persisted_entry_ids = commit.entry_ids,
                     Err(error) => {
@@ -446,11 +450,23 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 });
                 return;
             }
+            let mut recovery = Vec::new();
+            while let Ok(snapshot) = snapshot_rx.try_recv() {
+                // Only the final matching execution snapshot can attest this commit.
+                recovery = if snapshot.messages == new_messages {
+                    snapshot.recovery
+                } else {
+                    Vec::new()
+                };
+            }
             let persisted_entry_ids = if let Some(persistence) = &durable_persistence {
-                match persistence
-                    .session
-                    .commit_turn(&turn_id, &new_messages, &persistence.policy)
-                {
+                match persistence.session.finalize_turn_with_recovery(
+                    &turn_id,
+                    &new_messages,
+                    &persistence.policy,
+                    TurnTranscriptOutcome::Success,
+                    &recovery,
+                ) {
                     Ok(commit) => commit.entry_ids,
                     Err(error) => {
                         let mut message = format!("failed to persist completed turn: {error}");
@@ -514,6 +530,14 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             });
         }
         Ok((Err(e), partial_messages)) => {
+            let mut recovery = Vec::new();
+            while let Ok(snapshot) = snapshot_rx.try_recv() {
+                recovery = if snapshot.messages == partial_messages {
+                    snapshot.recovery
+                } else {
+                    Vec::new()
+                };
+            }
             let mut error_message = e.to_string();
             if diagnostic_failure.is_some() {
                 error_message
@@ -541,11 +565,12 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             }
             let mut persisted_entry_ids = Vec::new();
             if transcript_persisted && let Some(durable) = &durable_persistence {
-                match durable.session.finalize_turn(
+                match durable.session.finalize_turn_with_recovery(
                     &turn_id,
                     &partial_messages,
                     &durable.policy,
                     TurnTranscriptOutcome::Error,
+                    &recovery,
                 ) {
                     Ok(commit) => persisted_entry_ids = commit.entry_ids,
                     Err(persist_err) => {

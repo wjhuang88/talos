@@ -2826,6 +2826,7 @@ async fn continuation_budget_recovers_without_reexecuting_tools_or_losing_histor
     let mut complete_snapshot = false;
     while let Ok(snapshot) = snapshots_rx.try_recv() {
         complete_snapshot |= snapshot
+            .messages
             .iter()
             .filter(|message| matches!(message, Message::Tool { .. }))
             .count()

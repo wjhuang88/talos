@@ -352,6 +352,24 @@ async fn fifty_tool_turns_preserve_semantics_raw_export_and_durable_restart() {
         .expect("lookup")
         .expect("reopen");
     assert_eq!(reopened.session().snapshot_bytes().expect("bytes"), saved);
+    let recovered_entries = reopened.session().read_entries().expect("receipt source");
+    let receipts = recovered_entries
+        .iter()
+        .filter_map(talos_session::HistoryRecoveryReceipt::from_terminal_entry)
+        .flatten()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        receipts.len(),
+        50,
+        "each actual completed tool execution has durable provenance"
+    );
+    for receipt in receipts {
+        let source = recovered_entries
+            .iter()
+            .find(|entry| entry.id == receipt.entry_id())
+            .expect("source");
+        assert!(receipt.verified_content(source).is_some());
+    }
     let model = Arc::new(RetentionModel::new(50, false));
     let (mut handle, mut actor) =
         actor_for_history(model.clone(), calls.clone(), raw.clone(), directory.path());

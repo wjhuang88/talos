@@ -67,6 +67,7 @@ pub mod context;
 pub mod evaluator;
 mod helpers;
 pub mod permission_pipeline;
+mod persistence_snapshot;
 pub mod prompt;
 mod request_plan;
 mod scheduler;
@@ -823,7 +824,29 @@ impl Agent {
         &self,
         prepared: PreparedSessionTurn,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
-        snapshot_tx: Option<mpsc::UnboundedSender<Vec<Message>>>,
+        snapshot_tx: Option<mpsc::UnboundedSender<persistence_snapshot::PersistenceSnapshot>>,
+        boundary_tx: Option<mpsc::UnboundedSender<SteeringBoundaryRequest>>,
+        boundary_ack_tx: Option<mpsc::UnboundedSender<SteeringBoundaryAcknowledgement>>,
+    ) -> (AgentResult<String>, Vec<Message>) {
+        persistence_snapshot::RECOVERY_EXECUTION
+            .scope(
+                uuid::Uuid::new_v4(),
+                self.run_prepared_inner_scoped(
+                    prepared,
+                    event_tx,
+                    snapshot_tx,
+                    boundary_tx,
+                    boundary_ack_tx,
+                ),
+            )
+            .await
+    }
+
+    async fn run_prepared_inner_scoped(
+        &self,
+        prepared: PreparedSessionTurn,
+        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+        snapshot_tx: Option<mpsc::UnboundedSender<persistence_snapshot::PersistenceSnapshot>>,
         boundary_tx: Option<mpsc::UnboundedSender<SteeringBoundaryRequest>>,
         boundary_ack_tx: Option<mpsc::UnboundedSender<SteeringBoundaryAcknowledgement>>,
     ) -> (AgentResult<String>, Vec<Message>) {
@@ -888,11 +911,8 @@ impl Agent {
         }
 
         if let Some(snapshot_tx) = &snapshot_tx {
-            let _ =
-                snapshot_tx.send(self.persistence_projection_with_tokens(
-                    &messages[persist_start..],
-                    &private_tokens,
-                ));
+            let _ = snapshot_tx
+                .send(self.persistence_snapshot(&messages[persist_start..], &private_tokens));
         }
 
         let mut boundary_observed_plan = None;
@@ -1785,10 +1805,8 @@ impl Agent {
             if let Some(snapshot_tx) = &snapshot_tx {
                 // This is the first safe boundary after a complete tool batch:
                 // the projection excludes private fields and incomplete calls.
-                let _ = snapshot_tx.send(self.persistence_projection_with_tokens(
-                    &messages[persist_start..],
-                    &private_tokens,
-                ));
+                let _ = snapshot_tx
+                    .send(self.persistence_snapshot(&messages[persist_start..], &private_tokens));
             }
             if let Some(boundary_tx) = &boundary_tx {
                 let (response, injected) = tokio::sync::oneshot::channel();
@@ -1887,10 +1905,9 @@ impl Agent {
                     let (_, injected_messages) = Self::structured_session_inputs(&batch.items);
                     messages.extend(injected_messages);
                     if let Some(snapshot_tx) = &snapshot_tx {
-                        let _ = snapshot_tx.send(self.persistence_projection_with_tokens(
-                            &messages[persist_start..],
-                            &private_tokens,
-                        ));
+                        let _ = snapshot_tx.send(
+                            self.persistence_snapshot(&messages[persist_start..], &private_tokens),
+                        );
                     }
                     if let Some(boundary_ack_tx) = &boundary_ack_tx {
                         let (projected, confirmation) = tokio::sync::oneshot::channel();
@@ -1916,8 +1933,11 @@ impl Agent {
         // persist. Incomplete streamed assistant fragments are never pushed to
         // `messages` — only finalized assistant messages with complete tool
         // calls are (SESSION-006 / I135).
-        let partial_messages =
-            self.persistence_projection_with_tokens(&messages[persist_start..], &private_tokens);
+        let final_snapshot = self.persistence_snapshot(&messages[persist_start..], &private_tokens);
+        let partial_messages = final_snapshot.messages.clone();
+        if let Some(snapshot_tx) = &snapshot_tx {
+            let _ = snapshot_tx.send(final_snapshot);
+        }
         if let (Some(observer), Some(limit), Some((mut plan, appended_start))) = (
             checkpoint_observer.as_ref(),
             request_context_limit,

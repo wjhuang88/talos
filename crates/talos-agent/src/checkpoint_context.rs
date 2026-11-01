@@ -19,11 +19,33 @@ fn result_identity(name: &str, result: &MessageToolResult) -> [u8; 32] {
 }
 
 pub(crate) struct ResultReceipt {
+    execution: Option<uuid::Uuid>,
     digest: [u8; 32],
     instance: std::sync::Weak<dyn talos_core::tool::AgentTool>,
 }
 
 impl Agent {
+    pub(crate) fn has_checkpoint_result(&self, name: &str, result: &MessageToolResult) -> bool {
+        let Ok(execution) = crate::persistence_snapshot::RECOVERY_EXECUTION.try_with(|id| *id)
+        else {
+            return false;
+        };
+        let Some(instance) = self.tools.instance_handle(name) else {
+            return false;
+        };
+        let digest = result_identity(name, result);
+        self.checkpoint_result_receipts
+            .lock()
+            .map(|receipts| {
+                receipts.iter().any(|receipt| {
+                    receipt.execution == Some(execution)
+                        && receipt.digest == digest
+                        && receipt.instance.ptr_eq(&instance)
+                })
+            })
+            .unwrap_or(false)
+    }
+
     /// Authorize only exact model-facing bytes observed at the execution boundary.
     /// Receipts are process-local and bounded; recovered history has no authority.
     pub(crate) fn record_checkpoint_result(&self, name: &str, result: &MessageToolResult) {
@@ -35,6 +57,9 @@ impl Agent {
                 receipts.pop_front();
             }
             receipts.push_back(ResultReceipt {
+                execution: crate::persistence_snapshot::RECOVERY_EXECUTION
+                    .try_with(|id| *id)
+                    .ok(),
                 digest: result_identity(name, result),
                 instance,
             });

@@ -283,3 +283,58 @@ cross-user, duplicate-call and repeated-result cases cannot mint receipts.
 Current Session tests pass 228/228 and refreshed all-target Clippy passes; both
 governance validators pass. No workspace/platform or model-facing acceptance is
 claimed by these local storage checks.
+
+### Execution snapshot envelope — local, unmerged
+
+Agent safe-boundary snapshots now carry projected messages and explicit recovery
+projections. The successful durable turn path uses only the final matching
+snapshot and commits its receipts atomically. Projection eligibility requires the
+existing exact-result/live-tool-instance receipt and identical model/persistence
+text; restored raw text alone does not mint a receipt. Focused regression covers
+unverified input, differing persistence text and replaced tool instances. Agent
+library tests pass 588/588 (`/private/tmp/i313-agent-envelope-all.log`).
+
+This stage remains under independent review. Cancelled/error-turn receipt transfer,
+stronger per-turn provenance/replay tests, real Actor restart recovery, differing
+eligible/persisted projection support, scoped index and model tools remain open.
+A successful narrow snapshot test does not close those acceptance requirements.
+
+### Success/error/cancel receipt custody regression
+
+The final Agent envelope is now generated once and supplies both returned messages
+and recovery provenance, avoiding duplicate stateful projection calls. Cancellation
+preserves provenance from the latest complete boundary before adding the interruption
+notice; error finalization uses the final matching envelope. Both paths use atomic
+receipt finalization. Real Actor failed/cancelled durable fixtures now reopen and
+verify original-entry receipts. The fifty-turn fixture verifies all fifty real tool
+execution receipts after reopen. Agent 588/588 and all-target Clippy pass; logs
+`/private/tmp/i313-envelope-terminal-tests.log` and
+`/private/tmp/i313-envelope-terminal-clippy.log`.
+
+Cross-turn receipt cache isolation/replay regressions are still open. These tests
+prove storage custody, not a model-facing history_search result or branch authority.
+No full T5 acceptance or merge is claimed; the increment remains local/uncommitted.
+
+### Per-execution receipt isolation
+
+Each `run_prepared_inner` now scopes an unguessable task-local execution UUID.
+Execution receipts retain that identity; persistence snapshots require the current
+identity plus exact result digest and live tool instance. Historical checkpoint
+eligibility is unchanged. A nested distinct-execution regression rejects identical
+old call IDs/text until actual execution records a new receipt. Spawned unrelated
+tasks do not inherit this authority; existing joined tool futures remain inside
+one execution scope. Success/error/cancel Actor custody regressions still pass.
+Agent 588/588 and all-target Clippy pass in
+`/private/tmp/i313-execution-scope-tests.log` and
+`/private/tmp/i313-execution-scope-clippy.log`. Independent review is pending.
+Remaining scope includes differing permitted projections, scoped indexing/search,
+model checkpoint tools and all composed T5 validation; no completion claimed.
+
+Execution envelope review APPROVE: tracked diff SHA-256
+`2506514450669455ce7c1c18bbfe3706a076f9d293547058ddd72763e0729134`, snapshot
+file SHA-256 `1c2fc679eed0e0ef16504a5c55693220072ea35fc571c1e0113906d30fb27fa0`.
+Reviewer did not run tests and shares Agent/GitHub identity; approval is bounded
+to this increment, not I313 closure. Two focused snapshot tests pass, including
+scope non-inheritance by spawned tasks and nested scope restoration across yield.
+Earlier full Agent suite 588/588 predates this test-only addition. Both governance
+validators passed with zero warnings; no new full-goal completion evidence claimed.

@@ -150,7 +150,9 @@ impl Agent {
         &self,
         prepared: PreparedSessionTurn,
         event_tx: mpsc::UnboundedSender<AgentEvent>,
-        snapshot_tx: Option<mpsc::UnboundedSender<Vec<Message>>>,
+        snapshot_tx: Option<
+            mpsc::UnboundedSender<crate::persistence_snapshot::PersistenceSnapshot>,
+        >,
         boundary_tx: Option<mpsc::UnboundedSender<crate::SteeringBoundaryRequest>>,
         boundary_ack_tx: Option<mpsc::UnboundedSender<crate::SteeringBoundaryAcknowledgement>>,
     ) -> (AgentResult<String>, Vec<Message>) {
