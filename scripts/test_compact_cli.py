@@ -1,20 +1,29 @@
 #!/usr/bin/env python3
-"""Exercise real inline /compact with an isolated mock session (no paid calls)."""
+"""Exercise real inline and optional POSIX TUI /compact (no paid calls)."""
+import argparse
 import os
 import json
 from pathlib import Path
 import subprocess
-import sys
+import re
 import tempfile
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
 import signal
 import queue
+import time
 
 
 def main():
-    binary = Path(sys.argv[1] if len(sys.argv) > 1 else "target/debug/talos").resolve()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("binary", nargs="?", type=Path, default=Path("target/debug/talos"))
+    parser.add_argument("--tui", action="store_true", help="also exercise a real controlling PTY")
+    parser.add_argument("--tui-capture", type=Path, help="write the synthetic TUI terminal capture")
+    args = parser.parse_args()
+    if args.tui and os.name != "posix":
+        parser.error("--tui requires POSIX controlling-terminal support")
+    binary = args.binary.resolve()
     with tempfile.TemporaryDirectory(prefix="talos-compact-cli-") as directory:
         root = Path(directory)
         # Only the child receives an isolated configuration/session home.
@@ -206,6 +215,52 @@ def main():
             assert large.read_bytes().startswith(saved), "continuation rewrote original history"
             assert b"[Derived checkpoint;" not in large.read_bytes(), "derived checkpoint persisted as history"
             print("CLI checkpoint reuse passed: next ordinary request uses derived projection")
+            if args.tui:
+                from accept_auto_locale_tui import Tui
+                # Reuse the original seed, without the inline fixture's appended turn.
+                large.write_bytes(saved)
+                environment["TERM"] = "xterm-256color"
+                client = Tui(binary, root, environment, large.stem)
+                previous_calls = len(requests)
+                try:
+                    client.wait_for("compact-fixture")
+                    client.send("/compact")
+                    # Terminal diff rendering may reuse the suffix of "started"
+                    # while painting "applied". The numeric before/after pair is
+                    # emitted only for Applied; do not flatten cursor edits into
+                    # an assumed full status word.
+                    client.wait_for("estimated tokens")
+                    rendered = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "",
+                                      client.transcript[client.offset:].decode(errors="replace"))
+                    applied = re.search(r"estimated tokens\s+(\d+)\s*→\s*(\d+)", rendered)
+                    assert applied and int(applied[1]) > int(applied[2]), rendered
+                    assert large.read_bytes() == saved, "TUI compact rewrote raw history"
+                    after_manual = len(requests)
+                    assert after_manual > previous_calls, "TUI never requested a checkpoint"
+                    client.send("Continue local report")
+                    client.wait_for("LOCAL_CHECKPOINT_CONTINUATION_OK")
+                    persisted_by = time.monotonic() + 10
+                    while b"LOCAL_CHECKPOINT_CONTINUATION_OK" not in large.read_bytes():
+                        assert time.monotonic() < persisted_by, "TUI continuation was not persisted"
+                        client.pump(persisted_by)
+                    ordinary = [request for request in requests[after_manual:]
+                                if not request["messages"][-1]["content"].startswith(
+                                    "Produce only a JSON checkpoint")]
+                    assert ordinary, "TUI did not send an ordinary continuation"
+                    assert len(ordinary) == len(requests[after_manual:]), "TUI regenerated checkpoint"
+                    assert any("[Derived checkpoint;" in json.dumps(request["messages"])
+                               for request in ordinary), "TUI continuation omitted checkpoint"
+                    assert b"[Derived checkpoint;" not in client.transcript, "TUI exposed checkpoint"
+                    assert b"invalid-private-summary" not in client.transcript
+                    assert large.read_bytes().startswith(saved), "TUI rewrote original history"
+                    assert b"[Derived checkpoint;" not in large.read_bytes()
+                    print("Real TUI compact passed: rendered applied estimate, continued request, raw preservation")
+                finally:
+                    try:
+                        if args.tui_capture:
+                            args.tui_capture.write_bytes(client.transcript)
+                    finally:
+                        client.close()
         finally:
             server.shutdown()
             server.server_close()

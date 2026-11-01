@@ -529,6 +529,17 @@ for source compatibility and the required next pre-1.0 minor release boundary.
 
 ## Unreleased I312 manual compaction migration
 
+Direct `talos-agent` consumers must migrate the deprecated legacy
+`Compactor::{compact, apply_collapse, apply_autocompact, manual_compact}` methods
+to the Runtime/Session operation below. The first three now always return
+`CompactionError::CompactionFailed`; `manual_compact` returns unchanged input and
+`CompactionStatus::Failed`. They perform neither provider calls nor partial
+preprocessing, even for empty/fitting inputs. Keeping the signatures does not
+preserve behavior: this is a next-minor migration under ADR-096, not a patch fix.
+Bare history/provider references cannot establish request/privacy authority.
+Deterministic Compactor utilities remain caller-owned transformations and cannot
+authorize dispatch or replacement of durable history.
+
 `SessionOp::Compact { session_generation, operation_id }` and matching
 `CancelCompact` expand the public Rust
 operation enum. Exhaustive consumers must add a handler (or an explicit unsupported

@@ -6,6 +6,60 @@
 > Baseline rule: preserve all parent acceptance; successful trimming alone cannot close this iteration.
 > MVP deliverable: a long-running session compacts complete provider requests safely, exposes numeric outcomes and accepts a typed /compact command while raw history remains recoverable.
 
+## Legacy API convergence — 2026-11-01
+
+Runtime follow-up: rebuilt current CLI and ran
+`python3 scripts/test_compact_cli.py target/debug/talos --tui --tui-capture /private/tmp/i312-tui-compact-reviewed.ansi`
+successfully (`/private/tmp/i312-tui-compact-reviewed.log`). The real controlling
+PTY executes `/compact`, emits a decreasing before/after estimate, then sends an
+ordinary request with the installed checkpoint and no new summary request. The
+test waits for final response persistence and verifies the original raw prefix
+and absence of a persisted checkpoint marker. ANSI byte checks only establish
+absence of contiguous markers, not exhaustive terminal privacy or pixel layout;
+fixed loopback summaries do not establish model quality. The first PTY assertion
+incorrectly expected a full repeated `applied` word from cursor-diff output;
+it was corrected to the Applied-only numeric pair. Capture-write failure now
+cannot skip child/PTY cleanup.
+
+Standard preflight 73508 exited 101: the Git eight-stage push fixture invoked
+`ps` and received sandbox EPERM (`prepared_add_tests/push.rs:306`), with 1032 other
+talos-tools tests passing. This is not a successful full gate. The unchanged
+standard command is running with host permission as session 66565, log
+`/private/tmp/i312-converged-preflight-host.log`; do not restart while live.
+Both governance validators passed in the preceding invocation. Final docs edits
+and full candidate review/CI/merge still require their own evidence.
+
+The old `Compactor` model-assisted entry points now fail closed before any provider
+call or preprocessing. Manual refusal returns the exact original messages, even
+for empty or fitting history. The independent summarizer, raw argument-to-prompt
+serialization and old failure counter are removed. Shared bounded stream decoding
+and its tests moved unchanged to `compaction/summary_stream.rs`; the Agent's
+structured checkpoint remains the single live automatic/manual pipeline.
+
+ADR-096 and SDK migration explicitly declare this next-minor behavioral break;
+retained signatures are not a compatibility claim. MEM-003 preserves its original
+plan and maps the old literal Compactor-call criterion to the replacement
+architecture. MEM-005 now maps all eleven rows without marking them complete;
+CLI and architecture references describe the unreleased behavior and T5 boundary.
+
+The obsolete legacy-success tests are replaced by a refusal matrix over empty,
+one-turn and 50-turn inputs and small/large limits. A panic-on-use provider proves
+zero disclosure calls, and manual results preserve input bytes without partial
+preprocessing. Existing authoritative checkpoint, retry, semantic Actor and stream
+regressions remain. Agent tests passed 587/587 and all-target warnings-denied
+Clippy passed (`/private/tmp/i312-converged-agent.log`,
+`/private/tmp/i312-converged-clippy.log`). The lower count reflects removed legacy
+behavior contracts, not ignored tests or removed live-pipeline acceptance.
+
+Independent static review approved tracked diff
+`d05ea18b4a45366047933426b645e9eff4d28ded8d5a453c3378d5ba07ad7df4`
+and new stream module hash
+`f602a3b39d0cc1323142d5a60ae3772d9026f26f6b7d579d13e06e2391b6db29`
+against `559867f74`; no independent test execution was claimed. Both P1 source
+findings now have local implementations, but actual TUI walkthrough, final full
+preflight/review/platform CI/CAS/merge and completion evidence remain outstanding.
+T4 and the full handoff remain Active/Partial.
+
 ## Post-turn maintenance increment — 2026-11-01
 
 The Actor now owns a per-turn advisory pressure slot. At normal Agent return

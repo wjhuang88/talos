@@ -41,6 +41,25 @@ schema fields, byte/token/reference limits, deadlines, receipts, cutoffs and tes
 
 ## Public API and migration
 
+The legacy public `Compactor::{compact, apply_collapse, apply_autocompact,
+manual_compact}` signatures have only messages and a provider reference. They
+cannot establish complete request budgets, tool disclosure authority or raw-source
+lineage. Retire their independent summarizer: retain the signatures with explicit
+deprecation, but fail closed before preprocessing or provider invocation.
+`compact`, `apply_collapse` and `apply_autocompact` always return
+`CompactionError::CompactionFailed` with migration guidance; `manual_compact`
+returns the exact original messages and `CompactionStatus::Failed`, including for
+empty or below-threshold inputs. Do not forge authority from untrusted history.
+
+This preserves call-site signatures, **not behavioral compatibility**. Ship only
+in the same next pre-1.0 minor release. Callers migrate live work to
+`RuntimeHandle::compact(operation_id)` or `SessionOp::Compact` and consume the
+typed terminal receipt. The Agent's single checkpoint pipeline supplies automatic
+and manual semantics; no legacy provider fallback remains. Pure deterministic
+utilities remain explicit caller-owned transforms, not session admission, privacy
+authorization or permission to replace raw history. Shared bounded summary stream
+decoding stays available to the checkpoint pipeline.
+
 Add a typed compact operation to SessionOp carrying generation and operation ID;
 use typed transient outcomes under non-exhaustive SessionEvent. Existing operation
 wire tags retain behavior. Adding a SessionOp variant breaks exhaustive Rust

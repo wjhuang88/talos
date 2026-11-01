@@ -1,3 +1,22 @@
+## Current acceptance checkpoint — 2026-11-01
+
+I312 remains Active/Partial. Post-turn pressure marking is implemented in
+`559867f74`; the subsequent local increment retires the legacy independent
+summarizer and documents its next-minor migration. Agent 587/587 and Clippy pass.
+Real inline plus controlling-PTY `/compact` walkthrough passes, including measured
+application, unchanged raw prefix and next-request checkpoint reuse without an
+extra summary call (`/private/tmp/i312-tui-compact-reviewed.log`). This is terminal
+text/runtime evidence, not pixel-layout or real-model semantic-quality assurance.
+Independent incremental API/privacy reviews approve these deltas, not complete T4.
+
+Standard full preflight 73508 failed on sandbox EPERM from the Git fixture's `ps`.
+The authorized host run 66565 remains the active gate; log
+`/private/tmp/i312-converged-preflight-host.log`. Do not restart it while live.
+Final full-scope review, exact-head CI, CAS/merge and owner completion evidence
+remain required. Earlier checkpoints below are historical snapshots.
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6;
+the first three stages are merged/closed, and T4/T5/T1/T6 are not Complete.
+
 ## Current acceptance checkpoint — 2026-10-31
 
 Latest: uncommitted numeric cancellation passes Agent 599/599, affected-crate
