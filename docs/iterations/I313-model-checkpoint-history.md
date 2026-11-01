@@ -205,3 +205,48 @@ corrections, without tests or activation approval. A disposable SQLite experimen
 (/private/tmp/i313-scoped-fts-ranking-experiment.log) confirmed a scoped WHERE
 clause does not isolate BM25 statistics from sibling corpus insertion. This is
 design evidence only, not a production regression or implementation deliverable.
+
+## Effective activation and first storage increment — 2026-11-01
+
+Claim #819 merged as `8b11e5f49794ea17f09c96eff8d59a6bf8f9a3d6` after
+exact-head governance CI `41280178297` (four success, four correctly skipped
+Rust/platform jobs), independent governance/API/privacy/storage review against
+head `dafdcf879d0060c74ba40e0579dfed54ee667d8c`, both validators and merge CAS.
+The proposed Active/Claimed state above is now effective. Issue #390 remains open.
+
+First local implementation adds `history_page` bounded source reads for native
+SessionEntry JSONL and TLOG, fixed captured cutoff, byte/entry limits, cooperative
+cancellation and strict malformed-record refusal. Five focused regressions pass,
+including multi-page >2 MiB source, >8192 entries, append-after-cutoff exclusion,
+corrupt UTF-8 lengths, overflow, truncation and deadline/cancel behavior.
+`cargo test --locked -p talos-session --lib history_page` and all-target
+warnings-denied Clippy pass with the pinned toolchain and consistent low-debug,
+non-incremental profiles. Logs: `/private/tmp/i313-history-page-tests.log` and
+`/private/tmp/i313-history-page-clippy.log`.
+
+This is not a model-facing recovery implementation: no scoped index, projection
+receipts, Actor tools or end-to-end recovery exist yet. Source offset is not
+identity/authorization; callers must bind it to validated snapshot lineage and
+receipts. Legacy message-envelope JSONL and over-bound individual records return
+unavailable/error rather than fabricate provenance. Synchronous regular-file reads
+are cooperatively cancellable between 8 KiB reads, not preemptible kernel calls.
+Full preflight, independent implementation review, composed scenarios and remote
+CI/merge remain outstanding. T1/T6 and the full goal are unchanged.
+
+### Bounded-source review corrections
+
+Independent review requested changes for FIFO-open blocking and valid JSONL
+compatibility. The correction uses nonblocking/no-follow Unix opening plus
+opened-handle regular-file validation; Windows restricts local absolute drive
+paths and rejects opened reparse/special handles. ADR-096 records the platform
+boundary and the two direct already-locked OS-constant dependency edges. An
+initial locked test correctly refused the changed manifest until `cargo metadata
+--offline` refreshed only those two lock edges; no dependency versions changed.
+
+JSONL now accepts blank/CRLF lines and a complete final record without newline
+only at the captured EOF. TLOG accepts empty metadata. A first record that fills
+one byte budget is not rejected merely because the file header occupies the first
+page: a header-only page advances before reading that record. Eight new storage
+regressions and all 223 Session library tests pass; all-target Clippy passes.
+Native Windows opening and full workspace/runtime integration remain unverified.
+Source paths, offsets and decoded entries still confer no model authority.

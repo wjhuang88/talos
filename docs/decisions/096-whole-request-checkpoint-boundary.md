@@ -114,3 +114,21 @@ manual runtime reachability and raw export/replay preservation. Independent API
 and privacy review, locked full preflight including external SDKs, exact-head
 platform CI and CAS remain required. Rollback discards derived projection state
 without deleting raw records or changing permission policy.
+
+## I313 bounded recovery source opening — 2026-11-01 implementation amendment
+
+Recovery reads must not block opening a special file before cancellation checks.
+The Session bounded-page reader uses the repository's existing platform strategy:
+Unix `O_NONBLOCK | O_NOFOLLOW` followed by opened-handle regular-file validation;
+Windows local absolute drive paths only, `FILE_FLAG_OPEN_REPARSE_POINT`, and
+opened-handle regular-file/non-reparse validation. Device/pipe/network namespaces
+are unsupported; parent-directory identity and source lineage remain host-owned
+checks, not guarantees of this raw reader. Filesystem/kernel operations are still
+synchronous, with cooperative cancellation between bounded reads, not hard-real-
+time I/O deadlines. No model may choose the filesystem path.
+
+This adds Session's direct target-specific use of already-locked `libc` and
+`windows-sys` constants, matching the existing tools recovery implementation.
+No package versions change, no new native implementation or Talos-authored unsafe
+is introduced. It refines the original no-new-dependency assumption solely for
+safe OS opening; independent platform/privacy review and native CI are required.

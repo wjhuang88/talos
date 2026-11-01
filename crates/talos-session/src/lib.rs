@@ -38,6 +38,7 @@ mod diagnostic;
 mod durable;
 mod durable_recovery;
 mod error;
+pub mod history_page;
 mod jsonl;
 mod manager;
 mod pending_submission;
