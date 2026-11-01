@@ -819,3 +819,29 @@ marker-test enhancement (`/private/tmp/i313-composed-session.log`,
 in `/private/tmp/i313-marker-replacement.log`. Independent review approved the
 production delta; reviewer did not run tests. All final T5, T1/T6 and whole-goal
 implementation, workspace validation and remote closure obligations remain open.
+
+### Cross-page terminal locators — local, unmerged
+
+Host scan pages now atomically persist original terminal entry IDs, turn IDs,
+ordinals and byte ranges alongside the recovery cursor in the existing index.
+Only version-one markers with matching metadata turn identity and bounded source
+ranges qualify. Scope/turn lookup returns an untrusted original-record locator,
+not marker text or disclosure authority. Duplicate terminal identity rolls back
+both page and cursor; non-append replacement removes that entry's prior locator.
+Existing untracked terminal state prevents reusing its scope for a fresh build.
+
+A real >2 MiB durable TLOG fixture places a permitted tool result on an earlier
+page than its terminal marker. Host pagination, index reopening read-only, marker
+lookup and both original-record/receipt rereads recover the committed tool fact.
+The test retains the tool record captured during scanning: it does not yet prove
+backfilling that early tool result into searchable FTS. Host scheduling, full
+source/branch authority and model search/detail remain required. Maintenance may
+look up markers during an incomplete scan; that cannot authorize model disclosure.
+
+Locked Session tests pass 248/248 and all-target warnings-denied Clippy passes:
+`/private/tmp/i313-terminal-session.log`, `/private/tmp/i313-terminal-clippy.log`.
+Independent static APPROVE, diff SHA256
+`e8422ddba79d4af18ae60ea08084781eb76f6babd4bedf213706c1cb42d342d7`;
+reviewer did not run tests and shares Agent/GitHub identity. Existing indexes need
+host schema initialization before terminal lookup; model queries never migrate.
+T5/T1/T6 and the whole goal remain incomplete; final workspace/remote gates remain.

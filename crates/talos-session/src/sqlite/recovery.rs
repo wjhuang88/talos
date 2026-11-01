@@ -159,7 +159,7 @@ impl SessionIndex {
             let _guard = install_budget(&self.conn, budget)?;
             let tx = self.conn.unchecked_transaction()?;
             let existing: i64 = tx.query_row(
-                "SELECT count(*) FROM recovery_sources WHERE scope=?1",
+                "SELECT (SELECT count(*) FROM recovery_sources WHERE scope=?1) + (SELECT count(*) FROM recovery_terminals WHERE scope=?1)",
                 [scope],
                 |r| r.get(0),
             )?;
@@ -318,13 +318,50 @@ impl SessionIndex {
         })
     }
 
+    /// Locate an original terminal marker during host maintenance, including one
+    /// encountered on a later scan page. This returns an untrusted locator only;
+    /// reread and verify the original marker and branch scope before disclosure.
+    pub fn recovery_terminal_candidate(
+        &self,
+        scope: &str,
+        turn_id: &str,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<Option<RecoveryCandidate>, IndexError> {
+        native_boundary(|| {
+            if scope.is_empty() || scope.len() > 128 || turn_id.is_empty() || turn_id.len() > 1024 {
+                return Err(invalid_build());
+            }
+            let _guard = install_budget(&self.conn, budget)?;
+            let row: Option<(String, i64, i64, i64)> = self.conn.query_row(
+                "SELECT entry_id,ordinal,start,end FROM recovery_terminals WHERE scope=?1 AND turn_id=?2",
+                params![scope,turn_id], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).optional()?;
+            budget.check()?;
+            row.map(|(entry_id, ordinal, start, end)| {
+                if entry_id.len() > 1024
+                    || ordinal < 0
+                    || start < 0
+                    || end <= start
+                    || end - start > crate::history_page::HISTORY_PAGE_BYTES as i64
+                {
+                    return Err(invalid_build());
+                }
+                Ok(RecoveryCandidate {
+                    entry_id,
+                    ordinal: ordinal as u64,
+                    record_range: Some(start as u64..end as u64),
+                })
+            })
+            .transpose()
+        })
+    }
+
     /// Initialize the additive recovery cache schema during authorized host maintenance.
     /// Model queries must never call this method implicitly.
     pub fn init_recovery_schema(&self) -> Result<(), IndexError> {
         self.init_recovery_schema_with_budget(&RecoveryWorkBudget::new(Duration::from_secs(10)))
     }
 
-    /// Initialize both recovery tables atomically under the host's work budget.
+    /// Initialize recovery cache tables atomically under the host's work budget.
     pub fn init_recovery_schema_with_budget(
         &self,
         budget: &RecoveryWorkBudget,
@@ -341,7 +378,11 @@ impl SessionIndex {
                     scope TEXT PRIMARY KEY, source_end INTEGER NOT NULL,
                     next_offset INTEGER NOT NULL, next_ordinal INTEGER NOT NULL);
                  CREATE TABLE IF NOT EXISTS recovery_locations (
-                    source_id INTEGER PRIMARY KEY, start INTEGER NOT NULL, end INTEGER NOT NULL);",
+                    source_id INTEGER PRIMARY KEY, start INTEGER NOT NULL, end INTEGER NOT NULL);
+                 CREATE TABLE IF NOT EXISTS recovery_terminals (
+                    scope TEXT NOT NULL, turn_id TEXT NOT NULL, entry_id TEXT NOT NULL,
+                    ordinal INTEGER NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL,
+                    PRIMARY KEY(scope, turn_id), UNIQUE(scope, entry_id));",
             )?;
             budget.check()?;
             tx.commit()?;
@@ -462,6 +503,27 @@ impl SessionIndex {
         }
         for (source, content) in projected {
             budget.check()?;
+            if !append_only {
+                tx.execute(
+                    "DELETE FROM recovery_terminals WHERE scope=?1 AND entry_id=?2",
+                    params![scope, source.entry.id],
+                )?;
+            }
+            if source.entry.role == "system"
+                && let Some(marker) =
+                    crate::turn_outcome::decode_turn_transcript_outcome(&source.entry.content)
+                && marker.version == 1
+                && source.entry.metadata.turn_id.as_deref() == Some(marker.turn_id.as_str())
+                && let Some(range) = &source.record_range
+            {
+                if marker.turn_id.is_empty() || marker.turn_id.len() > 1024 {
+                    return Err(invalid_build());
+                }
+                // Duplicate terminal authority is ambiguous, even across pages.
+                // UNIQUE conflicts roll back the page and its cursor together.
+                tx.execute("INSERT INTO recovery_terminals(scope,turn_id,entry_id,ordinal,start,end) VALUES(?1,?2,?3,?4,?5,?6)",
+                    params![scope,marker.turn_id,source.entry.id,source.ordinal as i64,range.start as i64,range.end as i64])?;
+            }
             let old: Option<i64> = tx
                 .query_row(
                     "SELECT id FROM recovery_sources WHERE scope=?1 AND entry_id=?2",
@@ -512,6 +574,245 @@ use rusqlite::OptionalExtension;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actual_tlog_later_page_marker_recovers_committed_tool_fact() {
+        use talos_core::message::{Message, MessageToolResult, ToolCall};
+        let dir = tempfile::tempdir().expect("directory");
+        let session =
+            crate::DurableSession::open_or_create(dir.path(), "recovery").expect("session");
+        let mut messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                reasoning: None,
+                tool_calls: vec![ToolCall {
+                    id: "call".into(),
+                    name: "read".into(),
+                    input: serde_json::json!({}),
+                }],
+            },
+            Message::Tool {
+                result: MessageToolResult {
+                    tool_use_id: "call".into(),
+                    content: "original tool fact".into(),
+                    is_error: false,
+                },
+            },
+        ];
+        messages.extend((0..600).map(|_| Message::User {
+            content: "padding ".repeat(600),
+        }));
+        let commit = session
+            .finalize_turn_with_recovery(
+                "turn",
+                &messages,
+                &crate::PersistencePolicy::default(),
+                crate::TurnTranscriptOutcome::Success,
+                &[crate::RecoveryProjection {
+                    message_index: 1,
+                    tool_call_id: "call".into(),
+                    tool_name: "read".into(),
+                    content: "original tool fact".into(),
+                }],
+            )
+            .expect("atomic turn");
+        let source = session.capture_recovery_source().expect("source");
+        assert!(source.source_end() > crate::history_page::HISTORY_PAGE_BYTES as u64);
+        let path = dir.path().join("index.db");
+        let mut host = SessionIndex::new(&path).expect("index");
+        host.init_recovery_schema().expect("schema");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(10));
+        let mut cursor = host
+            .begin_recovery_build("scope", source.source_end(), &budget)
+            .expect("begin");
+        let mut tool = None;
+        let mut pages = 0;
+        while !cursor.complete() {
+            let page = source
+                .read_page(cursor.next_offset(), budget.deadline, || budget.stopped())
+                .expect("bounded source page");
+            for (i, entry) in page.entries.iter().enumerate() {
+                if entry.id == commit.entry_ids[1] {
+                    tool = Some(
+                        source
+                            .capture_record(page.record_ranges[i].clone(), budget.deadline, || {
+                                budget.stopped()
+                            })
+                            .expect("tool source"),
+                    );
+                }
+            }
+            let sources: Vec<_> = page
+                .entries
+                .iter()
+                .enumerate()
+                .map(|(i, entry)| RecoveryIndexSource {
+                    entry,
+                    terminal: None,
+                    ordinal: cursor.next_ordinal() + i as u64,
+                    record_range: Some(page.record_ranges[i].clone()),
+                })
+                .collect();
+            host.advance_recovery_build(
+                "scope",
+                &cursor,
+                RecoveryBuildPage {
+                    next_offset: page.next_offset,
+                    scanned_entries: page.entries.len() as u64,
+                    sources: &sources,
+                },
+                &budget,
+            )
+            .expect("page commit");
+            cursor = host
+                .recovery_build_cursor("scope", &budget)
+                .expect("cursor")
+                .expect("present");
+            pages += 1;
+            if pages == 1 {
+                assert!(
+                    host.recovery_terminal_candidate("scope", "turn", &budget)
+                        .expect("lookup")
+                        .is_none()
+                );
+            }
+        }
+        assert!(pages > 1);
+        drop(host);
+        let reader = SessionIndex::open_read_only(&path).expect("read-only reopen");
+        let marker = reader
+            .recovery_terminal_candidate("scope", "turn", &budget)
+            .expect("lookup")
+            .expect("later marker");
+        let marker = source
+            .capture_record(marker.record_range.expect("range"), budget.deadline, || {
+                budget.stopped()
+            })
+            .expect("marker reread");
+        let text = tool
+            .expect("early tool")
+            .recover_text(
+                Some(&marker),
+                crate::history_projection::RecoveryTextKind::Detail,
+                budget.deadline,
+                || budget.stopped(),
+            )
+            .expect("verified source and receipt")
+            .expect("eligible");
+        assert_eq!(text.text, "original tool fact");
+    }
+
+    #[test]
+    fn later_page_terminal_locator_survives_reopen_and_duplicate_rolls_back_cursor() {
+        let dir = tempfile::tempdir().expect("directory");
+        let path = dir.path().join("index.db");
+        let mut host = SessionIndex::new(&path).expect("host");
+        host.init_recovery_schema().expect("schema");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+        let first = host
+            .begin_recovery_build("scope", 300, &budget)
+            .expect("begin");
+        host.advance_recovery_build(
+            "scope",
+            &first,
+            RecoveryBuildPage {
+                next_offset: 100,
+                scanned_entries: 1,
+                sources: &[],
+            },
+            &budget,
+        )
+        .expect("first page");
+        assert!(
+            host.recovery_terminal_candidate("scope", "turn", &budget)
+                .expect("lookup")
+                .is_none()
+        );
+        let marker = SessionEntry {
+            id: "terminal".into(),
+            parent_id: None,
+            timestamp: chrono::Utc::now(),
+            role: "system".into(),
+            content: crate::turn_outcome::encode_turn_transcript_outcome(
+                &crate::TurnTranscriptOutcomeRecord::new(
+                    "turn",
+                    crate::TurnTranscriptOutcome::Success,
+                ),
+            )
+            .expect("marker"),
+            metadata: crate::SessionMetadata {
+                turn_id: Some("turn".into()),
+                ..Default::default()
+            },
+        };
+        let prior = host
+            .recovery_build_cursor("scope", &budget)
+            .expect("cursor")
+            .expect("present");
+        host.advance_recovery_build(
+            "scope",
+            &prior,
+            RecoveryBuildPage {
+                next_offset: 200,
+                scanned_entries: 1,
+                sources: &[RecoveryIndexSource {
+                    entry: &marker,
+                    terminal: None,
+                    ordinal: 1,
+                    record_range: Some(100..200),
+                }],
+            },
+            &budget,
+        )
+        .expect("terminal page");
+        drop(host);
+        let mut host = SessionIndex::new(&path).expect("reopen");
+        let found = host
+            .recovery_terminal_candidate("scope", "turn", &budget)
+            .expect("lookup")
+            .expect("locator");
+        assert_eq!(found.record_range, Some(100..200));
+        assert_eq!(found.entry_id, "terminal");
+        assert!(
+            host.recovery_terminal_candidate("sibling", "turn", &budget)
+                .expect("scoped")
+                .is_none()
+        );
+        let prior = host
+            .recovery_build_cursor("scope", &budget)
+            .expect("cursor")
+            .expect("present");
+        let mut duplicate = marker;
+        duplicate.id = "duplicate".into();
+        assert!(
+            host.advance_recovery_build(
+                "scope",
+                &prior,
+                RecoveryBuildPage {
+                    next_offset: 300,
+                    scanned_entries: 1,
+                    sources: &[RecoveryIndexSource {
+                        entry: &duplicate,
+                        terminal: None,
+                        ordinal: 2,
+                        record_range: Some(200..300)
+                    }]
+                },
+                &budget
+            )
+            .is_err()
+        );
+        assert_eq!(
+            host.recovery_build_cursor("scope", &budget)
+                .expect("cursor"),
+            Some(prior)
+        );
+        assert_eq!(
+            host.recovery_terminal_candidate("scope", "turn", &budget)
+                .expect("locator"),
+            Some(found)
+        );
+    }
+
     #[test]
     fn model_query_connection_never_creates_or_repairs_index() {
         let dir = tempfile::tempdir().expect("directory");
