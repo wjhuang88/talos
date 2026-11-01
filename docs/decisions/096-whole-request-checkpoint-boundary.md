@@ -157,3 +157,19 @@ that differs from the stored tool text. Such cases require an explicitly permitt
 projection representation and the execution-owner envelope before T5 acceptance;
 they are not silently treated as delivered. Actor admission, snapshot lineage,
 index maintenance and model-facing query remain separate unfinished integration.
+
+### I313 explicit tool recovery view
+
+A tool whose model and persistence views differ may explicitly implement the
+additive, default-refusing AgentTool recovery_projection hook. Execution-owner
+provenance remains mandatory. The current path accepts this view only after
+private-token filtering and equality with the tool's permitted persistence view;
+Session persistence denial and sensitive-line redaction still prevent receipts.
+Read opts into its existing numbered, snapshot/anchor-free persistence view.
+CLI/Runtime permission wrappers forward the hook without granting execution or
+persistence permission. Callback panic refuses recovery. Durable receipt binding
+permits the existing line-ending normalization only and hashes final stored text.
+
+This enables recovery of sanitized Read results without retaining transient edit
+capabilities. It does not implement a separate permitted recovery representation
+whose text differs from the persisted tool entry; that acceptance remains open.

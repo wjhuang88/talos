@@ -386,6 +386,10 @@ impl AgentTool for TuiPermissionAwareTool {
         self.inner.project_result(result)
     }
 
+    fn recovery_projection(&self, result: &ToolResult) -> Option<String> {
+        self.inner.recovery_projection(result)
+    }
+
     fn produces_todo_presentation(&self) -> bool {
         self.inner.produces_todo_presentation()
     }
@@ -571,6 +575,10 @@ impl AgentTool for PermissionAwareTool {
 
     fn project_result(&self, result: &ToolResult) -> talos_core::tool::ToolResultProjection {
         self.inner.project_result(result)
+    }
+
+    fn recovery_projection(&self, result: &ToolResult) -> Option<String> {
+        self.inner.recovery_projection(result)
     }
 
     fn produces_todo_presentation(&self) -> bool {

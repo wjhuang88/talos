@@ -12,8 +12,9 @@ use crate::SessionEntry;
 /// Runtime-approved model projection for a tool result being committed.
 ///
 /// Only the execution owner may supply this value after tool/privacy projection.
-/// Storage accepts it only when it exactly matches the final policy-filtered tool
-/// text. Merely observing matching text in a recovered transcript is insufficient.
+/// Storage accepts it only when it matches the final policy-filtered tool
+/// text after the persistence layer's line-ending normalization. Merely observing
+/// matching text in a recovered transcript is insufficient.
 #[derive(Debug, Clone)]
 pub struct RecoveryProjection {
     /// Position in the messages passed to the atomic turn commit.
@@ -121,8 +122,11 @@ pub(crate) fn bind_receipts(
                 "recovery source entry is missing".into(),
             ));
         };
-        // Do not promote omitted, redacted or persistence-only text to the model.
-        if projection.content != result.content || projection.tool_call_id != result.tool_use_id {
+        // The durable filter canonicalizes line endings even without redaction.
+        // Permit only that normalization; sensitive-line replacement still differs
+        // and cannot promote omitted/redacted content into recovery authority.
+        let canonical = projection.content.lines().collect::<Vec<_>>().join("\n");
+        if canonical != result.content || projection.tool_call_id != result.tool_use_id {
             continue;
         }
         let matching_call = messages[..projection.message_index]
@@ -160,7 +164,7 @@ pub(crate) fn bind_receipts(
             tool_call_id: projection.tool_call_id.clone(),
             tool_name: projection.tool_name.clone(),
             stored_digest: digest(&entry.content),
-            projection_digest: digest(&projection.content),
+            projection_digest: digest(&result.content),
         });
     }
     Ok(receipts)

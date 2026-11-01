@@ -289,10 +289,10 @@ impl DurableSession {
 
     /// Atomically finalize a turn and runtime-approved recovery provenance.
     ///
-    /// Projections must originate from the live execution owner. Only exact matches
-    /// to final policy-filtered tool text receive a receipt; denied persistence or
-    /// changed/redacted projections cannot confer recovery permission. The receipt
-    /// is stored in the existing terminal marker, never a second transcript store.
+    /// Projections must originate from the live execution owner. Only matches
+    /// to final policy-filtered tool text after line-ending normalization receive
+    /// a receipt; denied persistence or redacted projections confer no permission.
+    /// The receipt is stored in the existing terminal marker, never a second store.
     pub fn finalize_turn_with_recovery(
         &self,
         turn_id: &str,

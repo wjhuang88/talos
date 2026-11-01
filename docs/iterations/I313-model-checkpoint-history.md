@@ -497,3 +497,36 @@ Independent incremental static review approved the production delta against
 `56533650a5fbc52ac6a6f1ed5a77caec9a675ad1cdf626be9582bfe4a33ad877`.
 Reviewer did not independently run tests and shares Agent/GitHub identity.
 No full T5 or remote validation/completion claim is made.
+
+### Explicit Read recovery view — local, unmerged
+
+Added the default-refusing AgentTool recovery_projection hook and forwarding
+through CLI/Runtime wrappers. Agent calls it only after verifying live execution
+provenance when model/private-filtered text differs from persistence text. The
+result is private-filtered again, bounded, and required to equal the tool's
+permitted persistence view. Panic refuses recovery. Read opts into its already
+sanitized numbered text, excluding transient snapshot IDs/anchors. Other tools
+retain default refusal for differing views. Session persistence policy still owns
+the final receipt decision; this is no new permission to retain model-only text.
+
+A real Read execution fixture composes Agent snapshot, atomic durable commit and
+reopen under both permitted and denied persistence. It initially failed because
+Session redaction also normalizes trailing LF/CRLF. Binding now accepts only that
+line normalization, hashes the final stored text, and still refuses sensitive-line
+replacement. The corrected three focused Agent tests pass. Separate retained
+recovery text differing from persisted tool text remains unimplemented, as do
+model search/checkpoint and full Actor integration.
+
+Independent API/privacy review approved production code and the normalization
+correction (six-file diff SHA256
+`cafef60c76c0322fcbfcf87dd18d6511543538ec9775e15f2d840bd8b1d55789`).
+Reviewer did not independently run tests and shares Agent/GitHub identity.
+Expanded all-target Clippy failed on two existing unwrap_err calls in
+search_backend/health.rs (lines 212/216), independently confirmed in origin/main;
+log `/private/tmp/i313-read-recovery-clippy.log`. This is not a passing all-target
+check. Standard-preflight-style production Clippy for all six affected crates
+passes; full Agent 590/590 and Session 241/241 library tests pass. Logs:
+`/private/tmp/i313-read-recovery-production-clippy.log`,
+`/private/tmp/i313-read-recovery-full-tests.log`; focused log
+`/private/tmp/i313-read-recovery-tests.log`. Full workspace preflight, native
+platform evidence and complete I313 review/CI/merge remain required.

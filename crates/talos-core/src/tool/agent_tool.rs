@@ -182,6 +182,17 @@ pub trait AgentTool: Send + Sync {
         ToolResultProjection::shared(result.content.clone())
     }
 
+    /// Explicitly permit a recovery view when model and persistence text differ.
+    ///
+    /// Called only for a live, provenance-verified model-facing result. Returning
+    /// text does not bypass session persistence policy or private-token filtering.
+    /// The current durable recovery path accepts only a view equal to the final
+    /// permitted persisted text. Default refusal prevents model-only data from
+    /// acquiring persistence permission merely because the model observed it.
+    fn recovery_projection(&self, _result: &ToolResult) -> Option<String> {
+        None
+    }
+
     /// Whether this registered implementation produces native Todo display geometry.
     ///
     /// Defaults to false, including for extensions with a Todo-like name. Only native

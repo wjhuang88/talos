@@ -47,9 +47,28 @@ impl Agent {
                     let Some(Message::Tool { result: stored }) = messages.get(index) else {
                         continue;
                     };
-                    let content = private.project(&result.content);
-                    // This stage supports only identical eligible/model/persisted text.
-                    // A different projection needs an explicit permitted representation.
+                    let mut content = private.project(&result.content);
+                    if content != stored.content {
+                        let Some(tool) = self.tools.get(name) else {
+                            continue;
+                        };
+                        let execution = talos_core::tool::ToolResult {
+                            content: result.content.clone(),
+                            is_error: result.is_error,
+                            continuations: Vec::new(),
+                            todo_presentation: None,
+                        };
+                        let Ok(Some(permitted)) =
+                            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                tool.recovery_projection(&execution)
+                            }))
+                        else {
+                            continue;
+                        };
+                        content = private.project(&permitted);
+                    }
+                    // A tool opt-in cannot override the final persistence view.
+                    // Separate model-only retained representations remain unsupported.
                     if content != stored.content
                         || content.len() > 8192
                         || result.tool_use_id.len() > 1024
@@ -121,6 +140,86 @@ mod tests {
             }
         }
     }
+    #[tokio::test]
+    async fn real_read_snapshot_recovers_only_persisted_numbered_text_after_restart() {
+        RECOVERY_EXECUTION
+            .scope(uuid::Uuid::new_v4(), async {
+                let dir = tempfile::tempdir().expect("tempdir");
+                std::fs::write(dir.path().join("fact.txt"), "durable fact\n").expect("file");
+                let read = Arc::new(talos_tools::ReadTool::with_snapshot_registry(
+                    dir.path().to_path_buf(),
+                    talos_tools::FileSnapshotRegistry::new(),
+                ));
+                let output = read.execute(serde_json::json!({"path": "fact.txt"})).await;
+                assert!(!output.is_error, "read fixture failed");
+                assert!(output.content.starts_with("[snapshot:"));
+                let mut private = PrivateTokens::default();
+                private.extend(read.model_private_tokens(&output));
+                let expected = private.project(&read.project_result(&output).persistence_content);
+                let mut registry = ToolRegistry::new();
+                registry.register(read);
+                let agent = Agent::new(Arc::new(Model), registry);
+                let result = MessageToolResult {
+                    tool_use_id: "call".into(),
+                    content: output.content,
+                    is_error: false,
+                };
+                let messages = vec![
+                    Message::Assistant {
+                        content: String::new(),
+                        reasoning: None,
+                        tool_calls: vec![ToolCall {
+                            id: "call".into(),
+                            name: "read".into(),
+                            input: serde_json::json!({"path":"fact.txt"}),
+                        }],
+                    },
+                    Message::Tool {
+                        result: result.clone(),
+                    },
+                ];
+                agent.record_checkpoint_result("read", &result);
+                let snapshot = agent.persistence_snapshot(&messages, &private);
+                assert_eq!(snapshot.recovery.len(), 1);
+                assert_eq!(snapshot.recovery[0].content, expected);
+                assert!(!expected.contains("snapshot:"));
+                for permit in [false, true] {
+                    let key = format!("read-{permit}");
+                    let session = talos_session::DurableSession::open_or_create(dir.path(), &key)
+                        .expect("session");
+                    session
+                        .finalize_turn_with_recovery(
+                            "turn",
+                            &snapshot.messages,
+                            &talos_session::PersistencePolicy {
+                                persist_raw_tool_output: permit,
+                                persist_reasoning: false,
+                            },
+                            talos_session::TurnTranscriptOutcome::Success,
+                            &snapshot.recovery,
+                        )
+                        .expect("commit");
+                    drop(session);
+                    let reopened = talos_session::DurableSession::open_existing(dir.path(), &key)
+                        .expect("reopen")
+                        .expect("session");
+                    let entries = reopened.session().read_entries().expect("entries");
+                    let receipts = talos_session::HistoryRecoveryReceipt::from_terminal_entry(
+                        entries.last().expect("terminal"),
+                    )
+                    .expect("receipts");
+                    assert_eq!(receipts.len(), usize::from(permit));
+                    if permit {
+                        assert_eq!(
+                            receipts[0].verified_content(&entries[1]),
+                            Some(expected.lines().collect::<Vec<_>>().join("\n"))
+                        );
+                    }
+                }
+            })
+            .await;
+    }
+
     #[tokio::test]
     async fn execution_scope_does_not_leak_to_unrelated_tasks_or_after_return() {
         assert!(RECOVERY_EXECUTION.try_with(|id| *id).is_err());
