@@ -136,6 +136,30 @@ impl SessionIndex {
         })
     }
 
+    /// Open an existing index for model-query reads without creating the database,
+    /// changing journal mode, initializing schema or running host maintenance.
+    /// Missing files fail to open; corrupt indexes fail at opening or querying.
+    /// The host must repair them separately.
+    /// SQLite may still coordinate existing WAL readers through its shared-memory
+    /// machinery. This is database read-only access, not filesystem sandboxing.
+    pub fn open_read_only(path: &Path) -> Result<Self, IndexError> {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let conn =
+                Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+            conn.busy_timeout(std::time::Duration::ZERO)?;
+            conn.execute_batch("PRAGMA query_only=ON;")?;
+            Ok(Self {
+                conn,
+                db_path: path.to_path_buf(),
+            })
+        }))
+        .unwrap_or_else(|_| {
+            Err(IndexError::Store(IndexStoreError::Database(
+                "read-only index opening panicked".into(),
+            )))
+        })
+    }
+
     /// Initialize the database schema.
     ///
     /// Creates the `sessions` table and the `messages_fts` FTS5 virtual table

@@ -751,3 +751,23 @@ Validation logs: `/private/tmp/i313-response-final-tests.log` and
 `/private/tmp/i313-response-final-clippy.log` (locked Session library tests and
 warnings-denied all-target Session Clippy). No full workspace or remote CI evidence
 is claimed for this local increment; T5/T1/T6 and the overall goal stay Active.
+
+### Read-only recovery index connection — local, unmerged
+
+SessionIndex::open_read_only opens an existing database with SQLite READ_ONLY,
+query_only and zero busy timeout inside a panic boundary. It never calls the
+write-capable constructor, changes journal mode, creates schema or repairs cache.
+SQLite may coordinate WAL readers through shared memory; this is not a filesystem
+sandbox or branch authorization. Missing files fail to open; corrupt files may
+fail on opening or querying and must be repaired by host maintenance. SQLite
+opening and underlying kernel I/O remain synchronous; zero busy timeout does not
+make those operations asynchronously cancellable.
+
+Real SQLite regressions cover missing-file/no-schema noncreation, DDL/rebuild write
+refusal, incomplete build refusal, a reader observing a completed host WAL build,
+scope-separated results, cancellation and unchanged corrupt bytes. Locked Session
+tests pass 244/244 and all-target warnings-denied Session Clippy passes; logs:
+`/private/tmp/i313-readonly-session.log`, `/private/tmp/i313-readonly-clippy.log`.
+Model search/detail dispatch, authoritative source scope, cross-page receipt lookup
+and host rebuild scheduling are still unimplemented. This connection prerequisite
+does not close T5, T1, T6 or the full goal; final workspace/remote gates remain open.

@@ -513,6 +513,127 @@ use rusqlite::OptionalExtension;
 mod tests {
     use super::*;
     #[test]
+    fn model_query_connection_never_creates_or_repairs_index() {
+        let dir = tempfile::tempdir().expect("directory");
+        let path = dir.path().join("index.db");
+        assert!(SessionIndex::open_read_only(&path).is_err());
+        assert!(!path.exists());
+        let index = SessionIndex::new(&path).expect("host creates index");
+        index.init_recovery_schema().expect("host schema");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+        let reader = SessionIndex::open_read_only(&path).expect("reader");
+        assert!(
+            reader
+                .recovery_candidates("scope", "", None, 20, &budget)
+                .expect("read query")
+                .is_empty()
+        );
+        assert!(reader.begin_recovery_build("scope", 10, &budget).is_err());
+        assert!(
+            reader
+                .conn
+                .execute_batch("CREATE TABLE forbidden_write(value TEXT)")
+                .is_err()
+        );
+        let no_schema = dir.path().join("empty.db");
+        let _host = SessionIndex::new(&no_schema).expect("empty host database");
+        let empty = SessionIndex::open_read_only(&no_schema).expect("read empty database");
+        assert!(
+            empty
+                .recovery_candidates("scope", "", None, 20, &budget)
+                .is_err()
+        );
+        let count: i64 = empty
+            .conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE name='recovery_sources'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("schema query");
+        assert_eq!(count, 0, "query never repairs missing schema");
+    }
+
+    #[test]
+    fn read_only_recovery_queries_observe_host_pages_and_refuse_incomplete_or_corrupt_cache() {
+        let dir = tempfile::tempdir().expect("directory");
+        let path = dir.path().join("index.db");
+        let mut host = SessionIndex::new(&path).expect("host");
+        host.init_recovery_schema().expect("schema");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+        let prior = host
+            .begin_recovery_build("authorized", 100, &budget)
+            .expect("begin");
+        let reader = SessionIndex::open_read_only(&path).expect("reader");
+        assert!(
+            reader
+                .recovery_candidates("authorized", "fact", None, 20, &budget)
+                .is_err()
+        );
+        let entry = SessionEntry {
+            id: "original".into(),
+            parent_id: None,
+            timestamp: chrono::Utc::now(),
+            role: "user".into(),
+            content: "retained fact".into(),
+            metadata: Default::default(),
+        };
+        host.advance_recovery_build(
+            "authorized",
+            &prior,
+            RecoveryBuildPage {
+                next_offset: 100,
+                scanned_entries: 1,
+                sources: &[RecoveryIndexSource {
+                    entry: &entry,
+                    terminal: None,
+                    ordinal: 0,
+                    record_range: Some(0..100),
+                }],
+            },
+            &budget,
+        )
+        .expect("host finishes build");
+        let hits = reader
+            .recovery_candidates("authorized", "fact", None, 20, &budget)
+            .expect("read completed cache");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].entry_id, "original");
+        assert!(
+            reader
+                .recovery_candidates("sibling", "fact", None, 20, &budget)
+                .expect("other scope")
+                .is_empty()
+        );
+        budget.cancel();
+        assert!(
+            reader
+                .recovery_candidates("authorized", "fact", None, 20, &budget)
+                .is_err()
+        );
+        let corrupt = dir.path().join("corrupt.db");
+        let bytes = b"not a sqlite database";
+        std::fs::write(&corrupt, bytes).expect("corrupt fixture");
+        if let Ok(reader) = SessionIndex::open_read_only(&corrupt) {
+            assert!(
+                reader
+                    .recovery_candidates(
+                        "authorized",
+                        "fact",
+                        None,
+                        20,
+                        &RecoveryWorkBudget::new(Duration::from_secs(2))
+                    )
+                    .is_err()
+            );
+        }
+        assert_eq!(
+            std::fs::read(&corrupt).expect("unchanged corrupt file"),
+            bytes
+        );
+    }
+
+    #[test]
     fn build_cursor_resumes_across_reopen_and_commits_with_page_atomically() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("index.db");
