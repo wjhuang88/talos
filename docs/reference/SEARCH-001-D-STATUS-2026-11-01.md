@@ -1,13 +1,14 @@
 # SEARCH-001-D Status Receipt — 2026-11-01
 
-> Status: Active / Claimed, incomplete.
+> Status: Historical accepted checkpoint; superseded for current status by the final disposition.
 > Owner: SEARCH-001-D / I294 / #644.
 > Parent: SEARCH-001 / #624.
 > Scope: research and evidence only; no provider admission or SEARCH-001-E/F authorization.
 
-This receipt records the accepted target-branch state after the 2026-11-01 evidence slices. It is
-intended to remove ambiguity from older in-file wording that still described #825 as a draft
-candidate while preserving the historical research record unchanged.
+This receipt records the accepted target-branch state after the initial 2026-11-01 evidence slices.
+It is retained to remove ambiguity from older in-file wording that still described #825 as a draft
+candidate while preserving the historical research record unchanged. Current status is defined by
+[SEARCH-001-D Final Disposition — 2026-11-01](SEARCH-001-D-FINAL-DISPOSITION-2026-11-01.md).
 
 ## Accepted merge receipts
 
@@ -50,9 +51,9 @@ The current terms split is maintained in
 It distinguishes permission to automate/call an API from rights to reuse returned result/page
 material; both providers advance on interface evidence but neither closes the default result-use gate.
 
-## Current blockers
+## Blockers at this checkpoint
 
-SEARCH-001-D / I294 remains incomplete. The shortest remaining closure path is:
+At this checkpoint SEARCH-001-D / I294 remained incomplete. The shortest remaining path was:
 
 1. obtain permitted live valid-query observations for Mwmbl and Purili from networks with working
    DNS/HTTPS while retaining only bounded metadata and provenance;
@@ -63,11 +64,18 @@ SEARCH-001-D / I294 remains incomplete. The shortest remaining closure path is:
 4. close the remaining result-use/service-terms disposition documented in the terms checkpoint;
 5. collect paired controlled regional observations, including genuine mainland-China provenance.
 
-Until those gates close, #644 and #624 remain open, Mwmbl/Purili remain unadmitted, and
-SEARCH-001-E/F remain unauthorized.
+At that checkpoint #644 and #624 remained open, Mwmbl/Purili were unadmitted, and
+SEARCH-001-E/F remained unauthorized.
 
 ## Interpretation rule
 
 Where an older SEARCH-001-D/I294 section on `main` still calls #825 a draft or candidate, this
-receipt is the newer accepted status for the 2026-11-01 sequence. Historical details remain useful
-for provenance, but they must not be read as overriding the merge receipts above.
+receipt is the newer accepted status for that intermediate 2026-11-01 sequence. Historical details
+remain useful for provenance, but they must not be read as overriding later accepted evidence.
+
+## Supersession
+
+The [final disposition](SEARCH-001-D-FINAL-DISPOSITION-2026-11-01.md) supersedes this receipt for
+current status. It closes the research/evidence gate with a BLOCKED / ZERO-ADMISSION outcome while
+preserving all blockers above as reasons that neither Mwmbl nor Purili is admitted. Parent #624
+remains open and SEARCH-001-E/F remain unauthorized because D admission did not occur.
