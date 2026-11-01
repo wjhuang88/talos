@@ -215,14 +215,23 @@ mod tests {
         }
         assert!(steps > 1);
         let seal = scan.finish().expect("seal");
-        // Test an actual append without rewriting the format creation header.
-        use std::io::Write;
-        std::fs::OpenOptions::new()
-            .append(true)
-            .open(session.file_path())
-            .expect("append handle")
-            .write_all(b"later suffix")
-            .expect("append suffix");
+        let original_bytes = std::fs::read(session.file_path()).expect("original bytes");
+        session
+            .finalize_turn_with_recovery(
+                "second",
+                &[Message::User {
+                    content: "later suffix".into(),
+                }],
+                &PersistencePolicy::default(),
+                TurnTranscriptOutcome::Success,
+                &[],
+            )
+            .expect("durable append");
+        assert!(
+            std::fs::read(session.file_path())
+                .expect("committed bytes")
+                .starts_with(&original_bytes)
+        );
         let mut verify = seal.begin_verification().expect("verify appended source");
         while !verify.step(deadline, || false).expect("same prefix") {}
         assert_eq!(

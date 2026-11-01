@@ -80,16 +80,21 @@ impl crate::store::SessionStore for CompactTextSessionStore {
             SessionError::ParseError("session file has no parent directory".into())
         })?;
         fs::create_dir_all(parent)?;
+        // Preserve the creation header across atomic turn commits. Replacing
+        // the file must not change an otherwise identical historical prefix.
+        let header = existing_creation_header(file_path)?.unwrap_or_else(|| {
+            format!(
+                "{TLOG_MAGIC}\t{TLOG_VERSION}\t{}\n",
+                Utc::now().timestamp_millis()
+            )
+            .into_bytes()
+        });
         let temporary = temporary_sibling(file_path);
         let mut file = OpenOptions::new()
             .create_new(true)
             .write(true)
             .open(&temporary)?;
-        writeln!(
-            file,
-            "{TLOG_MAGIC}\t{TLOG_VERSION}\t{}",
-            Utc::now().timestamp_millis()
-        )?;
+        file.write_all(&header)?;
         for entry in entries {
             file.write_all(encode_entry(entry).as_bytes())?;
         }
@@ -114,6 +119,44 @@ impl crate::store::SessionStore for CompactTextSessionStore {
     fn file_extension(&self) -> &'static str {
         "tlog"
     }
+}
+
+// A format header is tiny; never scan an unbounded malformed first line.
+fn existing_creation_header(path: &Path) -> Result<Option<Vec<u8>>, SessionError> {
+    let file = match crate::history_page::open_source(path) {
+        Ok(file) => file,
+        Err(crate::history_page::HistoryPageError::Io(error))
+            if error.kind() == std::io::ErrorKind::NotFound =>
+        {
+            return Ok(None);
+        }
+        Err(crate::history_page::HistoryPageError::Io(error)) => return Err(error.into()),
+        Err(_) => return Err(SessionError::ParseError("unsupported TLOG source".into())),
+    };
+    let mut bytes = Vec::new();
+    use std::io::BufRead;
+    std::io::BufReader::new(file.take(128)).read_until(b'\n', &mut bytes)?;
+    if bytes.is_empty() {
+        return Ok(None);
+    }
+    let valid = std::str::from_utf8(&bytes).ok().is_some_and(|line| {
+        let Some(line) = line.strip_suffix('\n') else {
+            return false;
+        };
+        let mut fields = line.split('\t');
+        fields.next() == Some(TLOG_MAGIC)
+            && fields.next() == Some("1")
+            && fields
+                .next()
+                .is_some_and(|timestamp| timestamp.parse::<i64>().is_ok())
+            && fields.next().is_none()
+    });
+    if !valid {
+        return Err(SessionError::ParseError(
+            "invalid TLOG creation header".into(),
+        ));
+    }
+    Ok(Some(bytes))
 }
 
 // ---------------------------------------------------------------------------
@@ -462,6 +505,69 @@ mod tests {
     use crate::store::SessionStore;
     use chrono::TimeZone;
     use std::io::Read;
+
+    #[test]
+    fn atomic_replacement_preserves_header_and_refuses_malformed_header_without_mutation() {
+        let dir = tempfile::tempdir().expect("directory");
+        let path = dir.path().join("session.tlog");
+        let store = CompactTextSessionStore;
+        let entry = make_entry("user", "original");
+        std::fs::write(&path, b"TALOS\t1\t123456789\n").expect("old creation time");
+        store
+            .replace_entries_atomically(&path, std::slice::from_ref(&entry))
+            .expect("commit");
+        assert!(
+            std::fs::read(&path)
+                .expect("bytes")
+                .starts_with(b"TALOS\t1\t123456789\n")
+        );
+        for malformed in [
+            b"TALOS\t99\t123\n".to_vec(),
+            vec![b'x'; 256],
+            b"TALOS\t1\tinvalid\n".to_vec(),
+        ] {
+            std::fs::write(&path, &malformed).expect("invalid source");
+            assert!(
+                store
+                    .replace_entries_atomically(&path, std::slice::from_ref(&entry))
+                    .is_err()
+            );
+            assert_eq!(std::fs::read(&path).expect("unchanged"), malformed);
+            assert_eq!(std::fs::read_dir(dir.path()).expect("directory").count(), 1);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn header_preservation_refuses_fifo_directory_and_symlink_without_temp_files() {
+        let dir = tempfile::tempdir().expect("directory");
+        let fifo = dir.path().join("fifo");
+        assert!(
+            std::process::Command::new("mkfifo")
+                .arg(&fifo)
+                .status()
+                .expect("fixture")
+                .success()
+        );
+        let target = dir.path().join("target");
+        std::fs::write(&target, b"TALOS\t1\t123\n").expect("target");
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink(&target, &link).expect("link");
+        let started = std::time::Instant::now();
+        for path in [&fifo, &link, &dir.path().to_path_buf()] {
+            assert!(
+                CompactTextSessionStore
+                    .replace_entries_atomically(path, &[])
+                    .is_err()
+            );
+        }
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
+        assert_eq!(std::fs::read_dir(dir.path()).expect("directory").count(), 3);
+        assert_eq!(
+            std::fs::read(target).expect("unchanged"),
+            b"TALOS\t1\t123\n"
+        );
+    }
 
     fn make_entry(role: &str, content: &str) -> SessionEntry {
         SessionEntry {

@@ -916,3 +916,28 @@ normal durable turn appends can use this seal. The passing append fixture uses a
 actual filesystem suffix append, not durable finalization. Windows support,
 source-context binding, model search/detail and product activation remain open.
 No T5 completion or full workspace/remote certification is claimed.
+
+### Durable turn prefix compatibility fix — local, unmerged
+
+Atomic TLOG replacement now preserves the validated existing creation header,
+read with a 128-byte bound before creating a temporary file. Missing/empty files
+receive a new header; malformed/unknown-version headers fail without replacing
+the source. This fixes the header regeneration gap recorded above for newly
+encoded durable turns. It does not promise arbitrary legacy record serialization
+is byte-stable across decode/reencode, nor authorize copied files as branches.
+
+The >2 MiB prefix regression now commits a real second durable turn, asserts the
+entire original byte prefix remains intact and verifies the existing prefix seal.
+The filesystem-only suffix append has been removed from that test. Additional
+coverage preserves a fixed historical timestamp and checks malformed/oversized
+headers leave both source bytes and directory contents unchanged. Locked Session
+tests pass 252/252 and all-target warnings-denied Session Clippy passes:
+`/private/tmp/i313-header-session.log`, `/private/tmp/i313-header-clippy.log`.
+Model search/detail wiring, branch/permission context and Windows source checking
+remain unfinished; final workspace/remote closure and T1/T6 remain open.
+
+Header-reader review required reusing the nonblocking/no-follow regular-file
+opener. The fix and actual FIFO/directory/symlink quick-refusal regression pass;
+no temporary file is created and the linked target stays unchanged. Windows
+local absolute-drive path restrictions of that opener remain applicable; native
+platform CI has not yet certified this storage change.
