@@ -1,34 +1,36 @@
 # Iteration I294: Native Provider Admission And Regional Evidence
 
-> Document status: Active
+> Document status: Complete / Closed — research gate completed with BLOCKED / ZERO-ADMISSION outcome
 > Parent: SEARCH-001-D / #644 / SEARCH-001 / #624
 > Objective: qualify native zero-key routes with provenance-backed evidence before E/F authorization.
+
+Completion Commit: `0afeb5b1a0d228d414a53ca2947bfd835c3f598b`
 
 | Field | Value |
 |---|---|
 | Story | SEARCH-001-D |
 | Source Issue | #644 |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 complete; B adapter boundary available |
-| Claim State | Claimed |
-| Research PR | #668, #673, #676, #686, #687 and #693 (merged); #825 (Draft evidence refresh) |
-| Completion | Pending |
+| Claim State | Closed |
+| Research PR | #668, #673, #676, #686, #687, #693, #825, #826, #827, #828, #829 and #830 (merged) |
+| Completion | Complete — blocked disposition; zero providers admitted |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-6 Sol / talos开发 session |
 | Work Slice | SEARCH-001-D native provider admission and regional evidence only |
 | Claimed At | 2026-10-06 |
 | Source Issue | #644 |
 | Governance Claim PR | #665 |
-| Implementation PR | #668, #673, #676, #686, #687 and #693 (merged); #825 (Draft evidence refresh) |
+| Implementation PR | #668, #673, #676, #686, #687, #693, #825, #826, #827, #828, #829 and #830 (merged) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
 | Last Updated | 2026-11-01 |
-| Handoff / Release Condition | Claim effective after #665 merge `7019f63d3df3d6eb58473a53a499b9b7e8b98925`; evidence research only, with E/F provider implementation gated by the resulting matrix. |
+| Handoff / Release Condition | Research gate closed with zero providers admitted. Mwmbl/Purili remain outside the default distribution; E/F remain unauthorized because D admission did not occur; #624 remains open. Material new evidence requires reopening #644 or a separately governed D follow-up. |
 
 ## Scope
 
@@ -49,6 +51,8 @@ The working candidate matrix, regional observation schema and admission gate are
 It is a research artifact only; no candidate is admitted by the register itself.
 The current bounded refresh candidate is
 [SEARCH-001-D Provider Evidence Refresh — 2026-11-01](../reference/SEARCH-001-D-PROVIDER-REFRESH-2026-11-01.md).
+The accepted closeout is
+[SEARCH-001-D Final Disposition — 2026-11-01](../reference/SEARCH-001-D-FINAL-DISPOSITION-2026-11-01.md).
 
 ## Partial Research Evidence
 
@@ -248,3 +252,17 @@ observations for Mwmbl and Purili from a working DNS/HTTPS environment; compare 
 and failure domains; then collect paired controlled regional observations including genuine
 mainland-China evidence. Only after those steps can D decide whether two routes are admitted or
 blocked and whether E/F may be activated. #644/#624 remain open.
+
+## Final Closeout — 2026-11-01
+
+The accepted [SEARCH-001-D final disposition](../reference/SEARCH-001-D-FINAL-DISPOSITION-2026-11-01.md)
+closes I294 as a research/evidence gate with a **BLOCKED / ZERO-ADMISSION** result. Mwmbl and Purili
+remain explicitly not admitted. Missing successful live valid-query evidence, hosted failure-domain
+independence, genuine mainland-China regional evidence and material result-use/service-term closure
+are blockers, not accepted assumptions. #827 supplies the reproducible bounded acquisition path
+without turning missing measurements into positive regional evidence.
+
+The completion evidence boundary is pre-existing merge
+`0afeb5b1a0d228d414a53ca2947bfd835c3f598b`; this closeout status change is not its own evidence.
+Parent #624 remains open, and SEARCH-001-E/F remain unauthorized because D admission did not occur.
+Future material evidence requires reopening #644 or a separately governed D follow-up.
