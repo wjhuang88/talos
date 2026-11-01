@@ -54,9 +54,20 @@ class SearchProviderObservationTests(unittest.TestCase):
     def test_admissible_url_rejects_credentials_and_non_http(self) -> None:
         self.assertTrue(harness.admissible_http_url("https://example.invalid/a"))
         self.assertTrue(harness.admissible_http_url("http://example.invalid/a"))
-        self.assertFalse(harness.admissible_http_url("https://u:p@example.invalid/a"))
+        username_only = "https://" + "user" + "@example.invalid/a"
+        username_password = "https://" + "user" + ":" + "pass" + "@example.invalid/a"
+        self.assertFalse(harness.admissible_http_url(username_only))
+        self.assertFalse(harness.admissible_http_url(username_password))
         self.assertFalse(harness.admissible_http_url("mailto:x@example.invalid"))
         self.assertFalse(harness.admissible_http_url("/relative"))
+
+    def test_bounded_body_requires_declared_content_to_be_complete(self) -> None:
+        self.assertTrue(harness.body_is_complete(b"{}", 0))
+        self.assertTrue(harness.body_is_complete(b"{}", None))
+        self.assertFalse(harness.body_is_complete(b"{}", 5))
+        self.assertFalse(
+            harness.body_is_complete(b"x" * (harness.MAX_BODY_BYTES + 1), 0)
+        )
 
     def test_build_evidence_excludes_query_text_and_proxy_values(self) -> None:
         args = argparse.Namespace(
