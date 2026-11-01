@@ -244,18 +244,12 @@ async fn legacy_parity_child() {
 
         let legacy_probes = query_free_probes(&legacy_requests);
         let protected_probes = query_free_probes(&protected);
+        assert_probe_requests_are_query_free(&legacy_requests, case.name());
+        assert_probe_requests_are_query_free(&protected, case.name());
         assert_eq!(
             sorted_probes(legacy_probes),
             sorted_probes(protected_probes),
             "{} query-free probe set",
-            case.name()
-        );
-        assert!(
-            legacy_requests
-                .iter()
-                .filter(|request| request.query_free_probe().is_some())
-                .all(|request| !request.target.contains('?') && request.body.is_empty()),
-            "{} legacy probe disclosed query",
             case.name()
         );
     }
@@ -279,6 +273,28 @@ fn query_free_probes(requests: &[ObservedRequest]) -> Vec<(&'static str, &'stati
         .iter()
         .filter_map(ObservedRequest::query_free_probe)
         .collect()
+}
+
+fn assert_probe_requests_are_query_free(requests: &[ObservedRequest], case: &str) {
+    for request in requests.iter().filter(|request| {
+        matches!(
+            request.host.as_str(),
+            "duckduckgo.com" | "probe-ddg.test" | "cn.bing.com" | "probe-bing.test"
+        ) && request.query_recipient() != Some("bing")
+    }) {
+        assert!(
+            matches!(request.method.as_str(), "HEAD" | "GET"),
+            "{case} probe used unexpected method: {request:?}"
+        );
+        assert_eq!(
+            request.target, "/",
+            "{case} probe disclosed query or used unexpected path: {request:?}"
+        );
+        assert!(
+            request.body.is_empty(),
+            "{case} probe disclosed body: {request:?}"
+        );
+    }
 }
 
 fn sorted_probes(
