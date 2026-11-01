@@ -380,3 +380,46 @@ projection file `426ad1045442412500eda1db12c1f05abacf361abd6c351324213b9376e1016
 Reviewer did not run tests and shares Agent/GitHub identity. Two Core regressions,
 230 Session library tests and affected all-target Clippy pass. This resolves the
 local parser/privacy finding, not host authorization or full T5 acceptance.
+
+### Recovery projection cache — local, unmerged
+
+Added recovery_sources and recovery_projection_fts in the existing SessionIndex
+connection, with scope/entry/order mapping and bounded-page atomic host writes.
+Only eligible projected text enters this FTS table; original global human search
+is unchanged. Focused regression proves raw-only tool terms have zero matches,
+conflicting page rollback preserves prior data, and replayed page writes do not
+increase row count. Test log: `/private/tmp/i313-recovery-index-tests.log`.
+
+This is not a query/disclosure authority: host snapshot binding, incremental
+completion cursor, source revalidation, SQLite cancellation/deadline enforcement,
+read-only scoped queries and model composition remain required. The write API
+bounds input bytes/count but does not yet bound SQLite instruction/time work.
+No indexing-complete or T5-complete claim is made by this local increment.
+
+### SQLite VM cancellation increment
+
+Enabled the existing rusqlite hooks feature (no version change) and added a
+clonable recovery cancellation/deadline budget capped at ten seconds. Projection,
+per-entry writes and pre-commit checks share it; SQLite VM progress interrupts
+long-running SQL. During the operation busy waiting is disabled, then the prior
+busy timeout and progress handler are restored/cleared by a guard. Kernel I/O is
+still synchronous; no hard preemption claim. A long recursive SQL regression
+observes OperationInterrupted and proves the connection works after guard cleanup.
+
+Initial timeout restoration used an unsupported SQLite u64 decode and failed
+compilation; corrected to u32 before rerunning checks. Current full Session tests
+and Clippy logs are `/private/tmp/i313-index-session-tests.log` and
+`/private/tmp/i313-index-budget-clippy.log`. Independent review remains pending;
+scoped query, source/branch authorization and model integration are still absent.
+
+### Recovery SQLite review corrections
+
+Independent review required panic containment at the new native integration
+boundary and budgeting schema initialization. Both initialization and page writes
+now catch unwinds around actual SQLite/transaction/guard work and return a
+content-independent error. Schema creation is atomic and uses the same deadline,
+VM callback and temporary no-busy-wait policy. Removed the inaccurate claim of a
+typed database-busy error; the existing IndexError retains string-backed details.
+Injected panic after a write proves rollback and restored busy_timeout; an expired
+schema budget creates no tables. Session 235/235 and all-target Clippy pass.
+Follow-up independent review and workspace/native verification remain outstanding.
