@@ -5,12 +5,13 @@ use crate::search_backend::transport::{
 use crate::web_search::WebSearchTool;
 use async_trait::async_trait;
 use rcgen::{BasicConstraints, CertificateParams, IsCa, Issuer, KeyPair};
+use socket2::SockRef;
 use std::{
     collections::HashMap,
     fs, io,
     net::SocketAddr,
     process::Command,
-    sync::{Arc, Mutex, atomic::Ordering},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 use talos_core::tool::{
@@ -56,13 +57,6 @@ impl Case {
             Self::SameDestinationRetry => &["lite", "lite"],
             Self::TerminalPrimaryFallback => &["lite", "instant"],
             Self::UnreachableDuckDuckGo => &["bing"],
-        }
-    }
-
-    fn expected_prepared_queries(self) -> &'static [&'static str] {
-        match self {
-            Self::SameDestinationRetry => &["lite"],
-            _ => self.expected_queries(),
         }
     }
 }
@@ -216,7 +210,7 @@ async fn legacy_parity_child() {
         let legacy_requests = legacy_proxy.requests();
         legacy_proxy.stop().await;
 
-        let (protected, dns_attempts) = run_prepared_case(case).await;
+        let protected = run_prepared_case(case).await;
         let legacy_queries = query_recipients(&legacy_requests);
         let protected_queries = query_recipients(&protected);
         assert_eq!(
@@ -227,20 +221,16 @@ async fn legacy_parity_child() {
         );
         assert_eq!(
             protected_queries,
-            case.expected_prepared_queries(),
-            "{} prepared query sequence",
+            case.expected_queries(),
+            "{} prepared query sequence from captured requests",
             case.name()
         );
-        if case == Case::SameDestinationRetry {
-            assert_eq!(
-                dns_attempts
-                    .iter()
-                    .filter(|host| host.as_str() == "source-lite.test")
-                    .count(),
-                2,
-                "retry stays on the prepared Lite destination"
-            );
-        }
+        assert_eq!(
+            protected_queries.len(),
+            legacy_queries.len(),
+            "{} logical query-bearing send counts",
+            case.name()
+        );
         assert!(
             protected_queries.len() <= legacy_queries.len(),
             "{} protected query count exceeds legacy",
@@ -298,7 +288,7 @@ fn sorted_probes(
     probes
 }
 
-async fn run_prepared_case(case: Case) -> (Vec<ObservedRequest>, Vec<String>) {
+async fn run_prepared_case(case: Case) -> Vec<ObservedRequest> {
     let fixtures = PreparedFixtures::new(case);
     let original = fixed_manifest();
     let chain = PreparedCompatibilityChain::prepare(&original, QUERY, 1).expect("prepared chain");
@@ -312,9 +302,6 @@ async fn run_prepared_case(case: Case) -> (Vec<ObservedRequest>, Vec<String>) {
     let effects = Arc::new(TestEffects {
         manifest: manifest.clone(),
         dns_ports,
-        case,
-        dns_attempts: Mutex::new(Vec::new()),
-        network_failed: std::sync::atomic::AtomicBool::new(false),
     });
     let transport = SearchTransport::new(
         manifest,
@@ -338,12 +325,7 @@ async fn run_prepared_case(case: Case) -> (Vec<ObservedRequest>, Vec<String>) {
             fixtures.requests()
         );
     }
-    let dns_attempts = effects
-        .dns_attempts
-        .lock()
-        .expect("DNS attempt log")
-        .clone();
-    (fixtures.requests(), dns_attempts)
+    fixtures.requests()
 }
 
 fn fixed_manifest() -> ToolNetworkManifest {
@@ -458,9 +440,6 @@ fn relocate_request(
 struct TestEffects {
     manifest: ToolNetworkManifest,
     dns_ports: HashMap<String, u16>,
-    case: Case,
-    dns_attempts: Mutex<Vec<String>>,
-    network_failed: std::sync::atomic::AtomicBool,
 }
 
 impl ToolNetworkAuthority for TestEffects {
@@ -480,16 +459,6 @@ impl ToolNetworkAuthority for TestEffects {
 #[async_trait]
 impl SearchDns for TestEffects {
     async fn resolve(&self, host: &str, _: u16) -> Result<Vec<SocketAddr>, TransportError> {
-        self.dns_attempts
-            .lock()
-            .expect("DNS attempt log")
-            .push(host.to_owned());
-        if self.case == Case::SameDestinationRetry
-            && host == "source-lite.test"
-            && !self.network_failed.swap(true, Ordering::Relaxed)
-        {
-            return Err(TransportError::Network);
-        }
         let port = self.dns_ports.get(host).ok_or(TransportError::Dns)?;
         Ok(vec![SocketAddr::from(([127, 0, 0, 1], *port))])
     }
@@ -525,7 +494,11 @@ impl PreparedFixtures {
             vec![wire_response(503, &[])]
         };
         let query = [
-            Server::new_with_delays(lite, delay),
+            if case == Case::SameDestinationRetry {
+                Server::new_with_resets(lite, delay, vec![0])
+            } else {
+                Server::new_with_delays(lite, delay)
+            },
             Server::new(instant),
             Server::new(vec![wire_response(503, &[])]),
             Server::new(bing),
@@ -614,7 +587,7 @@ fn parse_observed_request(raw: &str) -> ObservedRequest {
 
 #[derive(Clone)]
 enum ResponseAction {
-    Close,
+    Reset,
     Reply(Duration, Vec<u8>),
 }
 
@@ -805,7 +778,10 @@ async fn handle_legacy_connect(
         })
         .unwrap_or(0);
     match legacy_response(case, &parsed, recipient, attempt) {
-        ResponseAction::Close => Ok(()),
+        ResponseAction::Reset => {
+            SockRef::from(tls_stream.get_ref().0).set_linger(Some(Duration::ZERO))?;
+            Ok(())
+        }
         ResponseAction::Reply(delay, response) => {
             if !delay.is_zero() {
                 tokio::time::sleep(delay).await;
@@ -831,7 +807,7 @@ fn legacy_response(
     }
     match (case, recipient, attempt) {
         (Case::SlowPrimary, Some("lite"), _) => html_success(SLOW_PRIMARY_DELAY),
-        (Case::SameDestinationRetry, Some("lite"), 1) => ResponseAction::Close,
+        (Case::SameDestinationRetry, Some("lite"), 1) => ResponseAction::Reset,
         (Case::SameDestinationRetry, Some("lite"), _) => html_success(Duration::ZERO),
         (Case::TerminalPrimaryFallback, Some("lite"), _) => {
             ResponseAction::Reply(Duration::ZERO, status_response(403, &[]))

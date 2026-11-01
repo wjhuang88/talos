@@ -9971,6 +9971,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "similar 3.2.0",
+ "socket2",
  "talos-core",
  "talos-permission",
  "talos-plugin",
