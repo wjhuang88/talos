@@ -1074,7 +1074,7 @@ fn redact_reasoning(reasoning: AssistantReasoning) -> AssistantReasoning {
     }
 }
 
-fn redact(value: &str) -> String {
+pub(crate) fn redact(value: &str) -> String {
     value
         .lines()
         .map(|line| {

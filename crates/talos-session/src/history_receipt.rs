@@ -12,9 +12,9 @@ use crate::SessionEntry;
 /// Runtime-approved model projection for a tool result being committed.
 ///
 /// Only the execution owner may supply this value after tool/privacy projection.
-/// Storage accepts it only when it matches the final policy-filtered tool
-/// text after the persistence layer's line-ending normalization. Merely observing
-/// matching text in a recovered transcript is insufficient.
+/// Storage binds it to final policy-filtered tool text. Equal text uses a digest
+/// receipt; an explicitly permitted different view is retained in a version-two
+/// receipt after persistence filtering. Observed text alone is insufficient.
 #[derive(Debug, Clone)]
 pub struct RecoveryProjection {
     /// Position in the messages passed to the atomic turn commit.
@@ -38,6 +38,8 @@ pub struct HistoryRecoveryReceipt {
     tool_name: String,
     stored_digest: String,
     projection_digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    retained_projection: Option<String>,
 }
 
 impl HistoryRecoveryReceipt {
@@ -56,7 +58,7 @@ impl HistoryRecoveryReceipt {
         if receipts.len() > 8192
             || receipts
                 .iter()
-                .any(|r| r.version != 1 || r.turn_id != marker.turn_id)
+                .any(|r| !matches!(r.version, 1 | 2) || r.turn_id != marker.turn_id)
         {
             return None;
         }
@@ -72,7 +74,7 @@ impl HistoryRecoveryReceipt {
     /// The host must separately establish session/branch scope and marker origin.
     pub fn verified_content(&self, entry: &SessionEntry) -> Option<String> {
         if entry.content.len() > crate::history_page::HISTORY_PAGE_BYTES
-            || self.version != 1
+            || !matches!(self.version, 1 | 2)
             || self.entry_id != entry.id
             || entry.metadata.turn_id.as_deref() != Some(self.turn_id.as_str())
             || entry.role != "system"
@@ -81,8 +83,15 @@ impl HistoryRecoveryReceipt {
             return None;
         }
         let (_, call_id, content) = crate::jsonl::parse_tool_result(&entry.content);
-        (call_id == self.tool_call_id && digest(&content) == self.projection_digest)
-            .then_some(content)
+        if call_id != self.tool_call_id {
+            return None;
+        }
+        let projected = match (self.version, &self.retained_projection) {
+            (1, None) => content,
+            (2, Some(text)) if text.len() <= 8192 => text.clone(),
+            _ => return None,
+        };
+        (digest(&projected) == self.projection_digest).then_some(projected)
     }
 }
 
@@ -126,7 +135,9 @@ pub(crate) fn bind_receipts(
         // Permit only that normalization; sensitive-line replacement still differs
         // and cannot promote omitted/redacted content into recovery authority.
         let canonical = projection.content.lines().collect::<Vec<_>>().join("\n");
-        if canonical != result.content || projection.tool_call_id != result.tool_use_id {
+        if crate::durable::redact(&canonical) != canonical
+            || projection.tool_call_id != result.tool_use_id
+        {
             continue;
         }
         let matching_call = messages[..projection.message_index]
@@ -158,13 +169,14 @@ pub(crate) fn bind_receipts(
             ));
         }
         receipts.push(HistoryRecoveryReceipt {
-            version: 1,
+            version: if canonical == result.content { 1 } else { 2 },
+            retained_projection: (canonical != result.content).then(|| canonical.clone()),
             entry_id: entry.id.clone(),
             turn_id: entry.metadata.turn_id.clone().unwrap_or_default(),
             tool_call_id: projection.tool_call_id.clone(),
             tool_name: projection.tool_name.clone(),
             stored_digest: digest(&entry.content),
-            projection_digest: digest(&result.content),
+            projection_digest: digest(&canonical),
         });
     }
     Ok(receipts)

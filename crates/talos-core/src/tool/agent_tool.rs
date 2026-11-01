@@ -186,8 +186,8 @@ pub trait AgentTool: Send + Sync {
     ///
     /// Called only for a live, provenance-verified model-facing result. Returning
     /// text does not bypass session persistence policy or private-token filtering.
-    /// The current durable recovery path accepts only a view equal to the final
-    /// permitted persisted text. Default refusal prevents model-only data from
+    /// A different permitted view is retained in a bounded versioned receipt,
+    /// bound to the final stored result. Default refusal prevents model-only data from
     /// acquiring persistence permission merely because the model observed it.
     fn recovery_projection(&self, _result: &ToolResult) -> Option<String> {
         None

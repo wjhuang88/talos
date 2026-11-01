@@ -67,13 +67,9 @@ impl Agent {
                         };
                         content = private.project(&permitted);
                     }
-                    // A tool opt-in cannot override the final persistence view.
-                    // Separate model-only retained representations remain unsupported.
-                    if content != stored.content
-                        || content.len() > 8192
-                        || result.tool_use_id.len() > 1024
-                        || name.len() > 256
-                    {
+                    // Different views require the explicit tool opt-in above;
+                    // durable storage still enforces policy and redaction.
+                    if content.len() > 8192 || result.tool_use_id.len() > 1024 || name.len() > 256 {
                         continue;
                     }
                     recovery.push(RecoveryProjection {
@@ -113,6 +109,7 @@ mod tests {
     }
     struct Tool {
         different: bool,
+        opt_in: bool,
     }
     #[async_trait::async_trait]
     impl AgentTool for Tool {
@@ -127,6 +124,9 @@ mod tests {
         }
         async fn execute(&self, _: serde_json::Value) -> ToolResult {
             ToolResult::success("fact")
+        }
+        fn recovery_projection(&self, result: &ToolResult) -> Option<String> {
+            self.opt_in.then(|| result.content.clone())
         }
         fn project_result(&self, result: &ToolResult) -> ToolResultProjection {
             ToolResultProjection {
@@ -244,10 +244,10 @@ mod tests {
 
     #[test]
     fn only_live_matching_execution_projection_can_be_persisted_for_recovery() {
-        for different in [false, true] {
+        for (different, opt_in) in [(false, false), (true, false), (true, true)] {
             RECOVERY_EXECUTION.sync_scope(uuid::Uuid::new_v4(), || {
                 let mut registry = ToolRegistry::new();
-                registry.register(Arc::new(Tool { different }));
+                registry.register(Arc::new(Tool { different, opt_in }));
                 let mut agent = Agent::new(Arc::new(Model), registry);
                 let result = MessageToolResult {
                     tool_use_id: "call".into(),
@@ -277,9 +277,78 @@ mod tests {
                 );
                 agent.record_checkpoint_result("read", &result);
                 let snapshot = agent.persistence_snapshot(&messages, &private);
-                assert_eq!(snapshot.recovery.len(), usize::from(!different));
-                if !different {
+                assert_eq!(snapshot.recovery.len(), usize::from(!different || opt_in));
+                if !different || opt_in {
                     assert_eq!(snapshot.recovery[0].message_index, 1);
+                    for permit in [false, true] {
+                        let dir = tempfile::tempdir().expect("directory");
+                        let session =
+                            talos_session::DurableSession::open_or_create(dir.path(), "projection")
+                                .expect("session");
+                        session
+                            .finalize_turn_with_recovery(
+                                "turn",
+                                &snapshot.messages,
+                                &talos_session::PersistencePolicy {
+                                    persist_raw_tool_output: permit,
+                                    ..Default::default()
+                                },
+                                talos_session::TurnTranscriptOutcome::Success,
+                                &snapshot.recovery,
+                            )
+                            .expect("atomic commit");
+                        let retried = session
+                            .finalize_turn_with_recovery(
+                                "turn",
+                                &snapshot.messages,
+                                &talos_session::PersistencePolicy {
+                                    persist_raw_tool_output: permit,
+                                    ..Default::default()
+                                },
+                                talos_session::TurnTranscriptOutcome::Success,
+                                &snapshot.recovery,
+                            )
+                            .expect("idempotent same projection");
+                        assert!(!retried.newly_committed);
+                        drop(session);
+                        let reopened =
+                            talos_session::DurableSession::open_existing(dir.path(), "projection")
+                                .expect("reopen")
+                                .expect("present");
+                        let entries = reopened.session().read_entries().expect("entries");
+                        let receipts = talos_session::HistoryRecoveryReceipt::from_terminal_entry(
+                            entries.last().expect("marker"),
+                        )
+                        .expect("receipts");
+                        assert_eq!(receipts.len(), usize::from(permit));
+                        if permit {
+                            assert_eq!(
+                                receipts[0].verified_content(&entries[1]),
+                                Some("fact".into())
+                            );
+                            if different {
+                                assert!(entries[1].content.contains("omitted"));
+                                let receipt = serde_json::to_value(&receipts[0]).expect("receipt");
+                                assert_eq!(receipt["version"], 2);
+                                for (field, value) in [
+                                    ("version", serde_json::json!(99)),
+                                    ("version", serde_json::json!(1)),
+                                    ("retained_projection", serde_json::Value::Null),
+                                    ("retained_projection", serde_json::json!("x".repeat(8193))),
+                                    ("retained_projection", serde_json::json!("tampered")),
+                                ] {
+                                    let mut changed = receipt.clone();
+                                    changed[field] = value;
+                                    let changed: talos_session::HistoryRecoveryReceipt =
+                                        serde_json::from_value(changed).expect("decode");
+                                    assert!(changed.verified_content(&entries[1]).is_none());
+                                }
+                            }
+                            let mut changed = entries[1].clone();
+                            changed.content.push('x');
+                            assert!(receipts[0].verified_content(&changed).is_none());
+                        }
+                    }
                 }
                 RECOVERY_EXECUTION.sync_scope(uuid::Uuid::new_v4(), || {
                     assert!(
@@ -295,10 +364,10 @@ mod tests {
                             .persistence_snapshot(&messages, &private)
                             .recovery
                             .len(),
-                        usize::from(!different)
+                        usize::from(!different || opt_in)
                     );
                 });
-                agent.tools.register(Arc::new(Tool { different }));
+                agent.tools.register(Arc::new(Tool { different, opt_in }));
                 assert!(
                     agent
                         .persistence_snapshot(&messages, &private)

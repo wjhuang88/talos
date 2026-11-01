@@ -984,3 +984,26 @@ This API is a host backend, not model tool dispatch. Scope ownership/branch,
 generation and permission must still be bound and rechecked inside the final
 result-delivery fence; Windows seal support and Runtime/CLI integration remain
 unfinished. No completion or workspace/remote certification is claimed.
+
+### Explicit distinct recovery projection persistence — local, unmerged
+
+Live execution provenance plus explicit AgentTool recovery_projection opt-in can
+now retain a bounded recovery view different from ordinary persisted tool text.
+Private-token filtering runs first; storage refuses projections changed by its
+redaction policy and emits no receipt when tool persistence is disabled. Equal
+views retain v1 digest-only receipts. Different permitted views use v2 with at
+most 8192 bytes of text, bound to the final stored entry digest and call identity.
+The existing atomic terminal-marker size limit remains in force.
+
+Real execution snapshot tests commit and reopen both views under allow/deny
+policies, preserve default tool refusal, verify idempotence and reject changed
+stored data, unknown versions, v1 with retained text, missing/oversized retained
+text and changed projection digests. Agent 610/610 and Session 253/253 passed before
+the final test-only strengthening; the focused snapshot suite and final Clippy
+logs are `/private/tmp/i313-projection-focused.log` and
+`/private/tmp/i313-projection-clippy.log`; full suite log:
+`/private/tmp/i313-projection-tests.log`. Independent static review approves the
+production delta; reviewer did not run tests. This closes the prior unsupported
+representation path locally, not model search/detail or whole T5 acceptance.
+Old readers reject receipt sets containing v2 rather than disclosing unsupported
+text; raw transcripts remain readable. T5/T1/T6 and remote closure remain open.

@@ -580,3 +580,14 @@ manual operation receipt and does not complete the turn or write transcript text
 Cancellation before the shared Runtime checkpoint commit gate prevents installation;
 cancellation after Applied does not undo that projection. Provider error strings,
 summary content and image bytes are never included in these status events.
+
+### Pending I313 recovery receipt compatibility
+
+The local I313 implementation adds version-two recovery receipts for tools that
+explicitly permit a bounded recovery view different from their ordinary persisted
+result. The Session persistence policy and private/redaction filters still apply;
+this does not enable model history search by default. Equal views continue using
+version-one digest-only receipts. A version-one-only reader refuses a receipt set
+containing version two; it can still read the original transcript. Rollback may
+therefore make those tool facts unavailable for model recovery, without deleting
+raw history. See the I313 owner for current implementation and validation status.
