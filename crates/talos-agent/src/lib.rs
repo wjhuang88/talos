@@ -103,8 +103,27 @@ pub use compression::{CompressionMetrics, RetrievalMetrics};
 pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
 pub(crate) use request_plan::PreparedSessionTurn;
 
+pub(crate) struct SubmittedCheckpoint {
+    pub(crate) payload: String,
+    pub(crate) source: crate::compaction::HistorySource,
+    pub(crate) covered_end: usize,
+}
+
+impl SubmittedCheckpoint {
+    fn matches_source(
+        &self,
+        current: &crate::compaction::HistorySource,
+        message_count: usize,
+    ) -> bool {
+        self.covered_end > 0
+            && self.covered_end <= message_count
+            && self.covered_end <= 8192
+            && (0..self.covered_end).all(|index| self.source.same_entry(current, index))
+    }
+}
+
 pub(crate) struct BoundaryCompactJob {
-    pub(crate) submitted_checkpoint: Option<String>,
+    pub(crate) submitted_checkpoint: Option<SubmittedCheckpoint>,
     pub(crate) measurement: Arc<std::sync::Mutex<Option<u32>>>,
     pub(crate) result: tokio::sync::oneshot::Sender<checkpoint_manual::ManualCheckpointResult>,
 }
@@ -1875,8 +1894,21 @@ impl Agent {
                         if let Ok(mut value) = job.measurement.lock() {
                             *value = measured_before;
                         }
-                        if let Some(payload) = &job.submitted_checkpoint {
+                        if let Some(submitted) = &job.submitted_checkpoint {
+                            if !submitted.matches_source(source, messages.len()) {
+                                return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                    talos_core::session::CompactOutcome::FailedWithEstimate {
+                                        before: plan.estimated_tokens,
+                                        reason:
+                                            talos_core::session::CompactFailureReason::Preparation,
+                                    },
+                                );
+                            }
                             let deadline = source
+                                .deadline()
+                                .map_or(deadline, |bound| bound.min(deadline));
+                            let deadline = submitted
+                                .source
                                 .deadline()
                                 .map_or(deadline, |bound| bound.min(deadline));
                             let before = plan.estimated_tokens;
@@ -1888,7 +1920,8 @@ impl Agent {
                                     &private_tokens,
                                     source,
                                     deadline,
-                                    payload,
+                                    &submitted.payload,
+                                    submitted.covered_end,
                                     &mut projection,
                                 )
                                 .await;

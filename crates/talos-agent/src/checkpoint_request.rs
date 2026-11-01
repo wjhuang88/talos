@@ -129,6 +129,7 @@ impl Agent {
         source: &crate::compaction::HistorySource,
         deadline: tokio::time::Instant,
         payload: &str,
+        covered_end: usize,
         deferred: &mut Option<crate::checkpoint_projection::CheckpointProjection>,
     ) -> CompactionResult<()> {
         let deadline = source
@@ -141,7 +142,7 @@ impl Agent {
             Some(source),
             deadline,
             Some(deferred),
-            Some(payload),
+            Some((payload, covered_end)),
         )
         .await
     }
@@ -155,11 +156,14 @@ impl Agent {
         source: Option<&crate::compaction::HistorySource>,
         deadline: tokio::time::Instant,
         deferred: Option<&mut Option<crate::checkpoint_projection::CheckpointProjection>>,
-        submitted: Option<&str>,
+        submitted: Option<(&str, usize)>,
     ) -> CompactionResult<()> {
         check_checkpoint_deadline(deadline)?;
-        if submitted.is_some_and(|payload| payload.len() > crate::compaction::MAX_CHECKPOINT_BYTES)
-        {
+        if submitted.is_some_and(|(payload, end)| {
+            payload.len() > crate::compaction::MAX_CHECKPOINT_BYTES
+                || end == 0
+                || end > plan.messages.len()
+        }) {
             return Err(CompactionError::CompactionFailed(
                 "checkpoint payload exceeds byte limit".into(),
             ));
@@ -193,6 +197,7 @@ impl Agent {
                 "no eligible checkpoint prefix".into(),
             ));
         };
+        let split = submitted.map_or(split, |(_, end)| split.min(end));
         let eligible: Vec<usize> = (0..split)
             .filter(|&index| {
                 !matches!(plan.messages[index], Message::System { .. })
@@ -256,6 +261,14 @@ impl Agent {
                 "checkpoint source byte limit exceeded".into(),
             ));
         }
+        // Both provider-generated and submitted checkpoints require complete
+        // source batches. Submitted payloads skip the summarizer packing loop,
+        // so pairing validation must happen before those paths diverge.
+        let mut group_start = 0;
+        while group_start < eligible.len() {
+            check_checkpoint_deadline(deadline)?;
+            group_start = checkpoint_group_end(&plan.messages, &eligible, group_start)?;
+        }
         let references: Vec<String> = eligible
             .iter()
             .map(|&index| match source {
@@ -275,7 +288,7 @@ impl Agent {
                 None => Ok(format!("raw:{index}")),
             })
             .collect::<CompactionResult<_>>()?;
-        let rendered = if let Some(payload) = submitted {
+        let rendered = if let Some((payload, _)) = submitted {
             if private.project(payload) != payload {
                 return Err(CompactionError::CompactionFailed(
                     "checkpoint contains private content".into(),
@@ -837,6 +850,130 @@ mod tests {
             .collect()
     }
 
+    #[test]
+    fn submitted_snapshot_accepts_append_but_rejects_prefix_mutation_and_generation() {
+        let mut raw = history();
+        let bind = |generation, messages: &[Message]| {
+            crate::compaction::HistorySource::bind(
+                generation,
+                messages.len() as u64,
+                messages,
+                (0..messages.len()).map(|n| format!("entry-{n}")).collect(),
+            )
+            .expect("binding")
+        };
+        let submitted = crate::SubmittedCheckpoint {
+            payload: String::new(),
+            source: bind(1, &raw),
+            covered_end: 20,
+        };
+        raw.push(Message::User {
+            content: "appended".into(),
+        });
+        assert!(submitted.matches_source(&bind(1, &raw), raw.len()));
+        assert!(!submitted.matches_source(&bind(2, &raw), raw.len()));
+        raw[0] = Message::User {
+            content: "changed prefix".into(),
+        };
+        assert!(!submitted.matches_source(&bind(1, &raw), raw.len()));
+    }
+
+    #[tokio::test]
+    async fn submitted_checkpoint_refuses_incomplete_or_mismatched_source_batches() {
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: true,
+            fail_after: None,
+        });
+        let agent = Agent::new(provider.clone(), ToolRegistry::new());
+        for case in 0..5 {
+            let mut raw = history();
+            let call = talos_core::message::ToolCall {
+                id: "old-call".into(),
+                name: "read".into(),
+                input: serde_json::json!({}),
+            };
+            raw[1] = Message::Assistant {
+                content: String::new(),
+                reasoning: None,
+                tool_calls: if case == 1 {
+                    vec![call.clone(), call]
+                } else {
+                    vec![call]
+                },
+            };
+            // Missing result, duplicate call IDs, wrong result ID, orphan result,
+            // or an otherwise valid batch cut between its call and result.
+            if case == 2 || case == 4 {
+                raw[2] = Message::Tool {
+                    result: talos_core::message::MessageToolResult {
+                        tool_use_id: if case == 4 {
+                            "old-call"
+                        } else {
+                            "different-call"
+                        }
+                        .into(),
+                        content: "result".into(),
+                        is_error: false,
+                    },
+                };
+            } else if case == 3 {
+                raw[1] = Message::Tool {
+                    result: talos_core::message::MessageToolResult {
+                        tool_use_id: "orphan".into(),
+                        content: "result".into(),
+                        is_error: false,
+                    },
+                };
+            }
+            let source = crate::compaction::HistorySource::bind(
+                1,
+                raw.len() as u64,
+                &raw,
+                (0..raw.len()).map(|n| format!("source-{n}")).collect(),
+            )
+            .expect("source");
+            let before = agent.estimate_provider_request_tokens(&raw, &[]);
+            let mut plan = ProviderRequestPlan {
+                messages: raw.clone(),
+                tool_definitions: vec![],
+                estimated_tokens: before,
+                ephemeral_image_tokens: 0,
+                omitted_tool_exchanges: 0,
+                tool_protocol: ToolProtocol::Native,
+            };
+            let item = serde_json::json!({"text":"safe summary", "sources":["source-0"]});
+            let payload =
+                serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                "facts":[],"assumptions":[],"resources":[],"open_loops":[]})
+                .to_string();
+            let mut deferred = None;
+            let error = agent
+                .checkpoint_submitted_deferred(
+                    &mut plan,
+                    before * 2,
+                    &PrivateTokens::default(),
+                    &source,
+                    tokio::time::Instant::now() + Duration::from_secs(5),
+                    &payload,
+                    if case == 4 {
+                        2
+                    } else {
+                        eligible_prefix_end(&raw).expect("cutoff")
+                    },
+                    &mut deferred,
+                )
+                .await
+                .expect_err("unpaired source must refuse compaction");
+            assert!(error.to_string().contains("complete tool exchange"));
+            assert!(deferred.is_none());
+            assert_eq!(plan.messages, raw);
+            assert_eq!(plan.estimated_tokens, before);
+        }
+        assert!(provider.requests.lock().expect("requests").is_empty());
+    }
+
     #[tokio::test]
     async fn submitted_checkpoint_uses_shared_validation_without_provider_or_early_install() {
         let provider = Arc::new(SummaryProvider {
@@ -863,6 +1000,18 @@ mod tests {
             },
         });
         let recent_start = eligible_prefix_end(&raw).expect("eligible");
+        // Discovery issued this cutoff before later complete user exchanges.
+        // Newly eligible history must not silently expand submitted coverage.
+        for _ in 0..12 {
+            raw.push(Message::User {
+                content: "later input".into(),
+            });
+            raw.push(Message::Assistant {
+                content: "later reply".into(),
+                reasoning: None,
+                tool_calls: vec![],
+            });
+        }
         let source = crate::compaction::HistorySource::bind(
             1,
             raw.len() as u64,
@@ -918,6 +1067,7 @@ mod tests {
                     &source,
                     tokio::time::Instant::now() + Duration::from_secs(5),
                     &submitted,
+                    recent_start,
                     &mut deferred,
                 )
                 .await;
@@ -1714,6 +1864,7 @@ mod tests {
                 &source,
                 tokio::time::Instant::now() + Duration::from_secs(120),
                 "{}",
+                eligible_prefix_end(&original).expect("cutoff"),
                 &mut deferred,
             )
             .await

@@ -562,3 +562,32 @@ covers five-file diff SHA256
 `e5a24e0204e68e1e23e98068f52a4b09855625fd90321244ba1cd5fde255595d`.
 Reviewer did not run tests and shares Agent/GitHub identity. Full T5, remote
 preflight/platform/CI/merge and later T1/T6 acceptance remain outstanding.
+
+### Frozen submitted coverage and shared pairing gate — local, unmerged
+
+Submitted checkpoint jobs now carry the runtime-held HistorySource and frozen
+covered_end with their payload. The complete-batch path compares generation,
+entry identities and digests for that prefix before preparation, bounds coverage
+to 8192 entries, and retains the earlier current/frozen source deadline through
+candidate installation. The shared engine uses the smaller of the frozen cutoff
+and current recent-window cutoff, so later appended exchanges cannot silently
+expand coverage. This establishes source consistency only: session/branch/
+permission authority, opaque discovery tokens and actual model admission remain
+unimplemented. The manual producer still sends no submitted job.
+
+Moved complete-tool-exchange validation before automatic/submitted route
+selection; the submitted route had skipped the automatic summarizer packing
+loop's pairing check. Regression rejects missing results, duplicate call IDs,
+wrong result IDs, orphan results and a valid call/result cut by the frozen cutoff.
+Other regressions preserve appended history, reject prefix mutation/generation
+change and retain private-content/size/deadline rejection without early install.
+
+Production delta passed full Agent 595/595 and all-target warnings-denied Clippy:
+`/private/tmp/i313-submitted-snapshot-agent-tests.log`,
+`/private/tmp/i313-submitted-snapshot-clippy.log`. The later test-only mid-batch
+cutoff addition passes the three submitted tests:
+`/private/tmp/i313-submitted-cut-batch-tests.log`. Independent static review
+approved the production delta and final test-only addition; two-code-file diff
+SHA256 `87f03807cb9e235a77a6d8a3b1300ca2006a6888ce9b0220e30239ad8f07e882`.
+Reviewer did not run tests and shares Agent/GitHub identity.
+No model-tool/Actor delivery, full T5 completion or remote validation is claimed.
