@@ -91,15 +91,15 @@ fn admit(
 fn validated_limits_preserve_existing_bounds_without_a_running_budget() {
     for (duration, requests, bytes) in [
         (Duration::ZERO, 1, 1),
-        (Duration::from_secs(61), 1, 1),
+        (Duration::from_secs(121), 1, 1),
         (Duration::from_secs(1), 0, 1),
-        (Duration::from_secs(1), 9, 1),
+        (Duration::from_secs(1), 17, 1),
         (Duration::from_secs(1), 1, 0),
         (Duration::from_secs(1), 1, 1_048_577),
     ] {
         assert!(TransportLimits::new(duration, requests, bytes).is_err());
     }
-    assert!(TransportLimits::new(Duration::from_secs(60), 8, 1_048_576).is_ok());
+    assert!(TransportLimits::new(Duration::from_secs(120), 16, 1_048_576).is_ok());
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn trait_object_retains_exact_manifest_profile_and_redacts_captured_input() {
     let object: Box<dyn PreparedNetworkToolInvocation> = Box::new(invocation);
     assert_eq!(object.manifest(), &manifest);
     assert_eq!(object.permission_profile(), profile);
-    assert_eq!(profile.len(), 4);
+    assert_eq!(profile.len(), 6);
 }
 
 #[tokio::test]

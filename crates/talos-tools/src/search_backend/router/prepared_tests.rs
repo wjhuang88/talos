@@ -75,7 +75,7 @@ async fn prepared_candidates_share_router_scheduler_and_budget_deadline() {
             },
         ])
     );
-    assert_eq!(authority.checks.load(Ordering::SeqCst), 2);
+    assert_eq!(authority.checks.load(Ordering::SeqCst), 3);
 }
 
 #[tokio::test(start_paused = true)]

@@ -42,7 +42,22 @@ impl SearchCompositionConfiguration {
     /// Builds the zero-key direct candidate plus an optional explicitly supplied SearXNG route.
     /// Credential discovery and production selection are intentionally outside this stage.
     pub(crate) fn new(searxng: Option<SearXngConfiguration>) -> Result<Self, TransportError> {
-        let direct = DirectCompatibilityConfiguration::new()?;
+        Self::from_direct(DirectCompatibilityConfiguration::new()?, searxng)
+    }
+
+    /// Production freezes supported environment-proxy state once at tool construction. Optional
+    /// providers are deliberately absent so their proxy policy cannot be accidentally widened.
+    pub(crate) fn new_production() -> Result<Self, TransportError> {
+        Self::from_direct(
+            DirectCompatibilityConfiguration::new_with_environment_proxy()?,
+            None,
+        )
+    }
+
+    fn from_direct(
+        direct: DirectCompatibilityConfiguration,
+        searxng: Option<SearXngConfiguration>,
+    ) -> Result<Self, TransportError> {
         let scope = combined_scope(
             direct.scope(),
             searxng.as_ref().map(SearXngConfiguration::scope),
@@ -292,7 +307,9 @@ impl SearchCandidateExecutionError {
 
 fn transport_backend_error(error: TransportError) -> SearchBackendError {
     match error {
-        TransportError::Dns | TransportError::ConnectionRefused => SearchBackendError::Unreachable,
+        TransportError::Dns | TransportError::ConnectionRefused | TransportError::Network => {
+            SearchBackendError::Unreachable
+        }
         TransportError::Deadline => SearchBackendError::Timeout,
         TransportError::ResponseEncoding => SearchBackendError::Parse,
         TransportError::InvalidRequest
@@ -310,6 +327,7 @@ fn transport_backend_error(error: TransportError) -> SearchBackendError {
 
 fn compatibility_backend_error(error: CompatibilityError) -> SearchBackendError {
     match error {
+        CompatibilityError::Unreachable => SearchBackendError::Unreachable,
         CompatibilityError::Transport(error) => transport_backend_error(error),
         CompatibilityError::Ddg(error) => match error {
             DdgParseError::Empty => SearchBackendError::NoResults,
@@ -351,6 +369,7 @@ fn compatibility_plan_backend_error(error: CompatibilityPlanError) -> SearchBack
                 SearchBackendError::RequestFailed("compatibility sources exhausted".into())
             }
         }
+        CompatibilityPlanError::Wikipedia(error) => compatibility_backend_error(error),
     }
 }
 
@@ -408,7 +427,7 @@ mod tests {
             second.manifest().invocation_id()
         );
         assert_eq!(first.permission_profile(), second.permission_profile());
-        assert_eq!(first.permission_profile().len(), 5);
+        assert_eq!(first.permission_profile().len(), 7);
         assert!(!format!("{first:?}").contains("first private query"));
     }
 
@@ -439,7 +458,7 @@ mod tests {
         let prepared = configuration
             .prepare("private query", 2, limits())
             .expect("prepared");
-        assert_eq!(prepared.manifest().scope().endpoints().len(), 4);
+        assert_eq!(prepared.manifest().scope().endpoints().len(), 9);
         let running = prepared.start(Arc::new(RejectAuthority));
         assert_eq!(running.candidates().len(), 1);
         assert_eq!(running.candidates()[0].id(), SearchBackendId::DuckDuckGo);
@@ -457,6 +476,13 @@ mod tests {
         assert_eq!(
             SearchCandidateExecutionError::SearXng(SearXngError::Transport(TransportError::Dns))
                 .into_backend_error(),
+            SearchBackendError::Unreachable
+        );
+        assert_eq!(
+            SearchCandidateExecutionError::SearXng(SearXngError::Transport(
+                TransportError::Network
+            ))
+            .into_backend_error(),
             SearchBackendError::Unreachable
         );
         assert_eq!(

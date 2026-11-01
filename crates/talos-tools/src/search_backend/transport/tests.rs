@@ -252,11 +252,24 @@ pub(super) struct Server {
     read_errors: Arc<Mutex<Vec<std::io::ErrorKind>>>,
     read_error_count: Arc<AtomicUsize>,
     requests: Arc<Mutex<Vec<Vec<u8>>>>,
+    request_times: Arc<Mutex<Vec<std::time::Instant>>>,
     worker: Mutex<Option<thread::JoinHandle<()>>>,
 }
 
 impl Server {
     pub(super) fn new(responses: Vec<String>) -> Self {
+        Self::new_with_delays(responses, Vec::new())
+    }
+
+    pub(super) fn new_with_delays(responses: Vec<String>, response_delays: Vec<Duration>) -> Self {
+        Self::new_with_resets(responses, response_delays, Vec::new())
+    }
+
+    pub(super) fn new_with_resets(
+        responses: Vec<String>,
+        response_delays: Vec<Duration>,
+        reset_requests: Vec<usize>,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("loopback fixture");
         listener.set_nonblocking(true).expect("nonblocking");
         let port = listener.local_addr().expect("address").port();
@@ -266,16 +279,20 @@ impl Server {
         let read_errors = Arc::new(Mutex::new(Vec::with_capacity(4)));
         let read_error_count = Arc::new(AtomicUsize::new(0));
         let requests = Arc::new(Mutex::new(Vec::new()));
-        let (s, a, c, r, errors, error_count) = (
+        let request_times = Arc::new(Mutex::new(Vec::new()));
+        let (s, a, c, r, times, errors, error_count) = (
             stop.clone(),
             accepted.clone(),
             closed.clone(),
             requests.clone(),
+            request_times.clone(),
             read_errors.clone(),
             read_error_count.clone(),
         );
         let worker = thread::spawn(move || {
             let mut responses: VecDeque<_> = responses.into();
+            let mut response_delays: VecDeque<_> = response_delays.into();
+            let mut request_index = 0;
             let limit = std::time::Instant::now() + Duration::from_secs(10);
             while !s.load(Ordering::Relaxed) && std::time::Instant::now() < limit {
                 let (mut socket, _) = match listener.accept() {
@@ -335,8 +352,25 @@ impl Server {
                         }
                     }
                 }
+                times
+                    .lock()
+                    .expect("request times")
+                    .push(std::time::Instant::now());
                 r.lock().expect("requests").push(bytes);
+                let current_request = request_index;
+                request_index += 1;
+                if reset_requests.contains(&current_request) {
+                    socket2::SockRef::from(&socket)
+                        .set_linger(Some(Duration::ZERO))
+                        .expect("abort fixture connection");
+                    continue;
+                }
                 if let Some(response) = responses.pop_front() {
+                    if let Some(delay) = response_delays.pop_front()
+                        && !delay.is_zero()
+                    {
+                        thread::sleep(delay);
+                    }
                     let _ = socket.write_all(response.as_bytes());
                 } else {
                     // Hold the response open and observe peer EOF on deadline/caller drop.
@@ -378,6 +412,7 @@ impl Server {
             read_errors,
             read_error_count,
             requests,
+            request_times,
             worker: Mutex::new(Some(worker)),
         }
     }
@@ -401,6 +436,9 @@ impl Server {
     pub(super) fn request(&self, index: usize) -> String {
         String::from_utf8(self.requests.lock().expect("requests")[index].clone())
             .expect("http bytes")
+    }
+    pub(super) fn request_time(&self, index: usize) -> std::time::Instant {
+        self.request_times.lock().expect("request times")[index]
     }
 }
 
@@ -1056,8 +1094,8 @@ fn explicit_proxy_and_invalid_bounds_are_closed_errors_not_direct_fallback() {
     ));
     for (duration, requests, bytes) in [
         (Duration::ZERO, 1, 1),
-        (Duration::from_secs(61), 1, 1),
-        (Duration::from_secs(1), 9, 1),
+        (Duration::from_secs(121), 1, 1),
+        (Duration::from_secs(1), 17, 1),
         (Duration::from_secs(1), 1, 1_048_577),
     ] {
         assert!(TransportBudget::new(duration, requests, bytes).is_err());
@@ -1300,6 +1338,46 @@ async fn failed_response_is_not_automatically_retried_by_http_client() {
         TransportError::Request
     );
     assert_eq!(server.count(), 1);
+}
+
+#[tokio::test]
+async fn body_read_timeout_remains_retryable_network() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("listener");
+    let address = listener.local_addr().expect("address");
+    let server = thread::spawn(move || {
+        let (mut socket, _) = listener.accept().expect("accept");
+        let mut request = Vec::new();
+        let mut buffer = [0; 1024];
+        while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+            let count = socket.read(&mut buffer).expect("request");
+            assert_ne!(count, 0, "request headers");
+            request.extend_from_slice(&buffer[..count]);
+        }
+        socket
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\nConnection: close\r\n\r\nx")
+            .expect("partial body");
+        thread::sleep(Duration::from_millis(300));
+    });
+    let client = Client::builder()
+        .timeout(Duration::from_millis(100))
+        .build()
+        .expect("client");
+    let mut response = client
+        .get(format!("http://{address}/"))
+        .send()
+        .await
+        .expect("response headers");
+    let error = loop {
+        match response.chunk().await {
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("fixture body should time out"),
+            Err(error) => break error,
+        }
+    };
+
+    assert!(error.is_timeout());
+    assert_eq!(classify_body_read_error(error), TransportError::Network);
+    server.join().expect("server");
 }
 
 #[tokio::test]
