@@ -867,3 +867,27 @@ This is explicit host maintenance, not automatic Runtime scheduling or model
 search/detail dispatch. Current source/branch/full-prefix authority, product
 activation and remaining acceptance still require implementation. T5 stays
 Partial; T1/T6 and full workspace/remote closure remain outstanding.
+
+### Dynamic model pressure notice — local, unmerged
+
+With the built-in checkpoint tools explicitly enabled, the real provider request
+sealing path appends content-free pressure metadata at Advisory or higher using
+the existing full-request estimate. Normal requests have no notice. Definitions
+and instruction prefix remain stable. The notice is request-only, is re-estimated
+with image/output/reasoning reserves and passes the same final admission check.
+Its level describes the pre-notice/pre-final-recovery estimate, not a claim about
+the final reduced request. A fitting Advisory request can continue normally.
+
+Focused tests include actual provider dispatch, unchanged tool definitions,
+absence from returned persistence messages, unchanged original prefix, no private
+content in metadata, threshold removal on increased capacity and rejection when
+the notice cannot fit. Six pressure-related tests pass in
+`/private/tmp/i313-pressure-focused.log`. Locked Agent tests pass 610/610 and
+warnings-denied all-target Agent Clippy passes in
+`/private/tmp/i313-pressure-agent.log` and `/private/tmp/i313-pressure-clippy.log`.
+Independent static review APPROVE against `c9ddf1360`, code diff SHA256
+`031a2f99e4e49fd6a13470c4b9c326fa484f985995751cc33f5e1d1a29b7f17a`;
+reviewer did not run tests. The query-normalization experiment was reverted after
+it changed existing semantics without advancing source authority. Durable model
+search/detail, authorization context and Runtime/CLI activation remain unfinished;
+this notice does not close those requirements or T5/T1/T6.

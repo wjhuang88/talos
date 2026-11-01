@@ -656,3 +656,109 @@ async fn actor_generation_and_raw_revision_survive_request_preparation() {
         None
     );
 }
+
+#[tokio::test]
+async fn model_checkpoint_pressure_is_dynamic_budgeted_and_leaves_raw_and_tools_unchanged() {
+    let mut agent = budget_test_agent();
+    agent.enable_model_checkpoint_tools().expect("enable");
+    let raw = vec![
+        Message::System {
+            content: "stable instruction".into(),
+            cache_markers: vec![],
+        },
+        Message::User {
+            content: "private historical content ".repeat(2000),
+        },
+    ];
+    let original = raw.clone();
+    let mut base = budget_plan(&agent, raw.clone());
+    base.tool_definitions = agent.tool_definitions.clone();
+    base.estimated_tokens =
+        agent.estimate_provider_request_tokens(&base.messages, &base.tool_definitions);
+    let tools = format!("{:?}", base.tool_definitions);
+    let before = base.estimated_tokens;
+    for (limit, expected) in [(before * 2, false), (before * 10 / 9, true)] {
+        let plan = agent
+            .seal_observed_request_plan(base.clone(), Some(limit), &Default::default(), None, None)
+            .await
+            .expect("admitted");
+        assert_eq!(plan.messages.len(), raw.len() + usize::from(expected));
+        assert_eq!(&plan.messages[..raw.len()], raw.as_slice());
+        assert_eq!(format!("{:?}", plan.tool_definitions), tools);
+        assert_eq!(
+            plan.estimated_tokens,
+            agent.estimate_provider_request_tokens(&plan.messages, &plan.tool_definitions)
+        );
+        if expected {
+            let Message::Multimodal { parts } = plan.messages.last().expect("notice") else {
+                panic!("dynamic context")
+            };
+            let ContentPart::Text { text } = &parts[0] else {
+                panic!("text")
+            };
+            let value: serde_json::Value = serde_json::from_str(text).expect("numeric notice");
+            assert_eq!(value["context_pressure"]["level"], "Advisory");
+            assert_eq!(
+                value["context_pressure"]["estimated_tokens_before_notice"],
+                before
+            );
+            assert!(!text.contains("private historical"));
+        }
+    }
+    assert_eq!(raw, original);
+    // The notice cannot escape admission when no space is left.
+    assert!(
+        agent
+            .seal_observed_request_plan(base, Some(before), &Default::default(), None, None)
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn actual_provider_receives_pressure_without_persisting_it() {
+    let (model, captured) = CapturingModel::new();
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(model),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("/tmp"),
+        Arc::new(HookRegistry::new()),
+    );
+    agent.set_request_budget_spec(RequestBudgetSpec::new(1));
+    agent.enable_model_checkpoint_tools().expect("tools");
+    let items = vec![SubmissionItem {
+        id: "input".into(),
+        enqueue_sequence: 0,
+        kind: SubmissionKind::UserTurn,
+        text: "ordinary input ".repeat(3000),
+        attachments: vec![],
+    }];
+    let baseline = agent
+        .prepare_session_turn(&items, vec![], 1_000_000)
+        .await
+        .expect("baseline");
+    let limit = baseline.initial_plan.estimated_tokens * 10 / 9;
+    let prepared = agent
+        .prepare_session_turn(&items, vec![], limit)
+        .await
+        .expect("advisory");
+    let (result, persisted) = agent
+        .run_prepared_session_turn(prepared, mpsc::unbounded_channel().0, None, None, None)
+        .await;
+    result.expect("ordinary continuation");
+    let requests = captured.lock().expect("captured");
+    assert_eq!(requests.len(), 1);
+    let request = &requests[0];
+    let notices = |messages: &[Message]| {
+        messages.iter().filter(|message| matches!(message,Message::Multimodal {parts} if parts.iter().any(|part| matches!(part,ContentPart::Text{text} if text.contains("context_pressure"))))).count()
+    };
+    assert_eq!(notices(&request.messages), 1);
+    assert_eq!(notices(&persisted), 0);
+    assert_eq!(
+        format!("{:?}", request.tools),
+        format!("{:?}", baseline.initial_plan.tool_definitions)
+    );
+    assert!(agent.estimate_provider_request_tokens(&request.messages, &request.tools) <= limit);
+}

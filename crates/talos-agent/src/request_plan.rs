@@ -526,6 +526,31 @@ impl Agent {
                 );
             }
         }
+        if self.tools.is_builtin_instance("compact_context")
+            && let Some(limit) = request_context_limit
+        {
+            let pressure = crate::compaction::RequestPressure::assess(plan.estimated_tokens, limit);
+            if pressure != crate::compaction::RequestPressure::Normal {
+                // Dynamic request-only context: never mutate the stable tool
+                // definitions, instruction prefix, or authoritative transcript.
+                let text = serde_json::json!({
+                    "context_pressure": {
+                        "level": format!("{pressure:?}"),
+                        "estimated_tokens_before_notice": plan.estimated_tokens,
+                        "context_limit": limit,
+                        "action": "Consider compact_context at a safe task boundary; admission is not installation."
+                    }
+                }).to_string();
+                plan.messages.push(Message::Multimodal {
+                    parts: vec![ContentPart::Text { text }],
+                });
+                plan.estimated_tokens = self
+                    .estimate_provider_request_tokens(&plan.messages, &plan.tool_definitions)
+                    .saturating_add(plan.ephemeral_image_tokens);
+            }
+        }
+        // The notice is subject to the same whole-request admission as all
+        // other request content, including output/reasoning and image reserves.
         self.recover_request_budget(&mut plan, request_context_limit)?;
         Ok(plan)
     }
