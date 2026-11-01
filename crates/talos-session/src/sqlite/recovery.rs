@@ -93,7 +93,140 @@ pub struct RecoveryCandidate {
     pub ordinal: u64,
 }
 
+/// Persisted scan position for one immutable, host-authorized source snapshot.
+/// This is cache progress, not proof of source or branch authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryBuildCursor {
+    source_end: u64,
+    next_offset: u64,
+    next_ordinal: u64,
+}
+
+impl RecoveryBuildCursor {
+    /// Captured byte cutoff; later appends are outside this build.
+    pub fn source_end(&self) -> u64 {
+        self.source_end
+    }
+    /// Byte position from which host maintenance resumes.
+    pub fn next_offset(&self) -> u64 {
+        self.next_offset
+    }
+    /// Ordinal of the next scanned entry, including ineligible entries.
+    pub fn next_ordinal(&self) -> u64 {
+        self.next_ordinal
+    }
+    /// Whether all bytes through the captured cutoff have been scanned.
+    pub fn complete(&self) -> bool {
+        self.next_offset == self.source_end
+    }
+}
+
+/// One bounded host-authorized scan page with its next source position.
+pub struct RecoveryBuildPage<'a> {
+    /// Byte offset after the complete records parsed in this page.
+    pub next_offset: u64,
+    /// Number of scanned records, including records ineligible for recovery.
+    pub scanned_entries: u64,
+    /// Eligible sources and their original scan ordinals.
+    pub sources: &'a [RecoveryIndexSource<'a>],
+}
+
+struct RecoveryPageAdvance<'a> {
+    prior: &'a RecoveryBuildCursor,
+    next_offset: u64,
+    scanned_entries: u64,
+}
+
 impl SessionIndex {
+    /// Begin host maintenance for a fresh opaque snapshot scope. Existing state
+    /// is never replaced: resume it or issue a new scope after revalidation.
+    pub fn begin_recovery_build(
+        &self,
+        scope: &str,
+        source_end: u64,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<RecoveryBuildCursor, IndexError> {
+        native_boundary(|| {
+            if scope.is_empty() || scope.len() > 128 || source_end > i64::MAX as u64 {
+                return Err(invalid_build());
+            }
+            let _guard = install_budget(&self.conn, budget)?;
+            let tx = self.conn.unchecked_transaction()?;
+            let existing: i64 = tx.query_row(
+                "SELECT count(*) FROM recovery_sources WHERE scope=?1",
+                [scope],
+                |r| r.get(0),
+            )?;
+            if existing != 0 {
+                return Err(invalid_build());
+            }
+            tx.execute("INSERT INTO recovery_builds(scope,source_end,next_offset,next_ordinal) VALUES(?1,?2,0,0)", params![scope, source_end as i64])?;
+            budget.check()?;
+            tx.commit()?;
+            Ok(RecoveryBuildCursor {
+                source_end,
+                next_offset: 0,
+                next_ordinal: 0,
+            })
+        })
+    }
+
+    /// Read persisted maintenance progress without initializing or repairing it.
+    /// A complete cursor still requires current source/branch revalidation.
+    pub fn recovery_build_cursor(
+        &self,
+        scope: &str,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<Option<RecoveryBuildCursor>, IndexError> {
+        native_boundary(|| {
+            if scope.is_empty() || scope.len() > 128 {
+                return Err(invalid_build());
+            }
+            let _guard = install_budget(&self.conn, budget)?;
+            let row: Option<(i64, i64, i64)> = self.conn.query_row(
+                "SELECT source_end,next_offset,next_ordinal FROM recovery_builds WHERE scope=?1",
+                [scope], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+            ).optional()?;
+            budget.check()?;
+            row.map(|(end, offset, ordinal)| {
+                if end < 0 || offset < 0 || offset > end || ordinal < 0 {
+                    return Err(invalid_build());
+                }
+                Ok(RecoveryBuildCursor {
+                    source_end: end as u64,
+                    next_offset: offset as u64,
+                    next_ordinal: ordinal as u64,
+                })
+            })
+            .transpose()
+        })
+    }
+
+    /// Atomically cache an authorized page and advance its resumable scan cursor.
+    /// `scanned_entries` includes entries omitted from eligible projections.
+    /// Source parsing, immutable-prefix verification and branch membership are
+    /// host responsibilities. A stale/concurrent cursor rolls back the whole page.
+    pub fn advance_recovery_build(
+        &mut self,
+        scope: &str,
+        prior: &RecoveryBuildCursor,
+        page: RecoveryBuildPage<'_>,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<(), IndexError> {
+        native_boundary(|| {
+            self.cache_page_inner(
+                scope,
+                page.sources,
+                budget,
+                Some(RecoveryPageAdvance {
+                    prior,
+                    next_offset: page.next_offset,
+                    scanned_entries: page.scanned_entries,
+                }),
+            )
+        })
+    }
+
     /// Find at most twenty candidates in a host-selected snapshot scope.
     /// An empty query discovers entries in source order. Nonempty queries use FTS
     /// only over eligible projection text, without global rank/statistics.
@@ -124,6 +257,15 @@ impl SessionIndex {
                 deadline: budget.deadline.min(Instant::now() + Duration::from_secs(2)),
             };
             let _guard = install_budget(&self.conn, &local)?;
+            let building: bool = self.conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM recovery_builds WHERE scope=?1 AND next_offset<>source_end)",
+                [scope], |r| r.get(0),
+            )?;
+            if building {
+                return Err(IndexError::Store(IndexStoreError::Database(
+                    "recovery index is building".into(),
+                )));
+            }
             let sql = if query.is_empty() {
                 "SELECT entry_id,ordinal FROM recovery_sources WHERE scope=?1 AND ordinal>?2 ORDER BY ordinal LIMIT ?3"
             } else {
@@ -174,7 +316,10 @@ impl SessionIndex {
                 "CREATE TABLE IF NOT EXISTS recovery_sources (
                     id INTEGER PRIMARY KEY, scope TEXT NOT NULL, entry_id TEXT NOT NULL,
                     ordinal INTEGER NOT NULL, UNIQUE(scope, entry_id), UNIQUE(scope, ordinal));
-                 CREATE VIRTUAL TABLE IF NOT EXISTS recovery_projection_fts USING fts5(content);",
+                 CREATE VIRTUAL TABLE IF NOT EXISTS recovery_projection_fts USING fts5(content);
+                 CREATE TABLE IF NOT EXISTS recovery_builds (
+                    scope TEXT PRIMARY KEY, source_end INTEGER NOT NULL,
+                    next_offset INTEGER NOT NULL, next_ordinal INTEGER NOT NULL);",
             )?;
             budget.check()?;
             tx.commit()?;
@@ -208,7 +353,7 @@ impl SessionIndex {
         sources: &[RecoveryIndexSource<'_>],
         budget: &RecoveryWorkBudget,
     ) -> Result<(), IndexError> {
-        native_boundary(|| self.cache_page_inner(scope, sources, budget))
+        native_boundary(|| self.cache_page_inner(scope, sources, budget, None))
     }
 
     fn cache_page_inner(
@@ -216,6 +361,7 @@ impl SessionIndex {
         scope: &str,
         sources: &[RecoveryIndexSource<'_>],
         budget: &RecoveryWorkBudget,
+        advance: Option<RecoveryPageAdvance<'_>>,
     ) -> Result<(), IndexError> {
         let _guard = install_budget(&self.conn, budget)?;
         let invalid = || {
@@ -243,6 +389,44 @@ impl SessionIndex {
             projected.push((source, recovery_index_text(source.entry, source.terminal)));
         }
         let tx = self.conn.unchecked_transaction()?;
+        let append_only = advance.is_some();
+        if let Some(advance) = advance {
+            let prior = advance.prior;
+            let ordinal = prior
+                .next_ordinal
+                .checked_add(advance.scanned_entries)
+                .filter(|n| *n <= i64::MAX as u64)
+                .ok_or_else(invalid_build)?;
+            if prior.complete()
+                || advance.next_offset <= prior.next_offset
+                || advance.next_offset > prior.source_end
+                || advance.next_offset - prior.next_offset
+                    > crate::history_page::HISTORY_PAGE_BYTES as u64
+                || advance.scanned_entries > crate::history_page::HISTORY_PAGE_ENTRIES as u64
+                || sources.len() as u64 > advance.scanned_entries
+                || sources
+                    .iter()
+                    .any(|s| s.ordinal < prior.next_ordinal || s.ordinal >= ordinal)
+            {
+                return Err(invalid_build());
+            }
+            let changed = tx.execute(
+                "UPDATE recovery_builds SET next_offset=?1,next_ordinal=?2 WHERE scope=?3 AND source_end=?4 AND next_offset=?5 AND next_ordinal=?6",
+                params![advance.next_offset as i64, ordinal as i64, scope, prior.source_end as i64, prior.next_offset as i64, prior.next_ordinal as i64],
+            )?;
+            if changed != 1 {
+                return Err(invalid_build());
+            }
+        } else {
+            let tracked: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM recovery_builds WHERE scope=?1)",
+                [scope],
+                |r| r.get(0),
+            )?;
+            if tracked {
+                return Err(invalid_build());
+            }
+        }
         for (source, content) in projected {
             budget.check()?;
             let old: Option<i64> = tx
@@ -253,6 +437,9 @@ impl SessionIndex {
                 )
                 .optional()?;
             if let Some(id) = old {
+                if append_only {
+                    return Err(invalid_build());
+                }
                 tx.execute("DELETE FROM recovery_projection_fts WHERE rowid=?1", [id])?;
                 tx.execute("DELETE FROM recovery_sources WHERE id=?1", [id])?;
             }
@@ -274,11 +461,217 @@ impl SessionIndex {
     }
 }
 
+fn invalid_build() -> IndexError {
+    IndexError::Store(IndexStoreError::Database(
+        "invalid or stale recovery build cursor".into(),
+    ))
+}
+
 use rusqlite::OptionalExtension;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn build_cursor_resumes_across_reopen_and_commits_with_page_atomically() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("index.db");
+        let mut index = SessionIndex::new(&path).expect("index");
+        index.init_recovery_schema().expect("schema");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(10));
+        let page_bytes = crate::history_page::HISTORY_PAGE_BYTES as u64;
+        let first = index
+            .begin_recovery_build("scope", page_bytes * 2, &budget)
+            .expect("start");
+        let entry = SessionEntry {
+            id: "first".into(),
+            parent_id: None,
+            timestamp: chrono::Utc::now(),
+            role: "user".into(),
+            content: "recoverable fact".into(),
+            metadata: Default::default(),
+        };
+        let sources = [RecoveryIndexSource {
+            entry: &entry,
+            terminal: None,
+            ordinal: 0,
+        }];
+        index
+            .advance_recovery_build(
+                "scope",
+                &first,
+                RecoveryBuildPage {
+                    next_offset: page_bytes,
+                    scanned_entries: 8192,
+                    sources: &sources,
+                },
+                &budget,
+            )
+            .expect("first page");
+        drop(index);
+        let mut index = SessionIndex::new(&path).expect("reopen");
+        let resumed = index
+            .recovery_build_cursor("scope", &budget)
+            .expect("cursor")
+            .expect("present");
+        assert_eq!(resumed.next_offset(), page_bytes);
+        assert_eq!(resumed.next_ordinal(), 8192);
+        assert!(!resumed.complete());
+        assert!(
+            index
+                .recovery_candidates("scope", "recoverable", None, 20, &budget)
+                .is_err()
+        );
+        assert!(
+            index
+                .begin_recovery_build("scope", page_bytes * 2, &budget)
+                .is_err()
+        );
+        assert!(
+            index
+                .advance_recovery_build(
+                    "scope",
+                    &first,
+                    RecoveryBuildPage {
+                        next_offset: page_bytes,
+                        scanned_entries: 8192,
+                        sources: &sources,
+                    },
+                    &budget
+                )
+                .is_err()
+        );
+        // A repeated source ID must roll back even the cursor UPDATE executed
+        // earlier in the transaction. It cannot erase the prior eligible fact.
+        let duplicate = [RecoveryIndexSource {
+            entry: &entry,
+            terminal: None,
+            ordinal: 8192,
+        }];
+        assert!(
+            index
+                .advance_recovery_build(
+                    "scope",
+                    &resumed,
+                    RecoveryBuildPage {
+                        next_offset: page_bytes * 2,
+                        scanned_entries: 1,
+                        sources: &duplicate,
+                    },
+                    &budget
+                )
+                .is_err()
+        );
+        assert_eq!(
+            index
+                .recovery_build_cursor("scope", &budget)
+                .expect("cursor"),
+            Some(resumed.clone())
+        );
+        assert!(index.cache_recovery_page("scope", &sources).is_err());
+        index
+            .advance_recovery_build(
+                "scope",
+                &resumed,
+                RecoveryBuildPage {
+                    next_offset: page_bytes * 2,
+                    scanned_entries: 8192,
+                    sources: &[],
+                },
+                &budget,
+            )
+            .expect("second page including ineligible entries");
+        let done = index
+            .recovery_build_cursor("scope", &budget)
+            .expect("cursor")
+            .expect("present");
+        assert!(done.complete());
+        assert_eq!(done.next_ordinal(), 16384);
+        assert_eq!(
+            index
+                .recovery_candidates("scope", "recoverable", None, 20, &budget)
+                .expect("candidates")[0]
+                .entry_id,
+            "first"
+        );
+    }
+
+    #[test]
+    fn actual_source_pages_rebuild_beyond_single_page_limits() {
+        use std::io::Write;
+        for content in ["fact".to_string(), "fact ".repeat(70)] {
+            let dir = tempfile::tempdir().expect("tempdir");
+            let path = dir.path().join("source.jsonl");
+            let mut file = std::io::BufWriter::new(std::fs::File::create(&path).expect("source"));
+            for n in 0..10_000 {
+                let entry = SessionEntry {
+                    id: n.to_string(),
+                    parent_id: None,
+                    timestamp: chrono::Utc::now(),
+                    role: "user".into(),
+                    content: content.clone(),
+                    metadata: Default::default(),
+                };
+                serde_json::to_writer(&mut file, &entry).expect("record");
+                writeln!(file).expect("newline");
+            }
+            file.flush().expect("flush");
+            let end = std::fs::metadata(&path).expect("metadata").len();
+            let mut index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
+            index.init_recovery_schema().expect("schema");
+            let budget = RecoveryWorkBudget::new(Duration::from_secs(10));
+            let mut cursor = index
+                .begin_recovery_build("scope", end, &budget)
+                .expect("start");
+            let mut pages = 0;
+            while !cursor.complete() {
+                let page = crate::history_page::read_history_page(
+                    &path,
+                    crate::history_page::HistoryEncoding::Jsonl,
+                    cursor.next_offset(),
+                    end,
+                    budget.deadline,
+                    || budget.stopped(),
+                )
+                .expect("bounded source read");
+                let sources: Vec<_> = page
+                    .entries
+                    .iter()
+                    .enumerate()
+                    .map(|(n, entry)| RecoveryIndexSource {
+                        entry,
+                        terminal: None,
+                        ordinal: cursor.next_ordinal() + n as u64,
+                    })
+                    .collect();
+                index
+                    .advance_recovery_build(
+                        "scope",
+                        &cursor,
+                        RecoveryBuildPage {
+                            next_offset: page.next_offset,
+                            scanned_entries: page.entries.len() as u64,
+                            sources: &sources,
+                        },
+                        &budget,
+                    )
+                    .expect("atomic page");
+                cursor = index
+                    .recovery_build_cursor("scope", &budget)
+                    .expect("progress")
+                    .expect("cursor");
+                pages += 1;
+            }
+            assert!(pages > 1);
+            assert_eq!(cursor.next_ordinal(), 10_000);
+            let tail = index
+                .recovery_candidates("scope", "fact", Some(9998), 20, &budget)
+                .expect("last fact");
+            assert_eq!(tail.len(), 1);
+            assert_eq!(tail[0].entry_id, "9999");
+        }
+    }
+
     #[test]
     fn progress_budget_interrupts_actual_sqlite_work_and_clears_handler() {
         let dir = tempfile::tempdir().expect("tempdir");

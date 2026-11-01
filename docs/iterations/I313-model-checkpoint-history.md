@@ -444,3 +444,29 @@ diff SHA256 `dbfbb9f0951ff379cf622d7263766c743233b8fec27a8d144b66572207873b3f`.
 Reviewer did not run tests and shares Agent/GitHub identity. Host snapshot/branch
 authority, complete incremental rebuild and source revalidation, model tools and
 Actor integration remain required; no full T5 acceptance is claimed.
+
+### Persistent recovery rebuild cursor — local, unmerged
+
+The existing SessionIndex now stores immutable-cutoff build progress in
+recovery_builds. Host maintenance begins a fresh scope and atomically advances
+byte/record cursors with each bounded projection page using a compare-and-swap
+condition. Stale cursors, duplicate indexed source IDs and writes bypassing tracked
+progress are rejected; page failure rolls back the cursor too. Reopening the index
+resumes the recorded position. Tracked incomplete builds refuse candidate queries.
+This is maintenance progress, not source/branch authority: the host still must
+validate the source prefix and lineage, and model-facing typed status mapping is
+not yet implemented. Untracked low-level cache scopes still require caller-owned
+completeness checks; they are not a model-query surface.
+
+Real native SessionEntry JSONL fixtures with 10,000 records each compose bounded
+source reads and multiple atomic cache pages, then recover the final entry.
+A separate reopen/rollback fixture advances beyond both single-page counters;
+this does not certify cross-page tool receipt resolution or an Actor rebuild loop.
+Session 239/239 and all-target warnings-denied Clippy pass. Logs:
+`/private/tmp/i313-cursor-session-tests.log`, `/private/tmp/i313-cursor-clippy.log`.
+Independent static review APPROVE against `6b0bc4ac1`, two-file diff SHA256
+`d1233ecc7c2061701b6a56226a1cc39312814e41f14ddb43c4c7b99f108ff40f`;
+reviewer did not execute tests and shares Agent/GitHub identity. Fresh fetch kept
+origin/main at `8b11e5f49794ea17f09c96eff8d59a6bf8f9a3d6`. No T5 completion,
+remote implementation CI, source disclosure authority or model-tool integration
+is claimed. Full original acceptance and T1/T6 remain outstanding.
