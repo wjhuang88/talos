@@ -338,3 +338,45 @@ to this increment, not I313 closure. Two focused snapshot tests pass, including
 scope non-inheritance by spawned tasks and nested scope restoration across yield.
 Earlier full Agent suite 588/588 predates this test-only addition. Both governance
 validators passed with zero warnings; no new full-goal completion evidence claimed.
+
+### Index input projection — local, unmerged
+
+Added a bounded model-search text projection for host-authorized entries. User
+text and assistant text exclude metadata; assistant tool argument blocks are
+removed by a linear scanner including truncated blocks. System/tool results
+require a matching same-turn committed receipt; unknown roles and unverifiable
+results are unavailable. Focused projection regression and Session all-target
+Clippy pass (`/private/tmp/i313-index-projection-tests.log`,
+`/private/tmp/i313-index-projection-clippy.log`).
+This helper assumes host-validated branch/source membership and does not implement
+that authorization, FTS indexing, scoped query or model delivery. Independent
+review and composed receipt/index tests remain required. The existing general
+strip_tool_syntax helper assumes complete blocks and can overrun a truncated
+block; this recovery path avoids it, but the broader helper correction remains
+an identified follow-up, not a completed fix.
+
+### Shared tool-syntax parser correction
+
+The prior truncated-block follow-up is now implemented: core strip_tool_syntax
+uses a linear scan and excludes an unfinished tool block through EOF, avoiding
+out-of-range replacement and argument disclosure. Recovery index projection now
+reuses that shared parser instead of maintaining a duplicate implementation.
+Two focused Core regressions and all 229 Session library tests pass. Logs:
+`/private/tmp/i313-tool-syntax-tests.log`,
+`/private/tmp/i313-projection-session-tests.log`. Independent privacy review and
+Clippy are pending for this local increment; host branch authority, indexing and
+model discovery/query still remain unimplemented.
+
+### Serialized-argument fence privacy correction
+
+Independent review found that a triple-backtick sequence inside a JSON argument
+could terminate the naive scanner early and disclose the remaining argument text.
+The shared parser now locates a complete JSON value with the JSON decoder before
+accepting its closing fence; malformed/truncated blocks exclude the rest through
+EOF. Real message_parts serialization regressions cover backticks, escaped quotes,
+backslashes/newlines and missing closing fences. Independent bounded privacy review
+APPROVE: tracked diff `9703258e7135825d7b158d3e1699ef91ddeddab704ef67a1c2976156d610857e`,
+projection file `426ad1045442412500eda1db12c1f05abacf361abd6c351324213b9376e1016d`.
+Reviewer did not run tests and shares Agent/GitHub identity. Two Core regressions,
+230 Session library tests and affected all-target Clippy pass. This resolves the
+local parser/privacy finding, not host authorization or full T5 acceptance.

@@ -39,6 +39,7 @@ mod durable;
 mod durable_recovery;
 mod error;
 pub mod history_page;
+pub mod history_projection;
 mod history_receipt;
 pub use history_receipt::{HistoryRecoveryReceipt, RecoveryProjection};
 mod jsonl;
