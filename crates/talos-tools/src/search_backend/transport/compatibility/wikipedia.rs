@@ -85,10 +85,10 @@ impl PreparedWikipediaSearch {
         }
         let candidates = parse(&response.body, self.max_results)?;
         transport.budget.check_live()?;
-        // Router candidate identity remains the fixed zero-key compatibility family. Wikipedia is
-        // an internal migration-time last resort, not a separately admitted native backend.
+        // Wikipedia is an internal migration-time fallback, not a native backend. Its result
+        // identity is retained while the outer prepared candidate remains DuckDuckGo.
         admission::admit(
-            SearchBackendId::DuckDuckGo,
+            SearchBackendId::Wikipedia,
             candidates,
             self.max_results,
             || transport.budget.check_live(),
@@ -114,7 +114,7 @@ fn parse(body: &[u8], max_results: u32) -> Result<Vec<SearchBackendResult>, Comp
     }
     Ok((0..count)
         .map(|index| SearchBackendResult {
-            backend: SearchBackendId::DuckDuckGo,
+            backend: SearchBackendId::Wikipedia,
             title: titles[index].as_str().unwrap_or("Untitled").to_owned(),
             url: urls[index].as_str().unwrap_or("").to_owned(),
             snippet: descriptions[index].as_str().unwrap_or("").to_owned(),
@@ -200,7 +200,7 @@ mod tests {
     }
 
     #[test]
-    fn parser_preserves_legacy_shape_inside_compatibility_identity() {
+    fn parser_preserves_wikipedia_fallback_identity() {
         let rows = parse(
             br#"["q",["Rust","Tokio"],["Lang","Runtime"],["https://rust-lang.org","https://tokio.rs"]]"#,
             2,
@@ -209,7 +209,7 @@ mod tests {
         assert_eq!(rows.len(), 2);
         assert!(
             rows.iter()
-                .all(|row| row.backend == SearchBackendId::DuckDuckGo)
+                .all(|row| row.backend == SearchBackendId::Wikipedia)
         );
         assert_eq!(rows[0].title, "Rust");
         assert_eq!(rows[1].url, "https://tokio.rs");
@@ -259,7 +259,7 @@ mod tests {
             .expect("fallback response")
             .into_results();
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].backend, SearchBackendId::DuckDuckGo);
+        assert_eq!(rows[0].backend, SearchBackendId::Wikipedia);
         assert_eq!(rows[0].url, "https://rust-lang.org/");
         assert_eq!(server.count(), 1);
         let sent = server.request(0);

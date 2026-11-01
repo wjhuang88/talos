@@ -84,6 +84,17 @@ fn classify_send_error(error: reqwest::Error) -> TransportError {
     .unwrap_or(TransportError::Request)
 }
 
+fn classify_body_read_error(error: reqwest::Error) -> TransportError {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if error.is_timeout() {
+            TransportError::Network
+        } else {
+            TransportError::Request
+        }
+    }))
+    .unwrap_or(TransportError::Request)
+}
+
 /// One execution budget shared by all future router candidates and redirect hops.
 pub(super) struct TransportBudget {
     deadline: Instant,
@@ -841,7 +852,7 @@ impl SearchTransport {
             let mut result = Vec::new();
             loop {
                 self.budget.check_live()?;
-                let chunk = response.chunk().await.map_err(classify_send_error)?;
+                let chunk = response.chunk().await.map_err(classify_body_read_error)?;
                 self.budget.check_live()?;
                 let Some(chunk) = chunk else {
                     break;

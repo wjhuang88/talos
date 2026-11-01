@@ -1303,6 +1303,46 @@ async fn failed_response_is_not_automatically_retried_by_http_client() {
 }
 
 #[tokio::test]
+async fn body_read_timeout_remains_retryable_network() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("listener");
+    let address = listener.local_addr().expect("address");
+    let server = thread::spawn(move || {
+        let (mut socket, _) = listener.accept().expect("accept");
+        let mut request = Vec::new();
+        let mut buffer = [0; 1024];
+        while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+            let count = socket.read(&mut buffer).expect("request");
+            assert_ne!(count, 0, "request headers");
+            request.extend_from_slice(&buffer[..count]);
+        }
+        socket
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\nConnection: close\r\n\r\nx")
+            .expect("partial body");
+        thread::sleep(Duration::from_millis(300));
+    });
+    let client = Client::builder()
+        .timeout(Duration::from_millis(100))
+        .build()
+        .expect("client");
+    let mut response = client
+        .get(format!("http://{address}/"))
+        .send()
+        .await
+        .expect("response headers");
+    let error = loop {
+        match response.chunk().await {
+            Ok(Some(_)) => {}
+            Ok(None) => panic!("fixture body should time out"),
+            Err(error) => break error,
+        }
+    };
+
+    assert!(error.is_timeout());
+    assert_eq!(classify_body_read_error(error), TransportError::Network);
+    server.join().expect("server");
+}
+
+#[tokio::test]
 async fn response_header_limits_and_unsupported_encoding_stop_before_body_use() {
     for (headers, error) in [
         (
