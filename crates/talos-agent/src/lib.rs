@@ -40,6 +40,7 @@
 
 mod background_jobs;
 pub(crate) mod bounded_model;
+mod checkpoint_history;
 mod checkpoint_tools;
 pub mod compaction;
 pub mod compression;
@@ -461,8 +462,9 @@ impl Agent {
     /// Enable stable model checkpoint/discovery tools for an Actor-hosted Agent.
     ///
     /// Checkpoint admission requires the Actor and a permission pipeline. History
-    /// discovery currently exposes bounded opaque references only; durable search
-    /// and detail are unavailable. Standalone execution fails closed.
+    /// search/detail require host-prepared durable storage and a discovered snapshot.
+    /// Unsupported storage and standalone execution fail closed. Result pagination
+    /// and long-history discovery remain incomplete; tools are explicit opt-in.
     pub fn enable_model_checkpoint_tools(
         &mut self,
     ) -> Result<(), talos_core::tool::ToolRegistrationError> {

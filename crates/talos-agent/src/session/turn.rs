@@ -179,14 +179,28 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         .sandbox
         .as_ref()
         .and_then(|sandbox| sandbox.cleanup_receipt());
+    let history_owner = durable_persistence.as_ref().map(|p| p.session.clone());
+    let history_cancel = cancel_token.clone();
     let mut agent_task = tokio::spawn(async move {
-        agent
-            .run_prepared_session_turn(
-                prepared,
-                event_tx,
-                Some(snapshot_tx),
-                Some(boundary_tx),
-                Some(agent_ack_tx),
+        let recovery = if agent.tools.is_builtin_instance("history_search") {
+            if let Some(owner) = &history_owner {
+                crate::checkpoint_history::History::prepare(owner, &history_cancel).await
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        crate::checkpoint_history::HISTORY
+            .scope(
+                recovery,
+                agent.run_prepared_session_turn(
+                    prepared,
+                    event_tx,
+                    Some(snapshot_tx),
+                    Some(boundary_tx),
+                    Some(agent_ack_tx),
+                ),
             )
             .await
     });

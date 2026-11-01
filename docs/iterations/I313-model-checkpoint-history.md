@@ -1007,3 +1007,40 @@ production delta; reviewer did not run tests. This closes the prior unsupported
 representation path locally, not model search/detail or whole T5 acceptance.
 Old readers reject receipt sets containing v2 rather than disclosing unsupported
 text; raw transcripts remain readable. T5/T1/T6 and remote closure remain open.
+
+### Actual durable Actor search/detail wiring — local, unmerged
+
+Explicitly enabled checkpoint tools now prepare a durable recovery context in
+turn forwarding before provider execution. The host uses the existing root index,
+checks linear parent order, builds eligible projections, resolves cross-page
+receipts and verifies the full prefix captured before maintenance. Queries reopen
+read-only, validate current owner/scope readiness before and after lookup, read
+through the sealed source, and share one 2 MiB record-read allowance across results.
+A host per-session scope slot atomically removes the prior transient scope's FTS,
+locators, terminals, pending rows and cursor before replacement. Retired contexts
+return Unavailable, not complete empty results.
+
+history_search search/detail require the issued discovery snapshot, unchanged
+execution prefix and a current permission lease. The final permission publication
+closure checks cancellation without filesystem I/O. File/index validation occurs
+immediately beforehand: it is not an atomic filesystem/permission transaction.
+The cancellation token is observed inside actual SQLite progress and source-read
+budgets through a nonblocking callback. Search returns explicit complete=false
+when capped at twenty results or response bytes; pagination_available=false is
+honest current behavior, not acceptance of missing pagination.
+
+A real Actor fixture now drives provider discover -> search -> detail -> ordinary
+continuation using durable committed history, asserting the recovered original
+fact and unchanged raw prefix (`/private/tmp/i313-wire-actor.log`). Additional
+fixtures cover permission reset, cancellation, scope retirement and host cleanup.
+Final locked Agent 613/613 and Session 253/253 pass, including the scope-readiness
+correction; affected all-target Clippy is recorded alongside them. Final logs:
+`/private/tmp/i313-wire-final-tests.log`, `/private/tmp/i313-wire-final-clippy.log`.
+Independent static review approves this bounded wiring; reviewer did not run tests.
+
+Remaining within T5: result pagination, >8192-entry discovery, host preparation
+resumption across timeout/next turn (current preparation starts fresh with a
+10-second budget), tighter final delivery coordination, Windows source checking,
+default Runtime/CLI activation, all remaining thirty acceptance rows and full
+workspace/SDK/platform/remote gates. Unsupported or unfinished paths return
+Unavailable; that does not satisfy their required acceptance. T1/T6 remain open.

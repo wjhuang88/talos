@@ -414,6 +414,15 @@ impl DurableSession {
         &self.external_id
     }
 
+    /// Existing Session index location owned by this durable storage root.
+    /// Obtaining this path does not authorize model-triggered creation or repair.
+    pub fn recovery_index_path(&self) -> Result<std::path::PathBuf, SessionError> {
+        self.bindings_path
+            .parent()
+            .map(|root| root.join("index.db"))
+            .ok_or_else(|| SessionError::DurableTurn("missing storage root".into()))
+    }
+
     /// Returns the UUID-named TLOG path under the host-selected directory.
     #[must_use]
     pub fn file_path(&self) -> &std::path::Path {

@@ -5167,3 +5167,144 @@ fn model_checkpoint_enable_reports_collision_without_partial_registration() {
     assert!(!agent.tools.is_builtin_instance("history_search"));
     assert!(agent.tools.get("compact_context").is_none());
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn durable_actor_history_search_and_detail_reach_real_provider_continuation() {
+    struct RecoveryModel {
+        step: AtomicUsize,
+    }
+    #[async_trait]
+    impl LanguageModel for RecoveryModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let step = self.step.fetch_add(1, Ordering::SeqCst);
+            let result = |id: &str| -> serde_json::Value {
+                let result = messages
+                    .iter()
+                    .find_map(|message| match message {
+                        Message::Tool { result } if result.tool_use_id == id => Some(result),
+                        _ => None,
+                    })
+                    .expect("real paired result");
+                assert!(!result.is_error, "{}", result.content);
+                serde_json::from_str(&result.content).expect("result JSON")
+            };
+            let events = if step < 3 {
+                let input = match step {
+                    0 => serde_json::json!({"mode":"discover"}),
+                    1 => {
+                        serde_json::json!({"mode":"search","snapshot":result("recover-0")["snapshot"],"query":"originalfact"})
+                    }
+                    _ => {
+                        let found = result("recover-1");
+                        assert_eq!(
+                            found["results"][0]["text"],
+                            "originalfact unique constraint"
+                        );
+                        serde_json::json!({"mode":"detail","snapshot":result("recover-0")["snapshot"],"reference":found["results"][0]["reference"]})
+                    }
+                };
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: format!("recover-{step}"),
+                            name: "history_search".into(),
+                            input,
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else {
+                assert_eq!(step, 3);
+                assert_eq!(
+                    result("recover-2")["text"],
+                    "originalfact unique constraint"
+                );
+                success_events("recovered and continued")
+            };
+            let (tx, rx) = mpsc::channel(16);
+            for event in events {
+                tx.send(event).await.expect("receiver");
+            }
+            Ok(rx)
+        }
+    }
+    let root = tempfile::tempdir().expect("root");
+    let durable =
+        talos_session::DurableSession::open_or_create(root.path(), "recovery").expect("durable");
+    let raw: Vec<_> = (0..30)
+        .map(|i| Message::User {
+            content: if i == 0 {
+                "originalfact unique constraint".into()
+            } else {
+                format!("other {i}")
+            },
+        })
+        .collect();
+    durable
+        .commit_turn("prior", &raw, &Default::default())
+        .expect("commit");
+    let mut engine = talos_permission::PermissionEngine::empty();
+    engine.set_workspace_root(root.path().into());
+    engine.add_rule(talos_permission::PermissionRule::new_nature(
+        talos_core::tool::ToolNature::Read,
+        None,
+        None,
+        talos_permission::PermissionDecision::Allow,
+    ));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(RecoveryModel {
+            step: AtomicUsize::new(0),
+        }),
+        ToolRegistry::new(),
+        Some(Arc::new(engine)),
+        None,
+        root.path().into(),
+        Arc::new(talos_plugin::HookRegistry::new()),
+    );
+    agent.enable_model_checkpoint_tools().expect("enable");
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: raw.clone(),
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_durable_persistence(durable.clone(), Default::default());
+    actor.set_recovered_history_sources(durable.read_history_snapshot().expect("snapshot"));
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor
+    });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "recover prior constraint".into(),
+        })
+        .await
+        .expect("submit");
+    let events = tokio::time::timeout(
+        Duration::from_secs(15),
+        collect_until_completions(&mut handle.eq_rx, 1),
+    )
+    .await
+    .expect("bounded turn");
+    assert!(events.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    let actor = task.await.expect("actor");
+    assert_eq!(&actor.history[..raw.len()], raw.as_slice());
+}

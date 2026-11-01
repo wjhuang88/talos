@@ -124,6 +124,12 @@ struct HistoryInput {
     mode: String,
     #[serde(default)]
     cursor: Option<String>,
+    #[serde(default)]
+    snapshot: Option<String>,
+    #[serde(default)]
+    query: Option<String>,
+    #[serde(default)]
+    reference: Option<String>,
 }
 
 pub(crate) struct CompactContextTool;
@@ -139,7 +145,7 @@ impl AgentTool for HistorySearchTool {
         "history_search"
     }
     fn description(&self) -> &str {
-        "Discover a current execution checkpoint snapshot and source references. Durable search and detail are not available in this implementation stage."
+        "Discover a checkpoint snapshot, search permitted durable history, or read a returned reference. Search/detail require the discovered snapshot and a prepared durable host index; unsupported storage returns Unavailable."
     }
     fn parameters(&self) -> Value {
         serde_json::to_value(schemars::schema_for!(HistoryInput)).unwrap_or_else(|_| json!({}))
@@ -157,12 +163,73 @@ impl AgentTool for HistorySearchTool {
         let Ok(input) = serde_json::from_value::<HistoryInput>(input) else {
             return ToolResult::error("invalid history input");
         };
-        if input.mode != "discover" {
-            return unavailable();
-        }
         let Ok(execution) = EXECUTION.try_with(Clone::clone) else {
             return unavailable();
         };
+        if matches!(input.mode.as_str(), "search" | "detail") {
+            if input.cursor.is_some()
+                || input.query.as_ref().is_some_and(|query| query.len() > 1024)
+                || input
+                    .reference
+                    .as_ref()
+                    .is_some_and(|reference| reference.len() > 128)
+                || (input.mode == "search" && (input.query.is_none() || input.reference.is_some()))
+                || (input.mode == "detail" && (input.reference.is_none() || input.query.is_some()))
+            {
+                return ToolResult::error("invalid history query bounds");
+            }
+            let authority = {
+                let Ok(state) = execution.state.lock() else {
+                    return unavailable();
+                };
+                let Some(snapshot) = &state.issued else {
+                    return unavailable();
+                };
+                let Some(current) = &state.current else {
+                    return unavailable();
+                };
+                if input.snapshot.as_deref() != Some(snapshot.token.as_str())
+                    || current.end < snapshot.end
+                    || !(0..snapshot.end).all(|i| snapshot.source.same_entry(&current.source, i))
+                {
+                    return ToolResult::error("stale history snapshot");
+                }
+                snapshot.authority.clone()
+            };
+            if !authority.valid() {
+                return unavailable();
+            }
+            let result = crate::checkpoint_history::HISTORY
+                .try_with(|history| {
+                    history
+                        .as_ref()?
+                        .query(input.query.as_deref(), input.reference.as_deref())
+                })
+                .ok()
+                .flatten();
+            return authority
+                .commit(|| {
+                    if !crate::checkpoint_history::HISTORY
+                        .try_with(|history| {
+                            history.as_ref().is_some_and(|history| !history.cancelled())
+                        })
+                        .unwrap_or(false)
+                    {
+                        return unavailable();
+                    }
+                    result
+                        .map(|result| ToolResult::success(result.to_string()))
+                        .unwrap_or_else(|| ToolResult::error("history recovery Unavailable"))
+                })
+                .unwrap_or_else(unavailable);
+        }
+        if input.mode != "discover"
+            || input.query.is_some()
+            || input.reference.is_some()
+            || input.snapshot.is_some()
+        {
+            return ToolResult::error("invalid discovery input");
+        }
         let Ok(mut state) = execution.state.lock() else {
             return unavailable();
         };
@@ -358,6 +425,36 @@ mod tests {
         execution.refresh(Some(&source), &raw);
         (execution, receiver, raw)
     }
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn real_history_tool_search_detail_uses_host_prepared_durable_source() {
+        let (execution, _, raw) = fixture();
+        let root = tempfile::tempdir().expect("root");
+        let durable =
+            talos_session::DurableSession::open_or_create(root.path(), "query").expect("session");
+        durable
+            .commit_turn("prior", &raw, &Default::default())
+            .expect("commit");
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let history = crate::checkpoint_history::History::prepare(&durable, &cancel)
+            .await
+            .expect("host context");
+        crate::checkpoint_history::HISTORY.scope(Some(history),EXECUTION.scope(execution.clone(),async {
+            let discovery = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+            let discovery: Value = serde_json::from_str(&discovery.content).expect("discovery");
+            let search = HistorySearchTool.execute(json!({"mode":"search","snapshot":discovery["snapshot"],"query":"authorized"})).await;
+            assert!(!search.is_error,"{}",search.content);
+            let search: Value = serde_json::from_str(&search.content).expect("search");
+            let reference = &search["results"][0]["reference"];
+            assert_eq!(search["results"][0]["text"],"authorized source 0");
+            let detail = HistorySearchTool.execute(json!({"mode":"detail","snapshot":discovery["snapshot"],"reference":reference})).await;
+            assert!(!detail.is_error,"{}",detail.content);
+            assert_eq!(serde_json::from_str::<Value>(&detail.content).expect("detail")["text"],"authorized source 0");
+            execution.permission.as_ref().expect("permission").clear().expect("reset");
+            assert!(HistorySearchTool.execute(json!({"mode":"detail","snapshot":discovery["snapshot"],"reference":reference})).await.is_error);
+        })).await;
+    }
+
     fn submission(discovery: &Value) -> Value {
         let item = json!({"text":"retain goal", "sources":[discovery["sources"][0]]});
         json!({"snapshot":discovery["snapshot"],"checkpoint":{

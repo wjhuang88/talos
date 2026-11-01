@@ -9,11 +9,13 @@ and affected Clippy plus incremental static review. See I313 owner for exact
 logs, limitations and remaining acceptance. These local increments are unmerged;
 opt-in model checkpoint admission/Actor installation and terminal continuation
 receipts are locally implemented. Host bounded recovery scan/backfill is now
-implemented and tested across restart and pages; model search/detail dispatch,
-full durable scope authority and default Runtime/CLI activation remain unfinished.
+implemented and tested across restart and pages. Explicitly enabled durable Actor
+search/detail now reaches actual provider continuation locally; pagination,
+long-history discovery, resumed host preparation, full final-delivery coordination
+and default Runtime/CLI activation remain unfinished.
 Dynamic content-free pressure notices now reach actual provider requests when
 checkpoint tools are enabled, without entering raw history or changing definitions.
-Latest Session tests pass 248/248 and Agent tests 610/610; final workspace and
+Latest Session tests pass 253/253 and Agent tests 613/613; final workspace and
 remote gates remain open.
 The first four queue stages are merged; T5 remains Partial, T1/T6 unimplemented.
 Earlier activation and implementation snapshots below are historical.
