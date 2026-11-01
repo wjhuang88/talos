@@ -6996,6 +6996,7 @@ async fn ephemeral_tool_image_drives_real_continuation_checkpoint() {
         session_id: "image-continuation".into(),
         generation: 0,
         admission: None,
+        post_turn_pressure: Default::default(),
     });
     let (events, mut received) = mpsc::unbounded_channel();
     let (result, persisted) = agent

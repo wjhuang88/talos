@@ -2126,6 +2126,7 @@ mod tests {
             session_id: "test".into(),
             generation: 0,
             admission: Some(control),
+            post_turn_pressure: Default::default(),
         };
         let result = agent
             .seal_observed_request_plan(
@@ -2188,6 +2189,7 @@ mod tests {
             session_id: "test".into(),
             generation: 0,
             admission: None,
+            post_turn_pressure: Default::default(),
         };
         let result = agent
             .seal_observed_request_plan(

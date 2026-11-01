@@ -6,6 +6,31 @@
 > Baseline rule: preserve all parent acceptance; successful trimming alone cannot close this iteration.
 > MVP deliverable: a long-running session compacts complete provider requests safely, exposes numeric outcomes and accepts a typed /compact command while raw history remains recoverable.
 
+## Post-turn maintenance increment — 2026-11-01
+
+The Actor now owns a per-turn advisory pressure slot. At normal Agent return
+(including returned errors), the last dispatched sealed request plus finalized
+output is re-estimated with its actual tool schemas, request reservations and
+image reserve. Critical/Emergency pressure marks future assessment without a
+provider call or raw-history rewrite. Starting another turn consumes the hint,
+allocates a new slot and performs full request admission; generation replacement
+also clears the slot. Aborted tasks do not fabricate an unmeasured result.
+
+This is an advisory estimate, not the next request's exact budget: persistence
+projection may reduce output and consumed images retain a conservative reserve.
+It cannot authorize dispatch or skip next-request observation/admission.
+The real Actor regression verifies long-response marking, unchanged raw text,
+no maintenance provider invocation, next-turn slot isolation and generation reset.
+Agent library tests passed 600/600 (`/private/tmp/i312-post-turn-agent.log`), and
+all-target warnings-denied Agent Clippy passed (`/private/tmp/i312-post-turn-clippy.log`).
+Independent static review approved diff
+`339296c8e63d092669b9c5258f9e17c4db728898d94d6d99b59d75fbe2aa30ba`
+against `4f6c68b92`; the reviewer did not run tests. This resolves the post-turn
+implementation finding. Legacy public Compactor convergence, full acceptance
+documentation/TUI walkthrough and final exact-head CI/review/merge remain open.
+The previous complete preflight predates this increment; no new full-suite claim
+is made. T4/T5/T1/T6 and the overall goal remain incomplete.
+
 ## Current manual failure increment — 2026-11-01
 
 Follow-up validation (2026-11-01): standard cancellation-stage preflight session

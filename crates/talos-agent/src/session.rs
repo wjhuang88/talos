@@ -139,6 +139,7 @@ pub struct AppServerSession {
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     history: Vec<Message>,
     recovered_source: Option<crate::compaction::HistorySource>,
+    post_turn_pressure: crate::checkpoint_progress::PostTurnPressure,
     session_file: Option<PathBuf>,
     session_dir: Option<PathBuf>,
     persistence: Option<TurnPersistence>,
@@ -193,6 +194,7 @@ impl AppServerSession {
             persistence: None,
             durable_persistence: None,
             recovered_source: None,
+            post_turn_pressure: Default::default(),
             pending_store,
             session_id,
             session_generation: 0,
@@ -211,6 +213,7 @@ impl AppServerSession {
     /// Assigns the authoritative generation before this Actor is spawned.
     pub fn set_generation(&mut self, generation: u64) {
         self.session_generation = generation;
+        self.post_turn_pressure = Default::default();
         self.background_jobs
             .set_identity(self.session_id.clone(), generation);
     }
@@ -1051,11 +1054,21 @@ impl AppServerSession {
         if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
             let _ = self.try_archive_session(file, dir);
         }
+        if let Some(estimated_tokens) = self.post_turn_pressure.take() {
+            tracing::debug!(
+                estimated_tokens,
+                "post-turn pressure requires fresh request assessment"
+            );
+        }
+        // Prior work cannot mark a later turn's slot, including after cancellation.
+        // Admission below still evaluates the newly assembled complete request.
+        self.post_turn_pressure = Default::default();
         let checkpoint_observer = crate::checkpoint_progress::CheckpointObserver {
             sender: self.eq_tx.clone(),
             session_id: self.session_id.clone(),
             generation: self.session_generation,
             admission: self.runtime_admission.clone(),
+            post_turn_pressure: self.post_turn_pressure.clone(),
         };
         let runtime_managed = self.runtime_admission.is_some();
         let prepared_before_commit = if runtime_managed {

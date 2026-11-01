@@ -378,6 +378,79 @@ async fn test_submit_and_receive() {
 }
 
 #[tokio::test]
+async fn post_turn_pressure_marks_large_response_without_summarizing_or_rewriting_history() {
+    let response = "finalized response ".repeat(10_000);
+    let model = MockModel::new(vec![success_events(&response), success_events("next")]);
+    let remaining = model.responses.clone();
+    let workspace = tempfile::tempdir().expect("workspace");
+    let (handle, mut actor) = AppServerSession::new(
+        make_agent(model),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: workspace.path().to_path_buf(),
+            initial_history: vec![],
+            model_context_limit: 20_000,
+        },
+    );
+    let first = actor
+        .start_submission(
+            structured_submission(
+                "pressure-1",
+                "item-1",
+                0,
+                "hi",
+                SubmissionSource::Compatibility,
+            ),
+            1,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("first admission"));
+    let record = first.handle.await.expect("join").expect("record");
+    actor.commit_turn_record(record);
+    assert_eq!(
+        remaining.lock().expect("responses").len(),
+        1,
+        "maintenance must not invoke the provider"
+    );
+    assert!(actor.history.iter().any(|message| matches!(message,
+        Message::Assistant { content, .. } if content == &response)));
+    let marked = actor
+        .post_turn_pressure
+        .take()
+        .expect("large finalized reply marks pressure");
+    assert!(marked > actor.model_context_limit);
+    actor
+        .post_turn_pressure
+        .record(marked, actor.model_context_limit);
+    let prior_slot = actor.post_turn_pressure.clone();
+    actor.model_context_limit = u32::MAX;
+    let second = actor
+        .start_submission(
+            structured_submission(
+                "pressure-2",
+                "item-2",
+                0,
+                "continue",
+                SubmissionSource::Compatibility,
+            ),
+            2,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("second admission"));
+    // Simulate a late result from prior work after the new turn owns its slot.
+    prior_slot.record(u32::MAX, 1);
+    actor.commit_turn_record(second.handle.await.expect("join").expect("record"));
+    assert_eq!(actor.post_turn_pressure.take(), None);
+    assert!(remaining.lock().expect("responses").is_empty());
+    actor.post_turn_pressure.record(100, 1);
+    actor.set_generation(1);
+    assert_eq!(actor.post_turn_pressure.take(), None);
+    drop(handle);
+}
+
+#[tokio::test]
 async fn app_server_session_registers_session_owned_process_tool() {
     let agent = make_agent(MockModel::new(vec![]));
     let config = SessionConfig {

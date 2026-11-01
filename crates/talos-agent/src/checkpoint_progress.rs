@@ -3,12 +3,35 @@
 use talos_core::session::{AutomaticCompactFailure, AutomaticCompactState, SessionEvent};
 use tokio::sync::mpsc;
 
+/// Session-local advisory state. It never authorizes compaction or replaces the
+/// next request's full admission check. A fresh slot isolates each turn.
+#[derive(Clone, Default)]
+pub(crate) struct PostTurnPressure(std::sync::Arc<std::sync::Mutex<Option<u32>>>);
+
+impl PostTurnPressure {
+    pub(crate) fn record(&self, estimated: u32, limit: u32) {
+        use crate::compaction::RequestPressure;
+        if let Ok(mut pending) = self.0.lock() {
+            *pending = matches!(
+                RequestPressure::assess(estimated, limit),
+                RequestPressure::Critical | RequestPressure::Emergency
+            )
+            .then_some(estimated);
+        }
+    }
+
+    pub(crate) fn take(&self) -> Option<u32> {
+        self.0.lock().ok()?.take()
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct CheckpointObserver {
     pub(crate) sender: mpsc::UnboundedSender<SessionEvent>,
     pub(crate) session_id: String,
     pub(crate) generation: u64,
     pub(crate) admission: Option<crate::session::RuntimeAdmissionControl>,
+    pub(crate) post_turn_pressure: PostTurnPressure,
 }
 
 impl CheckpointObserver {

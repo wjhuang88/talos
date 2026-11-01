@@ -849,6 +849,7 @@ impl Agent {
         let mut protocol_recovery_attempts = 0u8;
         let mut protocol_override = None;
         let mut private_tokens = transient_text::PrivateTokens::default();
+        let mut maintenance_plan = None;
 
         if let Some(pipeline) = self.permission_pipeline.as_ref() {
             const MAX_OBSERVED_USER_MESSAGES: usize = 8;
@@ -980,6 +981,9 @@ impl Agent {
             );
 
             let (progress_tx, mut progress_rx) = mpsc::unbounded_channel();
+            if checkpoint_observer.is_some() {
+                maintenance_plan = Some((plan.clone(), messages.len()));
+            }
             let browser_tool_names: Vec<String> = plan
                 .tool_definitions
                 .iter()
@@ -1914,6 +1918,25 @@ impl Agent {
         // calls are (SESSION-006 / I135).
         let partial_messages =
             self.persistence_projection_with_tokens(&messages[persist_start..], &private_tokens);
+        if let (Some(observer), Some(limit), Some((mut plan, appended_start))) = (
+            checkpoint_observer.as_ref(),
+            request_context_limit,
+            maintenance_plan,
+        ) {
+            // Retain the last actual request's prompt, schemas, projection and
+            // image reserve. Add only finalized output since that dispatch;
+            // never rerun hooks or issue a post-turn summarization request.
+            plan.messages.extend(
+                self.persistence_projection_with_tokens(
+                    &messages[appended_start..],
+                    &private_tokens,
+                ),
+            );
+            let estimated = self
+                .estimate_provider_request_tokens(&plan.messages, &plan.tool_definitions)
+                .saturating_add(plan.ephemeral_image_tokens);
+            observer.post_turn_pressure.record(estimated, limit);
+        }
         (result, partial_messages)
     }
 
