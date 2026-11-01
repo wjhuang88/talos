@@ -534,7 +534,7 @@ for source compatibility and the required next pre-1.0 minor release boundary.
 operation enum. Exhaustive consumers must add a handler (or an explicit unsupported
 response). Ship this change only with the next pre-1.0 minor release per ADR-096.
 The Runtime facade exposes `RuntimeHandle::compact(operation_id)` / `cancel_compact(operation_id)` and re-exports
-`CompactState`/`CompactOutcome`. Await transient `SessionEvent::CompactStatus` for
+`CompactState`/`CompactOutcome`/`CompactFailureReason`. Await transient `SessionEvent::CompactStatus` for
 the result; successful enqueue is not successful compaction. IDs are monotonic per
 runtime generation; one operation may be pending, 64 terminal receipts are retained,
 and duplicate retained IDs return the prior result with `replayed: true`.
@@ -545,12 +545,19 @@ The Actor holds continuation permission while preparing and applying the candida
 An unchanged continuation reuses its observed request; new steering input creates
 a different request. Observation denial or interruption aborts that continuation
 without retrying its hook. Interrupt/shutdown cancel pending work.
-Status contains bounded enums and numeric estimates, never checkpoint text. The
-`CancelledWithEstimate` outcome retains an already measured request count;
+Status contains bounded enums and numeric estimates, never checkpoint text.
+Exhaustive `CompactOutcome` matches must also handle `FailedWithEstimate { before,
+reason }` and `CancelledWithEstimate { before }`. `FailedWithEstimate` retains the
+whole-request estimate and a `CompactFailureReason` (`Preparation`, `Provider`,
+`Timeout`, or `CommitRejected`); `Failed` means no estimate is available. These
+failures preserve the prior projection and do not expose provider error strings.
+The `CancelledWithEstimate` outcome retains an already measured request count;
 `Cancelled` means no count is available. New operations never inherit a previous
 operation's measurement; receipt replay retains the original completed value. The
-external SDK fixture exercises below-threshold compaction before an ordinary turn
-in both dependency modes; it does not certify long-history semantic retention.
+external SDK fixture exhaustively matches and JSON-round-trips every terminal
+outcome and failure category, and exercises below-threshold compaction before an
+ordinary turn in both dependency modes. Its constructed failure cases verify the
+public contract, not execution of each failure path or long-history semantic retention.
 
 Automatic attempts emit `SessionEvent::AutomaticCompactStatus` directly, including
 initial request preparation before an ordinary turn starts. The Runtime re-exports

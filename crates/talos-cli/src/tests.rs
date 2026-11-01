@@ -368,6 +368,29 @@ mod tests {
                 }
             }
         }
+        agent_tx
+            .send(SessionEvent::CompactStatus {
+                session_id: "session".into(),
+                session_generation: 42,
+                operation_id,
+                state: CompactState::Completed {
+                    outcome: CompactOutcome::CancelledWithEstimate { before: 31415 },
+                    replayed: true,
+                },
+            })
+            .expect("cancelled measurement");
+        loop {
+            let output = tokio::time::timeout(std::time::Duration::from_secs(3), ui_rx.recv())
+                .await
+                .expect("cancelled display deadline")
+                .expect("output");
+            if let UiOutput::Tip { text, .. } = output
+                && text.contains("cancelled: prior context retained; estimated tokens 31415")
+            {
+                assert!(text.contains("previous result"));
+                break;
+            }
+        }
         user_tx
             .send(UserInput::Message("/compact extra".into()))
             .expect("invalid command");

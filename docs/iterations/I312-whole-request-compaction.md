@@ -6,9 +6,30 @@
 > Baseline rule: preserve all parent acceptance; successful trimming alone cannot close this iteration.
 > MVP deliverable: a long-running session compacts complete provider requests safely, exposes numeric outcomes and accepts a typed /compact command while raw history remains recoverable.
 
-## Current manual failure increment — 2026-10-31 (uncommitted)
+## Current manual failure increment — 2026-11-01
 
-Current cancellation-stage standard host preflight runs as session 9076, log
+Follow-up validation (2026-11-01): standard cancellation-stage preflight session
+9076 exited 0 (`/private/tmp/i312-cancel-final-preflight.log`), including both
+external SDK dependency modes. This is a local gate, not exact-head remote CI.
+The external SDK consumer now exhaustively matches all manual terminal outcomes
+and failure reasons and checks their JSON round trips. A separate run of
+`scripts/validate_runtime_sdk_fixture.py` exited 0 in both modes after that edit
+(`/private/tmp/i312-sdk-outcome-contract.log`). The SDK migration reference now
+documents `FailedWithEstimate` and `CompactFailureReason`. Constructed outcome
+fixtures certify the public consumer boundary, not runtime failure injection.
+The two P1 implementation findings below remain open; full-scope review remains
+REQUEST CHANGES. No implementation PR or completion is claimed.
+
+Full-scope static acceptance review returned REQUEST CHANGES against `458d78132`
+and target `3c748a115`. Findings retain explicit blockers: post-turn pressure marking
+has no implementation; legacy public Compactor compatibility versus the single
+checkpoint pipeline must be reconciled; MEM-005/MEM-003 owners and user references
+need final synchronization. Prior bounded approvals do not close these items.
+An additional TUI bridge regression checks measured cancellation receipt replay
+as transient status; validation log `/private/tmp/i312-tui-cancel-receipt.log`.
+The preceding Rust source's full preflight 9076 passed, as recorded above.
+
+Cancellation-stage standard host preflight completed as session 9076, log
 `/private/tmp/i312-cancel-final-preflight.log`. The prior 1696 success predates
 this runtime delta. Source inspection identifies a concrete request-variation
 mechanism: PromptBuilder adds current datetime on assembly, and checkpoint attempt

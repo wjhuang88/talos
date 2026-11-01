@@ -72,6 +72,7 @@ fn classify_runtime_error(error: &RuntimeError) -> &'static str {
 }
 
 async fn run_minimal_runtime() -> Result<()> {
+    verify_compact_outcome_contract()?;
     let mut runtime = RuntimeBuilder::new()
         .provider(Arc::new(
             MockProvider::new()
@@ -132,6 +133,49 @@ async fn run_minimal_runtime() -> Result<()> {
         "closing"
     );
     runtime.shutdown().await?;
+    Ok(())
+}
+
+// Exhaustive downstream matching deliberately fails compilation when the public
+// outcome contract changes. JSON round trips cover the external event boundary.
+fn verify_compact_outcome_contract() -> Result<()> {
+    use talos_runtime::{CompactFailureReason, CompactOutcome};
+    fn estimate(outcome: CompactOutcome) -> Option<u32> {
+        match outcome {
+            CompactOutcome::Applied { before, .. }
+            | CompactOutcome::NotEligible { before }
+            | CompactOutcome::CancelledWithEstimate { before } => Some(before),
+            CompactOutcome::FailedWithEstimate { before, reason } => {
+                match reason {
+                    CompactFailureReason::Preparation
+                    | CompactFailureReason::Provider
+                    | CompactFailureReason::Timeout
+                    | CompactFailureReason::CommitRejected => {}
+                }
+                Some(before)
+            }
+            CompactOutcome::Failed | CompactOutcome::Cancelled => None,
+        }
+    }
+    for (outcome, expected) in [
+        (CompactOutcome::Applied { before: 100, after: 50 }, Some(100)),
+        (CompactOutcome::NotEligible { before: 10 }, Some(10)),
+        (CompactOutcome::Failed, None),
+        (CompactOutcome::Cancelled, None),
+        (CompactOutcome::CancelledWithEstimate { before: 80 }, Some(80)),
+    ].into_iter().chain([
+        CompactFailureReason::Preparation,
+        CompactFailureReason::Provider,
+        CompactFailureReason::Timeout,
+        CompactFailureReason::CommitRejected,
+    ].into_iter().map(|reason| (
+        CompactOutcome::FailedWithEstimate { before: 90, reason }, Some(90),
+    ))) {
+        let encoded = serde_json::to_value(outcome)?;
+        let decoded: CompactOutcome = serde_json::from_value(encoded)?;
+        assert_eq!(decoded, outcome);
+        assert_eq!(estimate(decoded), expected);
+    }
     Ok(())
 }
 
