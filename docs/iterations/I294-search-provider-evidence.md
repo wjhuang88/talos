@@ -10,7 +10,7 @@
 | Source Issue | #644 |
 | Depends on | Accepted ADR-085; SEARCH-001-A / #625 complete; B adapter boundary available |
 | Claim State | Claimed |
-| Research PR | #668, #673, #676, #686 and #687 (merged); #693 (Review; partial offline evidence) |
+| Research PR | #668, #673, #676, #686, #687 and #693 (merged); #825 (Draft evidence refresh) |
 | Completion | Pending |
 
 ## Collaboration Claim
@@ -24,10 +24,10 @@
 | Claimed At | 2026-10-06 |
 | Source Issue | #644 |
 | Governance Claim PR | #665 |
-| Implementation PR | #668, #673, #676, #686 and #687 (merged); #693 (Review; offline evidence only) |
+| Implementation PR | #668, #673, #676, #686, #687 and #693 (merged); #825 (Draft evidence refresh) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only claim+activation PR; exact-head CI, governance validators, remote Issue reconciliation and merge-time CAS required. |
-| Last Updated | 2026-10-10 |
+| Last Updated | 2026-11-01 |
 | Handoff / Release Condition | Claim effective after #665 merge `7019f63d3df3d6eb58473a53a499b9b7e8b98925`; evidence research only, with E/F provider implementation gated by the resulting matrix. |
 
 ## Scope
@@ -47,6 +47,8 @@ The candidate matrix has dated evidence links and honest limitations; two indepe
 The working candidate matrix, regional observation schema and admission gate are maintained in
 [SEARCH-001-D provider evidence register](../reference/SEARCH-001-D-PROVIDER-EVIDENCE-2026-10-06.md).
 It is a research artifact only; no candidate is admitted by the register itself.
+The current bounded refresh candidate is
+[SEARCH-001-D Provider Evidence Refresh — 2026-11-01](../reference/SEARCH-001-D-PROVIDER-REFRESH-2026-11-01.md).
 
 ## Partial Research Evidence
 
@@ -177,26 +179,60 @@ reached workspace test execution but did not finish. Format/check/Clippy/Desktop
 process/permission/timeout tests and I170 walkthrough passed; subsequent test/governance/audit/
 smoke completion is not claimed. These attempts are partial evidence, not a passing CI gate.
 
-The candidate now integrates target `7097f1b503063539a2205e17ae29aed09c7ae32e`, including
+The final #693 candidate integrated target `7097f1b503063539a2205e17ae29aed09c7ae32e`, including
 #694's existing 45-minute Windows job budget and independently merged provider-default work,
-and #688's governance-only I296 activation. Rust remains pinned at 1.97.0; the toolchain
-implementation is not part of this slice. No Search claim, acceptance, dependency/lockfile,
-production search or test semantics change. Main's production changes are upstream context,
-not implementation authored by #693. Local checkout/cache was again absent on continuation;
-restored source is verified against the published candidate, and fresh validation is required.
+and #688's governance-only I296 activation. Rust remained pinned at 1.97.0; the toolchain
+implementation was not part of this slice. No Search claim, acceptance, dependency/lockfile,
+production search or test semantics change.
 
-Stage #693 remains in Review; whole D/I294 stays Active/Claimed and incomplete. Fresh exact-head
-CI/Agent review and final CAS supersede old-head approval for merge. E/F gated; #644/#624 open.
+#693 merged as `e63e0ee3793e2e8fd914f676224f982c6cae5593`. Exact head
+`e8683d99bb04e4a823e547358e9ba0dbb68625ff` passed full unskipped CI3097 / run
+`38024072972`; independent Agent review `6093757461` approved the candidate and final CAS
+`6094343503` was recorded. The nine tests remain partial offline M-Q02..M-Q05 evidence only;
+no hosted search success, native admission, independence or regional qualification was proved.
+D/I294 therefore remains Active / Claimed and incomplete; E/F remain gated, #644/#624 open.
 
-### Refreshed Local Checkpoint
+## Provider Evidence Refresh Candidate — 2026-11-01
 
-- Pinned Rust 1.97.0, locked dependencies, local dev/test debug=0, incremental disabled,
-  four jobs. Standard preflight passed site/installers, both governance validators, text,
-  classifier, formatting, workspace check and Clippy; stopped at the unchanged socket fixture
-  (64 runtime tests passed, one PermissionDenied/OS error 1). No full local preflight pass claimed.
-- With only the previously authorized local socket deferral, locked workspace tests passed:
-  3,576 passed, zero failed/ignored and one filtered; all nine I294 tests included and passed.
-- Independent SDK default and coding validator runs passed. No dependency or lockfile changed.
-- Old candidate parser/fixture are byte-identical. Fresh target Clippy with `-D warnings` and
-  final governance/claim validators passed (zero warnings); changed-file links and diff checks
-  passed. Remote exact-head CI/review and final CAS remain mandatory before merge.
+Draft #825 records a fresh source/policy checkpoint against current Mwmbl and Purili material.
+This is still evidence-only and remains ineffective as target-branch evidence until its exact head
+passes the applicable documentation/governance CI, independent review and merge-time CAS.
+
+### Mwmbl movement
+
+Official Mwmbl API pages now explicitly describe an anonymous no-key tier. API privacy says search
+queries are not logged/retained and request IPs are transient rather than persisted. API terms
+permit lawful/commercial API use but separately place returned search results under CC BY-NC-SA
+4.0 plus original-content rights, leaving result-use/licence applicability as an explicit default-
+distribution gate. Current upstream main observed at
+`86376eb363fb458f660223cb1111db8ea8f8bf6a`; the v2 source still permits the no-key branch, while
+standard `search_setup.py` still enables Wikipedia alongside Mwmbl's own index. Published anonymous
+quota wording and the inspected handler are not fully aligned, so deployed enforcement remains a
+qualification item. M-Q07 is materially advanced but not closed; M-Q01/M-Q06/M-Q08 remain pending.
+
+### Purili movement
+
+Current Purili developer/API/integration documentation explicitly exposes no-account/no-key/no-
+fixed-quota Search and Context APIs for applications, AI agents, retrieval pipelines and RAG, and
+describes Search as output from its crawler-built independent index. Its privacy policy records no
+user-linked search history/profiling and bounds standard IP/path/timestamp access logs to seven days.
+The previous evidence register cited a general terms page with personal/noncommercial conditions;
+a current authoritative general terms/use page was not independently recovered during this refresh.
+That discrepancy remains an admission gate; integration documentation alone does not silently grant
+all distributed-client/result-use rights.
+
+### Attempted live observation and remaining path
+
+One bounded non-sensitive valid-query attempt was prepared for each provider with TLS verification,
+a 15-second deadline, no credentials, no retries and no bypass. Both stopped before HTTP/TLS because
+the current execution environment could not resolve the provider hostname. The query text and raw
+results are not retained; the evidence packet records only the query digest and DNS outcome. Since
+two unrelated provider names failed at the same local DNS boundary, this is environment evidence,
+not provider outage and not regional evidence.
+
+The shortest remaining closure path is now explicit: reconcile Purili current use/result conditions;
+build an independently authored Purili offline parser/fixture packet; acquire permitted valid-query
+observations for Mwmbl and Purili from a working DNS/HTTPS environment; compare native provenance
+and failure domains; then collect paired controlled regional observations including genuine
+mainland-China evidence. Only after those steps can D decide whether two routes are admitted or
+blocked and whether E/F may be activated. #644/#624 remain open.
