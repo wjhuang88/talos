@@ -3710,18 +3710,42 @@ mod tests {
         entered: tokio::sync::Notify,
     }
 
+    struct PendingCheckpointConnection {
+        entered: tokio::sync::Notify,
+    }
+
+    #[async_trait::async_trait]
+    impl LanguageModel for PendingCheckpointConnection {
+        async fn stream(
+            &self,
+            messages: &[talos_runtime::Message],
+        ) -> talos_runtime::ProviderResult<talos_runtime::Receiver<AgentEvent>> {
+            assert!(
+                messages.iter().any(|message| matches!(message,
+                talos_runtime::Message::User { content }
+                    if content.starts_with("Produce only a JSON checkpoint"))),
+                "fixture must reach structured checkpoint generation, not ordinary dispatch"
+            );
+            self.entered.notify_one();
+            std::future::pending().await
+        }
+    }
+
     #[tokio::test(flavor = "current_thread")]
     async fn interrupt_during_history_compaction_reaches_cancelled_terminal() {
-        let provider = Arc::new(PendingConnection {
+        let provider = Arc::new(PendingCheckpointConnection {
             entered: tokio::sync::Notify::new(),
         });
         let mut handle = RuntimeBuilder::new()
             .provider(provider.clone())
-            .model_context_limit(1024)
+            // The full request exceeds this limit, but fixed overhead and each
+            // bounded checkpoint request fit. A 1024-token limit now correctly
+            // refuses admission before any provider call.
+            .model_context_limit(100_000)
             .initial_history(
                 (0..40)
                     .map(|index| talos_runtime::Message::User {
-                        content: format!("turn {index}: {}", "previous history ".repeat(128)),
+                        content: format!("turn {index}: {}", "previous history ".repeat(1_000)),
                     })
                     .collect(),
             )

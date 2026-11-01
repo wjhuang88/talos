@@ -54,6 +54,7 @@ pub(crate) struct TuiState {
     pub pending_approval_response: Option<tokio::sync::oneshot::Sender<ApprovalChoice>>,
     pub tip: Option<Tip>,
     pub status: StatusSnapshot,
+    pub compaction_pending: bool,
     pub thinking_preview: Option<String>,
     pub steering_queue_snapshot: Option<talos_conversation::SteeringQueueSnapshot>,
     pub slash_menu: BottomPanelState,

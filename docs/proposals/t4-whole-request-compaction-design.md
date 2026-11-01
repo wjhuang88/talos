@@ -2,7 +2,9 @@
 
 Scope: full handoff T4 / MEM-005 whole-request trigger, observable results and manual control.
 T5 model-callable compaction/history recovery remains a separate dependent delivery.
-Do not implement from this draft until the new target-branch claim is effective.
+The target-branch claim became effective through #817 at
+`02fee3cc9537e6bf688d167036389b4af3011aeb`; the preparation text below is historical.
+Implementation and remaining acceptance are tracked by I312.
 
 ## Current evidence
 

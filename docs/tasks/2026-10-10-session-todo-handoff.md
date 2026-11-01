@@ -1,4 +1,107 @@
-## Current phase — MODEL-014 closed, T4 preparing — 2026-10-30
+## Current acceptance checkpoint — 2026-11-01
+
+I312 remains Active/Partial. Post-turn pressure marking is implemented in
+`559867f74`; the subsequent local increment retires the legacy independent
+summarizer and documents its next-minor migration. Agent 587/587 and Clippy pass.
+Real inline plus controlling-PTY `/compact` walkthrough passes, including measured
+application, unchanged raw prefix and next-request checkpoint reuse without an
+extra summary call (`/private/tmp/i312-tui-compact-reviewed.log`). This is terminal
+text/runtime evidence, not pixel-layout or real-model semantic-quality assurance.
+Independent incremental API/privacy reviews approve these deltas, not complete T4.
+
+Standard full preflight 73508 failed on sandbox EPERM from the Git fixture's `ps`.
+The authorized host run 66565 exited 0, including both external SDK modes; log
+`/private/tmp/i312-converged-preflight-host.log`. Full-scope static review approved
+`d2269733c` against `3c748a115`; reviewer did not run tests and shares the
+Agent/GitHub account identity.
+Final exact-head CI, CAS/merge and owner completion evidence remain required. Earlier checkpoints below are historical snapshots.
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6;
+the first three stages are merged/closed, and T4/T5/T1/T6 are not Complete.
+
+## Current acceptance checkpoint — 2026-10-31
+
+Latest: uncommitted numeric cancellation passes Agent 599/599, affected-crate
+Clippy and real CLI signal/cancel/ordinary-continuation checks; see I312 logs.
+The earlier CLI claim of guaranteed same-request retry suppression is withdrawn:
+a repeat succeeded in another run, cause unproven. Exact same-key suppression
+remains unit-tested; CLI fixture now certifies only terminal outcomes/raw integrity.
+Current full preflight and all remote closure gates remain outstanding.
+
+2026-11-01 latest: current Rust preflight 1696 completed exit 0 with both SDK
+modes (`/private/tmp/i312-recovered-preflight.log`). Real POSIX CLI cancellation
+followed by an ordinary turn in the same process passes, with original transcript
+prefix preserved (`/private/tmp/i312-compact-cli-cancel-resume.log`). Numeric
+cancellation feedback and final T4 review/platform/CI/merge remain open.
+
+CLI stage committed `e19a73159`; additional real POSIX SIGINT compaction
+cancellation passes with exactly one visible terminal and unchanged raw bytes
+(`/private/tmp/i312-compact-cli-cancel.log`). Windows signal/TUI and numeric
+cancellation feedback remain uncertified; I312 and the whole queue stay Active.
+
+2026-11-01: missing worktree files were restored from HEAD without overwriting
+surviving edits; cause remains unknown. Current-source preflight session 1696 is
+running (`/private/tmp/i312-recovered-preflight.log`). Real CLI smoke passes after
+recovery, including unchanged summary-call count for the next ordinary request
+(`/private/tmp/i312-compact-cli-exact-reuse.log`). All final gates remain open.
+
+Newest: preflight 8264 completed exit 0 including both external SDK modes; log
+`/private/tmp/i312-manual-metrics-preflight.log`. It is preceding-inline-fix
+stage evidence. Real CLI no-op/resume/fork/success/invalid-summary failure script
+passes (`/private/tmp/i312-compact-cli-failure.log`), preserving raw bytes and
+excluding private summary text from failure output. T4 remains Partial; current
+CLI final validation/review and remote gates plus later queue remain open.
+The real-binary success fixture now also verifies the next ordinary HTTP request
+uses the derived checkpoint, preserves the original transcript prefix and does
+not persist summary context (`/private/tmp/i312-compact-cli-reuse.log`, exit 0).
+
+Latest: manual failure stage committed as `3f604764f`; low-debug/non-incremental
+standard host preflight session 8264 is running, log
+`/private/tmp/i312-manual-metrics-preflight.log`. Real CLI compact smoke script is
+written but not yet executed. Earlier uncommitted/Clippy-running text is historical.
+
+Real CLI smoke found inline `--fork` silently disabled. The local one-line wiring
+fix and rebuilt binary pass resume/fork `/compact` visible no-op plus raw-byte
+preservation (`/private/tmp/i312-compact-cli-smoke-fixed.log`). This is not binary
+successful-summary evidence. Preflight 8264 compiled before the fix and remains
+preceding-stage evidence; I312 tracks fresh review/validation requirements.
+The extended real-binary smoke passes TLOG and legacy JSONL resume/fork manual
+no-op paths with raw-byte preservation (`/private/tmp/i312-compact-cli-legacy.log`).
+Successful-summary binary acceptance and remaining T4 gates are still open.
+Update: real binary successful `/compact` via loopback HTTP now passes with
+applied estimates and byte-identical raw history (`/private/tmp/i312-compact-cli-applied.log`).
+This fixed-summary fixture proves wiring, not semantic quality. New script review,
+current-source final validation, remaining cancellation/lifecycle acceptance and
+remote review/CI/merge remain required; no task completion is claimed.
+
+Update: observability/semantic stage is committed at `102bdab06`; preflight
+session 64989 is terminal exit 101 from disk exhaustion during test compilation.
+Do not poll or certify it as successful. Authorized active-target cleanup and
+consistent low-debug/non-incremental builds address storage. The next uncommitted
+increment implements measured manual failure outcomes; tests/review are pending.
+I312 owns evidence and residuals; the running statements below are historical.
+
+Manual failure increment now passes 18/18 focused tests, including measured
+provider failure, shared-deadline timeout and diagnostic privacy. Both governance
+validators pass; affected-crate Clippy session 36034 is running. Review approved
+the runtime correction before the last test addition. Full preflight/CLI acceptance,
+final review/CI/merge remain pending; no T4 or whole-goal completion is claimed.
+
+Overall goal remains Active; queue remains I309 → T8/I308 → T2+T3 MODEL-014 →
+T4 → T5 → T1 → T6. T4/I312 has uncommitted semantic acceptance fixtures passing
+2/2 (50 heavy-tool turns with repeated folding/export/restart and text-heavy
+manual restart). Input-derived summaries test pipeline retention, not external
+model quality. The added child-session fork/source-identity regression also passed
+(current acceptance suite 3/3); this is storage/Actor evidence, not CLI fork evidence.
+See I312's current acceptance increment for logs and remaining CLI/legacy,
+lifecycle, full validation, independent review, remote CI and merge gates.
+No implementation PR or T4 completion is claimed. Prior checkpoints are history.
+
+Latest local acceptance is 4/4 after adding the CLI/TUI Session-persistence Actor
+path with content-bound provenance. Independent bounded static review approved
+the increment, not full T4. Standard host preflight session 64989 is running;
+log `/private/tmp/i312-observability-acceptance-preflight.log`. Reuse that handle.
+
+## Historical phase — MODEL-014 closed, T4 implementing — 2026-10-30
 
 Overall goal remains Active. I309, I308/T8 and I311/MODEL-014 T2+T3 are Complete.
 Completion Commit for T2+T3: `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`,
@@ -6,7 +109,19 @@ Completion Commit for T2+T3: `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`,
 `ca4a79961366eba7bc722b90bd449404cc7b07d5`; exact-head CI41032515451 all eight
 jobs passed, full local preflight and independent acceptance review passed, and
 CAS verified new target80b93933. See I311 for test/review limitations and failures.
-I312 T4 is proposed Active/Claimed in #817; no implementation authority before merge.
+I312 T4 is Active/Claimed after #817 merged at `02fee3cc9537e6bf688d167036389b4af3011aeb`.
+Local commits through `e90e333ca` implement bounded checkpoint folding, privacy
+filtering, manual Actor/CLI/SDK controls and complete-tool-batch boundary execution.
+The local source stage wires authenticated durable recovery snapshots and atomic
+turn-receipt IDs into Actor request preparation. Full standard host preflight
+passed, including both external SDK modes, and independent bounded static review
+approved the corrected source API; no implementation PR or remote CI yet. T4 remains Partial: fork/legacy provenance, complete lineage, ephemeral
+image parity, automatic visible outcomes, semantic long-session/restart acceptance
+and final review/CI/merge remain open. See I312's current evidence section; earlier
+missing-manual/local-uncommitted statements below are historical.
+Source stage is locally committed at `62cb8eed8`. A subsequent uncommitted image
+budget correction passed 6 focused tests, Agent 588/588 and affected-crate Clippy,
+plus bounded static review; its full preflight/final acceptance remains pending.
 Full queue retained: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
 Earlier checkpoints below are historical; no whole-goal completion is claimed.
 

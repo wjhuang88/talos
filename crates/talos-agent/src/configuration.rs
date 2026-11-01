@@ -112,6 +112,10 @@ impl Agent {
             tool_output_threshold: 4000,
             image_input_supported: false,
             request_budget_spec: RequestBudgetSpec::default(),
+            checkpoint_sequence: std::sync::atomic::AtomicU64::new(0),
+            checkpoint_attempts: std::sync::Mutex::new(Default::default()),
+            checkpoint_projection_state: std::sync::Mutex::new(None),
+            checkpoint_result_receipts: std::sync::Mutex::new(Default::default()),
             background_jobs: None,
             protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache::new(),
             execution_ledger: crate::execution_ledger::ExecutionLedger::default(),
@@ -269,6 +273,10 @@ impl Agent {
             tool_output_threshold: 4000,
             image_input_supported: false,
             request_budget_spec: RequestBudgetSpec::default(),
+            checkpoint_sequence: std::sync::atomic::AtomicU64::new(0),
+            checkpoint_attempts: std::sync::Mutex::new(Default::default()),
+            checkpoint_projection_state: std::sync::Mutex::new(None),
+            checkpoint_result_receipts: std::sync::Mutex::new(Default::default()),
             background_jobs: None,
             protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache::new(),
             execution_ledger: crate::execution_ledger::ExecutionLedger::default(),
@@ -284,6 +292,7 @@ impl Agent {
         model_id: Option<String>,
         replay: bool,
     ) -> Self {
+        self.invalidate_checkpoint_projection();
         self.provider_key = provider_key;
         self.model_id = model_id;
         self.replay_reasoning = replay;
@@ -292,6 +301,7 @@ impl Agent {
 
     /// Applies the exact Provider output reserve and conservative input policy.
     pub fn set_request_budget_spec(&mut self, spec: RequestBudgetSpec) {
+        self.invalidate_checkpoint_projection();
         self.request_budget_spec = spec;
     }
 
@@ -388,6 +398,7 @@ impl Agent {
     /// that were not presented return a recoverable tool error instead of
     /// executing silently.
     pub fn set_tool_presentation_policy(&mut self, policy: ToolPresentationPolicy) {
+        self.invalidate_checkpoint_projection();
         self.tool_presentation_policy = policy;
         let (descriptions, tool_definitions, presented_tool_names) =
             describe_presented_tools(&self.tools, &self.tool_presentation_policy);
@@ -403,6 +414,7 @@ impl Agent {
     /// The prompt and sealed request retain the same selection until reconfigured.
     pub fn set_tool_protocol(&mut self, protocol: ToolProtocol) {
         let protocol = self.resolve_tool_protocol(protocol);
+        self.invalidate_checkpoint_projection();
         self.tool_protocol = protocol;
         self.update_prompt_builder(true, |builder| match protocol {
             ToolProtocol::TalosStrict => builder.with_strict_tool_format(),

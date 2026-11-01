@@ -35,7 +35,7 @@ dashboard, broader dotagents compatibility, plugin carriers, and advanced docume
 - **Built-in coding tools**: file, search, edit, shell, symbol, directory tree, diff/stat, Git, HTTP request, and web search operations.
 - **Durable sessions and memory**: SQLite-backed session history, search, branch/fork support, export, semantic memory consolidation, and retention previews.
 - **Progressive context**: runtime Skill discovery plus explicit Skill body/reference activation without dumping hidden content into visible history.
-- **Request context budget**: the TUI shows `?` before admission evidence and `~N%` for the local request estimate, including tool definitions, safety margin and output reservation, not billing usage. Bounded recovery omits older complete tool exchanges from a request only, retaining instructions and the latest complete exchange; irreducible requests are rejected without replaying tools. Existing pre-turn history compaction is unchanged.
+- **Request context budget**: the TUI shows `?` before admission evidence and `~N%` for the local request estimate, including tool definitions, safety margin and output reservation, not billing usage. Bounded recovery omits older complete tool exchanges from a request only, retaining instructions and the latest complete exchange; irreducible requests are rejected without replaying tools. Unreleased whole-request checkpoints preserve original Actor history; derived projections remain rebuildable and manual compaction is available in TUI/inline. Automatic attempts show transient progress, token estimates and bounded failure reasons without displaying checkpoint content.
 - **Extensible surface**: MCP tools, hooks, JSON-RPC, governance-aware project status, and explicit local read-only WASM packages are implemented; remote plugin distribution and browser control remain bounded separately.
 
 ### TUI thinking and activity
@@ -975,6 +975,7 @@ mode.
 | `/help` | Show available commands |
 | `/quit`, `/exit` | Exit Talos |
 | `/status` | Show session info (model, token usage) |
+| `/compact` | Unreleased TUI/inline: compact model context without rewriting original history; active turns defer until a complete tool-batch boundary or turn completion |
 | `/auto`, `/auto on`, `/auto off` | Show or change bounded auto-assistance for this session only |
 | `/plugins` | Show explicitly loaded local plugin packages and registered capabilities |
 | `/mcp` | Show MCP server status and observed tool provenance |

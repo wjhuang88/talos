@@ -43,6 +43,23 @@ talos --help                          # full CLI reference
 See the [root README](../../README.md) for configuration, built-in tools, slash commands, skills,
 MCP integration, and the safety model.
 
+### Unreleased manual context compaction
+
+Enter `/compact` without arguments in the interactive TUI or inline mode. It
+compacts the model's request context while preserving original session history.
+An active turn queues the operation until a complete tool batch or turn completion.
+Transient status reports queued/started, applied token estimates, below-threshold
+skip, failure or cancellation; a measured failure/cancellation retains its prior
+estimate. Checkpoint content is not printed as a conversation message.
+
+Manual compaction is eligible at 80% of the resolved model context limit;
+automatic request preparation uses 95%. These estimates include prompt and tools,
+images, safety margin and configured output/reasoning reservations. A failure
+retains prior context; a request that cannot fit after safe recovery is refused.
+See [context behavior](../../docs/reference/ARCHITECTURE.md#context-compaction-pipeline)
+for raw-history and privacy boundaries. This is part of the next-minor I312 work,
+not a claim that an existing release provides this command.
+
 ## Support Boundary
 
 This crate provides a **binary only**. The `talos-cli` library API is not a supported SDK surface

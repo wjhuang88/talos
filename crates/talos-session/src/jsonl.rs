@@ -151,6 +151,18 @@ impl Session {
     }
 
     pub fn read_messages(&self) -> Result<Vec<Message>, SessionError> {
+        Ok(self
+            .read_messages_with_entry_ids()?
+            .into_iter()
+            .map(|(_, message)| message)
+            .collect())
+    }
+
+    /// Read model history paired with its original durable entry IDs.
+    /// Filtering and tool pairing share the exact conversion used by
+    /// `read_messages`; diagnostic/event entries never shift source identities.
+    /// IDs identify entries within this session, not a branch authorization.
+    pub fn read_messages_with_entry_ids(&self) -> Result<Vec<(String, Message)>, SessionError> {
         let entries = self.read_entries()?;
         let mut messages = Vec::new();
         let mut pending_tool_call_ids = HashSet::new();
@@ -207,7 +219,7 @@ impl Session {
             };
 
             if let Some(msg) = msg {
-                messages.push(msg);
+                messages.push((entry.id, msg));
             }
         }
 

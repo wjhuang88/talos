@@ -866,7 +866,10 @@ pub use talos_core::provider::{
     ProviderInvocationStream, ProviderProgress, ProviderResult, Receiver, ToolDefinition,
 };
 pub use talos_core::session::TurnCompletionStatus as RuntimeTurnCompletionStatus;
-pub use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
+pub use talos_core::session::{
+    AutomaticCompactFailure, AutomaticCompactState, CompactFailureReason, CompactOutcome,
+    CompactState, SessionEvent, TurnCompletionStatus, TurnEventPayload,
+};
 pub use talos_core::submission::{
     PendingSubmissionState, StructuredSubmission, SubmissionItem, SubmissionKind,
     SubmissionReceiptDisposition, SubmissionRejectionReason, SubmissionSource,
@@ -1640,8 +1643,17 @@ impl RuntimeBuilder {
         if !self.skill_index.is_empty() {
             agent.set_skill_index(self.skill_index);
         }
-        let initial_history = if let Some((session, _)) = &self.durable_session {
-            session.read_messages()?
+        let recovered_entries = self
+            .durable_session
+            .as_ref()
+            .map(|(session, _)| session.read_history_snapshot())
+            .transpose()?;
+        let initial_history = if let Some(entries) = &recovered_entries {
+            entries
+                .entries()
+                .iter()
+                .map(|(_, message)| message.clone())
+                .collect()
         } else {
             self.initial_history
         };
@@ -1661,12 +1673,16 @@ impl RuntimeBuilder {
         actor.set_runtime_admission(admission.clone());
         if let Some((session, policy)) = self.durable_session {
             actor.set_durable_persistence(session, policy);
+            if let Some(entries) = recovered_entries {
+                actor.set_recovered_history_sources(entries);
+            }
         }
         let runtime = tokio::runtime::Handle::try_current()
             .map_err(|_| RuntimeError::AsyncRuntimeUnavailable)?;
         let actor_exit_guard = RuntimeActorExitGuard {
             admission: admission.clone(),
         };
+        let session_generation = actor.generation();
         let actor_task = runtime.spawn(async move {
             let _actor_exit_guard = actor_exit_guard;
             actor.run().await;
@@ -1680,6 +1696,7 @@ impl RuntimeBuilder {
         );
 
         Ok(RuntimeHandle {
+            session_generation,
             command_tx: handle.sq_tx,
             event_rx: handle.eq_rx,
             coordinator,
@@ -1696,6 +1713,7 @@ impl Default for RuntimeBuilder {
 
 /// Handle for interacting with a running embedded Talos runtime.
 pub struct RuntimeHandle {
+    session_generation: u64,
     command_tx: mpsc::Sender<SessionOp>,
     event_rx: mpsc::UnboundedReceiver<SessionEvent>,
     coordinator: Arc<ShutdownCoordinator>,
@@ -1703,6 +1721,29 @@ pub struct RuntimeHandle {
 }
 
 impl RuntimeHandle {
+    /// Queue manual whole-request compaction without adding a transcript turn.
+    ///
+    /// IDs must increase within this runtime. Retained duplicate IDs return the
+    /// previous receipt through `SessionEvent::CompactStatus`; `Ok` means queued,
+    /// not applied. One pending operation is allowed. Interrupt/shutdown cancel
+    /// pending work; raw history remains authoritative on every outcome.
+    pub async fn compact(&self, operation_id: u64) -> RuntimeResult<()> {
+        self.send_admitted(SessionOp::Compact {
+            session_generation: self.session_generation,
+            operation_id,
+        })
+        .await
+    }
+
+    /// Cancel only a previously submitted compaction ID in this runtime.
+    pub async fn cancel_compact(&self, operation_id: u64) -> RuntimeResult<()> {
+        self.send_admitted(SessionOp::CancelCompact {
+            session_generation: self.session_generation,
+            operation_id,
+        })
+        .await
+    }
+
     /// Submits a user message as a new turn.
     pub async fn submit(&self, message: impl Into<String>) -> RuntimeResult<()> {
         self.send_admitted(SessionOp::Submit {
@@ -3392,6 +3433,7 @@ mod tests {
             RuntimeFinalizerRegistry::freeze(Vec::new()).expect("empty registry is valid"),
         );
         let runtime = RuntimeHandle {
+            session_generation: 0,
             command_tx,
             event_rx,
             coordinator,

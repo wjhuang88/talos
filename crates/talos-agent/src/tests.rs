@@ -6275,6 +6275,7 @@ fn ephemeral_image_budget_is_admitted_before_dispatch() {
         messages: vec![],
         tool_definitions: vec![],
         estimated_tokens: 100,
+        ephemeral_image_tokens: 0,
         omitted_tool_exchanges: 0,
         tool_protocol: talos_core::tool::ToolProtocol::Native,
     };
@@ -6752,3 +6753,280 @@ fn dispatch_recovery_requires_explicit_protocol_evidence() {
 mod edit_auto;
 mod recovery_dispatch;
 mod scheduler_auto;
+
+#[test]
+fn checkpoint_projection_excludes_arguments_reasoning_unknown_and_duplicate_provenance() {
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(ProjectedMockTool));
+    let agent = Agent::new(Arc::new(MockModel::new(vec![])), registry);
+    let messages = vec![
+        Message::Assistant {
+            content: "echo [snapshot:s1]".into(),
+            tool_calls: vec![ToolCall {
+                id: "known".into(),
+                name: "projected_read".into(),
+                input: serde_json::json!({"secret":"PRIVATE_ARGUMENT"}),
+            }],
+            reasoning: Some(AssistantReasoning {
+                provider: "test".into(),
+                model: "fixture".into(),
+                blocks: vec![ReasoningBlock::Plain {
+                    text: "PRIVATE_REASONING".into(),
+                }],
+            }),
+        },
+        Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "known".into(),
+                content: "1:aa|model-visible text".into(),
+                is_error: false,
+            },
+        },
+        Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "unknown".into(),
+                content: "UNKNOWN_PRIVATE".into(),
+                is_error: true,
+            },
+        },
+    ];
+    let recovered =
+        agent.checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default());
+    assert!(!format!("{recovered:?}").contains("model-visible text"));
+    if let Message::Tool { result } = &messages[1] {
+        agent.record_checkpoint_result("projected_read", result);
+    }
+    let raw = messages.clone();
+    let projected =
+        agent.checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default());
+    let text = format!("{projected:?}");
+    for excluded in [
+        "PRIVATE_ARGUMENT",
+        "PRIVATE_REASONING",
+        "UNKNOWN_PRIVATE",
+        "[snapshot:s1]",
+        "1:aa|",
+    ] {
+        assert!(!text.contains(excluded), "must exclude {excluded}");
+    }
+    assert!(text.contains("model-visible text"));
+    assert_eq!(messages, raw);
+    // Recovered history cannot infer a tool result producer from a duplicate ID.
+    let duplicate = [messages.clone(), messages].concat();
+    let projected =
+        agent.checkpoint_projection(&duplicate, &crate::transient_text::PrivateTokens::default());
+    assert!(!format!("{projected:?}").contains("model-visible text"));
+}
+
+#[tokio::test]
+async fn checkpoint_receipt_from_live_observation_rejects_tampering_and_same_name_replacement() {
+    let original_tool = Arc::new(ProjectedMockTool);
+    let mut registry = ToolRegistry::new();
+    registry.register(original_tool.clone());
+    let mut agent = Agent::new(Arc::new(MockModel::new(vec![])), registry);
+    let call = ToolCall {
+        id: "live-checkpoint".into(),
+        name: "projected_read".into(),
+        input: serde_json::json!({}),
+    };
+    let mut messages = vec![Message::Assistant {
+        content: String::new(),
+        tool_calls: vec![call.clone()],
+        reasoning: None,
+    }];
+    let mut private = crate::transient_text::PrivateTokens::default();
+    let context = HookContext::new(TurnId::new(), PathBuf::from("."));
+    let (tx, _rx) = mpsc::unbounded_channel();
+    agent
+        .observe_tool_result(
+            &context,
+            &call,
+            ToolExecutionResult::success("model-visible verified output"),
+            &tx,
+            &mut messages,
+            &mut private,
+        )
+        .await
+        .expect("observe actual result");
+    assert!(
+        format!("{:?}", agent.checkpoint_projection(&messages, &private))
+            .contains("model-visible verified output")
+    );
+    let mut tampered = messages.clone();
+    if let Message::Tool { result } = &mut tampered[1] {
+        result.content.push_str(" altered");
+    }
+    assert!(
+        !format!("{:?}", agent.checkpoint_projection(&tampered, &private))
+            .contains("verified output")
+    );
+    // Weak identity receipts keep allocation identity distinct without retaining
+    // the original tool object after registry replacement.
+    let original_identity = agent
+        .tools
+        .instance_handle("projected_read")
+        .expect("registered identity");
+    drop(original_tool);
+    let replacement = Arc::new(ProjectedMockTool);
+    agent.tools.register(replacement);
+    assert!(
+        original_identity.upgrade().is_none(),
+        "receipt must not retain the old tool"
+    );
+    assert!(
+        !original_identity.ptr_eq(
+            &agent
+                .tools
+                .instance_handle("projected_read")
+                .expect("replacement")
+        )
+    );
+    assert!(
+        !format!("{:?}", agent.checkpoint_projection(&messages, &private))
+            .contains("verified output")
+    );
+}
+
+#[tokio::test]
+async fn ephemeral_tool_image_drives_real_continuation_checkpoint() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    struct ImagePressureModel {
+        ordinary: EphemeralCapturingModel,
+        summaries: AtomicUsize,
+    }
+    #[async_trait]
+    impl LanguageModel for ImagePressureModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let [Message::User { content }] = messages else {
+                panic!("summary only");
+            };
+            assert!(content.starts_with("Produce only a JSON checkpoint"));
+            assert!(!content.contains("private-image"));
+            self.summaries.fetch_add(1, Ordering::SeqCst);
+            let sources: Vec<Value> =
+                serde_json::from_str(content.split("\nSources: ").last().expect("sources"))
+                    .expect("JSON");
+            let item = serde_json::json!({"text":"retain task constraint", "sources":[sources[0]["source"]]});
+            let payload =
+                serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                "facts":[],"assumptions":[],"resources":[],"open_loops":[]})
+                .to_string();
+            let (tx, rx) = mpsc::channel(4);
+            for event in text_done_events(&payload) {
+                tx.send(event).await.expect("summary stream");
+            }
+            Ok(rx)
+        }
+        async fn stream_with_ephemeral_images(
+            &self,
+            messages: &[Message],
+            definitions: &[ToolDefinition],
+            protocol: talos_core::tool::ToolProtocol,
+            progress: mpsc::UnboundedSender<ProviderProgress>,
+            browser_tools: &[String],
+            images: Vec<talos_core::provider::EphemeralImage>,
+        ) -> ProviderResult<ProviderInvocationStream> {
+            if images.is_empty() {
+                assert_eq!(
+                    self.summaries.load(Ordering::SeqCst),
+                    0,
+                    "initial request is advisory"
+                );
+            } else {
+                assert_eq!(images.len(), 1);
+                assert!(self.summaries.load(Ordering::SeqCst) > 0);
+                assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.starts_with("[Derived checkpoint;"))));
+            }
+            self.ordinary
+                .stream_with_ephemeral_images(
+                    messages,
+                    definitions,
+                    protocol,
+                    progress,
+                    browser_tools,
+                    images,
+                )
+                .await
+        }
+    }
+    let counts = Arc::new(Mutex::new(Vec::new()));
+    let model = Arc::new(ImagePressureModel {
+        ordinary: EphemeralCapturingModel {
+            requests: AtomicUsize::new(0),
+            counts: counts.clone(),
+        },
+        summaries: AtomicUsize::new(0),
+    });
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(TestEphemeralImageTool));
+    let mut agent =
+        Agent::with_security(model.clone(), registry, None, None, PathBuf::from("/tmp"));
+    agent.set_image_input_supported(true);
+    let raw: Vec<_> = (0..20)
+        .flat_map(|index| {
+            [
+                Message::User {
+                    content: format!("constraint {index}: {}", "a".repeat(4000)),
+                },
+                Message::Assistant {
+                    content: "ack".into(),
+                    tool_calls: vec![],
+                    reasoning: None,
+                },
+            ]
+        })
+        .collect();
+    let input = vec![Message::User {
+        content: "image".into(),
+    }];
+    let probe = agent
+        .prepare_turn_start("image".into(), input.clone(), raw.clone(), Some(u32::MAX))
+        .await
+        .expect("probe");
+    let limit = probe.initial_plan.estimated_tokens * 100 / 94;
+    let mut prepared = agent
+        .prepare_turn_start("image".into(), input, raw, Some(limit))
+        .await
+        .expect("prepare");
+    assert_eq!(model.summaries.load(Ordering::SeqCst), 0);
+    let (status_tx, mut status_rx) = mpsc::unbounded_channel();
+    prepared.checkpoint_observer = Some(crate::checkpoint_progress::CheckpointObserver {
+        sender: status_tx,
+        session_id: "image-continuation".into(),
+        generation: 0,
+        admission: None,
+        post_turn_pressure: Default::default(),
+    });
+    let (events, mut received) = mpsc::unbounded_channel();
+    let (result, persisted) = agent
+        .run_prepared_session_turn(prepared, events, None, None, None)
+        .await;
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(*counts.lock().await, vec![0, 1]);
+    assert!(matches!(
+        status_rx.try_recv().expect("start"),
+        talos_core::session::SessionEvent::AutomaticCompactStatus {
+            state: talos_core::session::AutomaticCompactState::Started { .. },
+            ..
+        }
+    ));
+    assert!(matches!(
+        status_rx.try_recv().expect("applied"),
+        talos_core::session::SessionEvent::AutomaticCompactStatus {
+            state: talos_core::session::AutomaticCompactState::Applied { .. },
+            ..
+        }
+    ));
+    assert!(status_rx.try_recv().is_err());
+    assert!(
+        !serde_json::to_string(&persisted)
+            .expect("history")
+            .contains("private-image")
+    );
+    while let Ok(event) = received.try_recv() {
+        if let AgentEvent::ContextBudget { budget } = event {
+            assert!(budget.estimated_tokens <= limit);
+        }
+    }
+}

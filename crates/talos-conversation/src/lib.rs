@@ -60,3 +60,104 @@ pub use validation::{
     project_type_detector_descriptors, render_json_evidence, render_json_plan,
     render_text_evidence, render_text_plan, run_validation_plan,
 };
+
+/// Format content-free checkpoint facts for transient user-visible status.
+pub fn format_compact_status(id: u64, state: talos_core::session::CompactState) -> String {
+    use talos_core::session::{CompactOutcome, CompactState};
+    let status = match state {
+        CompactState::Queued => "queued until a safe boundary".into(),
+        CompactState::Started => "started".into(),
+        CompactState::Busy => "busy: another compaction is pending".into(),
+        CompactState::Expired => "expired operation ID".into(),
+        CompactState::StaleGeneration => "rejected: session generation changed".into(),
+        CompactState::Completed { outcome, replayed } => {
+            let result = match outcome {
+                CompactOutcome::Applied { before, after } => {
+                    format!("applied: estimated tokens {before} → {after}")
+                }
+                CompactOutcome::NotEligible { before } => {
+                    format!("skipped: estimated tokens {before}, below threshold")
+                }
+                CompactOutcome::Failed => {
+                    "failed during preparation: estimate unavailable; prior context retained".into()
+                }
+                CompactOutcome::FailedWithEstimate { before, reason } => {
+                    use talos_core::session::CompactFailureReason;
+                    let reason = match reason {
+                        CompactFailureReason::Preparation => "preparation or validation rejected",
+                        CompactFailureReason::Provider => "provider failure",
+                        CompactFailureReason::Timeout => "deadline exceeded",
+                        CompactFailureReason::CommitRejected => "candidate installation rejected",
+                    };
+                    format!("failed ({reason}): estimated tokens {before}; prior context retained")
+                }
+                CompactOutcome::Cancelled => "cancelled: prior context retained".into(),
+                CompactOutcome::CancelledWithEstimate { before } => {
+                    format!("cancelled: prior context retained; estimated tokens {before}")
+                }
+            };
+            if replayed {
+                format!("{result} (previous result)")
+            } else {
+                result
+            }
+        }
+    };
+    format!("Compaction {id}: {status}")
+}
+
+/// Format automatic checkpoint metadata without revealing derived context.
+pub fn format_automatic_compact_status(
+    state: talos_core::session::AutomaticCompactState,
+) -> String {
+    use talos_core::session::AutomaticCompactState;
+    let status = match state {
+        AutomaticCompactState::Started { before } => format!("started: estimated tokens {before}"),
+        AutomaticCompactState::Applied { before, after } => {
+            format!("applied: estimated tokens {before} → {after}")
+        }
+        AutomaticCompactState::SkippedSourceUnavailable { before } => {
+            format!("skipped: no verified eligible source; estimated tokens {before}")
+        }
+        AutomaticCompactState::Failed { before, reason } => {
+            use talos_core::session::AutomaticCompactFailure;
+            let reason = match reason {
+                AutomaticCompactFailure::Provider => "provider failure",
+                AutomaticCompactFailure::Preparation => "preparation or validation rejected",
+                AutomaticCompactFailure::CommitRejected => "candidate installation rejected",
+            };
+            format!("failed ({reason}): prior context retained; estimated tokens {before}")
+        }
+        AutomaticCompactState::Cancelled { before } => {
+            format!("cancelled: prior context retained; estimated tokens {before}")
+        }
+    };
+    format!("Automatic compaction {status}")
+}
+
+#[cfg(test)]
+mod compact_status_tests {
+    #[test]
+    fn manual_failure_distinguishes_measured_request_from_unavailable_estimate() {
+        use talos_core::session::{CompactFailureReason, CompactOutcome, CompactState};
+        let render = |outcome| {
+            super::format_compact_status(
+                7,
+                CompactState::Completed {
+                    outcome,
+                    replayed: false,
+                },
+            )
+        };
+        let unknown = render(CompactOutcome::Failed);
+        assert!(unknown.contains("estimate unavailable"));
+        assert!(!unknown.contains("tokens 0"));
+        let measured = render(CompactOutcome::FailedWithEstimate {
+            before: 24_001,
+            reason: CompactFailureReason::Timeout,
+        });
+        assert!(measured.contains("deadline exceeded"));
+        assert!(measured.contains("estimated tokens 24001"));
+        assert!(measured.contains("prior context retained"));
+    }
+}

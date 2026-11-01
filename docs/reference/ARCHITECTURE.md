@@ -548,14 +548,36 @@ and free-form denial text. Runtime mode and interaction capability are recorded 
 
 ## Context Compaction Pipeline
 
-To handle long conversations, Talos uses a progressive compaction strategy. Layers are activated as context pressure increases:
+Unreleased I312 / ADR-096 uses one structured checkpoint pipeline for automatic
+and manual compaction. The admission estimate includes the assembled prompt,
+tool schemas, image reserve, safety margin and configured output/reasoning reserve.
+Resolved model limits drive the policy: automatic checkpointing starts at 95%
+pressure; manual `/compact` becomes eligible at 80%. Fixed overhead that cannot
+fit is refused. These are local estimates, not provider billing usage.
 
-1. **Pinned**: Critical system instructions and user-defined constraints that never expire.
-2. **Fresh**: The most recent messages, kept in full detail.
-3. **Summarized**: Mid-term history reduced to high-level summaries via LLM call.
-4. **Archived**: Older history excluded from the active prompt.
+Before dispatch, verified older complete exchanges may be folded into bounded,
+validated structured checkpoints. Recent exchanges and tool-call/result pairing
+remain intact. The candidate must fit the complete request budget before atomic
+installation. Failed summaries use bounded deterministic request recovery or a
+clear refusal; no failed partial checkpoint replaces the prior projection.
 
-> **Future consideration**: If RAG-based retrieval of older context becomes necessary (no reference project currently uses this), it would be implemented as an extension rather than a core compaction layer.
+Raw Actor history and durable transcripts remain authoritative. Checkpoints are
+rebuildable request projections, not rewritten transcript entries. Durable Runtime
+sources use storage-issued identities; CLI Session recovery binds source identities
+to their content, without claiming the same storage authentication. Summarizer
+input excludes private arguments/reasoning and
+unverified recovered tool payloads; transient UI status contains counts and bounded
+reason categories, never checkpoint text or hidden tool output.
+
+Manual work queues at a complete tool-batch boundary or turn completion. At turn
+return, advisory pressure based on the last request plus finalized output can mark
+future need; it makes no model call and does not bypass the next request's budget
+check. Cancellation before installation preserves the prior projection.
+The deprecated bare-history `Compactor` model methods fail closed; they are not a
+second summarization path. See [SDK migration](RUNTIME-SDK-CONTRACT.md#unreleased-i312-manual-compaction-migration).
+
+Model-callable compaction and bounded authoritative history recovery remain T5
+work; the T4 implementation does not claim that delivery.
 
 ## Storage Architecture
 

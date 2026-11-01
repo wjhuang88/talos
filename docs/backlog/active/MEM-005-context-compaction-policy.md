@@ -4,9 +4,35 @@
 |-------|-------|
 | Story ID | MEM-005 |
 | Priority | P2 |
-| Status | In Progress (T4 delegated to I312; effective only after #817 merge) |
+| Status | In Progress / Partial (T4 delegated to I312; #817 merged and effective) |
 | Depends On | MEM-002; MEM-003 for full LLM layers |
 | Origin | User feedback 2026-06-18 — context compaction needs explicit trigger and runtime logic |
+
+## Current acceptance disposition — 2026-11-01
+
+The published acceptance and preparation snapshots below remain intact. I312 is
+active and its implementation is local; no T4 completion or merged implementation
+is claimed. The following maps all eleven acceptance rows to current evidence.
+
+| Row | Current disposition |
+|---|---|
+| 1. Thresholds/model limits | Implemented: shared `RequestPressure` uses 80% manual eligibility and 95% automatic trigger against resolved model limits; CLI and architecture references document it. |
+| 2. Output/reasoning reserve | Implemented through the sealed request estimator and shared request-budget spec, including tool schemas and image reserve; request/admission regressions cover reserves. |
+| 3. Limit precedence | Existing model resolution supplies explicit config, refreshed catalog, built-in data and fallback; MODEL-014/I311 preserves explicit overrides. User-facing model and request-budget documentation remains the authority. |
+| 4. Pre-provider compaction | Implemented in shared initial/continuation request sealing; actual Actor and provider-capture regressions cover dispatch bounds. |
+| 5. Post-turn marking | Implemented in `559867f74`: per-turn advisory pressure slot, no provider call, fresh next-request admission and generation isolation. Aborted tasks do not invent estimates. |
+| 6. Manual command | Typed Runtime/Session operation and registered `/compact` are implemented in inline/TUI bridges; real CLI resume/fork/success/failure/cancel script passed at the preceding stage. |
+| 7. TUI transient status | Bridge numeric outcome/replay regressions pass. Real controlling-PTY walkthrough now observes applied before/after counts and ordinary continuation using the installed checkpoint. This validates terminal text emission, not pixel layout or exhaustive rendered privacy. |
+| 8. Raw recovery | Shared checkpoint projection leaves raw Actor/durable history intact; 50-turn and text-heavy restart/fork fixtures cover source lineage and raw exports. |
+| 9. Hidden-output boundary | Explicit summarizer projection and content-free status are implemented; privacy/stream rejection tests cover hidden data. No promise to rediscover arbitrary secrets in ordinary text. |
+| 10. Failure fallback | Summary validation/timeout/cancellation retain prior projection; bounded request recovery or explicit budget refusal remains the fallback. |
+| 11. Tests | Focused Agent, Actor and real inline suites have local evidence in I312. Final candidate preflight, independent full review, platform CI and merge are still required. |
+
+All rows remain open for final acceptance/merge evidence rather than being checked
+off from local tests alone. ADR-096 replaces legacy five-layer history mutation
+with the single structured checkpoint pipeline. Model-directed semantic checkpoint
+tools/history recovery remain T5; the research phases below are not implemented
+merely because T4 has local automatic/manual compaction.
 
 ## Problem
 

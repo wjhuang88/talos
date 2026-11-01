@@ -27,6 +27,7 @@ pub(super) struct DurableTurnPersistence {
 
 pub(super) struct TurnRecord {
     pub(super) new_messages: Vec<Message>,
+    pub(super) persisted_entry_ids: Vec<String>,
     pub(super) status: TurnRecordStatus,
     pub(super) completion: TurnCompletionStatus,
 }
@@ -240,22 +241,21 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     None => cancellation_error = Some(error),
                 }
             }
-            if let Some(durable) = &durable_persistence
-                && let Err(error) = durable.session.finalize_turn(
-                    &turn_id,
-                    &stable_prefix,
-                    &durable.policy,
-                    if cancellation_error.is_some() {
-                        TurnTranscriptOutcome::Error
-                    } else {
-                        TurnTranscriptOutcome::Cancelled
-                    },
-                )
-            {
-                let error = format!("failed to atomically persist cancelled turn: {error}");
-                match &mut cancellation_error {
-                    Some(message) => message.push_str(&format!("; {error}")),
-                    None => cancellation_error = Some(error),
+            let mut persisted_entry_ids = Vec::new();
+            if let Some(durable) = &durable_persistence {
+                match durable.session.finalize_turn(
+                    &turn_id, &stable_prefix, &durable.policy,
+                    if cancellation_error.is_some() { TurnTranscriptOutcome::Error }
+                    else { TurnTranscriptOutcome::Cancelled },
+                ) {
+                    Ok(commit) => persisted_entry_ids = commit.entry_ids,
+                    Err(error) => {
+                        let error = format!("failed to atomically persist cancelled turn: {error}");
+                        match &mut cancellation_error {
+                            Some(message) => message.push_str(&format!("; {error}")),
+                            None => cancellation_error = Some(error),
+                        }
+                    }
                 }
             }
             if cancellation_error.is_none()
@@ -290,6 +290,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
                     completion,
@@ -307,6 +308,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                persisted_entry_ids,
                 new_messages: stable_prefix,
                 status: TurnRecordStatus::Cancelled,
                 completion,
@@ -373,6 +375,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
                     completion,
@@ -410,6 +413,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
                     completion,
@@ -435,6 +439,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
                     completion,
@@ -470,6 +475,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                             },
                         });
                         let _ = result_tx.send(TurnRecord {
+                            persisted_entry_ids: Vec::new(),
                             new_messages: Vec::new(),
                             status: TurnRecordStatus::Error,
                             completion,
@@ -484,7 +490,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 let _ = eq_tx_clone.send(SessionEvent::EntriesCommitted {
                     session_id: session_id.clone(),
                     turn_id: turn_id.clone(),
-                    entry_ids: persisted_entry_ids,
+                    entry_ids: persisted_entry_ids.clone(),
                 });
             }
             let completion = TurnCompletionStatus::Success {
@@ -501,6 +507,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                persisted_entry_ids,
                 new_messages,
                 status: TurnRecordStatus::Success,
                 completion,
@@ -532,19 +539,22 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     }
                 }
             }
-            if transcript_persisted
-                && let Some(durable) = &durable_persistence
-                && let Err(persist_err) = durable.session.finalize_turn(
+            let mut persisted_entry_ids = Vec::new();
+            if transcript_persisted && let Some(durable) = &durable_persistence {
+                match durable.session.finalize_turn(
                     &turn_id,
                     &partial_messages,
                     &durable.policy,
                     TurnTranscriptOutcome::Error,
-                )
-            {
-                transcript_persisted = false;
-                error_message = format!(
-                    "{error_message}\n[warning: failed to atomically persist durable partial turn: {persist_err}]"
-                );
+                ) {
+                    Ok(commit) => persisted_entry_ids = commit.entry_ids,
+                    Err(persist_err) => {
+                        transcript_persisted = false;
+                        error_message = format!(
+                            "{error_message}\n[warning: failed to atomically persist durable partial turn: {persist_err}]"
+                        );
+                    }
+                }
             }
             if transcript_persisted
                 && let Err(persist_err) = persist_terminal_outcome(
@@ -571,6 +581,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                persisted_entry_ids,
                 new_messages: partial_messages,
                 status: TurnRecordStatus::Error,
                 completion,
@@ -600,6 +611,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                persisted_entry_ids: Vec::new(),
                 new_messages: Vec::new(),
                 status: TurnRecordStatus::Error,
                 completion,

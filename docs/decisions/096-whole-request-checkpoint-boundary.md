@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted as the proposed I312 / handoff T4 contract in #817. Ineffective until
-finalized atomic activation merges. This is no authorization to implement and does not close #390 or T5.
+Accepted I312 / handoff T4 contract: #817 merged at
+`02fee3cc9537e6bf688d167036389b4af3011aeb`. The claim is effective;
+this decision does not establish implementation completion or close #390 or T5.
 
 ## Context and constraints
 
@@ -40,12 +41,52 @@ schema fields, byte/token/reference limits, deadlines, receipts, cutoffs and tes
 
 ## Public API and migration
 
+The legacy public `Compactor::{compact, apply_collapse, apply_autocompact,
+manual_compact}` signatures have only messages and a provider reference. They
+cannot establish complete request budgets, tool disclosure authority or raw-source
+lineage. Retire their independent summarizer: retain the signatures with explicit
+deprecation, but fail closed before preprocessing or provider invocation.
+`compact`, `apply_collapse` and `apply_autocompact` always return
+`CompactionError::CompactionFailed` with migration guidance; `manual_compact`
+returns the exact original messages and `CompactionStatus::Failed`, including for
+empty or below-threshold inputs. Do not forge authority from untrusted history.
+
+This preserves call-site signatures, **not behavioral compatibility**. Ship only
+in the same next pre-1.0 minor release. Callers migrate live work to
+`RuntimeHandle::compact(operation_id)` or `SessionOp::Compact` and consume the
+typed terminal receipt. The Agent's single checkpoint pipeline supplies automatic
+and manual semantics; no legacy provider fallback remains. Pure deterministic
+utilities remain explicit caller-owned transforms, not session admission, privacy
+authorization or permission to replace raw history. Shared bounded summary stream
+decoding stays available to the checkpoint pipeline.
+
 Add a typed compact operation to SessionOp carrying generation and operation ID;
 use typed transient outcomes under non-exhaustive SessionEvent. Existing operation
 wire tags retain behavior. Adding a SessionOp variant breaks exhaustive Rust
 matches: every in-repository bridge/adapter and both independent Runtime SDK
 fixtures must be updated to handle the new variant explicitly. Do not silently
 ignore the operation in an adapter that advertises manual support.
+
+Automatic checkpoint feedback uses additive `SessionEvent::AutomaticCompactStatus`
+with typed bounded state/failure categories and numeric estimates, emitted directly
+to Session consumers rather than durable Agent transcript events. It may precede
+ordinary turn admission; consumers must not treat it as a turn terminal or a manual
+operation receipt. Initial and continuation attempts share this observer and the
+Runtime interrupt/shutdown commit gate. UI adapters discard old generations.
+
+Manual `CompactOutcome::FailedWithEstimate` carries the already measured whole
+request estimate and a bounded `CompactFailureReason` (preparation, provider,
+timeout or commit rejection). Consumers must handle this additional variant in
+the same next-minor migration. Failures whose estimate was not obtained or could
+not be propagated retain `Failed` and display an unavailable estimate, never a
+fabricated zero. Outer preparation timeouts preserve an already measured estimate;
+task join or response loss may still lose it. Neither outcome carries
+provider strings or checkpoint content; prior context remains unchanged.
+
+Manual `CancelledWithEstimate` preserves a measured request count across idle or
+tool-boundary cancellation. Per-operation measurement is reset on admission and
+terminal receipt replay retains the original value. Cancellation before measurement
+uses `Cancelled`; consumers handle the new variant in the next-minor migration.
 
 Ship only in the next pre-1.0 minor release, never as an existing-minor patch.
 Consumers must add the typed compact handling or explicit unsupported response to

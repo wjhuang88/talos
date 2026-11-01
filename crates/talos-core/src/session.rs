@@ -78,13 +78,135 @@ pub enum SessionOp {
         session_generation: u64,
         submission_id: String,
     },
+    /// Request a bounded derived checkpoint without adding a user turn.
+    Compact {
+        /// Runtime generation addressed by this operation.
+        session_generation: u64,
+        /// Monotonic ID within this generation, retained for bounded deduplication.
+        operation_id: u64,
+    },
+    /// Cancel only the addressed manual checkpoint; never a subsequent operation.
+    CancelCompact {
+        /// Runtime generation addressed by the cancellation.
+        session_generation: u64,
+        /// Previously accepted monotonic compaction ID.
+        operation_id: u64,
+    },
     Shutdown,
+}
+
+/// Content-free terminal facts for a manual checkpoint operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum CompactOutcome {
+    /// A validated derived projection was installed atomically.
+    Applied { before: u32, after: u32 },
+    /// The complete request was below the manual pressure threshold.
+    NotEligible { before: u32 },
+    /// Preparation or checkpoint validation failed; prior state remains usable.
+    Failed,
+    /// A prepared request failed compaction; no partial projection was applied.
+    FailedWithEstimate {
+        /// Whole-request estimate before the failed attempt.
+        before: u32,
+        /// Content-free category; never includes provider error text.
+        reason: CompactFailureReason,
+    },
+    /// Cancellation won before application.
+    Cancelled,
+    /// Cancellation won after the whole request had been measured.
+    CancelledWithEstimate { before: u32 },
+}
+
+/// Content-free failure categories for manual checkpoint attempts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CompactFailureReason {
+    /// Preparation or checkpoint validation rejected the candidate.
+    Preparation,
+    /// The summarizer provider failed.
+    Provider,
+    /// The shared operation deadline elapsed.
+    Timeout,
+    /// Atomic installation rejected the candidate.
+    CommitRejected,
+}
+
+/// Transient operation lifecycle; never a durable transcript entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum CompactState {
+    /// Accepted, waiting for the current turn's complete-batch boundary.
+    Queued,
+    /// Preparing and evaluating the whole request.
+    Started,
+    /// Exactly one execution result; duplicates may query the same receipt.
+    Completed {
+        outcome: CompactOutcome,
+        replayed: bool,
+    },
+    /// Another operation owns the bounded pending slot.
+    Busy,
+    /// This ID has left the receipt window and cannot execute again.
+    Expired,
+    /// The request does not address this runtime generation.
+    StaleGeneration,
+}
+
+/// Bounded automatic-checkpoint failure categories, never provider error text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AutomaticCompactFailure {
+    /// The summarizer provider or its bounded stream failed.
+    Provider,
+    /// Preparation, resource/attempt bounds, source/schema validation or reclaim failed.
+    Preparation,
+    /// The final projection installation rejected the prepared candidate.
+    CommitRejected,
+}
+
+/// Content-free automatic checkpoint progress for one sealed request.
+/// Variant tags are bounded outcome/reason codes; no provider error or summary
+/// text is carried. Failed/cancelled outcomes leave the prior projection intact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum AutomaticCompactState {
+    /// Summary preparation began at the reported whole-request estimate.
+    Started { before: u32 },
+    /// A validated projection reduced the request to the reported estimate.
+    Applied { before: u32, after: u32 },
+    /// Pressure was high but no verified eligible raw prefix was available.
+    SkippedSourceUnavailable { before: u32 },
+    /// Preparation/validation or the bounded attempt policy rejected compaction.
+    Failed {
+        before: u32,
+        reason: AutomaticCompactFailure,
+    },
+    /// Preparation was dropped before publishing a successful result.
+    Cancelled { before: u32 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SessionEvent {
+    /// Automatic checkpoint feedback, including pre-turn request admission.
+    /// This is transient UI state, not an Agent transcript event.
+    AutomaticCompactStatus {
+        /// Owning session identity.
+        session_id: String,
+        /// Owning runtime generation; replaced-session events must be ignored.
+        session_generation: u64,
+        /// Bounded metadata for the automatic attempt.
+        state: AutomaticCompactState,
+    },
+    /// Content-free manual checkpoint progress, never persisted as a user turn.
+    CompactStatus {
+        session_id: String,
+        session_generation: u64,
+        operation_id: u64,
+        state: CompactState,
+    },
     /// Pre-start admission failure, correlated without inventing a started turn.
     SubmissionContextBudget {
         /// Owning session identity.

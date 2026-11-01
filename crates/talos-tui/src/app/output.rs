@@ -835,7 +835,11 @@ impl Tui {
                 self.state.should_exit = true;
                 return true;
             }
-            UiOutput::SessionNew(_)
+            UiOutput::CompactionPending(active) => {
+                self.state.compaction_pending = active;
+            }
+            UiOutput::CompactRequest
+            | UiOutput::SessionNew(_)
             | UiOutput::SessionResume(_)
             | UiOutput::SessionFork(_)
             | UiOutput::SessionDelete(_)

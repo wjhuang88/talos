@@ -4,10 +4,32 @@
 |-------|-------|
 | Story ID | MEM-003 |
 | Priority | P3 |
-| Status | In Progress (T4 delegated to I312; effective only after #817 merge) |
-| Depends On | MEM-002/I024 in Review; close or explicitly accept residuals before activation |
+| Status | In Progress / Partial (T4 delegated to I312; #817 merged and effective) |
+| Depends On | MEM-002/I024 completed lower-layer baseline; higher-layer residuals remain here |
 | Blocks | None |
 | Origin | I024 Day 4 audit gap |
+
+## Current implementation and acceptance mapping — 2026-11-01
+
+The plan and older snapshots below are preserved history. ADR-096 replaces the
+old raw-history mutation architecture with a shared, structured checkpoint over
+the fully budgeted request projection. I312 is active after #817; implementation
+is local and has no merged completion evidence yet.
+
+| Original acceptance | Current replacement and evidence boundary |
+|---|---|
+| Actor calls `Compactor::compact()` / all five layers | Deliberately superseded by ADR-096: Actor automatic/manual paths use the Agent's shared checkpoint pipeline, retaining raw history. The legacy model-assisted API now refuses missing request authority and has no separate summarizer. The literal old call requirement is not claimed satisfied. |
+| 50 heavy-tool turns remain bounded | `session/checkpoint_acceptance_tests.rs::fifty_tool_turns_preserve_semantics_raw_export_and_durable_restart` exercises actual Actor turns, checkpoints and admitted request bounds. This is deterministic fixture evidence, not real-model quality assurance. |
+| Summary failures do not crash/retry storm | Shared bounded stream decoding, checkpoint attempt ledger and manual/automatic failure regressions replace the old independent circuit breaker. |
+| Existing session tests pass | Retained Actor/session regressions must pass on the final candidate; legacy tests expecting unsafe API success are replaced by explicit refusal/input-preservation regressions. |
+| Simulated 50-turn integration | The same real Actor fixture covers semantic markers, raw export and durable restart; text-heavy manual/fork fixtures cover sequential folding. |
+
+The deprecated Compactor signatures remain callable, but always fail before
+provider invocation; this is a behavior-breaking next-minor migration, not a
+compatible preservation of legacy summary behavior. Manual refusal returns the
+original messages. Deterministic utility methods do not confer session authority.
+Full preflight, independent final review, platform CI and merge remain required.
+MEM-003 is not Complete; I312 owns remaining evidence and user-reference sync.
 
 ## Problem
 

@@ -5,8 +5,8 @@ use super::constants::{
 use super::*;
 use crate::token::TokenEstimator;
 use async_trait::async_trait;
-use talos_core::message::{AgentEvent, Message, MessageToolResult, ToolCall, Usage};
-use talos_core::provider::{LanguageModel, ProviderError, ProviderResult};
+use talos_core::message::{AgentEvent, Message, MessageToolResult, ToolCall};
+use talos_core::provider::{LanguageModel, ProviderResult};
 use tokio::sync::mpsc;
 
 type Receiver<T> = mpsc::Receiver<T>;
@@ -67,50 +67,6 @@ fn make_turn(
         msgs.push(tool_msg(id, content));
     }
     msgs
-}
-
-// --- Mock provider that returns a fixed summary ---
-
-struct SummaryMockProvider {
-    summary: String,
-}
-
-impl SummaryMockProvider {
-    fn new(summary: &str) -> Self {
-        Self {
-            summary: summary.into(),
-        }
-    }
-}
-
-#[async_trait]
-impl LanguageModel for SummaryMockProvider {
-    async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
-        let (tx, rx) = mpsc::channel(32);
-        let summary = self.summary.clone();
-        tokio::spawn(async move {
-            let _ = tx.send(AgentEvent::TurnStart).await;
-            let _ = tx.send(AgentEvent::TextDelta { delta: summary }).await;
-            let _ = tx
-                .send(AgentEvent::TurnEnd {
-                    stop_reason: talos_core::message::StopReason::EndTurn,
-                    usage: Usage::default(),
-                })
-                .await;
-        });
-        Ok(rx)
-    }
-}
-
-// --- Mock provider that always fails ---
-
-struct FailingProvider;
-
-#[async_trait]
-impl LanguageModel for FailingProvider {
-    async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
-        Err(ProviderError::ServerError("mock failure".into()))
-    }
 }
 
 // ========== Layer 1: Budget ==========
@@ -298,101 +254,6 @@ fn test_layer3_microcompact_no_duplicates() {
     assert_eq!(result, messages);
 }
 
-// ========== Layer 4: Collapse ==========
-
-#[tokio::test]
-async fn test_layer4_collapse_summarizes_old_turns() {
-    let compactor = Compactor::new(TokenEstimator::new(), 100_000);
-    let mut messages = Vec::new();
-
-    // Create 15 turns
-    for i in 0..15 {
-        messages.extend(make_turn(
-            &format!("query {i}"),
-            &format!("response {i}"),
-            vec![(&format!("call_{i}"), &format!("result {i}"))],
-        ));
-    }
-
-    let provider = SummaryMockProvider::new("Summary of old turns");
-    let result = compactor
-        .apply_collapse(messages, &provider)
-        .await
-        .expect("operation should succeed");
-
-    // First message should be the summary
-    assert!(
-        matches!(&result[0], Message::User { content } if content.contains("Conversation summary"))
-    );
-    assert!(
-        matches!(&result[0], Message::User { content } if content.contains("Summary of old turns"))
-    );
-
-    // Remaining messages should be the last 10 turns (30 messages: 10 * 3)
-    let recent_count = result.len() - 1;
-    assert_eq!(recent_count, 30); // 10 turns * 3 messages each
-}
-
-#[tokio::test]
-async fn test_layer4_collapse_no_op_when_under_threshold() {
-    let compactor = Compactor::new(TokenEstimator::new(), 100_000);
-    let messages = make_turn("query", "response", vec![("call_1", "result")]);
-
-    let provider = SummaryMockProvider::new("summary");
-    let result = compactor
-        .apply_collapse(messages.clone(), &provider)
-        .await
-        .expect("operation should succeed");
-
-    assert_eq!(result, messages);
-}
-
-// ========== Layer 5: Autocompact ==========
-
-#[tokio::test]
-async fn test_layer5_autocompact_summarizes_all_old_turns() {
-    let compactor = Compactor::new(TokenEstimator::new(), 100_000);
-    let mut messages = Vec::new();
-
-    // Create 15 turns
-    for i in 0..15 {
-        messages.extend(make_turn(
-            &format!("query {i}"),
-            &format!("response {i}"),
-            vec![(&format!("call_{i}"), &format!("result {i}"))],
-        ));
-    }
-
-    let provider = SummaryMockProvider::new("Full conversation summary");
-    let result = compactor
-        .apply_autocompact(messages, &provider)
-        .await
-        .expect("operation should succeed");
-
-    // First message should be the summary
-    assert!(
-        matches!(&result[0], Message::User { content } if content.contains("Full conversation summary"))
-    );
-
-    // Remaining messages should be the last 10 turns
-    let recent_count = result.len() - 1;
-    assert_eq!(recent_count, 30); // 10 turns * 3 messages each
-}
-
-#[tokio::test]
-async fn test_layer5_autocompact_no_op_when_under_threshold() {
-    let compactor = Compactor::new(TokenEstimator::new(), 100_000);
-    let messages = make_turn("query", "response", vec![("call_1", "result")]);
-
-    let provider = SummaryMockProvider::new("summary");
-    let result = compactor
-        .apply_autocompact(messages.clone(), &provider)
-        .await
-        .expect("operation should succeed");
-
-    assert_eq!(result, messages);
-}
-
 // ========== should_compact ==========
 
 #[test]
@@ -427,147 +288,6 @@ fn test_should_compact_custom_threshold() {
     let messages = vec![user_msg(&content)];
 
     assert!(compactor.should_compact(&messages));
-}
-
-// ========== Circuit Breaker ==========
-
-#[tokio::test]
-async fn test_circuit_breaker_trips_after_3_failures() {
-    let mut compactor = Compactor::new(TokenEstimator::new(), 1);
-    let mut messages = Vec::new();
-    for i in 0..15 {
-        messages.extend(make_turn(
-            &format!("query {i}"),
-            &format!("response {i}"),
-            vec![(&format!("call_{i}"), &format!("result {i}"))],
-        ));
-    }
-
-    let provider = FailingProvider;
-
-    for _ in 0..3 {
-        let result = compactor.compact(messages.clone(), &provider).await;
-        assert!(result.is_err(), "Expected failure");
-    }
-
-    assert_eq!(compactor.failure_count(), 3);
-
-    let result = compactor.compact(messages.clone(), &provider).await;
-    assert!(matches!(
-        result.expect_err("operation should fail"),
-        CompactionError::CircuitBreakerTripped
-    ));
-}
-
-// ========== Recent turns preservation ==========
-
-#[tokio::test]
-async fn test_recent_turns_preserved_verbatim() {
-    let mut compactor = Compactor::new(TokenEstimator::new(), 100_000);
-    let mut messages = Vec::new();
-
-    // Create 15 turns with unique content
-    for i in 0..15 {
-        messages.extend(make_turn(
-            &format!("unique_query_{i}"),
-            &format!("unique_response_{i}"),
-            vec![(&format!("call_{i}"), &format!("unique_result_{i}"))],
-        ));
-    }
-
-    let provider = SummaryMockProvider::new("summary");
-    let result = compactor
-        .compact(messages.clone(), &provider)
-        .await
-        .expect("operation should succeed");
-
-    // The last 30 messages (10 turns * 3) should match the original last 30
-    let original_recent = &messages[messages.len() - 30..];
-    let result_recent = &result[result.len() - 30..];
-
-    assert_eq!(original_recent, result_recent);
-}
-
-// ========== Seamless continuation ==========
-
-#[tokio::test]
-async fn test_compaction_continues_conversation_seamlessly() {
-    let mut compactor = Compactor::new(TokenEstimator::new(), 160);
-    let mut messages = Vec::new();
-
-    for i in 0..15 {
-        messages.extend(make_turn(
-            &format!("query {i}"),
-            &format!("response {i}"),
-            vec![(&format!("call_{i}"), &format!("result {i}"))],
-        ));
-    }
-
-    let provider = SummaryMockProvider::new("Summary: user asked about files, assistant read them");
-    let compacted = compactor
-        .compact(messages, &provider)
-        .await
-        .expect("operation should succeed");
-
-    assert!(compacted.len() > 1);
-    if let Message::User { content } = &compacted[0] {
-        assert!(
-            content.contains("Summary"),
-            "first message content: {content}"
-        );
-    } else {
-        panic!("first message is not User: {:?}", compacted[0]);
-    }
-    assert!(matches!(compacted.last(), Some(Message::Tool { .. })));
-
-    let mut continued = compacted;
-    continued.push(user_msg("Follow-up question"));
-    assert!(matches!(continued.last(), Some(Message::User { .. })));
-}
-
-// ========== Full compact flow ==========
-
-#[tokio::test]
-async fn test_compact_stops_early_when_budget_layer_suffices() {
-    let mut compactor = Compactor::new(TokenEstimator::new(), 100_000);
-    let long_content = "x".repeat(5000);
-    let messages = vec![tool_msg("call_1", &long_content)];
-
-    // Budget layer should truncate and make it fit
-    let result = compactor
-        .compact(messages, &FailingProvider)
-        .await
-        .expect("operation should succeed");
-
-    assert_eq!(result.len(), 1);
-    if let Message::Tool { result: tr } = &result[0] {
-        assert!(tr.content.len() < 5000);
-        assert!(tr.content.ends_with(TRUNCATION_SUFFIX));
-    }
-}
-
-#[tokio::test]
-async fn test_compact_provider_error_propagates() {
-    let mut compactor = Compactor::new(TokenEstimator::new(), 1);
-    let mut messages = Vec::new();
-
-    // Create enough turns to trigger collapse layer
-    for i in 0..15 {
-        messages.extend(make_turn(
-            &format!("query {i}"),
-            &format!("response {i}"),
-            vec![(&format!("call_{i}"), &format!("result {i}"))],
-        ));
-    }
-
-    let provider = FailingProvider;
-    let result = compactor.compact(messages, &provider).await;
-
-    assert!(result.is_err());
-    assert!(matches!(
-        result.expect_err("operation should fail"),
-        CompactionError::ProviderError(_)
-    ));
 }
 
 // ========== Edge cases ==========
@@ -606,20 +326,6 @@ fn test_apply_budget_one_over_boundary() {
     if let Message::Tool { result: tr } = &result[0] {
         assert!(tr.content.ends_with(TRUNCATION_SUFFIX));
     }
-}
-
-#[tokio::test]
-async fn test_compact_resets_failure_count_on_success() {
-    let mut compactor = Compactor::new(TokenEstimator::new(), 100_000);
-    let long_content = "x".repeat(5000);
-    let messages = vec![tool_msg("call_1", &long_content)];
-
-    // This should succeed (budget layer is enough)
-    let result = compactor.compact(messages, &FailingProvider).await;
-    assert!(result.is_ok());
-
-    // Failure count should be reset to 0
-    assert_eq!(compactor.failure_count(), 0);
 }
 
 // ========== MEM-005-A: CompactionPolicy ==========
@@ -692,61 +398,10 @@ fn test_compact_deterministic_returns_skipped_when_insufficient() {
     assert!(matches!(
         status,
         CompactionStatus::Skipped {
-            reason: "deterministic layers insufficient; LLM layers required",
+            reason: "deterministic layers insufficient; use typed session compaction",
             ..
         }
     ));
-}
-
-// ========== MEM-005-A: manual_compact ==========
-
-#[tokio::test]
-async fn test_manual_compact_skipped_below_threshold() {
-    let mut compactor = Compactor::new(TokenEstimator::new(), 100_000);
-    let messages = vec![user_msg("Hello")];
-
-    let (_result, status) = compactor.manual_compact(messages, &FailingProvider).await;
-
-    assert!(matches!(
-        status,
-        CompactionStatus::Skipped {
-            reason: "below trigger threshold",
-            ..
-        }
-    ));
-}
-
-#[tokio::test]
-async fn test_manual_compact_applied_when_over_threshold() {
-    let mut compactor = Compactor::new(TokenEstimator::new(), 1100);
-    let long_content = "x".repeat(5000);
-    let messages = vec![tool_msg("call_1", &long_content)];
-
-    let (_result, status) = compactor.manual_compact(messages, &FailingProvider).await;
-
-    assert!(matches!(status, CompactionStatus::Applied { .. }));
-}
-
-#[tokio::test]
-async fn test_manual_compact_failed_on_provider_error() {
-    let mut compactor = Compactor::new(TokenEstimator::new(), 1);
-    let mut messages = Vec::new();
-    for i in 0..15 {
-        messages.extend(make_turn(
-            &format!("q{i}"),
-            &format!("r{i}"),
-            vec![(&format!("c{i}"), &format!("d{i}"))],
-        ));
-    }
-
-    let original = messages.clone();
-    let (result, status) = compactor.manual_compact(messages, &FailingProvider).await;
-
-    assert!(matches!(status, CompactionStatus::Failed { .. }));
-    assert_eq!(
-        result, original,
-        "manual compaction failure must preserve original context"
-    );
 }
 
 // ========== MEM-005-A: hidden-output guard ==========
@@ -864,5 +519,56 @@ fn fixture_microcompact_preserves_is_error() {
         assert_eq!(result.content, "second error");
     } else {
         panic!("expected Tool message");
+    }
+}
+
+struct ForbiddenLegacyProvider;
+
+#[async_trait]
+impl LanguageModel for ForbiddenLegacyProvider {
+    async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+        panic!("legacy compaction must never disclose history to a provider");
+    }
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn legacy_model_entry_points_refuse_without_disclosure_or_partial_transformation() {
+    let provider = ForbiddenLegacyProvider;
+    // Empty and fitting input must not disguise an unsupported API as success.
+    for turns in [0, 1, 50] {
+        let mut raw = Vec::new();
+        for turn in 0..turns {
+            raw.extend(make_turn(
+                &format!("original request {turn}"),
+                "original response",
+                vec![("private_tool", &"private-output".repeat(1_000))],
+            ));
+        }
+        let original = serde_json::to_value(&raw).expect("raw snapshot");
+        for limit in [1, u32::MAX] {
+            let mut legacy = Compactor::new(TokenEstimator::new(), limit);
+            for result in [
+                legacy.compact(raw.clone(), &provider).await,
+                legacy.apply_collapse(raw.clone(), &provider).await,
+                legacy.apply_autocompact(raw.clone(), &provider).await,
+            ] {
+                let error = result.expect_err("bare history cannot grant request authority");
+                assert!(matches!(error, CompactionError::CompactionFailed(_)));
+                assert!(error.to_string().contains("RuntimeHandle::compact"));
+                assert!(!error.to_string().contains("private-output"));
+            }
+            let (returned, status) = legacy.manual_compact(raw.clone(), &provider).await;
+            assert_eq!(
+                serde_json::to_value(returned).expect("returned snapshot"),
+                original
+            );
+            assert!(matches!(status, CompactionStatus::Failed { .. }));
+            assert!(!format!("{status:?}").contains("private-output"));
+            assert_eq!(
+                serde_json::to_value(&raw).expect("input snapshot"),
+                original
+            );
+        }
     }
 }

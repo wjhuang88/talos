@@ -31,8 +31,6 @@ use talos_session::PendingSubmissionStore;
 
 #[doc(hidden)]
 pub use crate::background_jobs::BackgroundJobFinalizerHandle;
-use crate::compaction::Compactor;
-use crate::token::TokenEstimator;
 use crate::{
     ActivatedSkillContext, Agent, SteeringBoundaryAcknowledgement, SteeringBoundaryBatch,
     SteeringBoundaryRequest,
@@ -40,6 +38,7 @@ use crate::{
 
 mod custody;
 mod lifecycle;
+mod manual_compaction;
 mod turn;
 
 #[doc(hidden)]
@@ -114,6 +113,7 @@ fn immediate_started_turn(
             },
         });
         Some(TurnRecord {
+            persisted_entry_ids: Vec::new(),
             new_messages: Vec::new(),
             status,
             completion,
@@ -138,7 +138,8 @@ pub struct AppServerSession {
     sq_rx: tokio::sync::mpsc::Receiver<SessionOp>,
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     history: Vec<Message>,
-    compactor: Compactor,
+    recovered_source: Option<crate::compaction::HistorySource>,
+    post_turn_pressure: crate::checkpoint_progress::PostTurnPressure,
     session_file: Option<PathBuf>,
     session_dir: Option<PathBuf>,
     persistence: Option<TurnPersistence>,
@@ -165,7 +166,6 @@ impl AppServerSession {
         let (eq_tx, eq_rx) = mpsc::unbounded_channel();
 
         let handle = SessionHandle { sq_tx, eq_rx };
-        let compactor = Compactor::new(TokenEstimator::new(), config.model_context_limit);
         let instance_id = NEXT_RUNTIME_SESSION_ID.fetch_add(1, Ordering::Relaxed);
         let session_id = format!("runtime_{}_{}", std::process::id(), instance_id);
         let background_jobs = crate::background_jobs::BackgroundJobSupervisor::new(
@@ -189,11 +189,12 @@ impl AppServerSession {
             sq_rx,
             eq_tx,
             history: config.initial_history,
-            compactor,
             session_file: None,
             session_dir: None,
             persistence: None,
             durable_persistence: None,
+            recovered_source: None,
+            post_turn_pressure: Default::default(),
             pending_store,
             session_id,
             session_generation: 0,
@@ -212,6 +213,7 @@ impl AppServerSession {
     /// Assigns the authoritative generation before this Actor is spawned.
     pub fn set_generation(&mut self, generation: u64) {
         self.session_generation = generation;
+        self.post_turn_pressure = Default::default();
         self.background_jobs
             .set_identity(self.session_id.clone(), generation);
     }
@@ -256,6 +258,7 @@ impl AppServerSession {
         metadata: talos_session::SessionMetadata,
     ) {
         self.pending_store = PendingSubmissionStore::for_session(&session);
+        self.recovered_source = None;
         self.session_id = session.id.to_string();
         self.background_jobs
             .set_identity(self.session_id.clone(), self.session_generation);
@@ -268,6 +271,7 @@ impl AppServerSession {
         session: talos_session::DurableSession,
         policy: talos_session::PersistencePolicy,
     ) {
+        self.recovered_source = None;
         let session_id = session.id().to_string();
         self.pending_store =
             PendingSubmissionStore::for_session_file(session.file_path(), &session_id);
@@ -275,6 +279,41 @@ impl AppServerSession {
         self.background_jobs
             .set_identity(self.session_id.clone(), self.session_generation);
         self.durable_persistence = Some(DurableTurnPersistence { session, policy });
+    }
+
+    /// Bind recovered messages to entries in the configured durable session.
+    /// Exact message equality and the current session namespace are required;
+    /// oversized or inconsistent snapshots disable durable source reuse.
+    pub fn set_recovered_history_sources(
+        &mut self,
+        snapshot: talos_session::DurableHistorySnapshot,
+    ) {
+        self.recovered_source = None;
+        let Some(durable) = &self.durable_persistence else {
+            return;
+        };
+        let entries = snapshot.entries();
+        if snapshot.session_id() != durable.session.id()
+            || entries.len() > 8192
+            || entries.len() != self.history.len()
+            || entries
+                .iter()
+                .zip(&self.history)
+                .any(|((_, message), raw)| message != raw)
+        {
+            return;
+        }
+        let namespace = durable.session.id();
+        let ids = entries
+            .iter()
+            .map(|(id, _)| format!("tlog:{namespace}:{id}"))
+            .collect();
+        self.recovered_source = crate::compaction::HistorySource::bind(
+            self.session_generation,
+            self.history.len() as u64,
+            &self.history,
+            ids,
+        );
     }
 
     /// Runs the session actor until shutdown or SQ disconnect.
@@ -374,9 +413,17 @@ impl AppServerSession {
             &mut recent_item_ids,
         );
         let mut shutting_down = false;
+        let mut compact = manual_compaction::ManualCompaction::new(self.session_generation);
 
         loop {
+            if shutting_down {
+                compact.cancel(self);
+            }
+            if current_turn.is_none() && !shutting_down {
+                compact.start(self);
+            }
             if current_turn.is_none()
+                && !compact.is_running()
                 && !paused
                 && let Some(submission) = pending.pop_front()
             {
@@ -434,11 +481,18 @@ impl AppServerSession {
                 }
             }
 
-            if shutting_down && current_turn.is_none() && pending.is_empty() {
+            if shutting_down
+                && current_turn.is_none()
+                && !compact.is_running()
+                && pending.is_empty()
+            {
                 break;
             }
 
             tokio::select! {
+                result = compact.wait(), if compact.is_running() => {
+                    compact.complete(self, result);
+                }
                 completed = async {
                     match current_turn.as_mut() {
                         Some(turn) => Some(turn.await),
@@ -563,6 +617,7 @@ impl AppServerSession {
                 op = self.sq_rx.recv(), if !shutting_down => {
                     let Some(op) = op else {
                         shutting_down = true;
+                        compact.cancel(self);
                         let should_interrupt = self.runtime_admission.as_ref().is_none_or(|control| {
                             !matches!(
                                 control.shutdown_policy(),
@@ -588,6 +643,12 @@ impl AppServerSession {
                         continue;
                     };
                     match op {
+                        SessionOp::CancelCompact { session_generation, operation_id } => {
+                            compact.cancel_operation(self, session_generation, operation_id);
+                        }
+                        SessionOp::Compact { session_generation, operation_id } => {
+                            compact.admit(self, session_generation, operation_id);
+                        }
                         SessionOp::Submit { message } => {
                             submission_counter = submission_counter.saturating_add(1);
                             let submission = compatibility_submission(
@@ -706,6 +767,7 @@ impl AppServerSession {
                             self.reconcile_submission(&submission, receipt_tx.as_ref());
                         }
                         SessionOp::Interrupt => {
+                            compact.cancel(self);
                             if let Some(token) = &cancel_token {
                                 token.cancel();
                             } else if !pending.is_empty() {
@@ -747,7 +809,7 @@ impl AppServerSession {
                             }
                         }
                         SessionOp::SetSkillContext { name, content } => {
-                            if current_turn.is_some() || !pending.is_empty() {
+                            if current_turn.is_some() || compact.is_running() || !pending.is_empty() {
                                 let _ = self.eq_tx.send(SessionEvent::Error {
                                     message: "cannot change active skill while a turn is active"
                                         .into(),
@@ -771,6 +833,7 @@ impl AppServerSession {
                         }
                         SessionOp::Shutdown => {
                             shutting_down = true;
+                            compact.cancel(self);
                             let should_interrupt = self.runtime_admission.as_ref().is_none_or(|control| {
                                 !matches!(
                                     control.shutdown_policy(),
@@ -833,7 +896,12 @@ impl AppServerSession {
                                 &mut delivered_boundary,
                             )
                         };
-                        let _ = request.response.send(injected);
+                        if !shutting_down && let Some(token) = cancel_token.as_ref().filter(|token| !token.is_cancelled()) {
+                            compact.start_boundary(self, request, injected, token);
+                        } else {
+                            let _ = request.compact.send(None);
+                            let _ = request.response.send(injected);
+                        }
                     } else {
                         current_boundary_rx = None;
                     }
@@ -960,9 +1028,19 @@ impl AppServerSession {
     }
 
     fn commit_turn_record(&mut self, record: TurnRecord) {
-        for msg in record.new_messages {
-            self.history.push(msg);
-        }
+        let start = self.history.len();
+        self.history.extend(record.new_messages);
+        self.recovered_source = crate::compaction::HistorySource::bind_committed(
+            self.session_generation,
+            &self.history,
+            self.recovered_source.as_ref(),
+            start,
+            self.durable_persistence
+                .as_ref()
+                .map(|durable| durable.session.id().to_string())
+                .as_deref(),
+            &record.persisted_entry_ids,
+        );
     }
 
     async fn start_submission(
@@ -971,35 +1049,44 @@ impl AppServerSession {
         turn_counter: u64,
         token: CancellationToken,
     ) -> Result<StartedTurn, UnstartedOutcome> {
+        // Durable segment archival retains original records and is independent
+        // of the model request projection. Never replace Actor history here.
+        if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
+            let _ = self.try_archive_session(file, dir);
+        }
+        if let Some(estimated_tokens) = self.post_turn_pressure.take() {
+            tracing::debug!(
+                estimated_tokens,
+                "post-turn pressure requires fresh request assessment"
+            );
+        }
+        // Prior work cannot mark a later turn's slot, including after cancellation.
+        // Admission below still evaluates the newly assembled complete request.
+        self.post_turn_pressure = Default::default();
+        let checkpoint_observer = crate::checkpoint_progress::CheckpointObserver {
+            sender: self.eq_tx.clone(),
+            session_id: self.session_id.clone(),
+            generation: self.session_generation,
+            admission: self.runtime_admission.clone(),
+            post_turn_pressure: self.post_turn_pressure.clone(),
+        };
         let runtime_managed = self.runtime_admission.is_some();
         let prepared_before_commit = if runtime_managed {
             None
         } else {
-            if self.compactor.should_compact(&self.history) {
-                let compacted = self.compactor.apply_budget(self.history.clone());
-                let compacted = self.compactor.apply_trim(compacted);
-                let compacted = self.compactor.apply_microcompact(compacted);
-                self.history = match self
-                    .compactor
-                    .compact(compacted, self.agent.provider())
-                    .await
-                {
-                    Ok(history) => history,
-                    Err(_) => self.compactor.compact_deterministic(self.history.clone()).0,
-                };
-                if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
-                    let _ = self.try_archive_session(file, dir, &self.history);
-                }
-            }
             if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
                 None
             } else {
                 match self
                     .agent
-                    .prepare_session_turn(
+                    .prepare_session_turn_at_revision(
                         &submission.items,
                         self.history.clone(),
                         self.model_context_limit,
+                        self.session_generation,
+                        self.history.len() as u64,
+                        self.recovered_source.as_ref(),
+                        Some(checkpoint_observer.clone()),
                     )
                     .await
                 {
@@ -1104,42 +1191,6 @@ impl AppServerSession {
             payload: TurnEventPayload::Started,
         });
 
-        if runtime_managed && self.compactor.should_compact(&self.history) {
-            let compacted = self.compactor.apply_budget(self.history.clone());
-            let compacted = self.compactor.apply_trim(compacted);
-            let compacted = self.compactor.apply_microcompact(compacted);
-            let compact_result = tokio::select! {
-                () = token.cancelled() => {
-                    return Ok(immediate_started_turn(
-                        self.eq_tx.clone(),
-                        self.session_id.clone(),
-                        turn_id,
-                        token,
-                        structured,
-                        TurnCompletionStatus::Cancelled,
-                    ));
-                }
-                result = self.compactor.compact(compacted, self.agent.provider()) => result,
-            };
-            self.history = match compact_result {
-                Ok(history) => history,
-                Err(_) => self.compactor.compact_deterministic(self.history.clone()).0,
-            };
-            if token.is_cancelled() {
-                return Ok(immediate_started_turn(
-                    self.eq_tx.clone(),
-                    self.session_id.clone(),
-                    turn_id,
-                    token,
-                    structured,
-                    TurnCompletionStatus::Cancelled,
-                ));
-            }
-            if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
-                let _ = self.try_archive_session(file, dir, &self.history);
-            }
-        }
-
         let prepared_turn = if !runtime_managed {
             prepared_before_commit
         } else if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
@@ -1156,10 +1207,14 @@ impl AppServerSession {
                         TurnCompletionStatus::Cancelled,
                     ));
                 }
-                result = self.agent.prepare_session_turn(
+                result = self.agent.prepare_session_turn_at_revision(
                     &submission.items,
                     self.history.clone(),
                     self.model_context_limit,
+                    self.session_generation,
+                    self.history.len() as u64,
+                    self.recovered_source.as_ref(),
+                    Some(checkpoint_observer.clone()),
                 ) => result,
             };
             match prepare_result {
@@ -1217,6 +1272,7 @@ impl AppServerSession {
                             },
                         });
                         return Some(TurnRecord {
+                            persisted_entry_ids: Vec::new(),
                             new_messages: Vec::new(),
                             status: TurnRecordStatus::Cancelled,
                             completion,
@@ -1289,6 +1345,7 @@ impl AppServerSession {
                     },
                 });
                 Some(TurnRecord {
+                    persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: record_status,
                     completion,
@@ -1363,7 +1420,6 @@ impl AppServerSession {
         &self,
         file: &Path,
         dir: &Path,
-        _compacted: &[Message],
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         use talos_session::CompactTextSessionStore;
         use talos_session::compaction_engine::CompactionEngine;

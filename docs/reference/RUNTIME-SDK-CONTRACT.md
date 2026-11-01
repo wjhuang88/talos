@@ -526,3 +526,57 @@ claimed by this source-development contract.
 Consumers using `talos_config::ModelConfig` directly must account for its new optional
 `reasoning_supported` field. See [the configuration migration](MODEL-CAPABILITY-INFERENCE.md#rust-configuration-migration)
 for source compatibility and the required next pre-1.0 minor release boundary.
+
+## Unreleased I312 manual compaction migration
+
+Direct `talos-agent` consumers must migrate the deprecated legacy
+`Compactor::{compact, apply_collapse, apply_autocompact, manual_compact}` methods
+to the Runtime/Session operation below. The first three now always return
+`CompactionError::CompactionFailed`; `manual_compact` returns unchanged input and
+`CompactionStatus::Failed`. They perform neither provider calls nor partial
+preprocessing, even for empty/fitting inputs. Keeping the signatures does not
+preserve behavior: this is a next-minor migration under ADR-096, not a patch fix.
+Bare history/provider references cannot establish request/privacy authority.
+Deterministic Compactor utilities remain caller-owned transformations and cannot
+authorize dispatch or replacement of durable history.
+
+`SessionOp::Compact { session_generation, operation_id }` and matching
+`CancelCompact` expand the public Rust
+operation enum. Exhaustive consumers must add a handler (or an explicit unsupported
+response). Ship this change only with the next pre-1.0 minor release per ADR-096.
+The Runtime facade exposes `RuntimeHandle::compact(operation_id)` / `cancel_compact(operation_id)` and re-exports
+`CompactState`/`CompactOutcome`/`CompactFailureReason`. Await transient `SessionEvent::CompactStatus` for
+the result; successful enqueue is not successful compaction. IDs are monotonic per
+runtime generation; one operation may be pending, 64 terminal receipts are retained,
+and duplicate retained IDs return the prior result with `replayed: true`.
+
+Compaction preserves raw history and emits no user/assistant turn. An active turn
+defers manual execution until a complete tool-batch boundary or turn completion.
+The Actor holds continuation permission while preparing and applying the candidate.
+An unchanged continuation reuses its observed request; new steering input creates
+a different request. Observation denial or interruption aborts that continuation
+without retrying its hook. Interrupt/shutdown cancel pending work.
+Status contains bounded enums and numeric estimates, never checkpoint text.
+Exhaustive `CompactOutcome` matches must also handle `FailedWithEstimate { before,
+reason }` and `CancelledWithEstimate { before }`. `FailedWithEstimate` retains the
+whole-request estimate and a `CompactFailureReason` (`Preparation`, `Provider`,
+`Timeout`, or `CommitRejected`); `Failed` means no estimate is available. These
+failures preserve the prior projection and do not expose provider error strings.
+The `CancelledWithEstimate` outcome retains an already measured request count;
+`Cancelled` means no count is available. New operations never inherit a previous
+operation's measurement; receipt replay retains the original completed value. The
+external SDK fixture exhaustively matches and JSON-round-trips every terminal
+outcome and failure category, and exercises below-threshold compaction before an
+ordinary turn in both dependency modes. Its constructed failure cases verify the
+public contract, not execution of each failure path or long-history semantic retention.
+
+Automatic attempts emit `SessionEvent::AutomaticCompactStatus` directly, including
+initial request preparation before an ordinary turn starts. The Runtime re-exports
+`AutomaticCompactState` and `AutomaticCompactFailure`; variant tags and typed
+failure categories are bounded reason codes, with whole-request token estimates.
+Consumers should display these as transient progress, reject old generations and
+continue waiting for the ordinary turn's terminal event. Automatic status is not a
+manual operation receipt and does not complete the turn or write transcript text.
+Cancellation before the shared Runtime checkpoint commit gate prevents installation;
+cancellation after Applied does not undo that projection. Provider error strings,
+summary content and image bytes are never included in these status events.

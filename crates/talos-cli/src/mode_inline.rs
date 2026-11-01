@@ -153,7 +153,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         &display_name,
         &cli,
         ResumeSelection::Disabled,
-        false,
+        true,
     )?;
 
     set_todo_prompt_provider(&mut agent, &session_manager, &session);
@@ -214,6 +214,10 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         if input == "/quit" || input == "/exit" {
             break;
         }
+        if input.split_whitespace().next() == Some("/compact") && input != "/compact" {
+            eprintln!("Usage: /compact");
+            continue;
+        }
         if input == "/skills" || input.starts_with("/skills ") {
             handle_inline_skills_command(input, &mut runtime_skills, &handle.sq_tx).await;
             continue;
@@ -221,17 +225,47 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
 
         let _ = handle
             .sq_tx
-            .send(match request_preview_payload(input) {
-                Some(message) => SessionOp::PreviewRequest { message },
-                None => SessionOp::Submit {
-                    message: input.to_string(),
-                },
+            .send(if input == "/compact" {
+                crate::mode_runtime::manual_compact_operation(session_generation)?
+            } else {
+                match request_preview_payload(input) {
+                    Some(message) => SessionOp::PreviewRequest { message },
+                    None => SessionOp::Submit {
+                        message: input.to_string(),
+                    },
+                }
             })
             .await;
 
         let mut turn_done = false;
         while let Some(event) = eq_rx.recv().await {
             match event {
+                SessionEvent::AutomaticCompactStatus { state, .. } => {
+                    println!(
+                        "{}",
+                        talos_conversation::format_automatic_compact_status(state)
+                    );
+                }
+                SessionEvent::CompactStatus {
+                    operation_id,
+                    state,
+                    ..
+                } => {
+                    println!(
+                        "{}",
+                        talos_conversation::format_compact_status(operation_id, state)
+                    );
+                    if matches!(
+                        state,
+                        talos_core::session::CompactState::Completed { .. }
+                            | talos_core::session::CompactState::Busy
+                            | talos_core::session::CompactState::Expired
+                            | talos_core::session::CompactState::StaleGeneration
+                    ) {
+                        turn_done = true;
+                        break;
+                    }
+                }
                 SessionEvent::BackgroundJobTerminal { summary, .. } => {
                     eprintln!("{}", format_background_terminal(&summary));
                 }

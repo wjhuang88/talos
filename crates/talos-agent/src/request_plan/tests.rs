@@ -53,6 +53,7 @@ fn budget_plan(agent: &Agent, messages: Vec<Message>) -> ProviderRequestPlan {
         estimated_tokens: agent.estimate_provider_request_tokens(&messages, &[]),
         messages,
         tool_definitions: Vec::new(),
+        ephemeral_image_tokens: 0,
         omitted_tool_exchanges: 0,
         tool_protocol: talos_core::tool::ToolProtocol::Native,
     }
@@ -83,7 +84,7 @@ fn recovery_preserves_instructions_latest_exchange_and_original_history() {
     let original = history.clone();
     let mut plan = budget_plan(&agent, history.clone());
     agent
-        .recover_request_budget(&mut plan, Some(2_000), 0)
+        .recover_request_budget(&mut plan, Some(2_000))
         .expect("bounded recovery");
     assert!(plan.estimated_tokens <= 2_000);
     assert_eq!(plan.omitted_tool_exchanges, 1);
@@ -112,7 +113,7 @@ fn recovery_refuses_incomplete_or_duplicate_tool_results() {
     let mut plan = budget_plan(&agent, malformed.clone());
     assert!(
         agent
-            .recover_request_budget(&mut plan, Some(1_000), 0)
+            .recover_request_budget(&mut plan, Some(1_000))
             .is_err()
     );
     assert_eq!(plan.messages, malformed);
@@ -136,7 +137,7 @@ fn recovery_removes_parallel_calls_and_results_atomically() {
     assert_eq!(complete_tool_exchanges(&history), vec![0..3, 3..5]);
     let mut plan = budget_plan(&agent, history);
     agent
-        .recover_request_budget(&mut plan, Some(1_000), 0)
+        .recover_request_budget(&mut plan, Some(1_000))
         .expect("recovery");
     assert_eq!(complete_tool_exchanges(&plan.messages), vec![0..2]);
     assert!(!plan.messages.iter().any(|message| matches!(message, Message::Tool { result } if result.tool_use_id == "a" || result.tool_use_id == "b")));
@@ -168,7 +169,7 @@ fn replay_reasoning_is_counted_and_never_removed() {
     let mut plan = budget_plan(&agent, history.clone());
     assert!(
         agent
-            .recover_request_budget(&mut plan, Some(1_000), 0)
+            .recover_request_budget(&mut plan, Some(1_000))
             .is_err()
     );
     assert_eq!(plan.messages, history);
@@ -615,5 +616,43 @@ async fn multiple_declared_images_saturate_budget_instead_of_overflowing() {
             .lock()
             .expect("operation should succeed")
             .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn actor_generation_and_raw_revision_survive_request_preparation() {
+    let agent = budget_test_agent();
+    let raw = vec![Message::User {
+        content: "original task".into(),
+    }];
+    let items = vec![SubmissionItem {
+        id: "next".into(),
+        enqueue_sequence: 0,
+        kind: SubmissionKind::UserTurn,
+        text: "continue".into(),
+        attachments: vec![],
+    }];
+    let prepared = agent
+        .prepare_session_turn_at_revision(&items, raw.clone(), 128_000, 42, 1, None, None)
+        .await
+        .expect("prepared source snapshot");
+    let source = prepared.history_source.expect("raw binding");
+    assert_eq!(source.generation(), 42);
+    assert_eq!(source.revision(), 1);
+    assert!(
+        source
+            .resolve(42, 1, 0, &raw[0])
+            .is_some_and(|id| id.starts_with("generation:42:entry:0:"))
+    );
+    assert_eq!(source.resolve(41, 1, 0, &raw[0]), None);
+    assert_eq!(source.resolve(42, 2, 0, &raw[0]), None);
+    assert_eq!(
+        source.resolve(
+            42,
+            1,
+            prepared.messages.len() - 1,
+            prepared.messages.last().expect("current input")
+        ),
+        None
     );
 }

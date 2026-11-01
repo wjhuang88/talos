@@ -222,6 +222,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
     let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
     let mut turn_state = BridgeTurnState::Idle;
     let mut deferred_accepted = None;
+    let mut pending_compact: Option<(u64, u64)> = None;
     let mut boundary_submission: Option<BoundarySubmission> = None;
     let mut known_sender = sq_tx_watch.borrow().clone();
     let mut sender_generation = authoritative_generation_for_sender(&known_sender).unwrap_or(0);
@@ -239,6 +240,8 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         if let Some(current_generation) =
                             authoritative_generation_for_sender(&current_sender)
                         {
+                            pending_compact = None;
+                            let _ = ui_tx.send(UiOutput::CompactionPending(false));
                             sender_generation = current_generation;
                             known_sender = current_sender;
                             // A new/resumed/forked session publishes a fresh command sender.
@@ -275,6 +278,15 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
             event = agent_rx.recv() => {
                 match event {
                     Some(event) => {
+                        if let SessionEvent::CompactStatus { session_generation, operation_id, state, .. } = &event
+                            && pending_compact == Some((*session_generation, *operation_id))
+                            && matches!(state, talos_core::session::CompactState::Completed { .. }
+                                | talos_core::session::CompactState::Busy
+                                | talos_core::session::CompactState::Expired
+                                | talos_core::session::CompactState::StaleGeneration) {
+                            pending_compact = None;
+                            let _ = ui_tx.send(UiOutput::CompactionPending(false));
+                        }
                         handle_session_event(
                             event,
                             &mut engine,
@@ -302,6 +314,30 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                     UiOutput::Exit => {
                                         let _ = ui_tx.send(UiOutput::Exit);
                                         return;
+                                    }
+                                    UiOutput::CompactRequest => {
+                                        if pending_compact.is_some() {
+                                            emit_bridge_error(&ui_tx, "manual compaction already pending");
+                                            continue;
+                                        }
+                                        let sender = sq_tx_watch.borrow().clone();
+                                        match authoritative_generation_for_sender(&sender)
+                                            .ok_or_else(|| anyhow::anyhow!("active session generation unavailable"))
+                                            .and_then(crate::mode_runtime::manual_compact_operation)
+                                        {
+                                            Ok(operation) => {
+                                                if let SessionOp::Compact { session_generation, operation_id } = &operation {
+                                                    pending_compact = Some((*session_generation, *operation_id));
+                                                }
+                                                if sender.try_send(operation).is_err() {
+                                                    pending_compact = None;
+                                                    emit_bridge_error(&ui_tx, "manual compaction queue unavailable");
+                                                } else {
+                                                    let _ = ui_tx.send(UiOutput::CompactionPending(true));
+                                                }
+                                            },
+                                            Err(error) => emit_bridge_error(&ui_tx, &error.to_string()),
+                                        }
                                     }
                                     UiOutput::SessionNew(req) => {
                                         if session_mutation_blocked(&turn_state, &engine) {
@@ -556,6 +592,13 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         }
                     }
                     UserInput::Cancel => {
+                        if let Some((session_generation, operation_id)) = pending_compact {
+                            let sender = sq_tx_watch.borrow().clone();
+                            if authoritative_generation_for_sender(&sender) == Some(session_generation)
+                                && sender.try_send(SessionOp::CancelCompact { session_generation, operation_id }).is_err() {
+                                emit_bridge_error(&ui_tx, "manual compaction cancellation queue unavailable");
+                            }
+                        }
                         request_cancel(&mut turn_state, &sq_tx_watch, &ui_tx);
                     }
                     UserInput::Exit => {
@@ -610,6 +653,35 @@ async fn handle_session_event(
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
 ) {
     match event {
+        SessionEvent::AutomaticCompactStatus {
+            session_generation,
+            state,
+            ..
+        } => {
+            if authoritative_generation_for_sender(&sq_tx_watch.borrow())
+                == Some(session_generation)
+            {
+                let _ = ui_tx.send(UiOutput::Tip {
+                    text: talos_conversation::format_automatic_compact_status(state),
+                    kind: TipKind::Info,
+                });
+            }
+        }
+        SessionEvent::CompactStatus {
+            session_generation,
+            operation_id,
+            state,
+            ..
+        } => {
+            if authoritative_generation_for_sender(&sq_tx_watch.borrow())
+                == Some(session_generation)
+            {
+                let _ = ui_tx.send(UiOutput::Tip {
+                    text: talos_conversation::format_compact_status(operation_id, state),
+                    kind: TipKind::Info,
+                });
+            }
+        }
         SessionEvent::SubmissionReceipt {
             session_id,
             session_generation,

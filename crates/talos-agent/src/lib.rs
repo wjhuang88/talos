@@ -56,6 +56,12 @@ use std::sync::Arc;
 
 pub mod auto_resolver;
 pub mod caching;
+mod checkpoint_attempts;
+mod checkpoint_context;
+mod checkpoint_manual;
+mod checkpoint_progress;
+mod checkpoint_projection;
+mod checkpoint_request;
 mod configuration;
 pub mod context;
 pub mod evaluator;
@@ -96,7 +102,13 @@ pub use compression::{CompressionMetrics, RetrievalMetrics};
 pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
 pub(crate) use request_plan::PreparedSessionTurn;
 
+pub(crate) struct BoundaryCompactJob {
+    pub(crate) measurement: Arc<std::sync::Mutex<Option<u32>>>,
+    pub(crate) result: tokio::sync::oneshot::Sender<checkpoint_manual::ManualCheckpointResult>,
+}
+
 pub(crate) struct SteeringBoundaryRequest {
+    pub(crate) compact: tokio::sync::oneshot::Sender<Option<BoundaryCompactJob>>,
     pub(crate) response: tokio::sync::oneshot::Sender<Option<SteeringBoundaryBatch>>,
 }
 
@@ -337,6 +349,12 @@ pub struct Agent {
     image_input_supported: bool,
     /// Exact output reserve and conservative input-estimation policy.
     request_budget_spec: RequestBudgetSpec,
+    checkpoint_sequence: std::sync::atomic::AtomicU64,
+    checkpoint_attempts: std::sync::Mutex<checkpoint_attempts::CheckpointAttempts>,
+    checkpoint_projection_state:
+        std::sync::Mutex<Option<checkpoint_projection::CheckpointProjection>>,
+    checkpoint_result_receipts:
+        std::sync::Mutex<std::collections::VecDeque<checkpoint_context::ResultReceipt>>,
     background_jobs: Option<Arc<dyn talos_core::background_job::BackgroundJobHost>>,
     /// Per-agent cache for endpoint/model protocol capability evidence.
     protocol_capability_cache: talos_core::tool::ProtocolCapabilityCache,
@@ -818,6 +836,8 @@ impl Agent {
             mut active_presented_tool_names,
             initial_plan,
             request_context_limit,
+            mut history_source,
+            checkpoint_observer,
         } = prepared;
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
@@ -829,6 +849,7 @@ impl Agent {
         let mut protocol_recovery_attempts = 0u8;
         let mut protocol_override = None;
         let mut private_tokens = transient_text::PrivateTokens::default();
+        let mut maintenance_plan = None;
 
         if let Some(pipeline) = self.permission_pipeline.as_ref() {
             const MAX_OBSERVED_USER_MESSAGES: usize = 8;
@@ -874,21 +895,52 @@ impl Agent {
                 ));
         }
 
+        let mut boundary_observed_plan = None;
+        let mut boundary_observation_error = None;
         let (result, final_status) = 'turn_loop: loop {
+            if let Some(error) = boundary_observation_error.take() {
+                break (Err(error), TurnStatus::Denied);
+            }
             let plan = if let Some(plan) = initial_plan.take() {
                 plan
             } else {
-                match self
-                    .seal_provider_request_plan(
+                if let Some(source) = &mut history_source
+                    && !source.bind_continuation(&messages, persist_start).await
+                {
+                    history_source = None;
+                }
+                let observed = if let Some(observed) = boundary_observed_plan.take() {
+                    pending_continuation_parts.clear();
+                    Ok(observed)
+                } else {
+                    self.observe_provider_request_plan(
                         &hook_ctx,
                         &messages,
                         &active_tool_definitions,
                         &mut pending_continuation_parts,
-                        request_context_limit,
                         &private_tokens,
                     )
                     .await
-                {
+                };
+                let sealed = match observed {
+                    Ok(mut observed) => {
+                        match self.reserve_ephemeral_images(&mut observed, &pending_images) {
+                            Ok(()) => {
+                                self.seal_observed_request_plan(
+                                    observed,
+                                    request_context_limit,
+                                    &private_tokens,
+                                    history_source.as_ref(),
+                                    checkpoint_observer.as_ref(),
+                                )
+                                .await
+                            }
+                            Err(error) => Err(error),
+                        }
+                    }
+                    Err(error) => Err(error),
+                };
+                match sealed {
                     Ok(plan) => plan,
                     Err(error) => {
                         self.emit_budget_rejection(&error, event_tx.as_ref());
@@ -929,6 +981,9 @@ impl Agent {
             );
 
             let (progress_tx, mut progress_rx) = mpsc::unbounded_channel();
+            if checkpoint_observer.is_some() {
+                maintenance_plan = Some((plan.clone(), messages.len()));
+            }
             let browser_tool_names: Vec<String> = plan
                 .tool_definitions
                 .iter()
@@ -1694,6 +1749,9 @@ impl Agent {
                             ..ui_result.clone()
                         }
                     };
+                    if observed.call == *call {
+                        self.record_checkpoint_result(&call.name, &llm_result);
+                    }
                     messages.push(Message::Tool { result: llm_result });
                 }
 
@@ -1734,11 +1792,98 @@ impl Agent {
             }
             if let Some(boundary_tx) = &boundary_tx {
                 let (response, injected) = tokio::sync::oneshot::channel();
+                let (compact, compact_job) = tokio::sync::oneshot::channel();
                 if boundary_tx
-                    .send(SteeringBoundaryRequest { response })
+                    .send(SteeringBoundaryRequest { response, compact })
                     .is_ok()
-                    && let Ok(Some(batch)) = injected.await
+                    && let Ok(Some(mut job)) = compact_job.await
                 {
+                    let deadline =
+                        tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+                    let mut measured_before = None;
+                    let preparation = async {
+                        let Some(limit) = request_context_limit else {
+                            return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed,
+                            );
+                        };
+                        let Some(source) = history_source.as_mut() else {
+                            return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed,
+                            );
+                        };
+                        if !source
+                            .bind_continuation_until(&messages, persist_start, deadline)
+                            .await
+                        {
+                            return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed,
+                            );
+                        }
+                        let mut parts = pending_continuation_parts.clone();
+                        // Once observation starts, failure/cancellation must not retry
+                        // a potentially effectful or explicitly denying hook.
+                        boundary_observation_error = Some(AgentError::ToolError(
+                            "continuation request observation did not complete".into(),
+                        ));
+                        let Ok(mut plan) = self
+                            .observe_provider_request_plan(
+                                &hook_ctx,
+                                &messages,
+                                &active_tool_definitions,
+                                &mut parts,
+                                &private_tokens,
+                            )
+                            .await
+                        else {
+                            return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed,
+                            );
+                        };
+                        // Preserve exactly the hook-observed request even when folding
+                        // fails or is cancelled. Actor application is a separate decision.
+                        boundary_observation_error = None;
+                        boundary_observed_plan = Some(plan.clone());
+                        if self
+                            .reserve_ephemeral_images(&mut plan, &pending_images)
+                            .is_err()
+                        {
+                            return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                talos_core::session::CompactOutcome::Failed,
+                            );
+                        }
+                        measured_before = Some(plan.estimated_tokens);
+                        if let Ok(mut value) = job.measurement.lock() {
+                            *value = measured_before;
+                        }
+                        self.prepare_manual_checkpoint(
+                            &mut plan,
+                            limit,
+                            &private_tokens,
+                            source,
+                            deadline,
+                        )
+                        .await
+                    };
+                    tokio::select! { biased;
+                        () = job.result.closed() => {},
+                        result = tokio::time::timeout_at(deadline, preparation) => {
+                            let result = result.unwrap_or(checkpoint_manual::ManualCheckpointResult::Outcome(
+                                match measured_before {
+                                    Some(before) => talos_core::session::CompactOutcome::FailedWithEstimate {
+                                        before,
+                                        reason: talos_core::session::CompactFailureReason::Timeout,
+                                    },
+                                    None => talos_core::session::CompactOutcome::Failed,
+                                }));
+                            let _ = job.result.send(result);
+                        },
+                    }
+                }
+                if let Ok(Some(batch)) = injected.await {
+                    // New steering input creates a different request and must be observed.
+                    boundary_observed_plan = None;
+                    boundary_observation_error = None;
                     let (_, injected_messages) = Self::structured_session_inputs(&batch.items);
                     messages.extend(injected_messages);
                     if let Some(snapshot_tx) = &snapshot_tx {
@@ -1773,6 +1918,25 @@ impl Agent {
         // calls are (SESSION-006 / I135).
         let partial_messages =
             self.persistence_projection_with_tokens(&messages[persist_start..], &private_tokens);
+        if let (Some(observer), Some(limit), Some((mut plan, appended_start))) = (
+            checkpoint_observer.as_ref(),
+            request_context_limit,
+            maintenance_plan,
+        ) {
+            // Retain the last actual request's prompt, schemas, projection and
+            // image reserve. Add only finalized output since that dispatch;
+            // never rerun hooks or issue a post-turn summarization request.
+            plan.messages.extend(
+                self.persistence_projection_with_tokens(
+                    &messages[appended_start..],
+                    &private_tokens,
+                ),
+            );
+            let estimated = self
+                .estimate_provider_request_tokens(&plan.messages, &plan.tool_definitions)
+                .saturating_add(plan.ephemeral_image_tokens);
+            observer.post_turn_pressure.record(estimated, limit);
+        }
         (result, partial_messages)
     }
 

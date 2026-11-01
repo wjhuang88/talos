@@ -213,22 +213,31 @@ impl RuntimeAdmissionControl {
 
     /// Cancels the observed start-committed turn and reports whether one existed.
     ///
-    /// The cloned token belongs only to that turn. Callers that observe `true`
+    /// Cancellation is serialized with checkpoint application. Callers that observe `true`
     /// must not also enqueue an untargeted interrupt for a subsequent turn.
     pub fn try_interrupt_active(&self) -> bool {
-        let token = {
-            let mut state = self.lock();
-            state.active.as_mut().map(|active| {
-                active.interrupt_requested = true;
-                active.token.clone()
-            })
-        };
-        if let Some(token) = token {
-            token.cancel();
+        let mut state = self.lock();
+        if let Some(active) = state.active.as_mut() {
+            active.interrupt_requested = true;
+            active.token.cancel();
             true
         } else {
             false
         }
+    }
+
+    /// Serialize the Actor's checkpoint swap against runtime shutdown/interrupt.
+    pub(crate) fn commit_checkpoint<T>(&self, commit: impl FnOnce() -> T) -> Option<T> {
+        let state = self.lock();
+        if !matches!(state.phase, AdmissionPhase::Open)
+            || state
+                .active
+                .as_ref()
+                .is_none_or(|active| active.token.is_cancelled())
+        {
+            return None;
+        }
+        Some(commit())
     }
 
     /// Returns the accepted actor policy, if admission is closing.
@@ -330,6 +339,47 @@ impl Default for RuntimeAdmissionControl {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn checkpoint_swap_and_runtime_interrupt_share_one_commit_gate() {
+        let control = RuntimeAdmissionControl::new();
+        let token = CancellationToken::new();
+        assert!(control.commit_start(token.clone()));
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let committing = control.clone();
+        let committing_token = token.clone();
+        let commit = std::thread::spawn(move || {
+            committing.commit_checkpoint(|| {
+                entered_tx.send(()).expect("barrier");
+                release_rx.recv().expect("release");
+                assert!(
+                    !committing_token.is_cancelled(),
+                    "interrupt cannot cross the swap gate"
+                );
+                42
+            })
+        });
+        entered_rx.recv().expect("commit entered");
+        let interrupting = control.clone();
+        let interrupt = std::thread::spawn(move || interrupting.interrupt_active());
+        release_tx.send(()).expect("release");
+        assert_eq!(commit.join().expect("commit"), Some(42));
+        interrupt.join().expect("interrupt");
+        assert!(token.is_cancelled());
+        assert_eq!(
+            control.commit_checkpoint(|| panic!("cancelled must not apply")),
+            None::<()>
+        );
+        control.finish_active(Some(&TurnCompletionStatus::Cancelled));
+        let token = CancellationToken::new();
+        assert!(control.commit_start(token));
+        control.begin_shutdown(1, RuntimeShutdownTurnPolicy::FinishCurrent);
+        assert_eq!(
+            control.commit_checkpoint(|| panic!("shutdown must not apply")),
+            None::<()>
+        );
+    }
 
     #[tokio::test]
     async fn shutdown_fence_rejects_a_reserved_but_uncommitted_submission() {

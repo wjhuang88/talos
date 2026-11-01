@@ -120,6 +120,11 @@ impl ConversationEngine {
         let mut outputs = Vec::new();
 
         match cmd {
+            "/compact" if arg.trim().is_empty() => outputs.push(UiOutput::CompactRequest),
+            "/compact" => outputs.push(content_block(
+                MessageSource::System,
+                "Usage: /compact\n".into(),
+            )),
             "/help" => {
                 let mut text = String::from("[System] Available commands:\n");
                 for command in command_registry().available_commands() {

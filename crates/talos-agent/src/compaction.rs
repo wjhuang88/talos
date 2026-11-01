@@ -1,41 +1,27 @@
-//! 5-layer context compaction for agent sessions.
+//! Structured checkpoints and request-pressure policy for session compaction.
 //!
-//! When the conversation context approaches the model's token limit, this module
-//! applies progressive compaction layers to reduce context size while preserving
-//! recent conversation fidelity.
-//!
-//! # Compaction Layers
-//!
-//! Layers are applied in order, stopping as soon as the context fits:
-//!
-//! 1. **Budget** — Cap individual tool results to 4000 characters, truncating
-//!    with `"... [truncated]"`.
-//! 2. **Trim** — Remove tool results from turns older than 20.
-//! 3. **Microcompact** — For each tool call ID, keep only the last result.
-//! 4. **Collapse** — Summarize turns older than 10 into a single summary message
-//!    using the LLM.
-//! 5. **Autocompact** — Use the LLM to summarize the entire conversation history.
-//!
-//! # Preservation Guarantee
-//!
-//! The last 10 turns are **never** compacted by layers 4 or 5. They are always
-//! preserved verbatim to maintain conversation continuity.
-//!
-//! # Circuit Breaker
-//!
-//! If compaction fails 3 consecutive times, the circuit breaker trips and
-//! subsequent compaction attempts return [`CompactionError::CircuitBreakerTripped`]
-//! immediately.
+//! Live automatic/manual compaction uses the Agent's shared request pipeline,
+//! which preserves raw history and validates budgets, privacy and source lineage.
+//! `Compactor` retains only explicitly selected legacy deterministic utilities;
+//! its deprecated model-assisted entry points refuse missing request authority.
 
+mod checkpoint;
 mod constants;
 mod engine;
+mod operations;
 mod policy;
+mod source;
+mod summary_stream;
 mod types;
 
 #[cfg(test)]
 #[allow(warnings)]
 mod tests;
 
+pub use checkpoint::{Checkpoint, CheckpointError, CheckpointItem, MAX_CHECKPOINT_BYTES};
 pub use engine::Compactor;
-pub use policy::CompactionPolicy;
+pub use operations::{CompactAdmission, CompactOperations, CompactOutcome};
+pub use policy::{CompactionPolicy, RequestPressure};
+pub use source::HistorySource;
+pub(crate) use summary_stream::read_summary_stream;
 pub use types::{CompactionError, CompactionResult, CompactionStatus};

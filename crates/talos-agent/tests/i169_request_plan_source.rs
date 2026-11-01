@@ -46,7 +46,8 @@ fn actor_and_provider_dispatch_share_the_sealed_plan() {
     }
 
     assert!(
-        session.contains(".prepare_session_turn("),
+        session.contains(".prepare_session_turn(")
+            || session.contains(".prepare_session_turn_at_revision("),
         "Actor must seal the initial Provider request before Turn start"
     );
     assert!(

@@ -49,3 +49,69 @@ impl CompactionPolicy {
         raw.saturating_sub(self.output_reserve)
     }
 }
+
+/// Pressure of an entire provider request, including all reserved tokens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RequestPressure {
+    /// Below eighty percent; manual compaction is not eligible.
+    Normal,
+    /// At least eighty percent; fitting requests continue without forced rewrite.
+    Advisory,
+    /// At least ninety-five percent and within capacity; checkpoint before dispatch.
+    Critical,
+    /// Above capacity (or no usable capacity); checkpoint or refuse dispatch.
+    Emergency,
+}
+
+impl RequestPressure {
+    /// Classify the existing admission estimate against the resolved total context.
+    ///
+    /// The caller must include output/reasoning reserves in `estimated_tokens`
+    /// exactly as admission does. Do not subtract them from `context_limit` again.
+    #[must_use]
+    pub fn assess(estimated_tokens: u32, context_limit: u32) -> Self {
+        if context_limit == 0 || estimated_tokens > context_limit {
+            return Self::Emergency;
+        }
+        let estimated = u64::from(estimated_tokens) * 100;
+        let capacity = u64::from(context_limit);
+        if estimated >= capacity * 95 {
+            Self::Critical
+        } else if estimated >= capacity * 80 {
+            Self::Advisory
+        } else {
+            Self::Normal
+        }
+    }
+}
+
+#[cfg(test)]
+mod pressure_tests {
+    use super::RequestPressure;
+
+    #[test]
+    fn exact_whole_request_thresholds() {
+        for (tokens, expected) in [
+            (0, RequestPressure::Normal),
+            (79, RequestPressure::Normal),
+            (80, RequestPressure::Advisory),
+            (94, RequestPressure::Advisory),
+            (95, RequestPressure::Critical),
+            (100, RequestPressure::Critical),
+            (101, RequestPressure::Emergency),
+        ] {
+            assert_eq!(RequestPressure::assess(tokens, 100), expected);
+        }
+    }
+
+    #[test]
+    fn no_capacity_fractional_cutoffs_and_large_limits() {
+        assert_eq!(RequestPressure::assess(0, 0), RequestPressure::Emergency);
+        assert_eq!(RequestPressure::assess(80, 101), RequestPressure::Normal);
+        assert_eq!(RequestPressure::assess(95, 101), RequestPressure::Advisory);
+        assert_eq!(
+            RequestPressure::assess(u32::MAX, u32::MAX),
+            RequestPressure::Critical
+        );
+    }
+}

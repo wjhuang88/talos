@@ -62,7 +62,8 @@ pub use artifacts::{
 };
 pub use diagnostic::{ProviderTerminalDiagnostic, ProviderTerminalOutcome, ProviderTerminalSource};
 pub use durable::{
-    DurableSession, DurableTranscriptEntry, PersistencePolicy, SessionCapabilities, TurnCommit,
+    DurableHistorySnapshot, DurableSession, DurableTranscriptEntry, PersistencePolicy,
+    SessionCapabilities, TurnCommit,
 };
 pub use error::SessionError;
 pub use manager::{

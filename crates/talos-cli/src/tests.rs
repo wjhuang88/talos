@@ -267,6 +267,151 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn compact_builtin_routes_to_typed_generation_and_transient_status() {
+        use talos_core::session::{CompactOutcome, CompactState, SessionOp};
+        let engine = ConversationEngine::new("test".into(), "test".into());
+        let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (user_tx, user_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (command_tx, mut command_rx) = tokio::sync::mpsc::channel(4);
+        crate::session_transition::register_generation_bound_sender(&command_tx, 42);
+        let (_sq_tx, sq_rx) = tokio::sync::watch::channel(command_tx);
+        let (_model_tx, model_rx) = tokio::sync::watch::channel(ModelInfo::default());
+        let (session_tx, _session_rx) = tokio::sync::mpsc::unbounded_channel();
+        let bridge = tokio::spawn(run_conversation_loop(
+            engine,
+            ConversationLoopIo {
+                agent_rx,
+                user_rx,
+                ui_tx,
+                sq_tx_watch: sq_rx,
+                model_info_watch: model_rx,
+                session_tx,
+                runtime_skills: empty_runtime_skills(),
+                permission_engine: None,
+            },
+        ));
+        user_tx
+            .send(UserInput::Message("/compact".into()))
+            .expect("command");
+        let op = tokio::time::timeout(std::time::Duration::from_secs(3), command_rx.recv())
+            .await
+            .expect("dispatch deadline")
+            .expect("operation");
+        let SessionOp::Compact {
+            session_generation: 42,
+            operation_id,
+        } = op
+        else {
+            panic!("expected generation-bound Compact, got {op:?}");
+        };
+        user_tx.send(UserInput::Cancel).expect("cancel compact");
+        let cancel = tokio::time::timeout(std::time::Duration::from_secs(3), command_rx.recv())
+            .await
+            .expect("cancel deadline")
+            .expect("cancel operation");
+        assert!(
+            matches!(cancel, SessionOp::CancelCompact { session_generation: 42, operation_id: id } if id == operation_id)
+        );
+        for generation in [41, 42] {
+            agent_tx
+                .send(SessionEvent::CompactStatus {
+                    session_id: "session".into(),
+                    session_generation: generation,
+                    operation_id,
+                    state: CompactState::Completed {
+                        outcome: CompactOutcome::Applied {
+                            before: generation as u32,
+                            after: 20,
+                        },
+                        replayed: false,
+                    },
+                })
+                .expect("status");
+        }
+        loop {
+            let output = tokio::time::timeout(std::time::Duration::from_secs(3), ui_rx.recv())
+                .await
+                .expect("display deadline")
+                .expect("output");
+            if let UiOutput::Tip { text, .. } = output {
+                assert!(!text.contains("41 →"), "stale generation must not display");
+                if text.contains("42 → 20") {
+                    break;
+                }
+            }
+        }
+        for generation in [41, 42] {
+            agent_tx
+                .send(SessionEvent::AutomaticCompactStatus {
+                    session_id: "fixture".into(),
+                    session_generation: generation,
+                    state: talos_core::session::AutomaticCompactState::Applied {
+                        before: generation as u32,
+                        after: 12,
+                    },
+                })
+                .expect("automatic status");
+        }
+        loop {
+            let output = tokio::time::timeout(std::time::Duration::from_secs(3), ui_rx.recv())
+                .await
+                .expect("automatic display deadline")
+                .expect("output");
+            if let UiOutput::Tip { text, .. } = output {
+                assert!(
+                    !text.contains("41 →"),
+                    "stale automatic status must not display"
+                );
+                if text.contains("Automatic compaction applied: estimated tokens 42 → 12") {
+                    break;
+                }
+            }
+        }
+        agent_tx
+            .send(SessionEvent::CompactStatus {
+                session_id: "session".into(),
+                session_generation: 42,
+                operation_id,
+                state: CompactState::Completed {
+                    outcome: CompactOutcome::CancelledWithEstimate { before: 31415 },
+                    replayed: true,
+                },
+            })
+            .expect("cancelled measurement");
+        loop {
+            let output = tokio::time::timeout(std::time::Duration::from_secs(3), ui_rx.recv())
+                .await
+                .expect("cancelled display deadline")
+                .expect("output");
+            if let UiOutput::Tip { text, .. } = output
+                && text.contains("cancelled: prior context retained; estimated tokens 31415")
+            {
+                assert!(text.contains("previous result"));
+                break;
+            }
+        }
+        user_tx
+            .send(UserInput::Message("/compact extra".into()))
+            .expect("invalid command");
+        loop {
+            let output = tokio::time::timeout(std::time::Duration::from_secs(3), ui_rx.recv())
+                .await
+                .expect("usage deadline")
+                .expect("output");
+            if matches!(output, UiOutput::Content(talos_conversation::ContentOutput::Block { text, .. }) if text.contains("Usage: /compact"))
+            {
+                break;
+            }
+        }
+        assert!(
+            command_rx.try_recv().is_err(),
+            "invalid compact must not submit a user turn"
+        );
+        bridge.abort();
+    }
+
+    #[tokio::test]
     async fn conversation_loop_displays_drained_queued_input() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (agent_tx, agent_rx) = tokio::sync::mpsc::unbounded_channel();
