@@ -132,3 +132,28 @@ This adds Session's direct target-specific use of already-locked `libc` and
 No package versions change, no new native implementation or Talos-authored unsafe
 is introduced. It refines the original no-new-dependency assumption solely for
 safe OS opening; independent platform/privacy review and native CI are required.
+
+## I313 recovery provenance storage increment — 2026-11-01
+
+The existing atomic terminal marker JSON may carry an optional `history_recovery`
+array. Its entries bind format version, original entry/turn/call/tool identity and
+SHA-256 digests of the final stored representation and eligible model projection.
+The public terminal outcome struct and SessionEntry fields are unchanged; legacy
+readers ignore the additive JSON field. No second transcript or cleartext result
+copy is created by this increment. Conversation exports omit internal terminal
+markers while preserving original conversation entries.
+
+The additive `finalize_turn_with_recovery` API accepts runtime-owner projections,
+then binds only exact matches to the final PersistencePolicy-filtered Tool text.
+Omitted or redacted mismatches receive no recovery receipt. Storage cannot infer
+runtime provenance from text/tool names in an existing transcript. Retry requires
+the same filtered entries and receipt set; disagreement fails without rewriting.
+An unsupported receipt version or source digest mismatch fails closed. These are
+runtime provenance records, not signatures protecting against arbitrary host log
+editing, and do not authorize session/branch membership.
+
+This first storage increment deliberately does not recover a model projection
+that differs from the stored tool text. Such cases require an explicitly permitted
+projection representation and the execution-owner envelope before T5 acceptance;
+they are not silently treated as delivered. Actor admission, snapshot lineage,
+index maintenance and model-facing query remain separate unfinished integration.

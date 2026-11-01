@@ -250,3 +250,36 @@ page: a header-only page advances before reading that record. Eight new storage
 regressions and all 223 Session library tests pass; all-target Clippy passes.
 Native Windows opening and full workspace/runtime integration remain unverified.
 Source paths, offsets and decoded entries still confer no model authority.
+
+### Atomic recovery receipt increment — local, unmerged
+
+The existing turn terminal marker now supports additive versioned recovery digest
+receipts without modifying public SessionEntry/outcome fields or creating another
+store. The new atomic finalize API accepts explicit runtime-owner projections;
+policy omission or a mismatch after redaction cannot mint authority. Idempotent
+retries compare receipt sets, source verification checks stored/projection digests,
+and transcript exports omit internal markers. New regressions exercise reopen,
+corruption, duplicate retries and persistence-policy denial/redaction.
+
+This is storage integration only. Agent snapshot envelopes, live tool projection
+provenance, branch-scoped index/query, checkpoint tools and Runtime/CLI behavior
+remain unimplemented. Different model/persistence projections are not recoverable
+through this increment; this residual must be resolved or explicitly bounded by
+actual tool policy evidence before T5 can close. No real-model quality claimed.
+
+Receipt review found two additional correctness gaps: a content-only marker size
+check omitted storage encoding overhead, and retry lookup could select outcome and
+receipts from different duplicate markers. Corrections check actual complete
+JSONL/TLOG encoded sizes and accept only one matching version-valid terminal
+entry. Regressions cover near-boundary escaped marker roundtrip in both formats,
+over-bound atomic refusal, unknown versions and duplicate marker refusal without
+writing. Pairing also refuses cross-user boundaries and duplicate invocation IDs
+or results. Current Session library tests pass 227/227; the preceding receipt
+stage all-target Clippy passed, with final refreshed review/check still required.
+
+Receipt correction independent static review approved the storage boundary (not
+Actor authorization or full T5). Additional adversarial pairing regression proves
+cross-user, duplicate-call and repeated-result cases cannot mint receipts.
+Current Session tests pass 228/228 and refreshed all-target Clippy passes; both
+governance validators pass. No workspace/platform or model-facing acceptance is
+claimed by these local storage checks.

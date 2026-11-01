@@ -4,6 +4,7 @@
 //! `.jsonl` and `.tlog` sessions are supported transparently.
 
 use crate::diagnostic::is_terminal_diagnostic_content;
+use crate::turn_outcome::is_turn_transcript_outcome_content;
 use crate::{SessionEntry, SessionError, SessionMetadata, SessionStore};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -52,7 +53,10 @@ impl From<&SessionEntry> for TranscriptEntry {
 pub fn export_json(entries: &[SessionEntry]) -> Result<String, serde_json::Error> {
     let transcript: Vec<TranscriptEntry> = entries
         .iter()
-        .filter(|entry| !is_terminal_diagnostic_content(&entry.content))
+        .filter(|entry| {
+            !is_terminal_diagnostic_content(&entry.content)
+                && (entry.role != "system" || !is_turn_transcript_outcome_content(&entry.content))
+        })
         .map(TranscriptEntry::from)
         .collect();
     serde_json::to_string_pretty(&transcript)
@@ -87,10 +91,10 @@ fn export_markdown_filtered(entries: &[SessionEntry], include_thinking: bool) ->
 
     let mut output = String::new();
     let mut first = true;
-    for entry in entries
-        .iter()
-        .filter(|entry| !is_terminal_diagnostic_content(&entry.content))
-    {
+    for entry in entries.iter().filter(|entry| {
+        !is_terminal_diagnostic_content(&entry.content)
+            && (entry.role != "system" || !is_turn_transcript_outcome_content(&entry.content))
+    }) {
         if !first {
             output.push_str("\n\n");
         }
@@ -130,7 +134,10 @@ pub fn read_transcript(
     let entries = store.read_entries(file_path)?;
     Ok(entries
         .iter()
-        .filter(|entry| !is_terminal_diagnostic_content(&entry.content))
+        .filter(|entry| {
+            !is_terminal_diagnostic_content(&entry.content)
+                && (entry.role != "system" || !is_turn_transcript_outcome_content(&entry.content))
+        })
         .map(TranscriptEntry::from)
         .collect())
 }

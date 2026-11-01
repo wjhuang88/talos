@@ -284,6 +284,23 @@ impl DurableSession {
         policy: &PersistencePolicy,
         outcome: TurnTranscriptOutcome,
     ) -> Result<TurnCommit, SessionError> {
+        self.finalize_turn_with_recovery(turn_id, messages, policy, outcome, &[])
+    }
+
+    /// Atomically finalize a turn and runtime-approved recovery provenance.
+    ///
+    /// Projections must originate from the live execution owner. Only exact matches
+    /// to final policy-filtered tool text receive a receipt; denied persistence or
+    /// changed/redacted projections cannot confer recovery permission. The receipt
+    /// is stored in the existing terminal marker, never a second transcript store.
+    pub fn finalize_turn_with_recovery(
+        &self,
+        turn_id: &str,
+        messages: &[Message],
+        policy: &PersistencePolicy,
+        outcome: TurnTranscriptOutcome,
+        projections: &[crate::RecoveryProjection],
+    ) -> Result<TurnCommit, SessionError> {
         if turn_id.is_empty() {
             return Err(SessionError::DurableTurn(
                 "turn_id must not be empty".into(),
@@ -306,10 +323,18 @@ impl DurableSession {
             .iter()
             .map(|entry| entry.id.clone())
             .collect::<Vec<_>>();
-        let marker = existing.iter().find_map(|entry| {
-            decode_turn_transcript_outcome(&entry.content)
-                .filter(|record| record.turn_id == turn_id)
+        let mut markers = existing.iter().filter(|entry| {
+            is_turn_transcript_outcome_content(&entry.content)
+                && (entry.metadata.turn_id.as_deref() == Some(turn_id)
+                    || decode_turn_transcript_outcome(&entry.content)
+                        .is_some_and(|record| record.turn_id == turn_id))
         });
+        let marker = markers.next();
+        if markers.next().is_some() {
+            return Err(SessionError::DurableTurn(
+                "duplicate terminal markers".into(),
+            ));
+        }
 
         let filtered = messages
             .iter()
@@ -321,8 +346,28 @@ impl DurableSession {
             .map(|entry| (entry.role.clone(), entry.content.clone()))
             .collect::<Vec<_>>();
 
-        if let Some(prior) = marker {
-            if prior.outcome == outcome && prior_parts == requested_parts {
+        if let Some(marker_entry) = marker {
+            let prior = decode_turn_transcript_outcome(&marker_entry.content)
+                .filter(|record| record.version == 1 && record.turn_id == turn_id)
+                .ok_or_else(|| SessionError::DurableTurn("invalid terminal marker".into()))?;
+            let stored_receipts = crate::HistoryRecoveryReceipt::from_terminal_entry(marker_entry)
+                .ok_or_else(|| {
+                    SessionError::DurableTurn("invalid terminal recovery marker".into())
+                })?;
+            let prior_source = prior_entries
+                .iter()
+                .map(|entry| (*entry).clone())
+                .collect::<Vec<_>>();
+            let requested_receipts = crate::history_receipt::bind_receipts(
+                &filtered,
+                &prior_source,
+                projections,
+                policy.persist_raw_tool_output,
+            )?;
+            if prior.outcome == outcome
+                && prior_parts == requested_parts
+                && stored_receipts == requested_receipts
+            {
                 return Ok(TurnCommit {
                     entry_ids: prior_ids,
                     newly_committed: false,
@@ -344,8 +389,9 @@ impl DurableSession {
 
         let mut parent_id = existing.last().map(|entry| entry.id.clone());
         let mut entry_ids = Vec::with_capacity(messages.len());
-        for message in filtered {
-            let (role, content) = message_parts(&message);
+        let entry_start = existing.len();
+        for message in &filtered {
+            let (role, content) = message_parts(message);
             let id = Uuid::new_v4().to_string();
             existing.push(SessionEntry {
                 id: id.clone(),
@@ -363,10 +409,27 @@ impl DurableSession {
         }
 
         let marker = TurnTranscriptOutcomeRecord::new(turn_id, outcome);
-        let marker_content = encode_turn_transcript_outcome(&marker)
+        let receipts = crate::history_receipt::bind_receipts(
+            &filtered,
+            &existing[entry_start..],
+            projections,
+            policy.persist_raw_tool_output,
+        )?;
+        let mut marker_content = encode_turn_transcript_outcome(&marker)
             .map_err(|error| SessionError::InvalidJson(error.to_string()))?;
+        if !receipts.is_empty() {
+            let mut value = serde_json::to_value(&marker)
+                .map_err(|error| SessionError::InvalidJson(error.to_string()))?;
+            value["history_recovery"] = serde_json::to_value(receipts)
+                .map_err(|error| SessionError::InvalidJson(error.to_string()))?;
+            marker_content = format!(
+                "{}{}",
+                crate::turn_outcome::TURN_TRANSCRIPT_OUTCOME_PREFIX,
+                value
+            );
+        }
         let marker_id = Uuid::new_v4().to_string();
-        existing.push(SessionEntry {
+        let marker_entry = SessionEntry {
             id: marker_id,
             parent_id,
             timestamp: Utc::now(),
@@ -376,7 +439,20 @@ impl DurableSession {
                 turn_id: Some(turn_id.to_string()),
                 ..SessionMetadata::default()
             },
-        });
+        };
+        let json_len = serde_json::to_vec(&marker_entry)
+            .map_err(|error| SessionError::InvalidJson(error.to_string()))?
+            .len()
+            + 1;
+        if json_len > crate::history_page::HISTORY_PAGE_BYTES
+            || crate::compact_text::encode_entry(&marker_entry).len()
+                > crate::history_page::HISTORY_PAGE_BYTES
+        {
+            return Err(SessionError::DurableTurn(
+                "encoded recovery marker exceeds source page bound".into(),
+            ));
+        }
+        existing.push(marker_entry);
 
         self.session
             .store
@@ -799,6 +875,239 @@ mod tests {
             Some(filename.as_str())
         );
         assert!(!first.file_path().to_string_lossy().contains("assistant:"));
+    }
+
+    #[test]
+    fn recovery_receipts_commit_atomically_and_survive_restart() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        let session = create_or_open(directory.path(), "recovery").expect("session");
+        let messages = vec![
+            Message::Assistant {
+                content: String::new(),
+                reasoning: None,
+                tool_calls: vec![ToolCall {
+                    id: "call".into(),
+                    name: "read".into(),
+                    input: serde_json::json!({}),
+                }],
+            },
+            Message::Tool {
+                result: MessageToolResult {
+                    tool_use_id: "call".into(),
+                    content: "fact: port 8123".into(),
+                    is_error: false,
+                },
+            },
+        ];
+        let projections = vec![crate::RecoveryProjection {
+            message_index: 1,
+            tool_call_id: "call".into(),
+            tool_name: "read".into(),
+            content: "fact: port 8123".into(),
+        }];
+        let first = session
+            .finalize_turn_with_recovery(
+                "turn",
+                &messages,
+                &PersistencePolicy::default(),
+                TurnTranscriptOutcome::Success,
+                &projections,
+            )
+            .expect("commit");
+        let retry = session
+            .finalize_turn_with_recovery(
+                "turn",
+                &messages,
+                &PersistencePolicy::default(),
+                TurnTranscriptOutcome::Success,
+                &projections,
+            )
+            .expect("retry");
+        assert_eq!(first.entry_ids, retry.entry_ids);
+        assert!(!retry.newly_committed);
+        drop(session);
+        let reopened = create_or_open(directory.path(), "recovery").expect("reopen");
+        let entries = reopened.session().read_entries().expect("entries");
+        let receipts =
+            crate::HistoryRecoveryReceipt::from_terminal_entry(entries.last().expect("marker"))
+                .expect("receipts");
+        assert_eq!(receipts.len(), 1);
+        assert!(
+            !crate::export_json(&entries)
+                .expect("export")
+                .contains("history_recovery")
+        );
+        assert!(!crate::export_markdown(&entries).contains("history_recovery"));
+        assert_eq!(
+            crate::read_transcript(&crate::CompactTextSessionStore, reopened.file_path())
+                .expect("read export")
+                .len(),
+            2
+        );
+        assert_eq!(receipts[0].entry_id(), first.entry_ids[1]);
+        assert_eq!(
+            receipts[0].verified_content(&entries[1]).as_deref(),
+            Some("fact: port 8123")
+        );
+        let mut corrupt = entries[1].clone();
+        corrupt.content.push_str("changed");
+        assert!(receipts[0].verified_content(&corrupt).is_none());
+        assert_eq!(reopened.transcript(None, 20).expect("transcript").len(), 2);
+        assert!(
+            reopened
+                .finalize_turn(
+                    "turn",
+                    &messages,
+                    &PersistencePolicy::default(),
+                    TurnTranscriptOutcome::Success
+                )
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn encoded_terminal_marker_bound_includes_json_escaping_and_metadata() {
+        use crate::history_page::{HISTORY_PAGE_BYTES, HistoryEncoding, read_history_page};
+        for (count, accepted) in [
+            ((HISTORY_PAGE_BYTES - 2048) / 6, true),
+            (HISTORY_PAGE_BYTES / 6 + 2048, false),
+        ] {
+            let directory = tempfile::tempdir().expect("tempdir");
+            let session = create_or_open(directory.path(), "marker-bound").expect("session");
+            let turn = "\"".repeat(count);
+            let before = std::fs::read(session.file_path()).expect("initial");
+            let result = session.finalize_turn_with_recovery(
+                &turn,
+                &[],
+                &PersistencePolicy::default(),
+                TurnTranscriptOutcome::Success,
+                &[],
+            );
+            assert_eq!(result.is_ok(), accepted);
+            if !accepted {
+                assert_eq!(
+                    std::fs::read(session.file_path()).expect("unchanged"),
+                    before
+                );
+                continue;
+            }
+            let entries = session.session().read_entries().expect("entries");
+            let json_path = directory.path().join("receipt.jsonl");
+            crate::SessionStore::replace_entries_atomically(
+                &crate::JsonlSessionStore,
+                &json_path,
+                &entries,
+            )
+            .expect("json encode");
+            for (path, encoding) in [
+                (session.file_path(), HistoryEncoding::Tlog),
+                (json_path.as_path(), HistoryEncoding::Jsonl),
+            ] {
+                let end = std::fs::metadata(path).expect("metadata").len();
+                let page = read_history_page(
+                    path,
+                    encoding,
+                    0,
+                    end,
+                    std::time::Instant::now() + std::time::Duration::from_secs(5),
+                    || false,
+                )
+                .expect("bounded page");
+                assert!(page.complete);
+                assert_eq!(page.entries.len(), 1);
+            }
+        }
+    }
+
+    #[test]
+    fn duplicate_or_unknown_terminal_markers_refuse_retry_without_writing() {
+        for duplicate in [false, true] {
+            let directory = tempfile::tempdir().expect("tempdir");
+            let session = create_or_open(directory.path(), "markers").expect("session");
+            let messages = vec![Message::User {
+                content: "original".into(),
+            }];
+            session
+                .commit_turn("turn", &messages, &PersistencePolicy::default())
+                .expect("commit");
+            let mut entries = session.session().read_entries().expect("read");
+            if duplicate {
+                let mut marker = entries.last().expect("marker").clone();
+                marker.id = "duplicate".into();
+                entries.push(marker);
+            } else {
+                let marker = entries.last_mut().expect("marker");
+                marker.content = marker.content.replace("\"version\":1", "\"version\":99");
+                assert!(crate::HistoryRecoveryReceipt::from_terminal_entry(marker).is_none());
+            }
+            session
+                .session()
+                .store
+                .replace_entries_atomically(session.file_path(), &entries)
+                .expect("corrupt fixture");
+            let before = std::fs::read(session.file_path()).expect("bytes");
+            assert!(
+                session
+                    .commit_turn("turn", &messages, &PersistencePolicy::default())
+                    .is_err()
+            );
+            assert_eq!(std::fs::read(session.file_path()).expect("bytes"), before);
+        }
+    }
+
+    #[test]
+    fn persistence_denial_or_redaction_never_mints_recovery_receipts() {
+        for (permit, content) in [(false, "private result"), (true, "api_key=sk-secret")] {
+            let directory = tempfile::tempdir().expect("tempdir");
+            let session = create_or_open(directory.path(), "denial").expect("session");
+            let messages = vec![
+                Message::Assistant {
+                    content: String::new(),
+                    reasoning: None,
+                    tool_calls: vec![ToolCall {
+                        id: "call".into(),
+                        name: "read".into(),
+                        input: serde_json::json!({}),
+                    }],
+                },
+                Message::Tool {
+                    result: MessageToolResult {
+                        tool_use_id: "call".into(),
+                        content: content.into(),
+                        is_error: false,
+                    },
+                },
+            ];
+            let projection = crate::RecoveryProjection {
+                message_index: 1,
+                tool_call_id: "call".into(),
+                tool_name: "read".into(),
+                content: content.into(),
+            };
+            session
+                .finalize_turn_with_recovery(
+                    "turn",
+                    &messages,
+                    &PersistencePolicy {
+                        persist_raw_tool_output: permit,
+                        ..Default::default()
+                    },
+                    TurnTranscriptOutcome::Success,
+                    &[projection],
+                )
+                .expect("commit");
+            let entries = session.session().read_entries().expect("entries");
+            assert!(
+                crate::HistoryRecoveryReceipt::from_terminal_entry(entries.last().expect("marker"))
+                    .expect("receipts")
+                    .is_empty()
+            );
+            assert!(
+                !std::fs::read_to_string(session.file_path())
+                    .expect("disk")
+                    .contains(content)
+            );
+        }
     }
 
     #[test]

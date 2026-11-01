@@ -123,7 +123,7 @@ impl crate::store::SessionStore for CompactTextSessionStore {
 /// Encode a [`SessionEntry`] as a single compact text record line.
 ///
 /// Format: `E\t<role>\t<ts_ms>\t<id>\t<parent_id|->\t<content_len>:<content>\t<meta_len>:<meta_json>\n`
-fn encode_entry(entry: &SessionEntry) -> String {
+pub(crate) fn encode_entry(entry: &SessionEntry) -> String {
     let role_num = role_to_num(&entry.role);
     let parent = entry.parent_id.as_deref().unwrap_or("-");
     let meta_json = if entry.metadata.is_empty() {
