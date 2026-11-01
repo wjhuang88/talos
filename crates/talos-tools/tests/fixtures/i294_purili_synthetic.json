@@ -1,0 +1,45 @@
+{
+  "results": [
+    {
+      "id": "invented-0",
+      "title": "独立编造 Ω <b>literal</b>",
+      "url": "https://example.invalid/alpha",
+      "displayUrl": "example.invalid › alpha",
+      "description": "synthetic snippet — 非真实搜索结果",
+      "favicon": "/api/favicon?host=example.invalid",
+      "source": "crawled"
+    },
+    {
+      "id": "invented-1",
+      "title": "Invented future source",
+      "url": "http://example.invalid/beta",
+      "displayUrl": "example.invalid › beta",
+      "description": "Unknown source label retained without native-route inference",
+      "favicon": null,
+      "source": "future-source"
+    },
+    {
+      "id": "invented-2",
+      "title": "Invented second index result",
+      "url": "https://example.invalid/gamma",
+      "displayUrl": "example.invalid › gamma",
+      "description": "Synthetic crawled provenance",
+      "source": "crawled"
+    },
+    {
+      "id": "invented-3",
+      "title": "Invented final result",
+      "url": "https://example.invalid/delta",
+      "displayUrl": "example.invalid › delta",
+      "description": "Synthetic result used only for output-bound experiments",
+      "favicon": "/api/favicon?host=example.invalid",
+      "source": "crawled"
+    }
+  ],
+  "total": 174,
+  "timeMs": "0.09",
+  "hasNext": true,
+  "totalPages": 18,
+  "page": 1,
+  "correction": null
+}
