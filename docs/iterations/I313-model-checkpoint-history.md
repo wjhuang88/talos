@@ -591,3 +591,34 @@ approved the production delta and final test-only addition; two-code-file diff
 SHA256 `87f03807cb9e235a77a6d8a3b1300ca2006a6888ce9b0220e30239ad8f07e882`.
 Reviewer did not run tests and shares Agent/GitHub identity.
 No model-tool/Actor delivery, full T5 completion or remote validation is claimed.
+
+### Actor coordinator model-boundary ingress — local, unmerged
+
+The existing Actor compaction coordinator accepts an internal model submission at
+the complete-batch boundary, using the same pending slot and origin-qualified
+ledger. Runtime-issued model IDs do not consume manual sequence IDs; model terminal
+outcomes use a dedicated oneshot rather than aliasing manual UI events. Busy model
+submissions refuse without disturbing queued manual work. Preparation dispatch
+failure, turn cancellation and abandoned receipt release the slot and resume the
+boundary; terminal send occurs before resume. This is not tool-level Admitted
+semantics: the production boundary sender still supplies submitted: None. Model
+registration, discovery authorization and pre-result admission remain required.
+
+Review initially found that a receipt closed after admission could still permit
+installation. Waiting now observes receipt closure and cancels; completion aborts
+the waiter and checks cancellation/closed receipt before candidate installation.
+This check establishes an installation linearization boundary, not an acknowledged
+receipt-delivery transaction: closure racing after that check does not roll back
+an installed checkpoint. Future model dispatch must consume its terminal receipt
+before continuation and handle channel closure as unavailable, never Applied.
+
+Six coordinator regressions cover shared manual/model capacity, terminal-before-
+resume ordering, manual-ID isolation, cancellation, closed dispatch, pre-admission
+abandonment and receipt closure after dispatch or candidate preparation. Full
+Agent 599/599 and all-target warnings-denied Clippy pass. Logs:
+`/private/tmp/i313-model-boundary-final-tests.log`,
+`/private/tmp/i313-model-boundary-final-clippy.log`.
+Independent static APPROVE: two-file diff SHA256
+`6cc754443609448ed2bb1291cf5a8589fdd7f78ae6dc9ede032a4b2d72c98741`.
+Reviewer did not run tests and shares Agent/GitHub identity. Full T5 and later
+T1/T6, workspace/native/remote gates and merged owner evidence remain outstanding.

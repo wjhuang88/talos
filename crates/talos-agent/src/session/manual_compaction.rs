@@ -2,13 +2,15 @@
 
 use super::*;
 use crate::checkpoint_manual::ManualCheckpointResult;
-use crate::compaction::{CompactAdmission, CompactOperations};
+use crate::compaction::{CompactAdmission, CompactOperations, CompactOrigin};
 use talos_core::session::{CompactOutcome, CompactState};
 
 pub(super) struct ManualCompaction {
     measurement: Arc<std::sync::Mutex<Option<u32>>>,
     ledger: CompactOperations,
     queued: Option<u64>,
+    next_model_id: Option<u64>,
+    model_receipt: Option<tokio::sync::oneshot::Sender<CompactOutcome>>,
     boundary_resume: Option<(
         tokio::sync::oneshot::Sender<Option<crate::SteeringBoundaryBatch>>,
         Option<crate::SteeringBoundaryBatch>,
@@ -22,6 +24,8 @@ impl ManualCompaction {
             measurement: Arc::new(std::sync::Mutex::new(None)),
             ledger: CompactOperations::new(generation),
             queued: None,
+            next_model_id: Some(0),
+            model_receipt: None,
             boundary_resume: None,
             running: None,
         }
@@ -68,11 +72,44 @@ impl ManualCompaction {
     pub(super) fn start_boundary(
         &mut self,
         actor: &AppServerSession,
-        request: crate::SteeringBoundaryRequest,
+        mut request: crate::SteeringBoundaryRequest,
         injected: Option<crate::SteeringBoundaryBatch>,
         turn_token: &CancellationToken,
     ) {
-        let Some(id) = self.queued.take() else {
+        let mut submitted_checkpoint = None;
+        let model_id = if let Some(submission) = request.submitted.take() {
+            if turn_token.is_cancelled() || submission.receipt.is_closed() {
+                let _ = submission.receipt.send(CompactOutcome::Cancelled);
+                let _ = request.compact.send(None);
+                let _ = request.response.send(injected);
+                return;
+            }
+            let Some(id) = self.next_model_id else {
+                let _ = submission.receipt.send(CompactOutcome::Failed);
+                let _ = request.compact.send(None);
+                let _ = request.response.send(injected);
+                return;
+            };
+            if self
+                .ledger
+                .admit_from(actor.session_generation, CompactOrigin::Model, id)
+                != CompactAdmission::Accepted
+            {
+                // Manual and model work share capacity. Refusal never consumes
+                // the model sequence or disturbs the manual pending operation.
+                let _ = submission.receipt.send(CompactOutcome::Failed);
+                let _ = request.compact.send(None);
+                let _ = request.response.send(injected);
+                return;
+            }
+            self.next_model_id = id.checked_add(1);
+            self.model_receipt = Some(submission.receipt);
+            submitted_checkpoint = Some(submission.checkpoint);
+            Some(id)
+        } else {
+            None
+        };
+        let Some(id) = model_id.or_else(|| self.queued.take()) else {
             let _ = request.compact.send(None);
             let _ = request.response.send(injected);
             return;
@@ -82,7 +119,7 @@ impl ManualCompaction {
         if request
             .compact
             .send(Some(crate::BoundaryCompactJob {
-                submitted_checkpoint: None,
+                submitted_checkpoint,
                 result,
                 measurement: self.measurement.clone(),
             }))
@@ -102,7 +139,9 @@ impl ManualCompaction {
         });
         self.boundary_resume = Some((request.response, injected));
         self.running = Some((id, token, task));
-        Self::emit(actor, id, CompactState::Started);
+        if self.model_receipt.is_none() {
+            Self::emit(actor, id, CompactState::Started);
+        }
     }
 
     pub(super) fn start(&mut self, actor: &AppServerSession) {
@@ -141,19 +180,36 @@ impl ManualCompaction {
 
     pub(super) async fn wait(&mut self) -> ManualCheckpointResult {
         match self.running.as_mut() {
-            Some((_, _, task)) => task
-                .await
-                .unwrap_or(ManualCheckpointResult::Outcome(CompactOutcome::Failed)),
+            Some((_, token, task)) => {
+                if let Some(receipt) = self.model_receipt.as_mut() {
+                    tokio::select! { biased;
+                        () = receipt.closed() => {
+                            token.cancel();
+                            ManualCheckpointResult::Outcome(CompactOutcome::Cancelled)
+                        },
+                        result = task => result.unwrap_or(ManualCheckpointResult::Outcome(CompactOutcome::Failed)),
+                    }
+                } else {
+                    task.await
+                        .unwrap_or(ManualCheckpointResult::Outcome(CompactOutcome::Failed))
+                }
+            }
             None => std::future::pending().await,
         }
     }
 
     pub(super) fn complete(&mut self, actor: &AppServerSession, result: ManualCheckpointResult) {
-        let Some((id, token, _)) = self.running.take() else {
+        let Some((id, token, task)) = self.running.take() else {
             return;
         };
+        task.abort();
         let commit = || {
-            if token.is_cancelled() {
+            if token.is_cancelled()
+                || self
+                    .model_receipt
+                    .as_ref()
+                    .is_some_and(|receipt| receipt.is_closed())
+            {
                 return CompactOutcome::Cancelled;
             }
             match result {
@@ -227,7 +283,19 @@ impl ManualCompaction {
         } else {
             outcome
         };
-        if self.ledger.finish(actor.session_generation, id, outcome) {
+        let origin = if self.model_receipt.is_some() {
+            CompactOrigin::Model
+        } else {
+            CompactOrigin::Manual
+        };
+        if self
+            .ledger
+            .finish_from(actor.session_generation, origin, id, outcome)
+        {
+            if let Some(receipt) = self.model_receipt.take() {
+                let _ = receipt.send(outcome);
+                return;
+            }
             Self::emit(
                 actor,
                 id,
@@ -279,6 +347,305 @@ impl Drop for ManualCompaction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn model_boundary_shares_manual_slot_and_receipts_before_resume() {
+        let agent = Agent::with_security(
+            Arc::new(SummaryModel),
+            ToolRegistry::new(),
+            None,
+            None,
+            std::env::temp_dir(),
+        );
+        let (mut handle, actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: std::env::temp_dir(),
+                initial_history: vec![],
+                model_context_limit: 30_000,
+            },
+        );
+        let mut coordinator = ManualCompaction::new(0);
+        let request = || {
+            let (compact, job) = tokio::sync::oneshot::channel();
+            let (response, resume) = tokio::sync::oneshot::channel();
+            let (receipt, outcome) = tokio::sync::oneshot::channel();
+            let source = crate::compaction::HistorySource::bind(0, 0, &[], vec![]).expect("source");
+            (
+                crate::SteeringBoundaryRequest {
+                    compact,
+                    response,
+                    submitted: Some(crate::ModelBoundarySubmission {
+                        checkpoint: crate::SubmittedCheckpoint {
+                            payload: "{}".into(),
+                            source,
+                            covered_end: 0,
+                        },
+                        receipt,
+                    }),
+                },
+                job,
+                resume,
+                outcome,
+            )
+        };
+        let token = CancellationToken::new();
+        coordinator.admit(&actor, 0, 1);
+        let (submission, job, resume, outcome) = request();
+        coordinator.start_boundary(&actor, submission, None, &token);
+        assert!(job.await.expect("refusal").is_none());
+        assert!(resume.await.expect("resume").is_none());
+        assert_eq!(outcome.await.expect("receipt"), CompactOutcome::Failed);
+        assert_eq!(coordinator.next_model_id, Some(0));
+        coordinator.cancel(&actor);
+        while handle.eq_rx.try_recv().is_ok() {}
+
+        let (submission, job, mut resume, mut outcome) = request();
+        coordinator.start_boundary(&actor, submission, None, &token);
+        let job = job.await.expect("job").expect("model preparation");
+        assert!(job.submitted_checkpoint.is_some());
+        assert!(resume.try_recv().is_err());
+        assert!(outcome.try_recv().is_err());
+        coordinator.admit(&actor, 0, 2);
+        assert!(matches!(
+            handle.eq_rx.try_recv().expect("manual busy"),
+            SessionEvent::CompactStatus {
+                state: CompactState::Busy,
+                ..
+            }
+        ));
+        job.result
+            .send(ManualCheckpointResult::Outcome(CompactOutcome::Failed))
+            .ok()
+            .expect("result");
+        let result = coordinator.wait().await;
+        coordinator.complete(&actor, result);
+        assert_eq!(outcome.await.expect("terminal"), CompactOutcome::Failed);
+        assert!(resume.await.expect("resume after terminal").is_none());
+        assert!(
+            handle.eq_rx.try_recv().is_err(),
+            "model receipt must not alias manual UI IDs"
+        );
+        coordinator.admit(&actor, 0, 2);
+        assert!(matches!(
+            handle.eq_rx.try_recv().expect("manual queued"),
+            SessionEvent::CompactStatus {
+                state: CompactState::Queued,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn cancelled_or_abandoned_model_submission_never_consumes_identity() {
+        for abandoned in [false, true] {
+            let agent = Agent::with_security(
+                Arc::new(SummaryModel),
+                ToolRegistry::new(),
+                None,
+                None,
+                std::env::temp_dir(),
+            );
+            let (_, actor) = AppServerSession::new(
+                agent,
+                SessionConfig {
+                    runtime_policy: RuntimePolicy::interactive(),
+                    workspace_root: std::env::temp_dir(),
+                    initial_history: vec![],
+                    model_context_limit: 30_000,
+                },
+            );
+            let mut coordinator = ManualCompaction::new(0);
+            let (compact, job) = tokio::sync::oneshot::channel();
+            let (response, resume) = tokio::sync::oneshot::channel();
+            let (receipt, outcome) = tokio::sync::oneshot::channel();
+            let token = CancellationToken::new();
+            let mut outcome = Some(outcome);
+            if abandoned {
+                drop(outcome.take());
+            } else {
+                token.cancel();
+            }
+            coordinator.start_boundary(
+                &actor,
+                crate::SteeringBoundaryRequest {
+                    compact,
+                    response,
+                    submitted: Some(crate::ModelBoundarySubmission {
+                        checkpoint: crate::SubmittedCheckpoint {
+                            payload: "{}".into(),
+                            source: crate::compaction::HistorySource::bind(0, 0, &[], vec![])
+                                .expect("source"),
+                            covered_end: 0,
+                        },
+                        receipt,
+                    }),
+                },
+                None,
+                &token,
+            );
+            assert!(job.await.expect("refused job").is_none());
+            assert!(resume.await.expect("resumed").is_none());
+            if let Some(outcome) = outcome {
+                assert_eq!(outcome.await.expect("receipt"), CompactOutcome::Cancelled);
+            }
+            assert_eq!(coordinator.next_model_id, Some(0));
+            assert!(!coordinator.is_running());
+            assert!(coordinator.model_receipt.is_none());
+            assert_eq!(coordinator.ledger.admit(0, 1), CompactAdmission::Accepted);
+        }
+    }
+
+    #[tokio::test]
+    async fn model_boundary_cancellation_and_closed_preparation_release_capacity() {
+        for closed_preparation in [false, true] {
+            let agent = Agent::with_security(
+                Arc::new(SummaryModel),
+                ToolRegistry::new(),
+                None,
+                None,
+                std::env::temp_dir(),
+            );
+            let (_, actor) = AppServerSession::new(
+                agent,
+                SessionConfig {
+                    runtime_policy: RuntimePolicy::interactive(),
+                    workspace_root: std::env::temp_dir(),
+                    initial_history: vec![],
+                    model_context_limit: 30_000,
+                },
+            );
+            let mut coordinator = ManualCompaction::new(0);
+            let (compact, job) = tokio::sync::oneshot::channel();
+            let (response, resume) = tokio::sync::oneshot::channel();
+            let (receipt, outcome) = tokio::sync::oneshot::channel();
+            let request = crate::SteeringBoundaryRequest {
+                compact,
+                response,
+                submitted: Some(crate::ModelBoundarySubmission {
+                    checkpoint: crate::SubmittedCheckpoint {
+                        payload: "{}".into(),
+                        source: crate::compaction::HistorySource::bind(0, 0, &[], vec![])
+                            .expect("source"),
+                        covered_end: 0,
+                    },
+                    receipt,
+                }),
+            };
+            let token = CancellationToken::new();
+            if closed_preparation {
+                drop(job);
+                coordinator.start_boundary(&actor, request, None, &token);
+            } else {
+                coordinator.start_boundary(&actor, request, None, &token);
+                let job = job.await.expect("dispatch").expect("job");
+                *job.measurement.lock().expect("measurement") = Some(123);
+                token.cancel();
+                let result = coordinator.wait().await;
+                coordinator.complete(&actor, result);
+                assert!(job.result.is_closed());
+            }
+            let outcome = outcome.await.expect("terminal receipt");
+            assert_eq!(
+                outcome,
+                if closed_preparation {
+                    CompactOutcome::Cancelled
+                } else {
+                    CompactOutcome::CancelledWithEstimate { before: 123 }
+                }
+            );
+            assert!(resume.await.expect("resume").is_none());
+            assert!(!coordinator.is_running());
+            assert!(coordinator.model_receipt.is_none());
+            assert_eq!(coordinator.ledger.admit(0, 1), CompactAdmission::Accepted);
+        }
+    }
+
+    #[tokio::test]
+    async fn abandoned_receipt_after_dispatch_cancels_before_candidate_install() {
+        for at_commit in [false, true] {
+            let agent = Agent::with_security(
+                Arc::new(SummaryModel),
+                ToolRegistry::new(),
+                None,
+                None,
+                std::env::temp_dir(),
+            );
+            let (_, actor) = AppServerSession::new(
+                agent,
+                SessionConfig {
+                    runtime_policy: RuntimePolicy::interactive(),
+                    workspace_root: std::env::temp_dir(),
+                    initial_history: vec![],
+                    model_context_limit: 30_000,
+                },
+            );
+            let mut coordinator = ManualCompaction::new(0);
+            let (compact, job) = tokio::sync::oneshot::channel();
+            let (response, resume) = tokio::sync::oneshot::channel();
+            let (receipt, outcome) = tokio::sync::oneshot::channel();
+            let source = crate::compaction::HistorySource::bind(0, 0, &[], vec![]).expect("source");
+            coordinator.start_boundary(
+                &actor,
+                crate::SteeringBoundaryRequest {
+                    compact,
+                    response,
+                    submitted: Some(crate::ModelBoundarySubmission {
+                        checkpoint: crate::SubmittedCheckpoint {
+                            payload: "{}".into(),
+                            source: source.clone(),
+                            covered_end: 0,
+                        },
+                        receipt,
+                    }),
+                },
+                None,
+                &CancellationToken::new(),
+            );
+            let job = job.await.expect("dispatch").expect("job");
+            let candidate = ManualCheckpointResult::Candidate {
+                projection: Box::new(crate::checkpoint_projection::CheckpointProjection {
+                    sequence: 0,
+                    parent_sequence: None,
+                    source,
+                    covered: vec![],
+                    content: "must not install".into(),
+                    context_limit: 30_000,
+                    private: crate::transient_text::PrivateTokens::default(),
+                }),
+                before: 100,
+                after: 20,
+                deadline: tokio::time::Instant::now() + std::time::Duration::from_secs(5),
+            };
+            let result = if at_commit {
+                job.result.send(candidate).ok().expect("send");
+                let result = coordinator.wait().await;
+                drop(outcome);
+                result
+            } else {
+                drop(outcome);
+                let result =
+                    tokio::time::timeout(std::time::Duration::from_secs(1), coordinator.wait())
+                        .await
+                        .expect("closed receipt wakes wait");
+                drop(candidate);
+                result
+            };
+            coordinator.complete(&actor, result);
+            assert!(
+                actor
+                    .agent
+                    .checkpoint_projection_state
+                    .lock()
+                    .expect("state")
+                    .is_none()
+            );
+            assert!(resume.await.expect("resume").is_none());
+            assert!(coordinator.model_receipt.is_none());
+            assert_eq!(coordinator.ledger.admit(0, 1), CompactAdmission::Accepted);
+        }
+    }
+
     #[tokio::test]
     async fn cancelled_measurement_is_receipted_and_never_leaks_to_next_operation() {
         let agent = Agent::with_security(

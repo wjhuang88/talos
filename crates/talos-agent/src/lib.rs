@@ -128,7 +128,13 @@ pub(crate) struct BoundaryCompactJob {
     pub(crate) result: tokio::sync::oneshot::Sender<checkpoint_manual::ManualCheckpointResult>,
 }
 
+pub(crate) struct ModelBoundarySubmission {
+    pub(crate) checkpoint: SubmittedCheckpoint,
+    pub(crate) receipt: tokio::sync::oneshot::Sender<talos_core::session::CompactOutcome>,
+}
+
 pub(crate) struct SteeringBoundaryRequest {
+    pub(crate) submitted: Option<ModelBoundarySubmission>,
     pub(crate) compact: tokio::sync::oneshot::Sender<Option<BoundaryCompactJob>>,
     pub(crate) response: tokio::sync::oneshot::Sender<Option<SteeringBoundaryBatch>>,
 }
@@ -1832,7 +1838,11 @@ impl Agent {
                 let (response, injected) = tokio::sync::oneshot::channel();
                 let (compact, compact_job) = tokio::sync::oneshot::channel();
                 if boundary_tx
-                    .send(SteeringBoundaryRequest { response, compact })
+                    .send(SteeringBoundaryRequest {
+                        response,
+                        compact,
+                        submitted: None,
+                    })
                     .is_ok()
                     && let Ok(Some(mut job)) = compact_job.await
                 {
