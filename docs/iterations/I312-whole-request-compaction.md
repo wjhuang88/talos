@@ -6,6 +6,25 @@
 > Baseline rule: preserve all parent acceptance; successful trimming alone cannot close this iteration.
 > MVP deliverable: a long-running session compacts complete provider requests safely, exposes numeric outcomes and accepts a typed /compact command while raw history remains recoverable.
 
+## Stable candidate validation — 2026-11-01
+
+Standard host `release_preflight.sh` session 66565 exited 0, including both
+external Runtime SDK dependency modes; log
+`/private/tmp/i312-converged-preflight-host.log`. This supersedes its running
+state below and the sandbox-EPERM attempt, without erasing that failed evidence.
+Both governance validators also passed after owner/reference/handoff edits
+(`/private/tmp/i312-convergence-docs-governance.log`,
+`/private/tmp/i312-convergence-docs-claims.log`).
+
+Independent full-scope static API/privacy/security review APPROVED implementation
+head `d2269733c26bb671bffb0c19e52cd9178ac98576` against
+`3c748a11576af6ca16301edecb35d8a234eef923`, full diff SHA-256
+`1163fe7b9724bd5d43dbdf3c270d1945765a6e7aea971ceb3e4f0ae4236b9dc1`.
+The reviewer did not run tests and uses the shared Agent/GitHub identity, not a
+different natural-person reviewer. No new implementation blockers were found;
+exact-head platform CI, merge CAS, merge and owner-first completion remain open.
+No T4 completion or later T5/T1/T6 delivery is claimed.
+
 ## Legacy API convergence — 2026-11-01
 
 Runtime follow-up: rebuilt current CLI and ran
@@ -56,8 +75,8 @@ Independent static review approved tracked diff
 and new stream module hash
 `f602a3b39d0cc1323142d5a60ae3772d9026f26f6b7d579d13e06e2391b6db29`
 against `559867f74`; no independent test execution was claimed. Both P1 source
-findings now have local implementations, but actual TUI walkthrough, final full
-preflight/review/platform CI/CAS/merge and completion evidence remain outstanding.
+findings now have local implementations. The scoped PTY walkthrough above passes;
+final platform CI/CAS/merge and completion evidence remain outstanding.
 T4 and the full handoff remain Active/Partial.
 
 ## Post-turn maintenance increment — 2026-11-01
