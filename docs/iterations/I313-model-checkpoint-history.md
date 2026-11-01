@@ -796,3 +796,26 @@ code diff SHA256 `7774833978b9eedcb7f863ecd0f03a385821eaca8e670f139a1074c7c2221c
 Reviewer did not run tests and shares Agent/GitHub identity. Model search/detail,
 full T5 acceptance and final workspace/remote validation remain unfinished; T1/T6
 and the overall handoff remain open.
+
+### Composed original-record and terminal reread — local, unmerged
+
+DurableRecoveryRecord::recover_text rereads both the original source and optional
+terminal receipt marker from the same captured descriptor/cutoff, checks each
+captured digest, then applies eligibility and fixed snippet/detail projection.
+The two record ranges must fit the combined 2 MiB source-operation budget before
+I/O begins. No marker means unverifiable tool text remains unavailable. A different
+capture cannot lend its marker even when it names the same durable path.
+
+The durable restart regression now recovers a newly persisted permitted tool fact
+through these real rereads, refuses missing/cross-capture markers and cancellation,
+and modifies actual on-disk terminal extension bytes while leaving the tool record
+unchanged; recovery then returns Stale. A private oversized-range fixture verifies
+combined-budget rejection before I/O. This still does not establish full-prefix or
+current branch/permission authority, cross-page marker lookup or model dispatch.
+
+Session 246/246 and all-target warnings-denied Clippy passed before the final
+marker-test enhancement (`/private/tmp/i313-composed-session.log`,
+`/private/tmp/i313-composed-clippy.log`); the enhanced real marker regression passed
+in `/private/tmp/i313-marker-replacement.log`. Independent review approved the
+production delta; reviewer did not run tests. All final T5, T1/T6 and whole-goal
+implementation, workspace validation and remote closure obligations remain open.

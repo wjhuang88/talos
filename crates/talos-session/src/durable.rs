@@ -134,6 +134,47 @@ pub struct DurableRecoveryRecord {
 }
 
 impl DurableRecoveryRecord {
+    /// Reread source and optional committed terminal from the same captured
+    /// storage source, then apply receipt eligibility and fixed response bounds.
+    /// Combined record bytes cannot exceed one source-page budget. The host must
+    /// separately validate current branch/prefix and permission before delivery.
+    pub fn recover_text(
+        &self,
+        terminal: Option<&Self>,
+        kind: crate::history_projection::RecoveryTextKind,
+        deadline: std::time::Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<
+        Option<crate::history_projection::RecoveryText>,
+        crate::history_page::HistoryPageError,
+    > {
+        use crate::history_page::{HISTORY_PAGE_BYTES, HistoryPageError};
+        let own_bytes = self.range.end - self.range.start;
+        if let Some(terminal) = terminal {
+            if !Arc::ptr_eq(&self.source.descriptor, &terminal.source.descriptor)
+                || self.source.source_end != terminal.source.source_end
+            {
+                return Err(HistoryPageError::Stale);
+            }
+            let total = own_bytes
+                .checked_add(terminal.range.end - terminal.range.start)
+                .ok_or(HistoryPageError::RecordTooLarge)?;
+            if total > HISTORY_PAGE_BYTES as u64 {
+                return Err(HistoryPageError::RecordTooLarge);
+            }
+        }
+        let source = self.reread(deadline, &stopped)?;
+        let terminal = terminal
+            .map(|record| record.reread(deadline, &stopped))
+            .transpose()?;
+        let text =
+            crate::history_projection::recovery_response_text(&source, terminal.as_ref(), kind);
+        if stopped() || std::time::Instant::now() >= deadline {
+            return Err(HistoryPageError::Stopped);
+        }
+        Ok(text)
+    }
+
     /// Reread and compare the original serialized entry before projection.
     pub fn reread(
         &self,
@@ -1078,6 +1119,38 @@ mod tests {
     }
 
     #[test]
+    fn composed_recovery_enforces_combined_source_budget_before_io() {
+        let source = DurableRecoverySource {
+            descriptor: Arc::new(RecoverySourceDescriptor {
+                session_id: Uuid::new_v4(),
+                branch_id: "test".into(),
+                path: std::path::PathBuf::from("nonexistent-recovery-budget-fixture"),
+            }),
+            source_end: 2 * crate::history_page::HISTORY_PAGE_BYTES as u64,
+        };
+        let record = DurableRecoveryRecord {
+            source: source.clone(),
+            range: 0..crate::history_page::HISTORY_PAGE_BYTES as u64,
+            digest: [0; 32],
+        };
+        let terminal = DurableRecoveryRecord {
+            source,
+            range: crate::history_page::HISTORY_PAGE_BYTES as u64
+                ..crate::history_page::HISTORY_PAGE_BYTES as u64 + 1,
+            digest: [0; 32],
+        };
+        assert!(matches!(
+            record.recover_text(
+                Some(&terminal),
+                crate::history_projection::RecoveryTextKind::Detail,
+                std::time::Instant::now() + std::time::Duration::from_secs(2),
+                || false
+            ),
+            Err(crate::history_page::HistoryPageError::RecordTooLarge)
+        ));
+    }
+
+    #[test]
     fn colon_external_id_maps_to_uuid_tlog_and_is_idempotent() {
         let directory = tempfile::tempdir().expect("temporary host directory");
         let first = create_or_open(
@@ -1160,6 +1233,56 @@ mod tests {
         drop(session);
         let reopened = create_or_open(directory.path(), "recovery").expect("reopen");
         let entries = reopened.session().read_entries().expect("entries");
+        let source = reopened.capture_recovery_source().expect("captured source");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let page = source.read_page(0, deadline, || false).expect("page");
+        let tool_index = page
+            .entries
+            .iter()
+            .position(|entry| entry.id == first.entry_ids[1])
+            .expect("tool record");
+        let tool = source
+            .capture_record(page.record_ranges[tool_index].clone(), deadline, || false)
+            .expect("tool locator");
+        let terminal = source
+            .capture_record(
+                page.record_ranges.last().expect("terminal range").clone(),
+                deadline,
+                || false,
+            )
+            .expect("terminal locator");
+        let kind = crate::history_projection::RecoveryTextKind::Detail;
+        assert!(
+            tool.recover_text(None, kind, deadline, || false)
+                .expect("no receipt")
+                .is_none()
+        );
+        assert_eq!(
+            tool.recover_text(Some(&terminal), kind, deadline, || false)
+                .expect("verified rereads")
+                .expect("eligible")
+                .text,
+            "fact: port 8123"
+        );
+        let other_capture = reopened
+            .capture_recovery_source()
+            .expect("independent capture");
+        let other_terminal = other_capture
+            .capture_record(
+                page.record_ranges.last().expect("range").clone(),
+                deadline,
+                || false,
+            )
+            .expect("other terminal");
+        assert!(
+            tool.recover_text(Some(&other_terminal), kind, deadline, || false)
+                .is_err()
+        );
+        assert!(
+            tool.recover_text(Some(&terminal), kind, deadline, || true)
+                .is_err()
+        );
+
         let receipts =
             crate::HistoryRecoveryReceipt::from_terminal_entry(entries.last().expect("marker"))
                 .expect("receipts");
@@ -1195,6 +1318,24 @@ mod tests {
                 )
                 .is_err()
         );
+        // Replace marker bytes on disk while leaving the original tool record intact.
+        let mut bytes = fs::read(reopened.file_path()).expect("stored transcript");
+        let start = terminal.range.start as usize;
+        let end = terminal.range.end as usize;
+        let offset = bytes[start..end]
+            .windows(b"history_recovery".len())
+            .position(|value| value == b"history_recovery")
+            .expect("receipt extension");
+        bytes[start + offset] = b'H';
+        fs::write(reopened.file_path(), bytes).expect("same-length terminal replacement");
+        assert!(
+            tool.reread(deadline, || false).is_ok(),
+            "tool source unchanged"
+        );
+        assert!(matches!(
+            tool.recover_text(Some(&terminal), kind, deadline, || false),
+            Err(crate::history_page::HistoryPageError::Stale)
+        ));
     }
 
     #[test]
