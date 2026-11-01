@@ -891,3 +891,28 @@ reviewer did not run tests. The query-normalization experiment was reverted afte
 it changed existing semantics without advancing source authority. Durable model
 search/detail, authorization context and Runtime/CLI activation remain unfinished;
 this notice does not close those requirements or T5/T1/T6.
+
+### Incremental raw-prefix consistency evidence — local, unmerged
+
+RecoveryPrefixScan reads raw source bytes in steps of at most 2 MiB, checks
+cancellation/deadline every 8 KiB read and retains one rolling digest rather than
+a page-sized manifest. Verification must reach the captured cutoff and compare
+the entire digest. Unix dev/inode/ctime/mtime/length stamps reject changes during
+a scan; other platforms currently return UnsupportedSource. This detects source
+consistency only, not permission/branch authority, and must be composed with a
+current delivery fence. It does not prevent an arbitrary host from rewriting data.
+
+A real >2 MiB fixture covers partial/cancelled scan refusal, same-length atomic
+replacement with preserved mtime between chunks, true suffix append compatibility
+and changed-prefix rejection. Session 250/250 and all-target warnings-denied
+Session Clippy pass in `/private/tmp/i313-seal-session.log` and
+`/private/tmp/i313-seal-clippy.log`.
+
+Important integration gap found by the raw-byte regression: current durable turn
+finalization atomically re-encodes TLOG and regenerates its creation header. That
+is not byte-prefix append and this seal correctly refuses it. Header preservation
+or an explicitly validated format-aware digest contract remains required before
+normal durable turn appends can use this seal. The passing append fixture uses an
+actual filesystem suffix append, not durable finalization. Windows support,
+source-context binding, model search/detail and product activation remain open.
+No T5 completion or full workspace/remote certification is claimed.

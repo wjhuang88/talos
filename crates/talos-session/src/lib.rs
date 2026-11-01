@@ -45,6 +45,8 @@ pub use history_receipt::{HistoryRecoveryReceipt, RecoveryProjection};
 mod jsonl;
 mod manager;
 mod pending_submission;
+mod recovery_seal;
+pub use recovery_seal::{RecoveryPrefixScan, RecoveryPrefixSeal};
 mod runtime_state;
 mod segment_chain;
 pub mod sqlite;

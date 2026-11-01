@@ -182,7 +182,7 @@ pub fn read_history_record(
     page.entries.pop().ok_or(HistoryPageError::InvalidRecord)
 }
 
-fn open_source(path: &Path) -> Result<std::fs::File, HistoryPageError> {
+pub(crate) fn open_source(path: &Path) -> Result<std::fs::File, HistoryPageError> {
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
     #[cfg(unix)]

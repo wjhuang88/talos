@@ -203,6 +203,51 @@ impl DurableRecoveryRecord {
 }
 
 impl DurableRecoverySource {
+    pub(crate) fn read_recovery_bytes(
+        &self,
+        offset: u64,
+        expected: &std::fs::Metadata,
+        deadline: std::time::Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<Vec<u8>, crate::history_page::HistoryPageError> {
+        use crate::history_page::{HISTORY_PAGE_BYTES, HistoryPageError};
+        use std::io::{Read, Seek, SeekFrom};
+        if offset > self.source_end {
+            return Err(HistoryPageError::Stale);
+        }
+        let mut file = crate::history_page::open_source(&self.descriptor.path)?;
+        if !crate::recovery_seal::same_file_version(&file.metadata()?, expected)? {
+            return Err(HistoryPageError::Stale);
+        }
+        file.seek(SeekFrom::Start(offset))?;
+        let size = (self.source_end - offset).min(HISTORY_PAGE_BYTES as u64) as usize;
+        let mut bytes = vec![0; size];
+        for chunk in bytes.chunks_mut(8192) {
+            if stopped() || std::time::Instant::now() >= deadline {
+                return Err(HistoryPageError::Stopped);
+            }
+            file.read_exact(chunk)?;
+        }
+        if stopped() || std::time::Instant::now() >= deadline {
+            return Err(HistoryPageError::Stopped);
+        }
+        if !crate::recovery_seal::same_file_version(&file.metadata()?, expected)? {
+            return Err(HistoryPageError::Stale);
+        }
+        Ok(bytes)
+    }
+    pub(crate) fn recovery_metadata(
+        &self,
+    ) -> Result<std::fs::Metadata, crate::history_page::HistoryPageError> {
+        let metadata = std::fs::symlink_metadata(&self.descriptor.path)?;
+        if !metadata.is_file() || metadata.file_type().is_symlink() {
+            return Err(crate::history_page::HistoryPageError::UnsupportedSource);
+        }
+        if metadata.len() < self.source_end {
+            return Err(crate::history_page::HistoryPageError::Stale);
+        }
+        Ok(metadata)
+    }
     /// Durable owner of the captured source; callers cannot supply another path.
     pub fn session_id(&self) -> Uuid {
         self.descriptor.session_id
