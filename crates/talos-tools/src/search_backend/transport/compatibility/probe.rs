@@ -144,6 +144,32 @@ impl PreparedReachabilityProbes {
             bing,
         })
     }
+
+    #[cfg(test)]
+    pub(in crate::search_backend) fn relocate_for_parity_test(
+        manifest: &ToolNetworkManifest,
+        duckduckgo: Url,
+        bing: Url,
+    ) -> Result<Self, TransportError> {
+        let prepare = |backend, url: Url| {
+            Ok::<_, TransportError>(PreparedProbe {
+                backend,
+                head: PreparedTransportRequest::status_only(manifest, url.clone(), Method::HEAD)?,
+                get: PreparedTransportRequest::status_only(manifest, url, Method::GET)?,
+            })
+        };
+        Ok(Self {
+            duckduckgo: prepare(ProbeBackend::DuckDuckGo, duckduckgo)?,
+            bing: prepare(ProbeBackend::Bing, bing)?,
+        })
+    }
+}
+
+#[cfg(test)]
+pub(in crate::search_backend) fn clear_cache_for_parity_test() {
+    if let Ok(mut cache) = cache().lock() {
+        *cache = ProbeCache::default();
+    }
 }
 
 async fn use_cached_or_probe(
