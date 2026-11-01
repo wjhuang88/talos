@@ -1107,3 +1107,24 @@ static review approves the source-budget increment (reviewer did not run tests).
 An additional actual tool/terminal regression confirms allowance exhaustion after
 the original read, zero remaining allowance and successful fresh-page retry
 (`/private/tmp/i313-budget-terminal.log`).
+
+### Long-history recovery discovery — local, unmerged
+
+Durable recovery discovery now works without a materialized compaction source.
+It returns an execution/host-scope-bound snapshot and no compaction sources,
+explicitly reporting compact_available=false. Search/detail retain source seal,
+owner-scope, cancellation and permission checks. Discovery validates source and
+index availability before publication, without I/O inside the permission fence.
+This removes the 8192-entry discovery dependency without widening compaction
+eligibility or constructing a whole-history reference map.
+
+The real 8300-record durable tool fixture reaches the last original fact and its
+detail, and covers scope replacement and permission reset. Initial six tool tests
+passed; strengthened validation and independent review remain pending. Runtime
+activation, preparation resumption, Windows and full T5 closure remain open.
+
+Final long-discovery Agent 617/617 and affected warnings-denied all-target Clippy
+pass (`/private/tmp/i313-long-final-agent.log`, `/private/tmp/i313-long-final-clippy.log`).
+Both governance validators pass. Independent static review approves the revised
+scope binding and availability checks; reviewer did not run tests. The existing
+non-atomic filesystem-validation/permission-publication boundary remains open.

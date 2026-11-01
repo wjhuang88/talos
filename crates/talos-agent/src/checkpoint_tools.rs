@@ -21,6 +21,7 @@ pub(crate) struct Execution {
 #[derive(Default)]
 struct State {
     current: Option<Snapshot>,
+    recovery: Option<(String, String, PermissionLease)>,
     issued: Option<Snapshot>,
     cursor: Option<(String, usize)>,
     receipt: Option<(u64, oneshot::Receiver<CompactOutcome>)>,
@@ -188,19 +189,34 @@ impl AgentTool for HistorySearchTool {
                 let Ok(state) = execution.state.lock() else {
                     return unavailable();
                 };
-                let Some(snapshot) = &state.issued else {
-                    return unavailable();
-                };
-                let Some(current) = &state.current else {
-                    return unavailable();
-                };
-                if input.snapshot.as_deref() != Some(snapshot.token.as_str())
-                    || current.end < snapshot.end
-                    || !(0..snapshot.end).all(|i| snapshot.source.same_entry(&current.source, i))
-                {
-                    return ToolResult::error("stale history snapshot");
+                if let Some((token, scope, authority)) = &state.recovery {
+                    let same_scope = crate::checkpoint_history::HISTORY
+                        .try_with(|history| {
+                            history
+                                .as_ref()
+                                .is_some_and(|history| history.scope_identity() == scope)
+                        })
+                        .unwrap_or(false);
+                    if !same_scope || input.snapshot.as_deref() != Some(token.as_str()) {
+                        return ToolResult::error("stale history snapshot");
+                    }
+                    authority.clone()
+                } else {
+                    let Some(snapshot) = &state.issued else {
+                        return unavailable();
+                    };
+                    let Some(current) = &state.current else {
+                        return unavailable();
+                    };
+                    if input.snapshot.as_deref() != Some(snapshot.token.as_str())
+                        || current.end < snapshot.end
+                        || !(0..snapshot.end)
+                            .all(|i| snapshot.source.same_entry(&current.source, i))
+                    {
+                        return ToolResult::error("stale history snapshot");
+                    }
+                    snapshot.authority.clone()
                 }
-                snapshot.authority.clone()
             };
             if !authority.valid() {
                 return unavailable();
@@ -242,6 +258,48 @@ impl AgentTool for HistorySearchTool {
             return unavailable();
         };
         let rediscover = input.cursor.is_none();
+        // Durable recovery does not require a materialized compaction source.
+        // HISTORY is scoped to this Actor execution and revalidates its sealed
+        // source and owner scope on every query. Never widen compaction eligibility.
+        if state.current.is_none() && rediscover {
+            let ready = crate::checkpoint_history::HISTORY
+                .try_with(|history| {
+                    let history = history.as_ref()?;
+                    history.reset_queries()?;
+                    history
+                        .available()
+                        .then(|| history.scope_identity().to_owned())
+                })
+                .ok()
+                .flatten();
+            let Some(scope) = ready else {
+                return unavailable();
+            };
+            let Some(permission) = &execution.permission else {
+                return unavailable();
+            };
+            let Ok(permission_snapshot) = permission.state_snapshot() else {
+                return unavailable();
+            };
+            let authority = PermissionLease {
+                state: permission.clone(),
+                snapshot: permission_snapshot,
+            };
+            let token = uuid::Uuid::new_v4().to_string();
+            let result = ToolResult::success(
+                json!({
+                    "snapshot":token, "sources":[], "complete":true,
+                    "next_cursor":null, "compact_available":false,
+                    "history_available":true
+                })
+                .to_string(),
+            );
+            state.issued = None;
+            state.cursor = None;
+            state.recovery = Some((token, scope, authority.clone()));
+            return authority.commit(|| result).unwrap_or_else(unavailable);
+        }
+        state.recovery = None;
         let (snapshot, start) = if let Some(cursor) = input.cursor {
             let Some((expected, start)) = state.cursor.as_ref() else {
                 return ToolResult::error("stale discovery cursor");
@@ -475,6 +533,52 @@ mod tests {
             assert!(HistorySearchTool.execute(json!({"mode":"detail","snapshot":rediscovery["snapshot"],"reference":reference})).await.is_error);
             execution.permission.as_ref().expect("permission").clear().expect("reset");
             assert!(HistorySearchTool.execute(json!({"mode":"detail","snapshot":discovery["snapshot"],"reference":reference})).await.is_error);
+        })).await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn durable_discovery_searches_beyond_compaction_source_limit() {
+        let (execution, _, _) = fixture();
+        let raw: Vec<_> = (0..8300)
+            .map(|i| Message::User {
+                content: format!("longhistory fact {i}"),
+            })
+            .collect();
+        execution.refresh(None, &raw);
+        let root = tempfile::tempdir().expect("root");
+        let durable = talos_session::DurableSession::open_or_create(root.path(), "long-query")
+            .expect("session");
+        durable
+            .commit_turn("prior", &raw, &Default::default())
+            .expect("commit");
+        let history = crate::checkpoint_history::History::prepare(
+            &durable,
+            &tokio_util::sync::CancellationToken::new(),
+        )
+        .await
+        .expect("host context");
+        crate::checkpoint_history::HISTORY.scope(Some(history), EXECUTION.scope(execution.clone(), async {
+            let discovery = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+            assert!(!discovery.is_error, "{}", discovery.content);
+            let discovery: Value = serde_json::from_str(&discovery.content).expect("discovery");
+            assert_eq!(discovery["compact_available"], false);
+            assert_eq!(discovery["sources"], json!([]));
+            let search = HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"8299"})).await;
+            assert!(!search.is_error, "{}", search.content);
+            let search: Value = serde_json::from_str(&search.content).expect("search");
+            assert_eq!(search["results"][0]["text"], "longhistory fact 8299");
+            let detail = HistorySearchTool.execute(json!({"mode":"detail", "snapshot":discovery["snapshot"], "reference":search["results"][0]["reference"]})).await;
+            assert!(!detail.is_error);
+            let replacement = crate::checkpoint_history::History::prepare(&durable, &tokio_util::sync::CancellationToken::new()).await.expect("replacement scope");
+            // Preparing a replacement retires the outer host scope.
+            assert!(HistorySearchTool.execute(json!({"mode":"discover"})).await.is_error);
+            crate::checkpoint_history::HISTORY.scope(Some(replacement), async {
+                assert!(HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"8299"})).await.is_error);
+                assert!(!HistorySearchTool.execute(json!({"mode":"discover"})).await.is_error);
+            }).await;
+            execution.permission.as_ref().expect("permission").clear().expect("reset");
+            assert!(HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"8299"})).await.is_error);
         })).await;
     }
 

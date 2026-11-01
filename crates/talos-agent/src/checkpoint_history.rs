@@ -157,6 +157,10 @@ impl History {
         })
     }
 
+    pub(crate) fn scope_identity(&self) -> &str {
+        &self.scope
+    }
+
     pub(crate) fn reset_queries(&self) -> Option<()> {
         *self.state.lock().ok()? = QueryState::default();
         Some(())
@@ -168,6 +172,23 @@ impl History {
 
     pub(crate) fn current(&self) -> bool {
         !self.cancel.is_cancelled() && self.seal.check_current().is_ok()
+    }
+
+    pub(crate) fn available(&self) -> bool {
+        let stopped = self.cancel.clone();
+        let budget =
+            RecoveryWorkBudget::with_cancellation_check(Duration::from_secs(2), move || {
+                stopped.is_cancelled()
+            });
+        self.current()
+            && SessionIndex::open_read_only(&self.path)
+                .ok()
+                .is_some_and(|index| {
+                    index
+                        .recovery_owner_scope_ready(&self.owner, &self.scope, &budget)
+                        .unwrap_or(false)
+                })
+            && self.current()
     }
 
     pub(crate) fn query(
