@@ -1,4 +1,4 @@
-//! One Actor-owned manual operation; raw history stays with the Actor.
+//! One Actor-owned manual/model operation; raw history stays with the Actor.
 
 use super::*;
 use crate::checkpoint_manual::ManualCheckpointResult;
@@ -10,6 +10,7 @@ pub(super) struct ManualCompaction {
     ledger: CompactOperations,
     queued: Option<u64>,
     next_model_id: Option<u64>,
+    queued_model: Option<(u64, crate::SubmittedCheckpoint)>,
     model_receipt: Option<tokio::sync::oneshot::Sender<CompactOutcome>>,
     boundary_resume: Option<(
         tokio::sync::oneshot::Sender<Option<crate::SteeringBoundaryBatch>>,
@@ -25,6 +26,7 @@ impl ManualCompaction {
             ledger: CompactOperations::new(generation),
             queued: None,
             next_model_id: Some(0),
+            queued_model: None,
             model_receipt: None,
             boundary_resume: None,
             running: None,
@@ -69,6 +71,43 @@ impl ManualCompaction {
         self.running.is_some()
     }
 
+    /// Reserve shared capacity before returning tool admission. Preparation and
+    /// installation remain deferred until the complete paired batch boundary.
+    pub(super) fn admit_model(
+        &mut self,
+        actor: &AppServerSession,
+        submission: crate::ModelBoundarySubmission,
+        turn_token: &CancellationToken,
+    ) -> Result<u64, CompactOutcome> {
+        let rejection = if turn_token.is_cancelled() || submission.receipt.is_closed() {
+            Some(CompactOutcome::Cancelled)
+        } else if self.next_model_id.is_none() {
+            Some(CompactOutcome::Failed)
+        } else {
+            None
+        };
+        if let Some(outcome) = rejection {
+            let _ = submission.receipt.send(outcome);
+            return Err(outcome);
+        }
+        let Some(id) = self.next_model_id else {
+            return Err(CompactOutcome::Failed);
+        };
+        if self
+            .ledger
+            .admit_from(actor.session_generation, CompactOrigin::Model, id)
+            != CompactAdmission::Accepted
+        {
+            let _ = submission.receipt.send(CompactOutcome::Failed);
+            return Err(CompactOutcome::Failed);
+        }
+        self.next_model_id = id.checked_add(1);
+        self.measurement = Arc::new(std::sync::Mutex::new(None));
+        self.model_receipt = Some(submission.receipt);
+        self.queued_model = Some((id, submission.checkpoint));
+        Ok(id)
+    }
+
     pub(super) fn start_boundary(
         &mut self,
         actor: &AppServerSession,
@@ -76,39 +115,19 @@ impl ManualCompaction {
         injected: Option<crate::SteeringBoundaryBatch>,
         turn_token: &CancellationToken,
     ) {
-        let mut submitted_checkpoint = None;
-        let model_id = if let Some(submission) = request.submitted.take() {
-            if turn_token.is_cancelled() || submission.receipt.is_closed() {
-                let _ = submission.receipt.send(CompactOutcome::Cancelled);
-                let _ = request.compact.send(None);
-                let _ = request.response.send(injected);
-                return;
-            }
-            let Some(id) = self.next_model_id else {
-                let _ = submission.receipt.send(CompactOutcome::Failed);
-                let _ = request.compact.send(None);
-                let _ = request.response.send(injected);
-                return;
-            };
-            if self
-                .ledger
-                .admit_from(actor.session_generation, CompactOrigin::Model, id)
-                != CompactAdmission::Accepted
-            {
-                // Manual and model work share capacity. Refusal never consumes
-                // the model sequence or disturbs the manual pending operation.
-                let _ = submission.receipt.send(CompactOutcome::Failed);
-                let _ = request.compact.send(None);
-                let _ = request.response.send(injected);
-                return;
-            }
-            self.next_model_id = id.checked_add(1);
-            self.model_receipt = Some(submission.receipt);
-            submitted_checkpoint = Some(submission.checkpoint);
-            Some(id)
-        } else {
-            None
-        };
+        if let Some(submission) = request.submitted.take()
+            && self.admit_model(actor, submission, turn_token).is_err()
+        {
+            let _ = request.compact.send(None);
+            let _ = request.response.send(injected);
+            return;
+        }
+        let (model_id, submitted_checkpoint) = self
+            .queued_model
+            .take()
+            .map_or((None, None), |(id, checkpoint)| {
+                (Some(id), Some(checkpoint))
+            });
         let Some(id) = model_id.or_else(|| self.queued.take()) else {
             let _ = request.compact.send(None);
             let _ = request.response.send(injected);
@@ -325,6 +344,13 @@ impl ManualCompaction {
         }
     }
 
+    /// An admission belongs to its originating turn, never the next turn.
+    pub(super) fn cancel_queued_model(&mut self, actor: &AppServerSession) {
+        if let Some((id, _)) = self.queued_model.take() {
+            self.finish(actor, id, CompactOutcome::Cancelled);
+        }
+    }
+
     pub(super) fn cancel(&mut self, actor: &AppServerSession) {
         if let Some((_, token, _)) = &self.running {
             token.cancel();
@@ -332,6 +358,7 @@ impl ManualCompaction {
         if let Some(id) = self.queued.take() {
             self.finish(actor, id, CompactOutcome::Cancelled);
         }
+        self.cancel_queued_model(actor);
     }
 }
 
@@ -429,6 +456,68 @@ mod tests {
         coordinator.admit(&actor, 0, 2);
         assert!(matches!(
             handle.eq_rx.try_recv().expect("manual queued"),
+            SessionEvent::CompactStatus {
+                state: CompactState::Queued,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn model_admission_cancel_before_batch_releases_shared_capacity() {
+        let agent = Agent::with_security(
+            Arc::new(SummaryModel),
+            ToolRegistry::new(),
+            None,
+            None,
+            std::env::temp_dir(),
+        );
+        let (mut handle, actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: std::env::temp_dir(),
+                initial_history: vec![],
+                model_context_limit: 30_000,
+            },
+        );
+        let mut coordinator = ManualCompaction::new(0);
+        let (receipt, mut outcome) = tokio::sync::oneshot::channel();
+        let token = CancellationToken::new();
+        assert_eq!(
+            coordinator.admit_model(
+                &actor,
+                crate::ModelBoundarySubmission {
+                    checkpoint: crate::SubmittedCheckpoint {
+                        payload: "{}".into(),
+                        covered_end: 0,
+                        source: crate::compaction::HistorySource::bind(0, 0, &[], vec![])
+                            .expect("source"),
+                    },
+                    receipt,
+                },
+                &token
+            ),
+            Ok(0)
+        );
+        assert!(outcome.try_recv().is_err());
+        coordinator.admit(&actor, 0, 1);
+        assert!(matches!(
+            handle.eq_rx.try_recv().expect("busy"),
+            SessionEvent::CompactStatus {
+                state: CompactState::Busy,
+                ..
+            }
+        ));
+        coordinator.cancel(&actor);
+        assert_eq!(
+            outcome.await.expect("cancel receipt"),
+            CompactOutcome::Cancelled
+        );
+        assert!(coordinator.queued_model.is_none());
+        coordinator.admit(&actor, 0, 1);
+        assert!(matches!(
+            handle.eq_rx.try_recv().expect("released"),
             SessionEvent::CompactStatus {
                 state: CompactState::Queued,
                 ..
@@ -726,6 +815,171 @@ mod tests {
             .expect("end");
             Ok(rx)
         }
+    }
+
+    #[tokio::test]
+    async fn submitted_model_candidate_applies_before_boundary_resume_without_raw_rewrite() {
+        let raw: Vec<_> = (0..30)
+            .flat_map(|_| {
+                [
+                    Message::User {
+                        content: "constraint ".repeat(400),
+                    },
+                    Message::Assistant {
+                        content: "recorded".into(),
+                        tool_calls: vec![],
+                        reasoning: None,
+                    },
+                ]
+            })
+            .collect();
+        let agent = Agent::with_security(
+            Arc::new(SummaryModel),
+            ToolRegistry::new(),
+            None,
+            None,
+            std::env::temp_dir(),
+        );
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: std::env::temp_dir(),
+                initial_history: raw.clone(),
+                model_context_limit: 30_000,
+            },
+        );
+        let control = RuntimeAdmissionControl::new();
+        actor.set_runtime_admission(control.clone());
+        let token = CancellationToken::new();
+        assert!(control.commit_start(token.clone()));
+        let source = crate::compaction::HistorySource::bind(
+            0,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|i| format!("source-{i}")).collect(),
+        )
+        .expect("source");
+        let item =
+            serde_json::json!({"text":"Preserve constraint and continue", "sources":["source-0"]});
+        let payload =
+            serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+            "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+            "facts":[],"assumptions":[],"resources":[],"open_loops":[]})
+            .to_string();
+        let (compact, job) = tokio::sync::oneshot::channel();
+        let (response, mut resume) = tokio::sync::oneshot::channel();
+        let (receipt, mut outcome) = tokio::sync::oneshot::channel();
+        let mut coordinator = ManualCompaction::new(0);
+        assert_eq!(
+            coordinator.admit_model(
+                &actor,
+                crate::ModelBoundarySubmission {
+                    checkpoint: crate::SubmittedCheckpoint {
+                        payload,
+                        source: source.clone(),
+                        covered_end: 20
+                    },
+                    receipt,
+                },
+                &token
+            ),
+            Ok(0)
+        );
+        assert!(
+            actor
+                .agent
+                .checkpoint_projection_state
+                .lock()
+                .expect("cache")
+                .is_none()
+        );
+        assert!(outcome.try_recv().is_err(), "admission is not application");
+        coordinator.start_boundary(
+            &actor,
+            crate::SteeringBoundaryRequest {
+                compact,
+                response,
+                submitted: None,
+            },
+            None,
+            &token,
+        );
+        let job = job.await.expect("dispatch").expect("job");
+        let submitted = job.submitted_checkpoint.expect("model checkpoint");
+        assert!(submitted.matches_source(&source, raw.len()));
+        let before = actor.agent.estimate_provider_request_tokens(&raw, &[]);
+        let mut plan = crate::request_plan::ProviderRequestPlan {
+            messages: raw.clone(),
+            tool_definitions: vec![],
+            estimated_tokens: before,
+            ephemeral_image_tokens: 0,
+            omitted_tool_exchanges: 0,
+            tool_protocol: talos_core::tool::ToolProtocol::Native,
+        };
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut projection = None;
+        actor
+            .agent
+            .checkpoint_submitted_deferred(
+                &mut plan,
+                before * 2,
+                &crate::transient_text::PrivateTokens::default(),
+                &source,
+                deadline,
+                &submitted.payload,
+                submitted.covered_end,
+                &mut projection,
+            )
+            .await
+            .expect("prepare");
+        assert!(
+            actor
+                .agent
+                .checkpoint_projection_state
+                .lock()
+                .expect("cache")
+                .is_none()
+        );
+        assert!(resume.try_recv().is_err());
+        assert!(outcome.try_recv().is_err());
+        job.result
+            .send(ManualCheckpointResult::Candidate {
+                projection: Box::new(projection.expect("candidate")),
+                before,
+                after: plan.estimated_tokens,
+                deadline,
+            })
+            .ok()
+            .expect("deliver");
+        let result = coordinator.wait().await;
+        coordinator.complete(&actor, result);
+        assert!(
+            matches!(outcome.try_recv().expect("terminal before continuation"),
+            CompactOutcome::Applied { before, after } if after < before)
+        );
+        assert!(resume.try_recv().expect("resume").is_none());
+        assert!(
+            actor
+                .agent
+                .checkpoint_projection_state
+                .lock()
+                .expect("cache")
+                .is_some()
+        );
+        assert_eq!(actor.history, raw);
+        assert!(
+            handle.eq_rx.try_recv().is_err(),
+            "no model IDs in manual UI events"
+        );
+        coordinator.admit(&actor, 0, 1);
+        assert!(matches!(
+            handle.eq_rx.try_recv().expect("manual slot reusable"),
+            SessionEvent::CompactStatus {
+                state: CompactState::Queued,
+                ..
+            }
+        ));
     }
 
     #[tokio::test]

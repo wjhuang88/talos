@@ -622,3 +622,29 @@ Independent static APPROVE: two-file diff SHA256
 `6cc754443609448ed2bb1291cf5a8589fdd7f78ae6dc9ede032a4b2d72c98741`.
 Reviewer did not run tests and shares Agent/GitHub identity. Full T5 and later
 T1/T6, workspace/native/remote gates and merged owner evidence remain outstanding.
+
+### Pre-batch model admission and positive installation — local, unmerged
+
+The shared Actor coordinator now separates model admission (runtime operation ID
+and shared capacity reservation) from complete-batch preparation/installation.
+Turn termination cancels a queued model submission without cancelling queued manual
+work; explicit cancellation also releases the model slot. This interface is not yet
+called by a production model tool: tool registration, scoped discovery authorization,
+admission transport and dynamic terminal receipt delivery remain outstanding.
+
+A submitted structured-checkpoint regression exercises admission, actual shared
+preparation and Actor installation, asserting no early projection, Applied available
+before continuation, unchanged raw history and reusable manual capacity. Another
+regression covers cancellation between admission and batch arrival. The initial
+positive fixture exceeded its retained-history budget and correctly failed; the
+final fixture uses sufficient capacity for voluntary compression.
+
+Final locked Agent tests pass 601/601 and all-target warnings-denied Agent Clippy
+passes. Logs: `/private/tmp/i313-preadmission-agent-final.log` and
+`/private/tmp/i313-preadmission-clippy.log`. Independent static review approved the
+two-code-file diff SHA256
+`9127f1667d28630674685ed5ea5af54f115775fcdccb099db761dc1faf67eff1`;
+reviewer did not run tests and shares Agent/GitHub identity. A queued receipt closure
+is cleaned up at boundary or turn terminal, not by an immediate wakeup; installation
+still checks closure. This does not establish model-tool delivery, full workspace
+validation, remote CI or T5 completion. T1/T6 and the overall goal remain open.

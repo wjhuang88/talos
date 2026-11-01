@@ -500,6 +500,7 @@ impl AppServerSession {
                     }
                 }, if current_turn.is_some() => {
                     current_turn = None;
+                    compact.cancel_queued_model(self);
                     cancel_token = None;
                     current_boundary_rx = None;
                     if let Some(rx) = current_boundary_ack_rx.as_mut() {
