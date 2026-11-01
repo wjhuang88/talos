@@ -470,3 +470,30 @@ reviewer did not execute tests and shares Agent/GitHub identity. Fresh fetch kep
 origin/main at `8b11e5f49794ea17f09c96eff8d59a6bf8f9a3d6`. No T5 completion,
 remote implementation CI, source disclosure authority or model-tool integration
 is claimed. Full original acceptance and T1/T6 remain outstanding.
+
+### Original-record locator and bounded reread — local, unmerged
+
+Bounded source pages now retain exact record byte ranges. read_history_record
+accepts a single bounded range and rejects empty/oversized, widened multi-record,
+misaligned and cancelled reads. JSONL/TLOG fixtures verify exact text after an
+append beyond the captured range. The additive recovery_locations table stores
+optional ranges with cached candidates; tracked writes constrain them to the
+current scan page. Replacement clears old ranges and corrupt decoded ranges fail
+closed. Missing ranges cannot support bounded disclosure.
+
+The real 10,000-entry JSONL fixtures now compose query with direct original-record
+reread and compare source ID/text. This proves locator plumbing, not immutable
+source digest, permission or branch authority. Cross-page terminal-receipt lookup,
+host rebuild scheduling, model tools and Actor integration remain required.
+The affected structs are new unmerged I313 APIs; added fields are not presented
+as source-compatible changes to an already released struct-literal API.
+
+Session 240/240 and all-target warnings-denied Clippy pass before one additional
+test-only regression; the final two focused locator tests pass, covering cache
+replacement and corruption. Logs: `/private/tmp/i313-locator-session-tests.log`,
+`/private/tmp/i313-locator-clippy.log`, `/private/tmp/i313-locator-regressions.log`.
+Independent incremental static review approved the production delta against
+`99340a0ee` and confirmed the final test-only addition, with two-file diff SHA256
+`56533650a5fbc52ac6a6f1ed5a77caec9a675ad1cdf626be9582bfe4a33ad877`.
+Reviewer did not independently run tests and shares Agent/GitHub identity.
+No full T5 or remote validation/completion claim is made.

@@ -28,6 +28,9 @@ pub enum HistoryEncoding {
 pub struct HistoryPage {
     /// Complete records decoded within this page.
     pub entries: Vec<SessionEntry>,
+    /// Exact byte spans aligned one-to-one with entries, excluding file headers
+    /// and inter-record blank lines. Spans are locators, never source authority.
+    pub record_ranges: Vec<std::ops::Range<u64>>,
     /// Byte offset of the next record, suitable only for the same source snapshot.
     pub next_offset: u64,
     /// Whether the captured source end was reached.
@@ -118,6 +121,7 @@ pub fn read_history_page(
         pos = end + 1;
     }
     let mut entries = Vec::new();
+    let mut record_ranges = Vec::new();
     while pos < bytes.len() && entries.len() < HISTORY_PAGE_ENTRIES {
         check()?;
         if matches!(encoding, HistoryEncoding::Jsonl) && matches!(bytes[pos], b'\n' | b'\r') {
@@ -139,6 +143,7 @@ pub fn read_history_page(
             }
             break;
         };
+        record_ranges.push(offset + pos as u64..offset + (pos + consumed) as u64);
         entries.push(entry);
         pos += consumed;
     }
@@ -146,10 +151,35 @@ pub fn read_history_page(
     let next_offset = offset + pos as u64;
     Ok(HistoryPage {
         entries,
+        record_ranges,
         next_offset,
         complete: next_offset == source_end,
         bytes_read: bytes.len(),
     })
+}
+
+/// Re-read exactly one bounded source record by a previously captured locator.
+/// The host must independently validate the snapshot, entry identity/digest and
+/// branch permission before disclosure. A matching locator alone proves none of
+/// these. Appends beyond the locator do not expand this read.
+pub fn read_history_record(
+    path: &Path,
+    encoding: HistoryEncoding,
+    range: std::ops::Range<u64>,
+    deadline: Instant,
+    stopped: impl Fn() -> bool,
+) -> Result<SessionEntry, HistoryPageError> {
+    if range.start >= range.end {
+        return Err(HistoryPageError::InvalidRecord);
+    }
+    if range.end - range.start > HISTORY_PAGE_BYTES as u64 {
+        return Err(HistoryPageError::RecordTooLarge);
+    }
+    let mut page = read_history_page(path, encoding, range.start, range.end, deadline, stopped)?;
+    if !page.complete || page.entries.len() != 1 || page.record_ranges.first() != Some(&range) {
+        return Err(HistoryPageError::InvalidRecord);
+    }
+    page.entries.pop().ok_or(HistoryPageError::InvalidRecord)
 }
 
 fn open_source(path: &Path) -> Result<std::fs::File, HistoryPageError> {
@@ -313,6 +343,67 @@ mod tests {
             role: "user".into(),
             content,
             metadata: SessionMetadata::default(),
+        }
+    }
+
+    #[test]
+    fn record_locators_reread_exact_source_and_reject_widening() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for (encoding, store) in [
+            (
+                HistoryEncoding::Jsonl,
+                &JsonlSessionStore as &dyn SessionStore,
+            ),
+            (
+                HistoryEncoding::Tlog,
+                &CompactTextSessionStore as &dyn SessionStore,
+            ),
+        ] {
+            let path = dir.path().join(store.file_extension());
+            let original = vec![entry(0, "first\n你好".into()), entry(1, "second".into())];
+            store
+                .replace_entries_atomically(&path, &original)
+                .expect("write");
+            let end = std::fs::metadata(&path).expect("metadata").len();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let page =
+                read_history_page(&path, encoding, 0, end, deadline, || false).expect("page");
+            assert_eq!(page.record_ranges.len(), original.len());
+            store
+                .append_entry(&path, &entry(2, "later".into()))
+                .expect("append");
+            for (range, expected) in page.record_ranges.iter().zip(&original) {
+                let actual =
+                    read_history_record(&path, encoding, range.clone(), deadline, || false)
+                        .expect("record");
+                assert_eq!(actual.id, expected.id);
+                assert_eq!(actual.content, expected.content);
+            }
+            let widened = page.record_ranges[0].start..page.record_ranges[1].end;
+            assert!(matches!(
+                read_history_record(&path, encoding, widened, deadline, || false),
+                Err(HistoryPageError::InvalidRecord)
+            ));
+            assert!(matches!(
+                read_history_record(
+                    &path,
+                    encoding,
+                    page.record_ranges[0].clone(),
+                    deadline,
+                    || true
+                ),
+                Err(HistoryPageError::Stopped)
+            ));
+            assert!(matches!(
+                read_history_record(
+                    &path,
+                    encoding,
+                    0..HISTORY_PAGE_BYTES as u64 + 1,
+                    deadline,
+                    || false
+                ),
+                Err(HistoryPageError::RecordTooLarge)
+            ));
         }
     }
 

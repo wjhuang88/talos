@@ -82,6 +82,9 @@ pub struct RecoveryIndexSource<'a> {
     pub terminal: Option<&'a SessionEntry>,
     /// Stable source order in this snapshot.
     pub ordinal: u64,
+    /// Exact original-record span, when supplied by the bounded source reader.
+    /// Missing locations cannot support bounded source disclosure.
+    pub record_range: Option<std::ops::Range<u64>>,
 }
 
 /// Untrusted cache candidate requiring authoritative source and scope revalidation.
@@ -91,6 +94,9 @@ pub struct RecoveryCandidate {
     pub entry_id: String,
     /// Snapshot order used for bounded keyset pagination.
     pub ordinal: u64,
+    /// Exact original-record span, when supplied by the bounded source reader.
+    /// Missing locations cannot support bounded source disclosure.
+    pub record_range: Option<std::ops::Range<u64>>,
 }
 
 /// Persisted scan position for one immutable, host-authorized source snapshot.
@@ -267,9 +273,9 @@ impl SessionIndex {
                 )));
             }
             let sql = if query.is_empty() {
-                "SELECT entry_id,ordinal FROM recovery_sources WHERE scope=?1 AND ordinal>?2 ORDER BY ordinal LIMIT ?3"
+                "SELECT s.entry_id,s.ordinal,l.start,l.end FROM recovery_sources s LEFT JOIN recovery_locations l ON l.source_id=s.id WHERE s.scope=?1 AND s.ordinal>?2 ORDER BY s.ordinal LIMIT ?3"
             } else {
-                "SELECT s.entry_id,s.ordinal FROM recovery_sources s JOIN recovery_projection_fts f ON f.rowid=s.id WHERE s.scope=?1 AND s.ordinal>?2 AND recovery_projection_fts MATCH ?4 ORDER BY s.ordinal LIMIT ?3"
+                "SELECT s.entry_id,s.ordinal,l.start,l.end FROM recovery_sources s JOIN recovery_projection_fts f ON f.rowid=s.id LEFT JOIN recovery_locations l ON l.source_id=s.id WHERE s.scope=?1 AND s.ordinal>?2 AND recovery_projection_fts MATCH ?4 ORDER BY s.ordinal LIMIT ?3"
             };
             let mut statement = self.conn.prepare(sql)?;
             let cursor = after.map_or(-1, |n| n as i64);
@@ -288,9 +294,23 @@ impl SessionIndex {
                         "invalid recovery cache row".into(),
                     )));
                 }
+                let start: Option<i64> = row.get(2)?;
+                let end: Option<i64> = row.get(3)?;
+                let record_range = match (start, end) {
+                    (None, None) => None,
+                    (Some(start), Some(end))
+                        if start >= 0
+                            && end > start
+                            && end - start <= crate::history_page::HISTORY_PAGE_BYTES as i64 =>
+                    {
+                        Some(start as u64..end as u64)
+                    }
+                    _ => return Err(invalid_build()),
+                };
                 candidates.push(RecoveryCandidate {
                     entry_id: id,
                     ordinal: ordinal as u64,
+                    record_range,
                 });
             }
             local.check()?;
@@ -319,7 +339,9 @@ impl SessionIndex {
                  CREATE VIRTUAL TABLE IF NOT EXISTS recovery_projection_fts USING fts5(content);
                  CREATE TABLE IF NOT EXISTS recovery_builds (
                     scope TEXT PRIMARY KEY, source_end INTEGER NOT NULL,
-                    next_offset INTEGER NOT NULL, next_ordinal INTEGER NOT NULL);",
+                    next_offset INTEGER NOT NULL, next_ordinal INTEGER NOT NULL);
+                 CREATE TABLE IF NOT EXISTS recovery_locations (
+                    source_id INTEGER PRIMARY KEY, start INTEGER NOT NULL, end INTEGER NOT NULL);",
             )?;
             budget.check()?;
             tx.commit()?;
@@ -386,6 +408,13 @@ impl SessionIndex {
             {
                 return Err(invalid());
             }
+            if source.record_range.as_ref().is_some_and(|r| {
+                r.start >= r.end
+                    || r.end > i64::MAX as u64
+                    || r.end - r.start > crate::history_page::HISTORY_PAGE_BYTES as u64
+            }) {
+                return Err(invalid());
+            }
             projected.push((source, recovery_index_text(source.entry, source.terminal)));
         }
         let tx = self.conn.unchecked_transaction()?;
@@ -404,9 +433,13 @@ impl SessionIndex {
                     > crate::history_page::HISTORY_PAGE_BYTES as u64
                 || advance.scanned_entries > crate::history_page::HISTORY_PAGE_ENTRIES as u64
                 || sources.len() as u64 > advance.scanned_entries
-                || sources
-                    .iter()
-                    .any(|s| s.ordinal < prior.next_ordinal || s.ordinal >= ordinal)
+                || sources.iter().any(|s| {
+                    s.ordinal < prior.next_ordinal
+                        || s.ordinal >= ordinal
+                        || s.record_range.as_ref().is_some_and(|r| {
+                            r.start < prior.next_offset || r.end > advance.next_offset
+                        })
+                })
             {
                 return Err(invalid_build());
             }
@@ -440,6 +473,7 @@ impl SessionIndex {
                 if append_only {
                     return Err(invalid_build());
                 }
+                tx.execute("DELETE FROM recovery_locations WHERE source_id=?1", [id])?;
                 tx.execute("DELETE FROM recovery_projection_fts WHERE rowid=?1", [id])?;
                 tx.execute("DELETE FROM recovery_sources WHERE id=?1", [id])?;
             }
@@ -449,6 +483,12 @@ impl SessionIndex {
                     params![scope, source.entry.id, source.ordinal as i64],
                 )?;
                 let id = tx.last_insert_rowid();
+                if let Some(range) = &source.record_range {
+                    tx.execute(
+                        "INSERT INTO recovery_locations(source_id,start,end) VALUES(?1,?2,?3)",
+                        params![id, range.start as i64, range.end as i64],
+                    )?;
+                }
                 tx.execute(
                     "INSERT INTO recovery_projection_fts(rowid,content) VALUES(?1,?2)",
                     params![id, content],
@@ -492,6 +532,7 @@ mod tests {
             metadata: Default::default(),
         };
         let sources = [RecoveryIndexSource {
+            record_range: None,
             entry: &entry,
             terminal: None,
             ordinal: 0,
@@ -544,6 +585,7 @@ mod tests {
         // A repeated source ID must roll back even the cursor UPDATE executed
         // earlier in the transaction. It cannot erase the prior eligible fact.
         let duplicate = [RecoveryIndexSource {
+            record_range: None,
             entry: &entry,
             terminal: None,
             ordinal: 8192,
@@ -639,6 +681,7 @@ mod tests {
                     .iter()
                     .enumerate()
                     .map(|(n, entry)| RecoveryIndexSource {
+                        record_range: Some(page.record_ranges[n].clone()),
                         entry,
                         terminal: None,
                         ordinal: cursor.next_ordinal() + n as u64,
@@ -669,7 +712,73 @@ mod tests {
                 .expect("last fact");
             assert_eq!(tail.len(), 1);
             assert_eq!(tail[0].entry_id, "9999");
+            let recovered = crate::history_page::read_history_record(
+                &path,
+                crate::history_page::HistoryEncoding::Jsonl,
+                tail[0].record_range.clone().expect("original locator"),
+                budget.deadline,
+                || budget.stopped(),
+            )
+            .expect("bounded authoritative reread");
+            assert_eq!(recovered.id, tail[0].entry_id);
+            assert_eq!(recovered.content, content);
         }
+    }
+
+    #[test]
+    fn locator_replacement_clears_old_span_and_corrupt_cache_fails_closed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
+        index.init_recovery_schema().expect("schema");
+        let entry = SessionEntry {
+            id: "entry".into(),
+            parent_id: None,
+            timestamp: chrono::Utc::now(),
+            role: "user".into(),
+            content: "fact".into(),
+            metadata: Default::default(),
+        };
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+        let mut source = RecoveryIndexSource {
+            entry: &entry,
+            terminal: None,
+            ordinal: 0,
+            record_range: Some(10..20),
+        };
+        index
+            .cache_recovery_page("scope", std::slice::from_ref(&source))
+            .expect("cache");
+        assert_eq!(
+            index
+                .recovery_candidates("scope", "fact", None, 1, &budget)
+                .expect("candidate")[0]
+                .record_range,
+            Some(10..20)
+        );
+        source.record_range = None;
+        index
+            .cache_recovery_page("scope", std::slice::from_ref(&source))
+            .expect("replace");
+        assert!(
+            index
+                .recovery_candidates("scope", "fact", None, 1, &budget)
+                .expect("candidate")[0]
+                .record_range
+                .is_none()
+        );
+        source.record_range = Some(10..20);
+        index
+            .cache_recovery_page("scope", &[source])
+            .expect("restore locator");
+        index
+            .conn
+            .execute("UPDATE recovery_locations SET start=-1", [])
+            .expect("corrupt cache");
+        assert!(
+            index
+                .recovery_candidates("scope", "fact", None, 1, &budget)
+                .is_err()
+        );
     }
 
     #[test]
@@ -782,11 +891,13 @@ mod tests {
                 "current",
                 &[
                     RecoveryIndexSource {
+                        record_range: None,
                         entry: &first,
                         terminal: None,
                         ordinal: 1,
                     },
                     RecoveryIndexSource {
+                        record_range: None,
                         entry: &second,
                         terminal: None,
                         ordinal: 2,
@@ -803,6 +914,7 @@ mod tests {
             .cache_recovery_page(
                 "sibling",
                 &[RecoveryIndexSource {
+                    record_range: None,
                     entry: &sibling,
                     terminal: None,
                     ordinal: 0,
@@ -933,11 +1045,13 @@ mod tests {
                 "scope",
                 &[
                     RecoveryIndexSource {
+                        record_range: None,
                         entry: &public,
                         terminal: None,
                         ordinal: 0,
                     },
                     RecoveryIndexSource {
+                        record_range: None,
                         entry: &hidden,
                         terminal: None,
                         ordinal: 1,
@@ -953,6 +1067,7 @@ mod tests {
                 .cache_recovery_page(
                     "scope",
                     &[RecoveryIndexSource {
+                        record_range: None,
                         entry: &other,
                         terminal: None,
                         ordinal: 0
@@ -971,6 +1086,7 @@ mod tests {
             .cache_recovery_page(
                 "scope",
                 &[RecoveryIndexSource {
+                    record_range: None,
                     entry: &public,
                     terminal: None,
                     ordinal: 0,
