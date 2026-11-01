@@ -2,7 +2,7 @@
 
 > Status: Published-interface trace plus synthetic offline evidence; no backend admission.
 > Owner: I294 / SEARCH-001-D / #644; effective claim #665.
-> Talos baseline: `e542b0276acf863c37b890d1e8155846bae2e5b1`.
+> Talos baseline: `df782c9a6a23bf6e636a0fc1a6461ed84e61b8be` (#825 merged evidence refresh).
 > Evidence date: 2026-11-01.
 
 This packet qualifies only the documented Purili core Search wire shape far enough to support
