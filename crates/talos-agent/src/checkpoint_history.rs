@@ -17,7 +17,12 @@ pub(crate) struct History {
     owner: String,
     cancel: CancellationToken,
     seal: RecoveryPrefixSeal,
-    refs: Mutex<BTreeMap<String, RecoveryCandidate>>,
+    state: Mutex<QueryState>,
+}
+#[derive(Default)]
+struct QueryState {
+    refs: BTreeMap<String, RecoveryCandidate>,
+    cursor: Option<(String, String, Option<u64>)>,
 }
 tokio::task_local! {
     pub(crate) static HISTORY: Option<History>;
@@ -116,8 +121,13 @@ impl History {
             owner: session.id().to_string(),
             cancel: cancel.clone(),
             seal,
-            refs: Mutex::new(BTreeMap::new()),
+            state: Mutex::new(QueryState::default()),
         })
+    }
+
+    pub(crate) fn reset_queries(&self) -> Option<()> {
+        *self.state.lock().ok()? = QueryState::default();
+        Some(())
     }
 
     pub(crate) fn cancelled(&self) -> bool {
@@ -128,7 +138,12 @@ impl History {
         !self.cancel.is_cancelled() && self.seal.check_current().is_ok()
     }
 
-    pub(crate) fn query(&self, query: Option<&str>, reference: Option<&str>) -> Option<Value> {
+    pub(crate) fn query(
+        &self,
+        query: Option<&str>,
+        reference: Option<&str>,
+        cursor: Option<&str>,
+    ) -> Option<Value> {
         let stopped = self.cancel.clone();
         let budget =
             RecoveryWorkBudget::with_cancellation_check(Duration::from_secs(2), move || {
@@ -144,9 +159,12 @@ impl History {
         {
             return None;
         }
-        let mut refs = self.refs.lock().ok()?;
+        let mut state = self.state.lock().ok()?;
         let result = if let Some(reference) = reference {
-            let candidate = refs.get(reference)?;
+            if cursor.is_some() {
+                return None;
+            }
+            let candidate = state.refs.get(reference)?;
             let text = index
                 .recovery_candidate_text(
                     &self.scope,
@@ -158,12 +176,23 @@ impl History {
                 .ok()??;
             json!({"status":"Ready","reference":reference,"text":text.text,"truncated":text.truncated})
         } else {
+            let query = query?;
+            let after = if let Some(cursor) = cursor {
+                let (expected, expected_query, after) = state.cursor.as_ref()?;
+                if cursor != expected || query != expected_query {
+                    return None;
+                }
+                *after
+            } else {
+                None
+            };
             let candidates = index
-                .recovery_candidates(&self.scope, query?, None, 20, &budget)
+                .recovery_candidates(&self.scope, query, after, 20, &budget)
                 .ok()?;
             let mut incomplete = candidates.len() == 20;
             let mut results = Vec::new();
             let mut next_refs = BTreeMap::new();
+            let mut last = after;
             // Bound all source/terminal record reads for this query together.
             let mut remaining = talos_session::history_page::HISTORY_PAGE_BYTES as u64;
             for candidate in candidates {
@@ -178,6 +207,7 @@ impl History {
                     )
                     .ok()?
                 else {
+                    last = Some(candidate.ordinal);
                     continue;
                 };
                 let reference = uuid::Uuid::new_v4().to_string();
@@ -189,10 +219,18 @@ impl History {
                     incomplete = true;
                     break;
                 }
+                last = Some(candidate.ordinal);
                 next_refs.insert(reference, candidate);
             }
-            *refs = next_refs;
-            json!({"status":"Ready","results":results,"complete":!incomplete,"pagination_available":false})
+            if incomplete && last == after {
+                return None;
+            }
+            let next = incomplete.then(|| uuid::Uuid::new_v4().to_string());
+            state.refs = next_refs;
+            state.cursor = next
+                .as_ref()
+                .map(|token| (token.clone(), query.to_owned(), last));
+            json!({"status":"Ready","results":results,"complete":!incomplete,"next_cursor":next})
         };
         if !self.current()
             || !index
@@ -209,6 +247,51 @@ impl History {
 mod tests {
     use super::*;
     #[tokio::test]
+    async fn search_pages_preserve_order_and_reject_query_changes_and_replay() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "pages").expect("session");
+        let raw: Vec<_> = (0..45)
+            .map(|i| talos_core::message::Message::User {
+                content: format!("paginated fact {i}"),
+            })
+            .collect();
+        session
+            .commit_turn("turn", &raw, &Default::default())
+            .expect("commit");
+        let history = History::prepare(&session, &CancellationToken::new())
+            .await
+            .expect("host");
+        let first = history.query(Some("paginated"), None, None).expect("first");
+        assert_eq!(first["results"].as_array().expect("results").len(), 20);
+        let cursor = first["next_cursor"].as_str().expect("cursor");
+        assert!(
+            history
+                .query(Some("different"), None, Some(cursor))
+                .is_none()
+        );
+        let second = history
+            .query(Some("paginated"), None, Some(cursor))
+            .expect("second");
+        assert!(
+            history
+                .query(Some("paginated"), None, Some(cursor))
+                .is_none()
+        );
+        assert_eq!(second["results"][0]["text"], "paginated fact 20");
+        let third = history
+            .query(Some("paginated"), None, second["next_cursor"].as_str())
+            .expect("third");
+        assert_eq!(third["results"][0]["text"], "paginated fact 40");
+        assert_eq!(third["results"].as_array().expect("results").len(), 5);
+        assert_eq!(third["complete"], true);
+        assert!(third["next_cursor"].is_null());
+        let detail = history
+            .query(None, third["results"][4]["reference"].as_str(), None)
+            .expect("detail");
+        assert_eq!(detail["text"], "paginated fact 44");
+    }
+
+    #[tokio::test]
     async fn next_host_preparation_removes_previous_scope_and_cancel_refuses_queries() {
         let root = tempfile::tempdir().expect("root");
         let session = DurableSession::open_or_create(root.path(), "scope").expect("session");
@@ -223,7 +306,7 @@ mod tests {
             .expect("commit");
         let cancel = CancellationToken::new();
         let first = History::prepare(&session, &cancel).await.expect("first");
-        assert!(first.query(Some("fact"), None).is_some());
+        assert!(first.query(Some("fact"), None, None).is_some());
         let second = History::prepare(&session, &cancel).await.expect("second");
         let index = SessionIndex::open_read_only(&second.path).expect("index");
         let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
@@ -240,11 +323,11 @@ mod tests {
                 .is_empty()
         );
         assert!(
-            first.query(Some("fact"), None).is_none(),
+            first.query(Some("fact"), None, None).is_none(),
             "retired scope is unavailable, not complete empty results"
         );
-        assert!(second.query(Some("fact"), None).is_some());
+        assert!(second.query(Some("fact"), None, None).is_some());
         cancel.cancel();
-        assert!(second.query(Some("fact"), None).is_none());
+        assert!(second.query(Some("fact"), None, None).is_none());
     }
 }

@@ -167,14 +167,20 @@ impl AgentTool for HistorySearchTool {
             return unavailable();
         };
         if matches!(input.mode.as_str(), "search" | "detail") {
-            if input.cursor.is_some()
+            if input
+                .cursor
+                .as_ref()
+                .is_some_and(|cursor| cursor.len() > 128)
                 || input.query.as_ref().is_some_and(|query| query.len() > 1024)
                 || input
                     .reference
                     .as_ref()
                     .is_some_and(|reference| reference.len() > 128)
                 || (input.mode == "search" && (input.query.is_none() || input.reference.is_some()))
-                || (input.mode == "detail" && (input.reference.is_none() || input.query.is_some()))
+                || (input.mode == "detail"
+                    && (input.reference.is_none()
+                        || input.query.is_some()
+                        || input.cursor.is_some()))
             {
                 return ToolResult::error("invalid history query bounds");
             }
@@ -201,9 +207,11 @@ impl AgentTool for HistorySearchTool {
             }
             let result = crate::checkpoint_history::HISTORY
                 .try_with(|history| {
-                    history
-                        .as_ref()?
-                        .query(input.query.as_deref(), input.reference.as_deref())
+                    history.as_ref()?.query(
+                        input.query.as_deref(),
+                        input.reference.as_deref(),
+                        input.cursor.as_deref(),
+                    )
                 })
                 .ok()
                 .flatten();
@@ -233,6 +241,7 @@ impl AgentTool for HistorySearchTool {
         let Ok(mut state) = execution.state.lock() else {
             return unavailable();
         };
+        let rediscover = input.cursor.is_none();
         let (snapshot, start) = if let Some(cursor) = input.cursor {
             let Some((expected, start)) = state.cursor.as_ref() else {
                 return ToolResult::error("stale discovery cursor");
@@ -260,6 +269,15 @@ impl AgentTool for HistorySearchTool {
         };
         if !snapshot.authority.valid() {
             return unavailable();
+        }
+        if rediscover {
+            let reset = crate::checkpoint_history::HISTORY
+                .try_with(|history| history.as_ref().map(|history| history.reset_queries()))
+                .ok()
+                .flatten();
+            if matches!(reset, Some(None)) {
+                return unavailable();
+            }
         }
         let refs: Vec<_> = snapshot
             .order
@@ -450,6 +468,11 @@ mod tests {
             let detail = HistorySearchTool.execute(json!({"mode":"detail","snapshot":discovery["snapshot"],"reference":reference})).await;
             assert!(!detail.is_error,"{}",detail.content);
             assert_eq!(serde_json::from_str::<Value>(&detail.content).expect("detail")["text"],"authorized source 0");
+            let old_cursor = search["next_cursor"].as_str().expect("search cursor");
+            let rediscovery = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+            let rediscovery: Value = serde_json::from_str(&rediscovery.content).expect("new snapshot");
+            assert!(HistorySearchTool.execute(json!({"mode":"search","snapshot":rediscovery["snapshot"],"query":"authorized","cursor":old_cursor})).await.is_error);
+            assert!(HistorySearchTool.execute(json!({"mode":"detail","snapshot":rediscovery["snapshot"],"reference":reference})).await.is_error);
             execution.permission.as_ref().expect("permission").clear().expect("reset");
             assert!(HistorySearchTool.execute(json!({"mode":"detail","snapshot":discovery["snapshot"],"reference":reference})).await.is_error);
         })).await;

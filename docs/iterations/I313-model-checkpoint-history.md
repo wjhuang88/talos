@@ -1044,3 +1044,22 @@ resumption across timeout/next turn (current preparation starts fresh with a
 default Runtime/CLI activation, all remaining thirty acceptance rows and full
 workspace/SDK/platform/remote gates. Unsupported or unfinished paths return
 Unavailable; that does not satisfy their required acceptance. T1/T6 remain open.
+
+### Search result cursor pagination — local, unmerged
+
+Search now returns an opaque single-use next_cursor bound to its query and last
+processed source ordinal. Pages retain the existing twenty-result, combined source
+read and response-byte limits. A new search replaces the cursor; rediscovery
+clears search cursors and detail references, while continuation discovery pages
+retain them. Changed query, replayed cursor, stale scope/source and permission
+changes refuse reuse. Detail references currently cover the latest search page;
+retaining stable references across pages remains an acceptance gap.
+
+A real durable 45-result fixture verifies three ordered pages, no skipped results,
+query mismatch/replay rejection and final detail lookup. Actual tool-layer tests
+verify rediscovery rejects old cursor and reference even with the new snapshot.
+Focused logs: `/private/tmp/i313-pagination-tests.log`; final locked Agent 614/614
+and warnings-denied all-target Clippy pass: `/private/tmp/i313-pagination-agent.log`,
+`/private/tmp/i313-pagination-clippy.log`. Source-byte exhaustion still returns
+Unavailable rather than a continuation page; long discovery, resumed preparation,
+platform/default activation and final T5/workspace/remote closure remain open.
