@@ -852,6 +852,26 @@ async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continua
 
 #[tokio::test]
 async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed_projection() {
+    struct BatchGate(Arc<tokio::sync::Notify>);
+    #[async_trait]
+    impl AgentTool for BatchGate {
+        fn name(&self) -> &str {
+            "batch_gate"
+        }
+        fn description(&self) -> &str {
+            "Controlled unfinished tool batch"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type":"object"})
+        }
+        fn is_read_only(&self) -> bool {
+            true
+        }
+        async fn execute(&self, _: Value) -> ToolResult {
+            self.0.notified().await;
+            ToolResult::success("batch completed")
+        }
+    }
     struct Model {
         step: AtomicUsize,
         installed: std::sync::Mutex<Option<String>>,
@@ -871,6 +891,7 @@ async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed
             let events = match step {
                 0 | 2 | 4 => {
                     if step == 2 {
+                        assert!(messages.iter().any(|message| matches!(message, Message::Tool { result } if result.tool_use_id == "gate" && result.content == "batch completed")), "checkpoint continuation keeps complete paired batch");
                         *self.installed.lock().expect("projection") =
                             Some(projection().expect("A installed"));
                     }
@@ -929,11 +950,16 @@ async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed
                         })
                         .expect("valid schema");
                     parsed.render(64_000).expect("within render cap");
-                    call(
+                    let mut events = call(
                         &format!("compact-{step}"),
                         "compact_context",
                         json!({"snapshot":discovery["snapshot"],"checkpoint":checkpoint}),
-                    )
+                    );
+                    if step == 1 {
+                        let gate = call("gate", "batch_gate", json!({}));
+                        events.insert(1, gate[0].clone());
+                    }
+                    events
                 }
                 6 => {
                     let current = projection().expect("B installed");
@@ -973,12 +999,14 @@ async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed
     durable
         .commit_turn("seed", &seed, &Default::default())
         .expect("seed");
+    let release = Arc::new(tokio::sync::Notify::new());
     let model = Arc::new(Model {
         step: AtomicUsize::new(0),
         installed: std::sync::Mutex::new(None),
     });
     let mut runtime = RuntimeBuilder::new()
         .provider(model.clone())
+        .tool(Arc::new(BatchGate(release.clone())))
         .workspace_root(root.path())
         .model_context_limit(64_000)
         .permission_rule(PermissionRule::new_nature(
@@ -995,11 +1023,64 @@ async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed
         .await
         .expect("submit");
     let mut outcomes = Vec::new();
+    let mut manual_busy = 0;
+    let mut gate_completed = false;
     let mut completed_success = false;
     tokio::time::timeout(Duration::from_secs(15), async {
         while let Some(event) = runtime.next_event().await {
             match event {
-                SessionEvent::ModelCheckpointTerminal { outcome, .. } => outcomes.push(outcome),
+                SessionEvent::ModelCheckpointTerminal { outcome, .. } => {
+                    assert!(
+                        gate_completed,
+                        "installation cannot precede the complete tool batch"
+                    );
+                    outcomes.push(outcome);
+                }
+                SessionEvent::TurnEvent {
+                    payload:
+                        talos_core::session::TurnEventPayload::Progress {
+                            event: AgentEvent::ToolResult { result, .. },
+                        },
+                    ..
+                } if result.tool_use_id == "compact-1" => {
+                    assert!(!result.is_error);
+                    assert_eq!(
+                        serde_json::from_str::<Value>(&result.content).expect("admission receipt")
+                            ["status"],
+                        "Admitted"
+                    );
+                    assert!(outcomes.is_empty());
+                    runtime
+                        .compact(99)
+                        .await
+                        .expect("manual contention request");
+                }
+                SessionEvent::CompactStatus {
+                    operation_id: 99,
+                    state,
+                    ..
+                } => {
+                    assert!(
+                        matches!(state, talos_core::session::CompactState::Busy),
+                        "{state:?}"
+                    );
+                    assert!(
+                        outcomes.is_empty(),
+                        "model operation remains pending during the blocked batch"
+                    );
+                    manual_busy += 1;
+                    release.notify_one();
+                }
+                SessionEvent::TurnEvent {
+                    payload:
+                        talos_core::session::TurnEventPayload::Progress {
+                            event: AgentEvent::ToolResult { result, .. },
+                        },
+                    ..
+                } if result.tool_use_id == "gate" => {
+                    assert_eq!(result.content, "batch completed");
+                    gate_completed = true;
+                }
                 SessionEvent::TurnEvent {
                     payload: talos_core::session::TurnEventPayload::Completed { status },
                     ..
@@ -1019,6 +1100,7 @@ async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed
     .expect("deadline");
     assert!(completed_success, "successful Turn completion is required");
     assert_eq!(model.step.load(Ordering::SeqCst), 7);
+    assert_eq!(manual_busy, 1);
     assert_eq!(outcomes.len(), 3);
     assert!(matches!(
         outcomes[0],
