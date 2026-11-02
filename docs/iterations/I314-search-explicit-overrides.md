@@ -16,14 +16,14 @@
 | Work Slice | SEARCH-001-H explicit premium/self-hosted override configuration and production composition; Tavily controlled transport; explicit fallback-to-auto; secret redaction. Excludes SEARCH-001-E/F admission and `rust-websearch` removal. |
 | Claimed At | 2026-11-02 |
 | Source Issue | #832 |
-| Governance Claim PR | Pending draft PR number on `docs/i314-search-explicit-overrides-activate`; backfill before validation/merge |
+| Governance Claim PR | #841 |
 | Authorization Mode | Single-maintainer merge with explicit maintainer-authorized parallel execution |
 | Authorization Evidence | Maintainer explicitly answered `允许并行` on 2026-11-02 after the activation gate was explained as I314 running concurrently with the currently Active I310 and I313 scopes. |
-| Implementation PR | Not started; branch only after this atomic activation is effective on `main` |
+| Implementation PR | Not started; branch only after #841 is effective on `main` |
 | Last Updated | 2026-11-02 |
 | Handoff / Release Condition | Keep the claim until SEARCH-001-H implementation and acceptance closeout or an explicit handoff. Parallel I310/I313 ownership is retained unchanged. |
 
-This Claimed/Active state is a candidate while the governance PR is open. It becomes effective only on target-branch merge under `docs/sop/AGENT-COLLABORATION.md`; no production implementation branch may start before that gate.
+This Claimed/Active state is a candidate while #841 is open. It becomes effective only on target-branch merge under `docs/sop/AGENT-COLLABORATION.md`; no production implementation branch may start before that gate.
 
 ## Published Baseline
 
@@ -126,12 +126,12 @@ I314 is non-overlapping with I310/I313. On 2026-11-02 the maintainer explicitly 
 | Date | Type | Record |
 |---|---|---|
 | 2026-11-02 | Planning | I314 selected for SEARCH-001-H as Planned / Unclaimed only. Existing Active/Review/Planned inventory retained; no claim or implementation authority established. |
-| 2026-11-02 | Parallel authorization | Maintainer explicitly answered `允许并行` after I314's concurrent activation with I310/I313 was explained. Atomic claim+activation opened from current `main`; authority becomes effective only when that governance PR merges. |
+| 2026-11-02 | Parallel authorization | Maintainer explicitly answered `允许并行` after I314's concurrent activation with I310/I313 was explained. Atomic claim+activation is #841; authority becomes effective only when #841 merges. |
 
 ## Verification Evidence
 
-- Activation candidate is governance-only; no runtime/configuration code, tests, dependency changes or public API changes are included.
-- Before activation merge: both governance validators, exact-head CI, review and merge-time CAS are required.
+- #841 is governance-only; no runtime/configuration code, tests, dependency changes or public API changes are included.
+- Before #841 merge: both governance validators, exact-head CI, review and merge-time CAS are required.
 
 ## Completion Evidence
 
@@ -140,7 +140,7 @@ I314 is non-overlapping with I310/I313. On 2026-11-02 the maintainer explicitly 
 
 ## Variance And Residuals
 
-- Implementation has not started; the effective claim begins only after activation reaches `main`.
+- Implementation has not started; the effective claim begins only after #841 reaches `main`.
 - I310/I313 remain independently Active/Claimed under explicit maintainer-authorized parallel execution.
 - No runtime/configuration code, tests, dependencies or public API are changed by this activation record.
 
