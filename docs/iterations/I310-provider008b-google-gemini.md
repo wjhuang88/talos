@@ -495,3 +495,34 @@ blocker and requested the HTTP matrices added above; final diff review remains i
 
 Draft #838 remains unaccepted. Remote CI3733 was pending at unchanged head 26a91246 before
 this new checkpoint; it is not validation of subsequent reasoning changes. No merge/release/tag.
+
+### Main synchronization and native CI recovery — 2026-11-02
+
+Recovered remote c042a1a045c59bd07869e3e2fb6e0808c7ca19e6 after workspace maintenance
+removed the newer task worktrees/toolchain/logs. Original dirty talos snapshot was not changed.
+Main advanced to d324c3348f1bb64a3a7b0a0682e14fc97c6293c3, including #832's missing
+Issue-owner matrix row. Rebased all 49 feature commits without conflict; every range-diff row
+is unchanged. This incorporates the main fix rather than editing unrelated Search ownership.
+
+Exact old-head CI3735/run41397974111 finished: six checks passed, two failed. Windows workspace,
+Windows Rust workspace, Windows/Linux Desktop feature checks, installer and classifier passed.
+The macOS job125129225344 had Provider 267 passed/one failure: cancellation produced native
+ConnectionReset (code54), but its test required clean EOF. Global job125129175751 failed on
+missing #832 matrix registration, now incorporated from main. No all-green CI claim.
+
+Restored the pending test repairs: cancellation accepts only bounded EOF or ConnectionReset,
+retaining cache-lock/cache-empty checks; identical SSE failure branches are collapsed without
+changing the terminal-state assertion. Both diffs previously received independent read-only
+review; macOS and final-head CI must rerun. Previous reasoning source c042a1a0 locally passed
+268 Provider tests twice (6.42s/8.79s); its all-target Clippy exposed the SSE duplicate branch.
+The subsequent fixes run was interrupted by workspace maintenance and has no recoverable result.
+Pinned toolchain and new focused validation are being restored; no pass is claimed for these
+new test repairs or the rebased candidate yet.
+
+Browser entry remains refused. Read-only audit found that enabling Original dispatch alone
+would leak raw browser arguments through the opaque JSON replay block into durable TLOG, and
+would mismatch Agent's protocolVersion-only safe ToolCall input on the next signed round.
+A model-private transient replay/persistence boundary and original JSON routing-key validation
+must be designed and verified together before this guard can be removed; do not put raw browser
+arguments into durable ToolCall.input or treat ReasoningBlock::Redacted as encryption. Draft
+#838 and parent #724 remain open; no completion, merge, release or tag.
