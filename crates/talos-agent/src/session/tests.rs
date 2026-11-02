@@ -4978,6 +4978,90 @@ fn assert_recovery_receipts_verify(durable: &talos_session::DurableSession, expe
 async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor() {
     use talos_core::tool::ToolNature;
     use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+    const TASK_STATE: &str = r#"{"completed":"baseline scan done","in_progress":"local recount active","pending":"final report pending","open_loops":"remote route failed; do not retry","facts":"local count verified as 42","assumptions":"recount may be necessary; unverified","next_step":"verify final total locally"}"#;
+    fn task_checkpoint(
+        messages: &[Message],
+        discovery: &serde_json::Value,
+        summary: &str,
+    ) -> serde_json::Value {
+        // Carry only state actually present in this request: initial tool evidence
+        // for A, then the installed checkpoint for B. Missing state fails the test.
+        let state = messages
+            .iter()
+            .find_map(|message| match message {
+                Message::Context { content } => content
+                    .strip_prefix("[Derived checkpoint; source history remains authoritative]\n")
+                    .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok()),
+                _ => None,
+            })
+            .unwrap_or_else(|| {
+                assert!(
+                    !summary.starts_with("SECOND_CHECKPOINT"),
+                    "B must read installed A, never raw-tool fallback"
+                );
+                messages
+                    .iter()
+                    .find_map(|message| match message {
+                        Message::Tool { result } => result
+                            .content
+                            .strip_prefix("omittedfact original constraint ")
+                            .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok()),
+                        _ => None,
+                    })
+                    .expect("original task evidence must reach the model")
+            });
+        let item =
+            |text: &str| serde_json::json!({"text":text,"sources":[discovery["sources"][0]]});
+        let mut checkpoint = serde_json::json!({"schema_version":1,"summary":item(summary),"goal":item("deliver offline report"),"next_step":item("placeholder"),
+            "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+            "facts":[],"assumptions":[],"resources":[],"open_loops":[]});
+        for field in [
+            "completed",
+            "in_progress",
+            "pending",
+            "open_loops",
+            "facts",
+            "assumptions",
+            "next_step",
+        ] {
+            let text = state[field]
+                .as_str()
+                .or_else(|| {
+                    if field == "next_step" {
+                        state[field]["text"].as_str()
+                    } else {
+                        state[field][0]["text"].as_str()
+                    }
+                })
+                .expect("typed task state survived previous request");
+            checkpoint[field] = if field == "next_step" {
+                item(text)
+            } else {
+                serde_json::json!([item(text)])
+            };
+        }
+        checkpoint
+    }
+    fn assert_task_state(checkpoint: &serde_json::Value) {
+        let expected: serde_json::Value = serde_json::from_str(TASK_STATE).expect("fixture state");
+        for field in [
+            "completed",
+            "in_progress",
+            "pending",
+            "open_loops",
+            "facts",
+            "assumptions",
+            "next_step",
+        ] {
+            let actual = if field == "next_step" {
+                &checkpoint[field]["text"]
+            } else {
+                &checkpoint[field][0]["text"]
+            };
+            assert_eq!(actual, &expected[field], "lost or misclassified {field}");
+        }
+        assert!(!checkpoint["facts"].to_string().contains("unverified"));
+    }
     struct CheckpointModel {
         step: AtomicUsize,
     }
@@ -4985,6 +5069,20 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     impl LanguageModel for CheckpointModel {
         async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
             let step = self.step.fetch_add(1, Ordering::SeqCst);
+            if step == 2 || step == 4 {
+                let checkpoint = messages
+                    .iter()
+                    .find_map(|message| match message {
+                        Message::Context { content } => content
+                            .strip_prefix(
+                                "[Derived checkpoint; source history remains authoritative]\n",
+                            )
+                            .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok()),
+                        _ => None,
+                    })
+                    .expect("installed checkpoint in actual provider request");
+                assert_task_state(&checkpoint);
+            }
             let events = match step {
                 0 | 1 => {
                     let (name, input) = if step == 0 {
@@ -5005,14 +5103,14 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                         assert!(!result.is_error, "{}", result.content);
                         let discovery: serde_json::Value =
                             serde_json::from_str(&result.content).expect("discovery JSON");
-                        let item = serde_json::json!({"text":"Keep the constraint and proceed", "sources":[discovery["sources"][0]]});
+                        let checkpoint = task_checkpoint(
+                            messages,
+                            &discovery,
+                            "Keep the constraint and proceed",
+                        );
                         (
                             "compact_context",
-                            serde_json::json!({"snapshot":discovery["snapshot"], "checkpoint": {
-                                "schema_version":1,"summary":item,"goal":item,"next_step":item,
-                                "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
-                                "facts":[],"assumptions":[],"resources":[],"open_loops":[]
-                            }}),
+                            serde_json::json!({"snapshot":discovery["snapshot"], "checkpoint": checkpoint}),
                         )
                     };
                     vec![
@@ -5093,17 +5191,17 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                             _ => None,
                         })
                         .expect("second checkpoint discovery");
-                    let item = serde_json::json!({"text":"SECOND_CHECKPOINT Continue with original evidence", "sources":[discovery["sources"][0]]});
+                    let checkpoint = task_checkpoint(
+                        messages,
+                        &discovery,
+                        "SECOND_CHECKPOINT Continue with original evidence",
+                    );
                     vec![
                         AgentEvent::ToolCall {
                             call: talos_core::message::ToolCall {
                                 id: "checkpoint-b".into(),
                                 name: "compact_context".into(),
-                                input: serde_json::json!({"snapshot":discovery["snapshot"], "checkpoint": {
-                                    "schema_version":1,"summary":item,"goal":item,"next_step":item,
-                                    "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
-                                    "facts":[],"assumptions":[],"resources":[],"open_loops":[]
-                                }}),
+                                input: serde_json::json!({"snapshot":discovery["snapshot"], "checkpoint": checkpoint}),
                             },
                             provenance: talos_core::tool::ToolProvenance::Native,
                             summary_fields: vec![],
@@ -5290,6 +5388,19 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                             .expect("text")
                             .starts_with("omittedfact original constraint")
                     );
+                    let recovered: serde_json::Value = serde_json::from_str(
+                        detail["text"]
+                            .as_str()
+                            .expect("detail text")
+                            .strip_prefix("omittedfact original constraint ")
+                            .expect("original source marker"),
+                    )
+                    .expect("recovered task state");
+                    assert_eq!(
+                        recovered,
+                        serde_json::from_str::<serde_json::Value>(TASK_STATE)
+                            .expect("expected task")
+                    );
                     success_events("checkpoint complete; recovered omitted original fact")
                 }
                 _ => panic!("unexpected extra provider request"),
@@ -5463,7 +5574,9 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         }
         async fn execute(&self, _: serde_json::Value) -> talos_core::tool::ToolResult {
             self.0.fetch_add(1, Ordering::SeqCst);
-            talos_core::tool::ToolResult::success("omittedfact original constraint")
+            talos_core::tool::ToolResult::success(format!(
+                "omittedfact original constraint {TASK_STATE}"
+            ))
         }
     }
     let calls = Arc::new(AtomicUsize::new(0));
@@ -5609,6 +5722,14 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         outcome,
         talos_core::session::CompactOutcome::Applied { .. }
     )));
+    for (operation, outcome) in &terminals {
+        if let talos_core::session::CompactOutcome::Applied { before, after } = outcome {
+            assert!(after < before, "actual request must reclaim context");
+            println!(
+                "checkpoint_operation={operation} request_tokens_before={before} request_tokens_after={after}"
+            );
+        }
+    }
     let (fork_receipt, mut fork_result) = mpsc::unbounded_channel();
     handle
         .sq_tx

@@ -777,6 +777,8 @@ impl DurableSession {
             .map_err(sql_error)?;
             tx.execute("INSERT INTO durable_fork_lineage(child_id,parent_id,parent_branch,source_end) VALUES(?1,?2,?3,?4)",
                 params![id.to_string(), parent, source.branch_id(), i64::try_from(source.source_end()).map_err(|_| SessionError::DurableTurn("fork source exceeds SQLite range".into()))?]).map_err(sql_error)?;
+            #[cfg(test)]
+            fork_crash_probe("publication-check");
             check()?;
             // A commit error can have an uncertain outcome. Preserve the file
             // once commit is attempted; recovery must reconcile it with bindings.
@@ -1619,7 +1621,19 @@ fn recovery_storage_boundary<T>(
 }
 
 #[cfg(test)]
+thread_local! {
+    static FORK_CANCEL_PROBE: std::cell::RefCell<Option<(&'static str, Arc<std::sync::atomic::AtomicBool>)>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
 pub(crate) fn fork_crash_probe(phase: &str) {
+    FORK_CANCEL_PROBE.with(|probe| {
+        let mut probe = probe.borrow_mut();
+        if probe.as_ref().is_some_and(|(target, _)| *target == phase) {
+            let (_, cancelled) = probe.take().expect("matched probe");
+            cancelled.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    });
     if std::env::var("TALOS_TEST_FORK_CRASH_PHASE").as_deref() == Ok(phase) {
         // Dedicated child fixture only; process::exit bypasses Rust Drop cleanup.
         std::process::exit(42);
@@ -1785,6 +1799,60 @@ fn is_sensitive_key(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn fork_cancellation_before_and_after_publication_preserves_authority() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        for phase in ["publication-check", "published"] {
+            let root = tempfile::tempdir().expect("root");
+            let parent =
+                super::DurableSession::open_or_create(root.path(), "parent").expect("parent");
+            parent
+                .commit_turn(
+                    "original",
+                    &[talos_core::message::Message::User {
+                        content: "original authoritative fact".into(),
+                    }],
+                    &Default::default(),
+                )
+                .expect("commit parent");
+            let bytes = std::fs::read(parent.file_path()).expect("parent bytes");
+            let cancelled = Arc::new(AtomicBool::new(false));
+            super::FORK_CANCEL_PROBE
+                .with(|probe| *probe.borrow_mut() = Some((phase, cancelled.clone())));
+            let stop = cancelled.clone();
+            let outcome = parent.fork_committed_tip(
+                "child",
+                std::time::Instant::now() + std::time::Duration::from_secs(5),
+                move || stop.load(Ordering::SeqCst),
+            );
+            assert!(cancelled.load(Ordering::SeqCst), "probe must execute");
+            let child = super::DurableSession::open_existing(root.path(), "child").expect("lookup");
+            if phase == "publication-check" {
+                assert!(outcome.is_err());
+                assert!(
+                    child.is_none(),
+                    "cancel before final check rolls back publication"
+                );
+            } else {
+                let returned = outcome.expect("committed publication wins late cancellation");
+                let child = child.expect("published binding remains");
+                assert_eq!(returned.id(), child.id());
+                assert_eq!(
+                    std::fs::read(child.file_path()).expect("child bytes"),
+                    bytes
+                );
+            }
+            assert_eq!(
+                std::fs::read(parent.file_path()).expect("unchanged parent"),
+                bytes
+            );
+        }
+    }
+
     #[cfg(unix)]
     #[test]
     fn fork_recovery_real_process_crash_boundaries() {

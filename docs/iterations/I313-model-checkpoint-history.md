@@ -2080,3 +2080,55 @@ Reviewer did not run tests and does not approve full I313. On reopen, ordinary
 raw history includes earlier recovery outputs: fresh call IDs and results prove
 new history_search/detail execution, not absence of the fact from every ordinary
 replayed message. Both governance validators are running for this local evidence stage.
+
+### Deterministic fork cancellation publication boundaries
+
+Stage `23e75dd56` committed the combined recovery/receipt-close regressions;
+both governance validators finished with zero warnings (combined-governance and
+combined-claims logs), superseding the earlier running snapshot.
+
+New test-only thread-local probes cancel immediately before the final publication
+check and immediately after successful commit. The regression requires the probe
+to fire, verifies rollback/no child in the first case and successful durable child
+with identical raw bytes in the latter, and preserves parent bytes in both cases.
+This proves boundary behavior, not every scheduling race during commit or between
+last check and commit. Production behavior is unchanged. Targeted regression,
+full Session library suite (277/277), and all-target warnings-denied Clippy pass:
+`/private/tmp/i313-fork-publication-cancel.log`,
+`/private/tmp/i313-session-publication-suite.log`,
+`/private/tmp/i313-publication-clippy.log`.
+Independent static review approves this code delta against `23e75dd56`, diff SHA256
+`baeb3e0979d38e4832cebed89e9cda317db82f47a04915bfce94f333a2eb9188`;
+reviewer did not run tests. This delta remains local/uncommitted; full I313
+acceptance, platform validation, final preflight and remote closure remain open.
+
+### Task-state retention through model checkpoints A and B
+
+The combined Actor fixture now supplies categorized task state through the actual
+recoverable tool result. A reads that live request evidence; B must read installed
+checkpoint Context and explicitly cannot fall back to raw tool output. Both actual
+post-installation requests assert nonempty completed/in-progress/pending work,
+known-failed route, verified fact, unverified assumption and next step in distinct
+schema fields. Fresh detail after restart/fork must equal original task state.
+This is deterministic retention evidence, not real-model task quality or proof
+that a model independently decides to avoid repeated work; calls remain scripted.
+The source failure/work labels are fixture data, not actual compiler/research runs.
+The locked targeted regression passes (`/private/tmp/i313-task-state-checkpoints.log`)
+and records both Applied request token estimates. Agent all-target Clippy passed
+before the final assertion/category tightening (`/private/tmp/i313-task-state-clippy.log`);
+that small final delta has compiled/passed the targeted test but not fresh Clippy.
+Independent static review approves tests.rs diff against `23e75dd56`, SHA256
+`318ddd961db9d9fa54c49eca7b64ed2091d8a9520047fe330028ebf83f581883`.
+Reviewer did not run tests. No full T5/Issue #390 completion is claimed; these local
+changes remain uncommitted and final governance/whole-workspace gates remain open.
+
+Retention/publication local convergence: final Agent+Session all-target Clippy
+passes (`/private/tmp/i313-retention-converge-clippy.log`); both governance
+validators pass with zero warnings (`/private/tmp/i313-retention-governance.log`,
+`/private/tmp/i313-retention-claims.log`). These supersede the earlier final-delta
+Clippy gap. Latest Applied estimates are 50,250→21,645 and 50,905→22,306;
+these are runtime estimates, not measured provider billing tokens.
+Windows inspection reconfirms same_file_version deliberately rejects authorization:
+retained READ-only sharing does not yet have native evidence excluding an existing
+writable mapping. Do not activate from stamp equality alone. Platform implementation
+and native validation remain required, independently of these passing local tests.
