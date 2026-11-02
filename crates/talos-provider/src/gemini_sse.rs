@@ -533,11 +533,9 @@ mod tests {
             b"data: {}",
         ] {
             let mut decoder = GeminiSse::new();
-            if decoder.push(wire).is_ok() {
-                assert!(decoder.finish().is_err());
-            } else {
-                assert!(decoder.finish().is_err());
-            }
+            // Malformed input may fail at push or EOF, but failure must remain terminal.
+            let _ = decoder.push(wire);
+            assert!(decoder.finish().is_err());
         }
         assert!(GeminiSse::new().push(&vec![b'x'; MAX_RECORD + 1]).is_err());
         assert!(GeminiSse::new().push(&vec![b'x'; MAX_STREAM + 1]).is_err());
