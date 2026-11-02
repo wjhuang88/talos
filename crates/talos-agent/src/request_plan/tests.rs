@@ -745,7 +745,17 @@ async fn actual_provider_receives_pressure_without_persisting_it() {
     };
     // Recalculate each actual request when the selected model's effective
     // context capacity shrinks and grows; advisory pressure is not sticky.
-    for (capacity, expected_notices) in [(1_000_000, 0), (limit, 1), (1_000_000, 0)] {
+    let reserve_capacity = baseline.initial_plan.estimated_tokens * 2;
+    let pressure_reserve = reserve_capacity * 9 / 10 - baseline.initial_plan.estimated_tokens + 1;
+    for (capacity, output_reserve, expected_notices) in [
+        (1_000_000, 1, 0),
+        (limit, 1, 1),
+        (1_000_000, 1, 0),
+        (reserve_capacity, 1, 0),
+        (reserve_capacity, pressure_reserve, 1),
+        (reserve_capacity, 1, 0),
+    ] {
+        agent.set_request_budget_spec(RequestBudgetSpec::new(output_reserve));
         let prepared = agent
             .prepare_session_turn(&items, vec![], capacity)
             .await
@@ -781,7 +791,17 @@ async fn actual_provider_receives_pressure_without_persisting_it() {
     }
     assert_eq!(
         captured.lock().expect("captured").len(),
-        3,
-        "no extra summarizer call"
+        6,
+        "capacity and output-reserve changes must not add summarizer calls"
     );
+    // Registered checkpoint tools cannot bypass admission when the reserve alone
+    // consumes the model capacity. No over-limit normal request may escape.
+    agent.set_request_budget_spec(RequestBudgetSpec::new(reserve_capacity + 1));
+    assert!(matches!(
+        agent
+            .prepare_session_turn(&items, vec![], reserve_capacity)
+            .await,
+        Err(AgentError::ContextBudgetExceeded { .. })
+    ));
+    assert_eq!(captured.lock().expect("captured").len(), 6);
 }

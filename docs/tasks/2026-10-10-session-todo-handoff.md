@@ -1,3 +1,12 @@
+## T5 output-reserve composition — 2026-11-02
+
+Actual-provider regression now covers reserve-triggered advisory appearance and
+removal with stable tools/no persisted notice, and oversized reserve refusal before
+dispatch. Focused locked test passed; independent static review approved. Actual
+model-switch/reasoning-policy composition remains open. See I313 owner for evidence.
+Windows correction preflight17638 remains in progress; no new native CI claim.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
 ## T5 bounded prefix revalidation candidate — 2026-11-02
 
 Implemented test-only Windows restoration by bounded content revalidation under

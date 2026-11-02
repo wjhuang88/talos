@@ -1,3 +1,17 @@
+## Registered checkpoint pressure / output reserve composition — 2026-11-02
+
+Extended the real provider-capture regression with fixed-capacity output-reserve
+increase/decrease: advisory appears/disappears, tool definitions and instructions
+stay stable, notices stay out of persisted history, and six normal requests need
+no summarizer call. A reserve exceeding capacity refuses dispatch. The estimator
+already includes output reserve; adding it again would double count.
+Focused locked test passed 1/1 (`/private/tmp/i313-reserve-pressure.log`); affected
+all-target Clippy passed (`/private/tmp/i313-reserve-pressure-clippy.log`). Static
+review approved source diff `cf4a2fa3dd7eb3853a7c262b99fee5f6a4f9fad7aa7236ff8cbbecee08b6b550`.
+This proves output-reserve composition only, not actual model activation, reasoning
+reserve derivation or config inheritance. These and remaining Issue390 gates stay
+open. T5 Partial; T1/T6 unimplemented.
+
 ## Windows content revalidation candidate — 2026-11-02
 
 The test-only Windows restore now reacquires a source lease and starts bounded
