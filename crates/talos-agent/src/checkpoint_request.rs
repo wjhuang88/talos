@@ -220,7 +220,9 @@ impl Agent {
                 "no eligible checkpoint prefix".into(),
             ));
         }
-        // Bound total projection allocation before cloning or serializing sources.
+        // Automatic summaries allocate a complete private projection. Submitted
+        // checkpoints validate references without allocating that projection, so
+        // their source limit is per record plus the shared operation deadline.
         // Sequential folds separately bound every provider request and output.
         let mut source_bytes = Some(0usize);
         for &index in &eligible {
@@ -257,12 +259,12 @@ impl Agent {
                         .fold(0usize, usize::saturating_add),
                     Message::System { .. } => 0,
                 };
-                Some(size)
+                (size <= 2 * 1024 * 1024).then_some(size)
             })();
             source_bytes = source_bytes
                 .zip(size)
                 .and_then(|(total, size)| total.checked_add(size))
-                .filter(|&size| size <= 2 * 1024 * 1024);
+                .filter(|&size| submitted.is_some() || size <= 2 * 1024 * 1024);
             if source_bytes.is_none() {
                 break;
             }

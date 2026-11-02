@@ -2320,3 +2320,43 @@ Native platform gates remain open. Whole queue stays Active.
 Independent static review also approves the isolated Unix re-export condition,
 diff SHA256 `ad05bb0aff10778177aee791d7568a5d8b53e127e99750f6656a2b2dace53ff2`;
 reviewer confirmed all five external consumers are Unix-only, without compiling.
+
+### Submitted checkpoint sources beyond cumulative 2 MiB (local increment)
+
+Draft PR837 now publishes `b6345550ab57f4bc31f7bbb8382d685c0410bae6` after
+standard preflight and independent static permission to publish a Partial stage.
+Reviewer checked commit objects, not the subsequent working-tree experiment;
+base `9ace8968603a67ada8d118459c81367611ad3fd2`, whole diff SHA256
+`5c8e68f9c072e6783008a6b0007bb035f8aa7a3c89b9abd3d9a6fd78484c2d08`.
+New exact-head CI41392118766 has native Windows jobs running; Issue reconciliation
+fails because the global matrix lacks independent Issue #832 (log
+`/private/tmp/i313-current-issue-reconciliation.log`). Its intake PR #833 remains
+open; this is a separately owned governance residual, not permission to ignore
+final gates or overwrite that owner's work. Do not certify current local code
+from this published-head CI.
+
+The subsequent local increment separates model-submitted checkpoint validation
+from automatic summarizer projection allocation. Submitted checkpoints do not
+call checkpoint_projection, so their scan now retains a 2 MiB per-record text
+limit plus shared deadline without imposing the automatic path's 2 MiB cumulative
+projection allocation limit. Automatic summaries retain that cumulative limit.
+Source binding retains its independently bounded record serialization/hash checks;
+source ID/digest, pairing, checkpoint payload/privacy and publication checks remain.
+This is not fixed-memory or hard-realtime scanning: reference collections and
+other synchronous request work remain proportional to history.
+
+The actual Actor A/B/fork/independent-process fixture now exceeds both 8192 records
+and 2 MiB serialized history, using a one-million-token fixture context capacity.
+It passes with estimates 745375→10001 and 746030→10662
+(`/private/tmp/i313-large-bytes-checkpoint.log`); full Agent tests pass 642/642
+(`/private/tmp/i313-large-bytes-suite.log`). These are scripted pipeline evidence,
+not semantic quality from a paid/model probe. Agent all-target warnings-denied
+Clippy passes (`/private/tmp/i313-large-bytes-clippy.log`). Independent static
+review approves two-file diff SHA256
+`5033a4021afc945761e0aef00ff43f00cf21f5131ccbb1422ae0682dc283d2ac`
+against `b6345550ab57f4bc31f7bbb8382d685c0410bae6`; reviewer did not run tests.
+The per-record projection count is not full serialized-message or RSS size.
+Final full gates, Windows functionality and all T5 acceptance must still close
+before T1/T6. Whole queue remains Active.
+Both local governance validators also pass with zero warnings for this increment
+(`/private/tmp/i313-large-bytes-{governance,claims}.log`).

@@ -5448,7 +5448,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                 runtime_policy: RuntimePolicy::interactive(),
                 workspace_root: root.into(),
                 initial_history: recovered_raw.clone(),
-                model_context_limit: 128_000,
+                model_context_limit: 1_000_000,
             },
         );
         assert!(
@@ -5558,9 +5558,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     // Exceed the former total-history source limit while retaining enough
     // request budget to exercise voluntary model checkpointing, not rejection.
     raw.extend((0..8300).map(|i| Message::User {
-        content: format!("prior {i}"),
+        content: format!("prior {i}: {}", "x".repeat(256)),
     }));
     assert!(raw.len() > 8192);
+    assert!(serde_json::to_vec(&raw).expect("history bytes").len() > 2 * 1024 * 1024);
     let durable = talos_session::DurableSession::open_or_create(root.path(), "checkpoint-recovery")
         .expect("durable");
     // Produce the only searchable fact through actual admission/execution, not a
@@ -5626,7 +5627,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             runtime_policy: RuntimePolicy::interactive(),
             workspace_root: root.path().into(),
             initial_history: vec![],
-            model_context_limit: 128_000,
+            model_context_limit: 1_000_000,
         },
     );
     producer_actor.set_durable_persistence(durable.clone(), Default::default());
@@ -5683,7 +5684,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             runtime_policy: RuntimePolicy::interactive(),
             workspace_root: root.path().into(),
             initial_history: raw.clone(),
-            model_context_limit: 128_000,
+            model_context_limit: 1_000_000,
         },
     );
     actor.set_durable_persistence(durable.clone(), Default::default());
