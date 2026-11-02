@@ -277,11 +277,9 @@ impl GeminiProvider {
                         Some(event) => terminal.push(event),
                         None => {
                             // The reader drops its sender only after return. Poll its result first.
-                            if !finished {
-                                if let Err(error) = (&mut reader).await {
-                                    let _ = tx.try_send(AgentEvent::Error{message:error.to_string()});
-                                    return;
-                                }
+                            if !finished && let Err(error) = (&mut reader).await {
+                                let _ = tx.try_send(AgentEvent::Error{message:error.to_string()});
+                                return;
                             }
                             if decision_only && terminal.iter().any(|event| matches!(event,GeminiOutput::FunctionCall{..})) {
                                 let _ = tx.try_send(AgentEvent::Error{message:"Gemini isolated decision returned a tool call".into()});

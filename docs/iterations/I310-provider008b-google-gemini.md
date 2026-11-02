@@ -402,3 +402,23 @@ governance checks have passed so far, but no final preflight/workspace/CI result
 Gemini remains Active / Claimed, Completion Commit: Pending. Browser argument integrity,
 compatibility modes, reasoning/model support, host/UI/catalog integration, sourced fixtures,
 full validation and exact-head review/CI/CAS still block completion and parent #724 closure.
+
+### Full-check fixes and Desktop feature build — 2026-11-02
+
+First standard preflight passed project/collaboration/text/classifier/projection/format checks
+and cargo check --workspace --locked, then failed Clippy on two doc_lazy_continuation lines
+in the Gemini api_key documentation. Fixed paragraph separation; the next Clippy run exposed
+one existing nested-reader collapsible_if in GeminiProvider. Collapsed it without changing
+short-circuit/error behavior; independent read-only diff review confirmed no semantic change.
+Final cargo clippy --workspace --locked -- -D warnings passed (50.81s including lock wait).
+
+Desktop's first feature-enabled check failed because pkg-config/fontconfig were absent.
+APT's default user drop is unsupported here; initial install also hit the system cache's
+permissions. Downloaded the repository-CI development packages to a task-local cache and
+extracted them to a temporary sysroot, without changing Cargo dependencies or Desktop features.
+With task-local PKG_CONFIG/PATH/SYSROOT/LD_LIBRARY_PATH, cargo check -p talos-desktop
+--features desktop-ui --locked passed (1m03s). This proves compilation, not rendered UI or
+live-provider acceptance. The initial failure remains part of the validation history.
+
+Standard release_preflight.sh rerun has started after these fixes; full workspace tests and
+its final status are still pending. No final CI, merge, release or Gemini completion claim.
