@@ -1,24 +1,26 @@
-## T5 local implementation checkpoint — 2026-11-01
+## T5 local implementation checkpoint — 2026-11-02
 
-T4 closure and T5 activation PR #819 merged at
-`8b11e5f49794ea17f09c96eff8d59a6bf8f9a3d6`; I313 is Active/Partial.
-Local implementation includes bounded source pages, atomic recovery receipts,
-execution-scoped snapshots, privacy-safe projections and cancellable recovery
-cache maintenance. Read-only scoped candidate queries pass seven focused tests
-and affected Clippy plus incremental static review. See I313 owner for exact
-logs, limitations and remaining acceptance. These local increments are unmerged;
-opt-in model checkpoint admission/Actor installation and terminal continuation
-receipts are locally implemented. Host bounded recovery scan/backfill is now
-implemented and tested across restart and pages. Explicitly enabled durable Actor
-search/detail now reaches actual provider continuation locally; pagination,
-long-history discovery, resumed host preparation, full final-delivery coordination
-and default Runtime/CLI activation remain unfinished.
-Dynamic content-free pressure notices now reach actual provider requests when
-checkpoint tools are enabled, without entering raw history or changing definitions.
-Latest Session tests pass 253/253 and Agent tests 613/613; final workspace and
-remote gates remain open.
-The first four queue stages are merged; T5 remains Partial, T1/T6 unimplemented.
-Earlier activation and implementation snapshots below are historical.
+The first four queue stages are merged; T5/I313 remains Active/Partial and
+unmerged; T1/T6 remain unimplemented. Full queue:
+I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
+Current local committed evidence includes Runtime/CLI checkpoint tool registration
+(`1eaf3aa71`), retained bounded preparation (`adcf93a4d`), append and independent
+process restart recovery (`188917ed2`), and actual Actor A→B checkpoint followed
+by rediscovery/search/detail of an omitted original fact (`b9462d0fd`). Latest
+committed Agent suite passes 627/627 with affected Clippy, both governance
+validators and incremental static review. These are not full final-delivery gates.
+Legacy CLI durable receipt recovery remains unavailable; registration is not
+proof of that behavior. See I313 owner for exact tests and remaining acceptance.
+
+Windows work is uncommitted and remains fail-closed: restrictive read-sharing
+handles are retained by file stamps and dropped on preparation timeout. Native
+Windows tests, writable-mapping semantics and Actor lifecycle coverage remain
+required. An isolated Windows module type check is not full-crate or native proof.
+Other outstanding T5 work includes branch/concurrency and all Issue #390 row
+coverage, bounded initial verification/resumption limits, final user docs,
+workspace preflight, platform CI, independent final review, CAS and merge.
+Earlier snapshots below are historical and do not override current owner evidence.
 
 ## T4 merged; T5 activation proposal — 2026-11-01
 

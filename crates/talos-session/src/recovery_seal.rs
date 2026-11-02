@@ -8,7 +8,7 @@ use std::time::Instant;
 /// This is content consistency evidence, not branch or permission authority.
 pub struct RecoveryPrefixScan {
     source: DurableRecoverySource,
-    stamp: std::fs::Metadata,
+    stamp: crate::recovery_stamp::FileStamp,
     offset: u64,
     digest: [u8; 32],
     expected: Option<[u8; 32]>,
@@ -36,7 +36,7 @@ impl RecoveryPrefixExpectation {
 #[derive(Clone)]
 pub struct RecoveryPrefixSeal {
     source: DurableRecoverySource,
-    stamp: std::fs::Metadata,
+    stamp: crate::recovery_stamp::FileStamp,
     digest: [u8; 32],
 }
 
@@ -225,10 +225,21 @@ pub(crate) fn same_file_version(
         && a.ctime() == b.ctime()
         && a.ctime_nsec() == b.ctime_nsec())
 }
-#[cfg(not(unix))]
+#[cfg(windows)]
 pub(crate) fn same_file_version(
-    _: &std::fs::Metadata,
-    _: &std::fs::Metadata,
+    a: &crate::recovery_stamp::FileStamp,
+    b: &crate::recovery_stamp::FileStamp,
+) -> Result<bool, HistoryPageError> {
+    // Windows write timestamps may lag until writer handles close. Identity
+    // sampling alone cannot authorize recovery while shared writes are allowed.
+    // Keep fail-closed until a reviewed stable-handle lifetime is implemented.
+    let _ = (a, b);
+    Err(HistoryPageError::UnsupportedSource)
+}
+#[cfg(not(any(unix, windows)))]
+pub(crate) fn same_file_version(
+    _: &crate::recovery_stamp::FileStamp,
+    _: &crate::recovery_stamp::FileStamp,
 ) -> Result<bool, HistoryPageError> {
     Err(HistoryPageError::UnsupportedSource)
 }

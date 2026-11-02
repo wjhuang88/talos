@@ -203,6 +203,9 @@ pub(crate) fn open_source(path: &Path) -> Result<std::fs::File, HistoryPageError
         {
             return Err(HistoryPageError::UnsupportedSource);
         }
+        // Retained recovery stamps keep this read lease alive. Existing writers
+        // make acquisition fail; new writes and deletion are denied until drop.
+        options.share_mode(windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ);
         options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
     }
     #[cfg(not(any(unix, windows)))]

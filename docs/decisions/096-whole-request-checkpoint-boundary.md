@@ -182,3 +182,43 @@ must be renamed before migration; construction returns a tool registration error
 rather than replacing caller code or conferring builtin trust. Low-level Agent
 hosts retain explicit opt-in. Registration does not grant permission or imply
 that unsupported storage can provide durable recovery.
+
+## I313 Windows recovery file identity — implementation amendment
+
+Windows recovery uses the already-locked windows-sys OS ABI to query
+GetFileInformationByHandleEx(FileIdInfo/FileBasicInfo) on a borrowed live File.
+Rust 1.99's equivalent MetadataExt identity/change-time methods remain unstable.
+The narrowly scoped unsafe boundary is limited to these two synchronous calls:
+initialized repr(C) output structs, exact matching information classes/sizes,
+writable stack storage valid for the call, and a handle borrowed for the full
+call. No ownership transfer, callback, retained pointer or model-selected path.
+Calls fail closed on unsupported filesystems/errors; panic containment surrounds
+the boundary. Compare volume/file ID, size, creation/write/change times, excluding
+access time so reads do not invalidate their own evidence. Existing local-drive,
+non-reparse, regular-file opening remains mandatory. This is OS access, not an
+additional C/C++ library or runtime. Independent unsafe/security/API review and
+native Windows CI are required before merge. Until those gates pass, Windows
+support remains unverified; timestamps are not protection against arbitrary host
+or filesystem tampering. Replace the ABI calls with stable std equivalents when
+all required identity/change fields become stable.
+
+References: [Rust 1.99 MetadataExt](https://doc.rust-lang.org/1.99.0/std/os/windows/fs/trait.MetadataExt.html),
+[GetFileInformationByHandleEx](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileinformationbyhandleex).
+
+Review limitation: the timestamp-based stamp alone is **not accepted as Windows
+recovery authorization**. Windows may defer timestamp updates while write handles
+remain open ([File Times](https://learn.microsoft.com/en-us/windows/win32/sysinfo/file-times)).
+The implementation must keep Windows recovery fail-closed until a stable-handle
+sharing/lifetime design prevents concurrent writes/deletion across verified reads.
+The ABI safety analysis above does not waive this content-stability requirement.
+
+The current unmerged preparation increment opens Windows recovery sources with
+FILE_SHARE_READ only and retains a cloned read handle in each FileStamp. Copies
+share its lifetime through Arc. Preparation expiry drops that in-memory lease on
+Windows; persisted cursor metadata must be freshly revalidated on a later attempt.
+Actor task-local recovery drops before normal finalization; cancellation aborts
+and joins the task before finalization. Independent static review accepts this
+increment only while authorization remains fail-closed. Pre-existing writable
+mapping behavior still requires native investigation; share-mode exclusion alone
+is not accepted as proof that all byte mutations are impossible. Native lifetime,
+write/delete and actual Actor success/cancel/timeout regressions remain required.

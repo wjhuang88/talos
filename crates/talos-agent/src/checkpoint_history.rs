@@ -347,7 +347,15 @@ impl History {
                 return None;
             }
             if Instant::now() >= deadline {
-                *pending = Some(work);
+                // Windows stamps own a no-write/delete lease. Never retain it
+                // between turns: normal persistence must be able to append.
+                // Persisted preparation metadata is revalidated on the next attempt.
+                #[cfg(not(windows))]
+                {
+                    *pending = Some(work);
+                }
+                #[cfg(windows)]
+                drop(work);
                 return None;
             }
             match work.step(cancel, deadline) {
@@ -363,7 +371,15 @@ impl History {
                     tokio::task::yield_now().await;
                 }
                 Some(PreparationStep::Expired) => {
-                    *pending = Some(work);
+                    // Windows stamps own a no-write/delete lease. Never retain it
+                    // between turns: normal persistence must be able to append.
+                    // Persisted preparation metadata is revalidated on the next attempt.
+                    #[cfg(not(windows))]
+                    {
+                        *pending = Some(work);
+                    }
+                    #[cfg(windows)]
+                    drop(work);
                     return None;
                 }
                 None => {
@@ -1204,5 +1220,41 @@ mod tests {
         assert!(second.query(Some("fact"), None, None).is_some());
         cancel.cancel();
         assert!(second.query(Some("fact"), None, None).is_none());
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_lease_tests {
+    use super::*;
+
+    #[test]
+    fn dropping_partial_preparation_releases_before_next_commit() {
+        let root = tempfile::tempdir().expect("root");
+        let session =
+            DurableSession::open_or_create(root.path(), "lease-release").expect("session");
+        session
+            .commit_turn(
+                "seed",
+                &[talos_core::message::Message::User {
+                    content: "original fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("seed commit");
+        let cancel = CancellationToken::new();
+        let work = Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(10))
+            .expect("preparation with live source lease");
+        // Both timeout exits drop this same owning value on Windows. Exercise
+        // the release against real durable persistence, not metadata equality.
+        drop(work);
+        session
+            .commit_turn(
+                "next",
+                &[talos_core::message::Message::User {
+                    content: "normal continuation".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("append after preparation drop");
     }
 }

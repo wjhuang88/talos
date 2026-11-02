@@ -1402,3 +1402,45 @@ volume_serial_number and change_time remain nightly-only in the pinned standard
 library docs (https://doc.rust-lang.org/1.99.0/std/os/windows/fs/trait.MetadataExt.html).
 Do not replace identity/change checking with size/mtime. A reviewed OS-boundary
 implementation is still required; this investigation is not Windows support.
+
+### Windows stamp investigation — unapproved local implementation
+
+Added an isolated OS file-ID/basic-info sampling boundary and ADR-096 safety
+analysis. Existing local seal tests pass. Full Windows cross-check is blocked by
+missing Windows C headers for bundled SQLite; an isolated locked/offline build of
+the actual stamp module passes x86_64-pc-windows-msvc type checking
+(`/private/tmp/i313-windows-stamp-isolated.log`). Neither is native execution.
+
+Independent security review rejects using this stamp to authorize reads while
+shared writers remain possible: Microsoft File Times documents delayed timestamp
+updates until modifying handles close. Windows same_file_version therefore still
+returns UnsupportedSource. A stable handle denying write/delete sharing, with
+correct lifetime across page scans and release before normal commit, remains
+unimplemented. The two ABI calls' buffer/handle invariants were not rejected,
+but their evidence semantics are not approved. No Windows completion claim.
+Source: https://learn.microsoft.com/en-us/windows/win32/sysinfo/file-times
+
+Windows lease follow-up (local, unmerged): recovery source opens now share only
+READ, and sampled FileStamp retains a cloned handle in Arc through its lifetime.
+Preparation timeout drops in-memory work on Windows instead of retaining a lease
+across turns; persisted preparation metadata remains subject to fresh verification.
+Added native Windows regressions for pre-existing writer refusal, retained-clone
+write/rename exclusion, compatible readers and final-drop release. These tests
+are not yet executed on Windows. same_file_version remains fail-closed pending
+security review and native verification. Actor finalization ordering and timeout
+release integration coverage remain required; this does not activate Windows.
+
+Lease increment review approves preparation only, not Windows activation. Static
+inspection confirms task-local History drops before successful finalization and
+abort is joined before cancellation finalization. Reviewer ran no tests. Added
+native-only real DurableSession regression for partial Preparation drop followed
+by successful commit; this is not yet executed and is not full Actor coverage.
+Pre-existing writable memory mappings remain an explicit activation blocker.
+Local seal regression and isolated Windows stamp type check pass at
+`/private/tmp/i313-lease-local.log` and `/private/tmp/i313-lease-cross.log`.
+
+Current lease follow-up also passes locked talos-agent check and both governance
+validators (zero warnings): `/private/tmp/i313-lease-agent-check.log`,
+`/private/tmp/i313-lease-governance.log`, `/private/tmp/i313-lease-claims.log`.
+Fetch completed; current implementation remains 37 local commits ahead and 21
+commits behind origin/main. Integration and final exact-head gates remain open.

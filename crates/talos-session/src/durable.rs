@@ -223,7 +223,7 @@ impl DurableRecoverySource {
         &self,
         offset: u64,
         end: u64,
-        expected: &std::fs::Metadata,
+        expected: &crate::recovery_stamp::FileStamp,
         deadline: std::time::Instant,
         stopped: impl Fn() -> bool,
     ) -> Result<Vec<u8>, crate::history_page::HistoryPageError> {
@@ -233,7 +233,10 @@ impl DurableRecoverySource {
             return Err(HistoryPageError::Stale);
         }
         let mut file = crate::history_page::open_source(&self.descriptor.path)?;
-        if !crate::recovery_seal::same_file_version(&file.metadata()?, expected)? {
+        if !crate::recovery_seal::same_file_version(
+            &crate::recovery_stamp::from_file(&file)?,
+            expected,
+        )? {
             return Err(HistoryPageError::Stale);
         }
         file.seek(SeekFrom::Start(offset))?;
@@ -248,14 +251,17 @@ impl DurableRecoverySource {
         if stopped() || std::time::Instant::now() >= deadline {
             return Err(HistoryPageError::Stopped);
         }
-        if !crate::recovery_seal::same_file_version(&file.metadata()?, expected)? {
+        if !crate::recovery_seal::same_file_version(
+            &crate::recovery_stamp::from_file(&file)?,
+            expected,
+        )? {
             return Err(HistoryPageError::Stale);
         }
         Ok(bytes)
     }
     pub(crate) fn recovery_metadata(
         &self,
-    ) -> Result<std::fs::Metadata, crate::history_page::HistoryPageError> {
+    ) -> Result<crate::recovery_stamp::FileStamp, crate::history_page::HistoryPageError> {
         let metadata = std::fs::symlink_metadata(&self.descriptor.path)?;
         if !metadata.is_file() || metadata.file_type().is_symlink() {
             return Err(crate::history_page::HistoryPageError::UnsupportedSource);
@@ -263,7 +269,11 @@ impl DurableRecoverySource {
         if metadata.len() < self.source_end {
             return Err(crate::history_page::HistoryPageError::Stale);
         }
-        Ok(metadata)
+        let file = crate::history_page::open_source(&self.descriptor.path)?;
+        if file.metadata()?.len() < self.source_end {
+            return Err(crate::history_page::HistoryPageError::Stale);
+        }
+        crate::recovery_stamp::from_file(&file)
     }
     /// Durable owner of the captured source; callers cannot supply another path.
     pub fn session_id(&self) -> Uuid {

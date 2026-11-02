@@ -46,6 +46,7 @@ mod jsonl;
 mod manager;
 mod pending_submission;
 mod recovery_seal;
+mod recovery_stamp;
 pub use recovery_seal::{RecoveryPrefixExpectation, RecoveryPrefixScan, RecoveryPrefixSeal};
 mod runtime_state;
 mod segment_chain;
