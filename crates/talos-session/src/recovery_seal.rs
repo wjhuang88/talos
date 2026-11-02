@@ -17,7 +17,7 @@ pub struct RecoveryPrefixScan {
 
 // Trusted bindings provenance only. Never deserialize this from the search index
 // or model input. Fields cannot be supplied through the public API (ADR-096).
-#[cfg(unix)]
+#[cfg(any(unix, all(windows, test)))]
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct StoredScan {
@@ -32,7 +32,7 @@ pub(crate) struct StoredScan {
     stamp: crate::recovery_stamp::StoredFileVersion,
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, all(windows, test)))]
 impl RecoveryPrefixScan {
     pub(crate) fn stored(
         &self,
@@ -56,7 +56,7 @@ impl RecoveryPrefixScan {
     }
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, all(windows, test)))]
 impl StoredScan {
     pub(crate) fn supersedes(&self, previous: &Self) -> bool {
         self.stamp != previous.stamp
@@ -395,6 +395,287 @@ pub(crate) fn same_file_version(
     _: &crate::recovery_stamp::FileStamp,
 ) -> Result<bool, HistoryPageError> {
     Err(HistoryPageError::UnsupportedSource)
+}
+
+#[cfg(all(test, any(unix, windows)))]
+mod process_resume_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn saved_scan_rejects_foreign_owner_and_corrupt_payload() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = crate::DurableSession::open_or_create(root.path(), "owner").expect("owner");
+        let foreign =
+            crate::DurableSession::open_or_create(root.path(), "foreign").expect("foreign");
+        let budget = || crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(5));
+        let source = owner.capture_recovery_source().expect("source");
+        let scan = source.begin_prefix_seal().expect("scan");
+        assert!(foreign.save_recovery_scan(&scan, &budget()).is_err());
+        assert!(
+            foreign
+                .restore_recovery_scan_for_source(&source, &budget())
+                .is_err()
+        );
+        let receipt = owner.save_recovery_scan(&scan, &budget()).expect("save");
+        assert!(foreign.clear_recovery_scan(&receipt, &budget()).is_err());
+        let cancelled = budget();
+        cancelled.cancel();
+        assert!(owner.restore_recovery_scan(&cancelled).is_err());
+        assert!(owner.clear_recovery_scan(&receipt, &cancelled).is_err());
+        assert!(
+            owner
+                .restore_recovery_scan(&budget())
+                .expect("uncancelled restore")
+                .is_some(),
+            "cancelled restore/cleanup must retain saved progress"
+        );
+        drop(scan);
+        drop(source);
+        let db = rusqlite::Connection::open(root.path().join("durable-bindings.sqlite"))
+            .expect("trusted db fixture");
+        let payload: String = db
+            .query_row(
+                "SELECT payload FROM durable_recovery_scans WHERE session_id=?1",
+                [owner.id().to_string()],
+                |row| row.get(0),
+            )
+            .expect("payload");
+        for field in ["version", "session", "branch", "cutoff", "offset", "digest"] {
+            let mut value: serde_json::Value = serde_json::from_str(&payload).expect("json");
+            value[field] = match field {
+                "session" => serde_json::json!(foreign.id()),
+                "branch" => serde_json::json!("foreign-branch"),
+                "digest" => serde_json::json!(vec![9u8; 32]),
+                _ => serde_json::json!(999999),
+            };
+            db.execute(
+                "UPDATE durable_recovery_scans SET payload=?1 WHERE session_id=?2",
+                rusqlite::params![value.to_string(), owner.id().to_string()],
+            )
+            .expect("corrupt");
+            assert!(
+                owner
+                    .restore_recovery_scan(&budget())
+                    .expect("restore")
+                    .is_none(),
+                "{field}"
+            );
+        }
+        db.execute(
+            "UPDATE durable_recovery_scans SET payload='invalid-json' WHERE session_id=?1",
+            [owner.id().to_string()],
+        )
+        .expect("malformed");
+        assert!(
+            owner
+                .restore_recovery_scan(&budget())
+                .expect("malformed restore")
+                .is_none()
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn restored_scan_retains_new_lease_until_dropped() {
+        let root = tempfile::tempdir().expect("root");
+        let owner =
+            crate::DurableSession::open_or_create(root.path(), "restored-lease").expect("owner");
+        let budget = || crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(5));
+        {
+            let scan = owner
+                .capture_recovery_source()
+                .expect("source")
+                .begin_prefix_seal()
+                .expect("scan");
+            owner.save_recovery_scan(&scan, &budget()).expect("save");
+        }
+        let writer = std::fs::OpenOptions::new()
+            .write(true)
+            .open(owner.file_path())
+            .expect("old leases released");
+        drop(writer);
+        let resumed = owner
+            .restore_recovery_scan(&budget())
+            .expect("restore")
+            .expect("scan");
+        assert!(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(owner.file_path())
+                .is_err(),
+            "new scan must exclude a writer"
+        );
+        drop(resumed);
+        let writer = std::fs::OpenOptions::new()
+            .write(true)
+            .open(owner.file_path())
+            .expect("new lease released");
+        assert!(
+            owner.restore_recovery_scan(&budget()).is_err(),
+            "sharing conflict cannot reuse saved offset"
+        );
+        drop(writer);
+    }
+
+    #[test]
+    fn saved_cursor_rejects_mutations_after_all_source_leases_are_dropped() {
+        use std::io::{Seek, SeekFrom, Write};
+        for mutation in ["append", "overwrite", "truncate", "replace"] {
+            let root = tempfile::tempdir().expect("root");
+            let owner =
+                crate::DurableSession::open_or_create(root.path(), "mutation").expect("owner");
+            owner
+                .commit_turn(
+                    "seed",
+                    &[talos_core::message::Message::User {
+                        content: "fact ".repeat(600_000),
+                    }],
+                    &Default::default(),
+                )
+                .expect("commit");
+            let budget = || crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(5));
+            {
+                let mut scan = owner
+                    .capture_recovery_source()
+                    .expect("source")
+                    .begin_prefix_seal()
+                    .expect("scan");
+                while scan.offset == 0 {
+                    assert!(
+                        !scan
+                            .step(Instant::now() + Duration::from_secs(5), || false)
+                            .expect("step")
+                    );
+                }
+                owner.save_recovery_scan(&scan, &budget()).expect("save");
+            }
+            let path = owner.file_path();
+            let original = std::fs::read(path).expect("bytes");
+            match mutation {
+                "append" => std::fs::OpenOptions::new()
+                    .append(true)
+                    .open(path)
+                    .expect("writer")
+                    .write_all(b"\n")
+                    .expect("append"),
+                "overwrite" => {
+                    let mut file = std::fs::OpenOptions::new()
+                        .write(true)
+                        .open(path)
+                        .expect("writer");
+                    file.seek(SeekFrom::End(-2)).expect("seek");
+                    file.write_all(b"X").expect("write");
+                    file.sync_all().expect("flush");
+                }
+                "truncate" => {
+                    let mut bytes = original.clone();
+                    let index = bytes.len() - 2;
+                    bytes[index] ^= 1;
+                    std::fs::write(path, bytes).expect("truncate and rewrite");
+                }
+                "replace" => {
+                    std::fs::remove_file(path).expect("old lease released");
+                    std::fs::write(path, &original).expect("same bytes new identity");
+                }
+                _ => unreachable!(),
+            }
+            assert!(
+                owner
+                    .restore_recovery_scan(&budget())
+                    .expect("restore attempt")
+                    .is_none(),
+                "{mutation}"
+            );
+        }
+    }
+
+    #[test]
+    fn saved_prefix_resumes_in_new_process_without_old_leases() {
+        const ROOT: &str = "TALOS_TEST_SAVED_PREFIX_ROOT";
+        let budget = || crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(5));
+        if let Some(root) = std::env::var_os(ROOT) {
+            let owner =
+                crate::DurableSession::open_existing(std::path::Path::new(&root), "scan-process")
+                    .expect("open")
+                    .expect("persisted owner");
+            let mut resumed = owner
+                .restore_recovery_scan(&budget())
+                .expect("restore")
+                .expect("saved progress");
+            assert_eq!(
+                resumed.scan.offset,
+                crate::history_page::HISTORY_PAGE_BYTES as u64
+            );
+            while !resumed
+                .scan
+                .step(Instant::now() + Duration::from_secs(5), || false)
+                .expect("page")
+            {}
+            let seal = resumed.scan.finish().expect("complete seal");
+            drop(seal);
+            assert!(
+                owner
+                    .clear_recovery_scan(&resumed.receipt, &budget())
+                    .expect("clear")
+            );
+            println!("SAVED_PREFIX_PROCESS_VERIFIED");
+            return;
+        }
+        let root = tempfile::tempdir().expect("root");
+        {
+            let owner =
+                crate::DurableSession::open_or_create(root.path(), "scan-process").expect("owner");
+            owner
+                .commit_turn(
+                    "seed",
+                    &[talos_core::message::Message::User {
+                        content: "fact ".repeat(600_000),
+                    }],
+                    &Default::default(),
+                )
+                .expect("commit");
+            let mut scan = owner
+                .capture_recovery_source()
+                .expect("source")
+                .begin_prefix_seal()
+                .expect("scan");
+            while scan.offset == 0 {
+                assert!(
+                    !scan
+                        .step(Instant::now() + Duration::from_secs(5), || false)
+                        .expect("step")
+                );
+            }
+            assert_eq!(scan.offset, crate::history_page::HISTORY_PAGE_BYTES as u64);
+            owner
+                .save_recovery_scan(&scan, &budget())
+                .expect("save nonzero cursor");
+        } // owner, scan, source and all Windows leases are gone before spawn
+        let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .args(["--exact", "recovery_seal::process_resume_tests::saved_prefix_resumes_in_new_process_without_old_leases", "--nocapture"])
+            .env(ROOT, root.path()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped())
+            .spawn().expect("child");
+        let deadline = Instant::now() + Duration::from_secs(30);
+        loop {
+            if child.try_wait().expect("wait").is_some() {
+                break;
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("child recovery deadline");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let output = child.wait_with_output().expect("output");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("SAVED_PREFIX_PROCESS_VERIFIED"));
+    }
 }
 
 #[cfg(all(test, unix))]

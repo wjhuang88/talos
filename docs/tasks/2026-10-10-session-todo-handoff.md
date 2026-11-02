@@ -1,3 +1,13 @@
+## T5 Windows saved-scan test candidate — 2026-11-02
+
+Test-only Windows version/scan persistence paths and cross-process, mutation,
+owner, malformed checkpoint and lease regressions are locally implemented. Unix
+tests passed; Windows native execution remains pending and production hooks remain
+closed. Independent static review permits a test candidate, not activation.
+Standard preflight is running at `/private/tmp/i313-windows-scan-test-preflight.log`.
+Full queue remains I309 → T8/I308 → T2+T3 → T4 → T5 → T1 → T6; T5 Partial,
+T1/T6 unimplemented. See I313 owner for exact evidence boundaries.
+
 ## T5 fork paging local increment — 2026-11-02
 
 Local fork now copies bounded raw pages and decodes messages/tail from one captured

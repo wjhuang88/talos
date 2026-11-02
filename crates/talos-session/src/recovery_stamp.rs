@@ -295,6 +295,34 @@ mod tests {
 
 /// Private source-version representation for host-owned scan checkpoints.
 /// Equality is only version evidence; loading this value does not authorize reads.
+#[cfg(all(windows, test))]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct StoredFileVersion {
+    volume: u64,
+    identity: [u8; 16],
+    size: u64,
+    created: i64,
+    written: i64,
+    changed: i64,
+}
+
+#[cfg(all(windows, test))]
+impl From<&FileStamp> for StoredFileVersion {
+    fn from(stamp: &FileStamp) -> Self {
+        Self {
+            volume: stamp.volume,
+            identity: stamp.identity,
+            size: stamp.size,
+            created: stamp.created,
+            written: stamp.written,
+            changed: stamp.changed,
+        }
+    }
+}
+
+/// Private Unix source-version representation for host-owned scan checkpoints.
+/// Equality is only version evidence; loading this value does not authorize reads.
 #[cfg(unix)]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -321,6 +349,107 @@ impl From<&FileStamp> for StoredFileVersion {
             changed: stamp.ctime(),
             changed_ns: stamp.ctime_nsec(),
         }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_stored_version_tests {
+    use super::*;
+
+    fn capture(path: &std::path::Path) -> StoredFileVersion {
+        let file = crate::history_page::open_source(path).expect("local source");
+        StoredFileVersion::from(&from_file(&file).expect("version"))
+    }
+
+    #[test]
+    fn persisted_version_reopens_unchanged_but_rejects_append_and_replacement() {
+        use std::io::Write;
+        let root = tempfile::tempdir().expect("root");
+        let path = root.path().join("source");
+        std::fs::write(&path, b"original").expect("source");
+        let original = capture(&path);
+        let encoded = serde_json::to_vec(&original).expect("serialize");
+        let restored: StoredFileVersion = serde_json::from_slice(&encoded).expect("restore");
+        assert_eq!(restored, capture(&path));
+        assert_eq!(
+            std::fs::read(&path).expect("read changes only access time"),
+            b"original"
+        );
+        assert_eq!(restored, capture(&path));
+        assert!(!String::from_utf8(encoded).expect("json").contains("lease"));
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .expect("lease released")
+            .write_all(b"append")
+            .expect("append");
+        assert_ne!(restored, capture(&path));
+        std::fs::remove_file(&path).expect("remove");
+        std::fs::write(&path, b"original").expect("same length replacement");
+        assert_ne!(restored, capture(&path));
+    }
+
+    #[test]
+    fn released_version_rejects_same_length_overwrite_and_truncate_rewrite() {
+        use std::io::Write;
+        for truncate in [false, true] {
+            let root = tempfile::tempdir().expect("root");
+            let path = root.path().join("source");
+            std::fs::write(&path, b"original").expect("source");
+            let original = capture(&path); // no old lease remains
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .open(&path)
+                .expect("writer");
+            if truncate {
+                file.set_len(0).expect("truncate");
+            }
+            file.write_all(b"modified").expect("same length write");
+            file.sync_all().expect("flush");
+            drop(file);
+            assert_ne!(original, capture(&path), "truncate={truncate}");
+        }
+    }
+
+    #[test]
+    fn every_version_field_and_unknown_fields_are_checked() {
+        let base = StoredFileVersion {
+            volume: 1,
+            identity: [2; 16],
+            size: 3,
+            created: 4,
+            written: 5,
+            changed: 6,
+        };
+        for field in [
+            "volume", "identity", "size", "created", "written", "changed",
+        ] {
+            let mut value = serde_json::to_value(&base).expect("json");
+            value[field] = if field == "identity" {
+                serde_json::json!(vec![9u8; 16])
+            } else {
+                serde_json::json!(99)
+            };
+            let changed: StoredFileVersion = serde_json::from_value(value).expect("version");
+            assert_ne!(base, changed, "{field}");
+            let mut missing = serde_json::to_value(&base).expect("json");
+            missing.as_object_mut().expect("object").remove(field);
+            assert!(
+                serde_json::from_value::<StoredFileVersion>(missing).is_err(),
+                "missing {field}"
+            );
+        }
+        let mut value = serde_json::to_value(&base).expect("json");
+        value["device"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<StoredFileVersion>(value).is_err());
+        assert!(
+            serde_json::from_value::<StoredFileVersion>(serde_json::json!({
+                "device":1, "inode":2, "size":3, "modified":4, "modified_ns":5,
+                "changed":6, "changed_ns":7
+            }))
+            .is_err(),
+            "Unix provenance must not deserialize as Windows"
+        );
     }
 }
 

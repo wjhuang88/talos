@@ -1,5 +1,29 @@
 # Iteration I313: Actor Model Checkpoints And Bounded History Recovery
 
+## Windows saved-scan test candidate — 2026-11-02
+
+Windows stored source-version representation and saved-scan APIs are enabled only
+under test cfg. Production Windows restoration and Agent hooks remain unavailable.
+The six version fields are volume/file ID/size/creation/write/change timestamps;
+no lease is serialized. Source restore reacquires the existing restricted local
+handle. No new native calls or unsafe blocks are introduced.
+
+Tests cover a nonzero cursor saved before all source leases are dropped, fresh
+process restore/finish/clear, and append/overwrite/truncate/replace rejection.
+Windows-only tests cover new-lease writer exclusion/release, sharing conflicts,
+field equality and malformed/cross-platform metadata. Ordinary reads are tested
+for non-invalidation, not proof that Windows updated access time. Foreign owner
+and structural payload errors are rejected; the digest test specifically rejects
+a nonzero digest at offset zero, not arbitrary trusted-store tampering.
+
+Unix Session suite passed 297 cases before the final owner/corruption test, which
+passed separately; affected Clippy passed before that final addition. Native
+Windows tests have not executed. Static reviewer approved test-only diff SHA256
+`2c4f998e36c14699b86565629bfc122d1da531728a0de593a12cfc1ff790ce78`,
+without running builds; approval does not activate production restoration.
+Standard preflight is running at `/private/tmp/i313-windows-scan-test-preflight.log`.
+T5 remains Partial; no full acceptance, merge or T1/T6 implementation is claimed.
+
 ## CLI fork paging and cancellation — local increment, 2026-11-02
 
 The real fork handler now stages raw bytes in bounded pages from the same captured
