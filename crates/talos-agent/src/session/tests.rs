@@ -5301,6 +5301,116 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             Ok(rx)
         }
     }
+    async fn recover_in_fresh_process(root: &std::path::Path) {
+        let reopened = talos_session::DurableSession::open_or_create(root, "checkpoint-recovery")
+            .expect("reopen after two checkpoints");
+        let persisted = std::fs::read(reopened.file_path()).expect("child initial transcript");
+        let recovered_raw = reopened.read_messages().expect("durable replay");
+        let mut engine = PermissionEngine::empty();
+        engine.set_workspace_root(root.into());
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Read,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ));
+        let restarted_model = Arc::new(CheckpointModel {
+            step: AtomicUsize::new(8),
+        });
+        let mut restarted_agent = Agent::with_security_and_hooks(
+            restarted_model.clone(),
+            ToolRegistry::new(),
+            Some(Arc::new(engine)),
+            None,
+            root.into(),
+            Arc::new(talos_plugin::HookRegistry::new()),
+        );
+        restarted_agent
+            .enable_model_checkpoint_tools()
+            .expect("restart tools");
+        let (mut restarted_handle, mut restarted_actor) = AppServerSession::new(
+            restarted_agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.into(),
+                initial_history: recovered_raw.clone(),
+                model_context_limit: 128_000,
+            },
+        );
+        assert!(
+            restarted_actor
+                .agent
+                .checkpoint_projection_state
+                .lock()
+                .expect("fresh projection")
+                .is_none()
+        );
+        restarted_actor.set_durable_persistence(reopened.clone(), Default::default());
+        restarted_actor.set_recovered_history_sources(
+            reopened.read_history_snapshot().expect("fresh sources"),
+        );
+        let restarted_task = tokio::spawn(async move {
+            restarted_actor.run().await;
+            restarted_actor
+        });
+        restarted_handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "recover the original constraint after restart".into(),
+            })
+            .await
+            .expect("restart submit");
+        let events = tokio::time::timeout(
+            Duration::from_secs(10),
+            collect_until_completions(&mut restarted_handle.eq_rx, 1),
+        )
+        .await
+        .expect("restart deadline");
+        assert!(events.iter().any(|event| matches!(
+            completed_status(event),
+            Some(TurnCompletionStatus::Success { .. })
+        )));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, SessionEvent::ModelCheckpointTerminal { .. })),
+            "restart must not replay or reexecute completed checkpoints"
+        );
+        restarted_handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("restart shutdown");
+        let restarted_actor = restarted_task.await.expect("restart actor");
+        assert_eq!(
+            &restarted_actor.history[..recovered_raw.len()],
+            recovered_raw.as_slice()
+        );
+        assert_eq!(
+            restarted_model.step.load(Ordering::SeqCst),
+            12,
+            "fresh discovery/search/detail/continuation without another checkpoint"
+        );
+        assert!(
+            std::fs::read(reopened.file_path())
+                .expect("restart transcript")
+                .starts_with(&persisted)
+        );
+        println!("TALOS_CHECKPOINT_RESTART_VERIFIED");
+    }
+    if let Some(root) = std::env::var_os("TALOS_TEST_CHECKPOINT_RESTART_ROOT") {
+        let parent: u32 = std::env::var("TALOS_TEST_CHECKPOINT_PARENT_PID")
+            .expect("parent pid")
+            .parse()
+            .expect("pid");
+        assert_ne!(
+            parent,
+            std::process::id(),
+            "must execute in an independent process"
+        );
+        recover_in_fresh_process(std::path::Path::new(&root)).await;
+        return;
+    }
     let root = tempfile::tempdir().expect("workspace");
     let mut engine = PermissionEngine::empty();
     engine.set_workspace_root(root.path().into());
@@ -5459,101 +5569,35 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             .expect("projection")
             .is_some()
     );
-    // Reopen the durable store and create a fresh Actor/model. No projection,
-    // cursor, discovery secret or execution-local history object is reused.
+    // The child receives only a disk path; no Actor/projection/query state crosses
+    // this boundary. Join shutdown before starting it so committed bytes are final.
     drop(actor);
     drop(durable);
-    let reopened =
-        talos_session::DurableSession::open_or_create(root.path(), "checkpoint-recovery")
-            .expect("reopen after two checkpoints");
-    let recovered_raw = reopened.read_messages().expect("durable replay");
-    let mut engine = PermissionEngine::empty();
-    engine.set_workspace_root(root.path().into());
-    engine.add_rule(PermissionRule::new_nature(
-        ToolNature::Read,
-        None,
-        None,
-        PermissionDecision::Allow,
-    ));
-    let restarted_model = Arc::new(CheckpointModel {
-        step: AtomicUsize::new(8),
-    });
-    let mut restarted_agent = Agent::with_security_and_hooks(
-        restarted_model.clone(),
-        ToolRegistry::new(),
-        Some(Arc::new(engine)),
-        None,
-        root.path().into(),
-        Arc::new(talos_plugin::HookRegistry::new()),
-    );
-    restarted_agent
-        .enable_model_checkpoint_tools()
-        .expect("restart tools");
-    let (mut restarted_handle, mut restarted_actor) = AppServerSession::new(
-        restarted_agent,
-        SessionConfig {
-            runtime_policy: RuntimePolicy::interactive(),
-            workspace_root: root.path().into(),
-            initial_history: recovered_raw.clone(),
-            model_context_limit: 128_000,
-        },
+    let mut child = tokio::process::Command::new(std::env::current_exe().expect("test binary"));
+    child.args(["--exact", "session::tests::registered_model_checkpoint_discovers_admits_and_applies_through_actor", "--nocapture"])
+        .env("TALOS_TEST_CHECKPOINT_RESTART_ROOT", root.path())
+        .env("TALOS_TEST_CHECKPOINT_PARENT_PID", std::process::id().to_string())
+        .kill_on_drop(true);
+    let output = tokio::time::timeout(Duration::from_secs(30), child.output())
+        .await
+        .expect("bounded child recovery")
+        .expect("launch child");
+    assert!(
+        output.status.success(),
+        "child failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
     );
     assert!(
-        restarted_actor
-            .agent
-            .checkpoint_projection_state
-            .lock()
-            .expect("fresh projection")
-            .is_none()
+        String::from_utf8_lossy(&output.stdout).contains("TALOS_CHECKPOINT_RESTART_VERIFIED"),
+        "child must actually execute recovery, not pass an empty test selection"
     );
-    restarted_actor.set_durable_persistence(reopened.clone(), Default::default());
-    restarted_actor
-        .set_recovered_history_sources(reopened.read_history_snapshot().expect("fresh sources"));
-    let restarted_task = tokio::spawn(async move {
-        restarted_actor.run().await;
-        restarted_actor
-    });
-    restarted_handle
-        .sq_tx
-        .send(SessionOp::Submit {
-            message: "recover the original constraint after restart".into(),
-        })
-        .await
-        .expect("restart submit");
-    let events = tokio::time::timeout(
-        Duration::from_secs(10),
-        collect_until_completions(&mut restarted_handle.eq_rx, 1),
-    )
-    .await
-    .expect("restart deadline");
-    assert!(events.iter().any(|event| matches!(
-        completed_status(event),
-        Some(TurnCompletionStatus::Success { .. })
-    )));
-    assert!(
-        !events
-            .iter()
-            .any(|event| matches!(event, SessionEvent::ModelCheckpointTerminal { .. })),
-        "restart must not replay or reexecute completed checkpoints"
-    );
-    restarted_handle
-        .sq_tx
-        .send(SessionOp::Shutdown)
-        .await
-        .expect("restart shutdown");
-    let restarted_actor = restarted_task.await.expect("restart actor");
-    assert_eq!(
-        &restarted_actor.history[..recovered_raw.len()],
-        recovered_raw.as_slice()
-    );
-    assert_eq!(
-        restarted_model.step.load(Ordering::SeqCst),
-        12,
-        "fresh discovery/search/detail/continuation without another checkpoint"
-    );
+    let reopened = talos_session::DurableSession::open_existing(root.path(), "checkpoint-recovery")
+        .expect("reopen after child")
+        .expect("durable binding");
     assert!(
         std::fs::read(reopened.file_path())
-            .expect("restart transcript")
+            .expect("child transcript")
             .starts_with(&persisted)
     );
 }

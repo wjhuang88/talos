@@ -1599,3 +1599,26 @@ persistent verification, fork composition, Windows and final candidate gates.
 Current delta passes Agent 628/628 and affected all-target warnings-denied Clippy:
 `/private/tmp/i313-history-delivery-agent.log`, `/private/tmp/i313-history-delivery-clippy.log`.
 These are local incremental checks, not full candidate platform/merge approval.
+
+### A→B then independent-process Actor recovery — local
+
+The prior same-process reopen fixture is now strengthened to a separate test
+process. Parent completes both checkpoints, shuts down/drops its Actor and durable
+handle, then launches the exact current test with only root path and parent PID.
+Child asserts a distinct PID, opens durable state and creates a fresh Actor/model,
+performs the four recovery requests with unique reopen call IDs, verifies no
+checkpoint replay and unchanged raw prefix, and emits a completion marker. Parent
+requires successful exit plus that marker (not merely an empty test selection),
+and verifies the child's append preserves the parent's complete persisted prefix.
+The subprocess wait has a 30-second timeout and kill-on-drop.
+
+Focused regression passes (`/private/tmp/i313-checkpoint-process-restart.log`).
+This supersedes the same-process-only limitation for this raw-rebuild scenario;
+it does not establish persisted checkpoint projections, fork/shared-ancestor
+recovery, all semantic scenario rows, Windows or final candidate completion.
+
+Affected all-target warnings-denied Clippy passes
+(`/private/tmp/i313-checkpoint-process-clippy.log`). Independent static review
+approves the subprocess fixture, including distinct PID, exact test selection,
+completion marker, dedicated call IDs and bounded child lifetime; reviewer did
+not execute tests. This remains incremental evidence, not whole-I313 approval.
