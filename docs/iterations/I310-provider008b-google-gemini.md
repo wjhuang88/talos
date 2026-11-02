@@ -206,3 +206,16 @@ Pinned locked Provider lib: 239 passed, zero failed/ignored/filtered (5.68s). In
 CRLF split, arbitrary chunk-size proptest, truncation/size errors, delayed tool release and loopback
 heartbeat-first-event timeout. Other HTTP reader failure/cancellation/idle cases remain to extend.
 Synthetic fixtures do not replace required sourced vendor samples. Independent reader review requested.
+
+### Identity-scoped replay envelope checkpoint — 2026-11-01
+
+Added private Gemini replay encoding/decoding in ReasoningBlock::Redacted with a versioned
+wire-family marker and exact provider/model identity. Preserve full ordered original parts and
+signatures; keep generated internal tool IDs in a separate ordinal binding table. Reject native
+ID mismatch, missing/duplicate/out-of-range associations, foreign identity/format and oversize or
+unsupported payloads. No Debug implementation on decoded private payload. Tests added for positional
+round-trip and rejected associations, but execution remains at dependency restoration after workspace
+maintenance pruned the previous build environment. Pinned rustfmt and diff whitespace checks pass.
+This helper is not yet connected to SSE completion/request replay or Agent persistence; no passing
+new test, runtime or complete signature-replay claim. Next: finish validation and wire the envelope
+through response completion and identity-checked request history.
