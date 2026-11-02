@@ -5839,7 +5839,14 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             ),
         )
         .await
-        .expect("restart deadline");
+        .unwrap_or_else(|error| {
+            panic!(
+                "restart deadline: {error}; identity={identity}; provider_step={}; verification_calls={}; actor_finished={}",
+                restarted_model.step.load(Ordering::SeqCst),
+                verification_calls.load(Ordering::SeqCst),
+                restarted_task.is_finished(),
+            )
+        });
         assert!(events.iter().any(|event| matches!(
             completed_status(event),
             Some(TurnCompletionStatus::Success { .. })
