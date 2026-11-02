@@ -867,7 +867,7 @@ mod tests {
             .collect()
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn submitted_snapshot_accepts_append_but_rejects_prefix_mutation_and_generation() {
         let mut raw = history();
         let bind = |generation, messages: &[Message]| {
@@ -904,6 +904,40 @@ mod tests {
                     tokio::time::Instant::now() + std::time::Duration::from_secs(2)
                 )
                 .await
+        );
+        let current = bind(1, &raw);
+        assert!(
+            !submitted
+                .matches_source(&current, raw.len(), tokio::time::Instant::now())
+                .await
+        );
+        {
+            let work = submitted.matches_source(
+                &current,
+                raw.len(),
+                tokio::time::Instant::now() + std::time::Duration::from_secs(2),
+            );
+            tokio::pin!(work);
+            tokio::select! {
+                biased;
+                _ = &mut work => panic!("identity comparison must yield"),
+                _ = std::future::ready(()) => {},
+            }
+            tokio::time::advance(std::time::Duration::from_secs(3)).await;
+            assert!(
+                !work.await,
+                "expiry during comparison must refuse authority"
+            );
+        }
+        assert!(
+            submitted
+                .matches_source(
+                    &current,
+                    raw.len(),
+                    tokio::time::Instant::now() + std::time::Duration::from_secs(2)
+                )
+                .await,
+            "expired comparison must not mutate either source"
         );
         raw[0] = Message::User {
             content: "changed prefix".into(),

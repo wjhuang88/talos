@@ -740,25 +740,48 @@ async fn actual_provider_receives_pressure_without_persisting_it() {
         .await
         .expect("baseline");
     let limit = baseline.initial_plan.estimated_tokens * 10 / 9;
-    let prepared = agent
-        .prepare_session_turn(&items, vec![], limit)
-        .await
-        .expect("advisory");
-    let (result, persisted) = agent
-        .run_prepared_session_turn(prepared, mpsc::unbounded_channel().0, None, None, None)
-        .await;
-    result.expect("ordinary continuation");
-    let requests = captured.lock().expect("captured");
-    assert_eq!(requests.len(), 1);
-    let request = &requests[0];
     let notices = |messages: &[Message]| {
         messages.iter().filter(|message| matches!(message,Message::Multimodal {parts} if parts.iter().any(|part| matches!(part,ContentPart::Text{text} if text.contains("context_pressure"))))).count()
     };
-    assert_eq!(notices(&request.messages), 1);
-    assert_eq!(notices(&persisted), 0);
+    // Recalculate each actual request when the selected model's effective
+    // context capacity shrinks and grows; advisory pressure is not sticky.
+    for (capacity, expected_notices) in [(1_000_000, 0), (limit, 1), (1_000_000, 0)] {
+        let prepared = agent
+            .prepare_session_turn(&items, vec![], capacity)
+            .await
+            .expect("request fits current capacity");
+        let (result, persisted) = agent
+            .run_prepared_session_turn(prepared, mpsc::unbounded_channel().0, None, None, None)
+            .await;
+        result.expect("ordinary continuation without voluntary checkpoint");
+        assert_eq!(notices(&persisted), 0);
+        let requests = captured.lock().expect("captured");
+        let request = requests.last().expect("actual request");
+        assert_eq!(notices(&request.messages), expected_notices);
+        assert_eq!(
+            format!("{:?}", request.tools),
+            format!("{:?}", baseline.initial_plan.tool_definitions)
+        );
+        let instructions = |messages: &[Message]| {
+            messages
+                .iter()
+                .filter_map(|message| match message {
+                    Message::System { content, .. } => Some(content.clone()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            instructions(&request.messages),
+            instructions(&baseline.initial_plan.messages)
+        );
+        assert!(
+            agent.estimate_provider_request_tokens(&request.messages, &request.tools) <= capacity
+        );
+    }
     assert_eq!(
-        format!("{:?}", request.tools),
-        format!("{:?}", baseline.initial_plan.tool_definitions)
+        captured.lock().expect("captured").len(),
+        3,
+        "no extra summarizer call"
     );
-    assert!(agent.estimate_provider_request_tokens(&request.messages, &request.tools) <= limit);
 }

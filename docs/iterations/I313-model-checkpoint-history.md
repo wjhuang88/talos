@@ -2360,3 +2360,26 @@ Final full gates, Windows functionality and all T5 acceptance must still close
 before T1/T6. Whole queue remains Active.
 Both local governance validators also pass with zero warnings for this increment
 (`/private/tmp/i313-large-bytes-{governance,claims}.log`).
+
+### Source-expiry and pressure-transition regression evidence
+
+Submitted source matching now has deterministic paused-clock regression coverage
+for expiry before entry and after its first cooperative yield; it refuses both,
+and a later fresh comparison succeeds without either source being mutated.
+Focused locked test passes (`/private/tmp/i313-source-comparison-expiry.log`).
+Actual provider request regression now runs effective context capacities
+large→small→large with checkpoint tools enabled. Captured notices are 0→1→0,
+persisted messages contain no pressure notice, tool definitions and system
+instruction content match baseline, requests stay within the passed capacity,
+and exactly three ordinary provider calls occur without a summary call.
+Focused locked test passes (`/private/tmp/i313-pressure-capacity-transitions.log`).
+This strengthens Issue390 rows1/2/3/21/27 at request execution; it does not prove
+UI model selection wiring or a hash measurement of every stable-prefix surface.
+These are test-only additions, not full T5 closure or native Windows evidence.
+Test Clippy passes (`/private/tmp/i313-expiry-pressure-clippy.log`), and both
+governance validators pass zero warnings
+(`/private/tmp/i313-expiry-pressure-{governance,claims}.log`). Independent static
+review approves code diff SHA256
+`fc0feca85c128a80cf487e950f8a16ec99e4923446e28a69f3149e92a4e8e16e`
+against `0d29471bcbbacb8be5206bd94e7597b5a82fd6c3`; reviewer read focused logs,
+without running tests. This is incremental test approval only.
