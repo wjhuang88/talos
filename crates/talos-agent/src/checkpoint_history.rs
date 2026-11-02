@@ -1570,6 +1570,58 @@ mod windows_lease_tests {
     use super::*;
 
     #[tokio::test]
+    async fn prepared_history_releases_source_before_next_durable_turn() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "live-history").expect("session");
+        session
+            .commit_turn(
+                "seed",
+                &[talos_core::message::Message::User {
+                    content: "retained original constraint".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("seed");
+        let cancel = CancellationToken::new();
+        let pending = tokio::sync::Mutex::new(None);
+        let history = History::prepare_cached(&session, &cancel, &pending)
+            .await
+            .expect("real preparation");
+        let result = history
+            .query(Some("constraint"), None, None)
+            .expect("query");
+        assert!(
+            result["results"]
+                .as_array()
+                .expect("results")
+                .iter()
+                .any(|item| item["text"]
+                    .as_str()
+                    .is_some_and(|text| text.contains("retained original constraint")))
+        );
+        assert!(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(session.file_path())
+                .is_err()
+        );
+        cancel.cancel();
+        assert!(history.query(Some("constraint"), None, None).is_none());
+        // Cancellation revokes queries; dropping the owner releases source custody.
+        drop(history);
+        assert!(pending.lock().await.is_none());
+        session
+            .commit_turn(
+                "next",
+                &[talos_core::message::Message::User {
+                    content: "normal continuation".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit after recovery owner drops");
+    }
+
+    #[tokio::test]
     async fn expired_preparation_drops_pending_lease_before_normal_persistence() {
         let root = tempfile::tempdir().expect("root");
         let session =

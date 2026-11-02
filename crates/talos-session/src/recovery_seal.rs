@@ -384,11 +384,10 @@ pub(crate) fn same_file_version(
     a: &crate::recovery_stamp::FileStamp,
     b: &crate::recovery_stamp::FileStamp,
 ) -> Result<bool, HistoryPageError> {
-    // Windows write timestamps may lag until writer handles close. Identity
-    // sampling alone cannot authorize recovery while shared writes are allowed.
-    // Keep fail-closed until a reviewed stable-handle lifetime is implemented.
-    let _ = (a, b);
-    Err(HistoryPageError::UnsupportedSource)
+    // Both stamps retain restrictive read leases minted only from validated
+    // local SourceFile handles (ADR-096). Identity/timestamps are compared while
+    // those leases exclude writers and deletion, not as standalone authority.
+    Ok(a == b)
 }
 #[cfg(not(any(unix, windows)))]
 pub(crate) fn same_file_version(

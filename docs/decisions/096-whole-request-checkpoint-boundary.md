@@ -235,6 +235,16 @@ not remote opening/I/O before the handle check. Native tests and independent
 security review remain required; this addition does not activate Windows recovery.
 Reference: [GetFinalPathNameByHandleW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew).
 
+I313 unmerged Windows activation candidate: version comparison may use equality
+only for FileStamp values constructed from typed SourceFile handles. Construction
+checks opened-handle local volume identity and retains FILE_SHARE_READ-only custody
+through every clone. Native CI on `cc05a907f` rejected leases for both retained
+mapping and view-only writable mappings, and passed writer/delete exclusion and
+replacement-identity tests. This supports testing the production candidate, not
+final activation approval. Exact-head native Actor success/cancellation/timeout,
+locality rejection, independent security review and merge gates remain mandatory.
+No test-only authorization branch may substitute for those production-path tests.
+
 ## Model terminal delivery
 
 The additive `SessionEvent::ModelCheckpointTerminal` variant reports one terminal

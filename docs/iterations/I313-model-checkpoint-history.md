@@ -2671,3 +2671,24 @@ pending. Host locked Agent test check passes
 test. Independent static review approves diff
 `07f4c7b8b61ef5b3c3d932c1078a53322786b71183ae92aaf99f99178d7b7ec1`;
 reviewer did not run native tests. No Windows activation or T5 completion claimed.
+
+### Unmerged Windows production-path candidate
+
+Windows same_file_version now compares stamps while both retain restrictive
+validated local SourceFile leases. This is a production-path candidate for native
+validation, not a cfg(test) alternate. It supersedes the earlier fail-closed code
+state only on this unmerged branch; merge/activation approval remains withheld.
+ADR-096 records the native mapping evidence and outstanding gates. A new native
+History::prepare/query/cancel/drop/next-commit regression complements the actual
+expiry and task-termination tests. Complete Actor Interrupt/Shutdown and remote
+locality coverage, Windows fork/resumption and full T5 acceptance remain open.
+Host Session suite passes 281/281 (`/private/tmp/i313-windows-candidate-session.log`)
+and Agent/Session all-target Clippy passes
+(`/private/tmp/i313-windows-candidate-clippy.log`); these do not compile or execute
+the Windows-only changes. Native exact-head verification is mandatory.
+Independent security review approves only publication of a native-validation
+candidate after standard preflight, diff
+`55c136f52cfdc38253fe5978b0410f8284907a37a04fd5aad56f51b2279871d4`
+against `8034100c7`. Review caught a Windows-only helper arity error; corrected to
+prepare_cached and strengthened query assertions to require original source text.
+Reviewer did not run tests; no merge or final activation approval was given.
