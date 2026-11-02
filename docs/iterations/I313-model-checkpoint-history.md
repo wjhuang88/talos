@@ -2419,3 +2419,43 @@ against `22985a44527c1b418b73f5801089a18d4b19664e`; reviewer read focused logs
 but did not run tests. No whole-emergency-path or full T5 approval is inferred.
 Both governance validators pass with zero warnings
 (`/private/tmp/i313-fingerprint-{governance,claims}.log`).
+
+### Two-phase automatic projection and real large-history Runtime replay
+
+Automatic checkpointing now completes a cooperative whole-prefix scan of duplicate
+call IDs and verified-tool private declarations before creating any projection.
+PreparedProjection then projects complete groups on demand; there is no second
+full projected-message Vec. Tool projections identical to immutable raw content
+borrow that content. Added private tokens and changed/owned tool projections
+retain a shared cumulative 2 MiB allocation quota; per-record 2 MiB source text,
+complete batch pairing, bounded grouping, provider-request capacity, fold count,
+output and shared-deadline checks remain. Source text no longer has a cumulative
+2 MiB rejection. Callback temporary allocations and metadata still grow; this is
+not fixed RSS, hard realtime or resumable initial Runtime I/O.
+
+New regression places a private declaration after 8300 records and verifies the
+previous first-message echo is filtered while raw history stays unchanged. Expiry
+after the first scan yield refuses preparation; the original oversized callback
+projection/token refusal tests remain. Agent automatic preparation over 4 MiB
+passes (`/private/tmp/i313-large-automatic-preparation.log`). Actual Runtime test
+commits >4 MiB, drops/reopens the durable handle, automatically folds before one
+ordinary provider dispatch, then verifies the persisted raw prefix unchanged
+(`/private/tmp/i313-large-runtime-emergency.log`). This is real Runtime reopen
+within the same process, not a separate-process test or semantic-model benchmark.
+Final Agent 645/645 and Runtime 81/81 library tests pass
+(`/private/tmp/i313-two-phase-suites.log`). Independent static privacy review
+approves four-file diff SHA256
+`ae194d11e5ca6df20219fe6afe00f6ca5d368660a3ef2f74d4815eb294655abb`
+against `955a55fd966bbf63fb2bc048e92fbc283b1fc02c`; reviewer did not run tests.
+
+Published-head Windows job125105619885 is now terminal failure. Native probe log
+`/private/tmp/i313-native-b634.log` records read-only-share lease acquisition with
+an existing writable mapping=false and HRESULT -2147024864 (sharing violation).
+The mapped-mutation field=false follows failed acquisition; it is not a successful
+lease mutation experiment. This establishes that exact mapping fixture only,
+not universal stable-source proof or Windows activation. Remaining Agent failure
+is registered checkpoint recovery unavailable; Windows implementation remains open.
+Agent/Runtime all-target warnings-denied Clippy also passes
+(`/private/tmp/i313-two-phase-clippy.log`); both governance validators pass zero
+warnings (`/private/tmp/i313-two-phase-{governance,claims}.log`). These local
+stage gates do not certify full preflight or native CI for the new code.

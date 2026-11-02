@@ -2182,6 +2182,116 @@ mod tests {
 
     use super::*;
 
+    #[tokio::test]
+    async fn reopened_large_history_automatically_compacts_before_normal_dispatch() {
+        struct EmergencyModel {
+            summaries: AtomicUsize,
+            normal: AtomicUsize,
+        }
+        #[async_trait::async_trait]
+        impl LanguageModel for EmergencyModel {
+            async fn stream(
+                &self,
+                messages: &[Message],
+            ) -> ProviderResult<tokio::sync::mpsc::Receiver<AgentEvent>> {
+                let summary = messages.first().and_then(|message| match message {
+                    Message::User { content }
+                        if content.starts_with("Produce only a JSON checkpoint") =>
+                    {
+                        Some(content)
+                    }
+                    _ => None,
+                });
+                let response = if let Some(prompt) = summary {
+                    self.summaries.fetch_add(1, Ordering::SeqCst);
+                    let sources: Vec<serde_json::Value> =
+                        serde_json::from_str(prompt.split("\nSources: ").last().expect("sources"))
+                            .expect("JSON");
+                    let item = serde_json::json!({"text":"Continue the recorded task", "sources":[sources[0]["source"]]});
+                    serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                        "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                        "facts":[],"assumptions":[],"resources":[],"open_loops":[]}).to_string()
+                } else {
+                    self.normal.fetch_add(1, Ordering::SeqCst);
+                    assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.starts_with("[Derived checkpoint;"))), "normal dispatch must use emergency checkpoint");
+                    assert!(!messages.iter().any(|message| matches!(message, Message::User { content } if content.starts_with("large old"))));
+                    "continued after emergency".into()
+                };
+                let (tx, rx) = tokio::sync::mpsc::channel(4);
+                tx.send(AgentEvent::TextDelta { delta: response })
+                    .await
+                    .expect("delta");
+                tx.send(AgentEvent::TurnEnd {
+                    stop_reason: talos_core::message::StopReason::EndTurn,
+                    usage: Default::default(),
+                })
+                .await
+                .expect("terminal");
+                Ok(rx)
+            }
+        }
+        let root = tempfile::tempdir().expect("root");
+        let durable = talos_session::DurableSession::open_or_create(root.path(), "large-emergency")
+            .expect("create");
+        let mut raw: Vec<_> = (0..20)
+            .flat_map(|i| {
+                [
+                    Message::User {
+                        content: format!("large old {i}: {}", "x".repeat(262_144)),
+                    },
+                    Message::Assistant {
+                        content: "recorded".into(),
+                        tool_calls: vec![],
+                        reasoning: None,
+                    },
+                ]
+            })
+            .collect();
+        raw.extend((0..20).map(|i| Message::User {
+            content: format!("recent {i}"),
+        }));
+        durable
+            .commit_turn("prior", &raw, &Default::default())
+            .expect("commit");
+        let path = durable.file_path().to_owned();
+        let original = std::fs::read(&path).expect("raw bytes");
+        assert!(original.len() > 4 * 1024 * 1024);
+        drop(durable);
+        let reopened = talos_session::DurableSession::open_existing(root.path(), "large-emergency")
+            .expect("lookup")
+            .expect("existing");
+        let model = Arc::new(EmergencyModel {
+            summaries: AtomicUsize::new(0),
+            normal: AtomicUsize::new(0),
+        });
+        let mut runtime = RuntimeBuilder::new()
+            .provider(model.clone())
+            .workspace_root(root.path())
+            .model_context_limit(128_000)
+            .durable_session(reopened)
+            .build()
+            .expect("reopen Runtime");
+        runtime.submit("continue").await.expect("submit");
+        let status = tokio::time::timeout(
+            Duration::from_secs(30),
+            collect_until_turn_completed(&mut runtime),
+        )
+        .await
+        .expect("deadline")
+        .expect("completion");
+        assert!(
+            matches!(status, talos_core::session::TurnCompletionStatus::Success { final_text, .. } if final_text == "continued after emergency")
+        );
+        runtime.shutdown().await.expect("shutdown");
+        assert!(model.summaries.load(Ordering::SeqCst) > 1);
+        assert_eq!(model.normal.load(Ordering::SeqCst), 1);
+        assert!(
+            std::fs::read(path)
+                .expect("final raw")
+                .starts_with(&original)
+        );
+    }
+
     fn evidence_subject() -> talos_core::evaluation::EvaluationSubject {
         talos_core::evaluation::EvaluationSubject {
             mission: talos_core::work::WorkIdentity {

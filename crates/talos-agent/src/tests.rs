@@ -6755,8 +6755,8 @@ mod edit_auto;
 mod recovery_dispatch;
 mod scheduler_auto;
 
-#[test]
-fn checkpoint_projection_excludes_arguments_reasoning_unknown_and_duplicate_provenance() {
+#[tokio::test]
+async fn checkpoint_projection_excludes_arguments_reasoning_unknown_and_duplicate_provenance() {
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(ProjectedMockTool));
     let agent = Agent::new(Arc::new(MockModel::new(vec![])), registry);
@@ -6791,15 +6791,17 @@ fn checkpoint_projection_excludes_arguments_reasoning_unknown_and_duplicate_prov
             },
         },
     ];
-    let recovered =
-        agent.checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default());
+    let recovered = agent
+        .checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default())
+        .await;
     assert!(!format!("{recovered:?}").contains("model-visible text"));
     if let Message::Tool { result } = &messages[1] {
         agent.record_checkpoint_result("projected_read", result);
     }
     let raw = messages.clone();
-    let projected =
-        agent.checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default());
+    let projected = agent
+        .checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default())
+        .await;
     let text = format!("{projected:?}");
     for excluded in [
         "PRIVATE_ARGUMENT",
@@ -6814,8 +6816,9 @@ fn checkpoint_projection_excludes_arguments_reasoning_unknown_and_duplicate_prov
     assert_eq!(messages, raw);
     // Recovered history cannot infer a tool result producer from a duplicate ID.
     let duplicate = [messages.clone(), messages].concat();
-    let projected =
-        agent.checkpoint_projection(&duplicate, &crate::transient_text::PrivateTokens::default());
+    let projected = agent
+        .checkpoint_projection(&duplicate, &crate::transient_text::PrivateTokens::default())
+        .await;
     assert!(!format!("{projected:?}").contains("model-visible text"));
 }
 
@@ -6850,16 +6853,22 @@ async fn checkpoint_receipt_from_live_observation_rejects_tampering_and_same_nam
         .await
         .expect("observe actual result");
     assert!(
-        format!("{:?}", agent.checkpoint_projection(&messages, &private))
-            .contains("model-visible verified output")
+        format!(
+            "{:?}",
+            agent.checkpoint_projection(&messages, &private).await
+        )
+        .contains("model-visible verified output")
     );
     let mut tampered = messages.clone();
     if let Message::Tool { result } = &mut tampered[1] {
         result.content.push_str(" altered");
     }
     assert!(
-        !format!("{:?}", agent.checkpoint_projection(&tampered, &private))
-            .contains("verified output")
+        !format!(
+            "{:?}",
+            agent.checkpoint_projection(&tampered, &private).await
+        )
+        .contains("verified output")
     );
     // Weak identity receipts keep allocation identity distinct without retaining
     // the original tool object after registry replacement.
@@ -6883,8 +6892,11 @@ async fn checkpoint_receipt_from_live_observation_rejects_tampering_and_same_nam
         )
     );
     assert!(
-        !format!("{:?}", agent.checkpoint_projection(&messages, &private))
-            .contains("verified output")
+        !format!(
+            "{:?}",
+            agent.checkpoint_projection(&messages, &private).await
+        )
+        .contains("verified output")
     );
 }
 

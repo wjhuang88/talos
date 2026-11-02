@@ -222,9 +222,8 @@ impl Agent {
                 "no eligible checkpoint prefix".into(),
             ));
         }
-        // Automatic summaries allocate a complete private projection. Submitted
-        // checkpoints validate references without allocating that projection, so
-        // their source limit is per record plus the shared operation deadline.
+        // Validate each source record under the shared deadline. Automatic
+        // summaries project bounded complete groups after the global privacy scan.
         // Sequential folds separately bound every provider request and output.
         let mut source_bytes = Some(0usize);
         for &index in &eligible {
@@ -265,8 +264,7 @@ impl Agent {
             })();
             source_bytes = source_bytes
                 .zip(size)
-                .and_then(|(total, size)| total.checked_add(size))
-                .filter(|&size| submitted.is_some() || size <= 2 * 1024 * 1024);
+                .and_then(|(total, size)| total.checked_add(size));
             if source_bytes.is_none() {
                 break;
             }
@@ -332,7 +330,9 @@ impl Agent {
                 .render(context_limit)
                 .map_err(|error| CompactionError::CompactionFailed(error.to_string()))?
         } else {
-            let projected = self.checkpoint_projection(&plan.messages[..split], private)?;
+            let projected = self
+                .prepare_checkpoint_projection(&plan.messages[..split], private, deadline)
+                .await?;
             let schema =
                 serde_json::to_string(&schemars::schema_for!(Checkpoint)).map_err(|_| {
                     CompactionError::CompactionFailed(
@@ -353,7 +353,7 @@ impl Agent {
                 while next < eligible.len() && text_offset == 0 {
                     tokio::task::yield_now().await;
                     check_checkpoint_deadline(deadline)?;
-                    let group_end = checkpoint_group_end(&projected, &eligible, next)?;
+                    let group_end = checkpoint_group_end(&plan.messages, &eligible, next)?;
                     // Bound repeated whole-prompt serialization during greedy packing.
                     // A complete parallel batch (at most 33 entries) stays together.
                     if !sources.is_empty() && sources.len() + group_end - next > 64 {
@@ -363,7 +363,7 @@ impl Agent {
                     for (position, &index) in eligible[next..group_end].iter().enumerate() {
                         let reference = &references[next + position];
                         sources.push(
-                            serde_json::json!({"source":reference,"message":projected[index]}),
+                            serde_json::json!({"source":reference,"message":projected.message(index, &plan.messages[index])}),
                         );
                     }
                     let prompt = checkpoint_prompt(&schema, &rendered, &sources, context_limit)?;
@@ -378,14 +378,15 @@ impl Agent {
                     // Raw and projected offsets differ after privacy filtering.
                     // Bind changed projections to the complete raw entry, and label
                     // segment offsets explicitly as projected. Never slice raw secrets.
-                    let group_end = checkpoint_group_end(&projected, &eligible, cursor)?;
+                    let group_end = checkpoint_group_end(&plan.messages, &eligible, cursor)?;
                     let batch = group_end > cursor + 1;
+                    let projected_message = projected.message(index, &plan.messages[index]);
                     let (raw, text) = if batch {
                         // Serialize only eligible projected messages, never arguments,
                         // reasoning or unverified original result payloads.
                         let group: Vec<_> = eligible[cursor..group_end]
                             .iter()
-                            .map(|&index| &projected[index])
+                            .map(|&index| projected.message(index, &plan.messages[index]))
                             .collect();
                         let serialized = serde_json::to_string(&group).map_err(|_| {
                             CompactionError::CompactionFailed(
@@ -403,7 +404,7 @@ impl Agent {
                                     "irreducible checkpoint exchange".into(),
                                 )
                             })?,
-                            segment_text(&projected[index]).ok_or_else(|| {
+                            segment_text(&projected_message).ok_or_else(|| {
                                 CompactionError::CompactionFailed(
                                     "checkpoint text offsets unavailable".into(),
                                 )
@@ -953,6 +954,53 @@ mod tests {
                 )
                 .await
         );
+    }
+
+    #[tokio::test]
+    async fn automatic_preparation_compacts_history_over_four_mib() {
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: false,
+            fail_after: None,
+        });
+        let agent = Agent::new(provider.clone(), ToolRegistry::new());
+        let mut raw: Vec<_> = (0..20)
+            .flat_map(|i| {
+                [
+                    Message::User {
+                        content: format!("old {i}: {}", "x".repeat(262_144)),
+                    },
+                    Message::Assistant {
+                        content: "recorded".into(),
+                        tool_calls: vec![],
+                        reasoning: None,
+                    },
+                ]
+            })
+            .collect();
+        raw.extend(history());
+        assert!(serde_json::to_vec(&raw).expect("bytes").len() > 4 * 1024 * 1024);
+        let items = vec![talos_core::session::SubmissionItem {
+            id: "large-restart".into(),
+            enqueue_sequence: 0,
+            kind: talos_core::session::SubmissionKind::UserTurn,
+            text: "continue from the recorded state".into(),
+            attachments: vec![],
+        }];
+        let prepared = agent
+            .prepare_session_turn(&items, raw.clone(), 128_000)
+            .await
+            .expect("large automatic preparation");
+        assert!(prepared.initial_plan.estimated_tokens <= 128_000);
+        assert!(prepared.initial_plan.messages.iter().any(|message| matches!(message, Message::Context { content } if content.starts_with("[Derived checkpoint;"))));
+        let requests = provider.requests.lock().expect("requests");
+        assert!(
+            requests.len() > 1,
+            "large history must fold across requests"
+        );
+        for request in requests.iter() {
+            assert!(agent.estimate_provider_request_tokens(request, &[]) <= 128_000);
+        }
     }
 
     #[tokio::test]
@@ -2248,6 +2296,7 @@ mod tests {
         ];
         let projected = agent
             .checkpoint_projection(&batch, &PrivateTokens::default())
+            .await
             .expect("bounded projection");
         let mut messages = batch;
         messages.extend((0..10).map(|i| Message::User {
