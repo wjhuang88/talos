@@ -310,6 +310,115 @@ fn structured_submission_rejects_unbounded_image_metadata() {
     );
 }
 
+#[cfg(windows)]
+#[tokio::test]
+async fn actor_interrupt_and_shutdown_release_recovery_source_before_persistence() {
+    struct HeldModel(Arc<tokio::sync::Notify>);
+    #[async_trait]
+    impl LanguageModel for HeldModel {
+        async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            self.0.notify_one();
+            std::future::pending().await
+        }
+    }
+    for shutdown in [false, true] {
+        let root = tempfile::tempdir().expect("root");
+        let durable = talos_session::DurableSession::open_or_create(root.path(), "actor-lease")
+            .expect("session");
+        durable
+            .commit_turn(
+                "seed",
+                &[Message::User {
+                    content: "original constraint".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("seed");
+        let ready = Arc::new(tokio::sync::Notify::new());
+        #[allow(deprecated)]
+        let mut agent = Agent::new(Arc::new(HeldModel(ready.clone())), ToolRegistry::new());
+        agent
+            .enable_model_checkpoint_tools()
+            .expect("builtin recovery tools");
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: durable.read_messages().expect("history"),
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_durable_persistence(durable.clone(), Default::default());
+        let task = tokio::spawn(async move {
+            actor.run().await;
+        });
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "continue".into(),
+            })
+            .await
+            .expect("submit");
+        tokio::time::timeout(Duration::from_secs(10), ready.notified())
+            .await
+            .expect("model reached after recovery preparation");
+        assert!(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(durable.file_path())
+                .is_err(),
+            "live recovery must retain source"
+        );
+        handle
+            .sq_tx
+            .send(if shutdown {
+                SessionOp::Shutdown
+            } else {
+                SessionOp::Interrupt
+            })
+            .await
+            .expect("stop");
+        let events = tokio::time::timeout(
+            Duration::from_secs(10),
+            collect_until_completions(&mut handle.eq_rx, 1),
+        )
+        .await
+        .expect("terminal deadline");
+        assert!(events.iter().any(|event| matches!(
+            completed_status(event),
+            Some(TurnCompletionStatus::Cancelled)
+        )));
+        assert!(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(durable.file_path())
+                .is_ok(),
+            "terminal must follow lease release"
+        );
+        if !shutdown {
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+        }
+        tokio::time::timeout(Duration::from_secs(10), task)
+            .await
+            .expect("join deadline")
+            .expect("Actor joined");
+        durable
+            .commit_turn(
+                "after-stop",
+                &[Message::User {
+                    content: "normal continuation".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit after stop");
+    }
+}
+
 #[track_caller]
 fn collect_until_completions(
     eq_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,

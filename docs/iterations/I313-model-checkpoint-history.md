@@ -2692,3 +2692,20 @@ candidate after standard preflight, diff
 against `8034100c7`. Review caught a Windows-only helper arity error; corrected to
 prepare_cached and strengthened query assertions to require original source text.
 Reviewer did not run tests; no merge or final activation approval was given.
+
+Standard host preflight on `ca13dc3f9ba3e476d2998aecb87b9184941b2c4a`
+exited 0, including both external SDK modes
+(`/private/tmp/i313-windows-production-preflight.log`). This is host evidence for
+the production-path candidate, not native Windows execution or merge approval.
+
+### Actor Interrupt/Shutdown source custody regression
+
+The next Windows regression runs an actual Actor with builtin checkpoint tools
+and durable history. A blocking model signals only after recovery preparation;
+the test confirms writer exclusion while the model is blocked, then submits
+Interrupt or Shutdown. Cancelled terminal delivery must follow lease release,
+and a later durable commit must succeed. This covers host recovery preparation
+and Actor termination, not model search admission, forced Actor abort or locality.
+Independent static review approved the prepared tests.rs SHA256
+`360cd0631316c01b5a96c16df752b2a7653cc6be7c200f0daa1403a09077790d`.
+Native execution remains pending; reviewer did not execute tests.
