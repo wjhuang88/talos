@@ -1,6 +1,45 @@
 # Iteration I313: Actor Model Checkpoints And Bounded History Recovery
 
 
+
+## Runtime coding composition — local increment, 2026-11-02
+
+The real RuntimeBuilder now has a deterministic coding-artifact regression:
+permission-gated registered repair edits a local TypeScript addition fixture,
+observes that the alternate subtraction match is absent, and commits recoverable
+tool evidence. History exceeds 8300 entries and 2 MiB. Two registered discovery /
+compact operations apply; B requires installed A, and the original tool fact is
+absent from the post-B provider projection. Runtime fork and same-process reopen
+recover the original fact through discovery/search/detail, then execute the pending
+source verification once. Parent/child raw prefixes remain unchanged. Counters
+show repair=1, verification=1, checkpoints=2, recovery calls=3.
+
+This is source-text repair/verification, not TypeScript compilation or execution;
+the alternative is verified not to match, not an executed failed patch or compiler failure. Provider
+responses remain scripted, completed repair is not registered in the continuation,
+and deployment remains an assumption. This adds Runtime composition to existing
+Actor independent-process evidence; it is not itself an independent-process test
+or full row30/model-quality certification.
+
+Initial compile missed Duration import (fixed). The first running fixture lacked
+explicit compact Write authorization and correctly failed permission admission;
+adding the fixture's Write rule allowed both Applied terminals, without bypassing
+production permission checks. Final locked focused test passed in 10.14 s
+(`/private/tmp/i313-runtime-coding-final.log`), estimates 703905→9835 and
+704484→10414. Affected all-target warnings-denied Clippy passed
+(`/private/tmp/i313-runtime-coding-clippy.log`). Independent static review approved
+the test-file hash `73af447e86d8f1dea860452c453038d92bb4dda76adaec9e21c582030158b449`,
+then requested explicit Completed(Success) rather than accepting channel EOF.
+That assertion was added and the focused regression passed again
+(`/private/tmp/i313-runtime-coding-completion.log`); no new full preflight is claimed.
+
+Acceptance audit correction: published contract9 explicitly permits legacy CLI
+storage without atomic record/receipt commit to return Unavailable. New legacy
+CLI durable receipts are not a required scope expansion; real refusal coverage
+and documentation remain required. Supported Runtime/Session tool facts must and
+do have actual recovery evidence. Windows production resumable scans, model-switch
+pressure composition, remaining 30-row gates and full closure remain outstanding.
+
 ## Research artifact and pending-work regression — local increment, 2026-11-02
 
 The existing large Actor A→B/fork/independent-process scenario now obtains its

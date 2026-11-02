@@ -1,3 +1,15 @@
+## T5 Runtime coding composition — 2026-11-02
+
+Local RuntimeBuilder fixture now repairs an actual source artifact, applies two
+registered checkpoints over long history, forks/reopens, recovers original tool
+facts and executes pending source verification. Focused locked test passed;
+Clippy and incremental review passed; reviewer-requested successful completion
+assertion also passed focused validation. This verifies source text, not compiler/model quality.
+Owner contract9 permits explicit legacy CLI Unavailable; do not expand scope into
+mandatory legacy receipts. Windows candidate b8a80873b CI41418548863 is pending;
+superseded CI41415936931 still reports in_progress after cancellation request.
+Full queue unchanged; T5 Partial and T1/T6 unimplemented.
+
 ## T5 research artifact regression — 2026-11-02
 
 Local Actor A→B/fork/restart fixture now reads a real local observation artifact,

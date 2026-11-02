@@ -1,0 +1,392 @@
+//! Deterministic Runtime composition over a real coding artifact, not model quality.
+use super::*;
+use async_trait::async_trait;
+use serde_json::{Value, json};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
+use talos_core::message::{AgentEvent, Message, StopReason};
+use talos_core::provider::{LanguageModel, ProviderResult};
+use talos_core::tool::{AgentTool, ToolNature, ToolResult};
+
+struct CodingTool {
+    path: PathBuf,
+    repair: bool,
+    calls: Arc<AtomicUsize>,
+}
+#[async_trait]
+impl AgentTool for CodingTool {
+    fn name(&self) -> &str {
+        if self.repair {
+            "repair_fixture"
+        } else {
+            "verify_fixture"
+        }
+    }
+    fn description(&self) -> &str {
+        "Operate on the local coding acceptance fixture"
+    }
+    fn parameters(&self) -> Value {
+        json!({"type":"object"})
+    }
+    fn is_read_only(&self) -> bool {
+        !self.repair
+    }
+    fn recovery_projection(&self, result: &ToolResult) -> Option<String> {
+        Some(result.content.clone())
+    }
+    async fn execute(&self, _: Value) -> ToolResult {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        let source = tokio::fs::read_to_string(&self.path).await.expect("source");
+        if self.repair {
+            assert!(
+                !source.contains("return a - b"),
+                "known failed patch must not match"
+            );
+            assert!(source.contains("return a + a"));
+            tokio::fs::write(&self.path, source.replace("return a + a", "return a + b"))
+                .await
+                .expect("repair");
+            ToolResult::success(
+                "codingfact repaired add.ts; subtraction patch did not match; pending verify addition; assumption deployment unverified",
+            )
+        } else {
+            assert_eq!(
+                source,
+                "export function add(a: number, b: number) { return a + b; }\n"
+            );
+            ToolResult::success("addition source verified; deployment remains unverified")
+        }
+    }
+}
+fn call(id: &str, name: &str, input: Value) -> Vec<AgentEvent> {
+    vec![
+        AgentEvent::ToolCall {
+            call: talos_core::message::ToolCall {
+                id: id.into(),
+                name: name.into(),
+                input,
+            },
+            provenance: talos_core::tool::ToolProvenance::Native,
+            summary_fields: vec![],
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::ToolUse,
+            usage: Default::default(),
+        },
+    ]
+}
+fn result(messages: &[Message], id: &str) -> Value {
+    let result = messages
+        .iter()
+        .rev()
+        .find_map(|message| match message {
+            Message::Tool { result } if result.tool_use_id == id => Some(result),
+            _ => None,
+        })
+        .expect("real tool result");
+    assert!(!result.is_error, "{}", result.content);
+    serde_json::from_str(&result.content).expect("JSON result")
+}
+struct CodingModel {
+    step: AtomicUsize,
+    recovering: bool,
+}
+#[async_trait]
+impl LanguageModel for CodingModel {
+    async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        let step = self.step.fetch_add(1, Ordering::SeqCst);
+        let events = if self.recovering {
+            match step {
+                0 => call("discover", "history_search", json!({"mode":"discover"})),
+                1 => call(
+                    "search",
+                    "history_search",
+                    json!({"mode":"search","snapshot":result(messages,"discover")["snapshot"],"query":"codingfact"}),
+                ),
+                2 => {
+                    let found = result(messages, "search");
+                    assert_eq!(found["results"].as_array().expect("results").len(), 1);
+                    call(
+                        "detail",
+                        "history_search",
+                        json!({"mode":"detail","snapshot":result(messages,"discover")["snapshot"],"reference":found["results"][0]["reference"]}),
+                    )
+                }
+                3 => {
+                    let detail = result(messages, "detail");
+                    assert!(
+                        detail["text"]
+                            .as_str()
+                            .expect("text")
+                            .contains("pending verify addition")
+                    );
+                    assert!(
+                        detail["text"]
+                            .as_str()
+                            .expect("text")
+                            .contains("deployment unverified")
+                    );
+                    call("verify", "verify_fixture", json!({}))
+                }
+                4 => {
+                    assert!(messages.iter().any(|message| matches!(message, Message::Tool { result } if result.tool_use_id == "verify" && !result.is_error && result.content == "addition source verified; deployment remains unverified")));
+                    vec![
+                        AgentEvent::TextDelta {
+                            delta: "verified repaired source; deployment unverified".into(),
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::EndTurn,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                _ => panic!("unexpected recovery request"),
+            }
+        } else {
+            match step {
+                0 | 2 => {
+                    if step == 2 {
+                        assert_eq!(result(messages, "compact-1")["status"], "Admitted");
+                    }
+                    call(
+                        &format!("discover-{step}"),
+                        "history_search",
+                        json!({"mode":"discover"}),
+                    )
+                }
+                1 | 3 => {
+                    if step == 3 {
+                        assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.contains("coding checkpoint A"))));
+                    }
+                    let evidence = if step == 1 {
+                        messages
+                            .iter()
+                            .find_map(|message| match message {
+                                Message::Tool { result }
+                                    if result.content.starts_with("codingfact repaired") =>
+                                {
+                                    Some(result.content.as_str())
+                                }
+                                _ => None,
+                            })
+                            .expect("original executed repair evidence")
+                    } else {
+                        messages
+                            .iter()
+                            .find_map(|message| match message {
+                                Message::Context { content }
+                                    if content.contains("coding checkpoint A") =>
+                                {
+                                    Some(content.as_str())
+                                }
+                                _ => None,
+                            })
+                            .expect("installed checkpoint evidence")
+                    };
+                    assert!(evidence.contains("subtraction patch did not match"));
+                    assert!(evidence.contains("deployment unverified"));
+                    assert!(evidence.contains("verify addition"));
+                    let discovery = result(messages, &format!("discover-{}", step - 1));
+                    let item =
+                        |text: &str| json!({"text":text,"sources":[discovery["sources"][0]]});
+                    let checkpoint = json!({"schema_version":1,"summary":item(if step==1 {"coding checkpoint A"} else {"coding checkpoint B"}),"goal":item("repair addition"),"next_step":item("verify addition"),"completed":[item("repair applied")],"open_loops":[item("subtraction patch did not match")],"assumptions":[item("deployment unverified")],"facts":[],"constraints":[],"in_progress":[],"pending":[item("verify addition")],"decisions":[],"resources":[]});
+                    call(
+                        &format!("compact-{step}"),
+                        "compact_context",
+                        json!({"snapshot":discovery["snapshot"],"checkpoint":checkpoint}),
+                    )
+                }
+                4 => {
+                    assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.contains("coding checkpoint B"))));
+                    assert!(
+                        !serde_json::to_string(messages)
+                            .expect("request")
+                            .contains("codingfact repaired")
+                    );
+                    vec![
+                        AgentEvent::TextDelta {
+                            delta: "checkpoints installed".into(),
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::EndTurn,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                _ => panic!("unexpected checkpoint request"),
+            }
+        };
+        let (tx, rx) = mpsc::channel(16);
+        for event in events {
+            tx.send(event).await.expect("receiver");
+        }
+        Ok(rx)
+    }
+}
+
+#[tokio::test]
+async fn runtime_coding_artifact_survives_two_checkpoints_and_fork_recovery() {
+    let root = tempfile::tempdir().expect("workspace");
+    let path = root.path().join("add.ts");
+    std::fs::write(
+        &path,
+        "export function add(a: number, b: number) { return a + a; }\n",
+    )
+    .expect("fixture");
+    let session =
+        DurableSession::open_or_create(&root.path().join("sessions"), "coding").expect("session");
+    let repairs = Arc::new(AtomicUsize::new(0));
+    let mut producer = RuntimeBuilder::new()
+        .provider(Arc::new(
+            talos_provider::mock::MockProvider::new()
+                .with_tool_call("repair_fixture", json!({}))
+                .with_response("repair recorded"),
+        ))
+        .workspace_root(root.path())
+        .permission_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ))
+        .tool(Arc::new(CodingTool {
+            path: path.clone(),
+            repair: true,
+            calls: repairs.clone(),
+        }))
+        .durable_session(session.clone())
+        .build()
+        .expect("producer");
+    producer.submit("repair addition").await.expect("submit");
+    assert!(matches!(
+        tokio::time::timeout(
+            Duration::from_secs(10),
+            collect_until_turn_completed(&mut producer)
+        )
+        .await
+        .expect("producer deadline")
+        .expect("completion"),
+        TurnCompletionStatus::Success { .. }
+    ));
+    producer.shutdown().await.expect("shutdown");
+    let filler: Vec<_> = (0..8300)
+        .map(|i| Message::User {
+            content: format!("prior {i} {}", "x".repeat(256)),
+        })
+        .collect();
+    session
+        .commit_turn("older-context", &filler, &Default::default())
+        .expect("filler");
+    let raw = std::fs::read(session.file_path()).expect("raw");
+    let mut runtime = RuntimeBuilder::new()
+        .provider(Arc::new(CodingModel {
+            step: AtomicUsize::new(0),
+            recovering: false,
+        }))
+        .workspace_root(root.path())
+        .model_context_limit(1_000_000)
+        .permission_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ))
+        .durable_session(session.clone())
+        .build()
+        .expect("runtime");
+    runtime
+        .submit("checkpoint work twice")
+        .await
+        .expect("submit");
+    let mut applied = 0;
+    let mut completed = false;
+    tokio::time::timeout(Duration::from_secs(40), async {
+        while let Some(event) = runtime.next_event().await {
+            match event {
+                SessionEvent::ModelCheckpointTerminal { outcome, .. } => {
+                    let talos_core::session::CompactOutcome::Applied { before, after } = outcome
+                    else {
+                        panic!("{outcome:?}")
+                    };
+                    assert!(after < before);
+                    applied += 1;
+                    println!("coding_checkpoint before={before} after={after}");
+                }
+                SessionEvent::TurnEvent {
+                    payload: talos_core::session::TurnEventPayload::Completed { status },
+                    ..
+                } => {
+                    assert!(matches!(status, TurnCompletionStatus::Success { .. }));
+                    completed = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+    })
+    .await
+    .expect("checkpoint deadline");
+    assert!(
+        completed,
+        "checkpoint stage requires successful completion, not channel EOF"
+    );
+    assert_eq!(applied, 2);
+    runtime.fork_durable("coding-child").await.expect("fork");
+    runtime.shutdown().await.expect("shutdown");
+    let child = DurableSession::open_existing(&root.path().join("sessions"), "coding-child")
+        .expect("lookup")
+        .expect("child");
+    assert!(
+        std::fs::read(child.file_path())
+            .expect("child raw")
+            .starts_with(&raw)
+    );
+    let verifies = Arc::new(AtomicUsize::new(0));
+    let recovery_model = Arc::new(CodingModel {
+        step: AtomicUsize::new(0),
+        recovering: true,
+    });
+    let child_before = std::fs::read(child.file_path()).expect("before recovery");
+    let child_path = child.file_path().to_path_buf();
+    let mut resumed = RuntimeBuilder::new()
+        .provider(recovery_model.clone())
+        .workspace_root(root.path())
+        .model_context_limit(1_000_000)
+        .tool(Arc::new(CodingTool {
+            path,
+            repair: false,
+            calls: verifies.clone(),
+        }))
+        .durable_session(child)
+        .build()
+        .expect("reopen");
+    resumed
+        .submit("recover pending work")
+        .await
+        .expect("submit");
+    let status = tokio::time::timeout(
+        Duration::from_secs(30),
+        collect_until_turn_completed(&mut resumed),
+    )
+    .await
+    .expect("recovery deadline")
+    .expect("complete");
+    assert!(
+        matches!(status,TurnCompletionStatus::Success {final_text,..} if final_text=="verified repaired source; deployment unverified")
+    );
+    resumed.shutdown().await.expect("shutdown");
+    assert_eq!(repairs.load(Ordering::SeqCst), 1);
+    assert_eq!(verifies.load(Ordering::SeqCst), 1);
+    assert_eq!(recovery_model.step.load(Ordering::SeqCst), 5);
+    assert!(
+        std::fs::read(child_path)
+            .expect("after recovery")
+            .starts_with(&child_before)
+    );
+    assert!(
+        std::fs::read(session.file_path())
+            .expect("parent")
+            .starts_with(&raw)
+    );
+    println!("coding repairs=1 verifications=1 checkpoints=2 recovery_calls=3");
+}

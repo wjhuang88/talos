@@ -6199,3 +6199,6 @@ mod owned_process_shutdown_tests {
         }
     }
 }
+
+#[cfg(all(test, any(unix, windows)))]
+mod checkpoint_coding_tests;
