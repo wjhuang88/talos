@@ -215,6 +215,14 @@ impl Config {
         ConfigStore::default_store().load_effective()
     }
 
+    fn uses_vertex_adc(&self) -> bool {
+        self.provider_protocol() == ProviderProtocol::GoogleGemini
+            && matches!(
+                self.active_provider_config().gemini,
+                Some(crate::GeminiTransportConfig::Vertex { .. })
+            )
+    }
+
     /// Returns the API key for the current provider.
     ///
     /// Resolution order:
@@ -225,7 +233,13 @@ impl Config {
     ///    This is the conventional name for keys issued by OpenAI-compatible
     ///    gateways (DashScope / Bailian / Z.ai / self-hosted). It is checked
     ///    after `OPENAI_API_KEY` so existing setups are unaffected.
+    /// Resolve the selected provider's API key. Explicit Vertex ADC returns an empty string
+    /// because its credentials are acquired later by the admitted request transport.
     pub fn api_key(&self) -> Result<String, ConfigError> {
+        // Legacy host API: Vertex uses request-owned ADC, so there is no API-key secret.
+        if self.uses_vertex_adc() {
+            return Ok(String::new());
+        }
         let provider = self.active_provider_config();
 
         if let Some(key) = provider.api_key.as_deref()
@@ -463,6 +477,9 @@ impl Config {
             if user_config.api_key_env.is_some() {
                 config.api_key_env = user_config.api_key_env.clone();
             }
+            if user_config.gemini.is_some() {
+                config.gemini = user_config.gemini.clone();
+            }
             config.tool_protocol = user_config.tool_protocol;
             config.models.extend(user_config.models.clone());
             config.timeout = user_config.timeout.clone();
@@ -504,6 +521,7 @@ impl Config {
         self.resolve_provider_endpoint()?;
         let provider = self.active_provider_config();
         if self.providers.contains_key(&self.provider)
+            && !self.uses_vertex_adc()
             && provider.api_key.is_none()
             && provider.api_key_env.is_none()
         {

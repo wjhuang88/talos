@@ -61,6 +61,7 @@ impl GeminiStream {
     }
 
     /// Native ordered parts for later identity-scoped replay; never presentation content.
+    #[cfg(test)]
     pub(crate) fn model_parts(&self) -> &[Value] {
         &self.model_parts
     }
