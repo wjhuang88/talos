@@ -2582,3 +2582,35 @@ Independent API/security re-review approves the corrected four-file diff
 reviewer read focused logs but did not run tests. Session library tests pass
 281/281 (`/private/tmp/i313-history-scan-final-suite.log`) and affected all-target
 Clippy passes (`/private/tmp/i313-history-scan-final-clippy.log`).
+
+### Cancellable Runtime history preparation
+
+RuntimeBuilder::build_cancellable now runs capture, bounded page reads/conversion
+and final source verification in blocking workers, with a child cancellation token
+whose drop guard stops further work if the future is dropped. Each page has a
+two-second cooperative budget. A private prepared snapshot avoids the second full
+read in build. Typed errors distinguish cancellation and history preparation
+failure; no Actor is created on preparation failure. Kernel reads can outlive a
+dropped future until return. Snapshot memory, synchronous clone/fork recovery and
+the existing synchronous build compatibility path remain; default caller migration
+and full startup boundedness are not delivered by this increment.
+
+Review found and corrected missing no-Tokio error handling and cancellation during
+the final synchronous build phase. Tests manually poll without Tokio and cancel
+at a controlled pre-publication gate. Cancellation observed immediately before
+Actor spawn wins; later cancellation may race successful publication. Cancelled
+and malformed-history preparations return errors. The real >4 MiB reopen/emergency
+test uses this async path on Unix; other platforms retain their original synchronous
+test path. Windows source authorization still prevents async durable preparation.
+
+Published-head host CI job125117216814 is terminal failure again in the registered
+Actor checkpoint scenario's two-second event wait (`/private/tmp/i313-host-cc05.log`).
+Previous focused/full local passes did not resolve that remote failure. Native
+Windows workspace job125117216878 remains live; mapping probe step success alone
+does not establish the lease/mutation field values or activation safety.
+Corrected Runtime library suite passes 84/84
+(`/private/tmp/i313-async-startup-final-suite.log`), with affected all-target Clippy
+pass (`/private/tmp/i313-async-startup-final-clippy.log`). Independent API/security
+review approves diff `f724735c4acb6722444014d98cd307f98db1ad71cafb3abcf65c902e1c19d017`
+against `fa5afe478`; reviewer did not run tests. No final preflight, exact-head CI
+or full T5 completion is inferred for this local increment.

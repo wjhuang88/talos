@@ -936,6 +936,14 @@ pub enum RuntimeError {
     #[error("runtime construction requires an active Tokio runtime")]
     AsyncRuntimeUnavailable,
 
+    /// Startup was cancelled before publishing a runtime handle.
+    #[error("runtime startup cancelled")]
+    StartupCancelled,
+
+    /// A bounded history recovery step failed before runtime publication.
+    #[error("runtime history recovery failed: {0}")]
+    HistoryRecovery(#[from] talos_session::history_page::HistoryPageError),
+
     /// The runtime actor task failed to join.
     #[error("runtime actor failed: {0}")]
     ActorJoin(#[from] tokio::task::JoinError),
@@ -1116,6 +1124,9 @@ pub struct RuntimeBuilder {
     sandbox_fallback_policy: SandboxFallbackPolicy,
     preset: Option<RuntimePreset>,
     initial_history: Vec<Message>,
+    prepared_history: Option<talos_session::DurableHistorySnapshot>,
+    #[cfg(test)]
+    startup_publication_gate: Option<Box<dyn FnOnce() + Send>>,
     model_context_limit: u32,
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
     auto_assistance: bool,
@@ -1189,6 +1200,9 @@ impl RuntimeBuilder {
             sandbox_fallback_policy: SandboxFallbackPolicy::Deny,
             preset: None,
             initial_history: Vec::new(),
+            prepared_history: None,
+            #[cfg(test)]
+            startup_publication_gate: None,
             model_context_limit: 128_000,
             approval_handler: None,
             auto_assistance: false,
@@ -1486,13 +1500,75 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Prepare durable history one bounded page at a time off the async executor,
+    /// then build the runtime. Dropping this future cancels pending preparation;
+    /// a kernel read already in progress can outlive the future until it returns.
+    /// Each page has a two-second cooperative deadline. No Actor or provider call
+    /// is created on preparation failure. Other construction work, including
+    /// history cloning and fork-intent recovery, still uses synchronous `build`.
+    /// Cancellation is checked again immediately before Actor creation; later
+    /// cancellation can race successful publication. Durable preparation fails
+    /// closed on platforms without enabled source-version authorization.
+    pub async fn build_cancellable(
+        mut self,
+        cancellation: tokio_util::sync::CancellationToken,
+    ) -> RuntimeResult<RuntimeHandle> {
+        tokio::runtime::Handle::try_current().map_err(|_| RuntimeError::AsyncRuntimeUnavailable)?;
+        if self.provider.is_none() {
+            return Err(RuntimeError::MissingProvider);
+        }
+        let cancellation = cancellation.child_token();
+        let _cancel_on_drop = cancellation.clone().drop_guard();
+        if cancellation.is_cancelled() {
+            return Err(RuntimeError::StartupCancelled);
+        }
+        if let Some((session, _)) = &self.durable_session {
+            let session = session.clone();
+            let mut scan =
+                tokio::task::spawn_blocking(move || session.begin_history_scan()).await??;
+            loop {
+                if cancellation.is_cancelled() {
+                    return Err(RuntimeError::StartupCancelled);
+                }
+                let stopped = cancellation.clone();
+                let (returned, result) = tokio::task::spawn_blocking(move || {
+                    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+                    let result = scan.step(deadline, || stopped.is_cancelled());
+                    (scan, result)
+                })
+                .await?;
+                scan = returned;
+                if cancellation.is_cancelled() {
+                    return Err(RuntimeError::StartupCancelled);
+                }
+                if result? {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+            self.prepared_history =
+                Some(tokio::task::spawn_blocking(move || scan.finish()).await??);
+        }
+        if cancellation.is_cancelled() {
+            return Err(RuntimeError::StartupCancelled);
+        }
+        self.build_inner(Some(cancellation))
+    }
+
     /// Builds and starts the runtime actor.
     ///
     /// The returned primary handle owns submission and event access. Dropping
     /// it initiates the non-blocking default shutdown plan; use
     /// [`RuntimeHandle::shutdown`] or [`RuntimeHandle::shutdown_with`] when the
     /// host must observe terminal cleanup.
-    pub fn build(mut self) -> RuntimeResult<RuntimeHandle> {
+    pub fn build(self) -> RuntimeResult<RuntimeHandle> {
+        self.build_inner(None)
+    }
+
+    fn build_inner(
+        mut self,
+        startup_cancellation: Option<tokio_util::sync::CancellationToken>,
+    ) -> RuntimeResult<RuntimeHandle> {
         let provider = self.provider.ok_or(RuntimeError::MissingProvider)?;
         let mut tools = self.tools;
         let mut builtin_contributions = Vec::new();
@@ -1674,11 +1750,14 @@ impl RuntimeBuilder {
                 }
             }
         }
-        let recovered_entries = self
-            .durable_session
-            .as_ref()
-            .map(|(session, _)| session.read_history_snapshot())
-            .transpose()?;
+        let recovered_entries = match self.prepared_history.take() {
+            Some(snapshot) => Some(snapshot),
+            None => self
+                .durable_session
+                .as_ref()
+                .map(|(session, _)| session.read_history_snapshot())
+                .transpose()?,
+        };
         let initial_history = if let Some(entries) = &recovered_entries {
             entries
                 .entries()
@@ -1711,6 +1790,18 @@ impl RuntimeBuilder {
             admission: admission.clone(),
         };
         let session_generation = actor.generation();
+        #[cfg(test)]
+        if let Some(gate) = self.startup_publication_gate.take() {
+            gate();
+        }
+        // Publication boundary: cancellation observed here wins over creating
+        // the Actor. Cancellation after this boundary can race successful build.
+        if startup_cancellation
+            .as_ref()
+            .is_some_and(|token| token.is_cancelled())
+        {
+            return Err(RuntimeError::StartupCancelled);
+        }
         let actor_task = runtime.spawn(async move {
             let _actor_exit_guard = actor_exit_guard;
             if let Some(entries) = recovered_entries {
@@ -2264,13 +2355,18 @@ mod tests {
             summaries: AtomicUsize::new(0),
             normal: AtomicUsize::new(0),
         });
-        let mut runtime = RuntimeBuilder::new()
+        let builder = RuntimeBuilder::new()
             .provider(model.clone())
             .workspace_root(root.path())
             .model_context_limit(128_000)
-            .durable_session(reopened)
-            .build()
+            .durable_session(reopened);
+        #[cfg(unix)]
+        let mut runtime = builder
+            .build_cancellable(tokio_util::sync::CancellationToken::new())
+            .await
             .expect("reopen Runtime");
+        #[cfg(not(unix))]
+        let mut runtime = builder.build().expect("compatibility startup");
         runtime.submit("continue").await.expect("submit");
         let status = tokio::time::timeout(
             Duration::from_secs(30),
@@ -5055,6 +5151,65 @@ mod tests {
         ));
 
         runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[test]
+    fn cancellable_startup_without_tokio_returns_typed_error() {
+        use std::future::Future;
+        let mut future = Box::pin(
+            RuntimeBuilder::new()
+                .provider(Arc::new(MockProvider::new()))
+                .build_cancellable(tokio_util::sync::CancellationToken::new()),
+        );
+        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+        assert!(matches!(
+            future.as_mut().poll(&mut context),
+            std::task::Poll::Ready(Err(RuntimeError::AsyncRuntimeUnavailable))
+        ));
+    }
+
+    #[tokio::test]
+    async fn cancellable_startup_checks_cancellation_at_actor_publication() {
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        let at_publication = cancellation.clone();
+        let mut builder = RuntimeBuilder::new().provider(Arc::new(MockProvider::new()));
+        builder.startup_publication_gate = Some(Box::new(move || at_publication.cancel()));
+        assert!(matches!(
+            builder.build_cancellable(cancellation).await,
+            Err(RuntimeError::StartupCancelled)
+        ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn cancellable_startup_refuses_cancelled_and_malformed_history() {
+        let root = tempfile::tempdir().expect("root");
+        let session =
+            DurableSession::open_or_create(root.path(), "startup-errors").expect("session");
+        let path = session.file_path().to_owned();
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        cancellation.cancel();
+        assert!(matches!(
+            RuntimeBuilder::new()
+                .provider(Arc::new(MockProvider::new()))
+                .durable_session(session.clone())
+                .build_cancellable(cancellation)
+                .await,
+            Err(RuntimeError::StartupCancelled)
+        ));
+        std::fs::write(&path, b"malformed source\n").expect("corrupt fixture");
+        assert!(matches!(
+            RuntimeBuilder::new()
+                .provider(Arc::new(MockProvider::new()))
+                .durable_session(session)
+                .build_cancellable(tokio_util::sync::CancellationToken::new())
+                .await,
+            Err(RuntimeError::HistoryRecovery(_))
+        ));
+        assert_eq!(
+            std::fs::read(path).expect("unchanged source"),
+            b"malformed source\n"
+        );
     }
 
     #[tokio::test]
