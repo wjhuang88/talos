@@ -399,6 +399,11 @@ impl BodyFormat {
     }
 }
 
+struct ExecutionOptions {
+    authorization: Option<reqwest::header::HeaderValue>,
+    status_only: bool,
+}
+
 fn encode_form(fields: &[(String, String)]) -> Result<Vec<u8>, TransportError> {
     encode_form_with_limit(fields, 16_384)
 }
@@ -658,6 +663,10 @@ impl SearchTransport {
             return Err(TransportError::InvalidRequest);
         }
         self.budget.check_live()?;
+        let options = ExecutionOptions {
+            authorization: request.authorization,
+            status_only: request.status_only,
+        };
         let result = timeout_at(
             self.budget.deadline,
             self.execute_inner(
@@ -666,8 +675,7 @@ impl SearchTransport {
                 request.body,
                 request.format,
                 request.headers,
-                request.authorization,
-                request.status_only,
+                options,
             ),
         )
         .await
@@ -707,8 +715,7 @@ impl SearchTransport {
         body: Option<Vec<u8>>,
         format: BodyFormat,
         headers: Option<compatibility::headers::CompatibilityHeaders>,
-        authorization: Option<reqwest::header::HeaderValue>,
-        status_only: bool,
+        options: ExecutionOptions,
     ) -> Result<TransportResponse, TransportError> {
         let mut redirects = 0;
         loop {
@@ -795,7 +802,7 @@ impl SearchTransport {
             if let Some(headers) = headers.as_ref() {
                 request = headers.apply(request);
             }
-            if let Some(authorization) = authorization.as_ref() {
+            if let Some(authorization) = options.authorization.as_ref() {
                 request = request.header(reqwest::header::AUTHORIZATION, authorization.clone());
             }
             if let Some(body) = body.as_ref() {
@@ -825,7 +832,7 @@ impl SearchTransport {
                 return Err(TransportError::ResponseLimit);
             }
             let status = response.status().as_u16();
-            if status_only {
+            if options.status_only {
                 return Ok(TransportResponse {
                     status,
                     body: Vec::new(),
