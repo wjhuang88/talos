@@ -35,7 +35,7 @@ archive-compress-zstd = ["dep:zstd"]
 
 [dev-dependencies]
 tempfile = "3"
-tokio = { version = "1.53.1", features = ["macros", "rt"] }
+tokio = { version = "1.53.1", features = ["macros", "rt", "sync", "time"] }
 
 [lints]
 workspace = true

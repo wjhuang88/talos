@@ -2641,3 +2641,19 @@ lease mutation experiment. Native same-byte replacement identity and retained-la
 clone exclusion tests passed. The workspace failure remains registered Actor
 checkpoint recovery unavailable. This supersedes the live-job note above; actual
 Actor lifecycle/platform activation and the full T5 gates remain outstanding.
+
+### Native task-owned lease termination regression
+
+The Windows stamp tests now move the final lease clone into a real Tokio task and
+verify write exclusion while held. Normal task return and abort followed by join
+must restore write/rename availability. A timed-out join explicitly retains
+custody until abort+join, preventing timeout from being mistaken for cancellation.
+Tokio dev features now explicitly include sync/time so this test does not depend
+on workspace feature unification. Native execution is pending; this tests the
+lease/task primitive, not the required complete Actor Interrupt/Shutdown lifecycle.
+Production Windows authorization remains closed.
+Host `cargo check --locked -p talos-session --tests` passes
+(`/private/tmp/i313-lease-task-check.log`); Windows-only code was not compiled by
+that host check. Independent static review approves two-file diff
+`88d66540856529158fbeb340a412a35e0426fe729382b6e30ae8c7e22337cbcb`
+against `f495119cd`; reviewer did not run native tests.

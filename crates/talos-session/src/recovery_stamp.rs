@@ -223,6 +223,54 @@ mod tests {
         assert!(crate::history_page::open_source(&path).is_ok());
     }
 
+    #[tokio::test]
+    async fn task_exit_releases_retained_source_lease() {
+        for finish in ["normal", "abort", "timeout"] {
+            let dir = tempfile::tempdir().expect("directory");
+            let path = dir.path().join("history.jsonl");
+            std::fs::write(&path, b"original").expect("source");
+            let source = crate::history_page::open_source(&path).expect("source lease");
+            let stamp = from_file(&source).expect("stamp");
+            drop(source);
+            let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+            let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+            let task = tokio::spawn(async move {
+                let retained = stamp.clone();
+                drop(stamp);
+                ready_tx.send(()).expect("ready");
+                let _ = release_rx.await;
+                drop(retained);
+            });
+            ready_rx.await.expect("task holds lease");
+            assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
+            match finish {
+                "normal" => {
+                    release_tx.send(()).expect("release");
+                    task.await.expect("normal exit");
+                }
+                "abort" => {
+                    task.abort();
+                    assert!(task.await.expect_err("aborted").is_cancelled());
+                }
+                _ => {
+                    let mut task = task;
+                    assert!(
+                        tokio::time::timeout(std::time::Duration::from_millis(1), &mut task)
+                            .await
+                            .is_err()
+                    );
+                    // Timing out a join does not cancel its task or release custody.
+                    assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
+                    task.abort();
+                    assert!(task.await.expect_err("joined after timeout").is_cancelled());
+                }
+            }
+            std::fs::write(&path, b"next turn").expect("writer after task exit");
+            std::fs::rename(&path, dir.path().join("released.jsonl"))
+                .expect("rename after task exit");
+        }
+    }
+
     #[test]
     fn replacing_source_after_lease_release_changes_identity() {
         let dir = tempfile::tempdir().expect("temp directory");
