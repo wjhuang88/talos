@@ -358,6 +358,23 @@ impl DurableRecoverySource {
     }
 }
 
+/// Opaque capability to remove one successfully saved scan record.
+/// Bound to its issuing durable handle; not serializable or query authority.
+#[cfg(unix)]
+pub struct RecoveryScanReceipt {
+    owner: Arc<()>,
+    payload: String,
+}
+
+/// Restored host scan and exact-record cleanup capability.
+#[cfg(unix)]
+pub struct RecoveryScanResume {
+    /// Scan requiring completion before any query authorization.
+    pub scan: crate::RecoveryPrefixScan,
+    /// Cleanup capability bound to the restoring durable handle.
+    pub receipt: RecoveryScanReceipt,
+}
+
 /// A UUID-backed durable session bound to an opaque host external ID.
 #[derive(Debug, Clone)]
 pub struct DurableSession {
@@ -368,6 +385,163 @@ pub struct DurableSession {
 }
 
 impl DurableSession {
+    /// Save completed initial-scan pages in host-owned bindings (ADR-096).
+    /// Only scans issued by this exact handle are accepted. Search-cache records
+    /// cannot be imported through this API. Unix only; other platforms reject.
+    #[cfg(unix)]
+    pub fn save_recovery_scan(
+        &self,
+        scan: &crate::RecoveryPrefixScan,
+        budget: &crate::sqlite::RecoveryWorkBudget,
+    ) -> Result<RecoveryScanReceipt, SessionError> {
+        recovery_storage_boundary(|| {
+            budget
+                .check()
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            let stored = scan
+                .stored(self)
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            let payload = serde_json::to_string(&stored)
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            if payload.len() > 4096 {
+                return Err(SessionError::DurableTurn(
+                    "scan checkpoint exceeds bound".into(),
+                ));
+            }
+            // Schema was installed when this configured handle was opened. Avoid
+            // open_bindings' initialization retries during bounded scan work.
+            let connection = Connection::open(&self.bindings_path).map_err(sql_error)?;
+            let _budget_guard = crate::sqlite::install_budget(&connection, budget)
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            connection
+                .busy_timeout(std::time::Duration::ZERO)
+                .map_err(sql_error)?;
+            let transaction = connection.unchecked_transaction().map_err(sql_error)?;
+            // The configured binding, not a serialized owner claim, grants storage scope.
+            let valid: bool = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM durable_bindings WHERE external_id=?1 AND session_id=?2)",
+            params![self.external_id, self.id().to_string()], |row| row.get(0)).map_err(sql_error)?;
+            if !valid {
+                return Err(SessionError::DurableTurn("stale durable binding".into()));
+            }
+            let previous: Option<String> = transaction.query_row(
+            "SELECT payload FROM durable_recovery_scans WHERE session_id=?1 AND length(payload)<=4096",
+            [self.id().to_string()], |row| row.get(0)).optional().map_err(sql_error)?;
+            if let Some(previous) = previous
+                && let Ok(previous) =
+                    serde_json::from_str::<crate::recovery_seal::StoredScan>(&previous)
+                && !stored.supersedes(&previous)
+            {
+                return Err(SessionError::DurableTurn("scan progress superseded".into()));
+            }
+            scan.stored(self)
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            transaction.execute("INSERT INTO durable_recovery_scans(session_id,payload) VALUES(?1,?2) ON CONFLICT(session_id) DO UPDATE SET payload=excluded.payload",
+            params![self.id().to_string(), payload]).map_err(sql_error)?;
+            scan.stored(self)
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            budget
+                .check()
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            transaction.commit().map_err(sql_error)?;
+            Ok(RecoveryScanReceipt {
+                owner: self.recovery_owner.clone(),
+                payload,
+            })
+        })
+    }
+
+    /// Restore host-owned initial scan progress for an unchanged source version.
+    /// Missing, malformed or stale records return None and require fresh scanning.
+    /// The restored scan still must complete before it can mint a prefix seal.
+    #[cfg(unix)]
+    pub fn restore_recovery_scan(
+        &self,
+        budget: &crate::sqlite::RecoveryWorkBudget,
+    ) -> Result<Option<RecoveryScanResume>, SessionError> {
+        let source = self.capture_recovery_source()?;
+        self.restore_recovery_scan_for_source(&source, budget)
+    }
+
+    /// Restore progress against the exact owner-issued source used by the caller.
+    /// This never recaptures a later cutoff between preparation and index creation.
+    #[cfg(unix)]
+    pub fn restore_recovery_scan_for_source(
+        &self,
+        source: &DurableRecoverySource,
+        budget: &crate::sqlite::RecoveryWorkBudget,
+    ) -> Result<Option<RecoveryScanResume>, SessionError> {
+        if !self.owns_recovery_source(source) {
+            return Err(SessionError::DurableTurn("foreign recovery source".into()));
+        }
+        recovery_storage_boundary(|| {
+            budget
+                .check()
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            // Schema was installed when this configured handle was opened. Avoid
+            // open_bindings' initialization retries during bounded scan work.
+            let connection = Connection::open(&self.bindings_path).map_err(sql_error)?;
+            let _budget_guard = crate::sqlite::install_budget(&connection, budget)
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            connection
+                .busy_timeout(std::time::Duration::ZERO)
+                .map_err(sql_error)?;
+            let payload: Option<String> = connection.query_row(
+            "SELECT s.payload FROM durable_recovery_scans s JOIN durable_bindings b ON b.session_id=s.session_id WHERE b.external_id=?1 AND b.session_id=?2 AND length(s.payload)<=4096",
+            params![self.external_id, self.id().to_string()], |row| row.get(0)).optional().map_err(sql_error)?;
+            let Some(payload) = payload else {
+                return Ok(None);
+            };
+            let Ok(stored) = serde_json::from_str::<crate::recovery_seal::StoredScan>(&payload)
+            else {
+                return Ok(None);
+            };
+            let result = stored
+                .restore(source.clone())
+                .ok()
+                .map(|scan| RecoveryScanResume {
+                    scan,
+                    receipt: RecoveryScanReceipt {
+                        owner: self.recovery_owner.clone(),
+                        payload,
+                    },
+                });
+            budget
+                .check()
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            Ok(result)
+        })
+    }
+
+    /// Remove only the persisted progress identified by this saved-record receipt.
+    /// A stale execution cannot erase a newer checkpoint. Returns whether deleted.
+    #[cfg(unix)]
+    pub fn clear_recovery_scan(
+        &self,
+        receipt: &RecoveryScanReceipt,
+        budget: &crate::sqlite::RecoveryWorkBudget,
+    ) -> Result<bool, SessionError> {
+        recovery_storage_boundary(|| {
+            budget
+                .check()
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            if !Arc::ptr_eq(&receipt.owner, &self.recovery_owner) {
+                return Err(SessionError::DurableTurn("foreign scan receipt".into()));
+            }
+            let connection = Connection::open(&self.bindings_path).map_err(sql_error)?;
+            let _guard = crate::sqlite::install_budget(&connection, budget)
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            let tx = connection.unchecked_transaction().map_err(sql_error)?;
+            let deleted = tx.execute("DELETE FROM durable_recovery_scans WHERE session_id=?1 AND payload=?2 AND EXISTS(SELECT 1 FROM durable_bindings WHERE external_id=?3 AND session_id=?1)",
+                params![self.id().to_string(), receipt.payload, self.external_id]).map_err(sql_error)?;
+            budget
+                .check()
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            tx.commit().map_err(sql_error)?;
+            Ok(deleted != 0)
+        })
+    }
+
     /// Lists existing host-owned durable identities without creating bindings.
     pub fn list_external_ids(root: &std::path::Path) -> Result<Vec<String>, SessionError> {
         let bindings_path = root.join("durable-bindings.sqlite");
@@ -824,6 +998,18 @@ fn transcript_entry(entry: SessionEntry) -> DurableTranscriptEntry {
     }
 }
 
+// Durable bindings currently expose one root branch per durable UUID. Reopening
+// must not mint a new branch identity; ephemeral Session::new roots are unsuitable
+// for persistent source provenance. This does not grant authority to copied handles.
+fn bind_durable_root_branch(session: &mut Session) {
+    let branch = format!("durable-root:{}", session.id);
+    if let Some(mut root) = session.branches.remove(&session.current_branch) {
+        root.root_id = branch.clone();
+        session.branches.insert(branch.clone(), root);
+    }
+    session.current_branch = branch;
+}
+
 pub(crate) fn create_or_open(
     root: &std::path::Path,
     external_id: &str,
@@ -851,13 +1037,14 @@ pub(crate) fn create_or_open(
     let session_dir = root.join("durable");
     fs::create_dir_all(&session_dir)?;
     let file_path = session_dir.join(format!("{id}.tlog"));
-    let session = Session::with_store(
+    let mut session = Session::with_store(
         id,
         "embedded".into(),
         "embedded".into(),
         file_path,
         Arc::new(crate::CompactTextSessionStore),
     );
+    bind_durable_root_branch(&mut session);
     if !session.file_path.exists() {
         session
             .store
@@ -898,13 +1085,14 @@ pub(crate) fn get_by_external_id(
     if !file_path.exists() {
         return Err(SessionError::SessionNotFound(id));
     }
-    let session = Session::with_store(
+    let mut session = Session::with_store(
         id,
         "embedded".into(),
         "embedded".into(),
         file_path,
         Arc::new(crate::CompactTextSessionStore),
     );
+    bind_durable_root_branch(&mut session);
     Ok(Some(DurableSession::new(
         external_id.to_string(),
         session,
@@ -943,7 +1131,11 @@ fn open_bindings(path: &std::path::Path) -> Result<Connection, SessionError> {
     // 5-second busy_timeout for subsequent transaction operations.
     let init_sql = "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; \
          CREATE TABLE IF NOT EXISTS durable_bindings \
-         (external_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE);";
+         (external_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE); \
+         CREATE TABLE IF NOT EXISTS durable_recovery_scans \
+         (session_id TEXT PRIMARY KEY, payload TEXT NOT NULL); \
+         CREATE TRIGGER IF NOT EXISTS durable_binding_scan_cleanup AFTER DELETE ON durable_bindings \
+         BEGIN DELETE FROM durable_recovery_scans WHERE session_id=OLD.session_id; END;";
     const MAX_INIT_RETRIES: u32 = 20;
     const RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(25);
     let mut retries = 0u32;
@@ -983,6 +1175,17 @@ fn validate_external_id(external_id: &str) -> Result<(), SessionError> {
         ));
     }
     Ok(())
+}
+
+#[cfg(unix)]
+fn recovery_storage_boundary<T>(
+    operation: impl FnOnce() -> Result<T, SessionError>,
+) -> Result<T, SessionError> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation)).unwrap_or_else(|_| {
+        Err(SessionError::DurableTurn(
+            "recovery storage operation panicked".into(),
+        ))
+    })
 }
 
 fn sql_error(error: rusqlite::Error) -> SessionError {
@@ -1144,6 +1347,49 @@ fn is_sensitive_key(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn recovery_storage_panic_rolls_back_and_binding_delete_cleans_scan() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "cleanup").expect("owner");
+        let result: Result<(), SessionError> = recovery_storage_boundary(|| {
+            let connection = open_bindings(&owner.bindings_path)?;
+            let tx = connection.unchecked_transaction().map_err(sql_error)?;
+            tx.execute(
+                "INSERT INTO durable_recovery_scans VALUES(?1,'partial')",
+                [owner.id().to_string()],
+            )
+            .map_err(sql_error)?;
+            panic!("injected storage panic before commit");
+        });
+        assert!(result.is_err());
+        let connection = open_bindings(&owner.bindings_path).expect("open");
+        let count: i64 = connection
+            .query_row("SELECT count(*) FROM durable_recovery_scans", [], |row| {
+                row.get(0)
+            })
+            .expect("count");
+        assert_eq!(count, 0, "panic unwinding must roll back partial progress");
+        connection
+            .execute(
+                "INSERT INTO durable_recovery_scans VALUES(?1,'completed')",
+                [owner.id().to_string()],
+            )
+            .expect("seed");
+        connection
+            .execute(
+                "DELETE FROM durable_bindings WHERE session_id=?1",
+                [owner.id().to_string()],
+            )
+            .expect("delete binding");
+        let count: i64 = connection
+            .query_row("SELECT count(*) FROM durable_recovery_scans", [], |row| {
+                row.get(0)
+            })
+            .expect("count after delete");
+        assert_eq!(count, 0);
+    }
+
     use super::*;
 
     #[test]

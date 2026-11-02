@@ -1645,3 +1645,140 @@ tests pass (`/private/tmp/i313-subpage-agent.log`). Independent static review
 approves the page-size/digest/lifetime increment, not persistent restart support.
 The new post-hash test uses the shared stopped-check branch rather than a wall-clock
 sleep and does not claim a hard real-time filesystem deadline.
+
+### Persistent initial-scan authority design — activation pending
+
+Independent architecture/security review approves implementation of the ADR-096
+amendment using existing host-owned durable bindings for scan provenance, separate
+from the untrusted search cache. This is a deliberate trusted-storage extension,
+not cryptographic integrity; even provenance-only host tampering is outside its
+promise. No extra user authorization or scope reduction is required. Restoration
+is not implemented or activated yet. APIs must accept only actual Session scans,
+bind configured owner/branch and opened-file version, validate page-aligned bounds,
+atomically persist bounded data with cancellation/CAS, and never bypass full scan
+completion or index verification. Windows remains fail-closed.
+
+Implemented a private serde Unix source-version value and reused it for existing
+same-file comparison without changing the compared fields. Regression covers
+roundtrip, read-only access and equal-length file replacement. This is groundwork,
+not cross-process initial-scan progress; persistence/restore and all acceptance
+regressions remain required.
+
+Persistent-scan implementation draft (uncommitted, not Actor-activated): private
+StoredScan binds version/session/branch/cutoff/completed offset/digest/expected
+prefix and Unix opened-file version. Session save accepts only an actual scan
+issued by its configured handle; bindings transaction checks the configured
+external-ID/UUID mapping and source version before/after write. Restore rejects
+malformed/out-of-range/non-page-aligned/zero-offset-invalid state and mismatched
+source versions; it returns a scan, never a ready seal. A new bindings table holds
+only bounded provenance JSON, not raw messages or search content.
+
+Locked Session check passes (`/private/tmp/i313-scan-store-check.log`). Added a
+nonzero-page save/reopen/resume regression with cross-owner save refusal and
+append invalidation; validation is running. Draft API still requires bounded
+cancellation throughout SQLite work, concurrent stale-owner CAS, lifecycle cleanup,
+independent process/tamper tests, final API/security review and Actor integration.
+Do not activate or claim persistence acceptance from this draft.
+
+Scan-store reopen failure resolved: generic Session construction minted a random
+root branch on every reopen. Durable factories now bind their single root branch
+to the persistent UUID; generic Session/fork construction is unchanged and owner
+Arc provenance remains mandatory. Nonzero-page restore passes with exact source
+version. Scan-store methods take existing RecoveryWorkBudget, use cancellation/
+progress handlers and zero busy wait, and skip initialization retries. The same
+transaction rejects regression to an older offset for the same stamped source.
+Tests cover cross-owner save refusal, cancelled save/load, old-page overwrite
+refusal, reopen from nonzero offset, completion and append invalidation.
+
+Full Session tests pass 260/260 (`/private/tmp/i313-scan-store-session.log`). This
+is still an uncommitted implementation draft: independent review is pending,
+Actor wiring, lifecycle cleanup, panic containment audit, cross-process and tamper
+matrix validation remain required. No persistent-initial-scan delivery claim.
+
+Scan-store review follow-up (still uncommitted/not Actor-activated): wrapped full
+save/restore/clear database operations in panic containment. Added exact-payload
+cleanup scoped by configured external-ID/UUID so old progress cannot delete a
+newer checkpoint, plus a bindings-delete trigger for lifecycle removal. Regression
+injects panic after transaction insert and confirms rollback; binding deletion
+removes provenance; stale cleanup preserves newer progress and exact cleanup
+removes it. ADR now records canonical durable-root migration/cache invalidation
+without transcript rewrite and distinguishes stable branch IDs from handle owner
+authority. Full Session validation running at `/private/tmp/i313-scan-cleanup-tests.log`.
+Concurrent-owner/source-version races, process restart, Actor integration and
+complete review remain required.
+
+Cleanup/panic follow-up Session suite passes 261/261. The first test compile used
+unsupported SQLite u64 count decoding; corrected to i64 and reran successfully.
+No successful result is claimed for that initial compile. Current log:
+`/private/tmp/i313-scan-cleanup-tests.log`.
+
+Scan cleanup receipt follow-up: save returns opaque RecoveryScanReceipt only after
+commit, binding owner Arc and exact serialized record. Each save includes a fresh
+record UUID, preventing an older receipt from deleting a same-offset resave.
+Clear no longer rereads or requires an unchanged source; it checks receipt owner,
+configured binding and exact stored payload. New regression covers obsolete
+same-offset receipt, foreign independently reopened handle, append-then-cleanup
+and idempotent repeat. Full Session tests pass 262/262
+(`/private/tmp/i313-scan-receipt-session.log`). Actor integration and concurrent/
+independent-process scan-store validation remain open; this remains uncommitted.
+
+### Unix initial-scan preparation wiring — local draft
+
+Restore now returns RecoveryScanResume containing the scan and an exact cleanup
+receipt bound to the restoring handle. Unix Preparation owns the durable handle,
+latest receipt and last persisted completed-byte count. Without an existing index
+continuation, begin restores valid host scan progress; persist saves only when a
+complete-page offset advances. Completion/failure/cancellation retirement uses
+the latest exact receipt. No partial scan yields History authorization.
+
+New actual host-preparation regression scans 32 chunks of a 3 MiB history, saves
+2 MiB progress, drops/reopens the owner, verifies nonzero resumed offset and cleanup
+receipt, then completes preparation, queries the last fact and verifies record
+retirement. All fourteen host-preparation tests pass
+(`/private/tmp/i313-scan-actor.log`). This fixture is same-process reopen; separate
+process initial-scan and concurrent-owner races remain required. Existing index
+continuation revalidation still uses its original full-prefix scan path and is
+not claimed to have complete persistent verification. Windows remains disabled.
+Incremental safety review requested before committing this draft.
+
+Source/abort review corrections (local): restore_recovery_scan_for_source checks
+handle provenance and uses the exact already-captured source; Preparation no longer
+mixes its cutoff with a second capture. New deterministic test captures old source,
+appends, saves newer-owner progress and verifies old-cutoff refusal, foreign-handle
+source refusal, and explicit fresh-source success. Session regression passes at
+`/private/tmp/i313-scan-source-race.log`.
+
+Unix preparation scan state now has a cancellation-aware Drop owner for its receipt;
+Actor-style token cancellation followed by task abort/await is tested for saved
+record retirement. Cleanup uses a short cooperative SQLite budget and can still
+fail on busy/error; durable guaranteed deletion is not claimed. Source/reset and
+abort changes require review. An initial compile referenced the old field name;
+corrected before rerunning host-preparation tests at
+`/private/tmp/i313-scan-drop-tests.log`.
+
+### Initial scan independent-process and owner ordering evidence
+
+The initial-scan host fixture now launches a separate exact test process after
+persisting 2 MiB and dropping the original preparation/owner. Child asserts distinct
+PID and nonzero restored offset, completes preparation, queries the last fact and
+checks record retirement. Parent requires successful exit and a child-only marker;
+30-second timeout/kill-on-drop bounds subprocess lifecycle. This passes at
+`/private/tmp/i313-initial-scan-process.log`; it supersedes the same-process-only
+limit for this initial scan scenario, not later index-prefix verification.
+
+Added two separately reopened owners on distinct threads: newer owner commits a
+complete page before releasing the older writer, whose lower-offset save must fail;
+a third owner verifies the persisted nonzero offset. This is deterministic
+interleaving, not a proof of every simultaneous busy/lock schedule. Full Session
+suite passes (`/private/tmp/i313-scan-owners-session.log`). Source-bound restore and
+cancelled-task receipt cleanup have independent incremental static approval, with
+synchronous Drop I/O and ignored cleanup errors explicitly still limited.
+
+Unix initial-scan stage converged locally: Session 264/264, Agent 630/630 and
+Session/Agent all-target warnings-denied Clippy pass. Logs:
+`/private/tmp/i313-scan-owners-session.log`, `/private/tmp/i313-scan-final-agent.log`,
+`/private/tmp/i313-scan-final-clippy.log`. Independent full-stage static review
+approves this bounded Unix initial-scan chain against `37901a322`; reviewer did
+not run tests or approve full I313/merge. Windows, index-continuation prefix
+revalidation, fork, cleanup error observability and final platform/remote gates
+remain open. These residuals are not waived by the stage approval.

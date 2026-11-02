@@ -11,6 +11,7 @@
 //! - `messages_fts` FTS5 virtual table: full-text searchable message content
 
 mod recovery;
+pub(crate) use recovery::install_budget;
 pub use recovery::{
     RecoveryBuildCursor, RecoveryBuildPage, RecoveryCandidate, RecoveryContinuation,
     RecoveryIndexSource, RecoveryReadError, RecoveryWorkBudget,

@@ -15,6 +15,92 @@ pub struct RecoveryPrefixScan {
     expected: Option<[u8; 32]>,
 }
 
+// Trusted bindings provenance only. Never deserialize this from the search index
+// or model input. Fields cannot be supplied through the public API (ADR-096).
+#[cfg(unix)]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct StoredScan {
+    save_id: uuid::Uuid,
+    version: u8,
+    session: uuid::Uuid,
+    branch: String,
+    cutoff: u64,
+    offset: u64,
+    digest: [u8; 32],
+    expected: Option<[u8; 32]>,
+    stamp: crate::recovery_stamp::StoredFileVersion,
+}
+
+#[cfg(unix)]
+impl RecoveryPrefixScan {
+    pub(crate) fn stored(
+        &self,
+        owner: &crate::DurableSession,
+    ) -> Result<StoredScan, HistoryPageError> {
+        if !owner.owns_recovery_source(&self.source) {
+            return Err(HistoryPageError::Stale);
+        }
+        self.check_stamp()?;
+        Ok(StoredScan {
+            save_id: uuid::Uuid::new_v4(),
+            version: 1,
+            session: self.source.session_id(),
+            branch: self.source.branch_id().into(),
+            cutoff: self.source.source_end(),
+            offset: self.offset,
+            digest: self.digest,
+            expected: self.expected,
+            stamp: (&self.stamp).into(),
+        })
+    }
+}
+
+#[cfg(unix)]
+impl StoredScan {
+    pub(crate) fn supersedes(&self, previous: &Self) -> bool {
+        self.stamp != previous.stamp
+            || (self.session == previous.session
+                && self.branch == previous.branch
+                && self.cutoff == previous.cutoff
+                && self.expected == previous.expected
+                && self.offset >= previous.offset)
+    }
+
+    pub(crate) fn restore(
+        self,
+        source: DurableRecoverySource,
+    ) -> Result<RecoveryPrefixScan, HistoryPageError> {
+        if self.version != 1
+            || self.session != source.session_id()
+            || self.branch != source.branch_id()
+            || self.cutoff != source.source_end()
+            || self.offset > self.cutoff
+            || (self.offset != self.cutoff
+                && !self
+                    .offset
+                    .is_multiple_of(crate::history_page::HISTORY_PAGE_BYTES as u64))
+            || (self.offset == 0 && self.digest != [0; 32])
+        {
+            return Err(HistoryPageError::Stale);
+        }
+        let stamp = source.recovery_metadata()?;
+        if crate::recovery_stamp::StoredFileVersion::from(&stamp) != self.stamp {
+            return Err(HistoryPageError::Stale);
+        }
+        let scan = RecoveryPrefixScan {
+            source,
+            stamp,
+            offset: self.offset,
+            pending_page: Vec::new(),
+            digest: self.digest,
+            expected: self.expected,
+        };
+        scan.check_stamp()?;
+        Ok(scan)
+    }
+}
+
 /// Persistable consistency expectation for one previously verified raw prefix.
 /// This is untrusted cache metadata, never branch or permission authority.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -141,6 +227,12 @@ impl RecoveryPrefixSeal {
 }
 
 impl RecoveryPrefixScan {
+    /// Number of bytes committed to complete-page scan progress.
+    /// Partial page bytes do not count and cannot authorize a query.
+    pub fn completed_bytes(&self) -> u64 {
+        self.offset
+    }
+
     /// Read at most 64 KiB, retaining at most one 2 MiB page between steps.
     /// Completed pages extend the version-one rolling digest. Verification
     /// compares the digest only at completion, never certifies a partial page.
@@ -238,14 +330,8 @@ pub(crate) fn same_file_version(
     a: &std::fs::Metadata,
     b: &std::fs::Metadata,
 ) -> Result<bool, HistoryPageError> {
-    use std::os::unix::fs::MetadataExt;
-    Ok(a.dev() == b.dev()
-        && a.ino() == b.ino()
-        && a.len() == b.len()
-        && a.mtime() == b.mtime()
-        && a.mtime_nsec() == b.mtime_nsec()
-        && a.ctime() == b.ctime()
-        && a.ctime_nsec() == b.ctime_nsec())
+    Ok(crate::recovery_stamp::StoredFileVersion::from(a)
+        == crate::recovery_stamp::StoredFileVersion::from(b))
 }
 #[cfg(windows)]
 pub(crate) fn same_file_version(
@@ -272,6 +358,321 @@ mod tests {
     use crate::{DurableSession, PersistencePolicy, TurnTranscriptOutcome};
     use std::time::Duration;
     use talos_core::message::Message;
+
+    #[test]
+    fn reopened_owners_cannot_regress_committed_scan_progress() {
+        let root = tempfile::tempdir().expect("root");
+        let first = DurableSession::open_or_create(root.path(), "owners").expect("first");
+        first
+            .commit_turn(
+                "seed",
+                &[Message::User {
+                    content: "fact ".repeat(600_000),
+                }],
+                &Default::default(),
+            )
+            .expect("seed");
+        let second = DurableSession::open_existing(root.path(), "owners")
+            .expect("open")
+            .expect("second");
+        let older = first
+            .capture_recovery_source()
+            .expect("older")
+            .begin_prefix_seal()
+            .expect("scan");
+        let mut newer = second
+            .capture_recovery_source()
+            .expect("newer")
+            .begin_prefix_seal()
+            .expect("scan");
+        for _ in 0..32 {
+            newer
+                .step(Instant::now() + Duration::from_secs(2), || false)
+                .expect("advance");
+        }
+        let (saved, wait_for_save) = std::sync::mpsc::channel();
+        let old_writer = std::thread::spawn(move || {
+            wait_for_save
+                .recv_timeout(Duration::from_secs(5))
+                .expect("new owner committed");
+            first
+                .save_recovery_scan(
+                    &older,
+                    &crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2)),
+                )
+                .is_err()
+        });
+        let new_writer = std::thread::spawn(move || {
+            second
+                .save_recovery_scan(
+                    &newer,
+                    &crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2)),
+                )
+                .expect("new owner save");
+            saved.send(()).expect("release old owner");
+        });
+        new_writer.join().expect("new writer");
+        assert!(
+            old_writer.join().expect("old writer"),
+            "old owner must not overwrite newer page"
+        );
+        let observer = DurableSession::open_existing(root.path(), "owners")
+            .expect("observer")
+            .expect("bound");
+        assert_eq!(
+            observer
+                .restore_recovery_scan(&crate::sqlite::RecoveryWorkBudget::new(
+                    Duration::from_secs(2)
+                ))
+                .expect("restore")
+                .expect("progress")
+                .scan
+                .completed_bytes(),
+            2 * 1024 * 1024
+        );
+    }
+
+    #[test]
+    fn restore_never_substitutes_new_cutoff_for_captured_source() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "capture-race").expect("owner");
+        owner
+            .commit_turn(
+                "seed",
+                &[Message::User {
+                    content: "old".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("seed");
+        let original = owner.capture_recovery_source().expect("original cutoff");
+        owner
+            .commit_turn(
+                "append",
+                &[Message::User {
+                    content: "new".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("append");
+        let concurrent = DurableSession::open_existing(root.path(), "capture-race")
+            .expect("open")
+            .expect("concurrent owner");
+        let fresh = concurrent.capture_recovery_source().expect("new cutoff");
+        assert!(fresh.source_end() > original.source_end());
+        let scan = fresh.begin_prefix_seal().expect("scan");
+        let budget = crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2));
+        concurrent
+            .save_recovery_scan(&scan, &budget)
+            .expect("new version progress");
+        assert!(
+            owner
+                .restore_recovery_scan_for_source(&original, &budget)
+                .expect("old cutoff refuses")
+                .is_none()
+        );
+        assert!(
+            owner
+                .restore_recovery_scan_for_source(&fresh, &budget)
+                .is_err(),
+            "equal session ID is not handle provenance"
+        );
+        let current = owner
+            .capture_recovery_source()
+            .expect("explicit fresh capture");
+        assert!(
+            owner
+                .restore_recovery_scan_for_source(&current, &budget)
+                .expect("matching cutoff")
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn saved_receipt_cleans_after_source_change_without_deleting_a_resave() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "receipt").expect("owner");
+        owner
+            .commit_turn(
+                "seed",
+                &[Message::User {
+                    content: "fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let scan = owner
+            .capture_recovery_source()
+            .expect("source")
+            .begin_prefix_seal()
+            .expect("scan");
+        let budget = crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2));
+        let first = owner.save_recovery_scan(&scan, &budget).expect("save");
+        let second = owner
+            .save_recovery_scan(&scan, &budget)
+            .expect("same offset resave");
+        assert!(
+            !owner
+                .clear_recovery_scan(&first, &budget)
+                .expect("obsolete receipt")
+        );
+        let foreign = DurableSession::open_existing(root.path(), "receipt")
+            .expect("open")
+            .expect("foreign handle");
+        assert!(foreign.clear_recovery_scan(&second, &budget).is_err());
+        owner
+            .commit_turn(
+                "later",
+                &[Message::User {
+                    content: "new suffix".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("append");
+        assert!(
+            owner
+                .clear_recovery_scan(&second, &budget)
+                .expect("cleanup after source changed")
+        );
+        assert!(
+            !owner
+                .clear_recovery_scan(&second, &budget)
+                .expect("cleanup idempotent")
+        );
+    }
+
+    #[test]
+    fn trusted_scan_store_resumes_completed_pages_and_refuses_changed_source() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "scan-store").expect("owner");
+        session
+            .commit_turn(
+                "seed",
+                &[Message::User {
+                    content: "fact ".repeat(600_000),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let mut scan = session
+            .capture_recovery_source()
+            .expect("source")
+            .begin_prefix_seal()
+            .expect("scan");
+        let old_scan = session
+            .capture_recovery_source()
+            .expect("old source")
+            .begin_prefix_seal()
+            .expect("old scan");
+        let old_receipt = session
+            .save_recovery_scan(
+                &old_scan,
+                &crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2)),
+            )
+            .expect("old checkpoint");
+        for _ in 0..32 {
+            assert!(
+                !scan
+                    .step(Instant::now() + Duration::from_secs(2), || false)
+                    .expect("page chunk")
+            );
+        }
+        assert_eq!(scan.offset, crate::history_page::HISTORY_PAGE_BYTES as u64);
+        let receipt = session
+            .save_recovery_scan(
+                &scan,
+                &crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2)),
+            )
+            .expect("save actual scan");
+        assert!(
+            session
+                .save_recovery_scan(
+                    &old_scan,
+                    &crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2))
+                )
+                .is_err(),
+            "older progress must not overwrite the committed page"
+        );
+        let budget = crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2));
+        assert!(
+            !session
+                .clear_recovery_scan(&old_receipt, &budget)
+                .expect("stale cleanup")
+        );
+        assert!(
+            session
+                .restore_recovery_scan(&budget)
+                .expect("preserved newer")
+                .is_some()
+        );
+        assert!(
+            session
+                .clear_recovery_scan(&receipt, &budget)
+                .expect("exact cleanup")
+        );
+        assert!(
+            session
+                .restore_recovery_scan(&budget)
+                .expect("removed")
+                .is_none()
+        );
+        session
+            .save_recovery_scan(&scan, &budget)
+            .expect("save for reopen");
+        let stopped = crate::sqlite::RecoveryWorkBudget::with_cancellation_check(
+            Duration::from_secs(2),
+            || true,
+        );
+        assert!(session.save_recovery_scan(&scan, &stopped).is_err());
+        assert!(session.restore_recovery_scan(&stopped).is_err());
+        let other = DurableSession::open_or_create(root.path(), "other").expect("other");
+        assert!(
+            other
+                .save_recovery_scan(
+                    &scan,
+                    &crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2))
+                )
+                .is_err()
+        );
+        drop(scan);
+        drop(session);
+        let reopened = DurableSession::open_existing(root.path(), "scan-store")
+            .expect("reopen")
+            .expect("owner");
+        let mut restored = reopened
+            .restore_recovery_scan(&crate::sqlite::RecoveryWorkBudget::new(
+                Duration::from_secs(2),
+            ))
+            .expect("restore")
+            .expect("saved progress")
+            .scan;
+        assert_eq!(
+            restored.offset,
+            crate::history_page::HISTORY_PAGE_BYTES as u64
+        );
+        while !restored
+            .step(Instant::now() + Duration::from_secs(2), || false)
+            .expect("continue")
+        {}
+        restored.finish().expect("complete seal");
+        reopened
+            .commit_turn(
+                "append",
+                &[Message::User {
+                    content: "later".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("append");
+        assert!(
+            reopened
+                .restore_recovery_scan(&crate::sqlite::RecoveryWorkBudget::new(
+                    Duration::from_secs(2)
+                ))
+                .expect("stale check")
+                .is_none()
+        );
+    }
 
     #[test]
     fn interruption_after_full_page_hash_retries_without_duplicating_bytes() {

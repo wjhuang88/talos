@@ -73,7 +73,7 @@ impl RecoveryWorkBudget {
         }
         false
     }
-    fn check(&self) -> Result<(), IndexError> {
+    pub(crate) fn check(&self) -> Result<(), IndexError> {
         if self.stopped() {
             Err(IndexError::Store(IndexStoreError::Database(
                 "recovery work stopped".into(),
@@ -84,7 +84,7 @@ impl RecoveryWorkBudget {
     }
 }
 
-struct ProgressGuard<'a>(&'a rusqlite::Connection, Duration);
+pub(crate) struct ProgressGuard<'a>(&'a rusqlite::Connection, Duration);
 impl Drop for ProgressGuard<'_> {
     fn drop(&mut self) {
         let _ = self.0.progress_handler(0, None::<fn() -> bool>);
@@ -92,7 +92,7 @@ impl Drop for ProgressGuard<'_> {
     }
 }
 
-fn install_budget<'a>(
+pub(crate) fn install_budget<'a>(
     conn: &'a rusqlite::Connection,
     budget: &RecoveryWorkBudget,
 ) -> Result<ProgressGuard<'a>, IndexError> {

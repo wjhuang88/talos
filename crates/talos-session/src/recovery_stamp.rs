@@ -132,3 +132,65 @@ mod tests {
         assert!(crate::history_page::open_source(&path).is_ok());
     }
 }
+
+/// Private source-version representation for host-owned scan checkpoints.
+/// Equality is only version evidence; loading this value does not authorize reads.
+#[cfg(unix)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct StoredFileVersion {
+    device: u64,
+    inode: u64,
+    size: u64,
+    modified: i64,
+    modified_ns: i64,
+    changed: i64,
+    changed_ns: i64,
+}
+
+#[cfg(unix)]
+impl From<&FileStamp> for StoredFileVersion {
+    fn from(stamp: &FileStamp) -> Self {
+        use std::os::unix::fs::MetadataExt;
+        Self {
+            device: stamp.dev(),
+            inode: stamp.ino(),
+            size: stamp.len(),
+            modified: stamp.mtime(),
+            modified_ns: stamp.mtime_nsec(),
+            changed: stamp.ctime(),
+            changed_ns: stamp.ctime_nsec(),
+        }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod stored_version_tests {
+    use super::*;
+
+    #[test]
+    fn roundtrip_preserves_identity_and_rejects_equal_length_replacement() {
+        let dir = tempfile::tempdir().expect("root");
+        let path = dir.path().join("source");
+        std::fs::write(&path, b"original").expect("source");
+        let file = crate::history_page::open_source(&path).expect("open");
+        let original = StoredFileVersion::from(&from_file(&file).expect("stamp"));
+        let encoded = serde_json::to_vec(&original).expect("encode");
+        let decoded: StoredFileVersion = serde_json::from_slice(&encoded).expect("decode");
+        assert_eq!(original, decoded);
+        // Reads may change access time, which is deliberately not version authority.
+        assert_eq!(std::fs::read(&path).expect("read"), b"original");
+        assert_eq!(
+            decoded,
+            StoredFileVersion::from(&from_file(&file).expect("read stamp"))
+        );
+        let replacement = dir.path().join("replacement");
+        std::fs::write(&replacement, b"original").expect("replacement");
+        std::fs::rename(&replacement, &path).expect("replace");
+        let fresh = crate::history_page::open_source(&path).expect("new handle");
+        assert_ne!(
+            decoded,
+            StoredFileVersion::from(&from_file(&fresh).expect("new stamp"))
+        );
+    }
+}

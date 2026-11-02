@@ -611,3 +611,13 @@ pending manual `Compact` command or a whole turn. The event contains only
 `CompactOutcome` metadata; it is not a raw transcript entry. Existing consumers of
 the non-exhaustive SessionEvent enum may ignore the additive event; status-aware
 hosts should handle it and discard stale-generation events.
+
+Unix host preparation can resume initial history verification from completed
+pages saved in the existing trusted durable-bindings store. The disposable search
+index cannot supply this provenance. Changed source versions require verification
+again; this is not protection against modification of the trusted host database.
+`DurableSession` root branch IDs are now stable for a durable UUID; discard cached
+random root IDs from earlier opens, while retaining original transcript/entry IDs.
+The opaque scan receipt permits exact-record cleanup only for its issuing handle;
+it does not authorize history queries. Windows and full index-prefix revalidation
+continuation remain subject to the incomplete I313 platform/acceptance gates.

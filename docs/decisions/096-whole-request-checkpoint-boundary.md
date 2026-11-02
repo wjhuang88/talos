@@ -233,3 +233,48 @@ SessionEvent consumers may ignore the new event; clients wanting model status
 must handle it, without treating it as a manual command or whole-turn completion.
 CLI inline/TUI display content-free outcome metadata. Dynamic provider receipt
 consumption remains separate and does not synthesize raw transcript messages.
+
+## Initial-scan restart authority (I313, approved design; activation pending)
+
+Untrusted search-index continuation metadata cannot certify bytes read by an
+exited process. Persist only completed-page scan checkpoints in the existing
+host-owned durable bindings database, separate from the disposable search index.
+This deliberately extends that database's existing session-identity authority to
+host scan provenance; it is not a new raw-history/projection store. No cached
+search row or model input may mint or import this authority.
+
+A checkpoint binds the configured durable session UUID/external identity, branch,
+fixed cutoff, completed-page offset/digest, format version, and opened-file
+identity/version. Session alone exports it after pre/post source checks and saves
+it atomically under the existing storage boundary. Restore checks exact configured
+owner and source version before using the offset. Changed versions (including
+append) rebuild/revalidate; length growth alone cannot prove prefix preservation.
+Missing/corrupt/unknown checkpoints fall back to fresh bounded scanning. Never
+publish query authority before the entire captured prefix completes. Clear state
+on cancellation/retirement and use bounded, cancellation-aware SQLite operations.
+
+Threat boundary: the host-owned bindings database already determines durable
+session identities and is itself trusted storage. There is no cryptographic
+integrity guarantee against a host modifying provenance rows alone, bindings,
+or source files; arbitrary host tampering is outside this boundary. It must reject tampering
+in the separate untrusted search cache and cross-owner/branch substitution.
+If bindings storage cannot be treated as host authority by the security review,
+use a separately protected integrity mechanism instead; do not activate restoration.
+Initial support requires reliable Unix device/inode/size/mtime/ctime matching.
+Windows remains fail-closed pending its separate source-version semantics review.
+
+Required proof: nonzero-offset continuation across independent processes with
+bounded work, exact digest equivalence, source replacement/mutation/append refusal,
+wrong owner/branch/version/offset rejection, cancelled writes and transaction crash
+consistency, plus no authority from index-only forged progress. This proposal is
+not implementation or acceptance evidence and does not close I313.
+
+Durable root identity migration: the two durable factories now derive their
+single root branch identity from the existing durable UUID. Earlier random
+in-memory root IDs are not stable across opens and any cached provenance carrying
+one is rejected/rebuilt. Raw transcript bytes and entry IDs are not rewritten.
+This changes the observable durable branch ID; consumers must discard old branch
+caches in the next-minor migration. Canonical branch identity is not owner
+authority: an independently opened or copied handle still cannot export another
+handle's scan, and restoring requires configured host bindings and source version.
+Generic Session branch/fork constructors retain their existing behavior.

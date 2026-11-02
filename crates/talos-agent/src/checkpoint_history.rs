@@ -58,6 +58,8 @@ impl QueryState {
 
 /// Host-owned progress; no partial state authorizes query results.
 pub(crate) struct Preparation {
+    #[cfg(unix)]
+    scan_store: ScanStore,
     source: talos_session::DurableRecoverySource,
     scan: Option<talos_session::RecoveryPrefixScan>,
     seal: Option<RecoveryPrefixSeal>,
@@ -68,6 +70,35 @@ pub(crate) struct Preparation {
     #[cfg(test)]
     after_page_read: Option<Box<dyn FnOnce() + Send>>,
 }
+#[cfg(unix)]
+struct ScanStore {
+    owner: DurableSession,
+    receipt: Option<talos_session::RecoveryScanReceipt>,
+    saved_bytes: u64,
+    cancel: CancellationToken,
+}
+#[cfg(unix)]
+impl ScanStore {
+    fn clear(&self) {
+        if let Some(receipt) = &self.receipt {
+            let _ = self.owner.clear_recovery_scan(
+                receipt,
+                &RecoveryWorkBudget::new(Duration::from_millis(100)),
+            );
+        }
+    }
+}
+#[cfg(unix)]
+impl Drop for ScanStore {
+    fn drop(&mut self) {
+        // Actor interruption aborts the turn task after cancelling its token.
+        // No async finalizer can be awaited from that dropped future.
+        if self.cancel.is_cancelled() {
+            self.clear();
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum PreparationStep {
     Pending,
@@ -109,6 +140,13 @@ impl Preparation {
                 })
         {
             return Some(Self {
+                #[cfg(unix)]
+                scan_store: ScanStore {
+                    owner: session.clone(),
+                    receipt: None,
+                    saved_bytes: 0,
+                    cancel: cancel.clone(),
+                },
                 source,
                 scan: Some(scan),
                 seal: None,
@@ -120,6 +158,19 @@ impl Preparation {
                 after_page_read: None,
             });
         }
+        #[cfg(unix)]
+        let restored = session
+            .restore_recovery_scan_for_source(&source, &budget)
+            .ok()
+            .flatten();
+        #[cfg(unix)]
+        let (scan, scan_receipt, saved_scan_bytes) = match restored {
+            Some(restored) => {
+                let offset = restored.scan.completed_bytes();
+                (restored.scan, Some(restored.receipt), offset)
+            }
+            None => (scan, None, 0),
+        };
         let scope = uuid::Uuid::new_v4().to_string();
         index
             .replace_recovery_owner_scope(&session.id().to_string(), &scope, &budget)
@@ -128,6 +179,13 @@ impl Preparation {
             .begin_recovery_build(&scope, source.source_end(), &budget)
             .ok()?;
         Some(Self {
+            #[cfg(unix)]
+            scan_store: ScanStore {
+                owner: session.clone(),
+                receipt: scan_receipt,
+                saved_bytes: saved_scan_bytes,
+                cancel: cancel.clone(),
+            },
             source,
             scan: Some(scan),
             seal: None,
@@ -139,10 +197,27 @@ impl Preparation {
             after_page_read: None,
         })
     }
-    fn persist(&self, cancel: &CancellationToken, deadline: Instant) -> Option<()> {
+    fn persist(&mut self, cancel: &CancellationToken, deadline: Instant) -> Option<()> {
         // During revalidation retain the previous checkpoint; no new index page
         // can commit until the scan finishes and installs the refreshed seal.
-        if self.scan.is_some() {
+        if let Some(scan) = &self.scan {
+            #[cfg(not(unix))]
+            let _ = scan;
+            #[cfg(unix)]
+            if scan.completed_bytes() > self.scan_store.saved_bytes {
+                let stopped = cancel.clone();
+                let budget = RecoveryWorkBudget::with_cancellation_check(
+                    deadline.saturating_duration_since(Instant::now()),
+                    move || stopped.is_cancelled(),
+                );
+                self.scan_store.receipt = Some(
+                    self.scan_store
+                        .owner
+                        .save_recovery_scan(scan, &budget)
+                        .ok()?,
+                );
+                self.scan_store.saved_bytes = scan.completed_bytes();
+            }
             return Some(());
         }
         let Some(seal) = &self.seal else {
@@ -173,6 +248,13 @@ impl Preparation {
         Some(())
     }
     fn retire(&self) {
+        #[cfg(unix)]
+        if let Some(receipt) = &self.scan_store.receipt {
+            let _ = self
+                .scan_store
+                .owner
+                .clear_recovery_scan(receipt, &RecoveryWorkBudget::new(Duration::from_secs(1)));
+        }
         if let Ok(index) = SessionIndex::new(&self.path) {
             let _ = index.clear_recovery_continuation(
                 &self.scope,
@@ -564,6 +646,134 @@ impl History {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn cancelled_preparation_task_abort_retires_saved_record() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "abort-scan").expect("owner");
+        session
+            .commit_turn(
+                "seed",
+                &[talos_core::message::Message::User {
+                    content: "fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let cancel = CancellationToken::new();
+        let mut work =
+            Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(2))
+                .expect("begin");
+        work.scan_store.receipt = Some(
+            session
+                .save_recovery_scan(
+                    work.scan.as_ref().expect("scan"),
+                    &RecoveryWorkBudget::new(Duration::from_secs(2)),
+                )
+                .expect("save"),
+        );
+        let (ready, reached) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            let _owned = work;
+            ready.send(()).expect("ready");
+            std::future::pending::<()>().await;
+        });
+        reached.await.expect("task owns preparation");
+        cancel.cancel();
+        task.abort();
+        assert!(task.await.expect_err("aborted").is_cancelled());
+        assert!(
+            session
+                .restore_recovery_scan(&RecoveryWorkBudget::new(Duration::from_secs(2)))
+                .expect("check cleanup")
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn initial_scan_reopens_from_persisted_page_and_retires_record() {
+        if let Some(root) = std::env::var_os("TALOS_TEST_INITIAL_SCAN_ROOT") {
+            let root = std::path::PathBuf::from(root);
+            let parent: u32 = std::env::var("TALOS_TEST_INITIAL_SCAN_PARENT")
+                .expect("parent")
+                .parse()
+                .expect("pid");
+            assert_ne!(parent, std::process::id());
+            let cancel = CancellationToken::new();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            let reopened = DurableSession::open_existing(&root, "initial-scan")
+                .expect("open")
+                .expect("owner");
+            let restored = Preparation::begin(&reopened, &cancel, deadline).expect("restore");
+            assert_eq!(
+                restored.scan.as_ref().expect("scan").completed_bytes(),
+                2 * 1024 * 1024
+            );
+            assert!(
+                restored.scan_store.receipt.is_some(),
+                "restore carries exact cleanup authority"
+            );
+            let pending = tokio::sync::Mutex::new(Some(restored));
+            let history = History::prepare_cached(&reopened, &cancel, &pending)
+                .await
+                .expect("finish");
+            assert!(
+                !history.query(Some("29"), None, None).expect("query")["results"]
+                    .as_array()
+                    .expect("array")
+                    .is_empty()
+            );
+            assert!(
+                reopened
+                    .restore_recovery_scan(&RecoveryWorkBudget::new(Duration::from_secs(2)))
+                    .expect("retired")
+                    .is_none()
+            );
+            println!("INITIAL_SCAN_RESUMED_NONZERO");
+            return;
+        }
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "initial-scan").expect("owner");
+        let raw: Vec<_> = (0..30)
+            .map(|i| talos_core::message::Message::User {
+                content: format!("initialscan fact {i} {}", "x".repeat(100_000)),
+            })
+            .collect();
+        session
+            .commit_turn("seed", &raw, &Default::default())
+            .expect("commit");
+        let cancel = CancellationToken::new();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut work = Preparation::begin(&session, &cancel, deadline).expect("begin");
+        for _ in 0..32 {
+            assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+            work.persist(&cancel, deadline).expect("bounded persist");
+        }
+        assert_eq!(work.scan_store.saved_bytes, 2 * 1024 * 1024);
+        assert!(
+            work.seal.is_none(),
+            "partial scan does not authorize results"
+        );
+        drop(work);
+        drop(session);
+        let mut command =
+            tokio::process::Command::new(std::env::current_exe().expect("test binary"));
+        command.args(["--exact", "checkpoint_history::tests::initial_scan_reopens_from_persisted_page_and_retires_record", "--nocapture"])
+            .env("TALOS_TEST_INITIAL_SCAN_ROOT", root.path())
+            .env("TALOS_TEST_INITIAL_SCAN_PARENT", std::process::id().to_string())
+            .kill_on_drop(true);
+        let output = tokio::time::timeout(Duration::from_secs(30), command.output())
+            .await
+            .expect("child deadline")
+            .expect("child launch");
+        assert!(
+            output.status.success(),
+            "child failed: {} {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("INITIAL_SCAN_RESUMED_NONZERO"));
+    }
+
     #[tokio::test]
     async fn invalid_persisted_version_rebuilds_and_cutoff_mismatch_is_not_saved() {
         let root = tempfile::tempdir().expect("root");
