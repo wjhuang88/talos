@@ -34,7 +34,8 @@ Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是
 
 未发布的 CLI 启动历史恢复已在 TUI、交互和 inline 模式接入可取消分页。
 读取失败会停止启动，不再静默使用空历史。超大单条记录、损坏或不支持的来源
-会返回错误，原始历史文件保留。参见[启动兼容性边界](docs/reference/RUNTIME-SDK-CONTRACT.md#cli-startup-history-restoration-i313-candidate)。
+会返回错误，原始历史文件保留。`/resume` 和模型切换也使用分页恢复，恢复失败保留当前会话；
+CLI fork 仍使用全文件复制。参见[启动兼容性边界](docs/reference/RUNTIME-SDK-CONTRACT.md#cli-startup-history-restoration-i313-candidate)。
 
 ## 当前 Release 边界
 

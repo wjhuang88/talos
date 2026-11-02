@@ -1391,7 +1391,7 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             .insert("target-model".to_string(), Default::default());
         config.save().expect("persist runtime baseline");
 
-        let (ui_tx, _ui_rx) = mpsc::unbounded_channel::<UiOutput>();
+        let (ui_tx, mut ui_rx) = mpsc::unbounded_channel::<UiOutput>();
         let hooks = Arc::new(HookRegistry::new());
         let session_manager =
             talos_session::SessionManager::with_dir(workspace.path().join("sessions"));
@@ -1455,7 +1455,15 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
         .await
         .expect("production-equivalent model switch must not hang");
 
-        let new_config = model_result.expect("model switch to mock must succeed");
+        let new_config = model_result.unwrap_or_else(|| {
+            let mut errors = Vec::new();
+            while let Ok(output) = ui_rx.try_recv() {
+                if let UiOutput::Content(ContentOutput::Block { text, .. }) = output {
+                    errors.push(text);
+                }
+            }
+            panic!("model switch to mock must succeed: {errors:?}");
+        });
         let bridge_update_ok = bridge_rx.try_recv().is_ok();
         let bridge_second_err = bridge_rx.try_recv().is_err();
 

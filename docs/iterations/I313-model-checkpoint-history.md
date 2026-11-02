@@ -1,5 +1,53 @@
 # Iteration I313: Actor Model Checkpoints And Bounded History Recovery
 
+## Lifecycle paging local increment — 2026-11-02
+
+Uncommitted increment after `0b454998a`: `/resume` and model activation use one
+paged snapshot for messages and last decoded entry. Restore errors preserve their
+cause; no search authority is inferred. The tail excludes invalid JSONL and
+incomplete TLOG suffixes. CLI fork remains full-file copy and is not migrated.
+
+Local model lifecycle tests pass 32/32, including cancellation at the three
+snapshot-entry awaits, old-route revocation and exact-marker retry. A real resume
+handler regression passes for oversized history while retaining original Session,
+generation, watches and command admission. Cross-page tail/suffix regression passes.
+Affected all-target Clippy passes (`/private/tmp/i313-lifecycle-paging-clippy.log`).
+Independent static reviewer approved four-file diff SHA256
+`b5ff9d40a1bcce4ee9d7770c973275f6675e5039af57aaa822727191da090622`
+for this local increment only; reviewer ran no builds. Cancellation gates prove
+transition interruption semantics, not immediate release during blocked kernel I/O.
+Full affected tests, standard preflight, native Windows validation and final merge
+remain pending. T5 remains Partial; T1/T6 remain unimplemented.
+
+Follow-up: affected CLI/Session suites passed 388/388 and 292/292 after fixing
+zero-byte TLOG restoration and first-append header initialization. Historical
+headerless TLOG compatibility was then added only to host message restoration;
+its focused test passed, with unchanged-file and strict-authority rejection checks.
+Latest all-target Clippy passed (`/private/tmp/i313-lifecycle-final-clippy.log`).
+Independent source review approved diff SHA256
+`76acc890ea247f5410c1ccaf126275efc75d6209b8f389d2dda73be89a3f22ca`.
+Standard preflight is running at `/private/tmp/i313-lifecycle-preflight.log`;
+no pass is claimed. Published-head CI `41409161521` host job failed during
+Chinese TUI resume (PTY closed); Windows workspace was still running when checked.
+The local compatibility fix requires real TUI revalidation before attributing
+that remote failure to the same cause.
+
+Final local lifecycle gate: standard preflight exited 0, including both external
+Runtime SDK modes (`/private/tmp/i313-lifecycle-preflight.log`). The rebuilt CLI
+passed the real TUI locale fixture for Chinese, English and Japanese initial,
+resumed and rotated sessions (`/private/tmp/i313-lifecycle-tui.log`, captures in
+`/private/tmp/i313-lifecycle-tui-captures`). Both governance validators passed
+with zero warnings. These gates cover the lifecycle production changes.
+
+The old published Windows workspace job also failed: the checkpoint restart
+child hit the ordinary two-second idle test helper before its ten-second total
+deadline. A separate test-only fix retains that outer ten-second budget and uses
+the same idle allowance; all semantic assertions and the child-process total
+deadline remain. Independent review approved single-file diff SHA256
+`f0e7b17dbb9ef75d4db24d87b615b7484dc4fd8de128d1eaaeff5f360776027e`.
+The completed preflight used the prior Agent test artifact, so the new test needs
+separate verification; native Windows exact-head evidence remains outstanding.
+
 > Document status: Review / Partial (#819 merged; stable stage candidate, full implementation remains unmerged)
 > Published plan date: 2026-11-01
 > Baseline rule: preserve all T5 and Issue #390 acceptance; preparation is not implementation.

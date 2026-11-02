@@ -403,8 +403,9 @@ pub(crate) async fn handle_session_resume(
         send_stream(ui_tx, MessageSource::Error, text);
         return None;
     }
-    let resume_history = match target_session.read_messages() {
-        Ok(h) => h,
+    let resume_history = match crate::history_restore::read_session_snapshot(&target_session).await
+    {
+        Ok((history, _)) => history,
         Err(e) => {
             let text = format!("[Error] Failed to read session history: {e}\n");
             send_stream(ui_tx, MessageSource::Error, text);
@@ -755,6 +756,90 @@ pub(crate) async fn handle_session_fork(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use talos_core::message::Message;
+
+    #[tokio::test]
+    async fn resume_oversized_history_keeps_original_session_and_command_route() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let workspace = canonical_workspace_root(root.path());
+        let original = manager
+            .create_session("original", &workspace)
+            .expect("original");
+        let target = manager
+            .create_session("target", &workspace)
+            .expect("target");
+        target
+            .append(&Message::User {
+                content: "x".repeat(2 * 1024 * 1024 + 1),
+            })
+            .expect("oversized record");
+        let (raw_tx, mut raw_rx) = mpsc::channel(4);
+        let owner = SessionTransition::new(raw_tx.clone(), original.clone()).expect("owner");
+        let route = owner.bind_active_sender();
+        let generation = owner.active_generation();
+        let transition = Arc::new(Mutex::new(owner));
+        let (ui_tx, mut ui_rx) = mpsc::unbounded_channel();
+        let (session_tx, session_rx) = watch::channel(original.clone());
+        let (route_tx, route_rx) = watch::channel(raw_tx);
+        let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel();
+        let builder = TuiRuntimeBuilder::new(
+            build_hook_registry(true),
+            root.path().to_path_buf(),
+            manager.clone(),
+            Arc::new(TuiApprovalHandler::new(
+                ui_tx.clone(),
+                root.path().to_path_buf(),
+            )),
+            Vec::new(),
+            false,
+            true,
+        );
+        let result = handle_session_resume(
+            &transition,
+            &ui_tx,
+            &Config::default(),
+            &builder,
+            &manager,
+            &session_tx,
+            &route_tx,
+            &bridge_tx,
+            Some(target.id.to_string()),
+        )
+        .await;
+        assert!(result.is_none());
+        assert_eq!(transition.lock().await.active_session().id, original.id);
+        assert_eq!(transition.lock().await.active_generation(), generation);
+        assert_eq!(session_rx.borrow().id, original.id);
+        assert!(!session_rx.has_changed().expect("session watch"));
+        assert!(!route_rx.has_changed().expect("route watch"));
+        assert!(bridge_rx.try_recv().is_err());
+        let mut outputs = Vec::new();
+        while let Ok(output) = ui_rx.try_recv() {
+            if let UiOutput::Content(ContentOutput::Block { text, .. }) = output {
+                outputs.push(text);
+            }
+        }
+        assert!(
+            outputs
+                .iter()
+                .any(|output| output.contains("Failed to read session history")),
+            "{outputs:?}"
+        );
+        route
+            .send(SessionOp::Submit {
+                message: "original still works".into(),
+            })
+            .await
+            .expect("admission");
+        let operation = tokio::time::timeout(std::time::Duration::from_secs(2), raw_rx.recv())
+            .await
+            .expect("delivery deadline")
+            .expect("old route");
+        assert!(
+            matches!(operation, SessionOp::Submit { message } if message == "original still works")
+        );
+    }
 
     fn info(id: uuid::Uuid, message_count: usize, age_minutes: u64) -> talos_session::SessionInfo {
         talos_session::SessionInfo {

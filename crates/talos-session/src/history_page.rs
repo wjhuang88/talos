@@ -137,7 +137,15 @@ fn read_page_impl(
         bytes.extend_from_slice(&chunk[..n]);
     }
     let mut pos = 0;
-    if offset == 0 && matches!(encoding, HistoryEncoding::Tlog) && !bytes.is_empty() {
+    // Older SessionManager-created empty files could receive records before a
+    // creation header. Only host message restoration accepts that legacy form;
+    // the authority reader still requires its validated header.
+    let legacy_headerless = synthetic_counter.is_some() && bytes.starts_with(b"E\t");
+    if offset == 0
+        && matches!(encoding, HistoryEncoding::Tlog)
+        && !bytes.is_empty()
+        && !legacy_headerless
+    {
         let end = bytes
             .iter()
             .position(|b| *b == b'\n')

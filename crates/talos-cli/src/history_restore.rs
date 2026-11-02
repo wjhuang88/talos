@@ -22,6 +22,37 @@ async fn read_session_history_cancellable(
     session: Session,
     cancellation: CancellationToken,
 ) -> Result<Vec<Message>> {
+    read_session_snapshot_cancellable(session, cancellation)
+        .await
+        .map(|(messages, _)| messages)
+}
+
+// Runtime transitions own their existing fence/rollback lifecycle. Dropping this
+// future cancels its worker, without installing a second process signal handler.
+pub(crate) async fn read_session_snapshot(
+    session: &Session,
+) -> Result<(Vec<Message>, Option<talos_session::SessionEntry>)> {
+    #[cfg(test)]
+    if let Ok(Some(reached)) = SNAPSHOT_CUT.try_with(|cut| {
+        let remaining = cut.0.get();
+        cut.0.set(remaining.saturating_sub(1));
+        (remaining == 1).then(|| cut.1.clone())
+    }) {
+        reached.notify_one();
+        std::future::pending::<()>().await;
+    }
+    read_session_snapshot_cancellable(session.clone(), CancellationToken::new()).await
+}
+
+#[cfg(test)]
+tokio::task_local! {
+    pub(crate) static SNAPSHOT_CUT: (std::cell::Cell<usize>, std::sync::Arc<tokio::sync::Notify>);
+}
+
+async fn read_session_snapshot_cancellable(
+    session: Session,
+    cancellation: CancellationToken,
+) -> Result<(Vec<Message>, Option<talos_session::SessionEntry>)> {
     if cancellation.is_cancelled() {
         bail!("session history startup cancelled");
     }
@@ -52,7 +83,7 @@ async fn read_session_history_cancellable(
             break;
         }
     }
-    let finish = tokio::task::spawn_blocking(move || scan.finish());
+    let finish = tokio::task::spawn_blocking(move || scan.finish_with_tail());
     tokio::select! {
         biased;
         _ = cancellation.cancelled() => bail!("session history startup cancelled"),

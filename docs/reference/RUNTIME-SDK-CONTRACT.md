@@ -650,6 +650,9 @@ on blocking workers. Ctrl-C cancels startup; corrupt/unavailable persisted histo
 returns an error instead of silently starting with no history. No file is rewritten.
 The new SessionMessageScan API reuses message/tool pairing across pages and supports
 legacy JSONL message envelopes, but emits no durable search provenance.
+Host message restoration also accepts historical headerless TLOG records beginning
+with `E\t`; strict history authority readers still require the creation header.
+Empty persisted sessions restore as empty, and their first append writes the header.
 
 A page reads at most 2 MiB / 8192 entries with cooperative cancellation and a CLI
 two-second page deadline. Total restored history still occupies linear memory;
@@ -658,5 +661,11 @@ headers/records, invalid UTF-8, oversized records and unsupported source volumes
 fail explicitly. Incomplete final TLOG records and invalid JSONL lines are omitted
 as before. SessionStore implementers default to no paged encoding; opt into a
 built-in encoding only when it matches the actual store. There is no whole-file
-fallback. Existing session/model switching paths are not yet migrated, and legacy
-CLI storage still lacks the receipts needed for durable model history_search.
+fallback. `/resume` and model switching use the same paged message/tail snapshot.
+The tail is the last successfully decoded entry, not proof of the final physical
+bytes; skipped JSONL or incomplete TLOG suffixes do not become activation evidence.
+Failed resume leaves the original command route active. Model switching retains
+the existing retirement/activation fence and retries the exact committed marker
+without duplicating it. Dropping a transition read cancels its worker cooperatively,
+without adding another Ctrl-C handler. CLI fork still uses full-file reads/copy,
+and legacy CLI storage lacks the receipts needed for durable model history_search.

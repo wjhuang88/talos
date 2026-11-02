@@ -23,6 +23,7 @@ pub struct SessionMessageScan {
     synthetic_counter: u64,
     decoder: HistoryMessageDecoder,
     messages: Vec<Message>,
+    last_entry: Option<crate::SessionEntry>,
     complete: bool,
 }
 
@@ -64,6 +65,7 @@ impl crate::Session {
             synthetic_counter: 0,
             decoder: Default::default(),
             messages: Vec::new(),
+            last_entry: None,
             complete: false,
         })
     }
@@ -90,7 +92,9 @@ impl SessionMessageScan {
         if self.complete {
             return Ok(true);
         }
-        if self.stamp.is_none() {
+        // SessionManager creates an empty file before the first append writes
+        // the TLOG header. This is a valid empty persisted session.
+        if self.end == 0 {
             self.complete = true;
             return Ok(true);
         }
@@ -104,6 +108,7 @@ impl SessionMessageScan {
             &stopped,
             &mut counter,
         )?;
+        let last_entry = page.entries.last().cloned();
         let mut decoder = self.decoder.clone();
         let mut messages = Vec::new();
         for entry in page.entries {
@@ -115,6 +120,9 @@ impl SessionMessageScan {
         self.check_current()?;
         check()?;
         self.messages.extend(messages);
+        if last_entry.is_some() {
+            self.last_entry = last_entry;
+        }
         self.decoder = decoder;
         self.synthetic_counter = counter;
         self.offset = page.next_offset;
@@ -125,11 +133,23 @@ impl SessionMessageScan {
     /// Return only a complete restore after checking source identity again.
     /// Completing or dropping the scan releases its retained source lease.
     pub fn finish(self) -> Result<Vec<Message>, HistoryPageError> {
+        self.finish_with_tail().map(|(messages, _)| messages)
+    }
+
+    /// Return the messages and last successfully decoded entry from the same validated
+    /// scan. The tail includes filtered diagnostic/control entries; invalid JSONL
+    /// lines and incomplete TLOG tails are skipped, and legacy envelopes can have
+    /// synthetic IDs. It is not proof of the final physical bytes. Neither value
+    /// grants model search authority; callers must enforce their host transition
+    /// fence before interpreting activation metadata or publishing a new Actor.
+    pub fn finish_with_tail(
+        self,
+    ) -> Result<(Vec<Message>, Option<crate::SessionEntry>), HistoryPageError> {
         if !self.complete {
             return Err(HistoryPageError::Stopped);
         }
         self.check_current()?;
-        Ok(self.messages)
+        Ok((self.messages, self.last_entry))
     }
 
     fn check_current(&self) -> Result<(), HistoryPageError> {
@@ -241,6 +261,137 @@ mod tests {
             );
             assert_eq!(finish(scan), expected);
             assert_eq!(expected, messages);
+        }
+    }
+
+    #[test]
+    fn headerless_legacy_tlog_restores_messages_without_granting_authority() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = session(root.path().join("legacy.tlog"));
+        let entry = crate::SessionEntry {
+            id: "original".into(),
+            parent_id: None,
+            timestamp: chrono::Utc::now(),
+            role: "user".into(),
+            content: "legacy\nmessage".into(),
+            metadata: Default::default(),
+        };
+        let bytes = crate::compact_text::encode_entry(&entry).into_bytes();
+        std::fs::write(&owner.file_path, &bytes).expect("legacy fixture");
+        assert_eq!(
+            finish(owner.begin_message_scan().expect("scan")),
+            vec![Message::User {
+                content: entry.content
+            }]
+        );
+        assert_eq!(std::fs::read(&owner.file_path).expect("unchanged"), bytes);
+        assert!(
+            crate::history_page::read_history_page(
+                &owner.file_path,
+                HistoryEncoding::Tlog,
+                0,
+                bytes.len() as u64,
+                Instant::now() + Duration::from_secs(5),
+                || false,
+            )
+            .is_err(),
+            "compatibility must not grant strict recovery authority"
+        );
+    }
+
+    #[test]
+    fn newly_created_empty_persisted_tlog_restores_without_a_header() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = crate::SessionManager::with_dir(root.path().join("sessions"));
+        let owner = manager
+            .create_session("empty", "workspace")
+            .expect("session");
+        assert_eq!(std::fs::metadata(&owner.file_path).expect("file").len(), 0);
+        assert!(finish(owner.begin_message_scan().expect("scan")).is_empty());
+        owner
+            .append(&Message::User {
+                content: "first append".into(),
+            })
+            .expect("append");
+        assert_eq!(
+            finish(owner.begin_message_scan().expect("scan after append")),
+            vec![Message::User {
+                content: "first append".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn snapshot_tail_survives_empty_trailing_pages_and_releases_append_lease() {
+        use std::io::Write;
+
+        for extension in ["jsonl", "tlog"] {
+            let root = tempfile::tempdir().expect("root");
+            let owner = session(root.path().join(format!("history.{extension}")));
+            let mut entries: Vec<_> = (0..8200)
+                .map(|i| crate::SessionEntry {
+                    id: format!("entry-{i}"),
+                    parent_id: None,
+                    timestamp: chrono::Utc::now(),
+                    role: "user".into(),
+                    content: format!("message-{i}"),
+                    metadata: Default::default(),
+                })
+                .collect();
+            entries.push(crate::SessionEntry {
+                id: "activation-tail".into(),
+                parent_id: None,
+                timestamp: chrono::Utc::now(),
+                role: "diagnostic".into(),
+                content: "transition marker".into(),
+                metadata: Default::default(),
+            });
+            owner
+                .store
+                .replace_entries_atomically(&owner.file_path, &entries)
+                .expect("fixture");
+            {
+                let mut file = std::fs::OpenOptions::new()
+                    .append(true)
+                    .open(&owner.file_path)
+                    .expect("append fixture");
+                if extension == "jsonl" {
+                    // Force pages with no decoded entries after the logical tail.
+                    file.write_all("not-json\n".repeat(300_000).as_bytes())
+                        .expect("invalid suffix");
+                } else {
+                    file.write_all(b"E\t0\t1000\tid\t-\t4:tail")
+                        .expect("incomplete suffix");
+                }
+            }
+            let original = std::fs::read(&owner.file_path).expect("original bytes");
+            let mut scan = owner.begin_message_scan().expect("capture");
+            let mut pages = 0;
+            loop {
+                pages += 1;
+                if scan
+                    .step(Instant::now() + Duration::from_secs(10), || false)
+                    .expect("page")
+                {
+                    break;
+                }
+            }
+            assert!(pages > 1);
+            let (messages, tail) = scan.finish_with_tail().expect("snapshot");
+            assert_eq!(messages.len(), 8200);
+            assert_eq!(tail.expect("diagnostic tail").id, "activation-tail");
+            assert_eq!(
+                std::fs::read(&owner.file_path).expect("unchanged"),
+                original
+            );
+            // In particular, Windows must release its retained read lease before
+            // the transition can append the next activation marker.
+            std::fs::OpenOptions::new()
+                .append(true)
+                .open(&owner.file_path)
+                .expect("snapshot finish releases writer exclusion")
+                .write_all(b"\n")
+                .expect("append after finish");
         }
     }
 

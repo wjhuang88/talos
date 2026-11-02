@@ -1,3 +1,19 @@
+## T5 lifecycle paging local increment — 2026-11-02
+
+Queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+First four stages are merged/closed; T5 remains Partial/unmerged and T1/T6
+unimplemented. Local resume/model-switch paging now has cancellation/retry,
+revoked-route and failed-resume preservation regressions. Affected suites passed
+388 CLI and 292 Session tests before the final focused headerless-compatibility
+regression, which also passed. Latest Clippy and independent source review passed.
+Full standard preflight passed at `/private/tmp/i313-lifecycle-preflight.log`.
+Published `0b454998a` CI host job failed in real Chinese TUI resume; the rebuilt
+local CLI now passes Chinese/English/Japanese initial/resumed/rotated real-TUI
+fixtures. Its Windows job failed at the checkpoint restart test's shorter idle
+timeout; a separately reviewed test-only adjustment still needs native evidence.
+CLI fork remains full-copy. Owner evidence and
+remaining boundaries are in [I313](../iterations/I313-model-checkpoint-history.md).
+
 ## T5 CLI startup candidate and native fork evidence — 2026-11-02
 
 Queue unchanged: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.

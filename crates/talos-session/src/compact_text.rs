@@ -46,7 +46,12 @@ impl crate::store::SessionStore for CompactTextSessionStore {
     }
 
     fn append_entry(&self, file_path: &Path, entry: &SessionEntry) -> Result<(), SessionError> {
-        if !file_path.exists() {
+        let needs_header = match fs::metadata(file_path) {
+            Ok(metadata) => metadata.len() == 0,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+            Err(error) => return Err(error.into()),
+        };
+        if needs_header {
             // Write file header on first append.
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent)?;
