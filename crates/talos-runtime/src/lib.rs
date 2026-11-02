@@ -1704,9 +1704,6 @@ impl RuntimeBuilder {
         actor.set_runtime_admission(admission.clone());
         if let Some((session, policy)) = self.durable_session {
             actor.set_durable_persistence(session, policy);
-            if let Some(entries) = recovered_entries {
-                actor.set_recovered_history_sources(entries);
-            }
         }
         let runtime = tokio::runtime::Handle::try_current()
             .map_err(|_| RuntimeError::AsyncRuntimeUnavailable)?;
@@ -1716,6 +1713,19 @@ impl RuntimeBuilder {
         let session_generation = actor.generation();
         let actor_task = runtime.spawn(async move {
             let _actor_exit_guard = actor_exit_guard;
+            if let Some(entries) = recovered_entries {
+                let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+                let bound = tokio::time::timeout_at(
+                    deadline,
+                    actor.set_recovered_history_sources_until(entries, deadline),
+                )
+                .await;
+                if !matches!(bound, Ok(true)) {
+                    tracing::warn!(
+                        "runtime recovered source binding unavailable within startup budget"
+                    );
+                }
+            }
             actor.run().await;
         });
         let coordinator = ShutdownCoordinator::new(
@@ -5404,7 +5414,7 @@ mod tests {
             let durable = manager
                 .create_or_open_session("runtime-recovery")
                 .expect("session");
-            let raw: Vec<_> = (0..30)
+            let raw: Vec<_> = (0..8300)
                 .map(|i| Message::User {
                     content: format!("other {i}"),
                 })

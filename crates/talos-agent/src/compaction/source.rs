@@ -125,6 +125,61 @@ impl HistorySource {
         Some(source)
     }
 
+    /// Build a completed-turn binding outside the Actor command loop.
+    pub(crate) async fn bind_committed_until(
+        generation: u64,
+        raw: &[Message],
+        previous: Option<&Self>,
+        start: usize,
+        namespace: Option<&str>,
+        committed_ids: &[String],
+        deadline: tokio::time::Instant,
+    ) -> Option<Self> {
+        if start > raw.len() {
+            return None;
+        }
+        let mut source =
+            Self::bind_content_until(generation, raw.len() as u64, raw, deadline).await?;
+        if let Some(previous) = previous.filter(|old| old.generation == generation) {
+            for index in 0..start.min(previous.digests.len()) {
+                tokio::task::yield_now().await;
+                if tokio::time::Instant::now() >= deadline {
+                    return None;
+                }
+                if source.digests[index] != previous.digests[index] {
+                    break;
+                }
+                source.entry_ids[index] = previous.entry_ids[index].clone();
+            }
+        }
+        if let Some(namespace) = namespace.filter(|name| !name.is_empty())
+            && committed_ids.len() == raw.len() - start
+            && committed_ids.iter().all(|id| !id.is_empty())
+        {
+            for (index, id) in committed_ids.iter().enumerate() {
+                tokio::task::yield_now().await;
+                if tokio::time::Instant::now() >= deadline
+                    || namespace.len() > 128
+                    || id.len() > 128
+                {
+                    return None;
+                }
+                source.entry_ids[start + index] = format!("tlog:{namespace}:{id}");
+            }
+        }
+        let mut seen = std::collections::HashSet::new();
+        for id in &source.entry_ids {
+            tokio::task::yield_now().await;
+            if tokio::time::Instant::now() >= deadline || id.len() > 128 || !seen.insert(id) {
+                return None;
+            }
+        }
+        // This is a committed snapshot; the worker budget must not become the
+        // lifetime of its identity. Each later attempt owns a fresh deadline.
+        source.deadline = None;
+        Some(source)
+    }
+
     /// Reuse verified durable identities for the unchanged recovered prefix.
     /// New or changed entries retain their generation/content identities.
     pub(crate) async fn bind_recovered_until(
@@ -440,6 +495,96 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[tokio::test]
+    async fn long_committed_sources_reject_aliases_expiry_and_changed_prefix() {
+        let mut raw: Vec<_> = (0..8300)
+            .map(|i| Message::User {
+                content: i.to_string(),
+            })
+            .collect();
+        let deadline = || tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        let previous = HistorySource::bind_until(
+            5,
+            8300,
+            &raw,
+            (0..8300).map(|i| format!("tlog:session:{i}")).collect(),
+            deadline(),
+        )
+        .await
+        .expect("long source");
+        raw.push(Message::User {
+            content: "new".into(),
+        });
+        let bound = HistorySource::bind_committed_until(
+            5,
+            &raw,
+            Some(&previous),
+            8300,
+            Some("session"),
+            &["new".into()],
+            deadline(),
+        )
+        .await
+        .expect("long commit");
+        assert_eq!(
+            bound.resolve(5, 8301, 8299, &raw[8299]),
+            Some("tlog:session:8299")
+        );
+        assert_eq!(
+            bound.resolve(5, 8301, 8300, &raw[8300]),
+            Some("tlog:session:new")
+        );
+        assert!(bound.deadline().is_none());
+        assert!(
+            HistorySource::bind_committed_until(
+                5,
+                &raw,
+                Some(&previous),
+                8300,
+                Some("session"),
+                &["8299".into()],
+                deadline()
+            )
+            .await
+            .is_none()
+        );
+        assert!(
+            HistorySource::bind_committed_until(
+                5,
+                &raw,
+                Some(&previous),
+                8300,
+                Some("session"),
+                &["new".into()],
+                tokio::time::Instant::now()
+            )
+            .await
+            .is_none()
+        );
+        raw[0] = Message::User {
+            content: "changed ancestry".into(),
+        };
+        let changed = HistorySource::bind_committed_until(
+            5,
+            &raw,
+            Some(&previous),
+            8300,
+            Some("session"),
+            &[],
+            deadline(),
+        )
+        .await
+        .expect("content-only fallback");
+        for index in [0, 8299, 8300] {
+            assert!(
+                changed
+                    .resolve(5, 8301, index, &raw[index])
+                    .expect("source")
+                    .starts_with("generation:")
+            );
+        }
     }
 
     #[tokio::test]

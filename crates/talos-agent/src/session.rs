@@ -110,6 +110,8 @@ fn immediate_started_turn(
             },
         });
         Some(TurnRecord {
+            committed_source: None,
+            completion_events: Vec::new(),
             persisted_entry_ids: Vec::new(),
             new_messages: Vec::new(),
             status,
@@ -319,6 +321,49 @@ impl AppServerSession {
             &self.history,
             ids,
         );
+    }
+
+    /// Bind a storage-issued recovered snapshot cooperatively before running the Actor.
+    ///
+    /// Unlike the bounded synchronous compatibility setter, this accepts long
+    /// histories under a caller-owned deadline. A dropped or expired operation
+    /// leaves recovery identity reuse disabled. Metadata grows with history;
+    /// individual comparisons and allocations are not hard-real-time operations.
+    pub async fn set_recovered_history_sources_until(
+        &mut self,
+        snapshot: talos_session::DurableHistorySnapshot,
+        deadline: tokio::time::Instant,
+    ) -> bool {
+        self.recovered_source = None;
+        if tokio::time::Instant::now() >= deadline {
+            return false;
+        }
+        let Some(durable) = &self.durable_persistence else {
+            return false;
+        };
+        if !durable.session.owns_history_snapshot(&snapshot)
+            || snapshot.entries().len() != self.history.len()
+        {
+            return false;
+        }
+        let namespace = durable.session.id();
+        let mut ids = Vec::new();
+        for ((id, message), raw) in snapshot.entries().iter().zip(&self.history) {
+            tokio::task::yield_now().await;
+            if tokio::time::Instant::now() >= deadline || message != raw {
+                return false;
+            }
+            ids.push(format!("tlog:{namespace}:{id}"));
+        }
+        self.recovered_source = crate::compaction::HistorySource::bind_until(
+            self.session_generation,
+            self.history.len() as u64,
+            &self.history,
+            ids,
+            deadline,
+        )
+        .await;
+        self.recovered_source.is_some()
     }
 
     /// Runs the session actor until shutdown or SQ disconnect.
@@ -551,7 +596,8 @@ impl AppServerSession {
                     }
                     let structured = current_structured.take();
                     match completed.and_then(Result::ok).flatten() {
-                        Some(record) => {
+                        Some(mut record) => {
+                            let completion_events = std::mem::take(&mut record.completion_events);
                             let status = record.status;
                             let completion = record.completion.clone();
                             self.commit_turn_record(record);
@@ -585,6 +631,9 @@ impl AppServerSession {
                             }
                             if let Some(admission) = &self.runtime_admission {
                                 admission.finish_active(Some(&completion));
+                            }
+                            for event in completion_events {
+                                let _ = self.eq_tx.send(event);
                             }
                             let resume_queued_user = resume_user_after_cancel
                                 && status == TurnRecordStatus::Cancelled
@@ -1152,17 +1201,25 @@ impl AppServerSession {
     fn commit_turn_record(&mut self, record: TurnRecord) {
         let start = self.history.len();
         self.history.extend(record.new_messages);
-        self.recovered_source = crate::compaction::HistorySource::bind_committed(
-            self.session_generation,
-            &self.history,
-            self.recovered_source.as_ref(),
-            start,
-            self.durable_persistence
-                .as_ref()
-                .map(|durable| durable.session.id().to_string())
-                .as_deref(),
-            &record.persisted_entry_ids,
-        );
+        self.recovered_source = record
+            .committed_source
+            .unwrap_or_else(|| {
+                crate::compaction::HistorySource::bind_committed(
+                    self.session_generation,
+                    &self.history,
+                    self.recovered_source.as_ref(),
+                    start,
+                    self.durable_persistence
+                        .as_ref()
+                        .map(|durable| durable.session.id().to_string())
+                        .as_deref(),
+                    &record.persisted_entry_ids,
+                )
+            })
+            .filter(|source| {
+                source.generation() == self.session_generation
+                    && source.revision() == self.history.len() as u64
+            });
     }
 
     async fn start_submission(
@@ -1394,6 +1451,8 @@ impl AppServerSession {
                             },
                         });
                         return Some(TurnRecord {
+                            committed_source: None,
+                            completion_events: Vec::new(),
                             persisted_entry_ids: Vec::new(),
                             new_messages: Vec::new(),
                             status: TurnRecordStatus::Cancelled,
@@ -1467,6 +1526,8 @@ impl AppServerSession {
                     },
                 });
                 Some(TurnRecord {
+                    committed_source: None,
+                    completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: record_status,
@@ -1504,15 +1565,22 @@ impl AppServerSession {
         let (boundary_ack_tx, boundary_ack_rx) = mpsc::unbounded_channel();
         #[cfg(test)]
         let boundary_ack_cancel_gate = self.boundary_ack_cancel_gate.clone();
+        let mut source_history = self.history.clone();
+        let previous_source = self.recovered_source.clone();
+        let source_generation = self.session_generation;
+        let source_namespace = durable_persistence
+            .as_ref()
+            .map(|p| p.session.id().to_string());
         let handle = tokio::spawn(async move {
             let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
             let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
-            let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
+            let (worker_eq_tx, mut worker_eq_rx) = mpsc::unbounded_channel();
+            let forwarding = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
                 agent,
                 prepared,
                 event_tx,
                 event_rx,
-                eq_tx,
+                eq_tx: worker_eq_tx,
                 cancel_token: token_clone,
                 turn_id,
                 session_id,
@@ -1525,9 +1593,52 @@ impl AppServerSession {
                 #[cfg(test)]
                 boundary_ack_cancel_gate,
             }))
-            .catch_unwind()
-            .await;
-            result_rx.await.ok()
+            .catch_unwind();
+            tokio::pin!(forwarding);
+            let mut completion_events = Vec::new();
+            loop {
+                tokio::select! {
+                    _ = &mut forwarding => break,
+                    Some(event) = worker_eq_rx.recv() => {
+                        if matches!(&event, SessionEvent::TurnEvent { payload: TurnEventPayload::Completed { .. }, .. }) {
+                            completion_events.push(event);
+                        } else {
+                            let _ = eq_tx.send(event);
+                        }
+                    }
+                }
+            }
+            while let Ok(event) = worker_eq_rx.try_recv() {
+                if matches!(
+                    &event,
+                    SessionEvent::TurnEvent {
+                        payload: TurnEventPayload::Completed { .. },
+                        ..
+                    }
+                ) {
+                    completion_events.push(event);
+                } else {
+                    let _ = eq_tx.send(event);
+                }
+            }
+            let mut record = result_rx.await.ok()?;
+            record.completion_events = completion_events;
+            let start = source_history.len();
+            source_history.extend(record.new_messages.iter().cloned());
+            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+            record.committed_source = Some(
+                crate::compaction::HistorySource::bind_committed_until(
+                    source_generation,
+                    &source_history,
+                    previous_source.as_ref(),
+                    start,
+                    source_namespace.as_deref(),
+                    &record.persisted_entry_ids,
+                    deadline,
+                )
+                .await,
+            );
+            Some(record)
         });
         Ok(StartedTurn {
             handle,

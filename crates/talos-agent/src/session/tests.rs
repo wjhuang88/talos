@@ -6190,3 +6190,131 @@ async fn fork_worker_shutdown_and_actor_abort_retire_before_publication() {
         );
     }
 }
+
+#[tokio::test]
+async fn cooperative_recovered_sources_bind_long_history_and_refuse_foreign_or_expired() {
+    let root = tempfile::tempdir().expect("root");
+    let durable = talos_session::DurableSession::open_or_create(root.path(), "long-recovery")
+        .expect("session");
+    let raw: Vec<_> = (0..8300)
+        .map(|i| Message::User {
+            content: format!("original {i}"),
+        })
+        .collect();
+    durable
+        .commit_turn("original", &raw, &Default::default())
+        .expect("commit");
+    let snapshot = durable.read_history_snapshot().expect("snapshot");
+    let expected = format!("tlog:{}:{}", durable.id(), snapshot.entries()[8299].0);
+    let (_handle, mut actor) = AppServerSession::new(
+        make_agent(MockModel::new(vec![success_events("continued")])),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: raw.clone(),
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_durable_persistence(durable.clone(), Default::default());
+    let deadline = || tokio::time::Instant::now() + Duration::from_secs(10);
+    assert!(
+        actor
+            .set_recovered_history_sources_until(snapshot.clone(), deadline())
+            .await
+    );
+    assert_eq!(
+        actor
+            .recovered_source
+            .as_ref()
+            .expect("source")
+            .resolve(0, 8300, 8299, &raw[8299]),
+        Some(expected.as_str())
+    );
+    // Poll into the cooperative scan, then drop it while it owns the mutable
+    // Actor borrow. Previously installed authority must not survive cancellation.
+    {
+        let mut binding =
+            Box::pin(actor.set_recovered_history_sources_until(snapshot.clone(), deadline()));
+        let pending = std::future::poll_fn(|cx| {
+            std::task::Poll::Ready(binding.as_mut().poll(cx).is_pending())
+        })
+        .await;
+        assert!(pending, "long binding must yield before publication");
+    }
+    assert!(actor.recovered_source.is_none());
+    assert!(
+        actor
+            .set_recovered_history_sources_until(snapshot.clone(), deadline())
+            .await
+    );
+    assert!(
+        !actor
+            .set_recovered_history_sources_until(snapshot.clone(), tokio::time::Instant::now())
+            .await
+    );
+    assert!(actor.recovered_source.is_none());
+    let reopened = talos_session::DurableSession::open_existing(root.path(), "long-recovery")
+        .expect("lookup")
+        .expect("existing");
+    assert!(
+        !actor
+            .set_recovered_history_sources_until(
+                reopened.read_history_snapshot().expect("foreign owner"),
+                deadline()
+            )
+            .await
+    );
+    actor.history[8299] = Message::User {
+        content: "changed".into(),
+    };
+    assert!(
+        !actor
+            .set_recovered_history_sources_until(snapshot.clone(), deadline())
+            .await
+    );
+    assert!(actor.recovered_source.is_none());
+    actor.history[8299] = raw[8299].clone();
+    assert!(
+        actor
+            .set_recovered_history_sources_until(snapshot, deadline())
+            .await
+    );
+    let started = actor
+        .start_submission(
+            structured_submission(
+                "long-next",
+                "long-item",
+                0,
+                "continue",
+                SubmissionSource::Compatibility,
+            ),
+            1,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("long turn admission"));
+    let record = started.handle.await.expect("worker").expect("turn record");
+    assert!(
+        record
+            .committed_source
+            .as_ref()
+            .is_some_and(Option::is_some)
+    );
+    actor.commit_turn_record(record);
+    let revision = actor.history.len() as u64;
+    let source = actor
+        .recovered_source
+        .as_ref()
+        .expect("long committed source");
+    assert_eq!(
+        source.resolve(0, revision, 8299, &raw[8299]),
+        Some(expected.as_str())
+    );
+    let committed = durable.read_history_snapshot().expect("updated snapshot");
+    let last = actor.history.len() - 1;
+    let last_id = format!("tlog:{}:{}", durable.id(), committed.entries()[last].0);
+    assert_eq!(
+        source.resolve(0, revision, last, &actor.history[last]),
+        Some(last_id.as_str())
+    );
+}

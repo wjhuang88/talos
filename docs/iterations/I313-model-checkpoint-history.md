@@ -2231,3 +2231,51 @@ including the real Actor checkpoint/fork/restart scenario after epoch correction
 (`/private/tmp/i313-discovery-agent-suite.log`). Warnings-denied all-target Clippy
 also passes (`/private/tmp/i313-discovery-clippy.log`), superseding pending notes.
 These remain local stage checks, not exact published-head CI or whole T5 closure.
+
+### Cooperative long-history recovery and ordinary-turn commit (local, unmerged)
+
+Runtime startup now uses additive async set_recovered_history_sources_until under
+an explicit two-second deadline. It clears prior authority, validates the
+storage-issued snapshot owner, length and exact message contents, and installs
+only a complete binding. The 8300-message Actor regression covers foreign owner,
+expiry, changed raw data, dropping the future at its first yield, successful retry,
+and a real subsequent ordinary turn preserving old and newly persisted IDs.
+
+Ordinary turn workers bind completed source identity cooperatively under a fresh
+two-second budget. They preserve unchanged-prefix identities, apply actual receipt
+IDs to new entries, reject duplicates and withdraw inherited IDs after divergence.
+Actor installation checks generation/revision and never retries a refused worker
+scan synchronously. Compatibility/preview paths retain bounded synchronous binding.
+Startup snapshot I/O/materialization and Actor history/source clones remain
+O(history), not bounded-memory or hard realtime. Interrupt during completed-turn
+binding waits for its cooperative budget rather than immediately aborting the scan.
+
+First full Agent run failed 2/642: scheduler completion timeout and checkpoint/fork
+requesting an idle Actor before worker binding finished
+(`/private/tmp/i313-long-commit-agent.log`). Completed was emitted too early.
+The worker now forwards progress but retains Completed in its record; Actor emits
+it after history installation, custody completion and finish_active. Corrected
+Agent suite passes 642/642 (`/private/tmp/i313-long-commit-agent-fixed.log`).
+Agent/Runtime all-target warnings-denied Clippy passes
+(`/private/tmp/i313-long-commit-clippy.log`). Fresh Runtime 8300-message
+reopen/child/sibling/independent-process regression passes
+(`/private/tmp/i313-long-commit-runtime.log`). Both governance validators pass
+with zero warnings (`/private/tmp/i313-long-commit-{governance,claims}.log`).
+
+Independent same-session static review approves seven code/script files against
+`e911e4902b4de9f5776828b978b055322df23507`, diff SHA256
+`adc556fd75054167b6b6a9a03787fe61c27dc69762726dee744893772e47bc43`.
+Subsequent changes only align inserted field indentation inside macro bodies.
+Reviewer did not run tests or publish remote review; approval is scoped, not full
+I313 acceptance. Standard preflight, current published-head CI, Windows support
+and full acceptance remain outstanding.
+
+Windows job 125092886203 failed; native evidence is retained at
+`/private/tmp/i313-windows-native-837.log`. The mapping probe failed before
+observation because PowerShell converted null map name to an empty string.
+Its local NullString.Value correction passes syntax/type checks but lacks native
+verification. Session recovery fixture retained a flushed BufWriter while asking
+for a restrictive read lease; dropping that writer passes the local targeted test
+(`/private/tmp/i313-source-writer-close.log`), not native proof. Both fixes remain
+separate local test/probe work. Windows Actor history/checkpoint functionality
+remains unavailable and must be implemented, not skipped.

@@ -28,6 +28,11 @@ pub(super) struct DurableTurnPersistence {
 }
 
 pub(super) struct TurnRecord {
+    // None: compatibility path has not attempted binding. Some(None): worker
+    // refused or exhausted its budget; never retry synchronously in the Actor.
+    // Some(Some(source)): complete worker-owned snapshot for atomic installation.
+    pub(super) committed_source: Option<Option<crate::compaction::HistorySource>>,
+    pub(super) completion_events: Vec<SessionEvent>,
     pub(super) new_messages: Vec<Message>,
     pub(super) persisted_entry_ids: Vec<String>,
     pub(super) status: TurnRecordStatus,
@@ -315,6 +320,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    committed_source: None,
+                    completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
@@ -333,6 +340,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                committed_source: None,
+                completion_events: Vec::new(),
                 persisted_entry_ids,
                 new_messages: stable_prefix,
                 status: TurnRecordStatus::Cancelled,
@@ -400,6 +409,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    committed_source: None,
+                    completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
@@ -438,6 +449,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    committed_source: None,
+                    completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
@@ -464,6 +477,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    committed_source: None,
+                    completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
@@ -512,6 +527,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                             },
                         });
                         let _ = result_tx.send(TurnRecord {
+                            committed_source: None,
+                            completion_events: Vec::new(),
                             persisted_entry_ids: Vec::new(),
                             new_messages: Vec::new(),
                             status: TurnRecordStatus::Error,
@@ -544,6 +561,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                committed_source: None,
+                completion_events: Vec::new(),
                 persisted_entry_ids,
                 new_messages,
                 status: TurnRecordStatus::Success,
@@ -627,6 +646,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                committed_source: None,
+                completion_events: Vec::new(),
                 persisted_entry_ids,
                 new_messages: partial_messages,
                 status: TurnRecordStatus::Error,
@@ -657,6 +678,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                committed_source: None,
+                completion_events: Vec::new(),
                 persisted_entry_ids: Vec::new(),
                 new_messages: Vec::new(),
                 status: TurnRecordStatus::Error,
