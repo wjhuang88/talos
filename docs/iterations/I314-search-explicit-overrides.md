@@ -17,7 +17,7 @@
 | Claimed At | 2026-11-02 |
 | Source Issue | #832 |
 | Governance Claim PR | #841 |
-| Authorization Mode | Single-maintainer merge with explicit maintainer-authorized parallel execution |
+| Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly answered `允许并行` on 2026-11-02 after the activation gate was explained as I314 running concurrently with the currently Active I310 and I313 scopes. |
 | Implementation PR | Not started; branch only after #841 is effective on `main` |
 | Last Updated | 2026-11-02 |
