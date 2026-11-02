@@ -107,7 +107,7 @@ impl PreparedCompatibilityChain {
                       mut request: super::PreparedTransportRequest,
                       mut retry: Option<super::PreparedTransportRequest>| {
             let headers = CompatibilityHeaders::capture(protocol, &select)?;
-            request.headers = Some(headers.clone());
+            request.headers = Some(headers);
             if let Some(retry) = retry.as_mut() {
                 retry.headers = Some(headers);
             }
