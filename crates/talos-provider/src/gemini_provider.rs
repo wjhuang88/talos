@@ -89,6 +89,7 @@ impl GeminiProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
         progress: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+        decision_only: bool,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let started = Instant::now();
         let deadline = started
@@ -232,6 +233,7 @@ impl GeminiProvider {
                     }
                     event = raw_rx.recv() => match event {
                         Some(GeminiOutput::Event(event @ (AgentEvent::TextDelta{..} | AgentEvent::ThinkingDelta{..}))) => {
+                            if decision_only && matches!(event, AgentEvent::ThinkingDelta{..}) { continue; }
                             if Instant::now() >= deadline { return; }
                             if !matches!(tokio::time::timeout_at(deadline.into(), sink.send(event)).await, Ok(Ok(()))) { return; }
                         }
@@ -244,7 +246,12 @@ impl GeminiProvider {
                                     return;
                                 }
                             }
+                            if decision_only && terminal.iter().any(|event| matches!(event,GeminiOutput::FunctionCall{..})) {
+                                let _ = tx.try_send(AgentEvent::Error{message:"Gemini isolated decision returned a tool call".into()});
+                                return;
+                            }
                             for event in terminal {
+                                if decision_only && matches!(event,GeminiOutput::Event(AgentEvent::ReasoningComplete{..})) { continue; }
                                 if Instant::now() >= deadline { return; }
                                 let sent = tokio::time::timeout_at(deadline.into(), async { match event {
                                     GeminiOutput::Event(event) => sink.send(event).await,
@@ -264,6 +271,18 @@ impl GeminiProvider {
 
 #[async_trait::async_trait]
 impl LanguageModel for GeminiProvider {
+    async fn stream_decision(
+        &self,
+        messages: &[Message],
+        limits: talos_core::provider::DecisionRequestLimits,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        crate::validate_decision_messages(messages, limits)?;
+        let mut isolated = self.clone();
+        isolated.output_limit = Some(limits.max_output_tokens);
+        isolated.timeout.max_attempts = limits.max_retries.min(self.timeout.max_attempts);
+        isolated.dispatch(messages, &[], None, true).await
+    }
+
     fn protocol_capabilities(&self) -> CapabilityProbe {
         CapabilityProbe::Known(ProtocolCapabilities {
             native_tools: true,
@@ -271,14 +290,14 @@ impl LanguageModel for GeminiProvider {
         })
     }
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
-        self.dispatch(messages, &[], None).await
+        self.dispatch(messages, &[], None, false).await
     }
     async fn stream_with_tools(
         &self,
         messages: &[Message],
         tools: &[ToolDefinition],
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
-        self.dispatch(messages, tools, None).await
+        self.dispatch(messages, tools, None, false).await
     }
     async fn stream_with_tools_and_progress(
         &self,
@@ -286,7 +305,7 @@ impl LanguageModel for GeminiProvider {
         tools: &[ToolDefinition],
         progress: mpsc::UnboundedSender<ProviderProgress>,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
-        self.dispatch(messages, tools, Some(&progress)).await
+        self.dispatch(messages, tools, Some(&progress), false).await
     }
 }
 
@@ -294,6 +313,153 @@ impl LanguageModel for GeminiProvider {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[tokio::test]
+    async fn isolated_decision_caps_output_without_mutating_conversation_settings() {
+        use talos_core::provider::DecisionRequestLimits;
+        let mut server = mockito::Server::new_async().await;
+        let wire = format!(
+            "data: {}\n\n",
+            json!({"candidates":[{"content":{"parts":[{"text":"yes"}]},"finishReason":"STOP"}]})
+        );
+        let decision = server
+            .mock("POST", "/")
+            .match_body(mockito::Matcher::PartialJson(
+                json!({"generationConfig":{"maxOutputTokens":17}}),
+            ))
+            .match_request(|request| {
+                let body: serde_json::Value =
+                    serde_json::from_slice(request.body().expect("body")).expect("JSON");
+                body.get("tools").is_none()
+                    && body["generationConfig"].get("thinkingConfig").is_none()
+            })
+            .with_body(wire.clone())
+            .create_async()
+            .await;
+        let conversation = server
+            .mock("POST", "/")
+            .match_body(mockito::Matcher::PartialJson(
+                json!({"generationConfig":{"maxOutputTokens":100}}),
+            ))
+            .with_body(wire)
+            .create_async()
+            .await;
+        let transport = GeminiTransport::ai_studio("model", "key", true)
+            .expect("transport")
+            .with_test_endpoint(server.url());
+        let provider = GeminiProvider::new(
+            transport,
+            "google".into(),
+            "model".into(),
+            Some(100),
+            Default::default(),
+        )
+        .expect("provider");
+        let messages = [Message::User {
+            content: "decide".into(),
+        }];
+        let mut events = provider
+            .stream_auto_review(
+                &messages,
+                DecisionRequestLimits {
+                    max_output_tokens: 17,
+                    max_retries: 0,
+                },
+            )
+            .await
+            .expect("decision");
+        let mut ended = false;
+        while let Some(event) = events.recv().await {
+            assert!(!matches!(
+                event,
+                AgentEvent::ToolCall { .. }
+                    | AgentEvent::ReasoningComplete { .. }
+                    | AgentEvent::ThinkingDelta { .. }
+                    | AgentEvent::Error { .. }
+            ));
+            ended |= matches!(event, AgentEvent::TurnEnd { .. });
+        }
+        assert!(ended);
+        let mut events = provider.stream(&messages).await.expect("conversation");
+        while events.recv().await.is_some() {}
+        decision.assert_async().await;
+        conversation.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn isolated_decision_refuses_tools_and_respects_zero_retries() {
+        use talos_core::provider::DecisionRequestLimits;
+        let mut server = mockito::Server::new_async().await;
+        let wire = format!(
+            "data: {}\n\n",
+            json!({"candidates":[{"content":{"parts":[{"functionCall":{"name":"write","args":{}}}]},"finishReason":"STOP"}]})
+        );
+        let malicious = server
+            .mock("POST", "/")
+            .with_body(wire)
+            .expect(1)
+            .create_async()
+            .await;
+        let transport = GeminiTransport::ai_studio("model", "key", true)
+            .expect("transport")
+            .with_test_endpoint(server.url());
+        let provider = GeminiProvider::new(
+            transport,
+            "google".into(),
+            "model".into(),
+            None,
+            Default::default(),
+        )
+        .expect("provider");
+        let messages = [Message::User {
+            content: "decide".into(),
+        }];
+        let limits = DecisionRequestLimits {
+            max_output_tokens: 17,
+            max_retries: 0,
+        };
+        let mut events = provider
+            .stream_decision(&messages, limits)
+            .await
+            .expect("decision");
+        let mut failed = false;
+        while let Some(event) = events.recv().await {
+            assert!(!matches!(
+                event,
+                AgentEvent::ToolCall { .. }
+                    | AgentEvent::TurnEnd { .. }
+                    | AgentEvent::ReasoningComplete { .. }
+            ));
+            failed |= matches!(event, AgentEvent::Error { .. });
+        }
+        assert!(failed);
+        malicious.assert_async().await;
+        malicious.remove_async().await;
+        let limited = server
+            .mock("POST", "/")
+            .with_status(429)
+            .expect(1)
+            .create_async()
+            .await;
+        assert!(matches!(
+            provider.stream_decision(&messages, limits).await,
+            Err(ProviderError::RateLimited(_))
+        ));
+        limited.assert_async().await;
+        assert!(
+            provider
+                .stream_decision(
+                    &[Message::Assistant {
+                        content: "history".into(),
+                        tool_calls: vec![],
+                        reasoning: None
+                    }],
+                    limits
+                )
+                .await
+                .is_err()
+        );
+    }
 
     #[tokio::test]
     async fn rate_limit_retries_are_bounded_and_report_progress() {
