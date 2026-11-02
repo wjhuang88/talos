@@ -727,6 +727,49 @@ async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continua
             Ok(rx)
         }
     }
+    let storage_projection = |session: &DurableSession| {
+        let entries = session
+            .session()
+            .read_entries()
+            .expect("actual stored records");
+        let receipts: Vec<_> = entries
+            .iter()
+            .flat_map(|entry| {
+                talos_session::HistoryRecoveryReceipt::from_terminal_entry(entry)
+                    .unwrap_or_default()
+            })
+            .collect();
+        let matches: Vec<_> = receipts
+            .iter()
+            .filter_map(|receipt| {
+                let entry = entries
+                    .iter()
+                    .find(|entry| entry.id == receipt.entry_id())?;
+                let content = receipt.verified_content(entry)?;
+                content
+                    .starts_with("visible-fact")
+                    .then_some((entry, content))
+            })
+            .collect();
+        assert_eq!(
+            matches.len(),
+            1,
+            "one persisted recovery receipt for the bounded source"
+        );
+        let (entry, content) = &matches[0];
+        assert!(
+            entry.metadata.raw_content.is_none(),
+            "durable projection must not copy hidden producer bytes into raw metadata"
+        );
+        assert_eq!(content.matches("[truncated,").count(), 1);
+        assert!(
+            !serde_json::to_string(&entries)
+                .expect("stored metadata")
+                .contains("hidden-tail")
+        );
+        (entry.id.clone(), content.clone())
+    };
+    let original_projection = storage_projection(&reopened);
     let original_bytes = std::fs::read(reopened.file_path()).expect("original transcript");
     let recovery = Arc::new(RecoverHuge(AtomicUsize::new(0)));
     let mut runtime = RuntimeBuilder::new()
@@ -785,6 +828,11 @@ async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continua
         std::fs::read(reopened.file_path())
             .expect("transcript after checkpoint")
             .starts_with(&original_bytes)
+    );
+    assert_eq!(
+        storage_projection(&reopened),
+        original_projection,
+        "checkpoint and recovery retain the same source and receipt projection"
     );
     let final_history = reopened.read_messages().expect("authoritative history");
     let original_results: Vec<_> = final_history
