@@ -621,6 +621,25 @@ async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continua
     );
     assert_eq!(model.0.load(Ordering::SeqCst), 2);
     runtime.shutdown().await.expect("shutdown");
+    // A completed old tool batch becomes eligible only after the protected
+    // recent exchanges. Preserve it in authoritative storage while compacting it.
+    let later: Vec<_> = (0..12)
+        .flat_map(|index| {
+            [
+                Message::User {
+                    content: format!("later safe task {index}"),
+                },
+                Message::Assistant {
+                    content: "completed".into(),
+                    tool_calls: vec![],
+                    reasoning: None,
+                },
+            ]
+        })
+        .collect();
+    durable
+        .commit_turn("later-safe-boundaries", &later, &Default::default())
+        .expect("later history");
     let reopened = DurableSession::open_existing(&root.path().join("sessions"), "huge-output")
         .expect("reopen")
         .expect("session");
@@ -642,23 +661,47 @@ async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continua
         async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
             let events = match self.0.fetch_add(1, Ordering::SeqCst) {
                 0 => call("discover", "history_search", json!({"mode":"discover"})),
-                1 => call(
+                1 => {
+                    let discovery = result(messages, "discover");
+                    let item =
+                        |text: &str| json!({"text":text,"sources":[discovery["sources"][0]]});
+                    call(
+                        "compact-huge",
+                        "compact_context",
+                        json!({"snapshot":discovery["snapshot"],
+                        "checkpoint":{"schema_version":1,"summary":item("Huge tool completed; original bounded fact remains recoverable"),
+                        "goal":item("recover prior fact"),"next_step":item("search authoritative history"),
+                        "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                        "facts":[],"assumptions":[],"resources":[],"open_loops":[]}}),
+                    )
+                }
+                2 => {
+                    assert_eq!(result(messages, "compact-huge")["status"], "Admitted");
+                    assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.starts_with("[Derived checkpoint;"))));
+                    assert!(!messages.iter().any(|message| matches!(message, Message::Tool { result } if result.tool_use_id == "huge")), "huge batch must actually leave the provider projection");
+                    call(
+                        "discover-recovery",
+                        "history_search",
+                        json!({"mode":"discover"}),
+                    )
+                }
+                3 => call(
                     "search",
                     "history_search",
                     // Recovery search accepts FTS syntax; quote a hyphenated
                     // literal so it is not parsed as an FTS column expression.
-                    json!({"mode":"search", "snapshot":result(messages,"discover")["snapshot"], "query":"\"visible-fact\""}),
+                    json!({"mode":"search", "snapshot":result(messages,"discover-recovery")["snapshot"], "query":"\"visible-fact\""}),
                 ),
-                2 => {
+                4 => {
                     let found = result(messages, "search");
                     assert_eq!(found["results"].as_array().expect("results").len(), 1);
                     call(
                         "detail",
                         "history_search",
-                        json!({"mode":"detail", "snapshot":result(messages,"discover")["snapshot"], "reference":found["results"][0]["reference"]}),
+                        json!({"mode":"detail", "snapshot":result(messages,"discover-recovery")["snapshot"], "reference":found["results"][0]["reference"]}),
                     )
                 }
-                3 => {
+                5 => {
                     let detail = result(messages, "detail");
                     let text = detail["text"].as_str().expect("recovered text");
                     assert!(text.starts_with("visible-fact"));
@@ -684,31 +727,79 @@ async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continua
             Ok(rx)
         }
     }
+    let original_bytes = std::fs::read(reopened.file_path()).expect("original transcript");
     let recovery = Arc::new(RecoverHuge(AtomicUsize::new(0)));
     let mut runtime = RuntimeBuilder::new()
         .provider(recovery.clone())
+        .permission_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ))
         .workspace_root(root.path())
         .model_context_limit(32_000)
-        .durable_session(reopened)
+        .durable_session(reopened.clone())
         .build()
         .expect("recovered runtime");
     runtime
         .submit("recover bounded fact")
         .await
         .expect("submit");
-    let status = tokio::time::timeout(
-        Duration::from_secs(10),
-        collect_until_turn_completed(&mut runtime),
-    )
+    let mut applied = 0;
+    let mut completed = false;
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while let Some(event) = runtime.next_event().await {
+            match event {
+                SessionEvent::ModelCheckpointTerminal { outcome, .. } => {
+                    let talos_core::session::CompactOutcome::Applied { before, after } = outcome
+                    else {
+                        panic!("{outcome:?}")
+                    };
+                    assert!(after < before);
+                    println!("huge_checkpoint before={before} after={after}");
+                    applied += 1;
+                }
+                SessionEvent::TurnEvent {
+                    payload: talos_core::session::TurnEventPayload::Completed { status },
+                    ..
+                } => {
+                    assert!(
+                        matches!(status, TurnCompletionStatus::Success { .. }),
+                        "{status:?}"
+                    );
+                    completed = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+    })
     .await
-    .expect("recovery deadline")
-    .expect("completion");
-    assert!(
-        matches!(status, TurnCompletionStatus::Success { .. }),
-        "{status:?}"
-    );
-    assert_eq!(recovery.0.load(Ordering::SeqCst), 4);
+    .expect("recovery deadline");
+    assert!(completed);
+    assert_eq!(applied, 1, "one confirmed installed checkpoint");
+    assert_eq!(recovery.0.load(Ordering::SeqCst), 6);
     runtime.shutdown().await.expect("shutdown");
+    assert!(
+        std::fs::read(reopened.file_path())
+            .expect("transcript after checkpoint")
+            .starts_with(&original_bytes)
+    );
+    let final_history = reopened.read_messages().expect("authoritative history");
+    let original_results: Vec<_> = final_history
+        .iter()
+        .filter_map(|message| match message {
+            Message::Tool { result } if result.tool_use_id == "huge" => Some(result),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(original_results.len(), 1);
+    assert_eq!(
+        original_results[0].content.matches("[truncated,").count(),
+        1
+    );
+    assert!(!original_results[0].content.contains("hidden-tail"));
 }
 
 #[tokio::test]
