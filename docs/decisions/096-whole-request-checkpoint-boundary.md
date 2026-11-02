@@ -283,7 +283,14 @@ in the separate untrusted search cache and cross-owner/branch substitution.
 If bindings storage cannot be treated as host authority by the security review,
 use a separately protected integrity mechanism instead; do not activate restoration.
 Initial support requires reliable Unix device/inode/size/mtime/ctime matching.
-Windows remains fail-closed pending its separate source-version semantics review.
+The unpublished I313 Windows activation candidate uses volume/file ID/size and
+creation/write/change timestamps from the existing restricted local handle. A
+restored cursor reacquires that handle and compares every field; no lease is
+serialized. Cross-platform/unknown metadata is refused, and cancellation cleanup
+is bounded best effort: persistent database errors may retain the progress row.
+This candidate requires native saved-scan tests, independent source-version/API
+review and native Agent-hook evidence before activation is accepted. Published
+Windows behavior remains fail-closed until those gates close.
 
 Required proof: nonzero-offset continuation across independent processes with
 bounded work, exact digest equivalence, source replacement/mutation/append refusal,

@@ -619,8 +619,13 @@ again; this is not protection against modification of the trusted host database.
 `DurableSession` root branch IDs are now stable for a durable UUID; discard cached
 random root IDs from earlier opens, while retaining original transcript/entry IDs.
 The opaque scan receipt permits exact-record cleanup only for its issuing handle;
-it does not authorize history queries. Windows and full index-prefix revalidation
-continuation remain subject to the incomplete I313 platform/acceptance gates.
+it does not authorize history queries. The unpublished Windows candidate exposes
+the same APIs and Agent preparation hooks for checked local sources, reacquiring
+a restricted handle and validating the complete stored source version on restore.
+Cancellation cleanup is bounded best effort; storage failures can retain a row.
+Native saved-scan and Agent-hook evidence remain required before Windows activation
+is accepted. Full index-prefix revalidation continuation and the complete I313
+platform/acceptance gates remain outstanding.
 
 Unix and Windows durable hosts can call `RuntimeHandle::fork_durable(external_id)` at an idle
 Actor boundary. It returns a fresh child UUID, preserves the committed raw prefix

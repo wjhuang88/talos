@@ -58,7 +58,7 @@ impl QueryState {
 
 /// Host-owned progress; no partial state authorizes query results.
 pub(crate) struct Preparation {
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     scan_store: ScanStore,
     source: talos_session::DurableRecoverySource,
     scan: Option<talos_session::RecoveryPrefixScan>,
@@ -70,14 +70,14 @@ pub(crate) struct Preparation {
     #[cfg(test)]
     after_page_read: Option<Box<dyn FnOnce() + Send>>,
 }
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 struct ScanStore {
     owner: DurableSession,
     receipt: Option<talos_session::RecoveryScanReceipt>,
     saved_bytes: u64,
     cancel: CancellationToken,
 }
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 impl ScanStore {
     fn clear(&self) {
         if let Some(receipt) = &self.receipt {
@@ -98,7 +98,7 @@ impl ScanStore {
         }
     }
 }
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 impl Drop for ScanStore {
     fn drop(&mut self) {
         // Actor interruption aborts the turn task after cancelling its token.
@@ -149,11 +149,11 @@ impl Preparation {
                     Some((source, scan))
                 })
         {
-            #[cfg(unix)]
+            #[cfg(any(unix, windows))]
             let restored = session
                 .restore_recovery_scan_for_source(&source, &budget)
                 .ok()?;
-            #[cfg(unix)]
+            #[cfg(any(unix, windows))]
             let (scan, receipt, saved_bytes) = match restored {
                 Some(restored) if restored.scan.verifies_expectation(&saved.prefix) => {
                     let offset = restored.scan.completed_bytes();
@@ -174,7 +174,7 @@ impl Preparation {
                 None => (scan, None, 0),
             };
             return Some(Self {
-                #[cfg(unix)]
+                #[cfg(any(unix, windows))]
                 scan_store: ScanStore {
                     owner: session.clone(),
                     receipt,
@@ -192,12 +192,12 @@ impl Preparation {
                 after_page_read: None,
             });
         }
-        #[cfg(unix)]
+        #[cfg(any(unix, windows))]
         let restored = session
             .restore_recovery_scan_for_source(&source, &budget)
             .ok()
             .flatten();
-        #[cfg(unix)]
+        #[cfg(any(unix, windows))]
         let (scan, scan_receipt, saved_scan_bytes) = match restored {
             Some(restored) => {
                 let offset = restored.scan.completed_bytes();
@@ -213,7 +213,7 @@ impl Preparation {
             .begin_recovery_build(&scope, source.source_end(), &budget)
             .ok()?;
         Some(Self {
-            #[cfg(unix)]
+            #[cfg(any(unix, windows))]
             scan_store: ScanStore {
                 owner: session.clone(),
                 receipt: scan_receipt,
@@ -235,9 +235,9 @@ impl Preparation {
         // During revalidation retain the previous checkpoint; no new index page
         // can commit until the scan finishes and installs the refreshed seal.
         if let Some(scan) = &self.scan {
-            #[cfg(not(unix))]
+            #[cfg(not(any(unix, windows)))]
             let _ = scan;
-            #[cfg(unix)]
+            #[cfg(any(unix, windows))]
             if scan.completed_bytes() > self.scan_store.saved_bytes {
                 let stopped = cancel.clone();
                 let budget = RecoveryWorkBudget::with_cancellation_check(
@@ -282,7 +282,7 @@ impl Preparation {
         Some(())
     }
     fn retire(&self) {
-        #[cfg(unix)]
+        #[cfg(any(unix, windows))]
         self.scan_store.clear();
         if let Ok(index) = SessionIndex::new(&self.path) {
             let _ = index.clear_recovery_continuation(
@@ -1694,5 +1694,67 @@ mod windows_lease_tests {
                 &Default::default(),
             )
             .expect("append after preparation drop");
+    }
+}
+
+#[cfg(all(test, any(unix, windows)))]
+mod persisted_preparation_tests {
+    use super::*;
+
+    #[test]
+    fn host_preparation_restores_completed_scan_pages_and_cancellation_cleans_receipt() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "scan-hooks").expect("session");
+        session
+            .commit_turn(
+                "seed",
+                &[talos_core::message::Message::User {
+                    content: "original evidence ".repeat(200_000),
+                }],
+                &Default::default(),
+            )
+            .expect("seed");
+        let cancel = CancellationToken::new();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let mut first = Preparation::begin(&session, &cancel, deadline).expect("prepare");
+        while first.scan_store.saved_bytes == 0 {
+            assert_eq!(
+                first.step(&cancel, deadline),
+                Some(PreparationStep::Pending)
+            );
+            first
+                .persist(&cancel, deadline)
+                .expect("save completed page");
+        }
+        let saved = first.scan_store.saved_bytes;
+        assert!(saved > 0);
+        drop(first); // All old source leases are released; uncancelled progress survives.
+        let second = Preparation::begin(&session, &cancel, deadline).expect("restore preparation");
+        assert_eq!(second.scan_store.saved_bytes, saved);
+        assert_eq!(
+            second
+                .scan
+                .as_ref()
+                .expect("resumed scan")
+                .completed_bytes(),
+            saved
+        );
+        cancel.cancel();
+        drop(second); // Agent cancellation cleanup uses the exact restored receipt.
+        assert!(
+            session
+                .restore_recovery_scan(&RecoveryWorkBudget::new(Duration::from_secs(2)))
+                .expect("check cleanup")
+                .is_none()
+        );
+        session
+            .commit_turn(
+                "next",
+                &[talos_core::message::Message::User {
+                    content: "normal continuation after cancelled preparation".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("source leases released");
     }
 }

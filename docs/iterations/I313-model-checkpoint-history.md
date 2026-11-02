@@ -2,6 +2,36 @@
 
 
 
+## Windows production scan-hook candidate — local, unpublished, 2026-11-02
+
+Local source now extends stored scan representation/APIs and Agent ScanStore
+save/restore/exact-receipt cleanup to Windows. It reuses the existing six-field
+source version and reacquired restricted local handle; platform-specific source
+verification is unchanged. No new unsafe/native implementation or dependency.
+This is a candidate under review, not a published activation: ADR-096's native
+evidence gate still applies. Test-only published head b8a80873b is undergoing
+Windows workspace tests in run41418548863. Its result cannot certify the new
+production Agent hooks; a subsequent exact-head native run is required as well.
+
+New shared Agent regression exercises actual Preparation persist at a nonzero
+page, drop/reacquire, exact-offset restore, cancellation receipt cleanup and
+subsequent host append. Focused local validation passed (1/1) at
+`/private/tmp/i313-windows-activation-hooks.log`. Independent static safety/API
+review found no new source blocker (five-file diff
+`c306aa7dbe1cfc89e895d7c213612b3ba0de2b53622a4421038c3361cad3f9fb`),
+but did not approve publication/activation without native evidence. Reviewer ran
+no builds. Cleanup remains bounded best effort (three 100ms attempts); persistent
+DB failure may retain a record with warning. This test is Preparation-level,
+not a new complete Actor Interrupt/Shutdown proof. Existing composition preflight session77258 started before this source
+change and cannot be claimed as exact-candidate validation. T5 remains Partial.
+
+Local affected all-target Clippy passed
+(`/private/tmp/i313-windows-activation-clippy.log`), as did both governance validators
+(`/private/tmp/i313-windows-activation-{governance,claims}.log`). ADR-096 and SDK
+contract now describe the unpublished Windows candidate and preserve the native
+activation gates and best-effort cleanup boundary. These docs do not establish
+native runtime evidence or full T5 completion.
+
 ## Installed checkpoint rejection preservation — local increment, 2026-11-02
 
 The Runtime rejection probe now uses complete checkpoint-shaped fields and source

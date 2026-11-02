@@ -1,3 +1,13 @@
+## T5 Windows production scan-hook candidate — local, unpublished
+
+Uncommitted implementation now connects Windows persisted scan APIs to Agent
+save/restore/cancellation cleanup, with a real shared Preparation regression.
+Native test-only CI41418548863 and independent review remain gates; production
+activation is not published. Focused test15185 passed; earlier composition preflight
+77258 remains live with a different source scope. Static review found no new
+source blocker, but native validation and activation approval remain outstanding. Full queue retained; T5 Partial,
+T1/T6 unimplemented. See I313 owner for validation boundaries.
+
 ## T5 installed checkpoint refusal preservation — 2026-11-02
 
 Local Runtime test now rejects complete-shaped oversized payloads before A and

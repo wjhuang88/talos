@@ -295,7 +295,7 @@ mod tests {
 
 /// Private source-version representation for host-owned scan checkpoints.
 /// Equality is only version evidence; loading this value does not authorize reads.
-#[cfg(all(windows, test))]
+#[cfg(windows)]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct StoredFileVersion {
@@ -307,7 +307,7 @@ pub(crate) struct StoredFileVersion {
     changed: i64,
 }
 
-#[cfg(all(windows, test))]
+#[cfg(windows)]
 impl From<&FileStamp> for StoredFileVersion {
     fn from(stamp: &FileStamp) -> Self {
         Self {

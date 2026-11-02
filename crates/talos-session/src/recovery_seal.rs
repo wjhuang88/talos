@@ -17,7 +17,7 @@ pub struct RecoveryPrefixScan {
 
 // Trusted bindings provenance only. Never deserialize this from the search index
 // or model input. Fields cannot be supplied through the public API (ADR-096).
-#[cfg(any(unix, all(windows, test)))]
+#[cfg(any(unix, windows))]
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct StoredScan {
@@ -32,7 +32,7 @@ pub(crate) struct StoredScan {
     stamp: crate::recovery_stamp::StoredFileVersion,
 }
 
-#[cfg(any(unix, all(windows, test)))]
+#[cfg(any(unix, windows))]
 impl RecoveryPrefixScan {
     pub(crate) fn stored(
         &self,
@@ -56,7 +56,7 @@ impl RecoveryPrefixScan {
     }
 }
 
-#[cfg(any(unix, all(windows, test)))]
+#[cfg(any(unix, windows))]
 impl StoredScan {
     pub(crate) fn supersedes(&self, previous: &Self) -> bool {
         self.stamp != previous.stamp
