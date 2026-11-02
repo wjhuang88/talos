@@ -186,7 +186,8 @@ async fn run_durable_session() -> Result<()> {
     let mut runtime = RuntimeBuilder::new()
         .provider(provider("durable fixture turn"))
         .durable_session(session)
-        .build()?;
+        .build_async()
+        .await?;
     runtime.submit("persist this fixture turn").await?;
     let status = collect_until_turn_completed(&mut runtime)
         .await
@@ -199,6 +200,24 @@ async fn run_durable_session() -> Result<()> {
     let reopened = manager.create_or_open_session("fixture:durable")?;
     let messages = reopened.read_messages()?;
     assert!(serde_json::to_string(&messages)?.contains("durable fixture turn"));
+    let mut resumed = RuntimeBuilder::new()
+        .provider(provider("resumed durable fixture"))
+        .durable_session(reopened)
+        .build_async()
+        .await?;
+    resumed.submit("continue after reopen").await?;
+    let status = collect_until_turn_completed(&mut resumed)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("reopened fixture ended before completion"))?;
+    assert!(matches!(
+        status,
+        RuntimeTurnCompletionStatus::Success { .. }
+    ));
+    resumed.shutdown().await?;
+    let recovered = manager
+        .create_or_open_session("fixture:durable")?
+        .read_messages()?;
+    assert!(serde_json::to_string(&recovered)?.contains("resumed durable fixture"));
     Ok(())
 }
 

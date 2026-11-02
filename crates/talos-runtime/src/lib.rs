@@ -1504,6 +1504,14 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Build with bounded-page durable history preparation on blocking workers.
+    /// Dropping the future requests cancellation. Use [`Self::build_cancellable`]
+    /// when the host needs to request cancellation without dropping the future.
+    pub async fn build_async(self) -> RuntimeResult<RuntimeHandle> {
+        self.build_cancellable(tokio_util::sync::CancellationToken::new())
+            .await
+    }
+
     /// Prepare durable history one bounded page at a time off the async executor,
     /// then build the runtime. Dropping this future cancels pending preparation;
     /// a kernel read already in progress can outlive the future until it returns.

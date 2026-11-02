@@ -2726,3 +2726,20 @@ Independent static review approves diff
 against `006d51a34`; reviewer did not run tests. The gate completion notification
 does not prove capture or lease release completed. Affected all-target Clippy
 passes (`/private/tmp/i313-startup-responsive-clippy.log`).
+
+### Independent SDK asynchronous startup consumer
+
+RuntimeBuilder::build_async exposes the cancellable preparation path without
+requiring callers to name the cancellation-token dependency. The independent
+single-Talos-dependency SDK fixture now uses it for durable startup and verifies
+shutdown, reopening, a second turn and persisted continuation. Both fixture modes
+pass (`/private/tmp/i313-async-sdk-fixture-locked.log`). This demonstrates external
+API reachability, not Desktop/CLI default migration or complete startup boundedness.
+An initial fixture command omitted the low-debug profile environment and was
+interrupted; the recorded successful run uses the required profile settings.
+Independent static review approves diff
+`e7bbfe5e86eee5450b059cbc3c0f5955cd0571c185b3d2140981b373179a981e`;
+reviewer did not execute tests. This fixture does not inspect the second provider's
+received context, so its evidence is reopening/persistence rather than recovered
+model-context content. All-target Runtime Clippy passes
+(`/private/tmp/i313-async-sdk-clippy.log`).
