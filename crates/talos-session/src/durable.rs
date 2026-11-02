@@ -454,14 +454,14 @@ impl DurableRecoverySource {
 
 /// Opaque capability to remove one successfully saved scan record.
 /// Bound to its issuing durable handle; not serializable or query authority.
-#[cfg(any(unix, windows))]
+#[cfg(any(unix, all(windows, test)))]
 pub struct RecoveryScanReceipt {
     owner: Arc<()>,
     payload: String,
 }
 
 /// Restored host scan and exact-record cleanup capability.
-#[cfg(any(unix, windows))]
+#[cfg(any(unix, all(windows, test)))]
 pub struct RecoveryScanResume {
     /// Scan requiring completion before any query authorization.
     pub scan: crate::RecoveryPrefixScan,
@@ -920,8 +920,8 @@ impl DurableSession {
 
     /// Save completed initial-scan pages in host-owned bindings (ADR-096).
     /// Only scans issued by this exact handle are accepted. Search-cache records
-    /// cannot be imported through this API. Supported on Unix and local Windows sources.
-    #[cfg(any(unix, windows))]
+    /// cannot be imported through this API. Unix only; other platforms reject.
+    #[cfg(any(unix, all(windows, test)))]
     pub fn save_recovery_scan(
         &self,
         scan: &crate::RecoveryPrefixScan,
@@ -987,7 +987,7 @@ impl DurableSession {
     /// Restore host-owned initial scan progress for an unchanged source version.
     /// Missing, malformed or stale records return None and require fresh scanning.
     /// The restored scan still must complete before it can mint a prefix seal.
-    #[cfg(any(unix, windows))]
+    #[cfg(any(unix, all(windows, test)))]
     pub fn restore_recovery_scan(
         &self,
         budget: &crate::sqlite::RecoveryWorkBudget,
@@ -998,7 +998,7 @@ impl DurableSession {
 
     /// Restore progress against the exact owner-issued source used by the caller.
     /// This never recaptures a later cutoff between preparation and index creation.
-    #[cfg(any(unix, windows))]
+    #[cfg(any(unix, all(windows, test)))]
     pub fn restore_recovery_scan_for_source(
         &self,
         source: &DurableRecoverySource,
@@ -1048,7 +1048,7 @@ impl DurableSession {
 
     /// Remove only the persisted progress identified by this saved-record receipt.
     /// A stale execution cannot erase a newer checkpoint. Returns whether deleted.
-    #[cfg(any(unix, windows))]
+    #[cfg(any(unix, all(windows, test)))]
     pub fn clear_recovery_scan(
         &self,
         receipt: &RecoveryScanReceipt,

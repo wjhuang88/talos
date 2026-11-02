@@ -283,14 +283,15 @@ in the separate untrusted search cache and cross-owner/branch substitution.
 If bindings storage cannot be treated as host authority by the security review,
 use a separately protected integrity mechanism instead; do not activate restoration.
 Initial support requires reliable Unix device/inode/size/mtime/ctime matching.
-The unpublished I313 Windows activation candidate uses volume/file ID/size and
-creation/write/change timestamps from the existing restricted local handle. A
-restored cursor reacquires that handle and compares every field; no lease is
-serialized. Cross-platform/unknown metadata is refused, and cancellation cleanup
-is bounded best effort: persistent database errors may retain the progress row.
-This candidate requires native saved-scan tests, independent source-version/API
-review and native Agent-hook evidence before activation is accepted. Published
-Windows behavior remains fail-closed until those gates close.
+Windows persisted offset restoration remains disabled. Native test-only head
+b8a80873b (run41418548863, job125196764203) demonstrated a same-length overwrite
+whose volume/file ID/size/creation/write/change fields remained identical.
+These fields alone therefore cannot certify an unchanged source across released
+leases. Do not mask this counterexample with sleeps or weakened assertions.
+The local activation candidate was withdrawn; a reliable source-change authority
+or bounded content revalidation design requires separate review and native proof.
+Live retained-handle source checks are a distinct boundary and are unchanged.
+
 
 Required proof: nonzero-offset continuation across independent processes with
 bounded work, exact digest equivalence, source replacement/mutation/append refusal,

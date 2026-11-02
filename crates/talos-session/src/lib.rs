@@ -104,5 +104,5 @@ pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetada
 #[allow(warnings)]
 mod tests;
 
-#[cfg(any(unix, windows))]
+#[cfg(any(unix, all(windows, test)))]
 pub use durable::{RecoveryScanReceipt, RecoveryScanResume};

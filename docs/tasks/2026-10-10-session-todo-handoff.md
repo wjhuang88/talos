@@ -1,3 +1,24 @@
+## Native Windows counterexample — activation withdrawn, 2026-11-02
+
+Test-only b8a80873b Windows job125196764203 in run41418548863 failed two Session
+regressions (278 passed). Same-length overwrite retained identical six version
+fields; metadata equality cannot safely resume a persisted offset after lease
+release. Keep that regression intact; no timing delay/waiver is accepted. Local
+activation commit ceef9369c was never published; its production cfg changes are
+withdrawn in the current correction. Agent hooks remain Unix-only. New shared
+Preparation regression remains Unix-only until a valid Windows design exists.
+
+The other failure required Err for sharing conflict although the restore contract
+also permits safe None. Its assertion now rejects every Ok(Some(scan)) outcome,
+preserving the no-authority-on-conflict boundary. Native counterexample log:
+`/private/tmp/i313-windows-b8a808-log.txt`. A reliable change authority or bounded
+content revalidation needs upstream research, independent review and native proof.
+Existing retained-live-lease checks remain unchanged. T5 stays Partial.
+
+Composition preflight session77258 exited0 with both SDK modes, but began before
+activation changes and does not certify native Windows. Current source correction
+has no new full preflight claim. T1/T6 remain unimplemented; full queue retained.
+
 ## T5 Windows production scan-hook candidate — local, unpublished
 
 Uncommitted implementation now connects Windows persisted scan APIs to Agent

@@ -58,7 +58,7 @@ impl QueryState {
 
 /// Host-owned progress; no partial state authorizes query results.
 pub(crate) struct Preparation {
-    #[cfg(any(unix, windows))]
+    #[cfg(unix)]
     scan_store: ScanStore,
     source: talos_session::DurableRecoverySource,
     scan: Option<talos_session::RecoveryPrefixScan>,
@@ -70,14 +70,14 @@ pub(crate) struct Preparation {
     #[cfg(test)]
     after_page_read: Option<Box<dyn FnOnce() + Send>>,
 }
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 struct ScanStore {
     owner: DurableSession,
     receipt: Option<talos_session::RecoveryScanReceipt>,
     saved_bytes: u64,
     cancel: CancellationToken,
 }
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 impl ScanStore {
     fn clear(&self) {
         if let Some(receipt) = &self.receipt {
@@ -98,7 +98,7 @@ impl ScanStore {
         }
     }
 }
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 impl Drop for ScanStore {
     fn drop(&mut self) {
         // Actor interruption aborts the turn task after cancelling its token.
@@ -149,11 +149,11 @@ impl Preparation {
                     Some((source, scan))
                 })
         {
-            #[cfg(any(unix, windows))]
+            #[cfg(unix)]
             let restored = session
                 .restore_recovery_scan_for_source(&source, &budget)
                 .ok()?;
-            #[cfg(any(unix, windows))]
+            #[cfg(unix)]
             let (scan, receipt, saved_bytes) = match restored {
                 Some(restored) if restored.scan.verifies_expectation(&saved.prefix) => {
                     let offset = restored.scan.completed_bytes();
@@ -174,7 +174,7 @@ impl Preparation {
                 None => (scan, None, 0),
             };
             return Some(Self {
-                #[cfg(any(unix, windows))]
+                #[cfg(unix)]
                 scan_store: ScanStore {
                     owner: session.clone(),
                     receipt,
@@ -192,12 +192,12 @@ impl Preparation {
                 after_page_read: None,
             });
         }
-        #[cfg(any(unix, windows))]
+        #[cfg(unix)]
         let restored = session
             .restore_recovery_scan_for_source(&source, &budget)
             .ok()
             .flatten();
-        #[cfg(any(unix, windows))]
+        #[cfg(unix)]
         let (scan, scan_receipt, saved_scan_bytes) = match restored {
             Some(restored) => {
                 let offset = restored.scan.completed_bytes();
@@ -213,7 +213,7 @@ impl Preparation {
             .begin_recovery_build(&scope, source.source_end(), &budget)
             .ok()?;
         Some(Self {
-            #[cfg(any(unix, windows))]
+            #[cfg(unix)]
             scan_store: ScanStore {
                 owner: session.clone(),
                 receipt: scan_receipt,
@@ -235,9 +235,9 @@ impl Preparation {
         // During revalidation retain the previous checkpoint; no new index page
         // can commit until the scan finishes and installs the refreshed seal.
         if let Some(scan) = &self.scan {
-            #[cfg(not(any(unix, windows)))]
+            #[cfg(not(unix))]
             let _ = scan;
-            #[cfg(any(unix, windows))]
+            #[cfg(unix)]
             if scan.completed_bytes() > self.scan_store.saved_bytes {
                 let stopped = cancel.clone();
                 let budget = RecoveryWorkBudget::with_cancellation_check(
@@ -282,7 +282,7 @@ impl Preparation {
         Some(())
     }
     fn retire(&self) {
-        #[cfg(any(unix, windows))]
+        #[cfg(unix)]
         self.scan_store.clear();
         if let Ok(index) = SessionIndex::new(&self.path) {
             let _ = index.clear_recovery_continuation(
@@ -1697,7 +1697,7 @@ mod windows_lease_tests {
     }
 }
 
-#[cfg(all(test, any(unix, windows)))]
+#[cfg(all(test, unix))]
 mod persisted_preparation_tests {
     use super::*;
 

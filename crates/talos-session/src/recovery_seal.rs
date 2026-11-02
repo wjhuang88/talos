@@ -17,7 +17,7 @@ pub struct RecoveryPrefixScan {
 
 // Trusted bindings provenance only. Never deserialize this from the search index
 // or model input. Fields cannot be supplied through the public API (ADR-096).
-#[cfg(any(unix, windows))]
+#[cfg(any(unix, all(windows, test)))]
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct StoredScan {
@@ -32,7 +32,7 @@ pub(crate) struct StoredScan {
     stamp: crate::recovery_stamp::StoredFileVersion,
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(any(unix, all(windows, test)))]
 impl RecoveryPrefixScan {
     pub(crate) fn stored(
         &self,
@@ -56,7 +56,7 @@ impl RecoveryPrefixScan {
     }
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(any(unix, all(windows, test)))]
 impl StoredScan {
     pub(crate) fn supersedes(&self, previous: &Self) -> bool {
         self.stamp != previous.stamp
@@ -566,7 +566,7 @@ mod process_resume_tests {
             .open(owner.file_path())
             .expect("new lease released");
         assert!(
-            owner.restore_recovery_scan(&budget()).is_err(),
+            !matches!(owner.restore_recovery_scan(&budget()), Ok(Some(_))),
             "sharing conflict cannot reuse saved offset"
         );
         drop(writer);
