@@ -4990,9 +4990,20 @@ async fn durable_turn_receipts_bind_live_actor_history_for_success_error_and_can
 
 #[tokio::test]
 async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messages() {
+    exercise_automatic_checkpoint_terminal_outcomes(false).await;
+}
+
+#[tokio::test]
+async fn registered_checkpoint_tools_preserve_automatic_terminal_outcomes() {
+    exercise_automatic_checkpoint_terminal_outcomes(true).await;
+}
+
+async fn exercise_automatic_checkpoint_terminal_outcomes(model_tools: bool) {
     use talos_core::session::AutomaticCompactState;
     struct ProgressModel {
         invalid: bool,
+        transport_error: bool,
+        ordinary: AtomicUsize,
         block: bool,
         entered: tokio::sync::Notify,
     }
@@ -5006,6 +5017,11 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
                 if self.block {
                     return std::future::pending().await;
                 }
+                if self.transport_error {
+                    return Err(talos_core::provider::ProviderError::NetworkError(
+                        "private-checkpoint-transport-detail".into(),
+                    ));
+                }
                 if self.invalid {
                     success_events("invalid checkpoint")
                 } else {
@@ -5018,6 +5034,7 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
                         "facts":[],"assumptions":[],"resources":[],"open_loops":[]}).to_string())
                 }
             } else {
+                self.ordinary.fetch_add(1, Ordering::SeqCst);
                 success_events("ordinary reply")
             };
             let (tx, rx) = mpsc::channel(8);
@@ -5027,15 +5044,28 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
             Ok(rx)
         }
     }
-    for outcome in ["applied", "failed", "cancelled"] {
+    for outcome in [
+        "applied",
+        "failed",
+        "cancelled",
+        "over_limit_failure",
+        "transport_failure",
+    ] {
         let directory = tempfile::tempdir().expect("directory");
         let model = Arc::new(ProgressModel {
-            invalid: outcome == "failed",
+            invalid: matches!(outcome, "failed" | "over_limit_failure"),
+            transport_error: outcome == "transport_failure",
+            ordinary: AtomicUsize::new(0),
             block: outcome == "cancelled",
             entered: tokio::sync::Notify::new(),
         });
         #[allow(deprecated)]
-        let agent = Agent::new(model.clone(), ToolRegistry::new());
+        let mut agent = Agent::new(model.clone(), ToolRegistry::new());
+        if model_tools {
+            agent
+                .enable_model_checkpoint_tools()
+                .expect("registered checkpoint tools");
+        }
         let raw: Vec<_> = (0..20)
             .flat_map(|index| {
                 [
@@ -5061,7 +5091,11 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
             )
             .await
             .expect("probe");
-        let limit = probe.initial_plan.estimated_tokens * 100 / 96;
+        let limit = if matches!(outcome, "over_limit_failure" | "transport_failure") {
+            probe.initial_plan.estimated_tokens * 9 / 10
+        } else {
+            probe.initial_plan.estimated_tokens * 100 / 96
+        };
         let (mut handle, mut actor) = AppServerSession::new(
             agent,
             SessionConfig {
@@ -5100,11 +5134,19 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
                     control.interrupt_active();
                 }
             }
+            assert!(
+                !format!("{event:?}").contains("private-checkpoint-transport-detail"),
+                "transient lifecycle must not expose provider internals"
+            );
             if let Some(status) = completed_status(&event) {
                 assert!(
                     matches!(
                         (outcome, status),
                         ("cancelled", TurnCompletionStatus::Cancelled)
+                            | (
+                                "over_limit_failure" | "transport_failure",
+                                TurnCompletionStatus::Error { .. }
+                            )
                             | ("applied" | "failed", TurnCompletionStatus::Success { .. })
                     ),
                     "{outcome}: {status:?}"
@@ -5134,12 +5176,20 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
                 assert_eq!(prior, before);
                 assert!(after < before && after <= limit);
             }
-            ("failed", AutomaticCompactState::Failed { before: prior, .. })
+            (
+                "failed" | "over_limit_failure" | "transport_failure",
+                AutomaticCompactState::Failed { before: prior, .. },
+            )
             | ("cancelled", AutomaticCompactState::Cancelled { before: prior }) => {
                 assert_eq!(prior, before)
             }
             _ => panic!("unexpected outcome: {outcome}, {states:?}"),
         }
+        assert_eq!(
+            model.ordinary.load(Ordering::SeqCst),
+            usize::from(matches!(outcome, "applied" | "failed")),
+            "{outcome}: failed over-limit preparation cannot dispatch a normal request"
+        );
         assert_eq!(&actor.history[..raw.len()], raw);
         assert!(
             !serde_json::to_string(&actor.history)

@@ -1,3 +1,12 @@
+## Automatic checkpoint failure/cancellation composition — 2026-11-02
+
+Actor Submit regression with registered tools now covers five terminal outcomes,
+including invalid-summary and injected provider-error failures over capacity with zero ordinary dispatch.
+Both new and baseline wrappers and all-target Clippy passed; independent static
+review found no blocker. Provider-boundary error injection is covered; actual network faults/tool execution failures are not. See I313 owner.
+Production-hook CI41434712578 remains pending for79b9c05d5, not these local tests.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
 ## Registered tools/manual compaction capacity regressions — 2026-11-02
 
 Two new Actor regressions pass: 32K manual compaction/duplicate receipt/normal

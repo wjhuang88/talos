@@ -1,3 +1,21 @@
+## Automatic checkpoint lifecycle with registered tools — 2026-11-02
+
+Extended real Actor Submit fixtures with registered checkpoint tools: applied,
+invalid-summary failure, cancellation, over-limit invalid-summary failure and
+injected provider NetworkError each produce one Started/terminal pair. Cancellation
+and over-limit failures make zero ordinary provider calls; applied and within-limit
+failed summary continue once. Raw prefix stays unchanged; failures install no projection.
+The transport fixture also checks no private error marker in SessionEvents through
+Turn completion. It does not prove all logs are clean, actual network faults, or tool
+execution failures. These are not model-initiated checkpoint tests.
+Registered five-case wrapper passed (`/private/tmp/i313-auto-transport.log`).
+Independent static review approved source diff
+`b76040423d669e1d653e53cf7f8e6216a5d35baae1cdf22b4541f90447167ad1`.
+Baseline five-case wrapper and refreshed all-target Clippy passed:
+`/private/tmp/i313-auto-transport-baseline.log`, `/private/tmp/i313-auto-transport-clippy.log`.
+Published production-hook candidate79b9c05d5 has CI41434712578 in progress;
+this local test change is not certified by that run. T5 Partial; T1/T6 unimplemented.
+
 ## Registered tools with manual Actor compaction — 2026-11-02
 
 Preserved the existing no-tools 20K fixture and added registered compact_context /
