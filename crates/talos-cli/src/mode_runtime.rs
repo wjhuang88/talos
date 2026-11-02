@@ -480,6 +480,7 @@ mod tests {
     #[allow(deprecated)]
     async fn reasoning_wire_budget_matches_registered_agent_output_reservation() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let mut measured = Vec::new();
         for (output, thinking) in [(4096, 1024), (8192, 6000)] {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
                 .await
@@ -506,7 +507,16 @@ mod tests {
                             }
                         }
                     };
-                    socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await.expect("response");
+                    let response = concat!(
+                        "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"fixture\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"model\":\"reasoning-fixture\",\"stop_reason\":null,\"usage\":{\"input_tokens\":1,\"output_tokens\":0}}}\n\n",
+                        "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n",
+                        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ok\"}}\n\n",
+                        "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+                        "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n\n",
+                        "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+                    );
+                    let wire = format!("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", response.len());
+                    socket.write_all(wire.as_bytes()).await.expect("response");
                     body
                 }).await.expect("fixture deadline")
             });
@@ -547,18 +557,67 @@ mod tests {
                 .expect("registered tools");
             set_request_budget_spec(&mut agent, &config);
             let reserved = agent.request_budget_spec().requested_output_tokens;
+            let root = tempfile::tempdir().expect("workspace");
+            let (handle, mut actor) = talos_agent::session::AppServerSession::new(
+                agent,
+                talos_core::session::SessionConfig {
+                    runtime_policy: talos_core::session::RuntimePolicy::interactive(),
+                    workspace_root: root.path().to_path_buf(),
+                    initial_history: vec![],
+                    model_context_limit: 32_000,
+                },
+            );
+            let join = tokio::spawn(async move { actor.run().await });
+            let mut events = handle.eq_rx;
+            handle
+                .sq_tx
+                .send(talos_core::session::SessionOp::Submit {
+                    message: "bounded thinking request".into(),
+                })
+                .await
+                .expect("submit");
+            let mut budget = None;
+            let mut completed = false;
             tokio::time::timeout(std::time::Duration::from_secs(5), async {
-                let mut events = provider
-                    .stream(&[talos_core::message::Message::User {
-                        content: "bounded thinking request".into(),
-                    }])
-                    .await
-                    .expect("dispatch");
-                while events.recv().await.is_some() {}
-            })
-            .await
-            .expect("provider deadline");
+                while let Some(event) = events.recv().await {
+                    if let talos_core::session::SessionEvent::TurnEvent { payload, .. } = event {
+                        match payload {
+                            talos_core::session::TurnEventPayload::Progress { event: talos_core::message::AgentEvent::ContextBudget { budget: value } } => budget = Some(value),
+                            talos_core::session::TurnEventPayload::Completed { status } => {
+                                assert!(matches!(status, talos_core::session::TurnCompletionStatus::Success { .. }), "{status:?}");
+                                completed = true;
+                                break;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }).await.expect("Actor deadline");
+            assert!(completed);
+            let budget = budget.expect("actual admission budget");
+            assert_eq!(budget.limit, Some(32_000));
+            measured.push(budget.estimated_tokens);
+            handle
+                .sq_tx
+                .send(talos_core::session::SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+            tokio::time::timeout(std::time::Duration::from_secs(5), join)
+                .await
+                .expect("shutdown deadline")
+                .expect("Actor joined");
             let body = server.await.expect("server");
+            for name in ["compact_context", "history_search"] {
+                assert_eq!(
+                    body["tools"]
+                        .as_array()
+                        .expect("registered wire tools")
+                        .iter()
+                        .filter(|tool| tool["name"] == name)
+                        .count(),
+                    1
+                );
+            }
             assert_eq!(body["max_tokens"], reserved);
             assert_eq!(body["thinking"]["budget_tokens"], thinking);
             assert_eq!(reserved, output);
@@ -567,6 +626,11 @@ mod tests {
                 "thinking consumes the total output allocation; do not add it twice"
             );
         }
+        assert_eq!(
+            measured[1] - measured[0],
+            4096,
+            "only the total output reservation changes admission cost"
+        );
     }
 
     #[test]
