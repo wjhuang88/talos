@@ -20,6 +20,7 @@ pub struct SessionMessageScan {
     stamp: Option<FileStamp>,
     end: u64,
     offset: u64,
+    copy_offset: u64,
     synthetic_counter: u64,
     decoder: HistoryMessageDecoder,
     messages: Vec<Message>,
@@ -62,6 +63,7 @@ impl crate::Session {
             stamp,
             end,
             offset: 0,
+            copy_offset: 0,
             synthetic_counter: 0,
             decoder: Default::default(),
             messages: Vec::new(),
@@ -72,6 +74,54 @@ impl crate::Session {
 }
 
 impl SessionMessageScan {
+    /// Read the next raw copy page from this same captured source version.
+    ///
+    /// Pages contain at most 2 MiB. Cancellation or source changes do not advance
+    /// the copy cursor. The host must discard any staged output on error and must
+    /// finish both copying and message decoding before publishing a fork. Raw
+    /// bytes include compatibility suffixes and grant no model search authority.
+    pub fn copy_next_page(
+        &mut self,
+        deadline: Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<Option<Vec<u8>>, HistoryPageError> {
+        use std::io::{Read, Seek, SeekFrom};
+
+        let check = || {
+            if stopped() || Instant::now() >= deadline {
+                Err(HistoryPageError::Stopped)
+            } else {
+                Ok(())
+            }
+        };
+        check()?;
+        self.check_current()?;
+        if self.copy_offset == self.end {
+            return Ok(None);
+        }
+        let mut file = open_source(&self.path)?;
+        let expected = self.stamp.as_ref().ok_or(HistoryPageError::Stale)?;
+        let opened = crate::recovery_stamp::from_file(&file)?;
+        if !crate::recovery_seal::same_file_version(expected, &opened)? {
+            return Err(HistoryPageError::Stale);
+        }
+        file.seek(SeekFrom::Start(self.copy_offset))?;
+        let amount = (self.end - self.copy_offset).min(2 * 1024 * 1024) as usize;
+        let mut bytes = vec![0; amount];
+        for chunk in bytes.chunks_mut(8192) {
+            check()?;
+            file.read_exact(chunk)?;
+        }
+        let after = crate::recovery_stamp::from_file(&file)?;
+        if !crate::recovery_seal::same_file_version(expected, &after)? {
+            return Err(HistoryPageError::Stale);
+        }
+        self.check_current()?;
+        check()?;
+        self.copy_offset += bytes.len() as u64;
+        Ok(Some(bytes))
+    }
+
     /// Restore one page, preserving cursor and tool-pairing state on cancellation.
     /// Deadlines are cooperative between bounded reads/records; kernel I/O cannot
     /// be forcibly interrupted. A stopped step can be retried on this scan.
@@ -262,6 +312,60 @@ mod tests {
             assert_eq!(finish(scan), expected);
             assert_eq!(expected, messages);
         }
+    }
+
+    #[test]
+    fn raw_copy_pages_preserve_bytes_and_retry_cancelled_cursor() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = session(root.path().join("copy.jsonl"));
+        let bytes = b"not-json\n".repeat(300_000);
+        std::fs::write(&owner.file_path, &bytes).expect("source");
+        let mut scan = owner.begin_message_scan().expect("capture");
+        let calls = std::cell::Cell::new(0);
+        assert!(matches!(
+            scan.copy_next_page(Instant::now() + Duration::from_secs(5), || {
+                calls.set(calls.get() + 1);
+                calls.get() > 5
+            }),
+            Err(HistoryPageError::Stopped)
+        ));
+        assert_eq!(scan.copy_offset, 0);
+        let mut copied = Vec::new();
+        let mut pages = 0;
+        while let Some(page) = scan
+            .copy_next_page(Instant::now() + Duration::from_secs(5), || false)
+            .expect("copy")
+        {
+            assert!(page.len() <= 2 * 1024 * 1024);
+            copied.extend(page);
+            pages += 1;
+        }
+        assert_eq!(pages, 2);
+        assert_eq!(copied, bytes);
+        assert!(
+            finish(scan).is_empty(),
+            "copy and decoding use independent cursors"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn raw_copy_rejects_source_change_between_pages() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = session(root.path().join("copy.jsonl"));
+        std::fs::write(&owner.file_path, vec![b'\n'; 3 * 1024 * 1024]).expect("source");
+        let mut scan = owner.begin_message_scan().expect("capture");
+        assert!(
+            scan.copy_next_page(Instant::now() + Duration::from_secs(5), || false)
+                .expect("first")
+                .is_some()
+        );
+        std::fs::write(&owner.file_path, vec![b' '; 3 * 1024 * 1024]).expect("replace bytes");
+        assert!(matches!(
+            scan.copy_next_page(Instant::now() + Duration::from_secs(5), || false),
+            Err(HistoryPageError::Stale)
+        ));
+        assert_eq!(scan.copy_offset, 2 * 1024 * 1024);
     }
 
     #[test]

@@ -1,5 +1,47 @@
 # Iteration I313: Actor Model Checkpoints And Bounded History Recovery
 
+## CLI fork paging and cancellation — local increment, 2026-11-02
+
+The real fork handler now stages raw bytes in bounded pages from the same captured
+source version used for message/tail decoding, replacing three independent whole
+reads. Source path and actual read-handle stamps are checked. Installation uses
+create-new staging and non-overwriting hard links; unsupported filesystems fail
+explicitly. Message memory remains proportional to history; kernel I/O and sync
+may outlive caller cancellation. This is not durable model search provenance.
+
+The unpublished child owner cleans transcript, runtime sidecar, index and lineage
+on error/drop. Failed cleanup is reported and requires existing storage recovery;
+there is no new process-crash atomicity or directory-fsync guarantee. Transition
+retirement remains owned after caller cancellation, and failed publication restores
+the old logical owner before awaiting independent cleanup. Retired old routes do
+not become runnable again. Prepared MCP ownership is released on cancellation.
+
+Affected tests passed 394 CLI and 295 Session cases, then the additional real fork
+commit-await cancellation regression passed (`/private/tmp/i313-fork-commit-cancel.log`).
+The real metadata-await handler regression and source bytes/cleanup/no-overwrite
+tests also pass. Latest affected all-target Clippy passed before the final added
+test (`/private/tmp/i313-fork-final-clippy.log`). Independent static review approved
+the prior four-file diff `b99029e2c52da8726a566b75b8008cfda66fcd397d794381f2a54c979fcdaeb8`;
+reviewer ran no tests. Standard preflight is running at
+`/private/tmp/i313-fork-preflight.log`; native Windows validation, final candidate
+review/CI and full T5 acceptance remain open. T1/T6 remain unimplemented.
+
+Final source review approved fork diff SHA256
+`6a8198b773da0571637b31d7c01ddce393008ec4928cbbf7d948bc94ac1c59c3`,
+including the actual handler commit-await cancellation regression. The reviewer
+ran no builds. Both governance validators passed with zero warnings. The standard
+preflight remains live; no successful completion is inferred from intermediate tests.
+
+Published `16e73d4c7` Windows job `125169246428` passed checkpoint restart but
+failed `fork_worker_busy_compact_receipt_and_interrupt_are_observed` at the successful
+retry's two-second receipt deadline. Production fork storage allows ten seconds.
+The separate test-only change allows twelve seconds for successful retry delivery,
+retaining two-second Busy/cancel/shutdown checks. It passed locally
+(`/private/tmp/i313-fork-retry-budget.log`) and independent review approved diff
+`1b6a68945d334490e50770b3381f2cb2a59f3f89e44816792e67170559892f7d`.
+The running preflight's previously compiled Agent test does not certify this
+change; new native exact-head evidence remains required.
+
 ## Lifecycle paging local increment — 2026-11-02
 
 Implementation `5bb33ccca` after `0b454998a`: `/resume` and model activation use one

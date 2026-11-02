@@ -43,8 +43,9 @@ Unreleased CLI startup history restoration uses cancellable bounded pages in TUI
 interactive and inline modes. Read failures now stop startup instead of silently
 using empty history. Oversized individual records and malformed/unsupported sources
 return errors; raw history is preserved. `/resume` and model switching also use
-paged restoration; failed resume retains the active session. CLI fork still uses
-full-file copying. See the [startup compatibility limits](docs/reference/RUNTIME-SDK-CONTRACT.md#cli-startup-history-restoration-i313-candidate).
+paged restoration; failed resume retains the active session. CLI fork stages
+bounded raw-byte pages from the same captured history, with cleanup on cancellation;
+it requires filesystem hard-link support. See the [startup compatibility limits](docs/reference/RUNTIME-SDK-CONTRACT.md#cli-startup-history-restoration-i313-candidate).
 
 ### TUI thinking and activity
 

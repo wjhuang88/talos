@@ -667,5 +667,9 @@ bytes; skipped JSONL or incomplete TLOG suffixes do not become activation eviden
 Failed resume leaves the original command route active. Model switching retains
 the existing retirement/activation fence and retries the exact committed marker
 without duplicating it. Dropping a transition read cancels its worker cooperatively,
-without adding another Ctrl-C handler. CLI fork still uses full-file reads/copy,
-and legacy CLI storage lacks the receipts needed for durable model history_search.
+without adding another Ctrl-C handler. CLI fork stages raw bytes in bounded pages
+from that same source version and installs without overwriting an existing child.
+Dropping an unpublished fork cleans its transcript, sidecar, index and lineage;
+cleanup failures require storage recovery. Filesystems without hard-link support
+fail explicitly. This does not add process-crash atomicity or directory-fsync
+guarantees. Legacy CLI storage still lacks durable model history_search receipts.

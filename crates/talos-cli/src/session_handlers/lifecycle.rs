@@ -2,6 +2,11 @@
 
 use super::super::*;
 
+#[cfg(test)]
+tokio::task_local! {
+    static FORK_METADATA_CUT: Arc<tokio::sync::Notify>;
+}
+
 /// Publish the UI boundary between two successfully committed sessions.
 ///
 /// The queue belongs to the retired conversation engine, so its preview must be
@@ -514,50 +519,6 @@ pub(crate) async fn handle_session_fork(
         return;
     }
 
-    let source_bytes = match source_session.snapshot_bytes() {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            send_stream(
-                ui_tx,
-                MessageSource::Error,
-                format!("[Error] Failed to read source Session file: {error}\n"),
-            );
-            return;
-        }
-    };
-    let fork_history = match source_session.read_messages() {
-        Ok(history) => history,
-        Err(error) => {
-            send_stream(
-                ui_tx,
-                MessageSource::Error,
-                format!("[Error] Failed to read source Session history: {error}\n"),
-            );
-            return;
-        }
-    };
-    let fork_entry_id = match source_session.read_entries() {
-        Ok(entries) => match entries.last() {
-            Some(entry) => entry.id.clone(),
-            None => {
-                send_stream(
-                    ui_tx,
-                    MessageSource::Error,
-                    "[Error] Cannot fork an empty Session.\n".to_string(),
-                );
-                return;
-            }
-        },
-        Err(error) => {
-            send_stream(
-                ui_tx,
-                MessageSource::Error,
-                format!("[Error] Failed to read source Session entries: {error}\n"),
-            );
-            return;
-        }
-    };
-
     let workspace_root_str = canonical_workspace_root(runtime_builder.workspace_root());
     let child_session = match session_manager.defer_create_session("talos", &workspace_root_str) {
         Ok(session) => session,
@@ -585,16 +546,29 @@ pub(crate) async fn handle_session_fork(
         send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
-    if let Err(error) = std::fs::write(&child_path, &source_bytes) {
-        let text = rollback_owned_session_message(
-            session_manager,
-            &child_session,
-            "Failed to clone source Session history",
-            error,
+    let staged_path = child_path.with_extension("fork-staging");
+    let (mut staged_history, fork_history, tail) =
+        match crate::history_restore::stage_fork_history(&source_session, staged_path).await {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                send_stream(
+                    ui_tx,
+                    MessageSource::Error,
+                    format!("[Error] Failed to stage source Session history: {error:#}\n"),
+                );
+                return;
+            }
+        };
+    let fork_entry_id = tail.id;
+    if let Err(error) = staged_history.install(&child_path) {
+        send_stream(
+            ui_tx,
+            MessageSource::Error,
+            format!("[Error] Failed to install fork history: {error:#}\n"),
         );
-        send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
+    staged_history.own_child(session_manager.clone(), child_session.clone());
 
     let inherited_identity =
         match talos_session::PendingSubmissionStore::for_session(&source_session).runtime_state() {
@@ -661,6 +635,11 @@ pub(crate) async fn handle_session_fork(
 
     let mut fork_config = config.clone();
     apply_session_model_to_config(&mut fork_config, &child_session);
+    #[cfg(test)]
+    if let Ok(reached) = FORK_METADATA_CUT.try_with(Clone::clone) {
+        reached.notify_one();
+        std::future::pending::<()>().await;
+    }
     let built_runtime = match runtime_builder
         .build(&fork_config, &child_session, fork_history)
         .await
@@ -717,6 +696,7 @@ pub(crate) async fn handle_session_fork(
             .await
         {
             Ok(old_session) => {
+                staged_history.retain();
                 emit_session_identity_after_queue_clear(
                     ui_tx,
                     child_session_for_watch.id.to_string(),
@@ -757,6 +737,201 @@ pub(crate) async fn handle_session_fork(
 mod tests {
     use super::*;
     use talos_core::message::Message;
+
+    #[tokio::test]
+    async fn fork_handler_cancel_after_metadata_preserves_parent_and_removes_child() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let workspace = canonical_workspace_root(root.path());
+        let parent = manager
+            .create_session("parent", &workspace)
+            .expect("parent");
+        parent
+            .append(&Message::User {
+                content: "original constraint".into(),
+            })
+            .expect("history");
+        let original = std::fs::read(&parent.file_path).expect("bytes");
+        let (raw_tx, mut raw_rx) = mpsc::channel(4);
+        let owner = SessionTransition::new(raw_tx.clone(), parent.clone()).expect("owner");
+        let route = owner.bind_active_sender();
+        let transition = Arc::new(Mutex::new(owner));
+        let (ui_tx, _ui_rx) = mpsc::unbounded_channel();
+        let (session_tx, session_rx) = watch::channel(parent.clone());
+        let (route_tx, route_rx) = watch::channel(raw_tx);
+        let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel();
+        let builder = TuiRuntimeBuilder::new(
+            build_hook_registry(true),
+            root.path().to_path_buf(),
+            manager.clone(),
+            Arc::new(TuiApprovalHandler::new(
+                ui_tx.clone(),
+                root.path().to_path_buf(),
+            )),
+            Vec::new(),
+            false,
+            true,
+        );
+        let config = Config::default();
+        let reached = Arc::new(tokio::sync::Notify::new());
+        {
+            let operation = FORK_METADATA_CUT.scope(
+                reached.clone(),
+                handle_session_fork(
+                    &transition,
+                    &ui_tx,
+                    &config,
+                    &builder,
+                    &manager,
+                    &session_tx,
+                    &route_tx,
+                    &bridge_tx,
+                    &session_rx,
+                ),
+            );
+            tokio::pin!(operation);
+            tokio::select! {
+                () = &mut operation => panic!("fork returned before cancellation cut"),
+                () = reached.notified() => {},
+                () = tokio::time::sleep(std::time::Duration::from_secs(10)) => panic!("cut deadline"),
+            }
+            assert_eq!(
+                manager
+                    .get_forks(&parent.id.to_string())
+                    .expect("staged lineage")
+                    .len(),
+                1
+            );
+        }
+        assert!(
+            manager
+                .get_forks(&parent.id.to_string())
+                .expect("clean lineage")
+                .is_empty()
+        );
+        let sessions = manager.list_sessions().expect("sessions");
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].id, parent.id);
+        assert_eq!(transition.lock().await.active_session().id, parent.id);
+        assert!(!session_rx.has_changed().expect("session watch"));
+        assert!(!route_rx.has_changed().expect("route watch"));
+        assert!(bridge_rx.try_recv().is_err());
+        route
+            .send(SessionOp::Submit {
+                message: "parent remains active".into(),
+            })
+            .await
+            .expect("admission");
+        assert!(
+            matches!(tokio::time::timeout(std::time::Duration::from_secs(2), raw_rx.recv()).await.expect("delivery"),
+            Some(SessionOp::Submit { message }) if message == "parent remains active")
+        );
+        assert_eq!(
+            std::fs::read(&parent.file_path).expect("parent bytes"),
+            original
+        );
+    }
+
+    #[tokio::test]
+    async fn fork_handler_cancel_during_commit_cleans_child_and_finishes_retirement() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let workspace = canonical_workspace_root(root.path());
+        let parent = manager
+            .create_session("parent", &workspace)
+            .expect("parent");
+        parent
+            .append(&Message::User {
+                content: "original constraint".into(),
+            })
+            .expect("history");
+        let original = std::fs::read(&parent.file_path).expect("bytes");
+        let (raw_tx, mut raw_rx) = mpsc::channel(4);
+        let mut owner = SessionTransition::new(raw_tx.clone(), parent.clone()).expect("owner");
+        let route = owner.bind_active_sender();
+        let stopped = tokio_util::sync::CancellationToken::new();
+        let stop = stopped.clone();
+        let release = Arc::new(tokio::sync::Notify::new());
+        let scheduler_release = release.clone();
+        let scheduler = tokio::spawn(async move {
+            stop.cancelled().await;
+            scheduler_release.notified().await;
+        });
+        let actor = tokio::spawn(async move {
+            assert!(matches!(raw_rx.recv().await, Some(SessionOp::Shutdown)));
+        });
+        owner
+            .attach_active_runtime(actor, stopped.clone(), scheduler)
+            .expect("runtime");
+        let transition = Arc::new(Mutex::new(owner));
+        let (ui_tx, _ui_rx) = mpsc::unbounded_channel();
+        let (session_tx, session_rx) = watch::channel(parent.clone());
+        let (route_tx, route_rx) = watch::channel(raw_tx);
+        let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel();
+        let builder = TuiRuntimeBuilder::new(
+            build_hook_registry(true),
+            root.path().to_path_buf(),
+            manager.clone(),
+            Arc::new(TuiApprovalHandler::new(
+                ui_tx.clone(),
+                root.path().to_path_buf(),
+            )),
+            Vec::new(),
+            false,
+            true,
+        );
+        let config = Config::default();
+        {
+            let operation = handle_session_fork(
+                &transition,
+                &ui_tx,
+                &config,
+                &builder,
+                &manager,
+                &session_tx,
+                &route_tx,
+                &bridge_tx,
+                &session_rx,
+            );
+            tokio::pin!(operation);
+            tokio::select! {
+                () = &mut operation => panic!("fork returned before cancellation cut"),
+                () = stopped.cancelled() => {},
+                () = tokio::time::sleep(std::time::Duration::from_secs(10)) => panic!("cut deadline"),
+            }
+            assert_eq!(
+                manager
+                    .get_forks(&parent.id.to_string())
+                    .expect("staged lineage")
+                    .len(),
+                1
+            );
+        }
+        assert!(
+            manager
+                .get_forks(&parent.id.to_string())
+                .expect("clean lineage")
+                .is_empty()
+        );
+        let sessions = manager.list_sessions().expect("sessions");
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].id, parent.id);
+        assert_eq!(transition.lock().await.active_session().id, parent.id);
+        assert!(!session_rx.has_changed().expect("session watch"));
+        assert!(!route_rx.has_changed().expect("route watch"));
+        assert!(bridge_rx.try_recv().is_err());
+        release.notify_one();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            transition.lock().await.shutdown().await;
+            route.closed().await;
+        })
+        .await
+        .expect("retirement completes after cancellation");
+        assert_eq!(
+            std::fs::read(&parent.file_path).expect("parent bytes"),
+            original
+        );
+    }
 
     #[tokio::test]
     async fn resume_oversized_history_keeps_original_session_and_command_route() {
