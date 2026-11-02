@@ -1546,3 +1546,28 @@ Session libc/windows-sys dependency edges; both locked external fixture modes no
 pass (`/private/tmp/i313-sdk-lock-fixed.log`). Host preflight itself exited 1 at
 its stale SDK lock; do not relabel it successful. New complete-candidate preflight
 and native CI remain required, alongside the other full-review blockers.
+
+### A→B then fresh Actor reopen recovery — local
+
+Extended the actual registered model checkpoint fixture: after both Applied
+checkpoints and omitted-fact recovery, shut down/drop the original Actor and
+DurableSession, reopen the durable store, and build a fresh Actor/model. The new
+Actor starts without a checkpoint projection, replays durable raw messages, binds
+fresh history sources, then performs discovery/search/detail and ordinary success.
+Assertions require four new provider requests, no reexecuted/replayed checkpoint
+terminals, unchanged replay prefix, and append-only original persisted bytes.
+Reopen calls use distinct discovery/search/detail IDs and require their paired
+results; historical tool IDs cannot supply the previous discovery or reference.
+Independent review caught that reverse selection alone could fall back to old
+results, so the initial reused-ID version was corrected before convergence.
+
+Focused test passes (`/private/tmp/i313-double-restart.log`). This covers same-
+process object/store reopen with raw-history rebuild; it does not certify an
+independent process restart, persisted checkpoint projection, fork ancestry or
+all Issue #390 semantic rows. Those remaining requirements are not waived.
+
+Revised unique-ID fixture passes; affected all-target warnings-denied Clippy and
+both governance validators pass. Logs: `/private/tmp/i313-double-restart-clippy.log`,
+`/private/tmp/i313-double-restart-governance.log`, `/private/tmp/i313-double-restart-claims.log`.
+Independent static review approves the corrected fixture only, without executing
+tests or certifying cross-process/fork/full I313 acceptance.

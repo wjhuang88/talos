@@ -5039,6 +5039,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                     );
                     let terminal = messages
                         .iter()
+                        .rev()
                         .find_map(|message| match message {
                             Message::Multimodal { parts } => {
                                 parts.iter().find_map(|part| match part {
@@ -5084,6 +5085,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                 3 => {
                     let discovery = messages
                         .iter()
+                        .rev()
                         .find_map(|message| match message {
                             Message::Tool { result } if result.tool_use_id == "rediscover" => {
                                 serde_json::from_str::<serde_json::Value>(&result.content).ok()
@@ -5112,31 +5114,38 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                         },
                     ]
                 }
-                4 => {
-                    let request = serde_json::to_string(messages).expect("request B");
-                    assert!(request.contains("SECOND_CHECKPOINT"));
-                    assert!(!request.contains("omittedfact original constraint"));
-                    let applied = messages.iter().any(|message| match message {
-                        Message::Multimodal { parts } => parts.iter().any(|part| match part {
-                            talos_core::message::ContentPart::Text { text } => {
-                                serde_json::from_str::<serde_json::Value>(text)
-                                    .ok()
-                                    .is_some_and(|value| {
-                                        value["checkpoint_operation"] == 1
-                                            && value["outcome"].as_str().is_some_and(|outcome| {
-                                                outcome.starts_with("Applied {")
-                                            })
-                                    })
-                            }
+                4 | 8 => {
+                    if step == 4 {
+                        let request = serde_json::to_string(messages).expect("request B");
+                        assert!(request.contains("SECOND_CHECKPOINT"));
+                        assert!(!request.contains("omittedfact original constraint"));
+                        let applied = messages.iter().any(|message| match message {
+                            Message::Multimodal { parts } => parts.iter().any(|part| match part {
+                                talos_core::message::ContentPart::Text { text } => {
+                                    serde_json::from_str::<serde_json::Value>(text)
+                                        .ok()
+                                        .is_some_and(|value| {
+                                            value["checkpoint_operation"] == 1
+                                                && value["outcome"].as_str().is_some_and(
+                                                    |outcome| outcome.starts_with("Applied {"),
+                                                )
+                                        })
+                                }
+                                _ => false,
+                            }),
                             _ => false,
-                        }),
-                        _ => false,
-                    });
-                    assert!(applied, "second checkpoint must actually apply");
+                        });
+                        assert!(applied, "second checkpoint must actually apply");
+                    }
                     vec![
                         AgentEvent::ToolCall {
                             call: talos_core::message::ToolCall {
-                                id: "rediscover-b".into(),
+                                id: (if step >= 8 {
+                                    "rediscover-reopened"
+                                } else {
+                                    "rediscover-b"
+                                })
+                                .into(),
                                 name: "history_search".into(),
                                 input: serde_json::json!({"mode":"discover"}),
                             },
@@ -5149,11 +5158,19 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                         },
                     ]
                 }
-                5 => {
+                5 | 9 => {
                     let discovery = messages
                         .iter()
+                        .rev()
                         .find_map(|message| match message {
-                            Message::Tool { result } if result.tool_use_id == "rediscover-b" => {
+                            Message::Tool { result }
+                                if result.tool_use_id
+                                    == if step >= 8 {
+                                        "rediscover-reopened"
+                                    } else {
+                                        "rediscover-b"
+                                    } =>
+                            {
                                 assert!(!result.is_error, "{}", result.content);
                                 serde_json::from_str::<serde_json::Value>(&result.content).ok()
                             }
@@ -5163,7 +5180,12 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                     vec![
                         AgentEvent::ToolCall {
                             call: talos_core::message::ToolCall {
-                                id: "recover-omitted".into(),
+                                id: (if step >= 8 {
+                                    "recover-omitted-reopened"
+                                } else {
+                                    "recover-omitted"
+                                })
+                                .into(),
                                 name: "history_search".into(),
                                 input: serde_json::json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"omittedfact"}),
                             },
@@ -5176,11 +5198,19 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                         },
                     ]
                 }
-                6 => {
+                6 | 10 => {
                     let result = messages
                         .iter()
+                        .rev()
                         .find_map(|message| match message {
-                            Message::Tool { result } if result.tool_use_id == "recover-omitted" => {
+                            Message::Tool { result }
+                                if result.tool_use_id
+                                    == if step >= 8 {
+                                        "recover-omitted-reopened"
+                                    } else {
+                                        "recover-omitted"
+                                    } =>
+                            {
                                 Some(result)
                             }
                             _ => None,
@@ -5197,8 +5227,16 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                     );
                     let discovery = messages
                         .iter()
+                        .rev()
                         .find_map(|message| match message {
-                            Message::Tool { result } if result.tool_use_id == "rediscover-b" => {
+                            Message::Tool { result }
+                                if result.tool_use_id
+                                    == if step >= 8 {
+                                        "rediscover-reopened"
+                                    } else {
+                                        "rediscover-b"
+                                    } =>
+                            {
                                 serde_json::from_str::<serde_json::Value>(&result.content).ok()
                             }
                             _ => None,
@@ -5207,7 +5245,12 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                     vec![
                         AgentEvent::ToolCall {
                             call: talos_core::message::ToolCall {
-                                id: "detail-omitted".into(),
+                                id: (if step >= 8 {
+                                    "detail-omitted-reopened"
+                                } else {
+                                    "detail-omitted"
+                                })
+                                .into(),
                                 name: "history_search".into(),
                                 input: serde_json::json!({"mode":"detail", "snapshot":discovery["snapshot"], "reference":found["results"][0]["reference"]}),
                             },
@@ -5220,11 +5263,19 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                         },
                     ]
                 }
-                7 => {
+                7 | 11 => {
                     let result = messages
                         .iter()
+                        .rev()
                         .find_map(|message| match message {
-                            Message::Tool { result } if result.tool_use_id == "detail-omitted" => {
+                            Message::Tool { result }
+                                if result.tool_use_id
+                                    == if step >= 8 {
+                                        "detail-omitted-reopened"
+                                    } else {
+                                        "detail-omitted"
+                                    } =>
+                            {
                                 Some(result)
                             }
                             _ => None,
@@ -5407,6 +5458,103 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             .lock()
             .expect("projection")
             .is_some()
+    );
+    // Reopen the durable store and create a fresh Actor/model. No projection,
+    // cursor, discovery secret or execution-local history object is reused.
+    drop(actor);
+    drop(durable);
+    let reopened =
+        talos_session::DurableSession::open_or_create(root.path(), "checkpoint-recovery")
+            .expect("reopen after two checkpoints");
+    let recovered_raw = reopened.read_messages().expect("durable replay");
+    let mut engine = PermissionEngine::empty();
+    engine.set_workspace_root(root.path().into());
+    engine.add_rule(PermissionRule::new_nature(
+        ToolNature::Read,
+        None,
+        None,
+        PermissionDecision::Allow,
+    ));
+    let restarted_model = Arc::new(CheckpointModel {
+        step: AtomicUsize::new(8),
+    });
+    let mut restarted_agent = Agent::with_security_and_hooks(
+        restarted_model.clone(),
+        ToolRegistry::new(),
+        Some(Arc::new(engine)),
+        None,
+        root.path().into(),
+        Arc::new(talos_plugin::HookRegistry::new()),
+    );
+    restarted_agent
+        .enable_model_checkpoint_tools()
+        .expect("restart tools");
+    let (mut restarted_handle, mut restarted_actor) = AppServerSession::new(
+        restarted_agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: recovered_raw.clone(),
+            model_context_limit: 128_000,
+        },
+    );
+    assert!(
+        restarted_actor
+            .agent
+            .checkpoint_projection_state
+            .lock()
+            .expect("fresh projection")
+            .is_none()
+    );
+    restarted_actor.set_durable_persistence(reopened.clone(), Default::default());
+    restarted_actor
+        .set_recovered_history_sources(reopened.read_history_snapshot().expect("fresh sources"));
+    let restarted_task = tokio::spawn(async move {
+        restarted_actor.run().await;
+        restarted_actor
+    });
+    restarted_handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "recover the original constraint after restart".into(),
+        })
+        .await
+        .expect("restart submit");
+    let events = tokio::time::timeout(
+        Duration::from_secs(10),
+        collect_until_completions(&mut restarted_handle.eq_rx, 1),
+    )
+    .await
+    .expect("restart deadline");
+    assert!(events.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event, SessionEvent::ModelCheckpointTerminal { .. })),
+        "restart must not replay or reexecute completed checkpoints"
+    );
+    restarted_handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("restart shutdown");
+    let restarted_actor = restarted_task.await.expect("restart actor");
+    assert_eq!(
+        &restarted_actor.history[..recovered_raw.len()],
+        recovered_raw.as_slice()
+    );
+    assert_eq!(
+        restarted_model.step.load(Ordering::SeqCst),
+        12,
+        "fresh discovery/search/detail/continuation without another checkpoint"
+    );
+    assert!(
+        std::fs::read(reopened.file_path())
+            .expect("restart transcript")
+            .starts_with(&persisted)
     );
 }
 
