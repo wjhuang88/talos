@@ -5004,6 +5004,7 @@ async fn exercise_automatic_checkpoint_terminal_outcomes(model_tools: bool) {
         invalid: bool,
         transport_error: bool,
         ordinary: AtomicUsize,
+        summaries: AtomicUsize,
         block: bool,
         entered: tokio::sync::Notify,
     }
@@ -5013,6 +5014,7 @@ async fn exercise_automatic_checkpoint_terminal_outcomes(model_tools: bool) {
             let events = if let [Message::User { content }] = messages
                 && content.starts_with("Produce only a JSON checkpoint")
             {
+                self.summaries.fetch_add(1, Ordering::SeqCst);
                 self.entered.notify_one();
                 if self.block {
                     return std::future::pending().await;
@@ -5056,6 +5058,7 @@ async fn exercise_automatic_checkpoint_terminal_outcomes(model_tools: bool) {
             invalid: matches!(outcome, "failed" | "over_limit_failure"),
             transport_error: outcome == "transport_failure",
             ordinary: AtomicUsize::new(0),
+            summaries: AtomicUsize::new(0),
             block: outcome == "cancelled",
             entered: tokio::sync::Notify::new(),
         });
@@ -5185,6 +5188,10 @@ async fn exercise_automatic_checkpoint_terminal_outcomes(model_tools: bool) {
             }
             _ => panic!("unexpected outcome: {outcome}, {states:?}"),
         }
+        assert!(
+            model.summaries.load(Ordering::SeqCst) > 0,
+            "{outcome}: must exercise the actual summary provider boundary"
+        );
         assert_eq!(
             model.ordinary.load(Ordering::SeqCst),
             usize::from(matches!(outcome, "applied" | "failed")),
