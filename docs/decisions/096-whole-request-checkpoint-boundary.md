@@ -222,3 +222,14 @@ increment only while authorization remains fail-closed. Pre-existing writable
 mapping behavior still requires native investigation; share-mode exclusion alone
 is not accepted as proof that all byte mutations are impossible. Native lifetime,
 write/delete and actual Actor success/cancel/timeout regressions remain required.
+
+## Model terminal delivery
+
+The additive `SessionEvent::ModelCheckpointTerminal` variant reports one terminal
+per admitted model operation from the Actor ledger, even when its oneshot receipt
+has no receiver or no subsequent provider request consumes it. Its event kind
+separates model operation IDs from manual CompactStatus IDs. Existing non-exhaustive
+SessionEvent consumers may ignore the new event; clients wanting model status
+must handle it, without treating it as a manual command or whole-turn completion.
+CLI inline/TUI display content-free outcome metadata. Dynamic provider receipt
+consumption remains separate and does not synthesize raw transcript messages.

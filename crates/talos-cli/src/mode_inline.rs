@@ -247,6 +247,22 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
                         talos_conversation::format_automatic_compact_status(state)
                     );
                 }
+                SessionEvent::ModelCheckpointTerminal {
+                    operation_id,
+                    outcome,
+                    ..
+                } => {
+                    println!(
+                        "Model {}",
+                        talos_conversation::format_compact_status(
+                            operation_id,
+                            talos_core::session::CompactState::Completed {
+                                outcome,
+                                replayed: false
+                            }
+                        )
+                    );
+                }
                 SessionEvent::CompactStatus {
                     operation_id,
                     state,

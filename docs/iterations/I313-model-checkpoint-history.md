@@ -1504,3 +1504,45 @@ rebased commits are their counterparts on the refreshed target baseline.
 | `188917ed21afca0c0dc88bbfcc3b66a49e81fc10` | `73ec499357047f13a8a3df6aa84787814dee8bff` |
 | `b9462d0fd8059f61a45b94f0e45cc1a0ccd9dedc` | `166f16131df29f0fef3044b56ef84840ba852caf` |
 | `34179192440768368f7902d53830b21063d75d1c` | `8861704261a58ae5767ec3d71918b556af472dc1` |
+
+### Full candidate review and local gate — 2026-11-02
+
+Independent static review REQUEST CHANGES on `6414552343e704d74a417a5b3a1ebed70b9a82f3`
+against `9ace8968603a67ada8d118459c81367611ad3fd2`. Blocking acceptance gaps:
+model receipt completion has no separately identified Session terminal when no
+continuation consumes it; initial/unsealed large-source scans cannot persist
+verified progress across budgets; actual fork/checkpoint/restart recovery coverage
+and branch resolution remain incomplete; source/generation validity is not bound
+to final permission-commit delivery; Windows remains unavailable; all thirty rows
+still require current composition evidence. Incremental approvals do not approve
+this complete scope. Next implementation: model-origin terminal status with no
+manual-ID aliasing and receiver-closed/cancellation regression.
+
+Standard preflight `/private/tmp/i313-rebased-preflight.log` terminated exit 101:
+workspace check/Clippy passed; talos-tools had 1056 passing tests and one EPERM
+failure in `prepared_local_push_runs_all_eight_admitted_stages` at process
+observation. This is not a successful workspace gate. Authorized host preflight
+is running at `/private/tmp/i313-rebased-preflight-host.log`; do not restart it
+solely because observation expires. Both post-probe governance validators passed
+with zero warnings (`/private/tmp/i313-mapping-governance.log`,
+`/private/tmp/i313-mapping-claims.log`). Native mapping execution remains pending.
+
+Model terminal fix (local): Actor ledger completion now emits the additive
+ModelCheckpointTerminal event even when the oneshot receiver closed, retaining
+model/manual ID separation. Inline/TUI display it without finishing a manual
+command or turn. Updated coordinator regressions cover cancellation, closed
+receiver and no duplicate terminal; actual A→B Actor fixture asserts exactly two
+Applied terminals with model IDs 0 and 1. Validation is in progress. The existing
+host preflight started before these Rust edits and cannot certify this new delta;
+its result is baseline evidence only, even if later SDK builds see updated sources.
+
+Terminal increment validation: Agent 627/627 and CLI 384/384 pass; affected
+core/agent/CLI all-target warnings-denied Clippy passes. Logs:
+`/private/tmp/i313-model-terminal-agent.log`, `/private/tmp/i313-model-terminal-cli.log`,
+`/private/tmp/i313-model-terminal-clippy.log`. Independent static review approves
+this delta only; normal Actor lifetime sends once, not durable delivery after
+process/receiver destruction. SDK lock correction `a7a623524` adds only existing
+Session libc/windows-sys dependency edges; both locked external fixture modes now
+pass (`/private/tmp/i313-sdk-lock-fixed.log`). Host preflight itself exited 1 at
+its stale SDK lock; do not relabel it successful. New complete-candidate preflight
+and native CI remain required, alongside the other full-review blockers.

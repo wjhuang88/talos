@@ -353,6 +353,14 @@ impl ManualCompaction {
             self.model_authority = None;
             if let Some(receipt) = self.model_receipt.take() {
                 let _ = receipt.send(outcome);
+                // The receiver may close, or consume the receipt without making
+                // another provider request. Session observers still need a terminal.
+                let _ = actor.eq_tx.send(SessionEvent::ModelCheckpointTerminal {
+                    session_id: actor.session_id.clone(),
+                    session_generation: actor.session_generation,
+                    operation_id: id,
+                    outcome,
+                });
                 return;
             }
             Self::emit(
@@ -490,10 +498,15 @@ mod tests {
         coordinator.complete(&actor, result);
         assert_eq!(outcome.await.expect("terminal"), CompactOutcome::Failed);
         assert!(resume.await.expect("resume after terminal").is_none());
-        assert!(
-            handle.eq_rx.try_recv().is_err(),
-            "model receipt must not alias manual UI IDs"
-        );
+        assert!(matches!(
+            handle.eq_rx.try_recv().expect("model terminal"),
+            SessionEvent::ModelCheckpointTerminal {
+                operation_id: 0,
+                outcome: CompactOutcome::Failed,
+                ..
+            }
+        ));
+        assert!(handle.eq_rx.try_recv().is_err(), "exactly one terminal");
         coordinator.admit(&actor, 0, 2);
         assert!(matches!(
             handle.eq_rx.try_recv().expect("manual queued"),
@@ -557,6 +570,14 @@ mod tests {
             CompactOutcome::Cancelled
         );
         assert!(coordinator.queued_model.is_none());
+        assert!(matches!(
+            handle.eq_rx.try_recv().expect("cancel terminal"),
+            SessionEvent::ModelCheckpointTerminal {
+                operation_id: 0,
+                outcome: CompactOutcome::Cancelled,
+                ..
+            }
+        ));
         coordinator.admit(&actor, 0, 1);
         assert!(matches!(
             handle.eq_rx.try_recv().expect("released"),
@@ -613,6 +634,19 @@ mod tests {
             .expect("receipt closure wakes Actor");
         coordinator.complete(&actor, terminal);
         assert!(!coordinator.has_pending_work());
+        assert!(matches!(
+            handle
+                .eq_rx
+                .try_recv()
+                .expect("abandoned receiver terminal"),
+            SessionEvent::ModelCheckpointTerminal {
+                operation_id: 0,
+                outcome: CompactOutcome::Cancelled,
+                ..
+            }
+        ));
+        coordinator.cancel(&actor);
+        assert!(handle.eq_rx.try_recv().is_err(), "terminal must not repeat");
         coordinator.admit(&actor, 0, 1);
         assert!(matches!(
             handle.eq_rx.try_recv().expect("released slot"),
@@ -1075,9 +1109,11 @@ mod tests {
         );
         assert_eq!(actor.history, raw);
         assert!(
-            handle.eq_rx.try_recv().is_err(),
-            "no model IDs in manual UI events"
+            matches!(handle.eq_rx.try_recv().expect("applied model terminal"),
+                SessionEvent::ModelCheckpointTerminal { operation_id: 0, outcome: CompactOutcome::Applied { before, after }, .. } if after < before
+            )
         );
+        assert!(handle.eq_rx.try_recv().is_err(), "no aliased manual event");
         coordinator.admit(&actor, 0, 1);
         assert!(matches!(
             handle.eq_rx.try_recv().expect("manual slot reusable"),

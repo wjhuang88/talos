@@ -5334,6 +5334,30 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         completed_status(event),
         Some(TurnCompletionStatus::Success { .. })
     )));
+    let terminals: Vec<_> = captured
+        .iter()
+        .filter_map(|event| match event {
+            SessionEvent::ModelCheckpointTerminal {
+                operation_id,
+                outcome,
+                ..
+            } => Some((*operation_id, *outcome)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        terminals.len(),
+        2,
+        "one Session terminal per admitted checkpoint"
+    );
+    assert_eq!(
+        terminals.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+        vec![0, 1]
+    );
+    assert!(terminals.iter().all(|(_, outcome)| matches!(
+        outcome,
+        talos_core::session::CompactOutcome::Applied { .. }
+    )));
     handle
         .sq_tx
         .send(SessionOp::Shutdown)

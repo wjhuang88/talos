@@ -200,6 +200,19 @@ pub enum SessionEvent {
         /// Bounded metadata for the automatic attempt.
         state: AutomaticCompactState,
     },
+    /// Exactly one terminal event for an admitted model checkpoint, independent
+    /// of whether a subsequent provider request consumes its receipt.
+    /// Operation IDs belong to the model namespace, never the manual namespace.
+    ModelCheckpointTerminal {
+        /// Owning session identity.
+        session_id: String,
+        /// Owning runtime generation.
+        session_generation: u64,
+        /// Model operation identity within this generation.
+        operation_id: u64,
+        /// Content-free terminal result; admission alone is not success.
+        outcome: CompactOutcome,
+    },
     /// Content-free manual checkpoint progress, never persisted as a user turn.
     CompactStatus {
         session_id: String,

@@ -602,3 +602,12 @@ history queries require prepared durable storage and a discovered snapshot.
 Unsupported storage returns Unavailable. Durable discovery may return
 `compact_available: false` with no compaction sources while permitting history
 search; this does not authorize compaction of an unsupported source range.
+
+Observe `SessionEvent::ModelCheckpointTerminal` for the final result of each
+admitted model operation, including when no provider continuation consumes its
+receipt. Correlate by session, generation and model operation ID. Model and manual
+operation IDs are separate namespaces: a model terminal must not complete a
+pending manual `Compact` command or a whole turn. The event contains only
+`CompactOutcome` metadata; it is not a raw transcript entry. Existing consumers of
+the non-exhaustive SessionEvent enum may ignore the additive event; status-aware
+hosts should handle it and discard stale-generation events.
