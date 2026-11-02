@@ -1,3 +1,23 @@
+## I313 stage convergence — 2026-11-02
+
+Local tests `7c6a819dd`, `09532dc93`, and `960b4b646` add reclamation refusal,
+resolved model budgets, and same-session sequential capacity switching with parsed
+history preservation and successful continuation. Independent static reviews and
+focused tests passed. Standard preflight passed through `7c6a819dd`, including
+both SDK modes; later CLI tests passed separately. See I313 owner for exact logs
+and boundaries. New exact-head remote CI/Windows evidence remains required; T5
+stays Partial and T1/T6 stay unimplemented. Entire accepted queue is unchanged.
+
+## Durable bounded-output recovery and main sync — 2026-11-02
+
+I313 test commit `9105791e1` proves real huge-tool output remains bounded through
+persistence/reopen and registered search/detail without the producer tool installed.
+Runtime coding regressions and continuation recovery regression pass; independent
+static review approved. Owner records exact scope and logs. Main #841 is included
+locally via `bcfa93932`; governance validators passed. PR #837 published head still
+has failed Windows CI; full T5 acceptance and merge remain open. Full queue retained:
+I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6; T1/T6 unimplemented.
+
 ## Runtime output fix and Windows failure — 2026-11-02
 
 Local candidate bounds huge ordinary Runtime tool output while preserving validated

@@ -1,3 +1,71 @@
+## Sequential model-switch continuation — 2026-11-02
+
+Commit `960b4b646` extends the production handler regression through a second
+model switch in the same persisted session, covering 64K-to-32K and 32K-to-64K.
+The session identity and parsed authoritative message prefix remain equal; the
+second rebuilt route completes an actual Submit and reports its new context limit.
+This compares parsed messages, not raw transcript bytes. Owner shutdown joins the
+retired runtime before each isolated-home fixture exits. Final focused regression
+passed (`/private/tmp/i313-sequential-switch-final.log`); independent static review
+approved, with the suggested watch borrow lifetime fix incorporated. All-target
+CLI Clippy passed before that sender-only adjustment. These tests use mock providers
+and do not close reasoning/pressure or all model-directed recovery composition.
+Full T5 remains Partial; T1/T6 remain unimplemented. PR #837 needs fresh head CI.
+
+## Model-switch budget composition — local, 2026-11-02
+
+Commit `09532dc93` extends the real handle_session_model success integration to rebuild the Actor
+under three explicit target configurations: 64K/1K, 32K/1K and 32K/8K
+context/output limits. Each rebuilt Actor accepts an actual Submit, emits a budget
+with the selected capacity and completes successfully; increased output reserve
+raises the measured request cost by more than 6000 tokens. Focused integration
+and CLI all-target Clippy passed (`/private/tmp/i313-model-switch-budget.log`,
+`/private/tmp/i313-model-switch-clippy.log`). It uses a mock provider and independent
+switch fixtures; it does not prove a sequential 64K-to-32K live-history transition,
+reasoning policy, pressure thresholds, or the entirety of rows 27/28.
+The earlier standard preflight passed for `7c6a819dd`; this CLI increment needs
+fresh exact-head CI. Independent static review approved; its shutdown follow-up
+now awaits transition-owned Actor/Scheduler retirement before each isolated home
+exits. Final focused test passed in `/private/tmp/i313-model-switch-budget-final.log`.
+Full T5 remains Partial.
+
+## Reclamation refusal composition — 2026-11-02
+
+Test commit `7c6a819dd` adds a real registered Runtime sequence: install checkpoint A,
+submit a structurally valid, render-bounded larger replacement, observe the public
+Preparation failure receipt while retaining A byte-for-byte, then install B and
+require successful Turn completion. Agent companion uses the same seed/candidate
+shape with actual source binding and eligible cutoff, asserting the exact internal
+insufficient-reclamation error, unchanged plan/estimate, no deferred installation
+and zero summarizer calls. This layered evidence supports acceptance row 10 without
+exposing internal error text through the public receipt. It is not a Runtime error
+probe or complete T5 acceptance. Focused Runtime and Agent tests passed:
+`/private/tmp/i313-reclaim-runtime.log`, `/private/tmp/i313-reclaim-cause.log`.
+Runtime all-target Clippy passed before the companion/final completion assertion;
+standard preflight for that code passed in `/private/tmp/i313-reclaim-preflight.log`
+(session 34281, exit 0), including locked workspace checks/Clippy/tests, both
+governance validators and both external Runtime SDK modes. Independent static review approved the final two-file diff
+`dbeb811f76dda8d2fb29974f033cf60e02387818e21ddbc974392dcd64623e33`.
+This does not certify subsequent CLI test edits or exact-head remote CI.
+T5 Partial; T1/T6 unimplemented.
+
+## Bounded output durable recovery — 2026-11-02
+
+Implementation/test evidence `9105791e1` extends actual >2MiB Runtime tool execution
+through bounded continuation, authoritative persisted result, reopen and registered
+history discovery/search/detail. Both coding tests passed in
+`/private/tmp/i313-huge-final-recovery.log`; the continuation recovery regression
+passed in `/private/tmp/i313-continuation-final.log`. The latter explicitly raises
+its test-only output threshold to 16K to retain its 12K-output recovery trigger.
+Formatting and independent static review passed. Recovery uses quoted FTS syntax
+for the hyphenated literal; unquoted syntax caused the prior Unavailable failure.
+No extra synthetic history is required. This proves same-process reopen without
+re-registering the producer tool, not cross-process recovery or metadata uniqueness.
+Main PR #841 (`c2d8b441c`) was merged locally at `bcfa93932`; both governance
+validators passed. Published PR #837 remains at `79b9c05d5` with failed Windows CI
+41434712578; neither new implementation nor tests have exact-head remote success.
+T5 remains Partial; T1/T6 remain unimplemented.
+
 ## Runtime output-boundary correction and Windows residual — 2026-11-02
 
 Real Runtime execution of a >2MiB ordinary tool result exposed missing generic
