@@ -1,6 +1,6 @@
 # SEARCH-001-H: Explicit Premium And Self-Hosted Search Overrides
 
-**Status**: Active / Claimed
+**Status**: In Progress / Claimed
 **Type**: Implementation / Policy Child
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -24,11 +24,11 @@
 | Claimed At | 2026-11-02 |
 | Source Issue | #832 |
 | Governance Claim PR | #841 |
-| Authorization Mode | Single-maintainer merge with explicit maintainer-authorized parallel execution |
+| Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | On 2026-11-02 the maintainer explicitly answered `允许并行` after being told that I314 would be activated and implemented in parallel with the currently Active I310 and I313 scopes. |
 | Handoff / Release Condition | Keep I314 ownership until implementation/acceptance closeout or an explicit handoff. Existing I310/I313 ownership remains unchanged; SEARCH-001-E/F stay separately blocked because D admission did not occur. |
 
-This claim/Active state is a candidate while #841 is open. It becomes effective only when #841 reaches `main`; no production implementation branch may start before that merge.
+This claim/In Progress state is a candidate while #841 is open. It becomes effective only when #841 reaches `main`; no production implementation branch may start before that merge.
 
 ## Goal
 
