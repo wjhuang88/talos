@@ -476,6 +476,99 @@ mod tests {
     use super::*;
     use talos_session::{CreateTodo, TodoPriority};
 
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn reasoning_wire_budget_matches_registered_agent_output_reservation() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        for (output, thinking) in [(4096, 1024), (8192, 6000)] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("loopback");
+            let url = format!("http://{}", listener.local_addr().expect("address"));
+            let server = tokio::spawn(async move {
+                tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                    let (mut socket, _) = listener.accept().await.expect("request");
+                    let mut bytes = Vec::new();
+                    let mut chunk = [0; 4096];
+                    let body = loop {
+                        let count = socket.read(&mut chunk).await.expect("read");
+                        assert_ne!(count, 0);
+                        bytes.extend_from_slice(&chunk[..count]);
+                        assert!(bytes.len() <= 128 * 1024, "bounded fixture request");
+                        if let Some(end) = bytes.windows(4).position(|b| b == b"\r\n\r\n") {
+                            let headers = std::str::from_utf8(&bytes[..end]).expect("headers");
+                            let length: usize = headers.lines().find_map(|line| {
+                                let (name, value) = line.split_once(':')?;
+                                name.eq_ignore_ascii_case("content-length").then(|| value.trim().parse().expect("length"))
+                            }).expect("content length");
+                            if bytes.len() >= end + 4 + length {
+                                break serde_json::from_slice::<serde_json::Value>(&bytes[end + 4..end + 4 + length]).expect("body");
+                            }
+                        }
+                    };
+                    socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await.expect("response");
+                    body
+                }).await.expect("fixture deadline")
+            });
+            let mut config = Config {
+                provider: "fixture".into(),
+                model: "reasoning-fixture".into(),
+                ..Default::default()
+            };
+            config.providers.insert(
+                "fixture".into(),
+                talos_config::ProviderConfig {
+                    protocol: talos_config::ProviderProtocol::AnthropicMessages,
+                    base_url: Some(url),
+                    models: std::collections::HashMap::from([(
+                        "reasoning-fixture".into(),
+                        talos_config::ModelConfig {
+                            context_limit: Some(32_000),
+                            output_limit: Some(output),
+                            reasoning_supported: Some(true),
+                            reasoning: Some(talos_config::ReasoningOptions {
+                                budget_tokens: Some(thinking),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            );
+            let provider = talos_provider::openai_responses::factory::build_configured_provider(
+                &config,
+                "fixture-key",
+            )
+            .expect("configured adapter");
+            let mut agent = Agent::new(provider.clone(), talos_core::tool::ToolRegistry::new());
+            agent
+                .enable_model_checkpoint_tools()
+                .expect("registered tools");
+            set_request_budget_spec(&mut agent, &config);
+            let reserved = agent.request_budget_spec().requested_output_tokens;
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                let mut events = provider
+                    .stream(&[talos_core::message::Message::User {
+                        content: "bounded thinking request".into(),
+                    }])
+                    .await
+                    .expect("dispatch");
+                while events.recv().await.is_some() {}
+            })
+            .await
+            .expect("provider deadline");
+            let body = server.await.expect("server");
+            assert_eq!(body["max_tokens"], reserved);
+            assert_eq!(body["thinking"]["budget_tokens"], thinking);
+            assert_eq!(reserved, output);
+            assert!(
+                thinking < reserved,
+                "thinking consumes the total output allocation; do not add it twice"
+            );
+        }
+    }
+
     #[test]
     fn todo_prompt_includes_only_active_items() {
         let dir = tempfile::tempdir().expect("operation should succeed");
