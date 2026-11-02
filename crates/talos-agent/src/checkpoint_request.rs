@@ -41,11 +41,12 @@ impl Agent {
             .iter()
             .map(|tool| (&tool.name, &tool.description, &tool.parameters))
             .collect();
-        let key = crate::checkpoint_attempts::fingerprint(
+        let key = crate::checkpoint_attempts::fingerprint_request(
+            &plan.messages,
+            &definitions,
             &(
-                &plan.messages,
-                &definitions,
                 context_limit,
+                plan.tool_protocol,
                 plan.ephemeral_image_tokens,
                 source.map(|source| (source.generation(), source.revision())),
                 self.request_budget_spec.requested_output_tokens,
@@ -54,6 +55,7 @@ impl Agent {
             ),
             deadline,
         )
+        .await
         .ok_or_else(|| {
             CompactionError::CompactionFailed("checkpoint identity unavailable".into())
         })?;

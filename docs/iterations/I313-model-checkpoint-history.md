@@ -2383,3 +2383,39 @@ review approves code diff SHA256
 `fc0feca85c128a80cf487e950f8a16ec99e4923446e28a69f3149e92a4e8e16e`
 against `0d29471bcbbacb8be5206bd94e7597b5a82fd6c3`; reviewer read focused logs,
 without running tests. This is incremental test approval only.
+
+### Full-scope independent acceptance audit and emergency fingerprint increment
+
+Independent read-only audit of `22985a445` confirms T5 remains incomplete. Next
+implementation priorities are (1) large-history automatic emergency preparation,
+including both whole-request fingerprint and cross-message-private-token-aware
+projection; (2) Windows source authority and durable fork; (3) paged/cancellable
+Runtime initial snapshot reads and resumable identity preparation; (4) actual
+coding/research artifacts and operation ledgers showing no repetition of completed
+or known-failed work. Complete 30-row Actor/Runtime composition evidence remains
+required. Existing cancellation/concurrency tests are valid partial evidence,
+not grounds to call all of that behavior unimplemented. No scope reduction accepted.
+
+The audit found an earlier automatic-entry guard: checkpoint_attempts::fingerprint
+serialized the complete request under a cumulative 4 MiB cap before any fold.
+Local fingerprint_request now hashes bounded individual messages/tool definitions
+cooperatively under one deadline, with category/count framing and all prior
+context/budget/source metadata; tool protocol is also included. Only a complete
+scan yields an attempt key. The underlying serializer keeps its per-component
+4 MiB cap and deadline; a single serialization can run synchronously until a
+write/deadline check. Hash collisions can suppress an attempt, never authorize it.
+
+Focused tests pass 5/5 (`/private/tmp/i313-large-fingerprint.log`), covering a
+five-million-byte aggregate, suffix/order/schema/context changes, oversized
+single component and deadline expiry after yielding. This removes only the
+fingerprint entry blocker. Automatic projection still has the cumulative 2 MiB
+limit, including its necessary global private-token pre-scan. Large Runtime
+restart→emergency compaction is not delivered by this increment.
+Final Agent suite passes 643/643 (`/private/tmp/i313-fingerprint-agent-suite.log`),
+and warnings-denied all-target Clippy passes (`/private/tmp/i313-fingerprint-clippy.log`).
+Independent static review approves two-file diff SHA256
+`e69a822967494e01aa2920dafb0a261149b04d8489fcbabed6492ae22c278d03`
+against `22985a44527c1b418b73f5801089a18d4b19664e`; reviewer read focused logs
+but did not run tests. No whole-emergency-path or full T5 approval is inferred.
+Both governance validators pass with zero warnings
+(`/private/tmp/i313-fingerprint-{governance,claims}.log`).
