@@ -2908,3 +2908,16 @@ approved the storage/auth/cancellation boundary, with Windows/standard gates sti
 pending. Its provider-order observation was addressed by asserting every one of
 8300 restored entries, not just count/first/last. Final verification must include
 that strengthened assertion.
+
+
+CLI startup stable candidate: implementation `1b84ad9ff4a833283bb93fc0e5d84d594118fcbb`
+rebased onto `d324c3348` (#839), with only its five governance files added versus
+pre-rebase implementation `95f16a28a`; code/build tree unchanged. Exact-head static
+candidate review approved code/build diff fingerprint
+`8f4ffc6e81735502fefcf7d49e3d13229d1c5ddc8dcc5532d62f6de722f5f054`, not final merge.
+The rebuilt MCP handshake passed all three tests. Standard preflight then exited
+0 with CARGO_BUILD_JOBS=1, low-debug/nonincremental profiles, locked workspace
+check/Clippy/tests, both governance validators and both external SDK modes:
+`/private/tmp/i313-cli-history-preflight-rebased.log`. This run includes every-entry
+8300-message ordering and byte-for-byte source preservation assertions. No native
+CLI candidate success is claimed until fresh CI. Full T5 remains Partial.
