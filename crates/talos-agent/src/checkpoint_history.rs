@@ -139,12 +139,36 @@ impl Preparation {
                     Some((source, scan))
                 })
         {
+            #[cfg(unix)]
+            let restored = session
+                .restore_recovery_scan_for_source(&source, &budget)
+                .ok()?;
+            #[cfg(unix)]
+            let (scan, receipt, saved_bytes) = match restored {
+                Some(restored) if restored.scan.verifies_expectation(&saved.prefix) => {
+                    let offset = restored.scan.completed_bytes();
+                    (restored.scan, Some(restored.receipt), offset)
+                }
+                Some(restored) => {
+                    // Retire only the exact incompatible record we observed.
+                    // Busy/error or a concurrent replacement must be retried,
+                    // never treated as permission to overwrite another owner.
+                    if !session
+                        .clear_recovery_scan(&restored.receipt, &budget)
+                        .ok()?
+                    {
+                        return None;
+                    }
+                    (scan, None, 0)
+                }
+                None => (scan, None, 0),
+            };
             return Some(Self {
                 #[cfg(unix)]
                 scan_store: ScanStore {
                     owner: session.clone(),
-                    receipt: None,
-                    saved_bytes: 0,
+                    receipt,
+                    saved_bytes,
                     cancel: cancel.clone(),
                 },
                 source,
@@ -887,6 +911,14 @@ mod tests {
                 assert_eq!(work.scope, expected);
                 assert!(work.parent.is_some());
                 assert!(work.seal.is_none());
+                assert_eq!(
+                    work.scan
+                        .as_ref()
+                        .expect("verification scan")
+                        .completed_bytes(),
+                    2 * 1024 * 1024,
+                    "independent process resumes prefix verification"
+                );
                 let pending = tokio::sync::Mutex::new(Some(work));
                 let history = History::prepare_cached(&session, &cancel, &pending)
                     .await
@@ -899,6 +931,75 @@ mod tests {
                         .starts_with("restartfact 29")
                 );
             });
+    }
+
+    #[tokio::test]
+    async fn changed_index_expectation_retires_only_observed_scan() {
+        let root = tempfile::tempdir().expect("root");
+        let session =
+            DurableSession::open_or_create(root.path(), "changed-expectation").expect("owner");
+        session
+            .commit_turn(
+                "seed",
+                &[talos_core::message::Message::User {
+                    content: "fact ".repeat(600_000),
+                }],
+                &Default::default(),
+            )
+            .expect("seed");
+        let cancel = CancellationToken::new();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut work = Preparation::begin(&session, &cancel, deadline).expect("begin");
+        while work.seal.is_none() {
+            assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+        }
+        work.persist(&cancel, deadline).expect("index continuation");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+        let index = SessionIndex::new(&work.path).expect("index");
+        let mut saved = index
+            .recovery_continuation(&session.id().to_string(), &budget)
+            .expect("read")
+            .expect("saved");
+        let mut verifying = Preparation::begin(&session, &cancel, deadline).expect("verify");
+        for _ in 0..32 {
+            assert_eq!(
+                verifying.step(&cancel, deadline),
+                Some(PreparationStep::Pending)
+            );
+        }
+        verifying.persist(&cancel, deadline).expect("save scan");
+        let mut changed = serde_json::to_value(&saved.prefix).expect("encode");
+        changed["digest"][0] = serde_json::json!(changed["digest"][0].as_u64().expect("byte") ^ 1);
+        saved.prefix = serde_json::from_value(changed).expect("decode");
+        index
+            .save_recovery_continuation(&session.id().to_string(), &saved, &budget)
+            .expect("changed cache expectation");
+        let mut replacement = Preparation::begin(&session, &cancel, deadline).expect("restart");
+        assert_eq!(
+            replacement.scan.as_ref().expect("scan").completed_bytes(),
+            0
+        );
+        for _ in 0..32 {
+            assert_eq!(
+                replacement.step(&cancel, deadline),
+                Some(PreparationStep::Pending)
+            );
+        }
+        replacement
+            .persist(&cancel, deadline)
+            .expect("new expectation can save");
+        verifying.scan_store.clear();
+        assert!(
+            session
+                .restore_recovery_scan(&budget)
+                .expect("read replacement")
+                .expect("old cleanup preserved new record")
+                .scan
+                .verifies_expectation(&saved.prefix)
+        );
+        // A forged cache digest still cannot finish verification or issue a seal.
+        while replacement.step(&cancel, deadline) == Some(PreparationStep::Pending) {}
+        assert!(replacement.seal.is_none());
     }
 
     #[tokio::test]
@@ -919,6 +1020,10 @@ mod tests {
         let mut work = Preparation::begin(&session, &cancel, deadline).expect("begin");
         while work.seal.is_none() {
             assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+            if work.scan.is_some() {
+                work.persist(&cancel, deadline)
+                    .expect("persist initial scan");
+            }
         }
         assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
         work.persist(&cancel, deadline)
@@ -927,6 +1032,20 @@ mod tests {
         let parent = work.parent.clone();
         assert!(parent.is_some());
         drop(work);
+        // Interrupt index-prefix verification after one completed page. The
+        // child must reuse this host-issued progress, not restart at zero.
+        let mut verification = Preparation::begin(&session, &cancel, deadline).expect("verify");
+        for _ in 0..32 {
+            assert_eq!(
+                verification.step(&cancel, deadline),
+                Some(PreparationStep::Pending)
+            );
+        }
+        verification
+            .persist(&cancel, deadline)
+            .expect("save verification");
+        assert!(verification.seal.is_none());
+        drop(verification);
         drop(session);
         let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"))
             .args([

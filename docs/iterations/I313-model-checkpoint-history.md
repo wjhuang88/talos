@@ -1782,3 +1782,35 @@ approves this bounded Unix initial-scan chain against `37901a322`; reviewer did
 not run tests or approve full I313/merge. Windows, index-continuation prefix
 revalidation, fork, cleanup error observability and final platform/remote gates
 remain open. These residuals are not waived by the stage approval.
+
+### Index-prefix verification restart — local follow-up
+
+Initial-scan stage committed as `20f65827d`. The next uncommitted delta restores
+host-issued progress for an existing index continuation only when version, cutoff
+and expected digest match exactly. No seal or query authority is issued early.
+The independent-process index-restart regression now interrupts verification at
+2 MiB and requires the child to resume that nonzero offset before querying the
+last fact. It passes at `/private/tmp/i313-prefix-resume.log`; exact expectation
+negative controls (initial scan, changed digest/cutoff/version) pass at
+`/private/tmp/i313-prefix-expectation.log`. Formatting and diff checks pass.
+Static review is requested; same-source provenance with a different expectation
+still needs lifecycle/overwrite analysis and regression before this delta commits.
+Full I313 platform, fork, cleanup and final delivery gates remain outstanding.
+
+Prefix restart review correction: incompatible scan provenance is now retired by
+its exact receipt before a fresh verification starts. Cleanup failure or a changed
+record returns unavailable for this attempt, never authorizes unconditional
+replacement. The initial-scan-to-index transition now persists actual initial
+progress before the independent child resumes verification. Added changed-digest
+cache regression: restart at zero, save replacement progress, obsolete receipt
+cannot clear it, forged digest cannot finish a seal. All sixteen host preparation
+tests pass (`/private/tmp/i313-prefix-host-suite.log`); transition subprocess also
+passes (`/private/tmp/i313-prefix-transition.log`). Fresh static review requested.
+
+Revised increment receives independent static approval against `20f65827d`
+(code diff SHA256 `e114c44ee60327a7605a5873e2af533bbf698c7e07b2271f654167580adf3667`).
+Reviewer did not run tests or approve full I313. The forged-digest host regression
+proves no seal is issued, but does not distinguish digest rejection from timeout;
+no stronger terminal-cause claim is made. Affected all-target Clippy passes at
+`/private/tmp/i313-prefix-clippy.log`. Fetch confirms no missing origin/main
+commits at this stage; no rebase is necessary.

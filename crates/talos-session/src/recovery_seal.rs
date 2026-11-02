@@ -227,6 +227,14 @@ impl RecoveryPrefixSeal {
 }
 
 impl RecoveryPrefixScan {
+    /// Whether this scan is verifying exactly the supplied cache expectation.
+    /// Matching does not certify completion or authorize history queries.
+    pub fn verifies_expectation(&self, expectation: &RecoveryPrefixExpectation) -> bool {
+        expectation.version == 1
+            && self.source.source_end() == expectation.cutoff
+            && self.expected == Some(expectation.digest)
+    }
+
     /// Number of bytes committed to complete-page scan progress.
     /// Partial page bytes do not count and cannot authorize a query.
     pub fn completed_bytes(&self) -> u64 {
@@ -358,6 +366,33 @@ mod tests {
     use crate::{DurableSession, PersistencePolicy, TurnTranscriptOutcome};
     use std::time::Duration;
     use talos_core::message::Message;
+
+    #[test]
+    fn resumed_verification_requires_exact_expectation() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "expectation").expect("owner");
+        let source = owner.capture_recovery_source().expect("source");
+        let expectation = RecoveryPrefixExpectation {
+            version: 1,
+            cutoff: source.source_end(),
+            digest: [7; 32],
+        };
+        let initial = source.begin_prefix_seal().expect("initial");
+        assert!(!initial.verifies_expectation(&expectation));
+        let scan = source
+            .verify_prefix_expectation(&expectation)
+            .expect("verify");
+        assert!(scan.verifies_expectation(&expectation));
+        let mut changed = expectation.clone();
+        changed.digest[0] ^= 1;
+        assert!(!scan.verifies_expectation(&changed));
+        changed = expectation.clone();
+        changed.cutoff += 1;
+        assert!(!scan.verifies_expectation(&changed));
+        changed = expectation;
+        changed.version += 1;
+        assert!(!scan.verifies_expectation(&changed));
+    }
 
     #[test]
     fn reopened_owners_cannot_regress_committed_scan_progress() {
