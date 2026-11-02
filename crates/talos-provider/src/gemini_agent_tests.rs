@@ -85,10 +85,24 @@ async fn run(vertex: bool) {
         "data: {}\n\n",
         json!({"candidates":[{"content":{"parts":[call_part.clone()]},"finishReason":"STOP"}]})
     );
+    let expected_images = encoded
+        .iter()
+        .map(|data| json!({"mimeType":"image/png","data":data}))
+        .collect::<Vec<_>>();
     let mut first = server
         .mock("POST", "/")
-        .match_request(|request| {
-            !String::from_utf8_lossy(request.body().expect("body")).contains("functionResponse")
+        .match_request(move |request| {
+            let bytes = request.body().expect("body");
+            let body: serde_json::Value = serde_json::from_slice(bytes).expect("JSON");
+            let images = body["contents"]
+                .as_array()
+                .expect("contents")
+                .iter()
+                .flat_map(|content| content["parts"].as_array().expect("parts"))
+                .filter_map(|part| part.get("inlineData").cloned())
+                .collect::<Vec<_>>();
+            !String::from_utf8_lossy(bytes).contains("functionResponse")
+                && images == expected_images
         })
         .match_body(mockito::Matcher::PartialJson(
             json!({"contents":[{"role":"user","parts":[
