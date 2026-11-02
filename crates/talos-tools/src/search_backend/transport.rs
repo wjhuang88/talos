@@ -782,7 +782,7 @@ impl SearchTransport {
             let mut request = client
                 .request(method.clone(), url.clone())
                 .header(reqwest::header::ACCEPT_ENCODING, "identity");
-            if let Some(headers) = headers {
+            if let Some(headers) = headers.as_ref() {
                 request = headers.apply(request);
             }
             if let Some(body) = body.as_ref() {
