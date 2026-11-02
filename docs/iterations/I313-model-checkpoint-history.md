@@ -2459,3 +2459,31 @@ Agent/Runtime all-target warnings-denied Clippy also passes
 (`/private/tmp/i313-two-phase-clippy.log`); both governance validators pass zero
 warnings (`/private/tmp/i313-two-phase-{governance,claims}.log`). These local
 stage gates do not certify full preflight or native CI for the new code.
+
+### Windows opened-handle locality preparation
+
+The next local increment verifies the opened source with
+GetFinalPathNameByHandleW(VOLUME_NAME_GUID), refusing failed, truncated, invalid
+UTF-16 or noncanonical volume namespace results. Both open_source and Windows
+stamp construction check locality; no DOS/NT fallback is allowed. ADR-096 records
+the bounded ABI boundary. This does not enable Windows recovery authorization or
+prove mapping/lifecycle exclusion. Native mapped-drive/ancestor redirection,
+retained-view and Actor lifecycle tests remain required before activation.
+The host parser regression passes (1/1; `/private/tmp/i313-volume-path-test.log`)
+and workspace formatting passes. Full Windows cross-check was attempted but
+failed building zstd-sys with the host C compiler, before checking this crate
+(`/private/tmp/i313-volume-windows-check.log`); no Windows compilation pass claimed.
+
+Published-head CI 41392118766 is terminal failure. Windows Desktop passed;
+Windows workspace still fails recovery availability. The host Agent failure is
+the 2-second collect_until_completions event timeout in the registered checkpoint
+scenario (`/private/tmp/i313-host-b634.log`), not evidence of the Windows cause.
+Its cause remains under investigation. Global issue reconciliation also failed;
+the independent Issue #832 registration remains owned outside this work slice.
+Affected-crate all-target Clippy passes (`/private/tmp/i313-volume-clippy.log`).
+Independent static review approves the locality/ABI delta against `46c3ba027`,
+reviewed three-file diff hash
+`547217a7c017248d78fd7b5bfc4bb2ca9f2ef0d45e20593c725fe7364916ce24`;
+the only subsequent change to those files moves the ADR paragraph under the
+correct Windows section as requested. Reviewer did not run tests; activation,
+restrictive-handle construction invariant and native lifecycle coverage stay open.

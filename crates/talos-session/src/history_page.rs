@@ -219,6 +219,7 @@ pub(crate) fn open_source(path: &Path) -> Result<std::fs::File, HistoryPageError
         if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
             return Err(HistoryPageError::UnsupportedSource);
         }
+        crate::recovery_stamp::verify_local_volume(&file)?;
     }
     if !metadata.is_file() {
         return Err(HistoryPageError::UnsupportedSource);

@@ -53,6 +53,7 @@ pub(crate) fn from_file(file: &std::fs::File) -> Result<FileStamp, HistoryPageEr
 
 #[cfg(windows)]
 fn windows_stamp(file: &std::fs::File) -> Result<FileStamp, HistoryPageError> {
+    verify_local_volume(file)?;
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{
         FILE_BASIC_INFO, FILE_ID_INFO, FileBasicInfo, FileIdInfo, GetFileInformationByHandleEx,
@@ -93,6 +94,76 @@ fn windows_stamp(file: &std::fs::File) -> Result<FileStamp, HistoryPageError> {
         written: basic.LastWriteTime,
         changed: basic.ChangeTime,
     })
+}
+
+/// Refuse remote/unknown namespaces using the opened object, not its input path.
+#[cfg(windows)]
+pub(crate) fn verify_local_volume(file: &std::fs::File) -> Result<(), HistoryPageError> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{GetFinalPathNameByHandleW, VOLUME_NAME_GUID};
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut buffer = vec![0u16; 32768];
+        // SAFETY (ADR-096): live borrowed handle; initialized writable buffer,
+        // exact capacity in UTF-16 units; no pointer survives this synchronous call.
+        let length = unsafe {
+            GetFinalPathNameByHandleW(
+                file.as_raw_handle(),
+                buffer.as_mut_ptr(),
+                buffer.len() as u32,
+                VOLUME_NAME_GUID,
+            )
+        } as usize;
+        if length == 0 || length >= buffer.len() {
+            return Err(HistoryPageError::UnsupportedSource);
+        }
+        let path = String::from_utf16(&buffer[..length])
+            .map_err(|_| HistoryPageError::UnsupportedSource)?;
+        if !is_local_volume_path(&path) {
+            return Err(HistoryPageError::UnsupportedSource);
+        }
+        Ok(())
+    }))
+    .unwrap_or(Err(HistoryPageError::UnsupportedSource))
+}
+
+#[cfg(any(windows, test))]
+fn is_local_volume_path(path: &str) -> bool {
+    let Some(rest) = path.strip_prefix(r"\\?\Volume{") else {
+        return false;
+    };
+    let bytes = rest.as_bytes();
+    bytes.len() >= 38
+        && &bytes[36..38] == b"}\\"
+        && bytes[..36].iter().enumerate().all(|(i, byte)| {
+            if matches!(i, 8 | 13 | 18 | 23) {
+                *byte == b'-'
+            } else {
+                byte.is_ascii_hexdigit()
+            }
+        })
+        && !bytes.contains(&0)
+}
+
+#[cfg(test)]
+mod volume_path_tests {
+    use super::is_local_volume_path;
+
+    #[test]
+    fn only_complete_volume_guid_namespace_is_accepted() {
+        assert!(is_local_volume_path(
+            r"\\?\Volume{01234567-89ab-cdef-0123-456789abcdef}\history.jsonl"
+        ));
+        for path in [
+            r"C:\history.jsonl",
+            r"\\?\UNC\server\share\history.jsonl",
+            r"\\server\share\history.jsonl",
+            r"\\?\Volume{01234567-89ab-cdef-0123-456789abcdef}",
+            r"\\?\Volume{01234567-89ab-cdef-0123-456789abcdeg}\history",
+            "\\\\?\\Volume{01234567-89ab-cdef-0123-456789abcdef}\\bad\0path",
+        ] {
+            assert!(!is_local_volume_path(path), "accepted {path:?}");
+        }
+    }
 }
 
 #[cfg(all(test, windows))]

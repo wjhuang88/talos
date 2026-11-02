@@ -223,6 +223,18 @@ mapping behavior still requires native investigation; share-mode exclusion alone
 is not accepted as proof that all byte mutations are impossible. Native lifetime,
 write/delete and actual Actor success/cancel/timeout regressions remain required.
 
+Windows source locality additionally uses `GetFinalPathNameByHandleW` with
+`VOLUME_NAME_GUID` on the opened handle. This ADR permits that OS ABI call with
+a live borrowed handle and an initialized 32768-unit UTF-16 output buffer whose
+exact capacity is passed to Windows. Zero, truncated/oversized, invalid UTF-16,
+embedded NUL and non-volume-GUID results fail closed without DOS/NT fallback.
+The GUID namespace must contain a canonical 36-character hexadecimal GUID and
+a rooted suffix. Network shares have no volume GUID path; unsupported volume
+drivers are also refused. This check prevents authorization of remote sources,
+not remote opening/I/O before the handle check. Native tests and independent
+security review remain required; this addition does not activate Windows recovery.
+Reference: [GetFinalPathNameByHandleW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew).
+
 ## Model terminal delivery
 
 The additive `SessionEvent::ModelCheckpointTerminal` variant reports one terminal
