@@ -283,7 +283,7 @@ in the separate untrusted search cache and cross-owner/branch substitution.
 If bindings storage cannot be treated as host authority by the security review,
 use a separately protected integrity mechanism instead; do not activate restoration.
 Initial support requires reliable Unix device/inode/size/mtime/ctime matching.
-Windows persisted offset restoration remains disabled. Native test-only head
+Windows production-hook restoration is a local candidate, not yet accepted. Native test-only head
 b8a80873b (run41418548863, job125196764203) demonstrated a same-length overwrite
 whose volume/file ID/size/creation/write/change fields remained identical.
 These fields alone therefore cannot certify an unchanged source across released
@@ -293,7 +293,10 @@ recomputes the saved-prefix digest in bounded pages under a fresh retained lease
 before reusing progress; metadata equality alone never skips these reads. Pending
 revalidation cannot export progress or mint a seal. This preserves bounded work
 per step but rereads the saved prefix after process restart. Production activation
-still requires independent review and native proof.
+still requires independent review and native proof. Test-only head d0721a1db
+passed native Windows CI41427581565. The new Agent hook candidate retains the
+exact cleanup receipt during revalidation and saves only verified progress; its
+own native validation is still required.
 Live retained-handle source checks are a distinct boundary and are unchanged.
 
 

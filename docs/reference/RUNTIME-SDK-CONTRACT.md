@@ -619,11 +619,15 @@ again; this is not protection against modification of the trusted host database.
 `DurableSession` root branch IDs are now stable for a durable UUID; discard cached
 random root IDs from earlier opens, while retaining original transcript/entry IDs.
 The opaque scan receipt permits exact-record cleanup only for its issuing handle;
-it does not authorize history queries. Windows persisted offset restoration is
-unavailable: native tests showed unchanged metadata after a same-length overwrite,
-so a released lease cannot be replaced by timestamp equality. The local activation
-candidate was withdrawn pending a reviewed reliable source-change or content
-revalidation design. Full I313 platform/acceptance gates remain outstanding.
+it does not authorize history queries. The Windows implementation candidate
+restores saved progress only after bounded content revalidation under a new retained
+lease. Metadata equality cannot certify unchanged content across released leases:
+native testing observed a same-length overwrite with identical version fields.
+Restoration rereads the saved prefix; each step stays bounded but restart does not
+skip that I/O. Until verification finishes, no saved progress grants query authority.
+Test-only native CI passed; production-hook native validation and full I313
+acceptance remain outstanding. Cancellation cleanup is bounded best effort; a
+persistent bindings-store failure may retain a receipt and emit a warning.
 
 Unix and Windows durable hosts can call `RuntimeHandle::fork_durable(external_id)` at an idle
 Actor boundary. It returns a fresh child UUID, preserves the committed raw prefix

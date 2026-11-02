@@ -1,3 +1,43 @@
+## Windows production-hook candidate after native revalidation proof — 2026-11-02
+
+Test-only head d0721a1db CI41427581565 completed successfully, including Windows
+workspace job125217969345. Local candidate now exposes Session saved-scan APIs on
+Windows and connects Agent save/restore/receipt cleanup. The shared Preparation
+regression requires zero reusable progress after restore on Windows, bounded
+revalidation before re-save, then exact-receipt cancellation cleanup. Local Unix
+focused test passed 1/1 (`/private/tmp/i313-windows-hook-revalidation.log`).
+Independent static review approved five-file diff
+`8272eb87efe00dff067d3a51b09a595434c811ae6ded1cbddcc6a910aa369e74`
+for local commit and draft publication after gates, not production acceptance.
+All-target Clippy found a constant platform assertion in an earlier mutation test;
+it is corrected into cfg-specific Unix refusal and Windows content-rejection
+branches without changing their safety assertions. Affected all-target Clippy
+passed (`/private/tmp/i313-windows-hook-clippy-fixed.log`). Final independent
+review approved source diff `b268b6866ab9ab6d3d2138967e0dadf4373d4a640791ab7f74c0445a6d7eaaad`
+for local commit and conditional draft publication. Standard preflight76765 remains
+running (`/private/tmp/i313-production-hook-preflight.log`); no success claim yet.
+SDK/ADR document restart reread cost and bounded best-effort cleanup. No new
+exact-head Windows hook CI or merge is claimed. T5 Partial; T1/T6 unimplemented.
+
+## Main synchronization and canonical rendering regression — 2026-11-02
+
+Merged origin/main `069c5da19` (PR840, independent I314 Planned/Unclaimed
+search scope) without conflicts in `6123fe9`. No I314 implementation is claimed.
+Runtime regression `8b6b2a2d3` verifies installed A/B canonical payload bytes and
+JSON serialization roundtrip stability. Source aliases are resolved by Runtime
+before installation, so comparing input aliases directly was invalid; the first
+attempt failed and was corrected at the installed boundary. This assertion does
+not establish source authority or independently prove different JSON key orders.
+Focused locked test passed 1/1 (11.39s), affected all-target Clippy passed; logs
+`/private/tmp/i313-canonical-composition-fixed.log` and
+`/private/tmp/i313-canonical-clippy.log`. Independent review approved source diff
+`4fd427ec25a6090d1c58cb5ccb124db5d863c9d34963325054816d99cc025e5b`.
+Published candidate remains d0721a1db with CI41427581565 in progress at this
+checkpoint. That run does not certify the local subsequent commits. Prior standard
+preflight17638 passed including both SDK modes; latest source test is separately
+validated above. Windows activation and full T5 acceptance remain open; T1/T6
+unimplemented. Full queue unchanged.
+
 ## Registered checkpoint pressure / output reserve composition — 2026-11-02
 
 Extended the real provider-capture regression with fixed-capacity output-reserve

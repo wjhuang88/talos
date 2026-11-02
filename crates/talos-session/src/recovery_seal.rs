@@ -19,7 +19,7 @@ pub struct RecoveryPrefixScan {
 
 // Trusted bindings provenance only. Never deserialize this from the search index
 // or model input. Fields cannot be supplied through the public API (ADR-096).
-#[cfg(any(unix, all(windows, test)))]
+#[cfg(any(unix, windows))]
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct StoredScan {
@@ -34,7 +34,7 @@ pub(crate) struct StoredScan {
     stamp: crate::recovery_stamp::StoredFileVersion,
 }
 
-#[cfg(any(unix, all(windows, test)))]
+#[cfg(any(unix, windows))]
 impl RecoveryPrefixScan {
     pub(crate) fn stored(
         &self,
@@ -61,7 +61,7 @@ impl RecoveryPrefixScan {
     }
 }
 
-#[cfg(any(unix, all(windows, test)))]
+#[cfg(any(unix, windows))]
 impl StoredScan {
     pub(crate) fn supersedes(&self, previous: &Self) -> bool {
         self.stamp != previous.stamp
@@ -746,14 +746,16 @@ mod process_resume_tests {
                 }
                 _ => unreachable!(),
             }
-            if let Some(mut resumed) = owner
+            let restored = owner
                 .restore_recovery_scan(&budget())
-                .expect("restore attempt")
-            {
-                assert!(
-                    cfg!(windows),
-                    "Unix metadata change must refuse immediately"
-                );
+                .expect("restore attempt");
+            #[cfg(unix)]
+            assert!(
+                restored.is_none(),
+                "Unix metadata change must refuse immediately"
+            );
+            #[cfg(windows)]
+            if let Some(mut resumed) = restored {
                 assert_eq!(resumed.scan.completed_bytes(), 0);
                 loop {
                     match resumed

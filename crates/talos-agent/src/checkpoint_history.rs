@@ -58,7 +58,7 @@ impl QueryState {
 
 /// Host-owned progress; no partial state authorizes query results.
 pub(crate) struct Preparation {
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     scan_store: ScanStore,
     source: talos_session::DurableRecoverySource,
     scan: Option<talos_session::RecoveryPrefixScan>,
@@ -70,14 +70,14 @@ pub(crate) struct Preparation {
     #[cfg(test)]
     after_page_read: Option<Box<dyn FnOnce() + Send>>,
 }
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 struct ScanStore {
     owner: DurableSession,
     receipt: Option<talos_session::RecoveryScanReceipt>,
     saved_bytes: u64,
     cancel: CancellationToken,
 }
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 impl ScanStore {
     fn clear(&self) {
         if let Some(receipt) = &self.receipt {
@@ -98,7 +98,7 @@ impl ScanStore {
         }
     }
 }
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 impl Drop for ScanStore {
     fn drop(&mut self) {
         // Actor interruption aborts the turn task after cancelling its token.
@@ -149,11 +149,11 @@ impl Preparation {
                     Some((source, scan))
                 })
         {
-            #[cfg(unix)]
+            #[cfg(any(unix, windows))]
             let restored = session
                 .restore_recovery_scan_for_source(&source, &budget)
                 .ok()?;
-            #[cfg(unix)]
+            #[cfg(any(unix, windows))]
             let (scan, receipt, saved_bytes) = match restored {
                 Some(restored) if restored.scan.verifies_expectation(&saved.prefix) => {
                     let offset = restored.scan.completed_bytes();
@@ -174,7 +174,7 @@ impl Preparation {
                 None => (scan, None, 0),
             };
             return Some(Self {
-                #[cfg(unix)]
+                #[cfg(any(unix, windows))]
                 scan_store: ScanStore {
                     owner: session.clone(),
                     receipt,
@@ -192,12 +192,12 @@ impl Preparation {
                 after_page_read: None,
             });
         }
-        #[cfg(unix)]
+        #[cfg(any(unix, windows))]
         let restored = session
             .restore_recovery_scan_for_source(&source, &budget)
             .ok()
             .flatten();
-        #[cfg(unix)]
+        #[cfg(any(unix, windows))]
         let (scan, scan_receipt, saved_scan_bytes) = match restored {
             Some(restored) => {
                 let offset = restored.scan.completed_bytes();
@@ -213,7 +213,7 @@ impl Preparation {
             .begin_recovery_build(&scope, source.source_end(), &budget)
             .ok()?;
         Some(Self {
-            #[cfg(unix)]
+            #[cfg(any(unix, windows))]
             scan_store: ScanStore {
                 owner: session.clone(),
                 receipt: scan_receipt,
@@ -235,9 +235,9 @@ impl Preparation {
         // During revalidation retain the previous checkpoint; no new index page
         // can commit until the scan finishes and installs the refreshed seal.
         if let Some(scan) = &self.scan {
-            #[cfg(not(unix))]
+            #[cfg(not(any(unix, windows)))]
             let _ = scan;
-            #[cfg(unix)]
+            #[cfg(any(unix, windows))]
             if scan.completed_bytes() > self.scan_store.saved_bytes {
                 let stopped = cancel.clone();
                 let budget = RecoveryWorkBudget::with_cancellation_check(
@@ -282,7 +282,7 @@ impl Preparation {
         Some(())
     }
     fn retire(&self) {
-        #[cfg(unix)]
+        #[cfg(any(unix, windows))]
         self.scan_store.clear();
         if let Ok(index) = SessionIndex::new(&self.path) {
             let _ = index.clear_recovery_continuation(
@@ -1697,7 +1697,7 @@ mod windows_lease_tests {
     }
 }
 
-#[cfg(all(test, unix))]
+#[cfg(all(test, any(unix, windows)))]
 mod persisted_preparation_tests {
     use super::*;
 
@@ -1729,7 +1729,32 @@ mod persisted_preparation_tests {
         let saved = first.scan_store.saved_bytes;
         assert!(saved > 0);
         drop(first); // All old source leases are released; uncancelled progress survives.
-        let second = Preparation::begin(&session, &cancel, deadline).expect("restore preparation");
+        let mut second =
+            Preparation::begin(&session, &cancel, deadline).expect("restore preparation");
+        assert!(
+            second.scan_store.receipt.is_some(),
+            "restored exact cleanup receipt"
+        );
+        if cfg!(windows) {
+            assert_eq!(second.scan_store.saved_bytes, 0);
+            assert_eq!(
+                second
+                    .scan
+                    .as_ref()
+                    .expect("pending verification")
+                    .completed_bytes(),
+                0
+            );
+            while second.scan.as_ref().expect("scan").completed_bytes() < saved {
+                assert_eq!(
+                    second.step(&cancel, deadline),
+                    Some(PreparationStep::Pending)
+                );
+            }
+            second
+                .persist(&cancel, deadline)
+                .expect("save verified progress");
+        }
         assert_eq!(second.scan_store.saved_bytes, saved);
         assert_eq!(
             second

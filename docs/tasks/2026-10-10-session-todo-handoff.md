@@ -1,3 +1,21 @@
+## Windows native revalidation proof and hook candidate — 2026-11-02
+
+CI41427581565 succeeded for d0721a1db (test-only Windows restoration). Local
+production-hook candidate now connects saved scan restoration and cancellation
+cleanup, with focused Unix integration test passed. Independent static review
+permits candidate publication after local gates; final small cfg-test correction
+and production-hook native evidence remain pending. See I313 owner and SDK.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
+## Main synchronization — 2026-11-02
+
+Local I313 branch merged main069c5da19 / PR840 at6123fe9 without conflicts;
+I314 remains independently Planned/Unclaimed. Canonical rendering integration
+regression8b6b2a2d3 passed focused test and Clippy, with independent review.
+See I313 owner for evidence limits. Published d0721a1db CI41427581565 remains
+in progress; local follow-up commits are not certified by that run.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
 ## T5 output-reserve composition — 2026-11-02
 
 Actual-provider regression now covers reserve-triggered advisory appearance and
