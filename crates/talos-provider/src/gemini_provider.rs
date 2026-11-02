@@ -14,11 +14,19 @@ use tokio::sync::mpsc;
 
 #[derive(Clone)]
 pub(crate) struct GeminiProvider {
-    transport: GeminiTransport,
+    transport: Option<GeminiTransport>,
+    vertex: Option<std::sync::Arc<VertexProfile>>,
     provider: String,
     model: String,
     output_limit: Option<u32>,
     timeout: ProviderTimeoutConfig,
+}
+
+struct VertexProfile {
+    project: String,
+    location: String,
+    allow_metadata: bool,
+    transport: tokio::sync::OnceCell<GeminiTransport>,
 }
 
 impl GeminiProvider {
@@ -36,7 +44,39 @@ impl GeminiProvider {
             ));
         }
         Ok(Self {
-            transport,
+            transport: Some(transport),
+            vertex: None,
+            provider,
+            model,
+            output_limit,
+            timeout,
+        })
+    }
+
+    pub(crate) fn vertex(
+        project: String,
+        location: String,
+        allow_metadata: bool,
+        provider: String,
+        model: String,
+        output_limit: Option<u32>,
+        timeout: ProviderTimeoutConfig,
+    ) -> ProviderResult<Self> {
+        crate::gemini_endpoint::vertex(&project, &location, &model, true)
+            .map_err(|message| ProviderError::InvalidResponse(message.into()))?;
+        if provider.is_empty() {
+            return Err(ProviderError::InvalidResponse(
+                "missing Gemini provider identity".into(),
+            ));
+        }
+        Ok(Self {
+            transport: None,
+            vertex: Some(std::sync::Arc::new(VertexProfile {
+                project,
+                location,
+                allow_metadata,
+                transport: tokio::sync::OnceCell::new(),
+            })),
             provider,
             model,
             output_limit,
@@ -61,6 +101,32 @@ impl GeminiProvider {
             tools,
             self.output_limit,
         )?;
+        let transport = match &self.transport {
+            Some(transport) => transport,
+            None => {
+                let profile = self.vertex.as_ref().ok_or_else(|| {
+                    ProviderError::InvalidResponse("missing Gemini transport".into())
+                })?;
+                tokio::time::timeout_at(
+                    deadline.into(),
+                    profile.transport.get_or_try_init(|| async {
+                        GeminiTransport::vertex_adc(
+                            &profile.project,
+                            &profile.location,
+                            &self.model,
+                            true,
+                            profile.allow_metadata,
+                            deadline,
+                        )
+                        .await
+                    }),
+                )
+                .await
+                .map_err(|_| {
+                    ProviderError::InvalidResponse("Vertex initialization timed out".into())
+                })??
+            }
+        };
         let mut attempt = 0;
         let (response, attempt_started) = loop {
             if Instant::now() >= deadline {
@@ -83,7 +149,7 @@ impl GeminiProvider {
                 let _ = tx.send(event);
             }
             let attempt_started = Instant::now();
-            match self.transport.dispatch(&body, deadline).await {
+            match transport.dispatch(&body, deadline).await {
                 Ok(response) => break (response, attempt_started),
                 Err(error) => match crate::retry::classify_retry_with_backoff(
                     &error,
