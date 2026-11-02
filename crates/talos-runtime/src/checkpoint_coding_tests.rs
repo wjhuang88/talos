@@ -710,3 +710,191 @@ async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continua
     assert_eq!(recovery.0.load(Ordering::SeqCst), 4);
     runtime.shutdown().await.expect("shutdown");
 }
+
+#[tokio::test]
+async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed_projection() {
+    struct Model {
+        step: AtomicUsize,
+        installed: std::sync::Mutex<Option<String>>,
+    }
+    #[async_trait]
+    impl LanguageModel for Model {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+            let step = self.step.fetch_add(1, Ordering::SeqCst);
+            let projection = || {
+                messages.iter().find_map(|message| match message {
+                    Message::Context { content } if content.starts_with("[Derived checkpoint;") => {
+                        Some(content.clone())
+                    }
+                    _ => None,
+                })
+            };
+            let events = match step {
+                0 | 2 | 4 => {
+                    if step == 2 {
+                        *self.installed.lock().expect("projection") =
+                            Some(projection().expect("A installed"));
+                    }
+                    if step == 4 {
+                        assert_eq!(
+                            projection(),
+                            *self.installed.lock().expect("projection"),
+                            "failed replacement preserves exact installed A"
+                        );
+                        assert_eq!(result(messages, "compact-3")["status"], "Admitted");
+                        let terminal = messages
+                            .iter()
+                            .rev()
+                            .find_map(|message| match message {
+                                Message::Multimodal { parts } => {
+                                    parts.iter().find_map(|part| match part {
+                                        talos_core::message::ContentPart::Text { text } => {
+                                            serde_json::from_str::<Value>(text).ok().filter(
+                                                |value| value.get("checkpoint_operation").is_some(),
+                                            )
+                                        }
+                                        _ => None,
+                                    })
+                                }
+                                _ => None,
+                            })
+                            .expect("terminal metadata");
+                        let outcome = terminal["outcome"].as_str().expect("outcome");
+                        assert!(
+                            outcome.contains("FailedWithEstimate")
+                                && outcome.contains("Preparation"),
+                            "{terminal}"
+                        );
+                    }
+                    call(
+                        &format!("discover-{step}"),
+                        "history_search",
+                        json!({"mode":"discover"}),
+                    )
+                }
+                1 | 3 | 5 => {
+                    let discovery = result(messages, &format!("discover-{}", step - 1));
+                    let item =
+                        |text: &str| json!({"text":text,"sources":[discovery["sources"][0]]});
+                    let text = if step == 3 {
+                        "x".repeat(3900)
+                    } else {
+                        format!("checkpoint {step}")
+                    };
+                    let checkpoint = json!({"schema_version":1,"summary":item(&text),"goal":item(&text),"next_step":item(&text),"completed":[],"open_loops":[],"assumptions":[],"facts":[],"constraints":[],"in_progress":[],"pending":[],"decisions":[],"resources":[]});
+                    // This probe is valid schema and fits the render cap. It must
+                    // fail the reclamation gate, not an input-size shortcut.
+                    let parsed =
+                        talos_agent::compaction::Checkpoint::parse(&checkpoint.to_string(), |_| {
+                            true
+                        })
+                        .expect("valid schema");
+                    parsed.render(64_000).expect("within render cap");
+                    call(
+                        &format!("compact-{step}"),
+                        "compact_context",
+                        json!({"snapshot":discovery["snapshot"],"checkpoint":checkpoint}),
+                    )
+                }
+                6 => {
+                    let current = projection().expect("B installed");
+                    assert!(current.contains("checkpoint 5"));
+                    assert_ne!(Some(current), *self.installed.lock().expect("projection"));
+                    vec![AgentEvent::TurnEnd {
+                        stop_reason: StopReason::EndTurn,
+                        usage: Default::default(),
+                    }]
+                }
+                _ => panic!("unexpected request {step}"),
+            };
+            let (tx, rx) = mpsc::channel(8);
+            for event in events {
+                tx.send(event).await.expect("receiver");
+            }
+            Ok(rx)
+        }
+    }
+    let root = tempfile::tempdir().expect("workspace");
+    let durable =
+        DurableSession::open_or_create(&root.path().join("sessions"), "reclaim").expect("session");
+    let seed: Vec<_> = (0..20)
+        .flat_map(|index| {
+            [
+                Message::User {
+                    content: format!("task {index} {}", "x".repeat(120)),
+                },
+                Message::Assistant {
+                    content: "completed".repeat(12),
+                    tool_calls: vec![],
+                    reasoning: None,
+                },
+            ]
+        })
+        .collect();
+    durable
+        .commit_turn("seed", &seed, &Default::default())
+        .expect("seed");
+    let model = Arc::new(Model {
+        step: AtomicUsize::new(0),
+        installed: std::sync::Mutex::new(None),
+    });
+    let mut runtime = RuntimeBuilder::new()
+        .provider(model.clone())
+        .workspace_root(root.path())
+        .model_context_limit(64_000)
+        .permission_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ))
+        .durable_session(durable)
+        .build()
+        .expect("runtime");
+    runtime
+        .submit("exercise reclamation rejection and recovery")
+        .await
+        .expect("submit");
+    let mut outcomes = Vec::new();
+    let mut completed_success = false;
+    tokio::time::timeout(Duration::from_secs(15), async {
+        while let Some(event) = runtime.next_event().await {
+            match event {
+                SessionEvent::ModelCheckpointTerminal { outcome, .. } => outcomes.push(outcome),
+                SessionEvent::TurnEvent {
+                    payload: talos_core::session::TurnEventPayload::Completed { status },
+                    ..
+                } => {
+                    assert!(
+                        matches!(status, TurnCompletionStatus::Success { .. }),
+                        "{status:?}"
+                    );
+                    completed_success = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+    })
+    .await
+    .expect("deadline");
+    assert!(completed_success, "successful Turn completion is required");
+    assert_eq!(model.step.load(Ordering::SeqCst), 7);
+    assert_eq!(outcomes.len(), 3);
+    assert!(matches!(
+        outcomes[0],
+        talos_core::session::CompactOutcome::Applied { .. }
+    ));
+    assert!(matches!(
+        outcomes[1],
+        talos_core::session::CompactOutcome::FailedWithEstimate {
+            reason: talos_core::session::CompactFailureReason::Preparation,
+            ..
+        }
+    ));
+    assert!(matches!(
+        outcomes[2],
+        talos_core::session::CompactOutcome::Applied { .. }
+    ));
+    runtime.shutdown().await.expect("shutdown");
+}

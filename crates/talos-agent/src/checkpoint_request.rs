@@ -1100,6 +1100,79 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn valid_submitted_checkpoint_reports_insufficient_reclamation_without_mutation() {
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: true,
+            fail_after: None,
+        });
+        let agent = Agent::new(provider.clone(), ToolRegistry::new());
+        // Same bounded candidate and seed size as the registered Runtime refusal.
+        let mut raw: Vec<_> = (0..20)
+            .flat_map(|index| {
+                [
+                    Message::User {
+                        content: format!("task {index} {}", "x".repeat(120)),
+                    },
+                    Message::Assistant {
+                        content: "completed".repeat(12),
+                        tool_calls: vec![],
+                        reasoning: None,
+                    },
+                ]
+            })
+            .collect();
+        raw.push(Message::User {
+            content: "exercise reclamation rejection and recovery".into(),
+        });
+        let end = eligible_prefix_end(&raw).expect("eligible prefix");
+        let source = crate::compaction::HistorySource::bind(
+            1,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|n| format!("source-{n}")).collect(),
+        )
+        .expect("bound source");
+        let item = serde_json::json!({"text":"x".repeat(3900),"sources":["source-0"]});
+        let payload =
+            serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+            "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+            "facts":[],"assumptions":[],"resources":[],"open_loops":[]})
+            .to_string();
+        let before = agent.estimate_provider_request_tokens(&raw, &[]);
+        let mut plan = ProviderRequestPlan {
+            messages: raw.clone(),
+            tool_definitions: vec![],
+            estimated_tokens: before,
+            ephemeral_image_tokens: 0,
+            omitted_tool_exchanges: 0,
+            tool_protocol: ToolProtocol::Native,
+        };
+        let mut deferred = None;
+        let error = agent
+            .checkpoint_submitted_deferred(
+                &mut plan,
+                64_000,
+                &PrivateTokens::default(),
+                &source,
+                tokio::time::Instant::now() + Duration::from_secs(5),
+                &payload,
+                end,
+                &mut deferred,
+            )
+            .await
+            .expect_err("must reject insufficient reclamation");
+        assert!(
+            matches!(error, CompactionError::CompactionFailed(ref reason) if reason == "checkpoint reclaims insufficient context"),
+            "{error}"
+        );
+        assert_eq!(plan.messages, raw);
+        assert_eq!(plan.estimated_tokens, before);
+        assert!(deferred.is_none());
+        assert!(provider.requests.lock().expect("requests").is_empty());
+    }
+
+    #[tokio::test]
     async fn submitted_checkpoint_uses_shared_validation_without_provider_or_early_install() {
         let provider = Arc::new(SummaryProvider {
             requests: Mutex::new(vec![]),
