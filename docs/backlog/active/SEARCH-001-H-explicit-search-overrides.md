@@ -23,12 +23,12 @@
 | Work Slice | SEARCH-001-H explicit premium/self-hosted override configuration and production composition; Tavily controlled transport; explicit fallback-to-auto; secret redaction. No SEARCH-001-E/F admission and no `rust-websearch` removal. |
 | Claimed At | 2026-11-02 |
 | Source Issue | #832 |
-| Governance Claim PR | Pending draft PR number on `docs/i314-search-explicit-overrides-activate`; backfill before validation/merge |
+| Governance Claim PR | #841 |
 | Authorization Mode | Single-maintainer merge with explicit maintainer-authorized parallel execution |
 | Authorization Evidence | On 2026-11-02 the maintainer explicitly answered `允许并行` after being told that I314 would be activated and implemented in parallel with the currently Active I310 and I313 scopes. |
 | Handoff / Release Condition | Keep I314 ownership until implementation/acceptance closeout or an explicit handoff. Existing I310/I313 ownership remains unchanged; SEARCH-001-E/F stay separately blocked because D admission did not occur. |
 
-This claim/Active state is a candidate while its governance PR is open. It becomes effective only when the atomic activation PR reaches `main`; no production implementation branch may start before that merge.
+This claim/Active state is a candidate while #841 is open. It becomes effective only when #841 reaches `main`; no production implementation branch may start before that merge.
 
 ## Goal
 
@@ -49,7 +49,7 @@ in the environment must not silently select paid usage or change the default sea
 
 ## Constraints
 
-- Production implementation starts only after this atomic claim+activation reaches `main`.
+- Production implementation starts only after #841 reaches `main`.
 - Parallel execution with I310/I313 is explicitly maintainer-authorized; their scopes and claims remain independent and unchanged.
 - Preserve the model-facing `web_search` schema and Network permission unless separately reviewed.
 - Do not create a second generic retry/backoff/circuit-breaker system; reuse SEARCH-001-C and
