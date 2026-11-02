@@ -5061,7 +5061,185 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                             .starts_with("Applied {"),
                         "{terminal}"
                     );
-                    success_events("checkpoint complete")
+                    assert!(
+                        !request.contains("omittedfact original constraint"),
+                        "covered fact must actually leave projected request"
+                    );
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: "rediscover".into(),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"discover"}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                3 => {
+                    let discovery = messages
+                        .iter()
+                        .find_map(|message| match message {
+                            Message::Tool { result } if result.tool_use_id == "rediscover" => {
+                                serde_json::from_str::<serde_json::Value>(&result.content).ok()
+                            }
+                            _ => None,
+                        })
+                        .expect("second checkpoint discovery");
+                    let item = serde_json::json!({"text":"SECOND_CHECKPOINT Continue with original evidence", "sources":[discovery["sources"][0]]});
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: "checkpoint-b".into(),
+                                name: "compact_context".into(),
+                                input: serde_json::json!({"snapshot":discovery["snapshot"], "checkpoint": {
+                                    "schema_version":1,"summary":item,"goal":item,"next_step":item,
+                                    "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                                    "facts":[],"assumptions":[],"resources":[],"open_loops":[]
+                                }}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                4 => {
+                    let request = serde_json::to_string(messages).expect("request B");
+                    assert!(request.contains("SECOND_CHECKPOINT"));
+                    assert!(!request.contains("omittedfact original constraint"));
+                    let applied = messages.iter().any(|message| match message {
+                        Message::Multimodal { parts } => parts.iter().any(|part| match part {
+                            talos_core::message::ContentPart::Text { text } => {
+                                serde_json::from_str::<serde_json::Value>(text)
+                                    .ok()
+                                    .is_some_and(|value| {
+                                        value["checkpoint_operation"] == 1
+                                            && value["outcome"].as_str().is_some_and(|outcome| {
+                                                outcome.starts_with("Applied {")
+                                            })
+                                    })
+                            }
+                            _ => false,
+                        }),
+                        _ => false,
+                    });
+                    assert!(applied, "second checkpoint must actually apply");
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: "rediscover-b".into(),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"discover"}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                5 => {
+                    let discovery = messages
+                        .iter()
+                        .find_map(|message| match message {
+                            Message::Tool { result } if result.tool_use_id == "rediscover-b" => {
+                                assert!(!result.is_error, "{}", result.content);
+                                serde_json::from_str::<serde_json::Value>(&result.content).ok()
+                            }
+                            _ => None,
+                        })
+                        .expect("post-checkpoint discovery");
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: "recover-omitted".into(),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"omittedfact"}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                6 => {
+                    let result = messages
+                        .iter()
+                        .find_map(|message| match message {
+                            Message::Tool { result } if result.tool_use_id == "recover-omitted" => {
+                                Some(result)
+                            }
+                            _ => None,
+                        })
+                        .expect("recovery result");
+                    assert!(!result.is_error, "{}", result.content);
+                    let found: serde_json::Value =
+                        serde_json::from_str(&result.content).expect("found");
+                    assert!(
+                        found["results"][0]["text"]
+                            .as_str()
+                            .expect("snippet")
+                            .starts_with("omittedfact original constraint")
+                    );
+                    let discovery = messages
+                        .iter()
+                        .find_map(|message| match message {
+                            Message::Tool { result } if result.tool_use_id == "rediscover-b" => {
+                                serde_json::from_str::<serde_json::Value>(&result.content).ok()
+                            }
+                            _ => None,
+                        })
+                        .expect("discovery");
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: "detail-omitted".into(),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"detail", "snapshot":discovery["snapshot"], "reference":found["results"][0]["reference"]}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                7 => {
+                    let result = messages
+                        .iter()
+                        .find_map(|message| match message {
+                            Message::Tool { result } if result.tool_use_id == "detail-omitted" => {
+                                Some(result)
+                            }
+                            _ => None,
+                        })
+                        .expect("detail result");
+                    assert!(!result.is_error, "{}", result.content);
+                    let detail: serde_json::Value =
+                        serde_json::from_str(&result.content).expect("detail");
+                    assert!(
+                        detail["text"]
+                            .as_str()
+                            .expect("text")
+                            .starts_with("omittedfact original constraint")
+                    );
+                    success_events("checkpoint complete; recovered omitted original fact")
                 }
                 _ => panic!("unexpected extra provider request"),
             };
@@ -5084,10 +5262,17 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         ));
     }
     let raw: Vec<_> = (0..30)
-        .flat_map(|_| {
+        .flat_map(|i| {
             [
                 Message::User {
-                    content: "constraint ".repeat(400),
+                    content: if i == 0 {
+                        format!(
+                            "omittedfact original constraint {}",
+                            "constraint ".repeat(400)
+                        )
+                    } else {
+                        "constraint ".repeat(400)
+                    },
                 },
                 Message::Assistant {
                     content: "recorded".into(),
@@ -5097,10 +5282,17 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             ]
         })
         .collect();
+    let durable = talos_session::DurableSession::open_or_create(root.path(), "checkpoint-recovery")
+        .expect("durable");
+    durable
+        .commit_turn("prior", &raw, &Default::default())
+        .expect("commit original history");
+    let original_bytes = std::fs::read(durable.file_path()).expect("original transcript");
+    let model = Arc::new(CheckpointModel {
+        step: AtomicUsize::new(0),
+    });
     let mut agent = Agent::with_security_and_hooks(
-        Arc::new(CheckpointModel {
-            step: AtomicUsize::new(0),
-        }),
+        model.clone(),
         ToolRegistry::new(),
         Some(Arc::new(engine)),
         None,
@@ -5119,6 +5311,8 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             model_context_limit: 128_000,
         },
     );
+    actor.set_durable_persistence(durable.clone(), Default::default());
+    actor.set_recovered_history_sources(durable.read_history_snapshot().expect("source snapshot"));
     let task = tokio::spawn(async move {
         actor.run().await;
         actor
@@ -5147,6 +5341,41 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         .expect("shutdown");
     let actor = task.await.expect("actor");
     assert_eq!(&actor.history[..raw.len()], raw.as_slice());
+    assert_eq!(
+        model.step.load(Ordering::SeqCst),
+        8,
+        "two checkpoints, discovery, search and detail with no repeated work"
+    );
+    let persisted = std::fs::read(durable.file_path()).expect("persisted transcript");
+    assert!(
+        persisted.starts_with(&original_bytes),
+        "checkpoint must not rewrite the original transcript"
+    );
+    let calls: Vec<_> = actor
+        .history
+        .iter()
+        .filter_map(|message| match message {
+            Message::Assistant { tool_calls, .. } => Some(tool_calls),
+            _ => None,
+        })
+        .flatten()
+        .map(|call| call.name.as_str())
+        .collect();
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|name| **name == "compact_context")
+            .count(),
+        2
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|name| **name == "history_search")
+            .count(),
+        5
+    );
+
     assert!(
         actor
             .agent

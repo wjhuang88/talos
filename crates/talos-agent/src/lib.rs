@@ -2083,8 +2083,17 @@ impl Agent {
                 }
             }
             if let Ok(execution) = checkpoint_tools::EXECUTION.try_with(Clone::clone)
-                && let Some(receipt) = execution.terminal().await
+                && let Some((receipt, applied)) = execution.terminal().await
             {
+                // Applied checkpoints consume discovery snapshots. Rediscovery is
+                // new state progress; unrelated repeated tool calls remain counted.
+                if applied && self.tools.is_builtin_instance("history_search") {
+                    doom_tracker.retain(|(name, input), _| {
+                        name != "history_search"
+                            || !serde_json::from_str::<serde_json::Value>(input)
+                                .is_ok_and(|value| value["mode"] == "discover")
+                    });
+                }
                 pending_checkpoint_receipt = Some(receipt);
             }
         };

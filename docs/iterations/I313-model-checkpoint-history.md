@@ -1349,3 +1349,56 @@ Warnings-denied affected all-target Clippy and both governance validators pass.
 Logs: `/private/tmp/i313-restart-final-tests.log`,
 `/private/tmp/i313-restart-final-clippy.log`, `/private/tmp/i313-restart-crash-gap.log`.
 This closes this local storage increment's checks, not I313 acceptance or merge.
+
+### Model checkpoint omitted-fact recovery — local, unmerged
+
+The actual Actor/provider checkpoint fixture now stores original durable history,
+installs a model-submitted checkpoint and asserts a unique original fact is absent
+from the next projected provider request. It then rediscovers, searches and requests
+detail before normal continuation. Initial attempt reused the consumed checkpoint
+discovery snapshot and correctly failed; the fixture now follows rediscovery.
+Current validation: `/private/tmp/i313-checkpoint-omitted-recovery.log`.
+This is deterministic integration evidence, not real-model task-quality evaluation;
+A→B and fork/restart composition remain separate required scenarios.
+
+Omitted-fact Actor recovery now passes end-to-end
+(`/private/tmp/i313-checkpoint-recovery-final.log`): Applied terminal metadata,
+unique fact absent from the post-checkpoint request, rediscovery, original-source
+search and detail, ordinary success, raw transcript byte-prefix preservation.
+Counters assert exactly six provider requests, one compact_context invocation and
+four history_search invocations (two discoveries/search/detail). This is one
+checkpoint fixture, not A→B or real-model quality evidence.
+
+### A→B recovery and discovery progress — local, unmerged
+
+Expanded the real Actor fixture to two separately Applied model checkpoints,
+then rediscovery/search/detail of an original fact omitted by both projections.
+The first run exposed a genuine protocol collision: the third identical discover
+call triggered doom-loop detection despite two successful checkpoint installs.
+The current fix carries typed Applied status from the Actor receipt and resets
+only built-in history_search discovery counters after Applied; other calls remain
+counted, and failed/cancelled checkpoint receipts do not reset detection.
+Validation running: `/private/tmp/i313-double-checkpoint-recovery.log`;
+independent review requested. This is not a general doom-loop exemption.
+
+A→B actual Actor recovery passes (`/private/tmp/i313-double-checkpoint-recovery.log`):
+both checkpoints report typed Applied, original omitted fact is recovered by
+search/detail, original transcript prefix is unchanged, with eight provider
+requests/two compact calls/five history calls. Independent static review approves
+the narrowly scoped discovery counter reset; reviewer did not run tests.
+Added receipt regression for Applied versus Failed/Cancelled/NotEligible/channel
+closure and single consumption. Full Agent/Clippy validation running at
+`/private/tmp/i313-double-final-tests.log` and `/private/tmp/i313-double-final-clippy.log`.
+
+A→B convergence: Agent 627/627 and affected warnings-denied all-target Clippy
+pass; both governance validators pass. Logs:
+`/private/tmp/i313-double-final-tests.log`, `/private/tmp/i313-double-final-clippy.log`.
+Independent code review approves the typed Applied-only reset; negative receipt
+regression now covers Failed/Cancelled/NotEligible/channel closure and one-time
+consumption. Windows identity support and full I313 closure remain open.
+
+Windows investigation: Rust 1.99 stable MetadataExt file_index,
+volume_serial_number and change_time remain nightly-only in the pinned standard
+library docs (https://doc.rust-lang.org/1.99.0/std/os/windows/fs/trait.MetadataExt.html).
+Do not replace identity/change checking with size/mtime. A reviewed OS-boundary
+implementation is still required; this investigation is not Windows support.

@@ -105,11 +105,12 @@ impl Execution {
             state.current = snapshot;
         }
     }
-    pub(crate) async fn terminal(&self) -> Option<String> {
+    pub(crate) async fn terminal(&self) -> Option<(String, bool)> {
         let pending = self.state.lock().ok()?.receipt.take();
         let (id, receipt) = pending?;
         let outcome = receipt.await.ok();
-        Some(json!({"checkpoint_operation":id,"outcome":outcome.map(|value| format!("{value:?}")).unwrap_or_else(|| "Unavailable".into())}).to_string())
+        let applied = matches!(outcome, Some(CompactOutcome::Applied { .. }));
+        Some((json!({"checkpoint_operation":id,"outcome":outcome.map(|value| format!("{value:?}")).unwrap_or_else(|| "Unavailable".into())}).to_string(), applied))
     }
 }
 
@@ -475,6 +476,42 @@ impl AgentTool for CompactContextTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn only_applied_terminal_receipts_report_discovery_progress() {
+        for (outcome, expected) in [
+            (
+                Some(CompactOutcome::Applied {
+                    before: 100,
+                    after: 50,
+                }),
+                true,
+            ),
+            (Some(CompactOutcome::Failed), false),
+            (Some(CompactOutcome::Cancelled), false),
+            (Some(CompactOutcome::NotEligible { before: 10 }), false),
+            (None, false),
+        ] {
+            let (execution, _, _) = fixture();
+            let (sender, receiver) = oneshot::channel();
+            execution.state.lock().expect("state").receipt = Some((7, receiver));
+            if let Some(outcome) = outcome {
+                sender.send(outcome).expect("receipt");
+            } else {
+                drop(sender);
+            }
+            let (receipt, applied) = execution.terminal().await.expect("terminal");
+            assert_eq!(applied, expected);
+            assert_eq!(
+                serde_json::from_str::<Value>(&receipt).expect("json")["checkpoint_operation"],
+                7
+            );
+            assert!(
+                execution.terminal().await.is_none(),
+                "receipt consumed exactly once"
+            );
+        }
+    }
 
     fn fixture() -> (
         Execution,
