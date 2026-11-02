@@ -1355,10 +1355,13 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
         new_config: Config,
         bridge_update_ok: bool,
         bridge_second_err: bool,
+        budget: talos_core::message::ContextBudget,
     }
 
     let _lock = HOME_ENV_MUTEX.lock().await;
-    let result = with_isolated_home(|| async {
+    let mut budgets = Vec::new();
+    for (context_limit, output_limit) in [(64_000, 1024), (32_000, 1024), (32_000, 8192)] {
+        let result = with_isolated_home(|| async {
         let workspace = tempfile::tempdir().expect("operation should succeed");
         let mut config = Config {
             model: "original-model".to_string(),
@@ -1388,7 +1391,10 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             .get_mut("target-gw")
             .expect("operation should succeed")
             .models
-            .insert("target-model".to_string(), Default::default());
+            .insert("target-model".to_string(), talos_config::ModelConfig {
+                context_limit: Some(context_limit), output_limit: Some(output_limit),
+                ..Default::default()
+            });
         config.save().expect("persist runtime baseline");
 
         let (ui_tx, mut ui_rx) = mpsc::unbounded_channel::<UiOutput>();
@@ -1400,7 +1406,7 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             .expect("operation should succeed");
         let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
         let (sq_tx, mut sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
-        let (sq_tx_watch_tx, _sq_rx_watch) = tokio::sync::watch::channel(sq_tx.clone());
+        let (sq_tx_watch_tx, sq_rx_watch) = tokio::sync::watch::channel(sq_tx.clone());
         let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel::<(
             talos_session::Session,
             mpsc::UnboundedReceiver<talos_core::session::SessionEvent>,
@@ -1464,26 +1470,68 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             }
             panic!("model switch to mock must succeed: {errors:?}");
         });
-        let bridge_update_ok = bridge_rx.try_recv().is_ok();
+        let (_, mut events) = bridge_rx.try_recv().expect("rebuilt Actor event receiver");
+        let bridge_update_ok = true;
+        let current_sq = sq_rx_watch.borrow().clone();
+        current_sq.send(talos_core::session::SessionOp::Submit {
+            message: "verify switched model budget".into(),
+        }).await.expect("submit to rebuilt Actor");
+        let mut budget = None;
+        let mut completed = false;
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            while let Some(event) = events.recv().await {
+                if let talos_core::session::SessionEvent::TurnEvent { payload, .. } = event {
+                    match payload {
+                        talos_core::session::TurnEventPayload::Progress { event: talos_core::message::AgentEvent::ContextBudget { budget: measured } } => {
+                            budget = Some(measured);
+                        }
+                        talos_core::session::TurnEventPayload::Completed { status } => {
+                            assert!(matches!(status, talos_core::session::TurnCompletionStatus::Success { .. }), "{status:?}");
+                            completed = true;
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }).await.expect("switched Actor completes");
+        assert!(completed);
+        transition.lock().await.shutdown().await;
+        let budget = budget.expect("real request budget event");
+        assert_eq!(budget.limit, Some(context_limit));
+        assert!(budget.estimated_tokens < context_limit);
+
         let bridge_second_err = bridge_rx.try_recv().is_err();
 
         SuccessResult {
             new_config,
             bridge_update_ok,
             bridge_second_err,
+            budget,
         }
     })
     .await;
 
-    assert_eq!(result.new_config.model, "target-model");
-    assert_eq!(result.new_config.provider, "target-gw");
+        assert_eq!(result.new_config.model, "target-model");
+        assert_eq!(result.new_config.provider, "target-gw");
+        assert!(
+            result.bridge_update_ok,
+            "bridge_rx_update_tx must receive exactly one update after successful rebuild"
+        );
+        assert!(
+            result.bridge_second_err,
+            "bridge_rx_update_tx must receive exactly ONE update, not more"
+        );
+        budgets.push(result.budget);
+    }
+    // The production switch resolves the new model's context and output policy,
+    // rebuilds the Actor/registered tools, then measures an actual admitted turn.
+    assert_eq!(budgets[0].limit, Some(64_000));
+    assert_eq!(budgets[1].limit, Some(32_000));
+    assert_eq!(budgets[2].limit, Some(32_000));
     assert!(
-        result.bridge_update_ok,
-        "bridge_rx_update_tx must receive exactly one update after successful rebuild"
-    );
-    assert!(
-        result.bridge_second_err,
-        "bridge_rx_update_tx must receive exactly ONE update, not more"
+        budgets[2].estimated_tokens > budgets[1].estimated_tokens + 6000,
+        "larger output reservation must reduce available request capacity: {budgets:?}"
     );
 }
 
