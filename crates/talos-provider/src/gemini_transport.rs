@@ -35,6 +35,12 @@ impl std::fmt::Debug for GeminiTransport {
 }
 
 impl GeminiTransport {
+    #[cfg(test)]
+    pub(crate) fn with_test_vertex_source(mut self, source: VertexTokenSource) -> Self {
+        self.authentication = Authentication::Vertex(source);
+        self
+    }
+
     pub(crate) fn is_streaming(&self) -> bool {
         self.streaming
     }

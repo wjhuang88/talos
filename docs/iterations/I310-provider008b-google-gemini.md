@@ -299,3 +299,15 @@ failed/ignored/filtered. Locked config/provider check passes; test-only helpers 
 remove four production dead-code warnings. No full host/workspace/real Agent/Vertex round-trip
 acceptance or catalog activation is claimed. Next: host builds, model/capability displays, real
 permission-gated Agent image/tool rounds for both profiles and remaining acceptance checks.
+
+### Real Agent acceptance fixture checkpoint — 2026-11-01
+
+Added controlled HTTP tests using the real Agent, PermissionEngine and workspace ReadTool, with
+two distinguishable granted PNG images, signed idless read call, actual tool result and follow-up
+native request preserving the signed model part. Both key-header AI Studio and explicit local
+ADC refresh/Bearer Vertex credential profiles are covered; token cache is expected to refresh once
+across both Agent requests. Assert no key/access/refresh/client-secret in returned history and no
+signature in Debug. Auth/destination test injection is cfg(test)-only. The tests build the admitted
+internal provider directly, not public factory-to-host wiring, and make no live cloud requests.
+Pinned rustfmt/diff checks pass. Cargo tests are still fetching dependencies after toolchain recovery;
+no new passing Agent or Provider result is claimed. Keep fixture work unaccepted until executed.
