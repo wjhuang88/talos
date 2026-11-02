@@ -181,3 +181,67 @@ reasoning events; they do not inherit conversation settings. Explicit reasoning_
 continues to suppress conversation controls, but cannot silently ignore replay=false.
 These exact model mappings do not infer preview, gateway or future model support, and do not
 activate catalog entries. See ADR-094 for the primary source and current acceptance boundary.
+
+
+## Explicit Gemini transports (unreleased implementation candidate)
+
+Draft #838 / I310 adds `google-gemini` to the adapters listed above. Full B acceptance and
+catalog activation are pending. Selecting a model named Gemini does not enable this candidate;
+configure both the wire and its authentication profile explicitly in `~/.talos/config.toml`.
+
+AI Studio uses the configured API-key source and the official generateContent destination:
+
+```toml
+provider = "google"
+model = "gemini-2.5-flash"
+
+[providers.google]
+protocol = "google-gemini"
+api_key_env = "GEMINI_API_KEY"
+
+[providers.google.gemini]
+transport = "ai-studio"
+```
+
+Set `GEMINI_API_KEY` in your environment before starting Talos. Standard Vertex uses OAuth
+ADC instead of an API key; it requires an explicit project and location:
+
+```toml
+provider = "vertex"
+model = "gemini-2.5-flash"
+
+[providers.vertex]
+protocol = "google-gemini"
+
+[providers.vertex.gemini]
+transport = "vertex"
+project = "your-project-id"
+location = "global"
+allow_metadata = false
+```
+
+For Vertex, set `GOOGLE_APPLICATION_CREDENTIALS` to a local `service_account` or `authorized_user`
+JSON file. Without that variable, discovery uses `$HOME/.config/gcloud/application_default_credentials.json`
+on Unix or `%APPDATA%/gcloud/application_default_credentials.json` on Windows. An invalid explicit
+file fails; it does not fall through to another account. File discovery is delayed until the first
+request. Token acquisition/refresh and cache locking share the request deadline; cancelling the
+request cancels its token exchange. The local synchronous service-account signer cannot be
+preempted; its input bounds and integration limits are recorded in ADR-094.
+
+Metadata authentication is disabled by default. `allow_metadata = true` permits the fixed metadata
+service only when no local ADC file exists. Environment metadata-host overrides, external-account
+executables, impersonation and arbitrary token destinations are not supported. Talos does not run
+`gcloud` or perform an interactive login. ADC is never used for AI Studio or a replacement gateway.
+Do not set a custom provider/model `base_url` for Vertex; it is rejected before credential discovery.
+
+The candidate supports ordered images, native tool results and positional signature replay.
+Browser invocation and compatibility tool modes are currently refused; original browser argument
+syntax alone is insufficient to make signed continuation safe for durable history. Use only
+supported native non-browser tools while testing this branch. Reasoning controls and their model
+boundaries are described above. Failures never trigger an automatic retry over a different wire.
+There is no live-vendor success claim or packaged Gemini catalog activation in this candidate.
+
+`ProviderConfig` gains optional `gemini: Option<GeminiTransportConfig>`; downstream exhaustive
+struct literals must supply `gemini: None` or use `..Default::default()`. The protocol and catalog
+enums gain `GoogleGemini`; keep catch-all match arms. These public changes require the next
+pre-1.0 minor migration, together with ADR-094, rather than a patch release.

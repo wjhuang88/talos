@@ -290,6 +290,11 @@ protocol = "anthropic-messages"
 export ANTHROPIC_API_KEY="..."
 ```
 
+
+尚未发布的 Gemini 实现候选（#838）要求显式配置 `google-gemini` 及 AI Studio 或 Vertex
+认证配置。浏览器调用、兼容工具模式和目录激活仍未完成。配置示例、ADC 发现规则及迁移限制见
+[Gemini 传输说明](docs/reference/PROVIDER-PROTOCOLS.md#explicit-gemini-transports-unreleased-implementation-candidate)。
+
 ## 运行 Talos
 
 在当前目录启动交互式 TUI：
