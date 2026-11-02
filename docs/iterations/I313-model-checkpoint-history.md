@@ -1,3 +1,37 @@
+## Windows content revalidation candidate — 2026-11-02
+
+The test-only Windows restore now reacquires a source lease and starts bounded
+64 KiB reads at zero, retaining the saved offset/digest solely as a verification
+target. It compares the existing fixed-page rolling digest at that target before
+reusing progress. Until then completed_bytes is zero, exporting a checkpoint is
+refused, and finish cannot mint a seal. Cancellation/deadline preserve only valid
+local progress. A fresh process rereads the saved prefix; no skipped-I/O benefit
+is claimed. Source metadata mismatch still refuses immediately.
+
+Portable regression deterministically simulates the native metadata collision:
+actual prefix overwrite plus matching stored metadata must fail digest verification
+and cannot finish. Unchanged content succeeds. Matrix covers one page, two pages,
+and non-page-aligned EOF, plus cancellation and denied re-save while unverified.
+The old metadata-inequality assertion is replaced by actual changed-byte evidence
+and mandatory content rejection; sleeps/timestamp assumptions are not introduced.
+Windows process fixture now expects zero reusable bytes until revalidation.
+
+Session library suite passed 299/299 and affected all-target Clippy passed before
+the final multi-page/EOF extension; that extension separately passed focused
+validation (`/private/tmp/i313-prefix-boundaries.log`). Earlier logs:
+`/private/tmp/i313-prefix-revalidation-{suite,clippy}.log`.
+Independent static review approved the earlier content-verification diff
+`6348b2a4a4114cc067d478ce1aa6258c21cd77a2bf7b9f9ae008fbca2c6d90be`,
+without builds. Final source diff review approved local commit and test-only draft
+publication at SHA256 `0b5510bc8a4eb166fcbda746606957ffb8ff6ebbd9eeab957d625d1f8c267771`.
+The final mutation regression changes bytes inside the saved prefix and requires
+immediate refusal or pending Windows verification ending in Stale with no seal.
+All five process-resume tests passed (`/private/tmp/i313-prefix-final-tests.log`).
+Standard preflight for this substantive correction is running in session17638,
+log `/private/tmp/i313-prefix-final-preflight.log`; no success is claimed yet.
+Native CI and production activation remain pending. Production Windows hooks remain
+disabled. T5 Partial, T1/T6 unimplemented.
+
 ## Native Windows counterexample — activation withdrawn, 2026-11-02
 
 Test-only b8a80873b Windows job125196764203 in run41418548863 failed two Session

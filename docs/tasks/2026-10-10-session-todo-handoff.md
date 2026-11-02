@@ -1,3 +1,17 @@
+## T5 bounded prefix revalidation candidate — 2026-11-02
+
+Implemented test-only Windows restoration by bounded content revalidation under
+a fresh retained lease; saved offsets cannot grant authority before digest match.
+Portable mutation-collision, cancellation, multi-page and partial-EOF regressions
+pass. Session299 tests and Clippy passed before final boundary extension, which
+passed separately. Windows native execution and production activation remain open;
+CI41418548863 is terminal failure for the prior metadata-only candidate.
+Final process-resume regressions passed 5/5. Independent static review permits
+local commit and test-only draft publication, not production activation or merge.
+New correction preflight session17638 is running; log
+`/private/tmp/i313-prefix-final-preflight.log`. Native evidence remains required.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
 ## Native Windows counterexample — activation withdrawn, 2026-11-02
 
 Test-only b8a80873b Windows job125196764203 in run41418548863 failed two Session

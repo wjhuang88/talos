@@ -13,6 +13,8 @@ pub struct RecoveryPrefixScan {
     pending_page: Vec<u8>,
     digest: [u8; 32],
     expected: Option<[u8; 32]>,
+    // A released Windows lease requires bounded content revalidation before reuse.
+    revalidate: Option<(u64, [u8; 32])>,
 }
 
 // Trusted bindings provenance only. Never deserialize this from the search index
@@ -42,6 +44,9 @@ impl RecoveryPrefixScan {
             return Err(HistoryPageError::Stale);
         }
         self.check_stamp()?;
+        if self.revalidate.is_some() {
+            return Err(HistoryPageError::Stale);
+        }
         Ok(StoredScan {
             save_id: uuid::Uuid::new_v4(),
             version: 1,
@@ -71,6 +76,14 @@ impl StoredScan {
         self,
         source: DurableRecoverySource,
     ) -> Result<RecoveryPrefixScan, HistoryPageError> {
+        self.restore_checked(source, cfg!(windows))
+    }
+
+    fn restore_checked(
+        self,
+        source: DurableRecoverySource,
+        revalidate_content: bool,
+    ) -> Result<RecoveryPrefixScan, HistoryPageError> {
         if self.version != 1
             || self.session != source.session_id()
             || self.branch != source.branch_id()
@@ -91,10 +104,16 @@ impl StoredScan {
         let scan = RecoveryPrefixScan {
             source,
             stamp,
-            offset: self.offset,
+            offset: if revalidate_content { 0 } else { self.offset },
             pending_page: Vec::new(),
-            digest: self.digest,
+            digest: if revalidate_content {
+                [0; 32]
+            } else {
+                self.digest
+            },
             expected: self.expected,
+            revalidate: (revalidate_content && self.offset != 0)
+                .then_some((self.offset, self.digest)),
         };
         scan.check_stamp()?;
         Ok(scan)
@@ -154,6 +173,7 @@ impl DurableRecoverySource {
             pending_page: Vec::new(),
             digest: [0; 32],
             expected: None,
+            revalidate: None,
         })
     }
 }
@@ -276,6 +296,9 @@ impl RecoveryPrefixScan {
     /// Number of bytes committed to complete-page scan progress.
     /// Partial page bytes do not count and cannot authorize a query.
     pub fn completed_bytes(&self) -> u64 {
+        if self.revalidate.is_some() {
+            return 0;
+        }
         self.offset
     }
 
@@ -329,12 +352,21 @@ impl RecoveryPrefixScan {
         hash.update(&self.pending_page);
         let digest: [u8; 32] = hash.finalize().into();
         let complete = next_offset == self.source.source_end();
+        if self
+            .revalidate
+            .is_some_and(|(end, expected)| next_offset == end && digest != expected)
+        {
+            return Err(HistoryPageError::Stale);
+        }
         if complete && self.expected.is_some_and(|expected| expected != digest) {
             return Err(HistoryPageError::Stale);
         }
         self.check_stamp()?;
         if stopped() || Instant::now() >= deadline {
             return Err(HistoryPageError::Stopped);
+        }
+        if self.revalidate.is_some_and(|(end, _)| next_offset == end) {
+            self.revalidate = None;
         }
         self.digest = digest;
         self.offset = next_offset;
@@ -346,7 +378,8 @@ impl RecoveryPrefixScan {
     /// Source stability is checked again; no partial digest grants evidence.
     pub fn finish(self) -> Result<RecoveryPrefixSeal, HistoryPageError> {
         self.check_stamp()?;
-        if self.offset != self.source.source_end()
+        if self.revalidate.is_some()
+            || self.offset != self.source.source_end()
             || self
                 .expected
                 .as_ref()
@@ -402,6 +435,85 @@ mod process_resume_tests {
     use super::*;
     use std::time::Duration;
 
+    #[test]
+    fn restored_prefix_revalidation_refuses_equal_metadata_content_change() {
+        use std::io::{Seek, Write};
+        for pages in [1u64, 2, 3] {
+            for changed in [false, true] {
+                let root = tempfile::tempdir().expect("root");
+                let owner = crate::DurableSession::open_or_create(root.path(), "revalidate")
+                    .expect("owner");
+                owner
+                    .commit_turn(
+                        "seed",
+                        &[talos_core::message::Message::User {
+                            content: "fact ".repeat(1_000_000),
+                        }],
+                        &Default::default(),
+                    )
+                    .expect("seed");
+                let mut scan = owner
+                    .capture_recovery_source()
+                    .expect("source")
+                    .begin_prefix_seal()
+                    .expect("scan");
+                let deadline = Instant::now() + Duration::from_secs(10);
+                let target = (pages * crate::history_page::HISTORY_PAGE_BYTES as u64)
+                    .min(scan.source.source_end());
+                while scan.completed_bytes() < target {
+                    scan.step(deadline, || false).expect("page");
+                }
+                let mut stored = scan.stored(&owner).expect("stored");
+                let saved_offset = stored.offset;
+                drop(scan);
+                if changed {
+                    let mut writer = std::fs::OpenOptions::new()
+                        .write(true)
+                        .open(owner.file_path())
+                        .expect("writer");
+                    writer.seek(std::io::SeekFrom::Start(128)).expect("seek");
+                    writer.write_all(b"DIFFERENT").expect("overwrite same size");
+                    writer.sync_all().expect("sync");
+                }
+                let source = owner.capture_recovery_source().expect("fresh lease");
+                // Deterministically model the observed Windows metadata collision on any host.
+                stored.stamp = (&source.recovery_metadata().expect("metadata")).into();
+                let mut resumed = stored
+                    .restore_checked(source, true)
+                    .expect("pending verification");
+                assert_eq!(resumed.completed_bytes(), 0);
+                assert!(
+                    resumed.stored(&owner).is_err(),
+                    "unverified offset cannot replace saved progress"
+                );
+                assert!(resumed.step(deadline, || true).is_err());
+                assert_eq!(resumed.completed_bytes(), 0);
+                let mut refused = false;
+                while resumed.completed_bytes() == 0 {
+                    match resumed.step(deadline, || false) {
+                        Ok(false) => {}
+                        Ok(true) => {
+                            assert_eq!(saved_offset, resumed.source.source_end());
+                            break;
+                        }
+                        Err(HistoryPageError::Stale) => {
+                            refused = true;
+                            break;
+                        }
+                        Err(error) => panic!("unexpected {error}"),
+                    }
+                }
+                assert_eq!(refused, changed);
+                if changed {
+                    assert!(resumed.finish().is_err(), "mismatch cannot mint a seal");
+                } else {
+                    assert_eq!(resumed.completed_bytes(), saved_offset);
+                    while !resumed.step(deadline, || false).expect("remaining page") {}
+                    resumed.finish().expect("fully verified source");
+                }
+            }
+        }
+    }
     #[test]
     fn saved_receipt_cleans_after_source_change_without_deleting_a_resave() {
         let root = tempfile::tempdir().expect("root");
@@ -618,13 +730,13 @@ mod process_resume_tests {
                         .write(true)
                         .open(path)
                         .expect("writer");
-                    file.seek(SeekFrom::End(-2)).expect("seek");
+                    file.seek(SeekFrom::Start(128)).expect("seek");
                     file.write_all(b"X").expect("write");
                     file.sync_all().expect("flush");
                 }
                 "truncate" => {
                     let mut bytes = original.clone();
-                    let index = bytes.len() - 2;
+                    let index = 128;
                     bytes[index] ^= 1;
                     std::fs::write(path, bytes).expect("truncate and rewrite");
                 }
@@ -634,13 +746,28 @@ mod process_resume_tests {
                 }
                 _ => unreachable!(),
             }
-            assert!(
-                owner
-                    .restore_recovery_scan(&budget())
-                    .expect("restore attempt")
-                    .is_none(),
-                "{mutation}"
-            );
+            if let Some(mut resumed) = owner
+                .restore_recovery_scan(&budget())
+                .expect("restore attempt")
+            {
+                assert!(
+                    cfg!(windows),
+                    "Unix metadata change must refuse immediately"
+                );
+                assert_eq!(resumed.scan.completed_bytes(), 0);
+                loop {
+                    match resumed
+                        .scan
+                        .step(Instant::now() + Duration::from_secs(5), || false)
+                    {
+                        Ok(false) => {}
+                        Ok(true) => panic!("{mutation} must not certify the changed prefix"),
+                        Err(HistoryPageError::Stale) => break,
+                        Err(error) => panic!("unexpected {error}"),
+                    }
+                }
+                assert!(resumed.scan.finish().is_err());
+            }
         }
     }
 
@@ -657,10 +784,22 @@ mod process_resume_tests {
                 .restore_recovery_scan(&budget())
                 .expect("restore")
                 .expect("saved progress");
-            assert_eq!(
-                resumed.scan.offset,
-                crate::history_page::HISTORY_PAGE_BYTES as u64
-            );
+            if cfg!(windows) {
+                assert_eq!(
+                    resumed.scan.completed_bytes(),
+                    0,
+                    "fresh lease must revalidate saved prefix"
+                );
+                assert_eq!(
+                    resumed.scan.revalidate.map(|(offset, _)| offset),
+                    Some(crate::history_page::HISTORY_PAGE_BYTES as u64)
+                );
+            } else {
+                assert_eq!(
+                    resumed.scan.offset,
+                    crate::history_page::HISTORY_PAGE_BYTES as u64
+                );
+            }
             while !resumed
                 .scan
                 .step(Instant::now() + Duration::from_secs(5), || false)

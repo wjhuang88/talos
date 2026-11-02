@@ -288,8 +288,12 @@ b8a80873b (run41418548863, job125196764203) demonstrated a same-length overwrite
 whose volume/file ID/size/creation/write/change fields remained identical.
 These fields alone therefore cannot certify an unchanged source across released
 leases. Do not mask this counterexample with sleeps or weakened assertions.
-The local activation candidate was withdrawn; a reliable source-change authority
-or bounded content revalidation design requires separate review and native proof.
+The local activation candidate was withdrawn. The replacement test candidate
+recomputes the saved-prefix digest in bounded pages under a fresh retained lease
+before reusing progress; metadata equality alone never skips these reads. Pending
+revalidation cannot export progress or mint a seal. This preserves bounded work
+per step but rereads the saved prefix after process restart. Production activation
+still requires independent review and native proof.
 Live retained-handle source checks are a distinct boundary and are unchanged.
 
 

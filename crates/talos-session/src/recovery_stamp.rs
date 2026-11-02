@@ -390,7 +390,7 @@ mod windows_stored_version_tests {
     }
 
     #[test]
-    fn released_version_rejects_same_length_overwrite_and_truncate_rewrite() {
+    fn released_metadata_cannot_authorize_same_length_overwrite_or_truncate() {
         use std::io::Write;
         for truncate in [false, true] {
             let root = tempfile::tempdir().expect("root");
@@ -407,7 +407,12 @@ mod windows_stored_version_tests {
             file.write_all(b"modified").expect("same length write");
             file.sync_all().expect("flush");
             drop(file);
-            assert_ne!(original, capture(&path), "truncate={truncate}");
+            let after = capture(&path);
+            assert_eq!(original.size, after.size);
+            assert_eq!(std::fs::read(&path).expect("changed content"), b"modified");
+            // Native CI demonstrated original == after here. Metadata equality
+            // is not content authority; restored_prefix_revalidation tests the
+            // required digest rejection deterministically on every platform.
         }
     }
 
