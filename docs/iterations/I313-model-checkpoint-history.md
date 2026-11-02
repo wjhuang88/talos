@@ -2187,3 +2187,20 @@ independent Issue #832; track as governance residual, not a T5 implementation
 failure. Windows mapping probe failed and workspace check was skipped; the job
 continues later Git guard tests. Job log download currently returns BlobNotFound,
 so the probe failure cause is unconfirmed and Windows authorization remains off.
+
+### Cooperative asynchronous source binding beyond total-history limits
+
+Local bind_content_until/bind_until no longer reject a whole history solely for
+exceeding 8192 entries or 2 MiB cumulatively. They yield/check deadlines while
+building identities and hashing records, restarting the byte budget after a
+bounded failed record attempt; a single oversized record still refuses binding.
+Review caught initial all-history ID construction/preallocation before yield;
+those now grow incrementally after an initial deadline check. Metadata remains
+O(history), allocator growth/drop is not hard-real-time, and this is not a
+persistently resumable scan. Synchronous commit and discovery limits remain open.
+All 14 source regressions pass (`/private/tmp/i313-source-pages-final.log`), including
+8300 entries, cumulative bytes, cross-batch duplicate IDs, single-record refusal,
+and expiry after crossing an entry batch. The last test proves deadline expiry,
+not every cancellation path. Independent static review approves source.rs diff
+SHA256 `f1c2b0c6416559243523f4964f7bc5dd59e24ceb3cda05a5a34253dd05e4d304`;
+reviewer did not run tests. Local changes remain uncommitted; no full T5 claim.
