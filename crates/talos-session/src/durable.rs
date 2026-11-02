@@ -485,7 +485,7 @@ impl DurableSession {
     /// the cursor, then restart from None on the next maintenance sweep.
     /// Published files are retained; this does not certify their content integrity.
     /// This host maintenance operation does not grant model write authority.
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     pub fn recover_fork_intents(
         &self,
         budget: &crate::sqlite::RecoveryWorkBudget,
@@ -527,12 +527,7 @@ impl DurableSession {
                             "fork intent identity noncanonical".into(),
                         ));
                     }
-                    use std::os::unix::fs::OpenOptionsExt;
-                    let lock = fs::OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-                        .open(directory.join(format!("{id}.fork-lock")))?;
+                    let lock = open_fork_lock(&directory.join(format!("{id}.fork-lock")), false)?;
                     if !lock.metadata()?.is_file() {
                         return Err(SessionError::DurableTurn("fork lock is not regular".into()));
                     }
@@ -574,6 +569,18 @@ impl DurableSession {
                         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
                         Err(e) => return Err(e.into()),
                     };
+                    #[cfg(windows)]
+                    if let Some(metadata) = &metadata {
+                        use std::os::windows::fs::MetadataExt;
+                        if metadata.file_attributes()
+                            & windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT
+                            != 0
+                        {
+                            return Err(SessionError::DurableTurn(
+                                "fork recovery source is a reparse point".into(),
+                            ));
+                        }
+                    }
                     if let Some(bound) = bound {
                         let cutoff: i64 = tx.query_row("SELECT source_end FROM durable_fork_lineage WHERE child_id=?1 AND parent_id=?2", params![encoded,parent], |r| r.get(0)).map_err(sql_error)?;
                         if bound != external
@@ -586,7 +593,7 @@ impl DurableSession {
                         }
                     } else if metadata.is_some() {
                         fs::remove_file(&path)?;
-                        fs::File::open(directory)?.sync_all()?;
+                        sync_fork_directory(directory)?;
                     }
                     budget
                         .check()
@@ -619,7 +626,7 @@ impl DurableSession {
     /// No index, checkpoint or scan authority is inherited. Cancellation and the
     /// total deadline are cooperative; regular-file I/O is synchronous.
     /// A process crash before binding publication can leave an unbound file.
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     pub fn fork_committed_tip(
         &self,
         external_id: &str,
@@ -799,19 +806,13 @@ impl DurableSession {
                 SessionError::DurableTurn("fork storage directory missing".into())
             })?;
             let path = directory.join(format!("{id}.tlog"));
-            use std::os::unix::fs::OpenOptionsExt;
             let lock_path = directory.join(format!("{id}.fork-lock"));
-            let fork_lock = fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(&lock_path)?;
+            let fork_lock = open_fork_lock(&lock_path, true)?;
             fork_lock
                 .try_lock()
                 .map_err(|_| SessionError::DurableTurn("fork lock unavailable".into()))?;
             fork_lock.sync_all()?;
-            fs::File::open(directory)?.sync_all()?;
+            sync_fork_directory(directory)?;
             // Persist exact recovery ownership before creating any child bytes.
             // Keep the lock inode even after success: unlink/recreation could
             // let two processes hold different locks under the same name.
@@ -819,11 +820,20 @@ impl DurableSession {
                 params![id.to_string(), self.id().to_string(), external_id]).map_err(sql_error)?;
             #[cfg(test)]
             fork_crash_probe("intent");
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(&path)?;
+            let mut options = fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::OpenOptionsExt;
+                options
+                    .custom_flags(windows_sys::Win32::Storage::FileSystem::FILE_FLAG_WRITE_THROUGH);
+            }
+            let mut file = options.open(&path)?;
             struct UnpublishedFile(std::path::PathBuf, bool);
             impl Drop for UnpublishedFile {
                 fn drop(&mut self) {
@@ -833,12 +843,15 @@ impl DurableSession {
                 }
             }
             let mut unpublished = UnpublishedFile(path.clone(), false);
+            #[cfg(windows)]
+            crate::recovery_stamp::verify_local_volume(&file)
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             seal.copy_to_staging(&mut file, deadline, || stopped())
                 .map_err(source_error)?;
             #[cfg(test)]
             fork_crash_probe("copied");
             file.sync_all()?;
-            fs::File::open(directory)?.sync_all()?;
+            sync_fork_directory(directory)?;
             #[cfg(test)]
             fork_crash_probe("synced");
             seal.check_current().map_err(source_error)?;
@@ -1710,7 +1723,65 @@ fn validate_external_id(external_id: &str) -> Result<(), SessionError> {
     Ok(())
 }
 
-#[cfg(unix)]
+// The retained lock name is never replaced by this protocol. Windows denies
+// delete sharing while open; both platforms reject final symlink/reparse objects.
+#[cfg(any(unix, windows))]
+fn open_fork_lock(path: &std::path::Path, create: bool) -> Result<fs::File, SessionError> {
+    let mut options = fs::OpenOptions::new();
+    options.read(true).write(true).create_new(create);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_FLAG_OPEN_REPARSE_POINT, FILE_FLAG_WRITE_THROUGH, FILE_SHARE_READ,
+            FILE_SHARE_WRITE,
+        };
+        options
+            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_WRITE_THROUGH);
+    }
+    let file = options.open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(SessionError::DurableTurn("fork lock is not regular".into()));
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        crate::recovery_stamp::verify_local_volume(&file)
+            .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+        if metadata.file_attributes()
+            & windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT
+            != 0
+        {
+            return Err(SessionError::DurableTurn(
+                "fork lock is a reparse point".into(),
+            ));
+        }
+    }
+    Ok(file)
+}
+
+// Windows uses write-through creation and file sync before SQLite publication.
+// There is no portable directory fsync there: process-exit recovery is supported,
+// but this does not promise Unix-equivalent namespace durability after power loss.
+#[cfg(any(unix, windows))]
+fn sync_fork_directory(directory: &std::path::Path) -> Result<(), SessionError> {
+    #[cfg(unix)]
+    fs::File::open(directory)?.sync_all()?;
+    #[cfg(windows)]
+    let _ = directory;
+    Ok(())
+}
+
+#[cfg(any(unix, windows))]
 fn recovery_storage_boundary<T>(
     operation: impl FnOnce() -> Result<T, SessionError>,
 ) -> Result<T, SessionError> {
@@ -1900,7 +1971,7 @@ fn is_sensitive_key(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn fork_cancellation_before_and_after_publication_preserves_authority() {
         use std::sync::{
@@ -1954,7 +2025,7 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn fork_recovery_real_process_crash_boundaries() {
         if let Some(root) = std::env::var_os("TALOS_TEST_FORK_CRASH_ROOT") {
@@ -2061,7 +2132,7 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn fork_recovery_waits_for_independent_lock_owner_exit() {
         if let Some(root) = std::env::var_os("TALOS_FORK_LOCK_TEST_ROOT") {
@@ -2296,7 +2367,7 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn durable_fork_allows_reused_call_id_across_turns_and_refuses_malformed_blocks() {
         use talos_core::message::{Message, MessageToolResult, ToolCall};
@@ -2361,7 +2432,7 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn durable_fork_rejects_duplicate_entries_and_reopened_turns() {
         for duplicate_entry in [false, true] {
@@ -2416,7 +2487,7 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn durable_fork_refuses_terminal_with_unpaired_tool_call() {
         let root = tempfile::tempdir().expect("root");
@@ -2446,7 +2517,7 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     #[test]
     fn durable_fork_reopens_ancestor_without_parent_or_sibling_suffix() {
         let root = tempfile::tempdir().expect("root");

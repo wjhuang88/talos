@@ -1750,7 +1750,7 @@ impl RuntimeBuilder {
         if !self.skill_index.is_empty() {
             agent.set_skill_index(self.skill_index);
         }
-        #[cfg(unix)]
+        #[cfg(any(unix, windows))]
         if let Some((session, _)) = &self.durable_session {
             let budget =
                 talos_session::sqlite::RecoveryWorkBudget::new(std::time::Duration::from_secs(2));
@@ -5275,7 +5275,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     async fn runtime_forks_durable_tip_without_changing_active_session() {
         let directory =
             std::env::temp_dir().join(format!("talos-runtime-fork-{}", uuid::Uuid::new_v4()));
@@ -5328,7 +5328,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     async fn runtime_fork_rejects_active_turn_and_then_succeeds_when_idle() {
         let directory =
             std::env::temp_dir().join(format!("talos-runtime-busy-fork-{}", uuid::Uuid::new_v4()));

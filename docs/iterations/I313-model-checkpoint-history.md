@@ -2787,3 +2787,55 @@ diff `dd73129fe94c868dfeda8490359f7f66e6420c693e7fd39a4055a2844481f0bc`;
 reviewer did not execute tests. Stopped means startup was stopped, not that blocked
 OS workers have exited or released leases. Full resource convergence, Windows
 native proof and the other T5 acceptance remain required.
+
+
+## Windows fork implementation and CI corrections — 2026-11-02
+
+Closure ledger: implement the missing Windows host fork/recovery path within T5;
+change Session storage, Actor dispatch, Runtime startup and their regressions;
+preserve published acceptance, existing Unix behavior and full queue. Owner stays
+Review / Partial. ADR-096 and Runtime SDK contract record Windows durability
+limits. Required gates: focused tests, locked full preflight, independent review,
+exact-head native CI and merge. All remaining acceptance stays owned by I313.
+
+Published-head CI `41399661902` is terminal failure. Windows production source
+recovery reached both checkpoint operations (745405→10031 and 746060→10692 request
+tokens), then failed because durable fork was unavailable. Its diagnostic test
+also compared a Windows backslash path against a slash literal; normalization is
+now fixed locally. Host preflight failed at the long-history Actor fixture's
+inner two-second event timeout despite its outer 30-second scenario allowance.
+The fixture now uses the existing 30-second total deadline for this multipage
+scenario; ordinary helpers retain their two-second idle limit. This is a test
+contract correction, not evidence that production operation budgets were met.
+
+The local fork candidate adds Windows write-through/create-new files, retained
+Rust file locks denying delete sharing, reparse rejection and actual-handle local
+volume checks, plus Runtime startup intent reconciliation. SQLite budget export
+now includes Windows. Existing process-crash, cancellation, independent lock and
+lineage regressions are enabled for Windows; native compilation and execution
+remain unverified. Static
+review identified the SQLite export and locality/reparse gaps; these were fixed
+before requesting another review. Windows directory fsync/power-loss equivalence
+is explicitly not promised. Unix fork-focused tests passed (24 unit + 1 filtered
+integration) in `/private/tmp/i313-windows-fork-local.log` before the final reparse
+and platform-test additions; current candidate gates remain pending.
+
+T5 remains incomplete/unmerged. CLI bounded startup, resumable Windows scans,
+remaining composition/privacy/platform acceptance and final review/CI/merge are
+still open. T1/T6 remain unimplemented; no overall completion is claimed.
+
+
+Local Actor checkpoint/fork/reopen composition passed in 16.30 seconds:
+`/private/tmp/i313-fork-actor-local.log`. Independent static re-review approved
+candidate diff `e98e113ef853fb042331a47d1f06dfd35004df157baaa5e0d70b2dc4c92476f2`,
+including four Windows Actor/Runtime fork test cfg extensions. Reviewer ran no
+tests and did not approve final merge or full T5. The extensions leave Unix test
+bodies unchanged; the already-running standard preflight was not restarted.
+
+
+Final local standard gate exited 0: Rust 1.99.0, low-debug/nonincremental profiles,
+`./scripts/release_preflight.sh` including locked workspace check, warnings-denied
+Clippy, full workspace tests and both standalone Runtime SDK modes. Log:
+`/private/tmp/i313-windows-fork-preflight.log`. Both governance validators also
+passed; their final synchronized-document rerun is required before publication.
+Windows CI has not yet tested this candidate; no native or full T5 closure claim.

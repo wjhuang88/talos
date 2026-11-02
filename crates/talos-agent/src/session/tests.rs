@@ -424,6 +424,15 @@ fn collect_until_completions(
     eq_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
     completion_count: usize,
 ) -> impl std::future::Future<Output = Vec<SessionEvent>> + '_ {
+    collect_until_completions_with_idle_timeout(eq_rx, completion_count, Duration::from_secs(2))
+}
+
+#[track_caller]
+fn collect_until_completions_with_idle_timeout(
+    eq_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
+    completion_count: usize,
+    idle_timeout: Duration,
+) -> impl std::future::Future<Output = Vec<SessionEvent>> + '_ {
     let caller = std::panic::Location::caller();
     async move {
         let mut events = Vec::new();
@@ -433,7 +442,7 @@ fn collect_until_completions(
             .count()
             < completion_count
         {
-            let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
+            let event = tokio::time::timeout(idle_timeout, eq_rx.recv())
             .await
             .unwrap_or_else(|_| panic!(
                 "turn completion event timeout at {caller}; received {} events; last kind {:?}",
@@ -459,6 +468,7 @@ async fn completion_timeout_reports_awaiting_phase_without_event_content() {
         .expect("timeout diagnostic");
     assert!(
         message
+            .replace('\\', "/")
             .contains("turn completion event timeout at crates/talos-agent/src/session/tests.rs:")
     );
     assert!(message.contains("received 0 events; last kind None"));
@@ -5844,10 +5854,11 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         .expect("submit");
     // This scenario performs several independently bounded operations over
     // 8300+ records. Bound the whole scenario separately from per-op deadlines;
-    // collect_until_completions still rejects a two-second event stall.
+    // No progress event is required between bounded recovery pages. The outer
+    // deadline bounds total completion, including admission/batch deadlocks.
     let captured = tokio::time::timeout(
         Duration::from_secs(30),
-        collect_until_completions(&mut handle.eq_rx, 1),
+        collect_until_completions_with_idle_timeout(&mut handle.eq_rx, 1, Duration::from_secs(30)),
     )
     .await
     .expect("no circular admission/batch wait");
@@ -6149,7 +6160,7 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
     assert_eq!(&actor.history[..raw.len()], raw.as_slice());
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 #[tokio::test]
 async fn fork_worker_busy_compact_receipt_and_interrupt_are_observed() {
     let workspace = tempfile::tempdir().expect("workspace");
@@ -6249,7 +6260,7 @@ async fn fork_worker_busy_compact_receipt_and_interrupt_are_observed() {
         .expect("join");
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 #[tokio::test]
 async fn fork_worker_shutdown_and_actor_abort_retire_before_publication() {
     for cancellation in ["shutdown", "abort", "receipt_closed"] {

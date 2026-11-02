@@ -930,7 +930,7 @@ impl AppServerSession {
                                 continue;
                             }
                             if receipt_tx.is_closed() { continue; }
-                            #[cfg(unix)]
+                            #[cfg(any(unix, windows))]
                             if let Some(durable) = &self.durable_persistence {
                                 let session = durable.session.clone();
                                 let observer = receipt_tx.clone();
@@ -960,7 +960,7 @@ impl AppServerSession {
                             } else {
                                 let _ = receipt_tx.send(Err("durable fork requires configured durable storage".into()));
                             }
-                            #[cfg(not(unix))]
+                            #[cfg(not(any(unix, windows)))]
                             { let _ = external_id; let _ = receipt_tx.send(Err("durable fork unavailable on this platform".into())); }
                         }
                         SessionOp::SetSkillContext { name, content } => {

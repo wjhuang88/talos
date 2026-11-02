@@ -329,3 +329,22 @@ and preserves the file, not transcript content integrity. Unix process-exit test
 cover intent/copy/sync/precommit/postcommit, including partial copying; they do not
 prove power-loss behavior. Full fork/checkpoint/tool-recovery composition and
 Windows support remain open, and this stage cannot close I313.
+
+
+### Windows fork candidate (I313, unmerged)
+
+The host fork/intent protocol now has a Windows implementation candidate using
+Rust File locking, retained lock names, final-reparse refusal and opened-handle
+local-volume checks for lock and newly created child files. Lock handles deny
+delete sharing. Child files use create-new and WRITE_THROUGH, then sync_all before
+SQLite binding publication. Recovery refuses reparse child entries and retains
+unresolved intents. These checks do not prevent I/O before the opened-handle
+locality check, nor protect against an arbitrary host replacing ancestor paths.
+
+Windows has no portable directory fsync in this implementation. The supported
+validation target is process-exit recovery, not a guarantee of Unix-equivalent
+namespace durability across power loss. Existing Unix directory sync remains.
+The six process-exit phases, independent live-lock owner, cancellation/publication
+race and parent/child/sibling isolation tests are now enabled on both platforms.
+Their Windows execution, full Actor fork/reopen composition and independent
+exact-head review remain required before merging this candidate.

@@ -1,3 +1,23 @@
+## T5 Windows fork candidate — 2026-11-02
+
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+The first four stages are merged/closed. T5/I313 remains Review / Partial and
+unmerged; T1/T6 are unimplemented. PR #837 published head `ca13dc3f9` has terminal
+failed CI `41399661902`: Windows reached both checkpoints then lacked durable
+fork; host long-history fixture hit its inner two-second event wait. Neither is
+pending CI anymore. Issue/owner reconciliation also failed independently.
+
+Local candidate now implements Windows fork and startup intent recovery, expands
+native crash/lock/Actor/Runtime tests, normalizes diagnostic path assertions and
+aligns the multipage scenario wait with its 30-second total deadline. The real
+Actor checkpoint/fork/reopen test passed locally (16.30 seconds); standard full
+preflight passed, including both external SDK modes, with log
+`/private/tmp/i313-windows-fork-preflight.log`. Static review
+permits native validation, not final merge. Windows native validation, latest-head
+CI, final acceptance and merge remain open. Owner details and durability limits:
+[I313](../iterations/I313-model-checkpoint-history.md). CLI full-read startup and
+Windows resumable-scan support remain outstanding, alongside full T5 composition.
+
 ## T5 stable-stage local gate passed — 2026-11-02
 
 Standard host preflight exited 0, including both external SDK modes:
