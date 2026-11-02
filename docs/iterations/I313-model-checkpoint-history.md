@@ -2557,3 +2557,28 @@ against `a532cdbf5`; reviewer read focused evidence but did not run tests.
 Following review, the regression also explicitly checks two output messages and
 the second message's original entry ID and Tool content, avoiding dependence only
 on comparing two paths that share the decoder.
+
+### Resumable bounded-page snapshot reader
+
+The additive DurableHistoryScan API captures a storage-issued source and advances
+one bounded page per step. It clones pairing state and stages decoded messages,
+committing cursor/decoder/messages only after cancellation/deadline and source
+version checks. finish refuses partial or stale snapshots and preserves owner
+provenance. Total retained history memory still grows; kernel I/O and individual
+record conversion remain synchronous. Runtime startup has not yet switched to
+this API, and Windows version authorization remains fail-closed.
+
+Independent review caught a cutoff/stamp capture race: an append between capture
+and stamp could validate old-cutoff data against a newer file version. Construction
+now requires stamp length exactly equal to cutoff, with a deterministic append
+between capture and construction regression. The 2.7 MiB fixture also covers
+multiple pages, cancellation during page processing with unchanged cursor/output,
+successful retry, deadline expiry, refusal to publish partial state, and source
+append after full read invalidating finish. Focused corrected test passes
+(`/private/tmp/i313-history-scan-race.log`). Full Runtime integration, platform
+activation, final gates and the remaining T5 acceptance are still required.
+Independent API/security re-review approves the corrected four-file diff
+`542a4a1aeeaeda125e77db4144299660ada9e5c8db35a885eae2cb05f96a8641`;
+reviewer read focused logs but did not run tests. Session library tests pass
+281/281 (`/private/tmp/i313-history-scan-final-suite.log`) and affected all-target
+Clippy passes (`/private/tmp/i313-history-scan-final-clippy.log`).

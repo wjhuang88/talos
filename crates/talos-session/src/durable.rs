@@ -98,6 +98,100 @@ pub struct DurableHistorySnapshot {
     entries: Vec<(String, Message)>,
 }
 
+/// Resumable in-memory history read, committing at most one bounded page per step.
+/// The final snapshot retains the full model history; this bounds work per step,
+/// not total retained history memory. No partially read snapshot can be published.
+pub struct DurableHistoryScan {
+    source: DurableRecoverySource,
+    stamp: crate::recovery_stamp::FileStamp,
+    offset: u64,
+    decoder: crate::jsonl::HistoryMessageDecoder,
+    entries: Vec<(String, Message)>,
+    complete: bool,
+}
+
+impl DurableHistoryScan {
+    fn new(source: DurableRecoverySource) -> Result<Self, SessionError> {
+        let stamp = source
+            .recovery_metadata()
+            .map_err(|_| SessionError::DurableTurn("history source metadata unavailable".into()))?;
+        if crate::recovery_stamp::length(&stamp) != Some(source.source_end()) {
+            return Err(SessionError::DurableTurn(
+                "history source changed during capture".into(),
+            ));
+        }
+        Ok(Self {
+            source,
+            stamp,
+            offset: 0,
+            decoder: Default::default(),
+            entries: Vec::new(),
+            complete: false,
+        })
+    }
+
+    /// Read and convert one page with cooperative cancellation/deadline checks.
+    /// A stopped step leaves the committed cursor and pairing state unchanged.
+    /// Kernel reads and individual record conversions remain synchronous.
+    pub fn step(
+        &mut self,
+        deadline: std::time::Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<bool, crate::history_page::HistoryPageError> {
+        use crate::history_page::HistoryPageError;
+        let check = || {
+            if stopped() || std::time::Instant::now() >= deadline {
+                Err(HistoryPageError::Stopped)
+            } else {
+                Ok(())
+            }
+        };
+        check()?;
+        self.check_current()?;
+        if self.complete {
+            return Ok(true);
+        }
+        let page = self.source.read_page(self.offset, deadline, &stopped)?;
+        let mut decoder = self.decoder.clone();
+        let mut entries = Vec::new();
+        for entry in page.entries {
+            check()?;
+            if let Some(message) = decoder.decode(entry) {
+                entries.push(message);
+            }
+        }
+        self.check_current()?;
+        check()?;
+        self.entries.extend(entries);
+        self.decoder = decoder;
+        self.offset = page.next_offset;
+        self.complete = page.complete;
+        Ok(self.complete)
+    }
+
+    /// Publish only a complete, freshly revalidated storage-issued snapshot.
+    pub fn finish(self) -> Result<DurableHistorySnapshot, crate::history_page::HistoryPageError> {
+        if !self.complete {
+            return Err(crate::history_page::HistoryPageError::Stopped);
+        }
+        self.check_current()?;
+        Ok(DurableHistorySnapshot {
+            owner: self.source.descriptor.owner.clone(),
+            session_id: self.source.session_id(),
+            entries: self.entries,
+        })
+    }
+
+    fn check_current(&self) -> Result<(), crate::history_page::HistoryPageError> {
+        if crate::recovery_seal::same_file_version(&self.stamp, &self.source.recovery_metadata()?)?
+        {
+            Ok(())
+        } else {
+            Err(crate::history_page::HistoryPageError::Stale)
+        }
+    }
+}
+
 impl DurableHistorySnapshot {
     /// Identity of the session read to produce this snapshot.
     pub fn session_id(&self) -> Uuid {
@@ -1071,6 +1165,13 @@ impl DurableSession {
             session_id: self.id(),
             entries: self.read_messages_with_entry_ids()?,
         })
+    }
+
+    /// Begin a resumable bounded-page snapshot read of the current durable source.
+    /// No transcript bytes are read here. Source changes invalidate the scan;
+    /// callers must not dispatch a turn using a partial or failed snapshot.
+    pub fn begin_history_scan(&self) -> Result<DurableHistoryScan, SessionError> {
+        DurableHistoryScan::new(self.capture_recovery_source()?)
     }
 
     /// Capture the configured durable source for incremental bounded maintenance.
@@ -2485,6 +2586,101 @@ mod tests {
     }
 
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn history_scan_resumes_pages_without_publishing_partial_or_stale_history() {
+        use crate::history_page::HistoryPageError;
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "scan").expect("owner");
+        let messages: Vec<_> = (0..30)
+            .map(|i| Message::User {
+                content: format!("{i}:{}", "x".repeat(90_000)),
+            })
+            .collect();
+        owner
+            .commit_turn("initial", &messages, &PersistencePolicy::default())
+            .expect("commit");
+        let expected = owner.read_history_snapshot().expect("reference");
+        let mut scan = owner.begin_history_scan().expect("begin");
+        let deadline = || std::time::Instant::now() + std::time::Duration::from_secs(5);
+        assert!(matches!(
+            scan.step(deadline(), || true),
+            Err(HistoryPageError::Stopped)
+        ));
+        assert_eq!(scan.offset, 0);
+        assert!(scan.entries.is_empty());
+        let checks = std::cell::Cell::new(0);
+        assert!(
+            !scan
+                .step(deadline(), || {
+                    checks.set(checks.get() + 1);
+                    false
+                })
+                .expect("first page")
+        );
+        let stop_at = checks.get() - 2;
+        let mut interrupted = owner.begin_history_scan().expect("interruptible scan");
+        let observed = std::cell::Cell::new(0);
+        assert!(matches!(
+            interrupted.step(deadline(), || {
+                observed.set(observed.get() + 1);
+                observed.get() >= stop_at
+            }),
+            Err(HistoryPageError::Stopped)
+        ));
+        assert_eq!(interrupted.offset, 0);
+        assert!(interrupted.entries.is_empty());
+        while !interrupted
+            .step(deadline(), || false)
+            .expect("retry interrupted")
+        {}
+        assert_eq!(
+            interrupted.finish().expect("retried snapshot").entries(),
+            expected.entries()
+        );
+        let offset = scan.offset;
+        let count = scan.entries.len();
+        assert!(matches!(
+            scan.step(std::time::Instant::now(), || false),
+            Err(HistoryPageError::Stopped)
+        ));
+        assert_eq!((scan.offset, scan.entries.len()), (offset, count));
+        while !scan.step(deadline(), || false).expect("resume") {}
+        let snapshot = scan.finish().expect("complete");
+        assert!(owner.owns_history_snapshot(&snapshot));
+        assert_eq!(snapshot.entries(), expected.entries());
+        assert!(matches!(
+            owner.begin_history_scan().expect("partial").finish(),
+            Err(HistoryPageError::Stopped)
+        ));
+
+        let mut stale = owner.begin_history_scan().expect("begin stale");
+        while !stale.step(deadline(), || false).expect("read") {}
+        owner
+            .commit_turn(
+                "append",
+                &[Message::User {
+                    content: "changed".into(),
+                }],
+                &PersistencePolicy::default(),
+            )
+            .expect("append");
+        assert!(matches!(stale.finish(), Err(HistoryPageError::Stale)));
+        let captured = owner
+            .capture_recovery_source()
+            .expect("capture before append");
+        owner
+            .commit_turn(
+                "capture-race",
+                &[Message::User {
+                    content: "late turn".into(),
+                }],
+                &PersistencePolicy::default(),
+            )
+            .expect("concurrent append");
+        assert!(DurableHistoryScan::new(captured).is_err());
+    }
 
     #[test]
     fn configured_owner_refuses_copied_identity_and_allows_handle_clones() {

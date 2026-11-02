@@ -34,6 +34,22 @@ impl Eq for FileStamp {}
 #[derive(Clone)]
 pub(crate) struct FileStamp;
 
+pub(crate) fn length(stamp: &FileStamp) -> Option<u64> {
+    #[cfg(unix)]
+    {
+        Some(stamp.len())
+    }
+    #[cfg(windows)]
+    {
+        Some(stamp.size)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = stamp;
+        None
+    }
+}
+
 pub(crate) fn from_file(
     file: &crate::history_page::SourceFile,
 ) -> Result<FileStamp, HistoryPageError> {

@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 // Pairing state belongs to the history stream, not to a storage page. In
 // particular, a call at the end of one page may have its result on the next.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct HistoryMessageDecoder {
     pending_tool_call_ids: HashSet<String>,
 }
