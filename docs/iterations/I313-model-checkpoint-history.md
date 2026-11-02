@@ -19,8 +19,8 @@
 | Governance Claim PR | #819 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Exact-head independent governance/API/privacy review, CI, validators and CAS required before activation |
-| Implementation PR | Pending stable-stage draft publication |
-| Last Updated | 2026-11-01 |
+| Implementation PR | #837 (draft, Partial stage) |
+| Last Updated | 2026-11-02 |
 | Handoff / Release Condition | Effective target-branch claim and merged T4 completion evidence before implementation |
 
 The draft does not reserve ownership. Finalized Claimed/Active state becomes
@@ -2164,3 +2164,26 @@ permits draft publication at `446aa98d34891a913ccf6d0b5d17c36899c30eb7`
 against `9ace8968603a67ada8d118459c81367611ad3fd2`, diff SHA256
 `e948f08b010a9eafba6f24ceb4fd6e75656ed042d36d9abdaad9b9953fc62aed`,
 not merge or Windows activation. Reviewer did not run the preflight.
+
+Stable stage published as draft PR #837 at `6153c913d`; full T5 acceptance remains
+open. CI is required for its exact published head; no remote pass or merge claim.
+
+### Continuation work bounds and first native CI
+
+Local continuation binding now caps the appended canonical suffix at 8192 entries,
+not the total request length including its synthetic prompt gap. The existing
+2 MiB hashing budget, deadline, source-start checks and atomic replacement remain.
+A regression with an 8300-entry synthetic gap binds one real new entry, refuses
+authority for the gap, rejects 8193 new entries and preserves the prior mapping.
+All 12 source tests pass (`/private/tmp/i313-source-bound-suite.log`). This does
+not fix initial long-history binding or live discovery's total-count limitation.
+Independent static review approves source.rs delta against `6153c913d`, SHA256
+`da806c6010b065cd41f16e751b0b5dc077fc28d1d8a1296ecce1d58c8bf0b92f`;
+reviewer did not run tests.
+
+PR #837 CI run `41387946490` uses published head `6153c913d` (not this local
+continuation fix). Issue reconciliation fails because the global matrix omits
+independent Issue #832; track as governance residual, not a T5 implementation
+failure. Windows mapping probe failed and workspace check was skipped; the job
+continues later Git guard tests. Job log download currently returns BlobNotFound,
+so the probe failure cause is unconfirmed and Windows authorization remains off.

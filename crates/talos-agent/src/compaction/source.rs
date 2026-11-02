@@ -256,7 +256,7 @@ impl HistorySource {
     ) -> bool {
         if persist_start < self.digests.len()
             || persist_start > messages.len()
-            || messages.len() > 8192
+            || messages.len().saturating_sub(persist_start) > 8192
         {
             return false;
         }
@@ -629,6 +629,47 @@ mod tests {
             .expect("valid binding");
         assert_eq!(source.resolve(1, 1, 0, &raw[0]), Some("a"));
     }
+    #[tokio::test]
+    async fn continuation_bounds_new_work_instead_of_synthetic_prefix_length() {
+        let raw = vec![Message::User {
+            content: "original".into(),
+        }];
+        let mut source = HistorySource::bind(7, 1, &raw, vec!["old-id".into()]).expect("source");
+        let mut messages = raw.clone();
+        messages.extend((0..8300).map(|_| Message::Context {
+            content: "synthetic gap".into(),
+        }));
+        let start = messages.len();
+        messages.push(Message::User {
+            content: "new canonical input".into(),
+        });
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        assert!(
+            source
+                .bind_continuation_until(&messages, start, deadline)
+                .await
+        );
+        assert!(source.resolve(7, 1, start, &messages[start]).is_some());
+        assert!(
+            source
+                .resolve(7, 1, start - 1, &messages[start - 1])
+                .is_none(),
+            "synthetic gap is not source authority"
+        );
+        messages.extend((0..8192).map(|_| Message::User {
+            content: "too much new work".into(),
+        }));
+        assert!(
+            !source
+                .bind_continuation_until(&messages, start, deadline)
+                .await
+        );
+        assert!(
+            source.resolve(7, 1, start, &messages[start]).is_some(),
+            "failed replacement preserves previous mapping"
+        );
+    }
+
     #[tokio::test(start_paused = true)]
     async fn continuation_carries_its_binding_deadline_and_failed_rebinding_is_atomic() {
         let raw = vec![Message::User {
