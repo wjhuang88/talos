@@ -245,3 +245,13 @@ checkpoint 489ddcc also batches results in original call order to preserve idles
 Pinned rustfmt and diff checks pass. Locked Provider tests restarted and are compiling dependencies
 after workspace maintenance; no fresh test pass claimed. Factory/LanguageModel/real Agent and
 recorded vendor fixture acceptance remain outstanding; no completion or merge claim.
+
+### Replay composition validation — 2026-11-01
+
+Rust 1.99.0 cargo test -p talos-provider --lib --locked completed: 246 passed,
+zero failed/ignored/filtered (5.24s). Validates latest request-side signed replay and response
+composition, ordered ReasoningComplete/tool/TurnEnd output, mixed generated/native IDs, serialized
+history restoration, reversed tool completions and failed-encode no-tool-release. Independent
+read-only source review found no new response-composition blocker and confirmed prior idless
+association fix. This is serde history restoration, not real TLOG/permission-gated Agent acceptance.
+Factory/LanguageModel, provider/model config/catalog and full required CI/preflight remain pending.
