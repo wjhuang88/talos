@@ -1,6 +1,6 @@
 # Iteration I313: Actor Model Checkpoints And Bounded History Recovery
 
-> Document status: Active / Partial (#819 merged; implementation remains local and unmerged)
+> Document status: Review / Partial (#819 merged; stable stage candidate, full implementation remains unmerged)
 > Published plan date: 2026-11-01
 > Baseline rule: preserve all T5 and Issue #390 acceptance; preparation is not implementation.
 > Planned objective: complete handoff T5 and remaining Issue #390 model-directed checkpoint/recovery acceptance, consuming I312 without creating another compaction or history authority.
@@ -19,7 +19,7 @@
 | Governance Claim PR | #819 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Exact-head independent governance/API/privacy review, CI, validators and CAS required before activation |
-| Implementation PR | Not started |
+| Implementation PR | Pending stable-stage draft publication |
 | Last Updated | 2026-11-01 |
 | Handoff / Release Condition | Effective target-branch claim and merged T4 completion evidence before implementation |
 
@@ -2155,3 +2155,12 @@ workspace gate. The authorized standard host rerun is live at
 `/private/tmp/i313-stable-stage-preflight-host.log`; no pass is claimed.
 Four-file documentation review approved after clarifying that legacy CLI durable
 search/detail remains unavailable; no expansion of stage publication authority.
+
+Standard host preflight completed exit 0 including both external Runtime SDK modes
+(`/private/tmp/i313-stable-stage-preflight-host.log`), implementation `0514fec35`
+and documentation head `446aa98d3`. Owner now enters Review/Partial for a stable
+stage draft; all listed acceptance residuals remain open. Independent review
+permits draft publication at `446aa98d34891a913ccf6d0b5d17c36899c30eb7`
+against `9ace8968603a67ada8d118459c81367611ad3fd2`, diff SHA256
+`e948f08b010a9eafba6f24ceb4fd6e75656ed042d36d9abdaad9b9953fc62aed`,
+not merge or Windows activation. Reviewer did not run the preflight.

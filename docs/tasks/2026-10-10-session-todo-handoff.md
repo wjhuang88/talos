@@ -1,3 +1,11 @@
+## T5 stable-stage local gate passed — 2026-11-02
+
+Standard host preflight exited 0, including both external SDK modes:
+`/private/tmp/i313-stable-stage-preflight-host.log`. I313 is Review/Partial,
+unmerged and preparing a draft candidate for native platform evidence. The first
+four queue stages remain merged; T5 acceptance residuals and T1/T6 remain open.
+This supersedes the running-validation snapshot below, not the full scope.
+
 ## T5 stable-stage preparation — 2026-11-02
 
 The queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
