@@ -325,3 +325,17 @@ serde history evidence, not live cloud, actual TLOG recovery or public factory V
 acceptance. Test-only source/endpoint injection bypasses factory for the Agent fixture. Remaining
 host/factory Vertex entrypoint, capabilities/decision/ephemeral/browser, vendor fixtures, full
 workspace preflight, exact-head CI/review and parent requirements remain open.
+
+### Factory ADC host-admission validation — 2026-11-01
+
+Implementation add3fcef3795291477a4a9375d42effe0886c5a4 adds isolated subprocess verification
+of the public factory and Config validation/API-key entrypoint: explicit Vertex profile needs no
+API key or HOME/APPDATA, factory defers invalid selected ADC until dispatch, and invalid explicit
+file returns its static admission error without metadata fallback/path disclosure. No process-global
+environment mutation is used. Provider lib: 255 passed, zero failed/ignored/filtered (5.34s), including
+the child probe and parent verification. CLI locked check passed. The joint default CLI/Desktop
+command skipped the feature-gated Desktop binary; it is NOT Desktop evidence. Correct locked
+Desktop check with --features desktop-ui started separately and has no final result recorded yet.
+This covers negative ADC admission, not a successful factory Vertex cloud endpoint exchange.
+Remaining positive lazy-path/host, capability/decision/ephemeral/browser and full integration gates
+continue to block completion. No merge/release/parent acceptance claim.
