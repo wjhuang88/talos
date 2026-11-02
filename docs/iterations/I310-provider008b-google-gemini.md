@@ -376,3 +376,29 @@ and requested the two deadline regressions now added; final source/test review r
 Git CLI push dry-run failed because this host has no GitHub username credentials; use the
 connected GitHub Git-data API with exact expected-head lease to persist checkpoints.
 Completion Commit: Pending. No Gemini/parent completion, PR merge, release or tag.
+
+### Request-owned PNG validation result — 2026-11-02
+
+Remote implementation checkpoint f321da9f3dfee0c810802023d76754bfb0615ce9 has exactly
+the same Git tree (abd6059378ad14bbb839614126cbd1809b6d47db) as locally reviewed
+4fa0bb7d65cdd60be9f33b78ceba8131c2d65262. All 43 existing checkpoints were
+replayed on main 9ace8968603a67ada8d118459c81367611ad3fd2, with identical per-commit
+range-diff patches; each Git-data reconstructed tree was checked before exact-head CAS update.
+No concurrent branch changes were overwritten.
+
+Pinned Rust1.99.0 cargo test -p talos-provider --lib --locked: 263 passed, zero
+failed/ignored/filtered (6.22s); repeated on final local source: 263 passed (6.13s).
+Config/Core --lib --locked regression: 267 and 123 passed respectively, zero failures.
+Formatting and staged whitespace checks passed. Independent final read-only source review
+found no new blocker; verified bounded test receipt waits, delayed response beyond image expiry,
+HTTP header timeout and in-flight Vertex token cancellation with zero generation requests.
+That token test uses a prebuilt credential source and does not validate lazy ADC initialization.
+
+Desktop check with explicit --features desktop-ui failed at yeslogic-fontconfig-sys because
+pkg-config is absent; this is a host build prerequisite failure, not a passing Desktop result.
+Initial apt-get update failed due unsupported setgroups/setuid in this host; environment repair
+is being attempted separately. Standard release_preflight.sh is running; installer and project
+governance checks have passed so far, but no final preflight/workspace/CI result is claimed.
+Gemini remains Active / Claimed, Completion Commit: Pending. Browser argument integrity,
+compatibility modes, reasoning/model support, host/UI/catalog integration, sourced fixtures,
+full validation and exact-head review/CI/CAS still block completion and parent #724 closure.
