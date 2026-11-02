@@ -1,6 +1,6 @@
 # Iteration I314: Explicit Premium And Self-Hosted Search Overrides
 
-> Document status: Planned
+> Document status: Active
 > Published plan date: 2026-11-02
 > Planned objective: implement SEARCH-001-H as an explicit user-controlled premium/keyed and self-hosted search override layer without changing the zero-config default route or admitting native zero-key providers.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,20 +10,20 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned; this document is planning only |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-5.6 Sol |
+| Work Slice | SEARCH-001-H explicit premium/self-hosted override configuration and production composition; Tavily controlled transport; explicit fallback-to-auto; secret redaction. Excludes SEARCH-001-E/F admission and `rust-websearch` removal. |
+| Claimed At | 2026-11-02 |
 | Source Issue | #832 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Planning only; no production implementation is authorized. |
-| Implementation PR | Not started |
+| Governance Claim PR | Pending draft PR number on `docs/i314-search-explicit-overrides-activate`; backfill before validation/merge |
+| Authorization Mode | Single-maintainer merge with explicit maintainer-authorized parallel execution |
+| Authorization Evidence | Maintainer explicitly answered `允许并行` on 2026-11-02 after the activation gate was explained as I314 running concurrently with the currently Active I310 and I313 scopes. |
+| Implementation PR | Not started; branch only after this atomic activation is effective on `main` |
 | Last Updated | 2026-11-02 |
-| Handoff / Release Condition | Before activation, re-run the nonterminal iteration inventory and either wait for conflicting Active work to close or obtain explicit maintainer authorization for non-overlapping parallel execution; then merge one atomic claim+activation PR. |
+| Handoff / Release Condition | Keep the claim until SEARCH-001-H implementation and acceptance closeout or an explicit handoff. Parallel I310/I313 ownership is retained unchanged. |
 
-This Planned record does not reserve ownership. Implementation must not start until a later governance-only PR records one effective `Claimed` / `Active` state on `main` under `docs/sop/AGENT-COLLABORATION.md`.
+This Claimed/Active state is a candidate while the governance PR is open. It becomes effective only on target-branch merge under `docs/sop/AGENT-COLLABORATION.md`; no production implementation branch may start before that gate.
 
 ## Published Baseline
 
@@ -95,7 +95,7 @@ This Planned record does not reserve ownership. Implementation must not start un
 - `docs/backlog/active/SEARCH-001-H-explicit-search-overrides.md`
 - Search/configuration user documentation and README surfaces that describe Tavily/SearXNG configuration.
 - `docs/reference` search/configuration contract where appropriate.
-- `docs/iterations/README.md` and `docs/BOARD.md` only when activation or later state changes become effective.
+- `docs/iterations/README.md` and `docs/BOARD.md` when activation or later state changes become effective.
 - Issue #832 synchronization comment after each effective governance transition.
 
 ### Risks And Rollback
@@ -108,41 +108,44 @@ This Planned record does not reserve ownership. Implementation must not start un
   - Mitigation: explicit redaction fixtures over every new observable surface.
 - Rollback: retain the currently shipped compatibility adapters and config parsing; revert the H composition/configuration selection commit(s) without schema/data migration. No native provider admission is coupled to H.
 
-## Nonterminal Iteration Inventory And Disposition — 2026-11-02
+## Nonterminal Iteration Inventory And Disposition — 2026-11-02 Activation Preflight
 
-This planning record does not activate I314. Current relevant target-branch truth was checked before selection:
+Target-branch truth was rechecked immediately before this activation candidate from `main` `069c5da196e492bd8120cc45f50e45438dd19423`:
 
-- I313 / T5 is effective `Active / Claimed` after #819 merged as `8b11e5f49794ea17f09c96eff8d59a6bf8f9a3d6`; retain ownership and execution unchanged.
-- I310 / PROVIDER-008-B Gemini is `Active / Claimed` under #811; retain independent provider-protocol ownership unchanged.
-- I302 / TEST-003 and I277 / DESKTOP-001-D3 remain Review/Claimed; retain their deferred evidence/acceptance work unchanged.
+- I313 / T5 remains effective `Active / Claimed`; implementation PR #837 is still Draft/Open, currently based on the I314 planning merge and owned independently.
+- I310 / PROVIDER-008-B Gemini remains effective `Active / Claimed`; implementation PR #838 is still Draft/Open and independently owned.
+- I302 / TEST-003 and I277 / DESKTOP-001-D3 remain Review/Claimed; their deferred evidence/acceptance work is unchanged.
 - I249 remains Planned and I164 remains Paused; neither scope transfers to I314.
-- SEARCH-001-C/I293 and SEARCH-001-D/I294 are Complete/Closed. D closed with BLOCKED / ZERO-ADMISSION, so E/F remain unauthorized.
-- No H implementation PR or effective H claimant exists at planning time.
+- SEARCH-001-C/I293 and SEARCH-001-D/I294 remain Complete/Closed. D closed with BLOCKED / ZERO-ADMISSION, so E/F remain unauthorized.
+- No other branch or target-branch record claims SEARCH-001-H / I314 implementation ownership.
 
-I314 is technically non-overlapping with I310/I313/I302/I277, but repository policy permits additional Active iterations only with explicit approval. Therefore this plan stays `Planned / Unclaimed`; no production branch or implementation PR may start from this commit. A later atomic claim+activation must repeat the inventory and record the applicable maintainer authorization or serial activation condition.
+I314 is non-overlapping with I310/I313. On 2026-11-02 the maintainer explicitly authorized parallel execution after being told that this would activate and implement I314 concurrently with those Active iterations. That authorization satisfies the plan's explicit-parallel activation path; it does not transfer, weaken, or merge the existing I310/I313 claims.
 
 ## Actual Activation And Execution
 
 | Date | Type | Record |
 |---|---|---|
 | 2026-11-02 | Planning | I314 selected for SEARCH-001-H as Planned / Unclaimed only. Existing Active/Review/Planned inventory retained; no claim or implementation authority established. |
+| 2026-11-02 | Parallel authorization | Maintainer explicitly answered `允许并行` after I314's concurrent activation with I310/I313 was explained. Atomic claim+activation opened from current `main`; authority becomes effective only when that governance PR merges. |
 
 ## Verification Evidence
 
-- Planning-only candidate; implementation validation not yet applicable.
+- Activation candidate is governance-only; no runtime/configuration code, tests, dependency changes or public API changes are included.
+- Before activation merge: both governance validators, exact-head CI, review and merge-time CAS are required.
 
 ## Completion Evidence
 
 - Completion Commit: Pending
-- Status-only documentation commits must not cite themselves. I314 remains Planned until a later atomic claim+activation reaches `main`, and cannot become Complete without already-existing implementation evidence.
+- Status-only documentation commits must not cite themselves. I314 cannot become Complete without already-existing implementation evidence.
 
 ## Variance And Residuals
 
-- Activation/claim remains pending.
-- No runtime/configuration code, tests, dependencies or public API are changed by this planning record.
+- Implementation has not started; the effective claim begins only after activation reaches `main`.
+- I310/I313 remain independently Active/Claimed under explicit maintainer-authorized parallel execution.
+- No runtime/configuration code, tests, dependencies or public API are changed by this activation record.
 
 ## Retrospective
 
 - Outcome: pending
-- Documentation: planning owner only
-- Lessons: none yet
+- Documentation: activation owner only until implementation begins
+- Lessons: explicit parallel authorization keeps non-overlapping work moving without weakening ownership boundaries.
