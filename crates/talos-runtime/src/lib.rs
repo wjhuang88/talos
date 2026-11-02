@@ -1646,6 +1646,34 @@ impl RuntimeBuilder {
         if !self.skill_index.is_empty() {
             agent.set_skill_index(self.skill_index);
         }
+        #[cfg(unix)]
+        if let Some((session, _)) = &self.durable_session {
+            let budget =
+                talos_session::sqlite::RecoveryWorkBudget::new(std::time::Duration::from_secs(2));
+            let mut cursor = None;
+            loop {
+                match session.recover_fork_intents(&budget, cursor.as_deref()) {
+                    Ok((scanned, retired, failed, next)) => {
+                        if failed != 0 {
+                            tracing::warn!(
+                                scanned,
+                                retired,
+                                failed,
+                                "fork recovery retained unresolved intents"
+                            );
+                        }
+                        cursor = next;
+                        if cursor.is_none() {
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        tracing::warn!("fork startup recovery stopped; intents retained for retry");
+                        break;
+                    }
+                }
+            }
+        }
         let recovered_entries = self
             .durable_session
             .as_ref()
@@ -1724,6 +1752,27 @@ pub struct RuntimeHandle {
 }
 
 impl RuntimeHandle {
+    /// Fork the committed durable tip while the Actor is idle, returning the
+    /// child UUID. The active runtime remains bound to its original session.
+    /// Busy sessions and existing destination identities are rejected.
+    /// Dropping this future requests cooperative cancellation before publication;
+    /// cancellation racing publication may leave a completed child.
+    pub async fn fork_durable(&self, external_id: impl Into<String>) -> RuntimeResult<String> {
+        let (receipt_tx, mut receipt_rx) = mpsc::unbounded_channel();
+        self.send_admitted(SessionOp::ForkDurable {
+            external_id: external_id.into(),
+            receipt_tx: Some(receipt_tx),
+        })
+        .await?;
+        receipt_rx
+            .recv()
+            .await
+            .ok_or(RuntimeError::CommandChannelClosed)?
+            .map_err(|message| {
+                RuntimeError::Session(talos_session::SessionError::DurableTurn(message))
+            })
+    }
+
     /// Queue manual whole-request compaction without adding a transcript turn.
     ///
     /// IDs must increase within this runtime. Retained duplicate IDs return the
@@ -4886,6 +4935,99 @@ mod tests {
         ));
 
         runtime.shutdown().await.expect("shutdown succeeds");
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn runtime_forks_durable_tip_without_changing_active_session() {
+        let directory =
+            std::env::temp_dir().join(format!("talos-runtime-fork-{}", uuid::Uuid::new_v4()));
+        let session = DurableSession::open_or_create(&directory, "parent").expect("parent");
+        let mut runtime = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new().with_response("done")))
+            .durable_session(session.clone())
+            .build()
+            .expect("runtime");
+        runtime.submit("ancestor fact").await.expect("submit");
+        collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("complete");
+        let id = runtime.fork_durable("child").await.expect("fork");
+        let child = DurableSession::open_existing(&directory, "child")
+            .expect("open")
+            .expect("child");
+        assert_eq!(id, child.id().to_string());
+        assert_ne!(child.id(), session.id());
+        assert_eq!(
+            child.read_messages().expect("child history"),
+            session.read_messages().expect("parent history")
+        );
+        assert!(runtime.fork_durable("child").await.is_err());
+        runtime.shutdown().await.expect("shutdown");
+        // The failed duplicate fork leaves its durable intent for maintenance.
+        // Rebuilding the actual runtime must retire it without touching child.
+        let resumed = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new().with_response("done")))
+            .durable_session(session.clone())
+            .build()
+            .expect("restart maintenance");
+        assert_eq!(
+            session
+                .recover_fork_intents(
+                    &talos_session::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2)),
+                    None,
+                )
+                .expect("no pending intent after startup")
+                .0,
+            0
+        );
+        assert!(
+            DurableSession::open_existing(&directory, "child")
+                .expect("child lookup")
+                .is_some()
+        );
+        resumed.shutdown().await.expect("resumed shutdown");
+        std::fs::remove_dir_all(directory).expect("cleanup");
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn runtime_fork_rejects_active_turn_and_then_succeeds_when_idle() {
+        let directory =
+            std::env::temp_dir().join(format!("talos-runtime-busy-fork-{}", uuid::Uuid::new_v4()));
+        let session = DurableSession::open_or_create(&directory, "parent").expect("parent");
+        let entered = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let mut runtime = RuntimeBuilder::new()
+            .provider(Arc::new(GatedModel {
+                entered: entered.clone(),
+                release: release.clone(),
+            }))
+            .durable_session(session)
+            .build()
+            .expect("runtime");
+        runtime.submit("work").await.expect("submit");
+        tokio::time::timeout(Duration::from_secs(2), entered.notified())
+            .await
+            .expect("provider entered");
+        assert!(
+            tokio::time::timeout(Duration::from_secs(2), runtime.fork_durable("child"))
+                .await
+                .expect("busy receipt")
+                .is_err()
+        );
+        assert!(
+            DurableSession::open_existing(&directory, "child")
+                .expect("lookup")
+                .is_none()
+        );
+        release.notify_one();
+        collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("complete");
+        runtime.fork_durable("child").await.expect("idle fork");
+        runtime.shutdown().await.expect("shutdown");
+        std::fs::remove_dir_all(directory).expect("cleanup");
     }
 
     #[tokio::test]

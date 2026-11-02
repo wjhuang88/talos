@@ -621,3 +621,19 @@ random root IDs from earlier opens, while retaining original transcript/entry ID
 The opaque scan receipt permits exact-record cleanup only for its issuing handle;
 it does not authorize history queries. Windows and full index-prefix revalidation
 continuation remain subject to the incomplete I313 platform/acceptance gates.
+
+Unix durable hosts can call `RuntimeHandle::fork_durable(external_id)` at an idle
+Actor boundary. It returns a fresh child UUID, preserves the committed raw prefix
+and keeps the original runtime active; existing target identities and busy Actors
+are rejected. Open the child through the same durable root for a separate runtime.
+The operation does not inherit search-index or checkpoint authority. Interrupt,
+shutdown and dropping the receipt request cooperative cancellation; publication
+may win that race, so reconcile the target identity before retrying. Kernel I/O
+has no hard abort guarantee. Startup performs bounded intent recovery; unresolved
+intents are retained and reported, and lock files intentionally remain. Windows
+fork is unavailable. This is local I313 implementation pending full merge gates.
+
+Exhaustive consumers must handle additive `SessionOp::ForkDurable` and
+`SubmissionRejectionReason::SessionBusy` in the next minor migration (ADR-096).
+ForkDurable requires an in-process receipt channel; serialized wire requests are
+unsupported and emit an error. SessionBusy is a temporary refusal, not closure.

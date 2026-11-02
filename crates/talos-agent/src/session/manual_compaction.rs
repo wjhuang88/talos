@@ -73,6 +73,15 @@ impl ManualCompaction {
         self.running.is_some()
     }
 
+    /// Forks require no accepted or finishing compaction operation.
+    pub(super) fn is_idle_for_fork(&self) -> bool {
+        self.running.is_none()
+            && self.queued.is_none()
+            && self.queued_model.is_none()
+            && self.model_receipt.is_none()
+            && self.boundary_resume.is_none()
+    }
+
     pub(super) fn has_pending_work(&self) -> bool {
         self.running.is_some() || self.queued_model.is_some()
     }
@@ -421,6 +430,16 @@ impl Drop for ManualCompaction {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn queued_manual_operation_prevents_fork_idle() {
+        let mut compact = super::ManualCompaction::new(1);
+        assert!(compact.is_idle_for_fork());
+        compact.queued = Some(1);
+        assert!(!compact.is_idle_for_fork());
+        compact.queued = None;
+        assert!(compact.is_idle_for_fork());
+    }
+
     use super::*;
     #[tokio::test]
     async fn model_boundary_shares_manual_slot_and_receipts_before_resume() {

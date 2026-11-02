@@ -159,6 +159,44 @@ impl DurableRecoverySource {
 }
 
 impl RecoveryPrefixSeal {
+    /// Copy this fully verified prefix into a host-owned staging writer.
+    ///
+    /// Uses at most 64 KiB per read and rechecks source identity between chunks.
+    /// This does not publish a fork or grant permission to write: the host must
+    /// hold its admission gate and discard the staging output on any error.
+    /// The writer can contain a partial prefix on failure. Kernel I/O is synchronous;
+    /// cancellation and deadlines are cooperative between reads and writes.
+    pub fn copy_to_staging(
+        &self,
+        writer: &mut impl std::io::Write,
+        deadline: Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<u64, HistoryPageError> {
+        self.check_current()?;
+        let mut offset = 0_u64;
+        while offset < self.source.source_end() {
+            if stopped() || Instant::now() >= deadline {
+                return Err(HistoryPageError::Stopped);
+            }
+            let end = offset
+                .saturating_add(64 * 1024)
+                .min(self.source.source_end());
+            let bytes =
+                self.source
+                    .read_recovery_bytes(offset, end, &self.stamp, deadline, &stopped)?;
+            writer.write_all(&bytes)?;
+            #[cfg(test)]
+            crate::durable::fork_crash_probe("midcopy");
+            self.check_current()?;
+            offset = end;
+        }
+        if stopped() || Instant::now() >= deadline {
+            return Err(HistoryPageError::Stopped);
+        }
+        self.check_current()?;
+        Ok(offset)
+    }
+
     /// Export bounded cache metadata for a future full source revalidation.
     pub fn expectation(&self) -> RecoveryPrefixExpectation {
         RecoveryPrefixExpectation {
@@ -366,6 +404,75 @@ mod tests {
     use crate::{DurableSession, PersistencePolicy, TurnTranscriptOutcome};
     use std::time::Duration;
     use talos_core::message::Message;
+
+    #[test]
+    fn staging_copy_preserves_raw_prefix_and_refuses_mutation_or_cancel() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "fork-copy").expect("owner");
+        owner
+            .commit_turn(
+                "seed",
+                &[Message::User {
+                    content: "fact ".repeat(30_000),
+                }],
+                &Default::default(),
+            )
+            .expect("seed");
+        let mut scan = owner
+            .capture_recovery_source()
+            .expect("source")
+            .begin_prefix_seal()
+            .expect("scan");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !scan.step(deadline, || false).expect("scan step") {}
+        let seal = scan.finish().expect("seal");
+        let original = std::fs::read(owner.file_path()).expect("original");
+        let mut copied = Vec::new();
+        assert_eq!(
+            seal.copy_to_staging(&mut copied, deadline, || false)
+                .expect("copy"),
+            original.len() as u64
+        );
+        assert_eq!(copied, original);
+        let mut cancelled = Vec::new();
+        assert!(matches!(
+            seal.copy_to_staging(&mut cancelled, deadline, || true),
+            Err(HistoryPageError::Stopped)
+        ));
+        assert!(cancelled.is_empty());
+        struct MutatingWriter<'a> {
+            owner: &'a DurableSession,
+            wrote: bool,
+        }
+        impl std::io::Write for MutatingWriter<'_> {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                assert!(!self.wrote, "source mutation must stop before second chunk");
+                self.wrote = true;
+                self.owner
+                    .commit_turn(
+                        "append",
+                        &[Message::User {
+                            content: "new".into(),
+                        }],
+                        &Default::default(),
+                    )
+                    .expect("append");
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut writer = MutatingWriter {
+            owner: &owner,
+            wrote: false,
+        };
+        assert!(matches!(
+            seal.copy_to_staging(&mut writer, deadline, || false),
+            Err(HistoryPageError::Stale)
+        ));
+        assert!(writer.wrote);
+    }
 
     #[test]
     fn resumed_verification_requires_exact_expectation() {

@@ -1835,3 +1835,194 @@ Clippy passes (`/private/tmp/i313-cleanup-clippy.log`). Next uncovered acceptanc
 is actual durable fork integration: generic CLI fork does not supply durable
 bindings/lineage authority. A host-only bounded prefix-fork design is under
 independent architecture review; no fork implementation is claimed yet.
+
+### Durable fork groundwork — uncommitted
+
+Independent architecture review accepts a host-only committed-tip fork direction,
+not an implementation: Actor idle/admission gate, bounded verified source copy,
+new durable identity and atomic trusted lineage publication, no copied index or
+checkpoint authority, and real ancestor/sibling/restart integration evidence are
+required. Source inspection corrects a design assumption: TLOG headers contain
+format version and creation time, not session UUID.
+
+Added draft RecoveryPrefixSeal staging-copy primitive with 64 KiB reads, source
+checks after writes and cooperative cancellation/deadline. Raw-prefix equality,
+pre-cancelled empty output and writer-induced source mutation refusal pass at
+`/private/tmp/i313-fork-copy.log`. Partial staging output must be discarded on
+error. This is not a published child or working fork; API review, publication/
+lineage/crash protocol and Runtime integration remain unimplemented.
+
+Durable fork storage draft now streams source verification and page-wise turn
+terminal checks, creates a fresh private TLOG, synchronizes it, and publishes the
+new external binding plus lineage in one transaction. Existing IDs fail rather
+than reopening; parent binding is rechecked. Normal errors remove unpublished
+files; crash orphan recovery is not implemented. The whole storage operation is
+panic-contained. Narrow actual fork/reopen test verifies original raw copy,
+ancestor plus child suffix, parent/sibling exclusion, collision/cancel refusal
+and owner-capability separation (`/private/tmp/i313-fork-storage-test.log`).
+Initial compilation failed on SQLite u64 parameters; checked i64 conversion fixes
+that failure. Full tool pairing, Actor idle gate, orphan recovery, independent
+storage review and Runtime/process-restart composition remain outstanding.
+No completed fork delivery or full acceptance claim; this draft is uncommitted.
+
+Fork storage review requests changes. Corrected shared file/SQLite deadline to
+at most ten seconds, moved copy/fsync before the publication transaction, and
+preserve the child file once commit is attempted because failure can have an
+uncertain outcome. Added parent-chain and pending tool pairing checks (at most
+8192 outstanding calls). Unpaired-call terminal refusal and existing fork/reopen
+regressions pass (`/private/tmp/i313-fork-pairing.log`). Duplicate entry/turn/call
+identity detection, byte bounds for pending identities, crash reconciliation,
+Actor gate and complete independent approval remain open. This remains a draft,
+not activated fork delivery; current narrow tests do not certify those gaps.
+
+Fork identity validation now uses disposable TEMP tables on the existing bindings
+connection for entry/turn/call uniqueness and pending call completion. FILE temp
+storage and a 256 KiB temp cache avoid a transcript-sized Rust identity set; this
+is not a measured total process-memory guarantee. No persistent second database
+is introduced. This supersedes the draft 8192 pending-call cap. Duplicate entry
+and reopened terminal turn fixtures refuse child publication; three storage fork
+tests pass (`/private/tmp/i313-fork-identities-final.log`). Revised independent
+storage review requested. Runtime idle gate, crash reconciliation, real tool-fact
+fork/restart composition and final gates still remain; draft stays uncommitted.
+
+Call-identity review correction: tool-call uniqueness/pairing is scoped to
+(turn_id, call_id), preserving legitimate ID reuse across turns. The generic
+extractor silently skips malformed blocks and invents missing IDs, so fork
+validation now strictly parses each JSON block, requires ID/name/args and a closing
+fence, and handles fences embedded inside JSON strings. Positive repeated-ID and
+embedded-fence fixtures plus malformed/missing-ID/unclosed refusals pass; all four
+fork storage tests pass (`/private/tmp/i313-fork-call-scope.log`). The temporary
+SQLite cache setting is not a hard RSS or disk quota. Deadline cleanup evidence,
+crash reconciliation and Actor integration still remain before activation.
+
+### Draft Runtime fork path
+
+Added host SessionOp::ForkDurable with direct completion receipt and RuntimeHandle
+fork_durable admission. Actor rejects active turns, running compaction, pending
+submissions or shutdown; successful storage fork leaves the active owner unchanged.
+Receipt closure/admission shutdown requests cooperative cancellation. Runtime check
+and actual submit→complete→fork→reopen/history-equality/collision regression pass
+(`/private/tmp/i313-fork-runtime-check.log`, `/private/tmp/i313-fork-runtime-test.log`).
+This is an uncommitted API draft under independent review. Synchronous storage
+currently occupies Actor execution; no hard cancellation guarantee is claimed.
+Busy/race/forced-shutdown tests, crash reconciliation, API/ADR docs, full tool-fact
+checkpoint/fork/restart recovery and full gates remain before merge/activation.
+
+Runtime gate review correction: dedicated is_idle_for_fork includes queued manual,
+queued model, running and retained model receipt/boundary work, rather than just
+is_running. Missing in-process receipt now emits an explicit unsupported-operation
+error instead of silently ignoring deserialized fork commands. Actual gated-model
+runtime test proves busy rejection with no child then successful fork after turn
+completion; both Runtime fork tests pass (`/private/tmp/i313-fork-busy.log`).
+Queued manual predicate regression is under validation. Direct Session queued
+Interrupt/Shutdown cannot interrupt the current synchronous storage call; only
+receipt closure/admission closure are polled. This remains an unresolved lifecycle
+limitation, not full cancellation acceptance. Public SessionOp migration and crash
+reconciliation are also required before this uncommitted API draft can merge.
+
+Fork worker lifecycle draft replaces synchronous Actor I/O: Actor retains a
+ForkWork busy owner and polls a blocking worker, suppresses turn/compaction start,
+rejects new work (tracked submissions receive rejection), preserves observational
+reconciliation, and processes global Interrupt/Shutdown cancellation. Normal
+shutdown waits for worker exit; dropping the Actor cancels its token but cannot
+forcibly abort a blocking kernel call. Two Runtime fork regressions pass before
+the final tracked-receipt handling correction (`/private/tmp/i313-fork-worker.log`);
+final Runtime check passes (`/private/tmp/i313-fork-worker-check.log`). Queued manual
+idle-predicate test also passed (`/private/tmp/i313-fork-queued.log`). Independent
+lifecycle review and deterministic worker-gate cancellation/shutdown tests remain,
+as do crash reconciliation, public API migration and full T5 fork acceptance.
+
+Worker review corrections: deadline captured before spawn_blocking, compaction
+gets operation-specific Busy/StaleGeneration, and temporary structured rejection
+uses new SessionBusy rather than SessionClosed. Runtime/CLI check passes before
+test-hook additions (`/private/tmp/i313-fork-busy-protocol.log`). Deterministic
+worker gate regression passes: Compact Busy, global Interrupt observed while
+worker is held, no child on cancellation, then successful retry and shutdown
+(`/private/tmp/i313-fork-worker-gate.log`). ADR-096 records draft public-enum
+migration and in-process-only fork receipt protocol. Shutdown-in-flight, receipt
+drop, Actor abort, publication race and crash reconciliation still require proof.
+
+Deterministic worker lifecycle suite now passes both tests, including Shutdown
+while held and Actor abort. Abort test waits for the blocking worker's final
+receipt sender to drop before asserting no child binding, so it observes worker
+exit rather than merely token cancellation (`/private/tmp/i313-fork-worker-lifecycle.log`).
+These gates precede storage publication and do not prove cancellation during
+fsync/commit. Receipt-drop and publication races remain required.
+
+Independent recovery design review accepts persistent intent in existing bindings,
+per-fork create_new lock plus std File locking, and idempotent recovery. Intent
+contains only UUID-derived paths, must precede child writes, and publication joins
+binding/lineage in one transaction. Recovery must acquire the lock then reread
+intent/binding; preserve published children, reject symlink/nonregular cleanup,
+retain lock files to avoid inode replacement races, and bound records/time/I/O.
+No crash recovery implementation is claimed yet. Independent-process crash-point
+and filesystem lock semantics tests remain required before fork activation.
+
+Fork intent/recovery implementation draft: create_new private UUID lock held by
+worker, synchronized before intent commit; intent precedes child bytes, publication
+transaction validates it, successful publication retires intent best-effort. Lock
+inodes remain. New bounded recover_fork_intents checks at most 32 fixed UUID paths,
+skips held locks, rereads binding after lock, preserves published lineage/cutoff,
+and deletes only exact unbound regular files before retiring intent. Same-process
+lock exclusion, unrelated-file preservation and idempotency pass
+(`/private/tmp/i313-fork-recovery-test.log`); four storage fork tests still pass
+(`/private/tmp/i313-fork-recovery-check.log`). Startup integration, cross-process
+lock/crash matrix, published preservation tests, review and pagination fairness
+remain; this is not complete crash recovery acceptance or a merged delivery.
+
+Recovery review correction adds keyset continuation and reports scanned/retired/
+failed/next_cursor. Per-record failures retain the intent and permit other records
+to proceed; global budget/connection failure still terminates the operation.
+New regression reaches a stale record after 32 missing-lock failures, then
+preserves a published child with simulated leftover intent. Both recovery tests
+pass (`/private/tmp/i313-fork-recovery-pages.log`). Published checks certify only
+binding/lineage/length correspondence and preservation, not content integrity.
+The planned symlink negative regression remains unimplemented. Startup caller,
+actual independent-process crash/lock matrix and fresh review remain required.
+
+Recovery negative/platform evidence: symlink lock and symlink child fixtures keep
+both the target bytes and failed intents. Independent child test process holds
+the actual std file lock; parent recovery skips it, then kill/wait releases it and
+recovery removes only the recorded partial child. A child-process guard bounds
+startup and kills/reaps on failure. All four recovery tests pass
+(`/private/tmp/i313-fork-recovery-process.log`). This verifies current macOS/local
+filesystem lock behavior and a seeded orphan, not the full real-fork crash-point
+matrix or other filesystems/platforms. Startup integration remains outstanding.
+
+Actual fork crash-path regression now exits a dedicated child process without
+Rust destructors after intent, copy, sync, precommit and published commit. Parent
+recovery retires all five intents, removes unbound files, retains published raw
+child bytes and preserves parent bytes (`/private/tmp/i313-fork-real-crashes.log`).
+This is process exit, not power-loss proof; mid-copy kill still remains.
+
+Runtime startup now sweeps paged intents under one cooperative two-second budget,
+reports content-free unresolved counts/failures, and retains failed records for
+retry. Rebuild regression confirms duplicate-fork residual intent retired while
+existing child remains; both Runtime fork tests pass
+(`/private/tmp/i313-fork-startup-final.log`). Initial compile lacked tracing in
+Runtime; added an edge to the already-locked tracing version (no package changes),
+then reran locked tests successfully. External SDK fixture lock synchronization
+and broader gates remain outstanding; no complete fork/T5 claim.
+
+Fork stage convergence: actual six-point process-exit matrix now includes a
+verified nonempty partial 64 KiB copy (`/private/tmp/i313-fork-midcopy.log`).
+Affected Session/Agent/Runtime all-target warnings-denied Clippy passes
+(`/private/tmp/i313-fork-converge-clippy.log`); full library suites pass Agent
+634/634, Runtime 80/80, Session 276/276 (`/private/tmp/i313-fork-converge-tests.log`).
+Independent static review approves this bounded stage against `ebe09bd0d`, code/
+lock diff SHA256 `5b22f4637e17de5204c6149300b0d54fa4ad12fe962dfe948951530854a50fe8`,
+not full I313. Reviewer did not run tests. SDK lock now adds only existing tracing
+edge; unrelated offline resolver downgrades were discarded. SDK modes underway.
+
+Residual boundaries: a sweep budget error loses continuation, so arbitrary
+backlog eventual cleanup is not promised; retained lock files are intentional to
+avoid inode races. Recovery preserves published binding/lineage/length, not
+content integrity. Cancellation may race successful publication; kernel I/O is
+not forcibly interruptible. Real tool-fact→checkpoint→fork→independent-process
+recovery, Windows support and final full-candidate gates remain outstanding.
+
+Both external SDK fixture modes pass (`/private/tmp/i313-fork-sdk.log`); both
+governance validators pass with zero warnings (`/private/tmp/i313-fork-governance.log`,
+`/private/tmp/i313-fork-claims.log`). Staged code/lock/ADR/owner diff reviewed; SDK
+contract records host usage and next-minor enum migration. These are stage-local
+checks, not standard final preflight/platform CI/merge evidence.

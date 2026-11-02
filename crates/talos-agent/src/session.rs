@@ -150,6 +150,8 @@ pub struct AppServerSession {
     #[cfg(test)]
     start_commit_gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
     #[cfg(test)]
+    fork_worker_gate: Option<(Arc<tokio::sync::Notify>, Arc<std::sync::atomic::AtomicBool>)>,
+    #[cfg(test)]
     boundary_ack_cancel_gate: Option<Arc<tokio::sync::Notify>>,
 }
 
@@ -200,6 +202,8 @@ impl AppServerSession {
             runtime_admission: None,
             #[cfg(test)]
             start_commit_gate: None,
+            #[cfg(test)]
+            fork_worker_gate: None,
             #[cfg(test)]
             boundary_ack_cancel_gate: None,
         };
@@ -383,6 +387,17 @@ impl AppServerSession {
             return;
         }
 
+        struct ForkWork {
+            task: JoinHandle<Result<String, String>>,
+            cancel: CancellationToken,
+            receipt: mpsc::UnboundedSender<Result<String, String>>,
+        }
+        impl Drop for ForkWork {
+            fn drop(&mut self) {
+                self.cancel.cancel();
+            }
+        }
+        let mut fork_work: Option<ForkWork> = None;
         let mut turn_counter: u64 = 0;
         let mut submission_counter: u64 = 0;
         let mut pending = VecDeque::<StructuredSubmission>::new();
@@ -419,11 +434,15 @@ impl AppServerSession {
         loop {
             if shutting_down {
                 compact.cancel(self);
+                if let Some(work) = &fork_work {
+                    work.cancel.cancel();
+                }
             }
-            if current_turn.is_none() && !shutting_down {
+            if current_turn.is_none() && fork_work.is_none() && !shutting_down {
                 compact.start(self);
             }
             if current_turn.is_none()
+                && fork_work.is_none()
                 && !compact.is_running()
                 && !paused
                 && let Some(submission) = pending.pop_front()
@@ -483,6 +502,7 @@ impl AppServerSession {
             }
 
             if shutting_down
+                && fork_work.is_none()
                 && current_turn.is_none()
                 && !compact.is_running()
                 && pending.is_empty()
@@ -491,6 +511,15 @@ impl AppServerSession {
             }
 
             tokio::select! {
+                result = async { match fork_work.as_mut() {
+                    Some(work) => Some((&mut work.task).await),
+                    None => None,
+                } }, if fork_work.is_some() => {
+                    if let Some(work) = fork_work.take() {
+                        let result = result.and_then(Result::ok).unwrap_or_else(|| Err("durable fork worker failed".into()));
+                        let _ = work.receipt.send(result);
+                    }
+                }
                 result = compact.wait(), if compact.has_pending_work() => {
                     compact.complete(self, result);
                 }
@@ -644,6 +673,38 @@ impl AppServerSession {
                         pending_image_bytes = current_submission_size.map_or(0, |size| size.3);
                         continue;
                     };
+                    if let Some(work) = &fork_work {
+                        if matches!(&op, SessionOp::Interrupt | SessionOp::Shutdown) {
+                            work.cancel.cancel();
+                        } else {
+                            match &op {
+                                SessionOp::Compact { session_generation, operation_id } => {
+                                    let _ = self.eq_tx.send(SessionEvent::CompactStatus {
+                                        session_id: self.session_id.clone(), session_generation: self.session_generation,
+                                        operation_id: *operation_id,
+                                        state: if *session_generation == self.session_generation { talos_core::session::CompactState::Busy } else { talos_core::session::CompactState::StaleGeneration },
+                                    });
+                                    continue;
+                                }
+                                SessionOp::SubmitStructured { submission } => self.emit_admission_rejection(submission, SubmissionRejectionReason::SessionBusy, None),
+                                SessionOp::SubmitStructuredTracked { submission, receipt_tx } => self.emit_admission_rejection(submission, SubmissionRejectionReason::SessionBusy, receipt_tx.as_ref()),
+                                SessionOp::ReconcileStructured { submission } | SessionOp::SubmitStructuredReconcile { submission } => {
+                                    self.reconcile_submission(submission, None);
+                                    continue;
+                                }
+                                SessionOp::ReconcileStructuredTracked { submission, receipt_tx } | SessionOp::SubmitStructuredReconcileTracked { submission, receipt_tx } => {
+                                    self.reconcile_submission(submission, receipt_tx.as_ref());
+                                    continue;
+                                }
+                                _ => {}
+                            }
+                            if let SessionOp::ForkDurable { receipt_tx: Some(receipt), .. } = &op {
+                                let _ = receipt.send(Err("durable fork is already running".into()));
+                            }
+                            let _ = self.eq_tx.send(SessionEvent::Error { message: "session is busy creating a durable fork".into() });
+                            continue;
+                        }
+                    }
                     match op {
                         SessionOp::CancelCompact { session_generation, operation_id } => {
                             compact.cancel_operation(self, session_generation, operation_id);
@@ -809,6 +870,49 @@ impl AppServerSession {
                             {
                                 paused = false;
                             }
+                        }
+                        SessionOp::ForkDurable { external_id, receipt_tx } => {
+                            let Some(receipt_tx) = receipt_tx else {
+                                let _ = self.eq_tx.send(SessionEvent::Error { message: "durable fork requires an in-process receipt channel".into() });
+                                continue;
+                            };
+                            if current_turn.is_some() || !compact.is_idle_for_fork() || !pending.is_empty() || shutting_down {
+                                let _ = receipt_tx.send(Err("durable fork requires an idle session".into()));
+                                continue;
+                            }
+                            if receipt_tx.is_closed() { continue; }
+                            #[cfg(unix)]
+                            if let Some(durable) = &self.durable_persistence {
+                                let session = durable.session.clone();
+                                let observer = receipt_tx.clone();
+                                let admission = self.runtime_admission.clone();
+                                let cancel = CancellationToken::new();
+                                let stopped = cancel.clone();
+                                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+                                #[cfg(test)]
+                                let gate = self.fork_worker_gate.clone();
+                                let task = tokio::task::spawn_blocking(move || {
+                                    #[cfg(test)]
+                                    if let Some((reached, release)) = gate {
+                                        reached.notify_one();
+                                        while !release.load(std::sync::atomic::Ordering::SeqCst) {
+                                            if stopped.is_cancelled() || observer.is_closed() || std::time::Instant::now() >= deadline {
+                                                return Err("durable fork cancelled at test gate".into());
+                                            }
+                                            std::thread::park_timeout(std::time::Duration::from_millis(1));
+                                        }
+                                    }
+                                    session.fork_committed_tip(&external_id,
+                                        deadline,
+                                        move || stopped.is_cancelled() || observer.is_closed() || admission.as_ref().is_some_and(|control| !control.is_open())
+                                    ).map(|child| child.id().to_string()).map_err(|_| "durable fork storage unavailable".to_owned())
+                                });
+                                fork_work = Some(ForkWork { task, cancel, receipt: receipt_tx });
+                            } else {
+                                let _ = receipt_tx.send(Err("durable fork requires configured durable storage".into()));
+                            }
+                            #[cfg(not(unix))]
+                            { let _ = external_id; let _ = receipt_tx.send(Err("durable fork unavailable on this platform".into())); }
                         }
                         SessionOp::SetSkillContext { name, content } => {
                             if current_turn.is_some() || compact.is_running() || !pending.is_empty() {

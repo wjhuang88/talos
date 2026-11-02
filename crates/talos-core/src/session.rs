@@ -22,6 +22,15 @@ pub use crate::submission::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionOp {
+    /// Host-only durable tip fork, admitted only while the Actor is idle.
+    /// This is not a model tool and does not change the active session.
+    ForkDurable {
+        /// New logical durable identity; existing identities must be rejected.
+        external_id: String,
+        /// Direct completion receipt (child UUID or content-free failure).
+        #[serde(skip)]
+        receipt_tx: Option<mpsc::UnboundedSender<Result<String, String>>>,
+    },
     Submit {
         message: String,
     },

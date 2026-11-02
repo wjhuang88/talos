@@ -5753,3 +5753,177 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
     let actor = task.await.expect("actor");
     assert_eq!(&actor.history[..raw.len()], raw.as_slice());
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn fork_worker_busy_compact_receipt_and_interrupt_are_observed() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let durable =
+        talos_session::DurableSession::open_or_create(workspace.path(), "parent").expect("parent");
+    let agent = make_agent(CountingModel {
+        calls: Arc::new(AtomicUsize::new(0)),
+    });
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: workspace.path().to_path_buf(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_durable_persistence(durable, Default::default());
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    actor.fork_worker_gate = Some((reached.clone(), release.clone()));
+    let task = tokio::spawn(async move { actor.run().await });
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkDurable {
+            external_id: "child".into(),
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("fork");
+    tokio::time::timeout(Duration::from_secs(2), reached.notified())
+        .await
+        .expect("worker entered");
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 77,
+        })
+        .await
+        .expect("compact");
+    let event = tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+        .await
+        .expect("receipt deadline")
+        .expect("event");
+    assert!(matches!(
+        event,
+        SessionEvent::CompactStatus {
+            operation_id: 77,
+            state: talos_core::session::CompactState::Busy,
+            ..
+        }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("interrupt");
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), result.recv())
+            .await
+            .expect("cancel deadline")
+            .expect("result")
+            .is_err()
+    );
+    assert!(
+        talos_session::DurableSession::open_existing(workspace.path(), "child")
+            .expect("lookup")
+            .is_none()
+    );
+    release.store(true, Ordering::SeqCst);
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkDurable {
+            external_id: "child".into(),
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("retry");
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), result.recv())
+            .await
+            .expect("retry deadline")
+            .expect("result")
+            .is_ok()
+    );
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(2), task)
+        .await
+        .expect("join deadline")
+        .expect("join");
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn fork_worker_shutdown_and_actor_abort_retire_before_publication() {
+    for abort in [false, true] {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let durable = talos_session::DurableSession::open_or_create(workspace.path(), "parent")
+            .expect("parent");
+        let (handle, mut actor) = AppServerSession::new(
+            make_agent(CountingModel {
+                calls: Arc::new(AtomicUsize::new(0)),
+            }),
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: workspace.path().to_path_buf(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_durable_persistence(durable, Default::default());
+        let reached = Arc::new(tokio::sync::Notify::new());
+        actor.fork_worker_gate = Some((
+            reached.clone(),
+            Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        ));
+        let task = tokio::spawn(async move { actor.run().await });
+        let (receipt, mut result) = mpsc::unbounded_channel();
+        handle
+            .sq_tx
+            .send(SessionOp::ForkDurable {
+                external_id: "child".into(),
+                receipt_tx: Some(receipt),
+            })
+            .await
+            .expect("fork");
+        tokio::time::timeout(Duration::from_secs(2), reached.notified())
+            .await
+            .expect("worker entered");
+        if abort {
+            task.abort();
+            assert!(task.await.expect_err("aborted Actor").is_cancelled());
+            // The blocking worker owns the remaining sender. Channel closure
+            // therefore witnesses its exit, not merely the Actor's cancellation.
+            assert!(
+                tokio::time::timeout(Duration::from_secs(2), result.recv())
+                    .await
+                    .expect("worker exit")
+                    .is_none()
+            );
+        } else {
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+            assert!(
+                tokio::time::timeout(Duration::from_secs(2), result.recv())
+                    .await
+                    .expect("worker receipt")
+                    .expect("result")
+                    .is_err()
+            );
+            tokio::time::timeout(Duration::from_secs(2), task)
+                .await
+                .expect("Actor joined after worker")
+                .expect("join");
+        }
+        assert!(
+            talos_session::DurableSession::open_existing(workspace.path(), "child")
+                .expect("lookup")
+                .is_none()
+        );
+    }
+}

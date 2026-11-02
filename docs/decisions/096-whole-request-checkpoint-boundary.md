@@ -278,3 +278,32 @@ caches in the next-minor migration. Canonical branch identity is not owner
 authority: an independently opened or copied handle still cannot export another
 handle's scan, and restoring requires configured host bindings and source version.
 Generic Session branch/fork constructors retain their existing behavior.
+
+## Durable fork host protocol (I313 implementation draft)
+
+The proposed Runtime fork uses an Actor-owned busy worker: only an idle Actor may
+start it, new execution is refused until it joins, and Interrupt/Shutdown signal
+cooperative cancellation. A ten-second budget begins at Actor admission, including
+blocking-pool queue time. Blocking kernel calls are not forcibly interruptible.
+Cancellation racing committed publication may leave a valid child; callers must
+reconcile the external identity rather than assume rollback.
+
+Public protocol migration: SessionOp gains ForkDurable and structured admission
+reasons gain SessionBusy. Downstream exhaustive matches must handle these variants
+in the next minor release. ForkDurable requires an in-process receipt sender;
+deserialized wire requests without it are explicitly unsupported and emit Error.
+SessionBusy means retry after maintenance finishes, not permanent session closure.
+Compaction rejected during fork emits operation-specific Busy/StaleGeneration.
+
+This draft is not approval to publish: crash reconciliation, full lifecycle tests,
+independent review and Runtime fork/history acceptance remain required.
+
+Fork stage now implements Actor-owned worker, intent/lock publication and bounded
+paged startup recovery, with independent stage review. Lock files intentionally
+remain to prevent inode replacement races. Failed/busy records are retained;
+sweep budget exhaustion does not persist its cursor, so arbitrary backlog eventual
+cleanup is not guaranteed. Published recovery validates identity/lineage/length
+and preserves the file, not transcript content integrity. Unix process-exit tests
+cover intent/copy/sync/precommit/postcommit, including partial copying; they do not
+prove power-loss behavior. Full fork/checkpoint/tool-recovery composition and
+Windows support remain open, and this stage cannot close I313.

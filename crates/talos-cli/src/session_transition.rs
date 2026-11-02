@@ -128,6 +128,7 @@ impl SessionCommandTarget {
             | SessionOp::SubmitStructuredReconcile { .. }
             | SessionOp::SubmitStructuredReconcileTracked { .. }
             | SessionOp::SetSkillContext { .. }
+            | SessionOp::ForkDurable { .. }
             | SessionOp::InterruptTurn { .. }
             | SessionOp::Compact { .. }
             | SessionOp::CancelCompact { .. }

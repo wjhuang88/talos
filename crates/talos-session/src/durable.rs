@@ -385,6 +385,430 @@ pub struct DurableSession {
 }
 
 impl DurableSession {
+    /// Reconcile at most 32 recorded fork intents under this storage root.
+    /// Active locks are skipped; only exact intent-derived unpublished files may
+    /// be removed. Returns (scanned, retired, failed, next cursor). Continue with
+    /// the cursor, then restart from None on the next maintenance sweep.
+    /// Published files are retained; this does not certify their content integrity.
+    /// This host maintenance operation does not grant model write authority.
+    #[cfg(unix)]
+    pub fn recover_fork_intents(
+        &self,
+        budget: &crate::sqlite::RecoveryWorkBudget,
+        after: Option<&str>,
+    ) -> Result<(usize, usize, usize, Option<String>), SessionError> {
+        recovery_storage_boundary(|| {
+            let connection = Connection::open(&self.bindings_path).map_err(sql_error)?;
+            let _guard = crate::sqlite::install_budget(&connection, budget)
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            let directory = self
+                .file_path()
+                .parent()
+                .ok_or_else(|| SessionError::DurableTurn("fork directory unavailable".into()))?;
+            let ids = connection
+                .prepare("SELECT child_id FROM durable_fork_intents WHERE child_id > ?1 ORDER BY child_id LIMIT 32")
+                .map_err(sql_error)?
+                .query_map([after.unwrap_or("")], |row| row.get::<_, String>(0))
+                .map_err(sql_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(sql_error)?;
+            let scanned = ids.len();
+            let next = if scanned == 32 {
+                ids.last().cloned()
+            } else {
+                None
+            };
+            let mut failed = 0;
+            let mut retired = 0;
+            for encoded in ids {
+                budget
+                    .check()
+                    .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+                let result = (|| -> Result<bool, SessionError> {
+                    let id = Uuid::parse_str(&encoded).map_err(|_| {
+                        SessionError::DurableTurn("fork intent identity invalid".into())
+                    })?;
+                    if id.to_string() != encoded {
+                        return Err(SessionError::DurableTurn(
+                            "fork intent identity noncanonical".into(),
+                        ));
+                    }
+                    use std::os::unix::fs::OpenOptionsExt;
+                    let lock = fs::OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+                        .open(directory.join(format!("{id}.fork-lock")))?;
+                    if !lock.metadata()?.is_file() {
+                        return Err(SessionError::DurableTurn("fork lock is not regular".into()));
+                    }
+                    match lock.try_lock() {
+                        Ok(()) => {}
+                        Err(std::fs::TryLockError::WouldBlock) => return Ok(false),
+                        Err(error) => {
+                            return Err(SessionError::DurableTurn(format!(
+                                "fork lock failed: {error}"
+                            )));
+                        }
+                    }
+                    let tx = connection.unchecked_transaction().map_err(sql_error)?;
+                    let intent: Option<(String, String, i64)> = tx.query_row("SELECT parent_id,external_id,version FROM durable_fork_intents WHERE child_id=?1", [&encoded], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional().map_err(sql_error)?;
+                    let Some((parent, external, version)) = intent else {
+                        return Ok(false);
+                    };
+                    if version != 1 {
+                        return Err(SessionError::DurableTurn("unsupported fork intent".into()));
+                    }
+                    let bound: Option<String> = tx
+                        .query_row(
+                            "SELECT external_id FROM durable_bindings WHERE session_id=?1",
+                            [&encoded],
+                            |r| r.get(0),
+                        )
+                        .optional()
+                        .map_err(sql_error)?;
+                    let path = directory.join(format!("{id}.tlog"));
+                    let metadata = match fs::symlink_metadata(&path) {
+                        Ok(value) if value.is_file() && !value.file_type().is_symlink() => {
+                            Some(value)
+                        }
+                        Ok(_) => {
+                            return Err(SessionError::DurableTurn(
+                                "fork recovery source is not regular".into(),
+                            ));
+                        }
+                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                        Err(e) => return Err(e.into()),
+                    };
+                    if let Some(bound) = bound {
+                        let cutoff: i64 = tx.query_row("SELECT source_end FROM durable_fork_lineage WHERE child_id=?1 AND parent_id=?2", params![encoded,parent], |r| r.get(0)).map_err(sql_error)?;
+                        if bound != external
+                            || cutoff < 0
+                            || metadata.as_ref().is_none_or(|m| m.len() < cutoff as u64)
+                        {
+                            return Err(SessionError::DurableTurn(
+                                "published fork recovery mismatch".into(),
+                            ));
+                        }
+                    } else if metadata.is_some() {
+                        fs::remove_file(&path)?;
+                        fs::File::open(directory)?.sync_all()?;
+                    }
+                    budget
+                        .check()
+                        .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+                    tx.execute(
+                        "DELETE FROM durable_fork_intents WHERE child_id=?1",
+                        [&encoded],
+                    )
+                    .map_err(sql_error)?;
+                    tx.commit().map_err(sql_error)?;
+                    Ok(true)
+                })();
+                match result {
+                    Ok(true) => retired += 1,
+                    Ok(false) => {}
+                    Err(_) => failed += 1,
+                }
+                budget
+                    .check()
+                    .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            }
+            Ok((scanned, retired, failed, next))
+        })
+    }
+
+    /// Fork the committed transcript tip into a new host-owned durable identity.
+    ///
+    /// The host must hold its Actor idle/admission gate for this operation. This
+    /// storage operation cannot detect an admitted turn that has not persisted.
+    /// No index, checkpoint or scan authority is inherited. Cancellation and the
+    /// total deadline are cooperative; regular-file I/O is synchronous.
+    /// A process crash before binding publication can leave an unbound file.
+    #[cfg(unix)]
+    pub fn fork_committed_tip(
+        &self,
+        external_id: &str,
+        deadline: std::time::Instant,
+        stopped: impl Fn() -> bool + Send + Sync + 'static,
+    ) -> Result<Self, SessionError> {
+        recovery_storage_boundary(|| {
+            validate_external_id(external_id)?;
+            let deadline =
+                deadline.min(std::time::Instant::now() + std::time::Duration::from_secs(10));
+            let stopped = Arc::new(stopped);
+            let stop_check = stopped.clone();
+            let budget = crate::sqlite::RecoveryWorkBudget::with_cancellation_check(
+                deadline.saturating_duration_since(std::time::Instant::now()),
+                move || stop_check(),
+            );
+            let check = || {
+                budget
+                    .check()
+                    .map_err(|e| SessionError::DurableTurn(e.to_string()))
+            };
+            let source_error =
+                |e: crate::history_page::HistoryPageError| SessionError::DurableTurn(e.to_string());
+            check()?;
+            let source = self.capture_recovery_source()?;
+            let mut scan = source.begin_prefix_seal().map_err(source_error)?;
+            while !scan.step(deadline, || stopped()).map_err(source_error)? {}
+            let seal = scan.finish().map_err(source_error)?;
+            // Require contiguous, terminally recorded turns. This is storage
+            // integrity validation, not proof that the Actor is idle.
+            let mut offset = 0;
+            let mut active_turn: Option<String> = None;
+            let mut previous_entry: Option<String> = None;
+            // Disposable uniqueness state spills to SQLite temporary storage;
+            // avoids a transcript-sized Rust set; this is not a hard RSS limit.
+            let connection = Connection::open(&self.bindings_path).map_err(sql_error)?;
+            let _guard = crate::sqlite::install_budget(&connection, &budget)
+                .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
+            connection
+                .execute_batch(
+                    "PRAGMA temp_store=FILE; PRAGMA temp.cache_size=-256;
+                CREATE TEMP TABLE fork_entries(id TEXT PRIMARY KEY);
+                CREATE TEMP TABLE fork_turns(id TEXT PRIMARY KEY);
+                CREATE TEMP TABLE fork_calls(turn_id TEXT NOT NULL, id TEXT NOT NULL, pending INTEGER NOT NULL, PRIMARY KEY(turn_id,id));",
+                )
+                .map_err(sql_error)?;
+            while offset < source.source_end() {
+                let page = source
+                    .read_page(offset, deadline, || stopped())
+                    .map_err(source_error)?;
+                for entry in page.entries {
+                    check()?;
+                    if entry.id.is_empty() || entry.parent_id != previous_entry {
+                        return Err(SessionError::DurableTurn(
+                            "fork parent chain is invalid".into(),
+                        ));
+                    }
+                    connection
+                        .execute("INSERT INTO fork_entries(id) VALUES(?1)", [&entry.id])
+                        .map_err(sql_error)?;
+                    previous_entry = Some(entry.id.clone());
+                    let turn = entry.metadata.turn_id.as_deref().ok_or_else(|| {
+                        SessionError::DurableTurn("fork entry has no turn identity".into())
+                    })?;
+                    if entry.role == "assistant" {
+                        let mut remaining = entry.content.as_str();
+                        while let Some(start) = remaining.find("```json-tool") {
+                            check()?;
+                            let inner = &remaining[start + "```json-tool".len()..];
+                            let mut stream = serde_json::Deserializer::from_str(inner)
+                                .into_iter::<serde_json::Value>();
+                            let object = stream.next().and_then(Result::ok).ok_or_else(|| {
+                                SessionError::DurableTurn("fork tool block is malformed".into())
+                            })?;
+                            let call_id = object
+                                .get("id")
+                                .and_then(serde_json::Value::as_str)
+                                .filter(|id| !id.is_empty())
+                                .ok_or_else(|| {
+                                    SessionError::DurableTurn(
+                                        "fork tool identity is missing".into(),
+                                    )
+                                })?;
+                            if object
+                                .get("name")
+                                .and_then(serde_json::Value::as_str)
+                                .is_none_or(str::is_empty)
+                                || object.get("args").is_none()
+                            {
+                                return Err(SessionError::DurableTurn(
+                                    "fork tool block is incomplete".into(),
+                                ));
+                            }
+                            remaining = inner[stream.byte_offset()..]
+                                .trim_start()
+                                .strip_prefix("```")
+                                .ok_or_else(|| {
+                                    SessionError::DurableTurn("fork tool block is unclosed".into())
+                                })?;
+                            connection
+                                .execute(
+                                    "INSERT INTO fork_calls(turn_id,id,pending) VALUES(?1,?2,1)",
+                                    params![turn, call_id],
+                                )
+                                .map_err(sql_error)?;
+                        }
+                    } else if entry.role == "system"
+                        && (entry.content.starts_with("__OK__:")
+                            || entry.content.starts_with("__ERROR__:"))
+                    {
+                        let (_, call_id, _) = crate::jsonl::parse_tool_result(&entry.content);
+                        if connection
+                            .execute(
+                                "UPDATE fork_calls SET pending=0 WHERE turn_id=?1 AND id=?2 AND pending=1",
+                                params![turn, call_id],
+                            )
+                            .map_err(sql_error)?
+                            != 1
+                        {
+                            return Err(SessionError::DurableTurn(
+                                "fork tool result is unpaired".into(),
+                            ));
+                        }
+                    }
+                    if active_turn
+                        .as_deref()
+                        .is_some_and(|current| current != turn)
+                    {
+                        return Err(SessionError::DurableTurn(
+                            "fork contains an incomplete turn".into(),
+                        ));
+                    }
+                    if active_turn.is_none() {
+                        connection
+                            .execute("INSERT INTO fork_turns(id) VALUES(?1)", [turn])
+                            .map_err(sql_error)?;
+                    }
+                    active_turn = Some(turn.to_owned());
+                    if is_turn_transcript_outcome_content(&entry.content) {
+                        let pending: bool = connection
+                            .query_row(
+                                "SELECT EXISTS(SELECT 1 FROM fork_calls WHERE turn_id=?1 AND pending=1)",
+                                [turn],
+                                |row| row.get(0),
+                            )
+                            .map_err(sql_error)?;
+                        if pending {
+                            return Err(SessionError::DurableTurn(
+                                "fork contains an incomplete tool batch".into(),
+                            ));
+                        }
+                        let terminal = decode_turn_transcript_outcome(&entry.content)
+                            .filter(|terminal| terminal.version == 1 && terminal.turn_id == turn)
+                            .ok_or_else(|| {
+                                SessionError::DurableTurn("fork terminal is invalid".into())
+                            })?;
+                        let _ = terminal;
+                        crate::HistoryRecoveryReceipt::from_terminal_entry(&entry).ok_or_else(
+                            || SessionError::DurableTurn("fork receipt is invalid".into()),
+                        )?;
+                        active_turn = None;
+                    }
+                }
+                if page.next_offset <= offset {
+                    return Err(SessionError::DurableTurn(
+                        "fork scan made no progress".into(),
+                    ));
+                }
+                offset = page.next_offset;
+            }
+            if active_turn.is_some() {
+                return Err(SessionError::DurableTurn("fork tip is not terminal".into()));
+            }
+            seal.check_current().map_err(source_error)?;
+            let id = Uuid::new_v4();
+            let directory = self.file_path().parent().ok_or_else(|| {
+                SessionError::DurableTurn("fork storage directory missing".into())
+            })?;
+            let path = directory.join(format!("{id}.tlog"));
+            use std::os::unix::fs::OpenOptionsExt;
+            let lock_path = directory.join(format!("{id}.fork-lock"));
+            let fork_lock = fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&lock_path)?;
+            fork_lock
+                .try_lock()
+                .map_err(|_| SessionError::DurableTurn("fork lock unavailable".into()))?;
+            fork_lock.sync_all()?;
+            fs::File::open(directory)?.sync_all()?;
+            // Persist exact recovery ownership before creating any child bytes.
+            // Keep the lock inode even after success: unlink/recreation could
+            // let two processes hold different locks under the same name.
+            connection.execute("INSERT INTO durable_fork_intents(child_id,parent_id,external_id,version) VALUES(?1,?2,?3,1)",
+                params![id.to_string(), self.id().to_string(), external_id]).map_err(sql_error)?;
+            #[cfg(test)]
+            fork_crash_probe("intent");
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&path)?;
+            struct UnpublishedFile(std::path::PathBuf, bool);
+            impl Drop for UnpublishedFile {
+                fn drop(&mut self) {
+                    if !self.1 {
+                        let _ = fs::remove_file(&self.0);
+                    }
+                }
+            }
+            let mut unpublished = UnpublishedFile(path.clone(), false);
+            seal.copy_to_staging(&mut file, deadline, || stopped())
+                .map_err(source_error)?;
+            #[cfg(test)]
+            fork_crash_probe("copied");
+            file.sync_all()?;
+            fs::File::open(directory)?.sync_all()?;
+            #[cfg(test)]
+            fork_crash_probe("synced");
+            seal.check_current().map_err(source_error)?;
+
+            let tx = connection.unchecked_transaction().map_err(sql_error)?;
+            let parent: String = tx
+                .query_row(
+                    "SELECT session_id FROM durable_bindings WHERE external_id=?1",
+                    [&self.external_id],
+                    |row| row.get(0),
+                )
+                .map_err(sql_error)?;
+            if parent != self.id().to_string() {
+                return Err(SessionError::DurableTurn(
+                    "fork parent binding changed".into(),
+                ));
+            }
+            let intent_valid: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM durable_fork_intents WHERE child_id=?1 AND parent_id=?2 AND external_id=?3 AND version=1)",
+                params![id.to_string(), parent, external_id], |row| row.get(0)).map_err(sql_error)?;
+            if !intent_valid {
+                return Err(SessionError::DurableTurn(
+                    "fork publication intent changed".into(),
+                ));
+            }
+            // Publish only after the copied file is durable.
+            tx.execute(
+                "INSERT INTO durable_bindings(external_id,session_id) VALUES(?1,?2)",
+                params![external_id, id.to_string()],
+            )
+            .map_err(sql_error)?;
+            tx.execute("INSERT INTO durable_fork_lineage(child_id,parent_id,parent_branch,source_end) VALUES(?1,?2,?3,?4)",
+                params![id.to_string(), parent, source.branch_id(), i64::try_from(source.source_end()).map_err(|_| SessionError::DurableTurn("fork source exceeds SQLite range".into()))?]).map_err(sql_error)?;
+            check()?;
+            // A commit error can have an uncertain outcome. Preserve the file
+            // once commit is attempted; recovery must reconcile it with bindings.
+            seal.check_current().map_err(source_error)?;
+            unpublished.1 = true;
+            #[cfg(test)]
+            fork_crash_probe("precommit");
+            tx.commit().map_err(sql_error)?;
+            #[cfg(test)]
+            fork_crash_probe("published");
+            // Publication is already durable. Cleanup failure must not turn it
+            // into an apparent failed fork; a later recovery can retire intent.
+            let _ = connection.execute(
+                "DELETE FROM durable_fork_intents WHERE child_id=?1",
+                [id.to_string()],
+            );
+            let mut session = Session::with_store(
+                id,
+                "embedded".into(),
+                "embedded".into(),
+                path,
+                Arc::new(crate::CompactTextSessionStore),
+            );
+            bind_durable_root_branch(&mut session);
+            Ok(Self::new(
+                external_id.to_owned(),
+                session,
+                self.bindings_path.clone(),
+            ))
+        })
+    }
+
     /// Save completed initial-scan pages in host-owned bindings (ADR-096).
     /// Only scans issued by this exact handle are accepted. Search-cache records
     /// cannot be imported through this API. Unix only; other platforms reject.
@@ -1134,6 +1558,12 @@ fn open_bindings(path: &std::path::Path) -> Result<Connection, SessionError> {
          (external_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE); \
          CREATE TABLE IF NOT EXISTS durable_recovery_scans \
          (session_id TEXT PRIMARY KEY, payload TEXT NOT NULL); \
+         CREATE TABLE IF NOT EXISTS durable_fork_lineage \
+         (child_id TEXT PRIMARY KEY, parent_id TEXT NOT NULL, parent_branch TEXT NOT NULL, source_end INTEGER NOT NULL); \
+         CREATE TABLE IF NOT EXISTS durable_fork_intents \
+         (child_id TEXT PRIMARY KEY, parent_id TEXT NOT NULL, external_id TEXT NOT NULL, version INTEGER NOT NULL); \
+         CREATE TRIGGER IF NOT EXISTS durable_binding_lineage_cleanup AFTER DELETE ON durable_bindings \
+         BEGIN DELETE FROM durable_fork_lineage WHERE child_id=OLD.session_id; END; \
          CREATE TRIGGER IF NOT EXISTS durable_binding_scan_cleanup AFTER DELETE ON durable_bindings \
          BEGIN DELETE FROM durable_recovery_scans WHERE session_id=OLD.session_id; END;";
     const MAX_INIT_RETRIES: u32 = 20;
@@ -1186,6 +1616,14 @@ fn recovery_storage_boundary<T>(
             "recovery storage operation panicked".into(),
         ))
     })
+}
+
+#[cfg(test)]
+pub(crate) fn fork_crash_probe(phase: &str) {
+    if std::env::var("TALOS_TEST_FORK_CRASH_PHASE").as_deref() == Ok(phase) {
+        // Dedicated child fixture only; process::exit bypasses Rust Drop cleanup.
+        std::process::exit(42);
+    }
 }
 
 fn sql_error(error: rusqlite::Error) -> SessionError {
@@ -1347,6 +1785,568 @@ fn is_sensitive_key(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn fork_recovery_real_process_crash_boundaries() {
+        if let Some(root) = std::env::var_os("TALOS_TEST_FORK_CRASH_ROOT") {
+            let owner = super::DurableSession::open_existing(std::path::Path::new(&root), "parent")
+                .expect("open")
+                .expect("parent");
+            owner
+                .fork_committed_tip(
+                    "child",
+                    std::time::Instant::now() + std::time::Duration::from_secs(5),
+                    || false,
+                )
+                .expect("crash probe must exit first");
+            panic!("probe was not reached");
+        }
+        for phase in [
+            "intent",
+            "midcopy",
+            "copied",
+            "synced",
+            "precommit",
+            "published",
+        ] {
+            let root = tempfile::tempdir().expect("root");
+            let owner =
+                super::DurableSession::open_or_create(root.path(), "parent").expect("parent");
+            owner
+                .commit_turn(
+                    "seed",
+                    &[talos_core::message::Message::User {
+                        content: "original fact ".repeat(10_000),
+                    }],
+                    &Default::default(),
+                )
+                .expect("seed");
+            let original = std::fs::read(owner.file_path()).expect("parent bytes");
+            let mut child = std::process::Command::new(std::env::current_exe().expect("binary"))
+                .args([
+                    "--exact",
+                    "durable::tests::fork_recovery_real_process_crash_boundaries",
+                    "--nocapture",
+                ])
+                .env("TALOS_TEST_FORK_CRASH_ROOT", root.path())
+                .env("TALOS_TEST_FORK_CRASH_PHASE", phase)
+                .stdout(std::process::Stdio::null())
+                .spawn()
+                .expect("spawn");
+            let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            let status = loop {
+                if let Some(status) = child.try_wait().expect("status") {
+                    break status;
+                }
+                if std::time::Instant::now() >= until {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("crash child timeout");
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            };
+            assert_eq!(status.code(), Some(42), "phase {phase}");
+            let conn = rusqlite::Connection::open(root.path().join("durable-bindings.sqlite"))
+                .expect("db");
+            let id: String = conn
+                .query_row("SELECT child_id FROM durable_fork_intents", [], |r| {
+                    r.get(0)
+                })
+                .expect("persisted intent");
+            if phase == "midcopy" {
+                let length =
+                    std::fs::metadata(root.path().join("durable").join(format!("{id}.tlog")))
+                        .expect("partial metadata")
+                        .len();
+                assert!(length > 0 && length < original.len() as u64);
+            }
+            let report = owner
+                .recover_fork_intents(
+                    &crate::sqlite::RecoveryWorkBudget::new(std::time::Duration::from_secs(2)),
+                    None,
+                )
+                .expect("recover");
+            assert_eq!((report.1, report.2), (1, 0), "phase {phase}");
+            let reopened =
+                super::DurableSession::open_existing(root.path(), "child").expect("child lookup");
+            if phase == "published" {
+                assert_eq!(
+                    std::fs::read(reopened.expect("published child").file_path())
+                        .expect("child bytes"),
+                    original
+                );
+            } else {
+                assert!(reopened.is_none());
+                assert!(
+                    !root
+                        .path()
+                        .join("durable")
+                        .join(format!("{id}.tlog"))
+                        .exists()
+                );
+            }
+            assert_eq!(
+                std::fs::read(owner.file_path()).expect("parent unchanged"),
+                original
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fork_recovery_waits_for_independent_lock_owner_exit() {
+        if let Some(root) = std::env::var_os("TALOS_FORK_LOCK_TEST_ROOT") {
+            let directory = std::path::PathBuf::from(root);
+            let id = std::env::var("TALOS_FORK_LOCK_TEST_ID").expect("id");
+            let lock = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(directory.join("durable").join(format!("{id}.fork-lock")))
+                .expect("lock");
+            lock.try_lock().expect("hold");
+            std::fs::write(directory.join("ready"), b"ready").expect("ready");
+            loop {
+                std::thread::park_timeout(std::time::Duration::from_secs(1));
+            }
+        }
+        let root = tempfile::tempdir().expect("root");
+        let owner = super::DurableSession::open_or_create(root.path(), "parent").expect("owner");
+        let id = uuid::Uuid::new_v4();
+        let directory = root.path().join("durable");
+        std::fs::File::create(directory.join(format!("{id}.fork-lock"))).expect("lock");
+        let partial = directory.join(format!("{id}.tlog"));
+        std::fs::write(&partial, b"partial").expect("partial");
+        let conn =
+            rusqlite::Connection::open(root.path().join("durable-bindings.sqlite")).expect("db");
+        conn.execute(
+            "INSERT INTO durable_fork_intents VALUES(?1,?2,'child',1)",
+            rusqlite::params![id.to_string(), owner.id().to_string()],
+        )
+        .expect("intent");
+        struct Child(std::process::Child);
+        impl Drop for Child {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let mut child = Child(
+            std::process::Command::new(std::env::current_exe().expect("test binary"))
+                .args([
+                    "--exact",
+                    "durable::tests::fork_recovery_waits_for_independent_lock_owner_exit",
+                    "--nocapture",
+                ])
+                .env("TALOS_FORK_LOCK_TEST_ROOT", root.path())
+                .env("TALOS_FORK_LOCK_TEST_ID", id.to_string())
+                .stdout(std::process::Stdio::null())
+                .spawn()
+                .expect("child"),
+        );
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !root.path().join("ready").exists() {
+            assert!(std::time::Instant::now() < until, "child ready timeout");
+            assert!(
+                child.0.try_wait().expect("status").is_none(),
+                "child exited early"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let budget = crate::sqlite::RecoveryWorkBudget::new(std::time::Duration::from_secs(2));
+        assert_eq!(
+            owner
+                .recover_fork_intents(&budget, None)
+                .expect("active skipped")
+                .1,
+            0
+        );
+        assert!(partial.exists());
+        child.0.kill().expect("terminate lock owner");
+        child.0.wait().expect("reap owner");
+        assert_eq!(
+            owner
+                .recover_fork_intents(&budget, None)
+                .expect("recover after exit")
+                .1,
+            1
+        );
+        assert!(!partial.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fork_recovery_preserves_symlink_targets_and_keeps_failed_intents() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = super::DurableSession::open_or_create(root.path(), "parent").expect("owner");
+        let directory = root.path().join("durable");
+        let target = root.path().join("valuable");
+        std::fs::write(&target, b"preserve").expect("target");
+        let conn =
+            rusqlite::Connection::open(root.path().join("durable-bindings.sqlite")).expect("db");
+        for lock_symlink in [false, true] {
+            let id = uuid::Uuid::new_v4();
+            let lock_path = directory.join(format!("{id}.fork-lock"));
+            let child_path = directory.join(format!("{id}.tlog"));
+            if lock_symlink {
+                std::os::unix::fs::symlink(&target, &lock_path).expect("lock symlink");
+                std::fs::write(&child_path, b"partial").expect("partial");
+            } else {
+                std::fs::File::create(&lock_path).expect("lock");
+                std::os::unix::fs::symlink(&target, &child_path).expect("child symlink");
+            }
+            conn.execute(
+                "INSERT INTO durable_fork_intents VALUES(?1,?2,'child',1)",
+                rusqlite::params![id.to_string(), owner.id().to_string()],
+            )
+            .expect("intent");
+        }
+        let report = owner
+            .recover_fork_intents(
+                &crate::sqlite::RecoveryWorkBudget::new(std::time::Duration::from_secs(2)),
+                None,
+            )
+            .expect("report");
+        assert_eq!((report.0, report.1, report.2), (2, 0, 2));
+        assert_eq!(
+            std::fs::read(&target).expect("target retained"),
+            b"preserve"
+        );
+        let count: i64 = conn
+            .query_row("SELECT count(*) FROM durable_fork_intents", [], |r| {
+                r.get(0)
+            })
+            .expect("count");
+        assert_eq!(count, 2);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fork_recovery_pages_past_bad_records_and_preserves_published_child() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = super::DurableSession::open_or_create(root.path(), "parent").expect("owner");
+        let conn =
+            rusqlite::Connection::open(root.path().join("durable-bindings.sqlite")).expect("db");
+        for n in 1..=33 {
+            conn.execute(
+                "INSERT INTO durable_fork_intents VALUES(?1,?2,'unused',1)",
+                rusqlite::params![uuid::Uuid::from_u128(n).to_string(), owner.id().to_string()],
+            )
+            .expect("intent");
+        }
+        let last = uuid::Uuid::from_u128(33);
+        std::fs::File::create(
+            root.path()
+                .join("durable")
+                .join(format!("{last}.fork-lock")),
+        )
+        .expect("lock");
+        let budget = crate::sqlite::RecoveryWorkBudget::new(std::time::Duration::from_secs(2));
+        let first = owner
+            .recover_fork_intents(&budget, None)
+            .expect("first page");
+        assert_eq!((first.0, first.1, first.2), (32, 0, 32));
+        let second = owner
+            .recover_fork_intents(&budget, first.3.as_deref())
+            .expect("next page");
+        assert_eq!((second.0, second.1, second.2), (1, 1, 0));
+        let child = owner
+            .fork_committed_tip(
+                "published",
+                std::time::Instant::now() + std::time::Duration::from_secs(2),
+                || false,
+            )
+            .expect("fork");
+        let raw = std::fs::read(child.file_path()).expect("raw");
+        conn.execute(
+            "INSERT INTO durable_fork_intents VALUES(?1,?2,'published',1)",
+            rusqlite::params![child.id().to_string(), owner.id().to_string()],
+        )
+        .expect("simulate postcommit crash");
+        let page = owner
+            .recover_fork_intents(&budget, first.3.as_deref())
+            .expect("published recovery");
+        assert_eq!(page.1, 1);
+        assert_eq!(std::fs::read(child.file_path()).expect("preserved"), raw);
+        assert!(
+            super::DurableSession::open_existing(root.path(), "published")
+                .expect("open")
+                .is_some()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fork_recovery_skips_active_lock_and_retires_only_unpublished_intent() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = super::DurableSession::open_or_create(root.path(), "parent").expect("owner");
+        let id = uuid::Uuid::new_v4();
+        let directory = root.path().join("durable");
+        let lock = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(directory.join(format!("{id}.fork-lock")))
+            .expect("lock");
+        lock.try_lock().expect("hold lock");
+        let conn =
+            rusqlite::Connection::open(root.path().join("durable-bindings.sqlite")).expect("db");
+        conn.execute(
+            "INSERT INTO durable_fork_intents VALUES(?1,?2,'child',1)",
+            rusqlite::params![id.to_string(), owner.id().to_string()],
+        )
+        .expect("intent");
+        let partial = directory.join(format!("{id}.tlog"));
+        std::fs::write(&partial, b"partial").expect("partial");
+        let unrelated = directory.join(format!("{}.tlog", uuid::Uuid::new_v4()));
+        std::fs::write(&unrelated, b"unrelated").expect("unrelated");
+        let budget = crate::sqlite::RecoveryWorkBudget::new(std::time::Duration::from_secs(2));
+        assert_eq!(
+            owner
+                .recover_fork_intents(&budget, None)
+                .expect("active skipped")
+                .1,
+            0
+        );
+        assert!(partial.exists());
+        drop(lock);
+        assert_eq!(
+            owner
+                .recover_fork_intents(&budget, None)
+                .expect("recover")
+                .1,
+            1
+        );
+        assert!(!partial.exists());
+        assert!(unrelated.exists());
+        assert_eq!(
+            owner
+                .recover_fork_intents(&budget, None)
+                .expect("idempotent")
+                .1,
+            0
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn durable_fork_allows_reused_call_id_across_turns_and_refuses_malformed_blocks() {
+        use talos_core::message::{Message, MessageToolResult, ToolCall};
+        let root = tempfile::tempdir().expect("root");
+        let parent = super::DurableSession::open_or_create(root.path(), "parent").expect("parent");
+        for turn in ["one", "two"] {
+            parent
+                .commit_turn(
+                    turn,
+                    &[
+                        Message::Assistant {
+                            content: String::new(),
+                            reasoning: None,
+                            tool_calls: vec![ToolCall {
+                                id: "reused".into(),
+                                name: "read".into(),
+                                input: serde_json::json!({"literal": "```"}),
+                            }],
+                        },
+                        Message::Tool {
+                            result: MessageToolResult {
+                                tool_use_id: "reused".into(),
+                                content: "fact".into(),
+                                is_error: false,
+                            },
+                        },
+                    ],
+                    &Default::default(),
+                )
+                .expect("turn");
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        parent
+            .fork_committed_tip("valid", deadline, || false)
+            .expect("valid reused IDs and embedded fence");
+        for (i, bad) in [
+            "```json-tool invalid ```",
+            "```json-tool {\"name\":\"read\",\"args\":{}} ```",
+            "```json-tool {\"id\":\"x\",\"name\":\"read\",\"args\":{}}",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let owner = super::DurableSession::open_or_create(root.path(), &format!("bad-{i}"))
+                .expect("owner");
+            owner
+                .commit_turn(
+                    "turn",
+                    &[Message::Assistant {
+                        content: (*bad).into(),
+                        reasoning: None,
+                        tool_calls: vec![],
+                    }],
+                    &Default::default(),
+                )
+                .expect("store malformed fixture");
+            assert!(
+                owner
+                    .fork_committed_tip(&format!("child-{i}"), deadline, || false)
+                    .is_err()
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn durable_fork_rejects_duplicate_entries_and_reopened_turns() {
+        for duplicate_entry in [false, true] {
+            let root = tempfile::tempdir().expect("root");
+            let parent =
+                super::DurableSession::open_or_create(root.path(), "parent").expect("parent");
+            for turn in ["first", "second"] {
+                parent
+                    .commit_turn(
+                        turn,
+                        &[talos_core::message::Message::User {
+                            content: "fact".into(),
+                        }],
+                        &Default::default(),
+                    )
+                    .expect("commit");
+            }
+            let mut entries = parent.session.read_entries().expect("entries");
+            if duplicate_entry {
+                entries[2].id = entries[0].id.clone();
+                entries[3].parent_id = Some(entries[2].id.clone());
+            } else {
+                entries[2].metadata.turn_id = Some("first".into());
+                entries[3].metadata.turn_id = Some("first".into());
+                entries[3].content = crate::turn_outcome::encode_turn_transcript_outcome(
+                    &crate::TurnTranscriptOutcomeRecord::new(
+                        "first",
+                        crate::TurnTranscriptOutcome::Success,
+                    ),
+                )
+                .expect("terminal");
+            }
+            parent
+                .session
+                .store
+                .replace_entries_atomically(parent.file_path(), &entries)
+                .expect("alter fixture");
+            assert!(
+                parent
+                    .fork_committed_tip(
+                        "child",
+                        std::time::Instant::now() + std::time::Duration::from_secs(5),
+                        || false
+                    )
+                    .is_err()
+            );
+            assert!(
+                super::DurableSession::open_existing(root.path(), "child")
+                    .expect("lookup")
+                    .is_none()
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn durable_fork_refuses_terminal_with_unpaired_tool_call() {
+        let root = tempfile::tempdir().expect("root");
+        let parent = super::DurableSession::open_or_create(root.path(), "parent").expect("parent");
+        let call = talos_core::message::Message::Assistant {
+            content: String::new(),
+            reasoning: None,
+            tool_calls: vec![talos_core::message::ToolCall {
+                id: "call".into(),
+                name: "read".into(),
+                input: serde_json::json!({}),
+            }],
+        };
+        parent
+            .commit_turn("turn", &[call], &Default::default())
+            .expect("persist");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        assert!(
+            parent
+                .fork_committed_tip("bad", deadline, || false)
+                .is_err()
+        );
+        assert!(
+            super::DurableSession::open_existing(root.path(), "bad")
+                .expect("lookup")
+                .is_none()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn durable_fork_reopens_ancestor_without_parent_or_sibling_suffix() {
+        let root = tempfile::tempdir().expect("root");
+        let parent = super::DurableSession::open_or_create(root.path(), "parent").expect("parent");
+        let message = |text: &str| talos_core::message::Message::User {
+            content: text.into(),
+        };
+        parent
+            .commit_turn("ancestor", &[message("shared fact")], &Default::default())
+            .expect("seed");
+        let bytes = std::fs::read(parent.file_path()).expect("raw");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let child = parent
+            .fork_committed_tip("child", deadline, || false)
+            .expect("fork");
+        let sibling = parent
+            .fork_committed_tip("sibling", deadline, || false)
+            .expect("sibling");
+        assert_ne!(parent.id(), child.id());
+        assert_eq!(std::fs::read(child.file_path()).expect("child raw"), bytes);
+        assert!(
+            parent
+                .fork_committed_tip("child", deadline, || false)
+                .is_err()
+        );
+        assert!(
+            parent
+                .fork_committed_tip("cancelled", deadline, || true)
+                .is_err()
+        );
+        assert!(
+            super::DurableSession::open_existing(root.path(), "cancelled")
+                .expect("lookup")
+                .is_none()
+        );
+        parent
+            .commit_turn(
+                "parent-later",
+                &[message("parent secret")],
+                &Default::default(),
+            )
+            .expect("parent append");
+        sibling
+            .commit_turn(
+                "sibling-later",
+                &[message("sibling secret")],
+                &Default::default(),
+            )
+            .expect("sibling append");
+        child
+            .commit_turn("child-later", &[message("child fact")], &Default::default())
+            .expect("child append");
+        drop(child);
+        let reopened = super::DurableSession::open_existing(root.path(), "child")
+            .expect("reopen")
+            .expect("child");
+        assert_eq!(
+            reopened.read_messages().expect("messages"),
+            vec![message("shared fact"), message("child fact")]
+        );
+        assert!(
+            std::fs::read(parent.file_path())
+                .expect("parent raw")
+                .starts_with(&bytes)
+        );
+        let foreign_source = parent.capture_recovery_source().expect("parent source");
+        assert!(!reopened.owns_recovery_source(&foreign_source));
+    }
+
     #[cfg(unix)]
     #[test]
     fn busy_scan_cleanup_keeps_receipt_valid_for_retry() {
