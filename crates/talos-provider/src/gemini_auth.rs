@@ -778,10 +778,16 @@ mod refresh_tests {
                 .await
                 .expect("response headers");
             entered_tx.send(()).expect("notify");
-            tokio::time::timeout(Duration::from_secs(2), socket.read(&mut byte))
+            let closed = tokio::time::timeout(Duration::from_secs(2), socket.read(&mut byte))
                 .await
-                .expect("connection closed")
-                .expect("EOF")
+                .expect("connection closed");
+            // Cancellation may close cleanly or reset while response headers are in flight.
+            // Both prove the request-owned exchange ended; other errors/data must fail.
+            match closed {
+                Ok(0) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {}
+                other => panic!("expected closed refresh connection, got {other:?}"),
+            }
         });
         let mut refresh = Box::pin(auth.token(deadline()));
         tokio::select! {
@@ -790,7 +796,7 @@ mod refresh_tests {
         }
         drop(refresh);
         assert!(auth.cache.try_lock().is_ok());
-        assert_eq!(server.await.expect("server"), 0);
+        server.await.expect("server");
         assert!(auth.cache.lock().await.is_none());
     }
 
