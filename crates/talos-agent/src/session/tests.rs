@@ -5626,7 +5626,14 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             .expect("restart submit");
         let events = tokio::time::timeout(
             Duration::from_secs(10),
-            collect_until_completions(&mut restarted_handle.eq_rx, 1),
+            // Recovery may bind multiple disk pages without emitting an event.
+            // Keep the outer ten-second total bound rather than imposing the
+            // ordinary helper's shorter two-second idle bound on native CI.
+            collect_until_completions_with_idle_timeout(
+                &mut restarted_handle.eq_rx,
+                1,
+                Duration::from_secs(10),
+            ),
         )
         .await
         .expect("restart deadline");
