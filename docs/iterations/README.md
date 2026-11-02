@@ -95,7 +95,7 @@ after exact-head CI, independent security/API review and CAS.
 is Review/Claimed after diagnostic #716 mergedb5b8241e. CI3221 all6jobs pass; TEST004/I305 closes
 only known-resource acceptance. Prior cold73→76, static mechanism candidates and unknown/native
 lifetime remain an OPEN#717 residual.
-I294/I300 remain Active; I277 retains Review, I249 Planned and I164 Paused.
+I294 and I300 are Complete / Closed; I277 retains Review, I249 Planned and I164 Paused.
 I301 bounded startup closeout is recorded below.
 I302 records the full inventory/non-overlap and workspace-recovery receipts; separate I302 commits
 in #716 do not close original global-resource questions or authorize Search activation.
@@ -106,9 +106,9 @@ finished green, including Windows Desktop rerun job `124783776313` and dependent
 workspace job `124784491542`; all other applicable jobs succeeded. Independent exact-head review
 comment `6554584202` found no remaining security, API or #814 parity blocker. The final CAS
 comparison was 7 ahead / 0 behind pre-merge `main` at `8b11e5f49794ea17f09c96eff8d59a6bf8f9a3d6`.
-The owner preserves the historical stage records. SEARCH-001-D / #644 remains OPEN for
-research/admission only; #808/#814 establish no provider permission, legal authorization or
-native-provider admission.
+The owner preserves the historical stage records. SEARCH-001-D / #644 is Complete / Closed with
+BLOCKED / ZERO-ADMISSION at #831; no provider was admitted, so SEARCH-001-E/F remain unauthorized.
+#808/#814 establish no provider permission or legal authorization.
 
 [I301](I301-missing-pending-sidecar-startup.md) / RUNTIME-010 is Complete / Closed.
 #711 implementation `98fa04cb` merged `9cad344b` after CI3161/review/CAS; post-merge startup
