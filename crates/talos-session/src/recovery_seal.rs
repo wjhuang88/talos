@@ -10,6 +10,7 @@ pub struct RecoveryPrefixScan {
     source: DurableRecoverySource,
     stamp: crate::recovery_stamp::FileStamp,
     offset: u64,
+    pending_page: Vec<u8>,
     digest: [u8; 32],
     expected: Option<[u8; 32]>,
 }
@@ -64,6 +65,7 @@ impl DurableRecoverySource {
             source: self.clone(),
             stamp: self.recovery_metadata()?,
             offset: 0,
+            pending_page: Vec::new(),
             digest: [0; 32],
             expected: None,
         })
@@ -139,10 +141,13 @@ impl RecoveryPrefixSeal {
 }
 
 impl RecoveryPrefixScan {
-    /// Read at most 2 MiB of raw bytes, extending a constant-size rolling digest.
-    /// Verification compares the digest only at completion, never certifies a page.
-    /// Cancellation, deadline, or concurrent source changes do not advance state.
-    /// A failed scan should be discarded; restart against a stable source.
+    /// Read at most 64 KiB, retaining at most one 2 MiB page between steps.
+    /// Completed pages extend the version-one rolling digest. Verification
+    /// compares the digest only at completion, never certifies a partial page.
+    /// Cancellation/deadline do not advance the committed offset or digest;
+    /// a verified pending page may already have grown before the final check.
+    /// Source changes require discarding the scan. A host may resume a deadline
+    /// interruption, but must discard an operation it has cancelled.
     pub fn step(
         &mut self,
         deadline: Instant,
@@ -155,19 +160,35 @@ impl RecoveryPrefixScan {
         if self.offset == self.source.source_end() {
             return Ok(true);
         }
+        // Preserve verified sub-page reads across cooperative budget exhaustion,
+        // while retaining the existing fixed-page digest format.
+        let page_end = self.source.source_end().min(
+            self.offset
+                .saturating_add(crate::history_page::HISTORY_PAGE_BYTES as u64),
+        );
+        let read_offset = self.offset + self.pending_page.len() as u64;
+        let read_end = page_end.min(read_offset.saturating_add(64 * 1024));
         let bytes = self.source.read_recovery_bytes(
-            self.offset,
-            self.source.source_end(),
+            read_offset,
+            read_end,
             &self.stamp,
             deadline,
             &stopped,
         )?;
-        let next_offset = self.offset + bytes.len() as u64;
+        self.check_stamp()?;
+        if stopped() || Instant::now() >= deadline {
+            return Err(HistoryPageError::Stopped);
+        }
+        self.pending_page.extend_from_slice(&bytes);
+        if read_end < page_end {
+            return Ok(false);
+        }
+        let next_offset = page_end;
         let mut hash = Sha256::new();
         hash.update(self.digest);
         hash.update(self.offset.to_le_bytes());
         hash.update(next_offset.to_le_bytes());
-        hash.update(bytes);
+        hash.update(&self.pending_page);
         let digest: [u8; 32] = hash.finalize().into();
         let complete = next_offset == self.source.source_end();
         if complete && self.expected.is_some_and(|expected| expected != digest) {
@@ -179,6 +200,7 @@ impl RecoveryPrefixScan {
         }
         self.digest = digest;
         self.offset = next_offset;
+        self.pending_page.clear();
         Ok(complete)
     }
 
@@ -250,6 +272,113 @@ mod tests {
     use crate::{DurableSession, PersistencePolicy, TurnTranscriptOutcome};
     use std::time::Duration;
     use talos_core::message::Message;
+
+    #[test]
+    fn interruption_after_full_page_hash_retries_without_duplicating_bytes() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "final-check").expect("session");
+        session
+            .commit_turn(
+                "seed",
+                &[Message::User {
+                    content: "small fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let source = session.capture_recovery_source().expect("source");
+        assert!(source.source_end() < 8192);
+        let mut scan = source.begin_prefix_seal().expect("scan");
+        let checks = std::cell::Cell::new(0);
+        let stopped = || {
+            let next = checks.get() + 1;
+            checks.set(next);
+            next == 5
+        };
+        assert!(matches!(
+            scan.step(Instant::now() + Duration::from_secs(2), stopped),
+            Err(HistoryPageError::Stopped)
+        ));
+        assert_eq!(checks.get(), 5, "stop at post-hash commit check");
+        assert_eq!(scan.offset, 0);
+        assert_eq!(scan.digest, [0; 32]);
+        assert_eq!(scan.pending_page.len() as u64, source.source_end());
+        assert!(
+            scan.step(Instant::now() + Duration::from_secs(2), || false)
+                .expect("retry")
+        );
+        assert!(scan.pending_page.is_empty());
+        let actual = scan.finish().expect("retried seal");
+        let mut uninterrupted = source.begin_prefix_seal().expect("fresh scan");
+        assert!(
+            uninterrupted
+                .step(Instant::now() + Duration::from_secs(2), || false)
+                .expect("fresh step")
+        );
+        assert_eq!(
+            actual.digest,
+            uninterrupted.finish().expect("fresh seal").digest
+        );
+    }
+
+    #[test]
+    fn subpage_progress_survives_expiry_and_preserves_version_one_digest() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "subpage").expect("session");
+        session
+            .commit_turn(
+                "seed",
+                &[Message::User {
+                    content: "fact ".repeat(600_000),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let source = session.capture_recovery_source().expect("source");
+        let bytes = std::fs::read(session.file_path()).expect("original bytes");
+        let mut expected = [0u8; 32];
+        let mut offset = 0u64;
+        for page in bytes.chunks(crate::history_page::HISTORY_PAGE_BYTES) {
+            let end = offset + page.len() as u64;
+            let mut hash = Sha256::new();
+            hash.update(expected);
+            hash.update(offset.to_le_bytes());
+            hash.update(end.to_le_bytes());
+            hash.update(page);
+            expected = hash.finalize().into();
+            offset = end;
+        }
+        let mut scan = source.begin_prefix_seal().expect("scan");
+        let mut steps = 0;
+        loop {
+            let complete = scan
+                .step(Instant::now() + Duration::from_secs(2), || false)
+                .expect("bounded step");
+            steps += 1;
+            assert!(scan.pending_page.len() <= crate::history_page::HISTORY_PAGE_BYTES);
+            if complete {
+                break;
+            }
+            let progress = (scan.offset, scan.pending_page.len(), scan.digest);
+            assert!(matches!(
+                scan.step(Instant::now(), || false),
+                Err(HistoryPageError::Stopped)
+            ));
+            assert_eq!(
+                (scan.offset, scan.pending_page.len(), scan.digest),
+                progress,
+                "expiry must preserve prior verified sub-page progress"
+            );
+        }
+        assert!(
+            steps > 32,
+            "multiple original pages split into bounded reads"
+        );
+        assert_eq!(
+            scan.finish().expect("complete seal").expectation().digest,
+            expected
+        );
+    }
 
     #[test]
     fn persisted_expectation_requires_full_reopened_source_verification() {

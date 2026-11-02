@@ -1622,3 +1622,26 @@ Affected all-target warnings-denied Clippy passes
 approves the subprocess fixture, including distinct PID, exact test selection,
 completion marker, dedicated call IDs and bounded child lifetime; reviewer did
 not execute tests. This remains incremental evidence, not whole-I313 approval.
+
+### Initial sealing sub-page progress — local, uncommitted
+
+Initial scan now reads at most 64 KiB per step and retains at most one 2 MiB
+pending page. Only completed original-sized pages update the rolling digest;
+version-one expectation bytes remain unchanged. Previously a deadline during a
+2 MiB read discarded the entire page, allowing repeated short budgets to stall.
+The new regression interposes expiry between each successful chunk, asserts
+retained progress and memory bounds, and compares the final digest against the
+original full-page algorithm over a source larger than one page. Four seal tests
+pass (`/private/tmp/i313-seal-subpage.log`); host preparation tests and static review
+are pending. This fixes in-memory sub-page progress only, not persistent initial
+verification across process restart or Windows lease release. Those remain open.
+
+Sub-page follow-up: clarified that a final interruption may retain pending bytes
+but never advances committed offset/digest. Added a deterministic stopped-check
+regression at the post-hash boundary with a complete pending page; retry performs
+no duplicate append and produces exactly the uninterrupted digest. Five seal tests
+pass (`/private/tmp/i313-seal-subpage-final.log`); thirteen Agent host-preparation
+tests pass (`/private/tmp/i313-subpage-agent.log`). Independent static review
+approves the page-size/digest/lifetime increment, not persistent restart support.
+The new post-hash test uses the shared stopped-check branch rather than a wall-clock
+sleep and does not claim a hard real-time filesystem deadline.
