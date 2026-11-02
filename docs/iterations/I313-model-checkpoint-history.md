@@ -2758,3 +2758,15 @@ reviewer did not run tests. Startup commands still queue, so user cancellation
 during preparation is not yet connected. Windows now depends on the unmerged
 source-authority candidate and requires exact-head native recovery verification.
 CLI migration, remaining synchronous preparation and full T5 gates remain open.
+
+### External provider observes recovered context
+
+The independent SDK reopened provider now asserts the actual request contains the
+original user turn, its persisted assistant answer and the new continuation in
+that order, with the original user present exactly once. Both external fixture
+modes pass (`/private/tmp/i313-sdk-recovered-context.log`). This supersedes the
+earlier fixture limitation about not inspecting provider context; it does not
+extend that small deterministic scenario to large-history or platform coverage.
+Independent static review approves diff
+`caf9b1280d9168b6ed4c9eb0d1d0dc11fda97246b52699fd038dbd38a7663048`;
+reviewer did not execute tests.

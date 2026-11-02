@@ -180,6 +180,29 @@ fn verify_compact_outcome_contract() -> Result<()> {
 }
 
 async fn run_durable_session() -> Result<()> {
+    struct RecoveredContextProvider(MockProvider);
+    #[async_trait]
+    impl LanguageModel for RecoveredContextProvider {
+        async fn stream(
+            &self,
+            messages: &[talos_runtime::Message],
+        ) -> talos_runtime::ProviderResult<talos_runtime::Receiver<talos_runtime::AgentEvent>> {
+            use talos_runtime::Message;
+            let original_user = messages.iter().position(|m| matches!(m,
+                Message::User { content } if content == "persist this fixture turn"))
+                .expect("original user turn reaches reopened provider");
+            let original_answer = messages.iter().position(|m| matches!(m,
+                Message::Assistant { content, .. } if content == "durable fixture turn"))
+                .expect("original assistant answer reaches reopened provider");
+            let continuation = messages.iter().position(|m| matches!(m,
+                Message::User { content } if content == "continue after reopen"))
+                .expect("new continuation reaches provider");
+            assert!(original_user < original_answer && original_answer < continuation);
+            assert_eq!(messages.iter().filter(|m| matches!(m,
+                Message::User { content } if content == "persist this fixture turn")).count(), 1);
+            self.0.stream(messages).await
+        }
+    }
     let directory = tempfile::tempdir()?;
     let manager = SessionManager::with_dir(directory.path().to_path_buf());
     let session = manager.create_or_open_session("fixture:durable")?;
@@ -201,7 +224,7 @@ async fn run_durable_session() -> Result<()> {
     let messages = reopened.read_messages()?;
     assert!(serde_json::to_string(&messages)?.contains("durable fixture turn"));
     let mut resumed = RuntimeBuilder::new()
-        .provider(provider("resumed durable fixture"))
+        .provider(Arc::new(RecoveredContextProvider(MockProvider::new().with_response("resumed durable fixture"))))
         .durable_session(reopened)
         .build_async()
         .await?;
