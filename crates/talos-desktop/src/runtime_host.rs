@@ -1236,7 +1236,7 @@ impl RuntimeHost {
                                 Some(session) => builder.durable_session(session),
                                 None => builder,
                             };
-                            match builder.build() {
+                            match builder.build_async().await {
                                 Ok(handle) => {
                                     run_host(
                                         command_rx,

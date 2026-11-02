@@ -2743,3 +2743,18 @@ reviewer did not execute tests. This fixture does not inspect the second provide
 received context, so its evidence is reopening/persistence rather than recovered
 model-context content. All-target Runtime Clippy passes
 (`/private/tmp/i313-async-sdk-clippy.log`).
+
+### Desktop product startup adopts asynchronous preparation
+
+The real Desktop host executor now awaits build_async before handing ownership
+to run_host. Success/error routing remains unchanged; durable preparation failure
+terminates startup without synchronous fallback. The desktop-ui binary test for
+configured persistence, shutdown, reopen and HistoryRestored passes
+(`/private/tmp/i313-desktop-async-native.log`). Initial --lib invocation failed
+because Desktop has no library target; the successful command uses the actual
+talos-desktop-mock binary with desktop-ui enabled. Independent static review
+approves diff `ba9681688c623ccb49fd1734e770faafa24e8ea85e879d29a20e22e0944adcb2`;
+reviewer did not run tests. Startup commands still queue, so user cancellation
+during preparation is not yet connected. Windows now depends on the unmerged
+source-authority candidate and requires exact-head native recovery verification.
+CLI migration, remaining synchronous preparation and full T5 gates remain open.
