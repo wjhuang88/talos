@@ -2,7 +2,7 @@
 use super::*;
 use async_trait::async_trait;
 use serde_json::{Value, json};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use talos_core::message::{AgentEvent, Message, StopReason};
 use talos_core::provider::{LanguageModel, ProviderResult};
@@ -88,7 +88,8 @@ fn result(messages: &[Message], id: &str) -> Value {
     serde_json::from_str(&result.content).expect("JSON result")
 }
 struct CodingModel {
-    rejected_probe: AtomicBool,
+    rejected_probe: AtomicUsize,
+    installed_a: std::sync::Mutex<Option<String>>,
     step: AtomicUsize,
     recovering: bool,
 }
@@ -97,16 +98,22 @@ impl LanguageModel for CodingModel {
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let step = self.step.fetch_add(1, Ordering::SeqCst);
         let events = if !self.recovering
-            && step == 1
-            && !self.rejected_probe.swap(true, Ordering::SeqCst)
+            && matches!(step, 1 | 3)
+            && self.rejected_probe.load(Ordering::SeqCst) < step
         {
-            self.step.store(1, Ordering::SeqCst);
+            self.step.store(step, Ordering::SeqCst);
+            self.rejected_probe.store(step, Ordering::SeqCst);
+            let discovery = result(messages, &format!("discover-{}", step - 1));
+            let item = |text: &str| json!({"text":text,"sources":[discovery["sources"][0]]});
             call(
-                "oversized",
+                &format!("oversized-{step}"),
                 "compact_context",
                 json!({
-                    "snapshot":result(messages,"discover-0")["snapshot"],
-                    "checkpoint":{"summary":"x".repeat(40 * 1024)}
+                    "snapshot":discovery["snapshot"],
+                    "checkpoint":{"schema_version":1,"summary":item(&"x".repeat(40 * 1024)),
+                        "goal":item("repair addition"),"next_step":item("verify addition"),
+                        "completed":[],"open_loops":[],"assumptions":[],"facts":[],
+                        "constraints":[],"in_progress":[],"pending":[],"decisions":[],"resources":[] }
                 }),
             )
         } else if self.recovering {
@@ -161,6 +168,18 @@ impl LanguageModel for CodingModel {
                 0 | 2 => {
                     if step == 2 {
                         assert_eq!(result(messages, "compact-1")["status"], "Admitted");
+                        let installed = messages
+                            .iter()
+                            .find_map(|message| match message {
+                                Message::Context { content }
+                                    if content.starts_with("[Derived checkpoint;") =>
+                                {
+                                    Some(content.clone())
+                                }
+                                _ => None,
+                            })
+                            .expect("installed A");
+                        *self.installed_a.lock().expect("projection") = Some(installed);
                     }
                     call(
                         &format!("discover-{step}"),
@@ -169,11 +188,13 @@ impl LanguageModel for CodingModel {
                     )
                 }
                 1 | 3 => {
-                    if step == 1 {
+                    {
                         let refusal = messages
                             .iter()
                             .find_map(|message| match message {
-                                Message::Tool { result } if result.tool_use_id == "oversized" => {
+                                Message::Tool { result }
+                                    if result.tool_use_id == format!("oversized-{step}") =>
+                                {
                                     Some(result)
                                 }
                                 _ => None,
@@ -185,13 +206,19 @@ impl LanguageModel for CodingModel {
                                 .content
                                 .contains("checkpoint payload exceeds byte limit")
                         );
-                        assert!(!messages.iter().any(|message| matches!(message, Message::Context { content } if content.starts_with("[Derived checkpoint;"))), "refusal must not install a projection");
-                        assert!(
-                            serde_json::to_string(messages)
-                                .expect("request")
-                                .contains("codingfact repaired"),
-                            "original source survives rejected input"
-                        );
+                        if step == 1 {
+                            assert!(!messages.iter().any(|message| matches!(message, Message::Context { content } if content.starts_with("[Derived checkpoint;"))), "refusal must not install a projection");
+                            assert!(
+                                serde_json::to_string(messages)
+                                    .expect("request")
+                                    .contains("codingfact repaired"),
+                                "original source survives rejected input"
+                            );
+                        } else {
+                            assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.contains("coding checkpoint A"))), "oversized replacement retains installed A");
+                            let installed = self.installed_a.lock().expect("projection");
+                            assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if Some(content) == installed.as_ref())), "refusal preserves A byte-for-byte");
+                        }
                     }
                     if step == 3 {
                         assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.contains("coding checkpoint A"))));
@@ -318,7 +345,8 @@ async fn runtime_coding_artifact_survives_two_checkpoints_and_fork_recovery() {
     let raw = std::fs::read(session.file_path()).expect("raw");
     let mut runtime = RuntimeBuilder::new()
         .provider(Arc::new(CodingModel {
-            rejected_probe: AtomicBool::new(false),
+            rejected_probe: AtomicUsize::new(0),
+            installed_a: std::sync::Mutex::new(None),
             step: AtomicUsize::new(0),
             recovering: false,
         }))
@@ -382,7 +410,8 @@ async fn runtime_coding_artifact_survives_two_checkpoints_and_fork_recovery() {
     );
     let verifies = Arc::new(AtomicUsize::new(0));
     let recovery_model = Arc::new(CodingModel {
-        rejected_probe: AtomicBool::new(false),
+        rejected_probe: AtomicUsize::new(0),
+        installed_a: std::sync::Mutex::new(None),
         step: AtomicUsize::new(0),
         recovering: true,
     });

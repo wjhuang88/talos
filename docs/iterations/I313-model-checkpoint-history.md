@@ -2,6 +2,29 @@
 
 
 
+## Installed checkpoint rejection preservation — local increment, 2026-11-02
+
+The Runtime rejection probe now uses complete checkpoint-shaped fields and source
+items with an oversized summary, before A and again between A and B. Both return
+the ingress byte-limit error; valid A/B still use the issued snapshots and yield
+exactly two Applied terminals. The first run passed
+(`/private/tmp/i313-installed-rejection.log`). A follow-up captures A's rendered
+Context before the second refusal and requires the same bytes afterward; this
+covers installed checkpoint text, not equality of the entire evolving request.
+Final focused test (11.37 s) and Clippy passed at
+`/private/tmp/i313-installed-rejection-exact.log` and
+`/private/tmp/i313-installed-rejection-clippy.log`. Independent review approved the
+pre-byte-equality delta `c73d7da86735a7d07aaa8cbcc7f423ab505b2d9e1211bb677bb7e8c408e1b9ec`
+without running builds. This remains ingress byte validation, not low-reclamation
+or every schema/failure/cancellation branch. Windows production and full T5
+acceptance remain open; T1/T6 remain unimplemented.
+
+Final static review approves source diff
+`1f0c0dbe93a3b5222394a5756fd69c23ce172f79f7cbe49332d525d4cf9ced00`
+for local commit, without executing builds. Standard accumulated composition-stage
+preflight is running (`/private/tmp/i313-composition-stage-preflight.log`); previous
+published-head checks do not certify this local increment.
+
 ## Registered oversized checkpoint refusal — local increment, 2026-11-02
 
 The Runtime coding fixture now first submits a 40 KiB compact_context payload

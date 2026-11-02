@@ -1,3 +1,12 @@
+## T5 installed checkpoint refusal preservation — 2026-11-02
+
+Local Runtime test now rejects complete-shaped oversized payloads before A and
+between A/B; first run passed. Exact rendered-A preservation assertion, Clippy and incremental review
+passed. Accumulated standard preflight is running at
+`/private/tmp/i313-composition-stage-preflight.log`. Published Windows CI41418548863 is in workspace tests;
+production Windows scan persistence remains disabled. Full queue unchanged;
+T5 Partial, T1/T6 unimplemented.
+
 ## T5 registered oversize refusal — 2026-11-02
 
 Runtime coding regression now proves a real oversized compact_context call is
