@@ -275,7 +275,11 @@ impl AppServerSession {
         self.session_id = session_id;
         self.background_jobs
             .set_identity(self.session_id.clone(), self.session_generation);
-        self.durable_persistence = Some(DurableTurnPersistence { session, policy });
+        self.durable_persistence = Some(DurableTurnPersistence {
+            session,
+            policy,
+            recovery_preparation: Arc::new(tokio::sync::Mutex::new(None)),
+        });
     }
 
     /// Bind recovered messages to entries in the configured durable session.

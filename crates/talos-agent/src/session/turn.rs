@@ -23,6 +23,8 @@ pub(super) struct TurnPersistence {
 pub(super) struct DurableTurnPersistence {
     pub(super) session: talos_session::DurableSession,
     pub(super) policy: talos_session::PersistencePolicy,
+    pub(super) recovery_preparation:
+        Arc<tokio::sync::Mutex<Option<crate::checkpoint_history::Preparation>>>,
 }
 
 pub(super) struct TurnRecord {
@@ -179,12 +181,17 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         .sandbox
         .as_ref()
         .and_then(|sandbox| sandbox.cleanup_receipt());
-    let history_owner = durable_persistence.as_ref().map(|p| p.session.clone());
+    let history_owner = durable_persistence.clone();
     let history_cancel = cancel_token.clone();
     let mut agent_task = tokio::spawn(async move {
         let recovery = if agent.tools.is_builtin_instance("history_search") {
             if let Some(owner) = &history_owner {
-                crate::checkpoint_history::History::prepare(owner, &history_cancel).await
+                crate::checkpoint_history::History::prepare_cached(
+                    &owner.session,
+                    &history_cancel,
+                    &owner.recovery_preparation,
+                )
+                .await
             } else {
                 None
             }

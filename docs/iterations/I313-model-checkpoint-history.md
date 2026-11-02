@@ -1195,3 +1195,52 @@ Reproducer: `python3 scripts/test_checkpoint_history_cli.py`; evidence:
 error wording; the corrected assertion checks the actual legacy-path error.
 This certifies discovery/refusal/continuation, not successful CLI durable search
 or model checkpoint installation. No paid calls were made.
+
+### Actor-retained preparation progress — local, unmerged
+
+Preparation now separates bounded steps from orchestration. DurableTurnPersistence
+owns a shared pending preparation slot across Actor turns; the ten-second loop
+retains completed-page cursor/parent and prefix scan state instead of always
+starting a new scope. Each step has a two-second work budget; a step error or
+cancellation discards pending authority. Parent state advances only after the
+SQLite page commits. Queries still require a completed source seal.
+
+Five focused tests pass (`/private/tmp/i313-resume-preparation.log`), including a
+real >2 MiB preparation resumed after one committed page and rejection after a
+source-version change. This is in-process retained progress only: normal appended
+turns still require safe prefix revalidation, process restart recovery is absent,
+and a timeout inside a step currently discards progress. Those remain acceptance
+gaps, not delivered resumable-host completion. Independent review requested.
+
+Preparation review correction: the operation deadline now starts before mutex
+acquisition/initialization; lock waiting observes cancellation and timeout. Each
+step's cooperative work deadline is capped by the remaining operation allowance.
+Expired initialization is refused. The actual expired-operation path retains a
+pending scope and the regression then resumes it successfully. Five focused tests
+pass (`/private/tmp/i313-preparation-deadline.log`). Synchronous OS I/O is still
+not hard-real-time bounded. The previous review requested changes on these bounds;
+re-review is pending. Step-internal timeout classification and normal appended
+turn/restart continuation remain unimplemented.
+
+Revised preparation received independent static approval for stable-file,
+in-process retained progress only; reviewer did not run tests. Agent 618/618
+passed before the deadline correction, and corrected all-target warnings-denied
+Clippy passes (`/private/tmp/i313-preparation-final-clippy.log`). Added a contention
+regression: expired and cancelled waiters cannot consume pending work while its
+mutex is held; releasing it permits the same scope to finish. Current focused
+validation: `/private/tmp/i313-preparation-waiters.log`.
+
+Source-step timeout refinement: typed HistoryPageError::Stopped from original-page
+reads or prefix scanning now retains pending progress only when cancellation is
+not active. Corruption/staleness and database failures still discard it. Seven
+focused tests pass (`/private/tmp/i313-preparation-source-timeout.log`), including
+actual expired seal scanning, cancelled refusal and successful unchanged-state
+retry. This supersedes the all-step-timeouts-discard limitation only for source
+reads/seal scanning; SQLite timeout, appended source and process restart remain
+open. Independent review requested for this refinement.
+
+Final retained-preparation Agent 620/620 passes
+(`/private/tmp/i313-preparation-final-agent.log`); independent static review
+approves source/seal timeout retention without certifying SQLite timeout, append
+or restart continuation. Reviewer did not run tests. The source/seal refinement
+above is the current boundary and supersedes earlier all-step-discard wording.

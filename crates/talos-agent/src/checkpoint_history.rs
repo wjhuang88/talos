@@ -56,46 +56,101 @@ impl QueryState {
     }
 }
 
-tokio::task_local! {
-    pub(crate) static HISTORY: Option<History>;
+/// Host-owned progress; no partial state authorizes query results.
+pub(crate) struct Preparation {
+    source: talos_session::DurableRecoverySource,
+    scan: talos_session::RecoveryPrefixScan,
+    path: std::path::PathBuf,
+    scope: String,
+    parent: Option<String>,
+    resolved: bool,
 }
-impl History {
-    /// Host maintenance runs before provider/tool execution, never inside a query.
-    pub(crate) async fn prepare(
+#[derive(Debug, PartialEq, Eq)]
+enum PreparationStep {
+    Pending,
+    Complete,
+    Expired,
+}
+
+impl Preparation {
+    fn begin(
         session: &DurableSession,
         cancel: &CancellationToken,
+        deadline: Instant,
     ) -> Option<Self> {
+        if cancel.is_cancelled() || Instant::now() >= deadline {
+            return None;
+        }
         let source = session.capture_recovery_source().ok()?;
         if !session.owns_recovery_source(&source) {
             return None;
         }
-        let mut scan = source.begin_prefix_seal().ok()?;
+        let scan = source.begin_prefix_seal().ok()?;
         let path = session.recovery_index_path().ok()?;
-        let mut index = SessionIndex::new(&path).ok()?;
+        let index = SessionIndex::new(&path).ok()?;
         let stopped = cancel.clone();
-        let budget =
-            RecoveryWorkBudget::with_cancellation_check(Duration::from_secs(10), move || {
-                stopped.is_cancelled()
-            });
-        let deadline = Instant::now() + Duration::from_secs(10);
+        let budget = RecoveryWorkBudget::with_cancellation_check(
+            deadline
+                .saturating_duration_since(Instant::now())
+                .min(Duration::from_secs(2)),
+            move || stopped.is_cancelled(),
+        );
         index.init_recovery_schema_with_budget(&budget).ok()?;
         let scope = uuid::Uuid::new_v4().to_string();
         index
             .replace_recovery_owner_scope(&session.id().to_string(), &scope, &budget)
             .ok()?;
-        let mut cursor = index
+        index
             .begin_recovery_build(&scope, source.source_end(), &budget)
             .ok()?;
-        let mut parent = None;
-        while !cursor.complete() {
-            if cancel.is_cancelled() || Instant::now() >= deadline {
-                return None;
-            }
-            let page = source
+        Some(Self {
+            source,
+            scan,
+            path,
+            scope,
+            parent: None,
+            resolved: false,
+        })
+    }
+    fn step(
+        &mut self,
+        cancel: &CancellationToken,
+        operation_deadline: Instant,
+    ) -> Option<PreparationStep> {
+        let deadline = operation_deadline.min(Instant::now() + Duration::from_secs(2));
+        if self.resolved {
+            return match self.scan.step(deadline, || cancel.is_cancelled()) {
+                Ok(true) => Some(PreparationStep::Complete),
+                Ok(false) => Some(PreparationStep::Pending),
+                Err(talos_session::history_page::HistoryPageError::Stopped)
+                    if !cancel.is_cancelled() =>
+                {
+                    Some(PreparationStep::Expired)
+                }
+                Err(_) => None,
+            };
+        }
+        let stopped = cancel.clone();
+        let budget = RecoveryWorkBudget::with_cancellation_check(
+            deadline.saturating_duration_since(Instant::now()),
+            move || stopped.is_cancelled(),
+        );
+        let mut index = SessionIndex::new(&self.path).ok()?;
+        let cursor = index.recovery_build_cursor(&self.scope, &budget).ok()??;
+        if !cursor.complete() {
+            let page = match self
+                .source
                 .read_page(cursor.next_offset(), deadline, || cancel.is_cancelled())
-                .ok()?;
-            // Embedded durable transcripts are linear. Refuse unsupported tree
-            // layout instead of indexing sibling records into one scope.
+            {
+                Ok(page) => page,
+                Err(talos_session::history_page::HistoryPageError::Stopped)
+                    if !cancel.is_cancelled() =>
+                {
+                    return Some(PreparationStep::Expired);
+                }
+                Err(_) => return None,
+            };
+            let mut parent = self.parent.clone();
             for entry in &page.entries {
                 if entry.parent_id != parent {
                     return None;
@@ -115,7 +170,7 @@ impl History {
                 .collect();
             index
                 .advance_recovery_build(
-                    &scope,
+                    &self.scope,
                     &cursor,
                     RecoveryBuildPage {
                         next_offset: page.next_offset,
@@ -125,36 +180,91 @@ impl History {
                     &budget,
                 )
                 .ok()?;
-            cursor = index.recovery_build_cursor(&scope, &budget).ok()??;
-            tokio::task::yield_now().await;
+            self.parent = parent;
+            return Some(PreparationStep::Pending);
         }
+        if !self.resolved {
+            self.resolved = index
+                .resolve_recovery_pending(&self.scope, &self.source, &budget)
+                .ok()?;
+            return Some(PreparationStep::Pending);
+        }
+        Some(PreparationStep::Pending)
+    }
+}
+
+tokio::task_local! {
+    pub(crate) static HISTORY: Option<History>;
+}
+impl History {
+    /// Prepare within one bounded host operation, retaining completed pages on timeout.
+    pub(crate) async fn prepare_cached(
+        session: &DurableSession,
+        cancel: &CancellationToken,
+        pending: &tokio::sync::Mutex<Option<Preparation>>,
+    ) -> Option<Self> {
+        Self::prepare_until(
+            session,
+            cancel,
+            pending,
+            Instant::now() + Duration::from_secs(10),
+        )
+        .await
+    }
+
+    async fn prepare_until(
+        session: &DurableSession,
+        cancel: &CancellationToken,
+        pending: &tokio::sync::Mutex<Option<Preparation>>,
+        deadline: Instant,
+    ) -> Option<Self> {
+        let mut pending = tokio::select! {
+            _ = cancel.cancelled() => return None,
+            result = tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), pending.lock()) => result.ok()?,
+        };
+        if pending
+            .as_ref()
+            .is_some_and(|work| !session.owns_recovery_source(&work.source))
+        {
+            *pending = None;
+        }
+        let mut work = pending
+            .take()
+            .or_else(|| Preparation::begin(session, cancel, deadline))?;
         loop {
-            if cancel.is_cancelled() || Instant::now() >= deadline {
+            if cancel.is_cancelled() {
                 return None;
             }
-            if index
-                .resolve_recovery_pending(&scope, &source, &budget)
-                .ok()?
-            {
-                break;
+            if Instant::now() >= deadline {
+                *pending = Some(work);
+                return None;
             }
-            tokio::task::yield_now().await;
-        }
-        loop {
-            if scan.step(deadline, || cancel.is_cancelled()).ok()? {
-                break;
+            match work.step(cancel, deadline) {
+                Some(PreparationStep::Complete) => break,
+                Some(PreparationStep::Pending) => tokio::task::yield_now().await,
+                Some(PreparationStep::Expired) => {
+                    *pending = Some(work);
+                    return None;
+                }
+                None => return None,
             }
-            tokio::task::yield_now().await;
         }
-        let seal = scan.finish().ok()?;
         Some(Self {
-            path,
-            scope,
+            path: work.path,
+            scope: work.scope,
             owner: session.id().to_string(),
             cancel: cancel.clone(),
-            seal,
+            seal: work.scan.finish().ok()?,
             state: Mutex::new(QueryState::default()),
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn prepare(
+        session: &DurableSession,
+        cancel: &CancellationToken,
+    ) -> Option<Self> {
+        Self::prepare_cached(session, cancel, &tokio::sync::Mutex::new(None)).await
     }
 
     pub(crate) fn scope_identity(&self) -> &str {
@@ -307,6 +417,175 @@ impl History {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn expired_seal_step_can_resume_but_cancelled_step_cannot() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "seal-timeout").expect("session");
+        session
+            .commit_turn(
+                "prior",
+                &[talos_core::message::Message::User {
+                    content: "deadline fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let cancel = CancellationToken::new();
+        let mut work =
+            Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(2))
+                .expect("begin");
+        while !work.resolved {
+            assert_eq!(
+                work.step(&cancel, Instant::now() + Duration::from_secs(2)),
+                Some(PreparationStep::Pending)
+            );
+        }
+        assert_eq!(
+            work.step(&cancel, Instant::now()),
+            Some(PreparationStep::Expired)
+        );
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        assert_eq!(
+            work.step(&cancelled, Instant::now() + Duration::from_secs(2)),
+            None
+        );
+        // Both failures leave the seal scan unchanged; only timeout is resumable by the host.
+        assert_eq!(
+            work.step(&cancel, Instant::now() + Duration::from_secs(2)),
+            Some(PreparationStep::Complete)
+        );
+        assert!(work.scan.finish().is_ok());
+    }
+
+    #[tokio::test]
+    async fn preparation_waiters_cancel_or_expire_without_consuming_pending_work() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "waiters").expect("session");
+        session
+            .commit_turn(
+                "prior",
+                &[talos_core::message::Message::User {
+                    content: "retained fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let cancel = CancellationToken::new();
+        let work = Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(2))
+            .expect("begin");
+        let scope = work.scope.clone();
+        let pending = tokio::sync::Mutex::new(Some(work));
+        let guard = pending.lock().await;
+        assert!(
+            History::prepare_until(
+                &session,
+                &cancel,
+                &pending,
+                Instant::now() + Duration::from_millis(1)
+            )
+            .await
+            .is_none()
+        );
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        assert!(
+            tokio::time::timeout(
+                Duration::from_secs(1),
+                History::prepare_cached(&session, &cancelled, &pending)
+            )
+            .await
+            .expect("cancellation must not wait for mutex")
+            .is_none()
+        );
+        assert_eq!(guard.as_ref().expect("retained work").scope, scope);
+        drop(guard);
+        let history = History::prepare_cached(&session, &cancel, &pending)
+            .await
+            .expect("resume after waiters");
+        assert_eq!(history.scope_identity(), scope);
+        assert!(history.query(Some("retained"), None, None).is_some());
+    }
+
+    #[tokio::test]
+    async fn host_preparation_resumes_completed_page_and_rejects_changed_source() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "resume").expect("session");
+        let raw: Vec<_> = (0..30)
+            .map(|i| talos_core::message::Message::User {
+                content: format!("resume fact {i} {}", "x".repeat(100_000)),
+            })
+            .collect();
+        session
+            .commit_turn("prior", &raw, &Default::default())
+            .expect("commit");
+        let cancel = CancellationToken::new();
+        let mut work =
+            Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(10))
+                .expect("begin");
+        assert_eq!(
+            work.step(&cancel, Instant::now() + Duration::from_secs(10)),
+            Some(PreparationStep::Pending)
+        );
+        let scope = work.scope.clone();
+        let reader = SessionIndex::open_read_only(&work.path).expect("read-only partial index");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+        assert!(
+            !reader
+                .recovery_owner_scope_ready(&session.id().to_string(), &scope, &budget)
+                .expect("readiness")
+        );
+        assert!(
+            reader
+                .recovery_candidates(&scope, "resume", None, 20, &budget)
+                .is_err(),
+            "partial coverage must not appear as complete search"
+        );
+        drop(reader);
+        let pending = tokio::sync::Mutex::new(Some(work));
+        assert!(
+            History::prepare_until(&session, &cancel, &pending, Instant::now())
+                .await
+                .is_none()
+        );
+        assert_eq!(
+            pending
+                .lock()
+                .await
+                .as_ref()
+                .expect("retained timeout progress")
+                .scope,
+            scope
+        );
+        let history = History::prepare_cached(&session, &cancel, &pending)
+            .await
+            .expect("resumed");
+        assert_eq!(history.scope_identity(), scope);
+        let result = history.query(Some("29"), None, None).expect("last fact");
+        assert!(
+            result["results"][0]["text"]
+                .as_str()
+                .expect("text")
+                .starts_with("resume fact 29")
+        );
+        let mut work =
+            Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(10))
+                .expect("begin again");
+        assert_eq!(
+            work.step(&cancel, Instant::now() + Duration::from_secs(10)),
+            Some(PreparationStep::Pending)
+        );
+        let bytes = std::fs::read(session.file_path()).expect("bytes");
+        std::fs::write(session.file_path(), bytes).expect("change source version");
+        let pending = tokio::sync::Mutex::new(Some(work));
+        assert!(
+            History::prepare_cached(&session, &cancel, &pending)
+                .await
+                .is_none()
+        );
+        assert!(pending.lock().await.is_none());
+    }
+
     #[test]
     fn references_require_canonical_format_and_current_discovery_secret() {
         let state = QueryState::default();
