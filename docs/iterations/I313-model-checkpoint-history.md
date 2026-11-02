@@ -24,6 +24,16 @@ without running builds; approval does not activate production restoration.
 Standard preflight is running at `/private/tmp/i313-windows-scan-test-preflight.log`.
 T5 remains Partial; no full acceptance, merge or T1/T6 implementation is claimed.
 
+Saved-scan test implementation is committed as `194cbbfe6`; independent review
+approved that exact head for draft publication only. Both governance validators
+passed with zero warnings. The existing Unix stale-receipt regression is now also
+compiled for Windows tests, releasing its source lease before host append. It
+checks that an old receipt cannot delete a same-offset resave, a reopened foreign
+handle cannot clean it, and exact cleanup still works after source mutation.
+The moved regression passed locally (`/private/tmp/i313-scan-receipt-cross-platform.log`);
+Windows execution remains pending. This follow-up was tested separately from the
+already-running preflight; it changes no production code.
+
 ## CLI fork paging and cancellation — local increment, 2026-11-02
 
 The real fork handler now stages raw bytes in bounded pages from the same captured

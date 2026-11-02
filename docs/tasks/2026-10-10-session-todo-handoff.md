@@ -8,6 +8,10 @@ Standard preflight is running at `/private/tmp/i313-windows-scan-test-preflight.
 Full queue remains I309 → T8/I308 → T2+T3 → T4 → T5 → T1 → T6; T5 Partial,
 T1/T6 unimplemented. See I313 owner for exact evidence boundaries.
 
+Saved-scan test commit: `194cbbfe6`. Stale-receipt cleanup coverage was also
+extended from Unix to the Windows test candidate and passed locally; native
+Windows execution and the running standard preflight remain outstanding.
+
 ## T5 fork paging local increment — 2026-11-02
 
 Local fork now copies bounded raw pages and decodes messages/tail from one captured

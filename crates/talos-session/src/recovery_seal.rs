@@ -403,6 +403,60 @@ mod process_resume_tests {
     use std::time::Duration;
 
     #[test]
+    fn saved_receipt_cleans_after_source_change_without_deleting_a_resave() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = crate::DurableSession::open_or_create(root.path(), "receipt").expect("owner");
+        owner
+            .commit_turn(
+                "seed",
+                &[talos_core::message::Message::User {
+                    content: "fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let scan = owner
+            .capture_recovery_source()
+            .expect("source")
+            .begin_prefix_seal()
+            .expect("scan");
+        let budget = crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2));
+        let first = owner.save_recovery_scan(&scan, &budget).expect("save");
+        let second = owner
+            .save_recovery_scan(&scan, &budget)
+            .expect("same offset resave");
+        assert!(
+            !owner
+                .clear_recovery_scan(&first, &budget)
+                .expect("obsolete receipt")
+        );
+        let foreign = crate::DurableSession::open_existing(root.path(), "receipt")
+            .expect("open")
+            .expect("foreign handle");
+        assert!(foreign.clear_recovery_scan(&second, &budget).is_err());
+        drop(scan); // Release the Windows source lease before the host appends.
+        owner
+            .commit_turn(
+                "later",
+                &[talos_core::message::Message::User {
+                    content: "new suffix".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("append");
+        assert!(
+            owner
+                .clear_recovery_scan(&second, &budget)
+                .expect("cleanup after source changed")
+        );
+        assert!(
+            !owner
+                .clear_recovery_scan(&second, &budget)
+                .expect("cleanup idempotent")
+        );
+    }
+
+    #[test]
     fn saved_scan_rejects_foreign_owner_and_corrupt_payload() {
         let root = tempfile::tempdir().expect("root");
         let owner = crate::DurableSession::open_or_create(root.path(), "owner").expect("owner");
@@ -907,59 +961,6 @@ mod tests {
                 .restore_recovery_scan_for_source(&current, &budget)
                 .expect("matching cutoff")
                 .is_some()
-        );
-    }
-
-    #[test]
-    fn saved_receipt_cleans_after_source_change_without_deleting_a_resave() {
-        let root = tempfile::tempdir().expect("root");
-        let owner = DurableSession::open_or_create(root.path(), "receipt").expect("owner");
-        owner
-            .commit_turn(
-                "seed",
-                &[Message::User {
-                    content: "fact".into(),
-                }],
-                &Default::default(),
-            )
-            .expect("commit");
-        let scan = owner
-            .capture_recovery_source()
-            .expect("source")
-            .begin_prefix_seal()
-            .expect("scan");
-        let budget = crate::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2));
-        let first = owner.save_recovery_scan(&scan, &budget).expect("save");
-        let second = owner
-            .save_recovery_scan(&scan, &budget)
-            .expect("same offset resave");
-        assert!(
-            !owner
-                .clear_recovery_scan(&first, &budget)
-                .expect("obsolete receipt")
-        );
-        let foreign = DurableSession::open_existing(root.path(), "receipt")
-            .expect("open")
-            .expect("foreign handle");
-        assert!(foreign.clear_recovery_scan(&second, &budget).is_err());
-        owner
-            .commit_turn(
-                "later",
-                &[Message::User {
-                    content: "new suffix".into(),
-                }],
-                &Default::default(),
-            )
-            .expect("append");
-        assert!(
-            owner
-                .clear_recovery_scan(&second, &budget)
-                .expect("cleanup after source changed")
-        );
-        assert!(
-            !owner
-                .clear_recovery_scan(&second, &budget)
-                .expect("cleanup idempotent")
         );
     }
 
