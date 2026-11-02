@@ -15,7 +15,7 @@ try {
     $stream = [IO.FileStream]::new($path, [IO.FileMode]::Open,
         [IO.FileAccess]::ReadWrite, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
     $mapping = [IO.MemoryMappedFiles.MemoryMappedFile]::CreateFromFile(
-        $stream, $null, 0, [IO.MemoryMappedFiles.MemoryMappedFileAccess]::ReadWrite,
+        $stream, [System.Management.Automation.Language.NullString]::Value, 0, [IO.MemoryMappedFiles.MemoryMappedFileAccess]::ReadWrite,
         [IO.HandleInheritability]::None, $true)
     $view = $mapping.CreateViewAccessor(0, 4, [IO.MemoryMappedFiles.MemoryMappedFileAccess]::ReadWrite)
     $stream.Dispose()

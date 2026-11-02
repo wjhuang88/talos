@@ -1726,6 +1726,8 @@ mod tests {
                 writeln!(file).expect("newline");
             }
             file.flush().expect("flush");
+            // Recovery read leases intentionally refuse an outstanding writer.
+            drop(file);
             let end = std::fs::metadata(&path).expect("metadata").len();
             let mut index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
             index.init_recovery_schema().expect("schema");
