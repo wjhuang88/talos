@@ -1582,6 +1582,9 @@ impl RuntimeBuilder {
                 fallback_handler,
             )
         };
+        agent
+            .enable_model_checkpoint_tools()
+            .map_err(|error| RuntimeError::Agent(AgentError::ToolError(error.to_string())))?;
         let permission_state = Arc::new(PermissionSessionState::new((*agent_engine).clone()));
         let fallback_resolver = approval_handler.clone().map(|handler| {
             Arc::new(RuntimeApprovalResolver { inner: handler }) as Arc<dyn ApprovalResolver>
@@ -5121,6 +5124,244 @@ mod tests {
             std::fs::read_to_string(source).expect("read source"),
             "original\n"
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn runtime_recovers_original_history_after_reopen() {
+        use talos_core::message::StopReason;
+        struct RecoveryModel {
+            step: AtomicUsize,
+        }
+        #[async_trait]
+        impl LanguageModel for RecoveryModel {
+            async fn stream(
+                &self,
+                messages: &[Message],
+            ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+                let step = self.step.fetch_add(1, Ordering::SeqCst);
+                let result = |id: &str| -> serde_json::Value {
+                    let result = messages
+                        .iter()
+                        .find_map(|message| match message {
+                            Message::Tool { result } if result.tool_use_id == id => Some(result),
+                            _ => None,
+                        })
+                        .expect("real paired result");
+                    assert!(!result.is_error, "{}", result.content);
+                    serde_json::from_str(&result.content).expect("result JSON")
+                };
+                let events = if step < 3 {
+                    let input = match step {
+                        0 => serde_json::json!({"mode":"discover"}),
+                        1 => {
+                            serde_json::json!({"mode":"search","snapshot":result("recover-0")["snapshot"],"query":"originalfact"})
+                        }
+                        _ => {
+                            let found = result("recover-1");
+                            assert_eq!(
+                                found["results"][0]["text"],
+                                "originalfact unique constraint"
+                            );
+                            serde_json::json!({"mode":"detail","snapshot":result("recover-0")["snapshot"],"reference":found["results"][0]["reference"]})
+                        }
+                    };
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: format!("recover-{step}"),
+                                name: "history_search".into(),
+                                input,
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                } else {
+                    assert_eq!(step, 3);
+                    assert_eq!(
+                        result("recover-2")["text"],
+                        "originalfact unique constraint"
+                    );
+                    vec![
+                        AgentEvent::TextDelta {
+                            delta: "recovered and continued".into(),
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::EndTurn,
+                            usage: Default::default(),
+                        },
+                    ]
+                };
+                let (tx, rx) = mpsc::channel(16);
+                for event in events {
+                    tx.send(event).await.expect("receiver");
+                }
+                Ok(rx)
+            }
+        }
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let durable = manager
+            .create_or_open_session("runtime-recovery")
+            .expect("session");
+        let raw: Vec<_> = (0..30)
+            .map(|i| Message::User {
+                content: format!("other {i}"),
+            })
+            .collect();
+        durable
+            .commit_turn("prior", &raw, &Default::default())
+            .expect("commit");
+        struct RecoverableFact(Arc<AtomicUsize>);
+        #[async_trait]
+        impl AgentTool for RecoverableFact {
+            fn name(&self) -> &str {
+                "recoverable_fact"
+            }
+            fn description(&self) -> &str {
+                "read original constraint"
+            }
+            fn parameters(&self) -> Value {
+                serde_json::json!({"type":"object"})
+            }
+            fn is_read_only(&self) -> bool {
+                true
+            }
+            fn recovery_projection(&self, result: &ToolResult) -> Option<String> {
+                Some(result.content.clone())
+            }
+            async fn execute(&self, _: Value) -> ToolResult {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                ToolResult::success("originalfact unique constraint")
+            }
+        }
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut producer = RuntimeBuilder::new()
+            .provider(Arc::new(
+                MockProvider::new()
+                    .with_tool_call("recoverable_fact", serde_json::json!({}))
+                    .with_response("recorded"),
+            ))
+            .workspace_root(root.path())
+            .permission_rule(PermissionRule::new_nature(
+                ToolNature::Read,
+                None,
+                None,
+                PermissionDecision::Allow,
+            ))
+            .tool(Arc::new(RecoverableFact(calls.clone())))
+            .durable_session(durable.clone())
+            .build()
+            .expect("producer");
+        producer.submit("read constraint").await.expect("submit");
+        assert!(matches!(
+            collect_until_turn_completed(&mut producer)
+                .await
+                .expect("completion"),
+            TurnCompletionStatus::Success { .. }
+        ));
+        producer.shutdown().await.expect("shutdown producer");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        drop(durable);
+        let reopened = manager
+            .get_session_by_external_id("runtime-recovery")
+            .expect("lookup")
+            .expect("reopened");
+        let mut runtime = RuntimeBuilder::new()
+            .provider(Arc::new(RecoveryModel {
+                step: AtomicUsize::new(0),
+            }))
+            .workspace_root(root.path())
+            .permission_rule(PermissionRule::new_nature(
+                ToolNature::Read,
+                None,
+                None,
+                PermissionDecision::Allow,
+            ))
+            .durable_session(reopened)
+            .build()
+            .expect("runtime");
+        runtime
+            .submit("recover original constraint")
+            .await
+            .expect("submit");
+        let status = tokio::time::timeout(
+            Duration::from_secs(15),
+            collect_until_turn_completed(&mut runtime),
+        )
+        .await
+        .expect("timeout")
+        .expect("completion");
+        assert!(
+            matches!(status, TurnCompletionStatus::Success { final_text, .. } if final_text == "recovered and continued")
+        );
+        runtime.shutdown().await.expect("shutdown");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "recovery must not execute the original tool"
+        );
+    }
+
+    #[tokio::test]
+    async fn runtime_refuses_caller_checkpoint_name_conflicts() {
+        struct Conflict(&'static str);
+        #[async_trait]
+        impl AgentTool for Conflict {
+            fn name(&self) -> &str {
+                self.0
+            }
+            fn description(&self) -> &str {
+                "caller tool"
+            }
+            fn parameters(&self) -> Value {
+                serde_json::json!({"type":"object"})
+            }
+            async fn execute(&self, _: Value) -> ToolResult {
+                ToolResult::success("caller")
+            }
+        }
+        for name in ["compact_context", "history_search"] {
+            let result = RuntimeBuilder::new()
+                .provider(Arc::new(MockProvider::new()))
+                .tool(Arc::new(Conflict(name)))
+                .build();
+            assert!(matches!(
+                result,
+                Err(RuntimeError::Agent(AgentError::ToolError(_)))
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn runtime_default_prompt_discloses_checkpoint_and_history_tools() {
+        let provider = Arc::new(MockProvider::new().with_request_debug_builder(|messages| {
+            serde_json::to_string(messages).expect("messages")
+        }));
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .build()
+            .expect("runtime");
+        runtime
+            .preview_request("inspect tools")
+            .await
+            .expect("preview");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("completion");
+        match status {
+            TurnCompletionStatus::Success { final_text, .. } => {
+                assert!(final_text.contains("compact_context"), "{final_text}");
+                assert!(final_text.contains("history_search"), "{final_text}");
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+        runtime.shutdown().await.expect("shutdown");
     }
 
     #[tokio::test]

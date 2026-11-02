@@ -464,7 +464,8 @@ impl Agent {
     /// Checkpoint admission requires the Actor and a permission pipeline. History
     /// search/detail require host-prepared durable storage and a discovered snapshot.
     /// Unsupported storage and standalone execution fail closed. Search supports
-    /// opaque cursor pages; long-history discovery remains incomplete. Explicit opt-in.
+    /// opaque cursor pages, including discovery beyond compaction source bounds.
+    /// Explicit opt-in for standalone Agent hosts; RuntimeBuilder enables these tools.
     pub fn enable_model_checkpoint_tools(
         &mut self,
     ) -> Result<(), talos_core::tool::ToolRegistrationError> {

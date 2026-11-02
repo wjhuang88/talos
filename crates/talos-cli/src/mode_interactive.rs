@@ -148,6 +148,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         ),
         Some(resolver),
     );
+    agent.enable_model_checkpoint_tools()?;
     agent.set_tool_protocol(config.tool_protocol());
     crate::mode_runtime::set_request_budget_spec(&mut agent, &config);
     if !loaded_plugin_packages.is_empty() {

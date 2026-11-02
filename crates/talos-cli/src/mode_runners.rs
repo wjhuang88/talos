@@ -203,6 +203,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
         ),
         None,
     );
+    agent.enable_model_checkpoint_tools()?;
     agent.set_tool_protocol(config.tool_protocol());
     crate::mode_runtime::set_image_input_capability(&mut agent, &config);
     crate::mode_runtime::set_request_budget_spec(&mut agent, &config);

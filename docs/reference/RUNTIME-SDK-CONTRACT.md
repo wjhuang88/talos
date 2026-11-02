@@ -591,3 +591,14 @@ version-one digest-only receipts. A version-one-only reader refuses a receipt se
 containing version two; it can still read the original transcript. Rollback may
 therefore make those tool facts unavailable for model recovery, without deleting
 raw history. See the I313 owner for current implementation and validation status.
+
+### Model checkpoint tool registration (I313, next minor)
+
+RuntimeBuilder registers `compact_context` and `history_search` by default.
+A caller registration using either reserved name makes construction fail; it is
+not silently replaced. Low-level Agent hosts explicitly enable these tools.
+Permission checks still govern calls. Model compaction requires Actor admission;
+history queries require prepared durable storage and a discovered snapshot.
+Unsupported storage returns Unavailable. Durable discovery may return
+`compact_available: false` with no compaction sources while permitting history
+search; this does not authorize compaction of an unsupported source range.

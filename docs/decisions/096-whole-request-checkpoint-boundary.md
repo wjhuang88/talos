@@ -173,3 +173,12 @@ permits the existing line-ending normalization only and hashes final stored text
 This enables recovery of sanitized Read results without retaining transient edit
 capabilities. It does not implement a separate permitted recovery representation
 whose text differs from the persisted tool entry; that acceptance remains open.
+
+### I313 Runtime default tool names — next-minor migration
+
+RuntimeBuilder enables the built-in `compact_context` and `history_search` tools
+by default. These names are reserved: existing caller tools using either name
+must be renamed before migration; construction returns a tool registration error
+rather than replacing caller code or conferring builtin trust. Low-level Agent
+hosts retain explicit opt-in. Registration does not grant permission or imply
+that unsupported storage can provide durable recovery.

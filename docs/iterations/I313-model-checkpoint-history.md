@@ -1128,3 +1128,70 @@ pass (`/private/tmp/i313-long-final-agent.log`, `/private/tmp/i313-long-final-cl
 Both governance validators pass. Independent static review approves the revised
 scope binding and availability checks; reviewer did not run tests. The existing
 non-atomic filesystem-validation/permission-publication boundary remains open.
+
+### Runtime activation — in progress, 2026-11-02
+
+RuntimeBuilder now registers the built-in checkpoint/history tools through the
+fallible Agent registration API; name conflicts fail construction rather than
+silently replacing caller tools or granting builtin trust. A Runtime preview
+regression checks default tool disclosure; validation is running at
+`/private/tmp/i313-runtime-activation.log`. Preview alone does not certify live
+provider recovery or restart behavior. CLI paths and real Runtime recovery
+acceptance remain unfinished.
+
+During this increment, 82 tracked files unexpectedly disappeared, including CLI
+entrypoints and Runtime tests. Missing paths alone were restored from current
+HEAD, retaining existing files; status was clean immediately after restoration.
+Cause is unknown. This is environment recovery, not implementation progress.
+
+Runtime activation regression now reopens a committed Session through SessionManager,
+builds the actual Runtime facade and drives provider discover/search/detail before
+ordinary continuation. The strengthened fixture now passes for explicitly permitted tool facts across
+restart; checkpoint-omitted fact and fork scenarios remain to be verified.
+Initial full Runtime run passed 76 tests and failed one obsolete default tool-set
+assertion; the assertion now includes checkpoint/history while retaining skill_read
+opt-in semantics. Added reserved-name collision refusal tests. Final validation
+is running at `/private/tmp/i313-runtime-final.log` and
+`/private/tmp/i313-runtime-clippy.log`; independent review requested.
+
+Runtime activation final baseline: 78/78 tests, warnings-denied all-target Clippy
+and both governance validators pass. The recovery fixture was then strengthened:
+the original fact now exists only as an actually executed tool result with an
+explicit recovery_projection. The producer Runtime commits and shuts down; a
+new Runtime reopens the session without registering that tool and completes
+search/detail/continuation. Original tool execution count stays one. Focused
+regression passes (`/private/tmp/i313-runtime-tool-recovery.log`). This establishes
+permitted tool-fact recovery across reopen, not checkpoint-omission/fork coverage.
+
+### CLI activation — local, unmerged
+
+Print, inline, interactive and TUI construction/rebuild paths now register the
+same fallible checkpoint/history contributions before tool presentation. Locked
+CLI all-target check passes (`/private/tmp/i313-cli-enable-check.log`). This is
+compile evidence only; real CLI discovery/admission still needs walkthrough.
+Legacy CLI persistence does not produce the DurableSession recovery receipts;
+search/detail remain explicitly unavailable on that storage path. Runtime's
+verified receipt path is not claimed as CLI durable recovery evidence.
+
+CLI activation validation: all 384 binary unit tests pass
+(`/private/tmp/i313-cli-enable-tests.log`). Independent static review approves
+Runtime and all five CLI entrypoints, including TUI rebuilding, permission
+pipeline retention and caller conflict refusal; reviewer did not run tests.
+Actual CLI walkthrough, checkpoint omission/fork, resumable preparation, Windows,
+full workspace/SDK and remote closure gates remain open.
+
+CLI affected all-target warnings-denied Clippy passes
+(`/private/tmp/i313-cli-enable-clippy.log`). A current CLI binary build is running
+for the required real provider walkthrough (`/private/tmp/i313-cli-enable-build.log`);
+this build is necessary because check/unit-test artifacts do not update the CLI
+executable. No paid provider calls are planned.
+
+Real inline CLI walkthrough now passes through a localhost SSE provider:
+checkpoint/history definitions remain present, discovery returns sources and a
+snapshot, legacy-storage search returns explicit execution-unavailable, and the
+provider continues normally. Existing raw transcript prefix remains unchanged.
+Reproducer: `python3 scripts/test_checkpoint_history_cli.py`; evidence:
+`/private/tmp/i313-cli-history-walkthrough.log`. The first run expected the wrong
+error wording; the corrected assertion checks the actual legacy-path error.
+This certifies discovery/refusal/continuation, not successful CLI durable search
+or model checkpoint installation. No paid calls were made.

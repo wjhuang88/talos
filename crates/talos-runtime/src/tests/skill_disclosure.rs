@@ -177,7 +177,7 @@ async fn skill_read_tool_is_opt_in_and_reads_bound_skills() {
     run_turn(&mut runtime, "hi").await;
     assert_eq!(
         requests.lock().expect("requests")[0].1,
-        vec!["process"],
+        vec!["compact_context", "history_search", "process"],
         "minimal Runtime/Session inventory changed; declare its disposition"
     );
     runtime.shutdown().await.expect("shutdown");
@@ -211,7 +211,7 @@ async fn skill_read_tool_is_opt_in_and_reads_bound_skills() {
     names.sort();
     assert_eq!(
         names,
-        vec!["process", "skill_read"],
+        vec!["compact_context", "history_search", "process", "skill_read"],
         "opt-in Runtime/Session inventory changed; declare its disposition"
     );
     assert!(requests[1].0.contains("ALPHA-BODY"), "{}", requests[1].0);
