@@ -5123,7 +5123,7 @@ fn assert_recovery_receipts_verify(durable: &talos_session::DurableSession, expe
 async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor() {
     use talos_core::tool::ToolNature;
     use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
-    const TASK_STATE: &str = r#"{"completed":"baseline scan done","in_progress":"local recount active","pending":"final report pending","open_loops":"remote route failed; do not retry","facts":"local count verified as 42","assumptions":"recount may be necessary; unverified","next_step":"verify final total locally"}"#;
+    const TASK_STATE: &str = r#"{"completed":"baseline scan done","in_progress":"local recount active","pending":"final report pending","open_loops":"missing-source.json unavailable; do not retry","facts":"local count verified as 42","assumptions":"recount may be necessary; unverified","next_step":"verify final total locally"}"#;
     fn task_checkpoint(
         messages: &[Message],
         discovery: &serde_json::Value,
@@ -5206,6 +5206,65 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             assert_eq!(actual, &expected[field], "lost or misclassified {field}");
         }
         assert!(!checkpoint["facts"].to_string().contains("unverified"));
+    }
+    struct VerifyResearchTotal(std::path::PathBuf, Arc<AtomicUsize>);
+    #[async_trait]
+    impl talos_core::tool::AgentTool for VerifyResearchTotal {
+        fn name(&self) -> &str {
+            "verify_research_total"
+        }
+        fn description(&self) -> &str {
+            "Verify the pending local research total"
+        }
+        fn parameters(&self) -> serde_json::Value {
+            serde_json::json!({"type":"object","properties":{},"additionalProperties":false})
+        }
+        fn is_read_only(&self) -> bool {
+            true
+        }
+        async fn execute(&self, _: serde_json::Value) -> talos_core::tool::ToolResult {
+            self.1.fetch_add(1, Ordering::SeqCst);
+            let bytes = tokio::fs::read(&self.0)
+                .await
+                .expect("verify actual source");
+            let observations: Vec<u64> = serde_json::from_slice(&bytes).expect("observations");
+            talos_core::tool::ToolResult::success(
+                serde_json::json!({
+                    "verified_total": observations.iter().sum::<u64>(),
+                    "observations": observations.len()
+                })
+                .to_string(),
+            )
+        }
+    }
+    fn continuation_tools(root: &std::path::Path, calls: Arc<AtomicUsize>) -> ToolRegistry {
+        let mut tools = ToolRegistry::new();
+        // Completed collection and its failed alternative are deliberately absent.
+        tools.register(Arc::new(VerifyResearchTotal(
+            root.join("observations.json"),
+            calls,
+        )));
+        tools
+    }
+    fn research_report_events(messages: &[Message]) -> Vec<AgentEvent> {
+        let result = messages
+            .iter()
+            .rev()
+            .find_map(|message| match message {
+                Message::Tool { result } if result.tool_use_id == "verify-pending-next-step" => {
+                    Some(result)
+                }
+                _ => None,
+            })
+            .expect("actual next-step result");
+        assert!(!result.is_error, "{}", result.content);
+        let report: serde_json::Value = serde_json::from_str(&result.content).expect("report");
+        assert_eq!(report["verified_total"], 42);
+        assert_eq!(report["observations"], 5);
+        success_events(&format!(
+            "research report: verified total {} from {} observations; missing-source route not retried",
+            report["verified_total"], report["observations"]
+        ))
     }
     struct CheckpointModel {
         step: AtomicUsize,
@@ -5546,8 +5605,31 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                         serde_json::from_str::<serde_json::Value>(TASK_STATE)
                             .expect("expected task")
                     );
-                    success_events("checkpoint complete; recovered omitted original fact")
+                    assert_eq!(recovered["next_step"], "verify final total locally");
+                    if step == 11 {
+                        // The persisted successful verification is completed work.
+                        // Reopening must reuse it instead of re-reading the input.
+                        research_report_events(messages)
+                    } else {
+                        self.step.store(12, Ordering::SeqCst);
+                        vec![
+                            AgentEvent::ToolCall {
+                                call: talos_core::message::ToolCall {
+                                    id: "verify-pending-next-step".into(),
+                                    name: "verify_research_total".into(),
+                                    input: serde_json::json!({}),
+                                },
+                                provenance: talos_core::tool::ToolProvenance::Native,
+                                summary_fields: vec![],
+                            },
+                            AgentEvent::TurnEnd {
+                                stop_reason: StopReason::ToolUse,
+                                usage: Default::default(),
+                            },
+                        ]
+                    }
                 }
+                12 => research_report_events(messages),
                 _ => panic!("unexpected extra provider request"),
             };
             let (tx, rx) = mpsc::channel(16);
@@ -5576,9 +5658,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         let restarted_model = Arc::new(CheckpointModel {
             step: AtomicUsize::new(8),
         });
+        let verification_calls = Arc::new(AtomicUsize::new(0));
         let mut restarted_agent = Agent::with_security_and_hooks(
             restarted_model.clone(),
-            ToolRegistry::new(),
+            continuation_tools(root, verification_calls.clone()),
             Some(Arc::new(engine)),
             None,
             root.into(),
@@ -5660,12 +5743,31 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         assert_eq!(
             restarted_model.step.load(Ordering::SeqCst),
             12,
-            "fresh discovery/search/detail/continuation without another checkpoint"
+            "fresh recovery reuses completed verification without another checkpoint"
         );
         assert!(
             std::fs::read(reopened.file_path())
                 .expect("restart transcript")
                 .starts_with(&persisted)
+        );
+        assert_eq!(
+            restarted_actor
+                .history
+                .iter()
+                .filter_map(|message| match message {
+                    Message::Assistant { tool_calls, .. } => Some(tool_calls),
+                    _ => None,
+                })
+                .flatten()
+                .filter(|call| call.name == "verify_research_total")
+                .count(),
+            1,
+            "restart must not repeat the completed verification"
+        );
+        assert_eq!(
+            verification_calls.load(Ordering::SeqCst),
+            0,
+            "completed verification must not execute after restart"
         );
         println!("TALOS_CHECKPOINT_RESTART_VERIFIED");
     }
@@ -5718,7 +5820,12 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         .expect("durable");
     // Produce the only searchable fact through actual admission/execution, not a
     // seeded user message or a manually constructed recovery receipt.
-    struct OriginalFact(Arc<AtomicUsize>);
+    struct OriginalFact {
+        calls: Arc<AtomicUsize>,
+        source: std::path::PathBuf,
+        missing: std::path::PathBuf,
+        operations: Arc<std::sync::Mutex<Vec<&'static str>>>,
+    }
     #[async_trait]
     impl talos_core::tool::AgentTool for OriginalFact {
         fn name(&self) -> &str {
@@ -5737,15 +5844,47 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             Some(result.content.clone())
         }
         async fn execute(&self, _: serde_json::Value) -> talos_core::tool::ToolResult {
-            self.0.fetch_add(1, Ordering::SeqCst);
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.operations.lock().expect("ledger").push("read-source");
+            let bytes = tokio::fs::read(&self.source)
+                .await
+                .expect("local research source");
+            let observations: Vec<u64> = serde_json::from_slice(&bytes).expect("observations");
+            let total: u64 = observations.iter().sum();
+            self.operations
+                .lock()
+                .expect("ledger")
+                .push("try-missing-source");
+            let failure = tokio::fs::read(&self.missing)
+                .await
+                .expect_err("missing route");
+            assert_eq!(failure.kind(), std::io::ErrorKind::NotFound);
+            let state = serde_json::json!({
+                "completed":"baseline scan done",
+                "in_progress":"local recount active",
+                "pending":"final report pending",
+                "open_loops":"missing-source.json unavailable; do not retry",
+                "facts":format!("local count verified as {total}"),
+                "assumptions":"recount may be necessary; unverified",
+                "next_step":"verify final total locally"
+            });
             talos_core::tool::ToolResult::success(format!(
-                "omittedfact original constraint {TASK_STATE}"
+                "omittedfact original constraint {state}"
             ))
         }
     }
     let calls = Arc::new(AtomicUsize::new(0));
     let mut tools = ToolRegistry::new();
-    tools.register(Arc::new(OriginalFact(calls.clone())));
+    let source = root.path().join("observations.json");
+    let source_bytes = b"[3,5,8,11,15]";
+    std::fs::write(&source, source_bytes).expect("research input artifact");
+    let operations = Arc::new(std::sync::Mutex::new(Vec::new()));
+    tools.register(Arc::new(OriginalFact {
+        calls: calls.clone(),
+        source: source.clone(),
+        missing: root.path().join("missing-source.json"),
+        operations: operations.clone(),
+    }));
     let producer_model = Arc::new(MockModel::new(vec![
         vec![
             AgentEvent::ToolCall {
@@ -5819,9 +5958,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     let model = Arc::new(CheckpointModel {
         step: AtomicUsize::new(0),
     });
+    let verification_calls = Arc::new(AtomicUsize::new(0));
     let mut agent = Agent::with_security_and_hooks(
         model.clone(),
-        ToolRegistry::new(),
+        continuation_tools(root.path(), verification_calls.clone()),
         Some(engine),
         None,
         root.path().into(),
@@ -5938,15 +6078,15 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     assert_eq!(&actor.history[..raw.len()], raw.as_slice());
     assert_eq!(
         model.step.load(Ordering::SeqCst),
-        8,
-        "two checkpoints, discovery, search and detail with no repeated work"
+        13,
+        "two checkpoints, recovery and pending verification with no repeated collection"
     );
     let persisted = std::fs::read(durable.file_path()).expect("persisted transcript");
     assert!(
         persisted.starts_with(&original_bytes),
         "checkpoint must not rewrite the original transcript"
     );
-    let calls: Vec<_> = actor
+    let tool_calls: Vec<_> = actor
         .history
         .iter()
         .filter_map(|message| match message {
@@ -5957,18 +6097,33 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         .map(|call| call.name.as_str())
         .collect();
     assert_eq!(
-        calls
+        tool_calls
             .iter()
             .filter(|name| **name == "compact_context")
             .count(),
         2
     );
     assert_eq!(
-        calls
+        tool_calls
             .iter()
             .filter(|name| **name == "history_search")
             .count(),
         5
+    );
+
+    assert_eq!(
+        tool_calls
+            .iter()
+            .filter(|name| **name == "verify_research_total")
+            .count(),
+        1
+    );
+    assert_eq!(
+        tool_calls
+            .iter()
+            .filter(|name| **name == "original_fact")
+            .count(),
+        1
     );
 
     assert!(
@@ -6013,6 +6168,25 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                 .starts_with(&persisted)
         );
     }
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "original work must not rerun"
+    );
+    assert_eq!(
+        *operations.lock().expect("operation ledger"),
+        ["read-source", "try-missing-source"],
+        "completed and known-failed operations must execute only once"
+    );
+    assert_eq!(std::fs::read(source).expect("retained input"), source_bytes);
+    assert_eq!(
+        verification_calls.load(Ordering::SeqCst),
+        1,
+        "pending verification executes once"
+    );
+    println!(
+        "research_collection_reads=1 verification_reads=1 known_failed_attempts=1 checkpoints=2 restart_processes=2"
+    );
 }
 
 #[test]

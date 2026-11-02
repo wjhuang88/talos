@@ -1,3 +1,15 @@
+## T5 research artifact regression — 2026-11-02
+
+Local Actor A→B/fork/restart fixture now reads a real local observation artifact,
+records an actual failed alternate source, executes pending verification and
+reuses its persisted result after reopen. Initial focused test and Clippy passed;
+final independent execution counters also passed focused validation. No model
+quality/full Runtime/CLI acceptance or full T5 completion is claimed.
+Published Windows test candidate remains `b8a80873b`, CI `41418548863` pending
+when checked. Cancellation requested for superseded run `41415936931`; terminal
+state still requires checking. Owner I313 carries exact validation boundaries.
+Full queue preserved; T5 Partial, T1/T6 unimplemented.
+
 ## T5 Windows saved-scan test candidate — 2026-11-02
 
 Test-only Windows version/scan persistence paths and cross-process, mutation,

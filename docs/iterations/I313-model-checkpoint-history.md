@@ -1,5 +1,41 @@
 # Iteration I313: Actor Model Checkpoints And Bounded History Recovery
 
+
+## Research artifact and pending-work regression — local increment, 2026-11-02
+
+The existing large Actor A→B/fork/independent-process scenario now obtains its
+original recoverable fact from a real `observations.json` fixture, computes 42
+from five observations and observes an actual NotFound error for the alternate
+source. Checkpoint task-state classification still separates fact/assumption,
+completed/active/pending work and the known-failed route. After original-fact
+recovery, an admitted read tool executes the pending local verification and the
+scripted provider renders a report from its actual result. Reopened parent/child
+reuse that persisted successful verification instead of executing it again.
+
+The source artifact remains byte-identical. A collection operation ledger checks
+one initial source read and one failed route; verification separately reads the
+same source once. Independent per-process verification counters distinguish one
+original execution from zero reopened executions. Completed collection tools are
+absent from continuation registries: this tests this script's no-repeat behavior,
+not autonomous model choice when those tools remain available. This is Actor
+composition, not complete Runtime/CLI or coding-scenario coverage or model quality.
+
+The first next-step variant passed its locked focused test (16.64 s), reporting
+request estimates 745442→10069 and 746101→10734, with two checkpoints and two
+restart processes (`/private/tmp/i313-research-next-step.log`). Affected all-target
+warnings-denied Clippy passed before the final independent-counter assertions
+(`/private/tmp/i313-research-clippy.log`). Final counter variant passed at
+`/private/tmp/i313-research-final-counts.log`; no new full preflight is claimed.
+Independent static review approved the pre-counter test diff
+`9d29a39fdf6fb2712776afcc2f732223ab90388b151c3438769c9d8443fe61d8`,
+without executing builds. Full T5 and later T1/T6 remain open.
+
+Final independent static review approves the counter-complete source diff
+`3b941b96258ff6b495c8de0566dfb74d1e7820f6a2347290476d39f68b49326b`
+for local commit. Final focused test passed in 16.69 s and affected all-target
+Clippy passed (`/private/tmp/i313-research-final-clippy.log`). Reviewer ran no
+builds. This local test increment is not part of published `b8a80873b` CI.
+
 ## Windows saved-scan test candidate — 2026-11-02
 
 Windows stored source-version representation and saved-scan APIs are enabled only
