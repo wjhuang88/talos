@@ -12,14 +12,20 @@ use talos_core::session::CompactOutcome;
 use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, ToolResult};
 use tokio::sync::{mpsc, oneshot};
 
+#[cfg(test)]
+type QueryCompletionHook = Box<dyn FnOnce() + Send>;
+
 #[derive(Clone)]
 pub(crate) struct Execution {
     sender: mpsc::UnboundedSender<crate::AgentActorRequest>,
     state: Arc<Mutex<State>>,
     permission: Option<Arc<talos_permission::PermissionSessionState>>,
+    #[cfg(test)]
+    after_history_query: Arc<Mutex<Option<QueryCompletionHook>>>,
 }
 #[derive(Default)]
 struct State {
+    generation: Option<u64>,
     current: Option<Snapshot>,
     recovery: Option<(String, String, PermissionLease)>,
     issued: Option<Snapshot>,
@@ -65,6 +71,8 @@ impl Execution {
             sender,
             state: Arc::new(Mutex::new(State::default())),
             permission,
+            #[cfg(test)]
+            after_history_query: Arc::new(Mutex::new(None)),
         }
     }
     pub(crate) fn refresh(&self, source: Option<&HistorySource>, messages: &[Message]) {
@@ -102,6 +110,15 @@ impl Execution {
             })
         });
         if let Ok(mut state) = self.state.lock() {
+            let generation = source.map(HistorySource::generation);
+            // None explicitly withdraws source authority. A valid same-generation
+            // append may lack a compaction snapshot but retains recovery discovery.
+            if generation.is_none() || state.generation != generation {
+                state.issued = None;
+                state.recovery = None;
+                state.cursor = None;
+            }
+            state.generation = generation;
             state.current = snapshot;
         }
     }
@@ -222,6 +239,7 @@ impl AgentTool for HistorySearchTool {
             if !authority.valid() {
                 return unavailable();
             }
+            let delivery_deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
             let result = crate::checkpoint_history::HISTORY
                 .try_with(|history| {
                     history.as_ref()?.query(
@@ -232,13 +250,58 @@ impl AgentTool for HistorySearchTool {
                 })
                 .ok()
                 .flatten();
-            return authority
-                .commit(|| {
-                    if !crate::checkpoint_history::HISTORY
+            #[cfg(test)]
+            {
+                let hook = execution
+                    .after_history_query
+                    .lock()
+                    .expect("query hook")
+                    .take();
+                if let Some(hook) = hook {
+                    hook();
+                }
+            }
+            // Revalidate after query construction. Keep execution state stable
+            // through permission commit, using the same state -> permission lock
+            // order as discovery. Filesystem/SQLite checks stay outside that lock.
+            let Ok(state) = execution.state.lock() else {
+                return unavailable();
+            };
+            let snapshot_current = if let Some((token, scope, _)) = &state.recovery {
+                input.snapshot.as_deref() == Some(token.as_str())
+                    && crate::checkpoint_history::HISTORY
                         .try_with(|history| {
-                            history.as_ref().is_some_and(|history| !history.cancelled())
+                            history
+                                .as_ref()
+                                .is_some_and(|history| history.scope_identity() == scope)
                         })
                         .unwrap_or(false)
+            } else if let (Some(issued), Some(current)) = (&state.issued, &state.current) {
+                input.snapshot.as_deref() == Some(issued.token.as_str())
+                    && current.end >= issued.end
+                    && (0..issued.end).all(|i| issued.source.same_entry(&current.source, i))
+            } else {
+                false
+            };
+            if !snapshot_current
+                || !crate::checkpoint_history::HISTORY
+                    .try_with(|history| {
+                        history
+                            .as_ref()
+                            .is_some_and(|history| history.available_until(delivery_deadline))
+                    })
+                    .unwrap_or(false)
+            {
+                return unavailable();
+            }
+            return authority
+                .commit(|| {
+                    if std::time::Instant::now() >= delivery_deadline
+                        || !crate::checkpoint_history::HISTORY
+                            .try_with(|history| {
+                                history.as_ref().is_some_and(|history| !history.cancelled())
+                            })
+                            .unwrap_or(false)
                     {
                         return unavailable();
                     }
@@ -538,6 +601,84 @@ mod tests {
         execution.refresh(Some(&source), &raw);
         (execution, receiver, raw)
     }
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn history_result_rechecks_mutation_reset_and_cancel_after_query() {
+        for recovery_only in [false, true] {
+            for change in [
+                "source",
+                "execution",
+                "generation",
+                "permission",
+                "cancel",
+                "append",
+            ] {
+                let (execution, _, mut raw) = fixture();
+                if recovery_only {
+                    // A short source is valid for durable recovery but has no
+                    // eligible compaction prefix.
+                    raw.truncate(2);
+                    let source = HistorySource::bind(
+                        0,
+                        raw.len() as u64,
+                        &raw,
+                        (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
+                    )
+                    .expect("short recovery-only source");
+                    execution.refresh(Some(&source), &raw);
+                    assert!(execution.state.lock().expect("state").current.is_none());
+                }
+                let root = tempfile::tempdir().expect("root");
+                let durable =
+                    talos_session::DurableSession::open_or_create(root.path(), "delivery-race")
+                        .expect("session");
+                durable
+                    .commit_turn("prior", &raw, &Default::default())
+                    .expect("commit");
+                let cancel = tokio_util::sync::CancellationToken::new();
+                let history = crate::checkpoint_history::History::prepare(&durable, &cancel)
+                    .await
+                    .expect("history");
+                crate::checkpoint_history::HISTORY.scope(Some(history), EXECUTION.scope(execution.clone(), async {
+                let discovery = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+                assert!(!discovery.is_error);
+                let discovery: Value = serde_json::from_str(&discovery.content).expect("snapshot");
+                let baseline = HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"authorized"})).await;
+                assert!(!baseline.is_error, "healthy query must succeed before {change}");
+                assert!(baseline.content.contains("authorized source 0"));
+                let current_execution = execution.clone();
+                let path = durable.file_path().to_path_buf();
+                let cancelled = cancel.clone();
+                *execution.after_history_query.lock().expect("hook") = Some(Box::new(move || {
+                    match change {
+                        "source" => {
+                            let mut bytes = std::fs::read(&path).expect("source");
+                            let offset = bytes.windows(b"authorized source".len())
+                                .position(|window| window == b"authorized source").expect("original fact");
+                            bytes[offset] = b'X';
+                            std::fs::write(&path, bytes).expect("same-size mutation");
+                        }
+                        "execution" => current_execution.refresh(None, &[]),
+                        "generation" | "append" => {
+                            if change == "append" { raw.push(Message::User { content: "later append".into() }); }
+                            let generation = u64::from(change == "generation");
+                            let source = HistorySource::bind(generation, raw.len() as u64, &raw,
+                                (0..raw.len()).map(|i| format!("raw-{i}")).collect()).expect("next generation");
+                            current_execution.refresh(Some(&source), &raw);
+                        }
+                        "permission" => current_execution.permission.as_ref().expect("permission").clear().expect("reset"),
+                        "cancel" => cancelled.cancel(),
+                        _ => unreachable!(),
+                    }
+                }));
+                let result = HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"authorized"})).await;
+                assert_eq!(result.is_error, change != "append", "change={change}, recovery_only={recovery_only}: {}", result.content);
+                if result.is_error { assert!(!result.content.contains("authorized source"), "no stale content"); }
+            })).await;
+            }
+        }
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn real_history_tool_search_detail_uses_host_prepared_durable_source() {

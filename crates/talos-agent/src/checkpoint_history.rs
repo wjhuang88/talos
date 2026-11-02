@@ -424,11 +424,18 @@ impl History {
     }
 
     pub(crate) fn available(&self) -> bool {
+        self.available_until(Instant::now() + Duration::from_secs(2))
+    }
+
+    pub(crate) fn available_until(&self, deadline: Instant) -> bool {
+        if Instant::now() >= deadline {
+            return false;
+        }
         let stopped = self.cancel.clone();
-        let budget =
-            RecoveryWorkBudget::with_cancellation_check(Duration::from_secs(2), move || {
-                stopped.is_cancelled()
-            });
+        let budget = RecoveryWorkBudget::with_cancellation_check(
+            deadline.saturating_duration_since(Instant::now()),
+            move || stopped.is_cancelled(),
+        );
         self.current()
             && SessionIndex::open_read_only(&self.path)
                 .ok()
@@ -438,6 +445,7 @@ impl History {
                         .unwrap_or(false)
                 })
             && self.current()
+            && Instant::now() < deadline
     }
 
     pub(crate) fn query(

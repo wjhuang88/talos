@@ -1571,3 +1571,31 @@ both governance validators pass. Logs: `/private/tmp/i313-double-restart-clippy.
 `/private/tmp/i313-double-restart-governance.log`, `/private/tmp/i313-double-restart-claims.log`.
 Independent static review approves the corrected fixture only, without executing
 tests or certifying cross-process/fork/full I313 acceptance.
+
+### History result post-query revalidation — local
+
+HistorySearch now revalidates the issued/current source or recovery-only token/scope
+after query construction. It retains the execution-state guard through the
+permission snapshot commit, using discovery's state→permission lock order. Source
+stamp and SQLite owner-scope checks run before acquiring the permission lock;
+cancellation and the shared two-second delivery deadline are checked inside commit.
+The added scope check uses only the remaining query/delivery budget.
+
+Execution refresh now tracks valid-source generation: explicit source withdrawal
+or a generation change clears issued/recovery/cursor state; a valid same-generation
+append preserves recovery discovery. Deterministic post-query hooks test both
+compaction-eligible and recovery-only paths against same-size source mutation,
+execution withdrawal, changed generation with the same entry IDs, permission
+reset and cancellation. Each starts with a successful healthy query; same-generation
+append is a positive control. All eight checkpoint_tools tests pass at
+`/private/tmp/i313-history-delivery-race.log`; full Agent/Clippy are running.
+
+Independent static review approves the revised increment only. This narrows the
+source/index-to-permission delivery window; it does not make external file/index
+changes atomic with permission commit or synchronous I/O hard real-time. The
+complete delivery coordination requirement remains open, alongside large-source
+persistent verification, fork composition, Windows and final candidate gates.
+
+Current delta passes Agent 628/628 and affected all-target warnings-denied Clippy:
+`/private/tmp/i313-history-delivery-agent.log`, `/private/tmp/i313-history-delivery-clippy.log`.
+These are local incremental checks, not full candidate platform/merge approval.
