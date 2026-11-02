@@ -81,10 +81,20 @@ struct ScanStore {
 impl ScanStore {
     fn clear(&self) {
         if let Some(receipt) = &self.receipt {
-            let _ = self.owner.clear_recovery_scan(
-                receipt,
-                &RecoveryWorkBudget::new(Duration::from_millis(100)),
-            );
+            for attempt in 0..3 {
+                match self.owner.clear_recovery_scan(
+                    receipt,
+                    &RecoveryWorkBudget::new(Duration::from_millis(100)),
+                ) {
+                    Ok(true) | Ok(false) => return,
+                    Err(_) if attempt < 2 => {
+                        tracing::debug!(attempt, "checkpoint cleanup will retry");
+                    }
+                    Err(_) => {
+                        tracing::warn!("checkpoint cleanup failed after retries");
+                    }
+                }
+            }
         }
     }
 }
@@ -273,12 +283,7 @@ impl Preparation {
     }
     fn retire(&self) {
         #[cfg(unix)]
-        if let Some(receipt) = &self.scan_store.receipt {
-            let _ = self
-                .scan_store
-                .owner
-                .clear_recovery_scan(receipt, &RecoveryWorkBudget::new(Duration::from_secs(1)));
-        }
+        self.scan_store.clear();
         if let Ok(index) = SessionIndex::new(&self.path) {
             let _ = index.clear_recovery_continuation(
                 &self.scope,

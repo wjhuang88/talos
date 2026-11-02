@@ -1814,3 +1814,24 @@ proves no seal is issued, but does not distinguish digest rejection from timeout
 no stronger terminal-cause claim is made. Affected all-target Clippy passes at
 `/private/tmp/i313-prefix-clippy.log`. Fetch confirms no missing origin/main
 commits at this stage; no rebase is necessary.
+
+### Cleanup failure observability and bounded retries
+
+Scan retirement and cancelled-task Drop now share exact-receipt cleanup with at
+most three immediate attempts per invocation and content-free debug/warn events.
+Real SQLite BEGIN IMMEDIATE contention regression proves failure retains a usable
+receipt, rollback permits retry, and successful deletion is idempotent
+(`/private/tmp/i313-cleanup-busy.log`). No durable cleanup guarantee is claimed:
+sustained locks can defeat immediate retries, budgets are cooperative rather than
+hard I/O deadlines, and retire plus Drop can each invoke a retry group.
+Independent static review approves the two-file delta against `1404a247c`
+(SHA256 `d616cea45ab3f86041bc484d1d7bd698975403583b50798226c3932b8e887cbf`),
+not full I313; reviewer did not run tests. Host preparation suite passed before
+the final common-helper deduplication; final affected checks are recorded below.
+
+Final cleanup delta host suite passes 16/16
+(`/private/tmp/i313-cleanup-final-host.log`); affected all-target warnings-denied
+Clippy passes (`/private/tmp/i313-cleanup-clippy.log`). Next uncovered acceptance
+is actual durable fork integration: generic CLI fork does not supply durable
+bindings/lineage authority. A host-only bounded prefix-fork design is under
+independent architecture review; no fork implementation is claimed yet.

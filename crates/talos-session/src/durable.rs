@@ -1349,6 +1349,32 @@ fn is_sensitive_key(key: &str) -> bool {
 mod tests {
     #[cfg(unix)]
     #[test]
+    fn busy_scan_cleanup_keeps_receipt_valid_for_retry() {
+        let root = tempfile::tempdir().expect("root");
+        let owner =
+            super::DurableSession::open_or_create(root.path(), "cleanup-retry").expect("owner");
+        let scan = owner
+            .capture_recovery_source()
+            .expect("source")
+            .begin_prefix_seal()
+            .expect("scan");
+        let budget = crate::sqlite::RecoveryWorkBudget::new(std::time::Duration::from_secs(2));
+        let receipt = owner.save_recovery_scan(&scan, &budget).expect("save");
+        let blocker = rusqlite::Connection::open(root.path().join("durable-bindings.sqlite"))
+            .expect("connection");
+        blocker.execute_batch("BEGIN IMMEDIATE").expect("lock");
+        assert!(owner.clear_recovery_scan(&receipt, &budget).is_err());
+        blocker.execute_batch("ROLLBACK").expect("unlock");
+        assert!(owner.clear_recovery_scan(&receipt, &budget).expect("retry"));
+        assert!(
+            !owner
+                .clear_recovery_scan(&receipt, &budget)
+                .expect("idempotent")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn recovery_storage_panic_rolls_back_and_binding_delete_cleans_scan() {
         let root = tempfile::tempdir().expect("root");
         let owner = DurableSession::open_or_create(root.path(), "cleanup").expect("owner");
