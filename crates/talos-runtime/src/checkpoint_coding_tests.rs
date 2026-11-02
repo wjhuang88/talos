@@ -97,6 +97,43 @@ struct CodingModel {
 impl LanguageModel for CodingModel {
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let step = self.step.fetch_add(1, Ordering::SeqCst);
+        if !self.recovering && matches!(step, 2 | 4) {
+            let actual = messages
+                .iter()
+                .find_map(|message| match message {
+                    Message::Context { content } if content.starts_with("[Derived checkpoint;") => {
+                        Some(content)
+                    }
+                    _ => None,
+                })
+                .expect("registered checkpoint installed");
+            // Runtime resolves model aliases to authoritative source identities before
+            // rendering. Test canonical bytes at that installed boundary.
+            let payload = actual
+                .strip_prefix("[Derived checkpoint; source history remains authoritative]\n")
+                .expect("projection envelope");
+            let parsed = talos_agent::compaction::Checkpoint::parse(payload, |_| true)
+                .expect("installed schema");
+            assert_eq!(
+                parsed.summary.text,
+                if step == 2 {
+                    "coding checkpoint A"
+                } else {
+                    "coding checkpoint B"
+                }
+            );
+            assert_eq!(parsed.render(1_000_000).expect("render installed"), payload);
+            let reordered: Value = serde_json::from_str(payload).expect("reordered object");
+            let roundtrip = talos_agent::compaction::Checkpoint::parse(
+                &serde_json::to_string(&reordered).expect("serialize object"),
+                |_| true,
+            )
+            .expect("same semantic input");
+            assert_eq!(
+                roundtrip.render(1_000_000).expect("render roundtrip"),
+                payload
+            );
+        }
         let events = if !self.recovering
             && matches!(step, 1 | 3)
             && self.rejected_probe.load(Ordering::SeqCst) < step
