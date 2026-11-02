@@ -1,6 +1,6 @@
 # SEARCH-001-H: Explicit Premium And Self-Hosted Search Overrides
 
-**Status**: Proposed / Unclaimed
+**Status**: Planned / Unclaimed
 **Type**: Implementation / Policy Child
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -9,9 +9,9 @@
 | Story ID | SEARCH-001-H |
 | Source Issue | [#832](https://github.com/wjhuang88/talos/issues/832) |
 | Depends on | Accepted ADR-085/ADR-090; SEARCH-001-C / #643 complete at #808 merge `eb870cdf0a63f45f20d89f1a50eba276f9198643` |
-| Selected Iteration | None — intake only; no implementation authority |
+| Selected Iteration | [I314](../../iterations/I314-search-explicit-overrides.md) — Planned / Unclaimed; no implementation authority |
 | Implementation PR | None |
-| Last Updated | 2026-11-01 |
+| Last Updated | 2026-11-02 |
 
 ## Collaboration Claim
 
@@ -20,13 +20,13 @@
 | Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | None until a bounded iteration and claim are accepted |
+| Work Slice | Not assigned; I314 is planning only until an atomic claim+activation is accepted |
 | Claimed At | Not applicable |
 | Source Issue | #832 |
 | Governance Claim PR | Not applicable |
 | Authorization Mode | Not applicable |
-| Authorization Evidence | Intake only; Issue/owner existence does not authorize production changes. |
-| Handoff / Release Condition | Select a bounded iteration and merge an effective claim before implementation. SEARCH-001-E/F remain separately blocked because D admission did not occur. |
+| Authorization Evidence | Planning only; Story/iteration existence does not authorize production changes. |
+| Handoff / Release Condition | Re-run nonterminal iteration inventory and merge one effective claim+activation before implementation. Existing Active work remains independently owned; SEARCH-001-E/F stay separately blocked because D admission did not occur. |
 
 ## Goal
 
@@ -47,7 +47,8 @@ in the environment must not silently select paid usage or change the default sea
 
 ## Constraints
 
-- No implementation before a selected iteration and effective collaboration claim.
+- No implementation before an effective collaboration claim and Active iteration state.
+- I314 is currently Planned / Unclaimed only; selecting it does not reserve ownership or authorize a branch/implementation PR.
 - Preserve the model-facing `web_search` schema and Network permission unless separately reviewed.
 - Do not create a second generic retry/backoff/circuit-breaker system; reuse SEARCH-001-C and
   NET-001/#199 boundaries.
@@ -84,4 +85,4 @@ in the environment must not silently select paid usage or change the default sea
 ## Rollback
 
 Retain the currently shipped compatibility configuration and provider adapters until an H
-implementation has explicit migration/rollback evidence. Intake alone changes no runtime behavior.
+implementation has explicit migration/rollback evidence. Planning alone changes no runtime behavior.
