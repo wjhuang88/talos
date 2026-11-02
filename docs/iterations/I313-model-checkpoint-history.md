@@ -2,7 +2,7 @@
 
 ## Lifecycle paging local increment — 2026-11-02
 
-Uncommitted increment after `0b454998a`: `/resume` and model activation use one
+Implementation `5bb33ccca` after `0b454998a`: `/resume` and model activation use one
 paged snapshot for messages and last decoded entry. Restore errors preserve their
 cause; no search authority is inferred. The tail excludes invalid JSONL and
 incomplete TLOG suffixes. CLI fork remains full-file copy and is not migrated.
@@ -47,6 +47,12 @@ deadline remain. Independent review approved single-file diff SHA256
 `f0e7b17dbb9ef75d4db24d87b615b7484dc4fd8de128d1eaaeff5f360776027e`.
 The completed preflight used the prior Agent test artifact, so the new test needs
 separate verification; native Windows exact-head evidence remains outstanding.
+
+Test-only follow-up `dc027b9be` passed the actual checkpoint/fork/restart fixture
+locally in 16.11 seconds (`/private/tmp/i313-restart-idle-fix.log`). The preceding
+published-head run `41409161521` is terminal failure, not a pending gate.
+Fetched target remains `d324c3348f1bb64a3a7b0a0682e14fc97c6293c3`; the local
+stage is ready for fresh native CI, not final merge or full T5 completion.
 
 > Document status: Review / Partial (#819 merged; stable stage candidate, full implementation remains unmerged)
 > Published plan date: 2026-11-01
