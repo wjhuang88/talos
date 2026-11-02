@@ -59,11 +59,14 @@ impl QueryState {
 /// Host-owned progress; no partial state authorizes query results.
 pub(crate) struct Preparation {
     source: talos_session::DurableRecoverySource,
-    scan: talos_session::RecoveryPrefixScan,
+    scan: Option<talos_session::RecoveryPrefixScan>,
+    seal: Option<RecoveryPrefixSeal>,
     path: std::path::PathBuf,
     scope: String,
     parent: Option<String>,
     resolved: bool,
+    #[cfg(test)]
+    after_page_read: Option<Box<dyn FnOnce() + Send>>,
 }
 #[derive(Debug, PartialEq, Eq)]
 enum PreparationStep {
@@ -96,6 +99,27 @@ impl Preparation {
             move || stopped.is_cancelled(),
         );
         index.init_recovery_schema_with_budget(&budget).ok()?;
+        if let Ok(Some(saved)) = index.recovery_continuation(&session.id().to_string(), &budget)
+            && let Some((source, scan)) = source
+                .recovery_prefix_at(saved.prefix.cutoff())
+                .ok()
+                .and_then(|source| {
+                    let scan = source.verify_prefix_expectation(&saved.prefix).ok()?;
+                    Some((source, scan))
+                })
+        {
+            return Some(Self {
+                source,
+                scan: Some(scan),
+                seal: None,
+                path,
+                scope: saved.scope,
+                parent: saved.parent,
+                resolved: false,
+                #[cfg(test)]
+                after_page_read: None,
+            });
+        }
         let scope = uuid::Uuid::new_v4().to_string();
         index
             .replace_recovery_owner_scope(&session.id().to_string(), &scope, &budget)
@@ -105,22 +129,76 @@ impl Preparation {
             .ok()?;
         Some(Self {
             source,
-            scan,
+            scan: Some(scan),
+            seal: None,
             path,
             scope,
             parent: None,
             resolved: false,
+            #[cfg(test)]
+            after_page_read: None,
         })
     }
+    fn persist(&self, cancel: &CancellationToken, deadline: Instant) -> Option<()> {
+        // During revalidation retain the previous checkpoint; no new index page
+        // can commit until the scan finishes and installs the refreshed seal.
+        if self.scan.is_some() {
+            return Some(());
+        }
+        let Some(seal) = &self.seal else {
+            return Some(());
+        };
+        seal.check_current().ok()?;
+        let stopped = cancel.clone();
+        let budget = RecoveryWorkBudget::with_cancellation_check(
+            deadline.saturating_duration_since(Instant::now()),
+            move || stopped.is_cancelled(),
+        );
+        let index = SessionIndex::new(&self.path).ok()?;
+        let cursor = index.recovery_build_cursor(&self.scope, &budget).ok()??;
+        index
+            .save_recovery_continuation(
+                &self.source.session_id().to_string(),
+                &talos_session::sqlite::RecoveryContinuation {
+                    scope: self.scope.clone(),
+                    offset: cursor.next_offset(),
+                    ordinal: cursor.next_ordinal(),
+                    parent: self.parent.clone(),
+                    prefix: seal.expectation(),
+                },
+                &budget,
+            )
+            .ok()?;
+        seal.check_current().ok()?;
+        Some(())
+    }
+    fn retire(&self) {
+        if let Ok(index) = SessionIndex::new(&self.path) {
+            let _ = index.clear_recovery_continuation(
+                &self.scope,
+                &RecoveryWorkBudget::new(Duration::from_secs(1)),
+            );
+        }
+    }
+
     fn step(
         &mut self,
         cancel: &CancellationToken,
         operation_deadline: Instant,
     ) -> Option<PreparationStep> {
         let deadline = operation_deadline.min(Instant::now() + Duration::from_secs(2));
-        if self.resolved {
-            return match self.scan.step(deadline, || cancel.is_cancelled()) {
-                Ok(true) => Some(PreparationStep::Complete),
+        if cancel.is_cancelled() {
+            return None;
+        }
+        if self.scan.is_none() && self.seal.as_ref()?.check_current().is_err() {
+            self.scan = Some(self.seal.as_ref()?.begin_verification().ok()?);
+        }
+        if let Some(scan) = &mut self.scan {
+            return match scan.step(deadline, || cancel.is_cancelled()) {
+                Ok(true) => {
+                    self.seal = Some(self.scan.take()?.finish().ok()?);
+                    Some(PreparationStep::Pending)
+                }
                 Ok(false) => Some(PreparationStep::Pending),
                 Err(talos_session::history_page::HistoryPageError::Stopped)
                     if !cancel.is_cancelled() =>
@@ -130,13 +208,29 @@ impl Preparation {
                 Err(_) => None,
             };
         }
+        if self.resolved {
+            return Some(PreparationStep::Complete);
+        }
         let stopped = cancel.clone();
         let budget = RecoveryWorkBudget::with_cancellation_check(
             deadline.saturating_duration_since(Instant::now()),
             move || stopped.is_cancelled(),
         );
         let mut index = SessionIndex::new(&self.path).ok()?;
-        let cursor = index.recovery_build_cursor(&self.scope, &budget).ok()??;
+        let retry = || {
+            (!cancel.is_cancelled()
+                && budget.deadline_interrupted()
+                && self
+                    .seal
+                    .as_ref()
+                    .is_some_and(|seal| seal.check_current().is_ok()))
+            .then_some(PreparationStep::Expired)
+        };
+        let cursor = match index.recovery_build_cursor(&self.scope, &budget) {
+            Ok(Some(cursor)) => cursor,
+            Ok(None) => return None,
+            Err(_) => return retry(),
+        };
         if !cursor.complete() {
             let page = match self
                 .source
@@ -150,6 +244,13 @@ impl Preparation {
                 }
                 Err(_) => return None,
             };
+            #[cfg(test)]
+            if let Some(hook) = self.after_page_read.take() {
+                hook();
+            }
+            // Never cache a page read across file versions, even if the original
+            // prefix is restored before the next continuation attempt.
+            self.seal.as_ref()?.check_current().ok()?;
             let mut parent = self.parent.clone();
             for entry in &page.entries {
                 if entry.parent_id != parent {
@@ -168,7 +269,7 @@ impl Preparation {
                     record_range: Some(page.record_ranges[i].clone()),
                 })
                 .collect();
-            index
+            if index
                 .advance_recovery_build(
                     &self.scope,
                     &cursor,
@@ -179,14 +280,23 @@ impl Preparation {
                     },
                     &budget,
                 )
-                .ok()?;
+                .is_err()
+            {
+                return retry();
+            }
+            self.seal.as_ref()?.check_current().ok()?;
             self.parent = parent;
             return Some(PreparationStep::Pending);
         }
         if !self.resolved {
-            self.resolved = index
-                .resolve_recovery_pending(&self.scope, &self.source, &budget)
-                .ok()?;
+            self.resolved = match index.resolve_recovery_pending(&self.scope, &self.source, &budget)
+            {
+                Ok(resolved) => resolved,
+                Err(_) => return retry(),
+            };
+            // Resolution rereads source records internally. If its transaction
+            // committed across a version change, discard this whole preparation.
+            self.seal.as_ref()?.check_current().ok()?;
             return Some(PreparationStep::Pending);
         }
         Some(PreparationStep::Pending)
@@ -233,6 +343,7 @@ impl History {
             .or_else(|| Preparation::begin(session, cancel, deadline))?;
         loop {
             if cancel.is_cancelled() {
+                work.retire();
                 return None;
             }
             if Instant::now() >= deadline {
@@ -240,13 +351,25 @@ impl History {
                 return None;
             }
             match work.step(cancel, deadline) {
-                Some(PreparationStep::Complete) => break,
-                Some(PreparationStep::Pending) => tokio::task::yield_now().await,
+                Some(PreparationStep::Complete) => {
+                    work.retire();
+                    break;
+                }
+                Some(PreparationStep::Pending) => {
+                    if work.persist(cancel, deadline).is_none() {
+                        work.retire();
+                        return None;
+                    }
+                    tokio::task::yield_now().await;
+                }
                 Some(PreparationStep::Expired) => {
                     *pending = Some(work);
                     return None;
                 }
-                None => return None,
+                None => {
+                    work.retire();
+                    return None;
+                }
             }
         }
         Some(Self {
@@ -254,7 +377,7 @@ impl History {
             scope: work.scope,
             owner: session.id().to_string(),
             cancel: cancel.clone(),
-            seal: work.scan.finish().ok()?,
+            seal: work.seal?,
             state: Mutex::new(QueryState::default()),
         })
     }
@@ -418,6 +541,334 @@ impl History {
 mod tests {
     use super::*;
     #[tokio::test]
+    async fn invalid_persisted_version_rebuilds_and_cutoff_mismatch_is_not_saved() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "bad-resume").expect("session");
+        session
+            .commit_turn(
+                "first",
+                &[talos_core::message::Message::User {
+                    content: "original fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let cancel = CancellationToken::new();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut work = Preparation::begin(&session, &cancel, deadline).expect("begin");
+        while work.seal.is_none() {
+            assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+        }
+        work.persist(&cancel, deadline).expect("persist");
+        let index = SessionIndex::new(&work.path).expect("index");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+        let owner = session.id().to_string();
+        let saved = index
+            .recovery_continuation(&owner, &budget)
+            .expect("load")
+            .expect("saved");
+        let mut json = serde_json::to_value(&saved).expect("json");
+        json["prefix"]["cutoff"] = json!(saved.prefix.cutoff() + 1);
+        let bad = serde_json::from_value(json).expect("bad cutoff");
+        assert!(
+            index
+                .save_recovery_continuation(&owner, &bad, &budget)
+                .is_err()
+        );
+        let mut json = serde_json::to_value(&saved).expect("json");
+        json["prefix"]["version"] = json!(255);
+        let bad = serde_json::from_value(json).expect("future version");
+        index
+            .save_recovery_continuation(&owner, &bad, &budget)
+            .expect("untrusted version stored");
+        let old_scope = work.scope.clone();
+        drop(work);
+        let rebuilt = Preparation::begin(&session, &cancel, deadline)
+            .expect("bad record must not block new build");
+        assert_ne!(rebuilt.scope, old_scope);
+        let pending = tokio::sync::Mutex::new(Some(rebuilt));
+        assert!(
+            History::prepare_cached(&session, &cancel, &pending)
+                .await
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn crash_between_page_commit_and_metadata_save_rebuilds_instead_of_reusing_parent() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "crash-gap").expect("session");
+        session
+            .commit_turn(
+                "first",
+                &[talos_core::message::Message::User {
+                    content: "crashgap fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let cancel = CancellationToken::new();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut work = Preparation::begin(&session, &cancel, deadline).expect("begin");
+        while work.seal.is_none() {
+            assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+        }
+        work.persist(&cancel, deadline).expect("save zero cursor");
+        let old_scope = work.scope.clone();
+        assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+        assert!(work.parent.is_some());
+        // Simulate a process exit before saving metadata for the committed page.
+        drop(work);
+        let rebuilt = Preparation::begin(&session, &cancel, deadline).expect("rebuild mismatch");
+        assert_ne!(rebuilt.scope, old_scope);
+        assert!(rebuilt.parent.is_none());
+        let pending = tokio::sync::Mutex::new(Some(rebuilt));
+        let history = History::prepare_cached(&session, &cancel, &pending)
+            .await
+            .expect("rebuilt history");
+        assert_eq!(
+            history.query(Some("crashgap"), None, None).expect("query")["results"][0]["text"],
+            "crashgap fact"
+        );
+    }
+
+    #[test]
+    fn preparation_restart_child() {
+        let Ok(root) = std::env::var("TALOS_TEST_RECOVERY_RESTART_ROOT") else {
+            return;
+        };
+        let expected = std::env::var("TALOS_TEST_RECOVERY_RESTART_SCOPE").expect("scope");
+        tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(async {
+                let session = DurableSession::open_or_create(
+                    std::path::Path::new(&root),
+                    "restart-preparation",
+                )
+                .expect("child reopen");
+                let cancel = CancellationToken::new();
+                let work =
+                    Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(10))
+                        .expect("child restore");
+                assert_eq!(work.scope, expected);
+                assert!(work.parent.is_some());
+                assert!(work.seal.is_none());
+                let pending = tokio::sync::Mutex::new(Some(work));
+                let history = History::prepare_cached(&session, &cancel, &pending)
+                    .await
+                    .expect("child resume");
+                assert_eq!(history.scope_identity(), expected);
+                assert!(
+                    history.query(Some("29"), None, None).expect("last fact")["results"][0]["text"]
+                        .as_str()
+                        .expect("text")
+                        .starts_with("restartfact 29")
+                );
+            });
+    }
+
+    #[tokio::test]
+    async fn persisted_preparation_reopens_and_resumes_same_index_scope() {
+        let root = tempfile::tempdir().expect("root");
+        let session =
+            DurableSession::open_or_create(root.path(), "restart-preparation").expect("session");
+        let raw: Vec<_> = (0..30)
+            .map(|i| talos_core::message::Message::User {
+                content: format!("restartfact {i} {}", "x".repeat(100_000)),
+            })
+            .collect();
+        session
+            .commit_turn("first", &raw, &Default::default())
+            .expect("commit");
+        let cancel = CancellationToken::new();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut work = Preparation::begin(&session, &cancel, deadline).expect("begin");
+        while work.seal.is_none() {
+            assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+        }
+        assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+        work.persist(&cancel, deadline)
+            .expect("persist continuation");
+        let scope = work.scope.clone();
+        let parent = work.parent.clone();
+        assert!(parent.is_some());
+        drop(work);
+        drop(session);
+        let mut child = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .args([
+                "--exact",
+                "checkpoint_history::tests::preparation_restart_child",
+                "--nocapture",
+            ])
+            .env("TALOS_TEST_RECOVERY_RESTART_ROOT", root.path())
+            .env("TALOS_TEST_RECOVERY_RESTART_SCOPE", &scope)
+            .spawn()
+            .expect("spawn independent recovery process");
+        let until = Instant::now() + Duration::from_secs(30);
+        loop {
+            if let Some(status) = child.try_wait().expect("child status") {
+                assert!(status.success());
+                break;
+            }
+            if Instant::now() >= until {
+                child.kill().expect("kill timed out child");
+                let _ = child.wait();
+                panic!("child recovery timeout");
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        // The successful child retires restart metadata. Re-create it for the
+        // same-process verification below from a fresh bounded preparation.
+        let session = DurableSession::open_or_create(root.path(), "restart-preparation")
+            .expect("reopen fixture");
+        let mut work = Preparation::begin(&session, &cancel, deadline).expect("fresh begin");
+        while work.seal.is_none() {
+            assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+        }
+        assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+        work.persist(&cancel, deadline).expect("save again");
+        let scope = work.scope.clone();
+        let parent = work.parent.clone();
+        drop(work);
+        drop(session);
+        let reopened =
+            DurableSession::open_or_create(root.path(), "restart-preparation").expect("reopen");
+        let restored = Preparation::begin(&reopened, &cancel, deadline).expect("restored");
+        assert_eq!(restored.scope, scope);
+        assert_eq!(restored.parent, parent);
+        assert!(
+            restored.seal.is_none(),
+            "persisted digest is not a verified seal"
+        );
+        let pending = tokio::sync::Mutex::new(Some(restored));
+        let history = History::prepare_cached(&reopened, &cancel, &pending)
+            .await
+            .expect("resumed history");
+        assert_eq!(history.scope_identity(), scope);
+        assert!(
+            history.query(Some("29"), None, None).expect("last fact")["results"][0]["text"]
+                .as_str()
+                .expect("text")
+                .starts_with("restartfact 29")
+        );
+    }
+
+    #[tokio::test]
+    async fn mutation_then_restore_during_page_read_discards_preparation() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "mutation").expect("session");
+        session
+            .commit_turn(
+                "prior",
+                &[talos_core::message::Message::User {
+                    content: "originalfact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let cancel = CancellationToken::new();
+        let mut work =
+            Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(2))
+                .expect("begin");
+        while work.seal.is_none() {
+            assert_eq!(
+                work.step(&cancel, Instant::now() + Duration::from_secs(2)),
+                Some(PreparationStep::Pending)
+            );
+        }
+        let path = session.file_path().to_path_buf();
+        let original = std::fs::read(&path).expect("original");
+        work.after_page_read = Some(Box::new(move || {
+            std::fs::write(&path, b"temporary corrupt source").expect("mutate");
+            std::fs::write(&path, original).expect("restore bytes");
+        }));
+        let scope = work.scope.clone();
+        let index_path = work.path.clone();
+        let pending = tokio::sync::Mutex::new(Some(work));
+        assert!(
+            History::prepare_cached(&session, &cancel, &pending)
+                .await
+                .is_none()
+        );
+        assert!(pending.lock().await.is_none());
+        let index = SessionIndex::open_read_only(&index_path).expect("index");
+        let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+        assert_eq!(
+            index
+                .recovery_build_cursor(&scope, &budget)
+                .expect("cursor")
+                .expect("scope")
+                .next_ordinal(),
+            0
+        );
+        assert!(
+            index
+                .recovery_candidates(&scope, "originalfact", None, 20, &budget)
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn sealed_preparation_survives_real_append_without_extending_captured_cutoff() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "append").expect("session");
+        let raw: Vec<_> = (0..30)
+            .map(|i| talos_core::message::Message::User {
+                content: format!("oldfact {i} {}", "x".repeat(100_000)),
+            })
+            .collect();
+        session
+            .commit_turn("first", &raw, &Default::default())
+            .expect("commit");
+        let cancel = CancellationToken::new();
+        let mut work =
+            Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(2))
+                .expect("begin");
+        while work.seal.is_none() {
+            assert_eq!(
+                work.step(&cancel, Instant::now() + Duration::from_secs(2)),
+                Some(PreparationStep::Pending)
+            );
+        }
+        assert_eq!(
+            work.step(&cancel, Instant::now() + Duration::from_secs(2)),
+            Some(PreparationStep::Pending)
+        );
+        assert!(work.parent.is_some());
+        let scope = work.scope.clone();
+        session
+            .commit_turn(
+                "append",
+                &[talos_core::message::Message::User {
+                    content: "newfact outside cutoff".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("append");
+        let pending = tokio::sync::Mutex::new(Some(work));
+        let history = History::prepare_cached(&session, &cancel, &pending)
+            .await
+            .expect("revalidated continuation");
+        assert_eq!(history.scope_identity(), scope);
+        assert!(
+            !history
+                .query(Some("oldfact"), None, None)
+                .expect("old facts")["results"]
+                .as_array()
+                .expect("array")
+                .is_empty()
+        );
+        assert!(
+            history
+                .query(Some("newfact"), None, None)
+                .expect("query cutoff")["results"]
+                .as_array()
+                .expect("array")
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
     async fn expired_seal_step_can_resume_but_cancelled_step_cannot() {
         let root = tempfile::tempdir().expect("root");
         let session = DurableSession::open_or_create(root.path(), "seal-timeout").expect("session");
@@ -434,16 +885,16 @@ mod tests {
         let mut work =
             Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(2))
                 .expect("begin");
-        while !work.resolved {
-            assert_eq!(
-                work.step(&cancel, Instant::now() + Duration::from_secs(2)),
-                Some(PreparationStep::Pending)
-            );
-        }
+        let original_scope = work.scope.clone();
         assert_eq!(
             work.step(&cancel, Instant::now()),
             Some(PreparationStep::Expired)
         );
+        assert!(
+            work.parent.is_none(),
+            "expired SQLite cursor read must not advance parent"
+        );
+        assert_eq!(work.scope, original_scope);
         let cancelled = CancellationToken::new();
         cancelled.cancel();
         assert_eq!(
@@ -451,11 +902,14 @@ mod tests {
             None
         );
         // Both failures leave the seal scan unchanged; only timeout is resumable by the host.
-        assert_eq!(
-            work.step(&cancel, Instant::now() + Duration::from_secs(2)),
-            Some(PreparationStep::Complete)
-        );
-        assert!(work.scan.finish().is_ok());
+        loop {
+            match work.step(&cancel, Instant::now() + Duration::from_secs(2)) {
+                Some(PreparationStep::Complete) => break,
+                Some(PreparationStep::Pending) => {}
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+        assert!(work.seal.expect("seal").check_current().is_ok());
     }
 
     #[tokio::test]

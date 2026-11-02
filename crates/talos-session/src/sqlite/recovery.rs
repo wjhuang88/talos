@@ -24,6 +24,7 @@ pub enum RecoveryReadError {
 #[derive(Clone)]
 pub struct RecoveryWorkBudget {
     cancelled: Arc<AtomicBool>,
+    deadline_interrupted: Arc<AtomicBool>,
     external_stop: Option<Arc<dyn Fn() -> bool + Send + Sync>>,
     deadline: Instant,
 }
@@ -33,6 +34,7 @@ impl RecoveryWorkBudget {
     pub fn new(timeout: Duration) -> Self {
         Self {
             cancelled: Arc::new(AtomicBool::new(false)),
+            deadline_interrupted: Arc::new(AtomicBool::new(false)),
             external_stop: None,
             deadline: Instant::now() + timeout.min(Duration::from_secs(10)),
         }
@@ -51,12 +53,25 @@ impl RecoveryWorkBudget {
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);
     }
+    /// Whether a budget check actually stopped this operation at its deadline.
+    /// This records an observed stop, not elapsed wall time. Only use to retry
+    /// failed transactional maintenance; it never establishes source validity.
+    pub fn deadline_interrupted(&self) -> bool {
+        self.deadline_interrupted.load(Ordering::Acquire)
+    }
     fn stopped(&self) -> bool {
-        self.cancelled.load(Ordering::Acquire)
-            || Instant::now() >= self.deadline
+        if self.cancelled.load(Ordering::Acquire)
             || self.external_stop.as_ref().is_some_and(|check| {
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| check())).unwrap_or(true)
             })
+        {
+            return true;
+        }
+        if Instant::now() >= self.deadline {
+            self.deadline_interrupted.store(true, Ordering::Release);
+            return true;
+        }
+        false
     }
     fn check(&self) -> Result<(), IndexError> {
         if self.stopped() {
@@ -170,7 +185,98 @@ struct RecoveryPageAdvance<'a> {
     scanned_entries: u64,
 }
 
+/// Untrusted host continuation metadata, bound to an exact committed build cursor.
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryContinuation {
+    /// Existing host scope; not model-provided authority.
+    pub scope: String,
+    /// Byte offset matching the committed cache cursor.
+    pub offset: u64,
+    /// Source ordinal matching the committed cache cursor.
+    pub ordinal: u64,
+    /// Last scanned source entry, for linear parent validation.
+    pub parent: Option<String>,
+    /// Previously sealed source prefix, requiring full revalidation on reopen.
+    pub prefix: crate::RecoveryPrefixExpectation,
+}
+
 impl SessionIndex {
+    /// Save bounded continuation metadata only for the exact current owner/cursor.
+    /// A crash between page commit and this write causes resume refusal, not drift.
+    pub fn save_recovery_continuation(
+        &self,
+        owner: &str,
+        value: &RecoveryContinuation,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<(), IndexError> {
+        native_boundary(|| {
+            let encoded = serde_json::to_string(value).map_err(|_| invalid_build())?;
+            if encoded.len() > 4096
+                || owner.len() > 128
+                || value.offset > i64::MAX as u64
+                || value.ordinal > i64::MAX as u64
+                || value.prefix.cutoff() > i64::MAX as u64
+            {
+                return Err(invalid_build());
+            }
+            let _guard = install_budget(&self.conn, budget)?;
+            let tx = self.conn.unchecked_transaction()?;
+            let valid: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM recovery_host_scopes h JOIN recovery_builds b ON b.scope=h.scope WHERE h.owner=?1 AND h.scope=?2 AND b.next_offset=?3 AND b.next_ordinal=?4 AND b.source_end=?5)", params![owner,value.scope,value.offset as i64,value.ordinal as i64,value.prefix.cutoff() as i64], |row| row.get(0))?;
+            if !valid {
+                return Err(invalid_build());
+            }
+            tx.execute("INSERT INTO recovery_continuations(scope,payload) VALUES(?1,?2) ON CONFLICT(scope) DO UPDATE SET payload=excluded.payload", params![value.scope,encoded])?;
+            budget.check()?;
+            tx.commit()?;
+            Ok(())
+        })
+    }
+
+    /// Load only metadata whose owner and persisted cursor still match exactly.
+    /// The caller must verify the prefix and configured source before reuse.
+    pub fn recovery_continuation(
+        &self,
+        owner: &str,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<Option<RecoveryContinuation>, IndexError> {
+        native_boundary(|| {
+            let _guard = install_budget(&self.conn, budget)?;
+            let row: Option<(String,String,i64,i64,i64)> = self.conn.query_row("SELECT c.scope,c.payload,b.next_offset,b.next_ordinal,b.source_end FROM recovery_continuations c JOIN recovery_host_scopes h ON h.scope=c.scope JOIN recovery_builds b ON b.scope=c.scope WHERE h.owner=?1 AND length(c.payload)<=4096", [owner], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?))).optional()?;
+            row.map(|(scope, payload, offset, ordinal, end)| {
+                let value: RecoveryContinuation =
+                    serde_json::from_str(&payload).map_err(|_| invalid_build())?;
+                if end < 0
+                    || value.prefix.cutoff() != end as u64
+                    || value.scope != scope
+                    || offset < 0
+                    || ordinal < 0
+                    || value.offset != offset as u64
+                    || value.ordinal != ordinal as u64
+                    || value.parent.as_ref().is_some_and(|p| p.len() > 1024)
+                {
+                    return Err(invalid_build());
+                }
+                Ok(value)
+            })
+            .transpose()
+        })
+    }
+
+    /// Retire restart metadata after completion or failed source validation.
+    pub fn clear_recovery_continuation(
+        &self,
+        scope: &str,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<(), IndexError> {
+        native_boundary(|| {
+            let _guard = install_budget(&self.conn, budget)?;
+            self.conn
+                .execute("DELETE FROM recovery_continuations WHERE scope=?1", [scope])?;
+            Ok(())
+        })
+    }
+
     /// Replace a host owner's previous transient recovery scope atomically.
     /// This bounds retained per-owner cache copies; concurrent older readers
     /// fail closed as their candidate mappings disappear. Host maintenance only.
@@ -197,6 +303,7 @@ impl SessionIndex {
                 tx.execute("DELETE FROM recovery_projection_fts WHERE rowid IN (SELECT id FROM recovery_sources WHERE scope=?1)",[&old])?;
                 tx.execute("DELETE FROM recovery_locations WHERE source_id IN (SELECT id FROM recovery_sources WHERE scope=?1)",[&old])?;
                 for table in [
+                    "recovery_continuations",
                     "recovery_sources",
                     "recovery_terminals",
                     "recovery_pending",
@@ -504,6 +611,7 @@ impl SessionIndex {
             }
             let local = RecoveryWorkBudget {
                 cancelled: budget.cancelled.clone(),
+                deadline_interrupted: budget.deadline_interrupted.clone(),
                 external_stop: budget.external_stop.clone(),
                 deadline: budget.deadline.min(Instant::now() + Duration::from_secs(2)),
             };
@@ -602,6 +710,7 @@ impl SessionIndex {
     ) -> Result<Option<crate::history_projection::RecoveryText>, RecoveryReadError> {
         let local = RecoveryWorkBudget {
             cancelled: budget.cancelled.clone(),
+            deadline_interrupted: budget.deadline_interrupted.clone(),
             external_stop: budget.external_stop.clone(),
             deadline: budget.deadline.min(Instant::now() + Duration::from_secs(2)),
         };
@@ -721,7 +830,8 @@ impl SessionIndex {
             let _guard = install_budget(&self.conn, budget)?;
             let tx = self.conn.unchecked_transaction()?;
             tx.execute_batch(
-                "CREATE TABLE IF NOT EXISTS recovery_host_scopes (owner TEXT PRIMARY KEY, scope TEXT NOT NULL);
+                "CREATE TABLE IF NOT EXISTS recovery_continuations (scope TEXT PRIMARY KEY, payload TEXT NOT NULL);
+                 CREATE TABLE IF NOT EXISTS recovery_host_scopes (owner TEXT PRIMARY KEY, scope TEXT NOT NULL);
                  CREATE TABLE IF NOT EXISTS recovery_sources (
                     id INTEGER PRIMARY KEY, scope TEXT NOT NULL, entry_id TEXT NOT NULL,
                     ordinal INTEGER NOT NULL, UNIQUE(scope, entry_id), UNIQUE(scope, ordinal));
@@ -944,6 +1054,18 @@ use rusqlite::OptionalExtension;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn deadline_interruption_records_observed_stop_not_elapsed_time_or_cancellation() {
+        let budget = RecoveryWorkBudget::new(Duration::ZERO);
+        assert!(!budget.deadline_interrupted());
+        assert!(budget.check().is_err());
+        assert!(budget.deadline_interrupted());
+        let cancelled = RecoveryWorkBudget::new(Duration::ZERO);
+        cancelled.cancel();
+        assert!(cancelled.check().is_err());
+        assert!(!cancelled.deadline_interrupted());
+    }
+
     #[test]
     fn actual_tlog_later_page_marker_recovers_committed_tool_fact() {
         use talos_core::message::{Message, MessageToolResult, ToolCall};
@@ -1772,6 +1894,60 @@ mod tests {
                 .expect("next query"),
             1
         );
+    }
+
+    #[test]
+    fn actual_sql_deadline_interrupt_rolls_back_progress_and_allows_retry() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
+        index.init_recovery_schema().expect("schema");
+        let setup = RecoveryWorkBudget::new(Duration::from_secs(2));
+        index
+            .begin_recovery_build("scope", 100, &setup)
+            .expect("begin");
+        let budget = RecoveryWorkBudget::new(Duration::from_millis(50));
+        {
+            let _guard = install_budget(&index.conn, &budget).expect("install");
+            let tx = index.conn.unchecked_transaction().expect("transaction");
+            tx.execute(
+                "UPDATE recovery_builds SET next_offset=50,next_ordinal=1 WHERE scope='scope'",
+                [],
+            )
+            .expect("uncommitted progress");
+            let result = tx.query_row("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<1000000000) SELECT sum(x) FROM n", [], |row| row.get::<_, i64>(0));
+            assert!(
+                matches!(result, Err(rusqlite::Error::SqliteFailure(ref error, _)) if error.code == rusqlite::ErrorCode::OperationInterrupted)
+            );
+            assert!(budget.deadline_interrupted());
+            // Drop the failed transaction before restoring the progress handler.
+        }
+        let retry = RecoveryWorkBudget::new(Duration::from_secs(2));
+        let cursor = index
+            .recovery_build_cursor("scope", &retry)
+            .expect("cursor")
+            .expect("scope");
+        assert_eq!(cursor.next_offset(), 0);
+        assert_eq!(cursor.next_ordinal(), 0);
+        {
+            let _guard = install_budget(&index.conn, &retry).expect("retry guard");
+            let tx = index
+                .conn
+                .unchecked_transaction()
+                .expect("retry transaction");
+            tx.execute(
+                "UPDATE recovery_builds SET next_offset=50,next_ordinal=1 WHERE scope='scope'",
+                [],
+            )
+            .expect("retry progress");
+            tx.commit().expect("retry commit");
+        }
+        let cursor = index
+            .recovery_build_cursor("scope", &retry)
+            .expect("cursor")
+            .expect("scope");
+        assert_eq!(cursor.next_offset(), 50);
+        assert_eq!(cursor.next_ordinal(), 1);
+        assert!(!retry.deadline_interrupted());
     }
 
     #[test]

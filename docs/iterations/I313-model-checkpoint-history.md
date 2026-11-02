@@ -1244,3 +1244,108 @@ Final retained-preparation Agent 620/620 passes
 approves source/seal timeout retention without certifying SQLite timeout, append
 or restart continuation. Reviewer did not run tests. The source/seal refinement
 above is the current boundary and supersedes earlier all-step-discard wording.
+
+### Observed SQLite deadline interruption — local, unmerged
+
+RecoveryWorkBudget now records when its own check/progress handler actually
+observes deadline expiration, distinct from elapsed time and cancellation. Actor
+preparation retains pending state after failed cursor/page/receipt maintenance
+only with that observation and no cancellation. Successful completion still
+requires the source seal and current owner scope. This does not make generic DB
+errors retryable or confer source authority. Regression covers actual expired
+SQLite cursor lookup without parent advancement and observed-vs-elapsed/cancel
+semantics. Full tests/Clippy running in `/private/tmp/i313-sql-stop-tests.log`
+and `/private/tmp/i313-sql-stop-clippy.log`; independent review pending. Normal
+append and process restart remain open.
+
+Observed-stop validation: Agent 620/620, Session 254/254 and affected all-target
+warnings-denied Clippy pass (`/private/tmp/i313-sql-stop-tests.log`,
+`/private/tmp/i313-sql-stop-clippy.log`). Independent static review approves;
+reviewer did not run tests and notes the flag records an observed deadline stop,
+not necessarily an error's sole cause. Retention never authorizes disclosure.
+An additional real recursive SQLite query is interrupted mid-execution by its
+50 ms budget after an uncommitted cursor update: transaction drop restores the
+zero cursor and a fresh-budget transaction successfully retries. This focused
+regression passes (`/private/tmp/i313-sql-interrupt.log`). Append/restart remain
+open and this is not full host-recovery completion.
+
+### Append-compatible preparation — local, unmerged
+
+Preparation now completes its immutable-prefix seal before indexing source pages.
+If the file version changes after sealing, it incrementally verifies the original
+captured cutoff against that seal before continuing the existing scope/cursor.
+Only a matching digest permits continuation; newly appended records are outside
+that snapshot. Unsealed partial scans still fail on source-version changes.
+Seven existing focused tests pass after phase reordering; a real commit-append
+regression runs in `/private/tmp/i313-append-regression.log`. Independent review
+is pending. This does not implement cross-process preparation recovery or certify
+all concurrent mutation boundaries; those remain open.
+
+Append review found a mixed-version indexing risk: restoring original bytes could
+allow later digest verification to retain an index populated during a rewrite.
+The current correction checks the existing seal after page reads, after index
+commit and after receipt resolution, discarding preparation on version change.
+Deadline retry additionally requires the seal still current. A deterministic
+page-boundary mutation/restore regression checks preparation removal, zero cursor
+advancement and query refusal. Validation log:
+`/private/tmp/i313-append-mutation-tests.log`; re-review pending. Earlier append
+success does not certify this concurrent-mutation boundary by itself.
+
+Final append/concurrency validation: Agent and Session library suite passes
+(`/private/tmp/i313-append-final-tests.log`, Session 255/255), affected all-target
+warnings-denied Clippy passes (`/private/tmp/i313-append-final-clippy.log`). Revised
+independent review approves the version checks; it does not certify every
+possible concurrent mutation timing or cross-process recovery.
+
+### Persisted prefix expectation — local, unmerged
+
+Storage now exposes bounded versioned cutoff/digest metadata from a completed
+seal. A newly configured source can revalidate that untrusted expectation only
+through a complete bounded-page scan; deserialization or scan creation alone
+never yields a seal. Real reopen with appended suffix preserves the original
+cutoff; incomplete scanning, changed digest, unknown version and oversized cutoff
+are refused (`/private/tmp/i313-persisted-expectation.log`). Actor persistence and
+restart scheduling are not yet wired; this prerequisite does not complete restart
+continuation. Source ownership/branch/permission binding remains the host's duty.
+
+### Persisted preparation wiring — local, unmerged
+
+Existing SessionIndex now stores bounded continuation metadata with exact
+owner/scope/cursor and source-cutoff checks. Actor preparation saves completed
+sealed stages and reopens by fully verifying persisted prefix expectations before
+index continuation. Crash gaps between index and metadata commits refuse cursor
+mismatch and rebuild rather than treating stale parent metadata as current.
+
+Review found and prompted corrections for saving an old seal during append
+revalidation, invalid persisted expectation initialization permanently blocking
+fresh builds, and missing cutoff/build consistency. Corrected focused validation
+is running (`/private/tmp/i313-restart-corrected.log`). Additional corruption and
+independent-process regressions remain required. Current reopen fixture rebuilds
+objects; it is not evidence of separate-process restart. This wiring is not yet
+approved or delivered.
+
+Restart correction validation now includes a separate test-binary child process:
+a >2 MiB source is sealed and one index page committed in the parent, then a new
+process loads the same scope/parent, fully revalidates the prefix and queries the
+last original fact. Eleven focused tests plus the child test pass
+(`/private/tmp/i313-restart-process.log`). This supersedes the object-reopen-only
+evidence limitation above. Additional unknown-version rebuild and cutoff/build
+mismatch refusal regressions are running (`/private/tmp/i313-restart-corruption.log`).
+Independent re-review requested; full current workspace/platform gates remain open.
+
+Twelve focused restart/corruption tests pass
+(`/private/tmp/i313-restart-corruption.log`), including unknown-version fallback
+and cutoff mismatch refusal. Independent static re-review approves this limited
+increment; reviewer did not run tests. Added an explicit crash-gap regression:
+commit one index page without updating saved metadata, then require a new scope
+and correct rebuilt query rather than reusing a stale parent cursor. Log:
+`/private/tmp/i313-restart-crash-gap.log`. Full affected suites and Clippy are
+running in `/private/tmp/i313-restart-final-tests.log` and
+`/private/tmp/i313-restart-final-clippy.log`.
+
+Persisted continuation convergence: Agent 625/625 plus separate child test and
+Session 256/256 pass; the additional crash-gap regression passes independently.
+Warnings-denied affected all-target Clippy and both governance validators pass.
+Logs: `/private/tmp/i313-restart-final-tests.log`,
+`/private/tmp/i313-restart-final-clippy.log`, `/private/tmp/i313-restart-crash-gap.log`.
+This closes this local storage increment's checks, not I313 acceptance or merge.

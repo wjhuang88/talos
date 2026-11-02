@@ -14,6 +14,23 @@ pub struct RecoveryPrefixScan {
     expected: Option<[u8; 32]>,
 }
 
+/// Persistable consistency expectation for one previously verified raw prefix.
+/// This is untrusted cache metadata, never branch or permission authority.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryPrefixExpectation {
+    version: u8,
+    cutoff: u64,
+    digest: [u8; 32],
+}
+
+impl RecoveryPrefixExpectation {
+    /// Captured byte cutoff; not authorization to access a source.
+    pub fn cutoff(&self) -> u64 {
+        self.cutoff
+    }
+}
+
 /// Storage-issued rolling digest for all raw bytes of one captured prefix. Later suffix appends
 /// are compatible; replacing any covered record invalidates verification.
 #[derive(Clone)]
@@ -24,6 +41,22 @@ pub struct RecoveryPrefixSeal {
 }
 
 impl DurableRecoverySource {
+    /// Revalidate an untrusted persisted prefix expectation against this configured
+    /// storage source. Only a completed scan grants content-consistency evidence;
+    /// the caller still binds owner, branch and permission independently.
+    pub fn verify_prefix_expectation(
+        &self,
+        expectation: &RecoveryPrefixExpectation,
+    ) -> Result<RecoveryPrefixScan, HistoryPageError> {
+        if expectation.version != 1 || expectation.cutoff > self.source_end() {
+            return Err(HistoryPageError::Stale);
+        }
+        let source = self.recovery_prefix_at(expectation.cutoff)?;
+        let mut scan = source.begin_prefix_seal()?;
+        scan.expected = Some(expectation.digest);
+        Ok(scan)
+    }
+
     /// Begin incrementally sealing this source's captured prefix.
     /// No source content is read until the first step.
     pub fn begin_prefix_seal(&self) -> Result<RecoveryPrefixScan, HistoryPageError> {
@@ -38,6 +71,15 @@ impl DurableRecoverySource {
 }
 
 impl RecoveryPrefixSeal {
+    /// Export bounded cache metadata for a future full source revalidation.
+    pub fn expectation(&self) -> RecoveryPrefixExpectation {
+        RecoveryPrefixExpectation {
+            version: 1,
+            cutoff: self.source.source_end(),
+            digest: self.digest,
+        }
+    }
+
     /// Begin a bounded-page verification of the entire captured prefix.
     /// The scan must finish before this evidence can authorize a later read.
     pub fn begin_verification(&self) -> Result<RecoveryPrefixScan, HistoryPageError> {
@@ -197,6 +239,68 @@ mod tests {
     use crate::{DurableSession, PersistencePolicy, TurnTranscriptOutcome};
     use std::time::Duration;
     use talos_core::message::Message;
+
+    #[test]
+    fn persisted_expectation_requires_full_reopened_source_verification() {
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "restart-seal").expect("session");
+        session
+            .commit_turn(
+                "first",
+                &[Message::User {
+                    content: "original fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let source = session.capture_recovery_source().expect("source");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut scan = source.begin_prefix_seal().expect("scan");
+        while !scan.step(deadline, || false).expect("step") {}
+        let seal = scan.finish().expect("seal");
+        let bytes = serde_json::to_vec(&seal.expectation()).expect("persist metadata");
+        session
+            .commit_turn(
+                "next",
+                &[Message::User {
+                    content: "new suffix".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("append");
+        drop(session);
+        let reopened = DurableSession::open_or_create(root.path(), "restart-seal").expect("reopen");
+        let source = reopened.capture_recovery_source().expect("new source");
+        let expectation: RecoveryPrefixExpectation =
+            serde_json::from_slice(&bytes).expect("restore metadata");
+        assert!(
+            source
+                .verify_prefix_expectation(&expectation)
+                .expect("begin only")
+                .finish()
+                .is_err()
+        );
+        let mut scan = source
+            .verify_prefix_expectation(&expectation)
+            .expect("verification");
+        while !scan.step(deadline, || false).expect("step") {}
+        assert_eq!(
+            scan.finish().expect("verified").source_end(),
+            expectation.cutoff
+        );
+        let mut bad = expectation.clone();
+        bad.digest[0] ^= 1;
+        let mut scan = source
+            .verify_prefix_expectation(&bad)
+            .expect("untrusted expectation");
+        assert!(scan.step(deadline, || false).is_err());
+        bad = expectation.clone();
+        bad.version = 2;
+        assert!(source.verify_prefix_expectation(&bad).is_err());
+        bad = expectation;
+        bad.cutoff = source.source_end() + 1;
+        assert!(source.verify_prefix_expectation(&bad).is_err());
+    }
 
     #[test]
     fn multi_page_prefix_verifies_after_append_and_refuses_replacement_or_partial_scan() {

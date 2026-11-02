@@ -12,8 +12,8 @@
 
 mod recovery;
 pub use recovery::{
-    RecoveryBuildCursor, RecoveryBuildPage, RecoveryCandidate, RecoveryIndexSource,
-    RecoveryReadError, RecoveryWorkBudget,
+    RecoveryBuildCursor, RecoveryBuildPage, RecoveryCandidate, RecoveryContinuation,
+    RecoveryIndexSource, RecoveryReadError, RecoveryWorkBudget,
 };
 
 use chrono::{DateTime, Utc};

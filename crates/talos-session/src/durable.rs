@@ -205,6 +205,20 @@ impl DurableRecoveryRecord {
 }
 
 impl DurableRecoverySource {
+    /// Restrict this configured source to an earlier cutoff. This does not verify
+    /// bytes or grant branch authority; complete prefix verification is required.
+    pub fn recovery_prefix_at(
+        &self,
+        cutoff: u64,
+    ) -> Result<Self, crate::history_page::HistoryPageError> {
+        if cutoff > self.source_end {
+            return Err(crate::history_page::HistoryPageError::Stale);
+        }
+        let mut source = self.clone();
+        source.source_end = cutoff;
+        Ok(source)
+    }
+
     pub(crate) fn read_recovery_bytes(
         &self,
         offset: u64,
