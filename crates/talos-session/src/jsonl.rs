@@ -12,6 +12,68 @@ use std::collections::HashSet;
 use talos_core::message::{AgentEvent, Message};
 use uuid::Uuid;
 
+// Pairing state belongs to the history stream, not to a storage page. In
+// particular, a call at the end of one page may have its result on the next.
+#[derive(Default)]
+pub(crate) struct HistoryMessageDecoder {
+    pending_tool_call_ids: HashSet<String>,
+}
+
+impl HistoryMessageDecoder {
+    pub(crate) fn decode(&mut self, entry: SessionEntry) -> Option<(String, Message)> {
+        let msg = match entry.role.as_str() {
+            "user" => {
+                self.pending_tool_call_ids.clear();
+                Some(Message::User {
+                    content: entry.content,
+                })
+            }
+            "assistant" => {
+                let tool_calls = talos_core::message::extract_tool_calls_from_text(&entry.content);
+                let cleaned = talos_core::message::strip_tool_syntax(&entry.content);
+                self.pending_tool_call_ids.clear();
+                self.pending_tool_call_ids
+                    .extend(tool_calls.iter().map(|call| call.id.clone()));
+                Message::Assistant {
+                    content: cleaned,
+                    tool_calls,
+                    reasoning: entry.metadata.reasoning,
+                }
+                .into()
+            }
+            "system" => {
+                if is_terminal_diagnostic_content(&entry.content)
+                    || is_turn_transcript_outcome_content(&entry.content)
+                {
+                    None
+                } else if let Some(sys_content) = entry.content.strip_prefix("__SYSTEM__:") {
+                    Some(Message::System {
+                        content: sys_content.to_string(),
+                        cache_markers: Vec::new(),
+                    })
+                } else if serde_json::from_str::<AgentEvent>(&entry.content).is_ok() {
+                    None
+                } else {
+                    let (is_error, tool_use_id, content) = parse_tool_result(&entry.content);
+                    if self.pending_tool_call_ids.remove(&tool_use_id) {
+                        Some(Message::Tool {
+                            result: talos_core::message::MessageToolResult {
+                                tool_use_id,
+                                content,
+                                is_error,
+                            },
+                        })
+                    } else {
+                        None
+                    }
+                }
+            }
+            _ => None,
+        };
+        msg.map(|message| (entry.id, message))
+    }
+}
+
 impl Session {
     pub fn append(&self, message: &Message) -> Result<(), SessionError> {
         self.append_with_metadata(message, SessionMetadata::default())
@@ -163,67 +225,12 @@ impl Session {
     /// `read_messages`; diagnostic/event entries never shift source identities.
     /// IDs identify entries within this session, not a branch authorization.
     pub fn read_messages_with_entry_ids(&self) -> Result<Vec<(String, Message)>, SessionError> {
-        let entries = self.read_entries()?;
-        let mut messages = Vec::new();
-        let mut pending_tool_call_ids = HashSet::new();
-
-        for entry in entries {
-            let msg = match entry.role.as_str() {
-                "user" => {
-                    pending_tool_call_ids.clear();
-                    Some(Message::User {
-                        content: entry.content,
-                    })
-                }
-                "assistant" => {
-                    let tool_calls =
-                        talos_core::message::extract_tool_calls_from_text(&entry.content);
-                    let cleaned = talos_core::message::strip_tool_syntax(&entry.content);
-                    pending_tool_call_ids.clear();
-                    pending_tool_call_ids.extend(tool_calls.iter().map(|call| call.id.clone()));
-                    Message::Assistant {
-                        content: cleaned,
-                        tool_calls,
-                        reasoning: entry.metadata.reasoning,
-                    }
-                    .into()
-                }
-                "system" => {
-                    if is_terminal_diagnostic_content(&entry.content)
-                        || is_turn_transcript_outcome_content(&entry.content)
-                    {
-                        None
-                    } else if let Some(sys_content) = entry.content.strip_prefix("__SYSTEM__:") {
-                        Some(Message::System {
-                            content: sys_content.to_string(),
-                            cache_markers: Vec::new(),
-                        })
-                    } else if serde_json::from_str::<AgentEvent>(&entry.content).is_ok() {
-                        None
-                    } else {
-                        let (is_error, tool_use_id, content) = parse_tool_result(&entry.content);
-                        if pending_tool_call_ids.remove(&tool_use_id) {
-                            Some(Message::Tool {
-                                result: talos_core::message::MessageToolResult {
-                                    tool_use_id,
-                                    content,
-                                    is_error,
-                                },
-                            })
-                        } else {
-                            None
-                        }
-                    }
-                }
-                _ => None,
-            };
-
-            if let Some(msg) = msg {
-                messages.push((entry.id, msg));
-            }
-        }
-
-        Ok(messages)
+        let mut decoder = HistoryMessageDecoder::default();
+        Ok(self
+            .read_entries()?
+            .into_iter()
+            .filter_map(|entry| decoder.decode(entry))
+            .collect())
     }
 
     pub fn read_events(&self) -> Result<Vec<AgentEvent>, SessionError> {

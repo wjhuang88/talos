@@ -2536,3 +2536,24 @@ history_page.rs `ba94aad7e2926b1515068eb5596ca1d015c5f3096085130154c62e199ea7fb9
 recovery_stamp.rs `c45f2655e536f59cadce291e4f6c4af17671ee921cf847c0c48a37a74f896a70`.
 Reviewer did not compile or run tests. Published PR #837 head is `cc05a907f`;
 exact-head CI 41395945401 started for that prior candidate, not this local increment.
+
+### Streaming history conversion foundation
+
+HistoryMessageDecoder now retains pending tool-call identities across storage
+pages; the existing read_messages_with_entry_ids path uses the same decoder.
+Conversion/filtering behavior is unchanged. A real bounded JSONL page regression
+places an assistant call at record 8192 and its result plus duplicate on the next
+page. It preserves the original entry IDs, accepts the paired result exactly once,
+filters diagnostic entries and equals the existing session history output.
+Focused regression passes (`/private/tmp/i313-paged-decoder.log`). This is the
+conversion foundation for paged startup, not implementation of bounded Runtime
+startup: the current Runtime still calls the full synchronous snapshot read.
+Resumable/cancellable startup and original full T5 acceptance remain required.
+Session suite passes 280/280 (`/private/tmp/i313-paged-decoder-suite.log`), and
+all-target Clippy passes (`/private/tmp/i313-paged-decoder-clippy.log`). Independent
+static review approves the two-file diff
+`cb21e2281c4c2bde4d3e7a36de0debcc59f517474f0245b27ce36dfcc601d30d`
+against `a532cdbf5`; reviewer read focused evidence but did not run tests.
+Following review, the regression also explicitly checks two output messages and
+the second message's original entry ID and Tool content, avoiding dependence only
+on comparing two paths that share the decoder.
