@@ -125,6 +125,21 @@ impl GeminiSse {
     }
 
     pub(crate) fn finish(&mut self) -> ProviderResult<Vec<GeminiOutput>> {
+        self.finish_inner(None)
+    }
+
+    pub(crate) fn finish_with_identity(
+        &mut self,
+        provider: &str,
+        model: &str,
+    ) -> ProviderResult<Vec<GeminiOutput>> {
+        self.finish_inner(Some((provider, model)))
+    }
+
+    fn finish_inner(
+        &mut self,
+        identity: Option<(&str, &str)>,
+    ) -> ProviderResult<Vec<GeminiOutput>> {
         if self.failed {
             return Err(invalid("Gemini SSE already closed"));
         }
@@ -135,7 +150,16 @@ impl GeminiSse {
         }
         match self.state.finish_eof() {
             Ok(end) => {
-                let mut output = std::mem::take(&mut self.pending_tools);
+                let mut output = Vec::new();
+                if let Some((provider, model)) = identity {
+                    let block = self.state.replay_block(provider, model)?;
+                    output.push(GeminiOutput::Event(
+                        talos_core::message::AgentEvent::ReasoningComplete {
+                            blocks: vec![block],
+                        },
+                    ));
+                }
+                output.append(&mut self.pending_tools);
                 output.push(GeminiOutput::Event(end));
                 Ok(output)
             }
@@ -151,6 +175,8 @@ impl GeminiSse {
 /// cancels the read; no reader task or credential refresh is detached.
 pub(crate) async fn read_response(
     response: reqwest::Response,
+    provider: &str,
+    model: &str,
     tx: &tokio::sync::mpsc::Sender<GeminiOutput>,
     deadline: std::time::Instant,
     first_packet: std::time::Duration,
@@ -193,7 +219,7 @@ pub(crate) async fn read_response(
                 if std::time::Instant::now() >= deadline {
                     return Err(invalid("Gemini SSE read timed out"));
                 }
-                for event in decoder.finish()? {
+                for event in decoder.finish_with_identity(provider, model)? {
                     if std::time::Instant::now() >= deadline {
                         return Err(invalid("Gemini SSE delivery timed out"));
                     }
@@ -259,6 +285,8 @@ mod tests {
         assert!(
             read_response(
                 response,
+                "google",
+                "model",
                 &tx,
                 Instant::now() - Duration::from_secs(1),
                 Duration::from_secs(1),
@@ -306,6 +334,8 @@ mod tests {
         let (tx, _rx) = tokio::sync::mpsc::channel(4);
         let error = read_response(
             response,
+            "google",
+            "model",
             &tx,
             Instant::now() + Duration::from_secs(2),
             Duration::from_millis(25),
@@ -315,6 +345,100 @@ mod tests {
         .expect_err("first event timeout");
         assert!(error.to_string().contains("timed out"));
         server.abort();
+    }
+
+    #[test]
+    fn completed_signed_stream_roundtrips_into_identity_checked_request_history() {
+        use serde_json::json;
+        use talos_core::message::{AssistantReasoning, Message, MessageToolResult, ToolCall};
+        let parts = json!([
+            {"text":"summary","thought":true,"thoughtSignature":"fixture-sig-a"},
+            {"functionCall":{"name":"lookup","args":{"q":1}},"thoughtSignature":"fixture-sig-b"},
+            {"functionCall":{"id":"native-b","name":"lookup","args":{"q":2}}}]);
+        let wire = format!(
+            "data: {}\n\n",
+            json!({"candidates":[{"content":{"parts":parts},"finishReason":"STOP"}]})
+        );
+        let mut decoder = GeminiSse::new();
+        let early = decoder.push(wire.as_bytes()).expect("stream");
+        assert!(
+            early
+                .iter()
+                .all(|event| !matches!(event, GeminiOutput::FunctionCall { .. }))
+        );
+        let output = decoder
+            .finish_with_identity("google", "model")
+            .expect("complete");
+        let mut blocks = Vec::new();
+        let mut calls = Vec::new();
+        for event in output {
+            match event {
+                GeminiOutput::Event(AgentEvent::ReasoningComplete { blocks: native }) => {
+                    blocks = native
+                }
+                GeminiOutput::FunctionCall {
+                    id,
+                    name,
+                    arguments,
+                } => calls.push(ToolCall {
+                    id,
+                    name,
+                    input: arguments,
+                }),
+                _ => {}
+            }
+        }
+        assert_eq!(calls.len(), 2);
+        let result = |call: &ToolCall| Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: call.id.clone(),
+                content: call.input.to_string(),
+                is_error: false,
+            },
+        };
+        let results = vec![result(&calls[1]), result(&calls[0])];
+        let assistant = Message::Assistant {
+            content: String::new(),
+            tool_calls: calls,
+            reasoning: Some(AssistantReasoning {
+                provider: "google".into(),
+                model: "model".into(),
+                blocks,
+            }),
+        };
+        assert!(!format!("{assistant:?}").contains("fixture-sig"));
+        let mut history: Vec<Message> =
+            serde_json::from_str(&serde_json::to_string(&vec![assistant]).expect("store"))
+                .expect("restore");
+        history.extend(results);
+        let request = crate::gemini_request::build_request_for_identity(
+            "google",
+            "model",
+            &history,
+            &[],
+            None,
+        )
+        .expect("replay request");
+        assert_eq!(request["contents"][0]["parts"], parts);
+        assert!(
+            request["contents"][1]["parts"][0]["functionResponse"]
+                .get("id")
+                .is_none()
+        );
+        assert_eq!(
+            request["contents"][1]["parts"][1]["functionResponse"]["id"],
+            "native-b"
+        );
+        assert!(
+            crate::gemini_request::build_request_for_identity(
+                "foreign",
+                "model",
+                &history,
+                &[],
+                None
+            )
+            .is_err()
+        );
     }
 
     #[test]
