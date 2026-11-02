@@ -2770,3 +2770,20 @@ extend that small deterministic scenario to large-history or platform coverage.
 Independent static review approves diff
 `caf9b1280d9168b6ed4c9eb0d1d0dc11fda97246b52699fd038dbd38a7663048`;
 reviewer did not execute tests.
+
+### Desktop startup stop commands
+
+Desktop now polls startup together with command/output lifetime. Interrupt,
+Shutdown, command closure and output closure stop preparation by dropping the
+startup future. Other commands enter a FIFO staging queue bounded to 16 entries;
+the existing channel has its own capacity, so total pending capacity is not 16.
+Overflow fails explicitly. After successful startup queued commands precede new
+channel commands. Actual configured persistence/reopen passes
+(`/private/tmp/i313-desktop-startup-command.log`); focused stop/order/overflow/
+closed-output tests pass (`/private/tmp/i313-desktop-startup-commands-final.log`).
+Desktop binary warnings-denied Clippy passes
+(`/private/tmp/i313-desktop-startup-clippy.log`). Independent static review approves
+diff `dd73129fe94c868dfeda8490359f7f66e6420c693e7fd39a4055a2844481f0bc`;
+reviewer did not execute tests. Stopped means startup was stopped, not that blocked
+OS workers have exited or released leases. Full resource convergence, Windows
+native proof and the other T5 acceptance remain required.

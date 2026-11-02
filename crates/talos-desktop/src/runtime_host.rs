@@ -1070,7 +1070,7 @@ impl RuntimeHost {
         #[cfg(test)]
         assert!(observer.is_none() || durable_identity.is_none());
         let workspace_root = workspace_root.into();
-        let (commands, command_rx) = mpsc::channel(COMMAND_CAPACITY);
+        let (commands, mut command_rx) = mpsc::channel(COMMAND_CAPACITY);
         let (outputs, output_rx) = mpsc::channel(EVENT_CAPACITY);
         let (terminal_tx, terminal_rx) = tokio::sync::oneshot::channel();
         let (exit_tx, exit_rx) = std::sync::mpsc::channel();
@@ -1236,9 +1236,20 @@ impl RuntimeHost {
                                 Some(session) => builder.durable_session(session),
                                 None => builder,
                             };
-                            match builder.build_async().await {
+                            let (built, queued) = match prepare_host_startup(
+                                builder.build_async(),
+                                &mut command_rx,
+                                &outputs,
+                            )
+                            .await
+                            {
+                                Ok(result) => result,
+                                Err(terminal) => return terminal,
+                            };
+                            match built {
                                 Ok(handle) => {
                                     run_host(
+                                        queued,
                                         command_rx,
                                         outputs,
                                         handle,
@@ -1306,8 +1317,36 @@ impl RuntimeHost {
     }
 }
 
+async fn prepare_host_startup<T>(
+    startup: impl std::future::Future<Output = T>,
+    commands: &mut mpsc::Receiver<RuntimeCommand>,
+    outputs: &mpsc::Sender<RuntimeOutput>,
+) -> Result<(T, std::collections::VecDeque<RuntimeCommand>), RuntimeOutput> {
+    tokio::pin!(startup);
+    let mut queued = std::collections::VecDeque::new();
+    loop {
+        tokio::select! {
+            biased;
+            _ = outputs.closed() => return Err(RuntimeOutput::Stopped),
+            command = commands.recv() => match command {
+                Some(RuntimeCommand::Shutdown | RuntimeCommand::Interrupt) | None => {
+                    return Err(RuntimeOutput::Stopped);
+                }
+                Some(command) => {
+                    if queued.len() == COMMAND_CAPACITY {
+                        return Err(RuntimeOutput::Error("startup command queue is full".into()));
+                    }
+                    queued.push_back(command);
+                }
+            },
+            result = &mut startup => return Ok((result, queued)),
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn run_host(
+    mut queued: std::collections::VecDeque<RuntimeCommand>,
     mut commands: mpsc::Receiver<RuntimeCommand>,
     outputs: mpsc::Sender<RuntimeOutput>,
     mut handle: RuntimeHandle,
@@ -1369,7 +1408,12 @@ async fn run_host(
                     }
                 }
             }
-            command = commands.recv() => {
+            command = async {
+                match queued.pop_front() {
+                    Some(command) => Some(command),
+                    None => commands.recv().await,
+                }
+            } => {
                 match command {
                     Some(RuntimeCommand::Submit(message)) => {
                         drop(evaluation.take());
@@ -1747,6 +1791,61 @@ mod cancellation_tests;
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn startup_commands_stop_pending_work_and_preserve_submission_order() {
+        for stop in [
+            super::RuntimeCommand::Interrupt,
+            super::RuntimeCommand::Shutdown,
+        ] {
+            let (tx, mut rx) = tokio::sync::mpsc::channel(super::COMMAND_CAPACITY);
+            let (outputs, _output_rx) = tokio::sync::mpsc::channel(1);
+            tx.send(stop).await.expect("stop");
+            let result =
+                super::prepare_host_startup(std::future::pending::<()>(), &mut rx, &outputs).await;
+            assert!(matches!(result, Err(super::RuntimeOutput::Stopped)));
+        }
+        let (tx, mut rx) = tokio::sync::mpsc::channel(super::COMMAND_CAPACITY);
+        let (outputs, _output_rx) = tokio::sync::mpsc::channel(1);
+        tx.send(super::RuntimeCommand::Submit("first".into()))
+            .await
+            .expect("first");
+        tx.send(super::RuntimeCommand::Submit("second".into()))
+            .await
+            .expect("second");
+        let (value, mut queued) =
+            super::prepare_host_startup(std::future::ready(42), &mut rx, &outputs)
+                .await
+                .expect("ready");
+        assert_eq!(value, 42);
+        assert!(
+            matches!(queued.pop_front(), Some(super::RuntimeCommand::Submit(text)) if text == "first")
+        );
+        assert!(
+            matches!(queued.pop_front(), Some(super::RuntimeCommand::Submit(text)) if text == "second")
+        );
+        assert!(queued.is_empty());
+    }
+
+    #[tokio::test]
+    async fn startup_command_overflow_and_closed_output_stop_preparation() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(super::COMMAND_CAPACITY + 1);
+        let (outputs, output_rx) = tokio::sync::mpsc::channel(1);
+        for _ in 0..=super::COMMAND_CAPACITY {
+            tx.send(super::RuntimeCommand::Submit("queued".into()))
+                .await
+                .expect("queued");
+        }
+        assert!(
+            matches!(super::prepare_host_startup(std::future::pending::<()>(), &mut rx, &outputs).await,
+            Err(super::RuntimeOutput::Error(message)) if message == "startup command queue is full")
+        );
+        drop(output_rx);
+        assert!(matches!(
+            super::prepare_host_startup(std::future::pending::<()>(), &mut rx, &outputs).await,
+            Err(super::RuntimeOutput::Stopped)
+        ));
+    }
+
     use super::*;
 
     #[test]
@@ -2615,6 +2714,7 @@ mod tests {
                 registry
             };
             let host = tokio::spawn(run_host(
+                std::collections::VecDeque::new(),
                 command_rx,
                 outputs,
                 handle,
@@ -4101,7 +4201,16 @@ mod tests {
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(5),
             run_host(
-                command_rx, outputs, handle, None, None, None, None, None, None,
+                std::collections::VecDeque::new(),
+                command_rx,
+                outputs,
+                handle,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
             ),
         )
         .await
@@ -4126,7 +4235,16 @@ mod tests {
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(5),
             run_host(
-                command_rx, outputs, handle, None, None, None, None, None, None,
+                std::collections::VecDeque::new(),
+                command_rx,
+                outputs,
+                handle,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
             ),
         )
         .await
