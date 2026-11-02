@@ -182,7 +182,35 @@ pub fn read_history_record(
     page.entries.pop().ok_or(HistoryPageError::InvalidRecord)
 }
 
-pub(crate) fn open_source(path: &Path) -> Result<std::fs::File, HistoryPageError> {
+/// A source handle constructed only after all platform source checks succeed.
+/// No conversion from arbitrary File or mutable access to the handle is exposed.
+pub(crate) struct SourceFile(std::fs::File);
+
+impl SourceFile {
+    pub(crate) fn metadata(&self) -> std::io::Result<std::fs::Metadata> {
+        self.0.metadata()
+    }
+
+    // Duplicating an existing handle preserves its sharing constraints.
+    #[cfg(windows)]
+    pub(crate) fn clone_lease(&self) -> std::io::Result<std::fs::File> {
+        self.0.try_clone()
+    }
+}
+
+impl Read for SourceFile {
+    fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+        self.0.read(bytes)
+    }
+}
+
+impl Seek for SourceFile {
+    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+        self.0.seek(position)
+    }
+}
+
+pub(crate) fn open_source(path: &Path) -> Result<SourceFile, HistoryPageError> {
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
@@ -224,7 +252,7 @@ pub(crate) fn open_source(path: &Path) -> Result<std::fs::File, HistoryPageError
     if !metadata.is_file() {
         return Err(HistoryPageError::UnsupportedSource);
     }
-    Ok(file)
+    Ok(SourceFile(file))
 }
 
 fn json_record(
@@ -334,6 +362,23 @@ fn prefixed<'a>(bytes: &'a [u8], pos: &mut usize) -> Result<Option<&'a [u8]>, Hi
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn validated_source_supports_bounded_read_and_seek() {
+        use std::io::{Read, Seek, SeekFrom};
+        let dir = tempfile::tempdir().expect("directory");
+        let path = dir.path().join("source");
+        std::fs::write(&path, b"abcdef").expect("source");
+        let mut source = super::open_source(&path).expect("validated source");
+        assert_eq!(source.metadata().expect("metadata").len(), 6);
+        source.seek(SeekFrom::Start(2)).expect("seek");
+        let mut bytes = [0; 2];
+        source.read_exact(&mut bytes).expect("read");
+        assert_eq!(&bytes, b"cd");
+        let mut tail = Vec::new();
+        source.take(1).read_to_end(&mut tail).expect("bounded read");
+        assert_eq!(tail, b"e");
+    }
+
     use super::*;
     use crate::{CompactTextSessionStore, JsonlSessionStore, SessionMetadata, SessionStore};
     use std::cell::Cell;

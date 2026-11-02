@@ -2510,3 +2510,29 @@ the registered checkpoint scenario passed in 16.55 seconds with A/B request toke
 estimates 745375→10001 and 746030→10662
 (`/private/tmp/i313-actor-ci-timeout-repro.log`). This single run neither fixes nor
 explains the CI failure; the two-second event-stall assertion remains unchanged.
+
+Standard host preflight on `cc05a907fcdc7a4277ad179c3bbc407f29d41f9d`
+exited 0, including both external Runtime SDK modes
+(`/private/tmp/i313-volume-stage-preflight.log`). Independent static review permits
+publishing the six-commit Partial candidate, range diff hash
+`f532f729eb846ea7d38b08cce70890e6091df8adee81297df58b4c82a11348aa`;
+this does not authorize merge or Windows activation. Native evidence and full
+I313 residuals remain open.
+
+### Typed recovery source handle
+
+The next local increment makes open_source return a private-field SourceFile,
+with only Read, Seek, metadata and a Windows-only clone of the verified lease.
+Stamp construction accepts this type instead of arbitrary std::fs::File; there
+is no From<File>, Deref or mutable handle replacement. The Windows stamp retains
+the same duplicated handle used for identity/locality queries. This enforces the
+construction invariant, not mapping stability, platform activation or fork/resume.
+Independent static review approved the prepared source files before application;
+native compilation and lifecycle validation remain required.
+Session library tests pass 279/279 (`/private/tmp/i313-sourcefile-tests.log`),
+including validated-source read/seek/bounded take; affected all-target Clippy
+passes (`/private/tmp/i313-sourcefile-clippy.log`). Reviewed file SHA256 values:
+history_page.rs `ba94aad7e2926b1515068eb5596ca1d015c5f3096085130154c62e199ea7fb9b`,
+recovery_stamp.rs `c45f2655e536f59cadce291e4f6c4af17671ee921cf847c0c48a37a74f896a70`.
+Reviewer did not compile or run tests. Published PR #837 head is `cc05a907f`;
+exact-head CI 41395945401 started for that prior candidate, not this local increment.

@@ -34,7 +34,9 @@ impl Eq for FileStamp {}
 #[derive(Clone)]
 pub(crate) struct FileStamp;
 
-pub(crate) fn from_file(file: &std::fs::File) -> Result<FileStamp, HistoryPageError> {
+pub(crate) fn from_file(
+    file: &crate::history_page::SourceFile,
+) -> Result<FileStamp, HistoryPageError> {
     #[cfg(unix)]
     {
         Ok(file.metadata()?)
@@ -52,8 +54,9 @@ pub(crate) fn from_file(file: &std::fs::File) -> Result<FileStamp, HistoryPageEr
 }
 
 #[cfg(windows)]
-fn windows_stamp(file: &std::fs::File) -> Result<FileStamp, HistoryPageError> {
-    verify_local_volume(file)?;
+fn windows_stamp(source: &crate::history_page::SourceFile) -> Result<FileStamp, HistoryPageError> {
+    let file = source.clone_lease()?;
+    verify_local_volume(&file)?;
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{
         FILE_BASIC_INFO, FILE_ID_INFO, FileBasicInfo, FileIdInfo, GetFileInformationByHandleEx,
@@ -85,11 +88,12 @@ fn windows_stamp(file: &std::fs::File) -> Result<FileStamp, HistoryPageError> {
     if basic_ok == 0 {
         return Err(std::io::Error::last_os_error().into());
     }
+    let size = file.metadata()?.len();
     Ok(FileStamp {
-        _lease: std::sync::Arc::new(file.try_clone()?),
+        _lease: std::sync::Arc::new(file),
         volume: identity.VolumeSerialNumber,
         identity: identity.FileId.Identifier,
-        size: file.metadata()?.len(),
+        size,
         created: basic.CreationTime,
         written: basic.LastWriteTime,
         changed: basic.ChangeTime,
