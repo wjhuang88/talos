@@ -34,6 +34,15 @@ The moved regression passed locally (`/private/tmp/i313-scan-receipt-cross-platf
 Windows execution remains pending. This follow-up was tested separately from the
 already-running preflight; it changes no production code.
 
+Final local gate: standard preflight exited 0, including both external Runtime
+SDK modes (`/private/tmp/i313-windows-scan-test-preflight.log`). Cancelled-budget
+assertions and the moved stale-receipt regression passed separately from its
+already-compiled test artifacts. Independent static review approves implementation
+head `209195fc616f2679e86522f320f1e317c2f13113` for draft publication only; reviewer
+ran no builds. Fresh fetch shows no upstream-only commits at main
+`d324c3348f1bb64a3a7b0a0682e14fc97c6293c3`. Native Windows evidence, production
+activation and full T5 closure remain outstanding.
+
 ## CLI fork paging and cancellation — local increment, 2026-11-02
 
 The real fork handler now stages raw bytes in bounded pages from the same captured

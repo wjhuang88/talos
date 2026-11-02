@@ -12,6 +12,10 @@ Saved-scan test commit: `194cbbfe6`. Stale-receipt cleanup coverage was also
 extended from Unix to the Windows test candidate and passed locally; native
 Windows execution and the running standard preflight remain outstanding.
 
+Local test-candidate preflight now passed (including both SDK modes); follow-up
+regressions passed separately. Implementation `209195fc6` is independently approved
+for draft publication, not activation/merge. Windows native evidence remains open.
+
 ## T5 fork paging local increment — 2026-11-02
 
 Local fork now copies bounded raw pages and decodes messages/tail from one captured
