@@ -84,7 +84,7 @@ fn result(messages: &[Message], id: &str) -> Value {
             _ => None,
         })
         .expect("real tool result");
-    assert!(!result.is_error, "{}", result.content);
+    assert!(!result.is_error, "{id}: {}", result.content);
     serde_json::from_str(&result.content).expect("JSON result")
 }
 struct CodingModel {
@@ -596,12 +596,15 @@ async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continua
         }
     }
     let root = tempfile::tempdir().expect("workspace");
+    let durable = DurableSession::open_or_create(&root.path().join("sessions"), "huge-output")
+        .expect("durable");
     let model = Arc::new(HugeModel(AtomicUsize::new(0)));
     let mut runtime = RuntimeBuilder::new()
         .provider(model.clone())
         .workspace_root(root.path())
         .model_context_limit(32_000)
         .tool(Arc::new(HugeTool))
+        .durable_session(durable.clone())
         .build()
         .expect("runtime");
     runtime.submit("read huge result").await.expect("submit");
@@ -617,5 +620,93 @@ async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continua
         "{status:?}"
     );
     assert_eq!(model.0.load(Ordering::SeqCst), 2);
+    runtime.shutdown().await.expect("shutdown");
+    let reopened = DurableSession::open_existing(&root.path().join("sessions"), "huge-output")
+        .expect("reopen")
+        .expect("session");
+    let history = reopened.read_messages().expect("persisted history");
+    let results: Vec<_> = history
+        .iter()
+        .filter_map(|message| match message {
+            Message::Tool { result } if result.tool_use_id == "huge" => Some(result),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(results.len(), 1, "one authoritative tool result");
+    assert!(results[0].content.len() < 4200);
+    assert_eq!(results[0].content.matches("[truncated,").count(), 1);
+    assert!(!results[0].content.contains("hidden-tail"));
+    struct RecoverHuge(AtomicUsize);
+    #[async_trait]
+    impl LanguageModel for RecoverHuge {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+            let events = match self.0.fetch_add(1, Ordering::SeqCst) {
+                0 => call("discover", "history_search", json!({"mode":"discover"})),
+                1 => call(
+                    "search",
+                    "history_search",
+                    // Recovery search accepts FTS syntax; quote a hyphenated
+                    // literal so it is not parsed as an FTS column expression.
+                    json!({"mode":"search", "snapshot":result(messages,"discover")["snapshot"], "query":"\"visible-fact\""}),
+                ),
+                2 => {
+                    let found = result(messages, "search");
+                    assert_eq!(found["results"].as_array().expect("results").len(), 1);
+                    call(
+                        "detail",
+                        "history_search",
+                        json!({"mode":"detail", "snapshot":result(messages,"discover")["snapshot"], "reference":found["results"][0]["reference"]}),
+                    )
+                }
+                3 => {
+                    let detail = result(messages, "detail");
+                    let text = detail["text"].as_str().expect("recovered text");
+                    assert!(text.starts_with("visible-fact"));
+                    assert_eq!(text.matches("[truncated,").count(), 1);
+                    assert!(text.len() < 4200);
+                    assert!(!text.contains("hidden-tail"));
+                    vec![
+                        AgentEvent::TextDelta {
+                            delta: "bounded fact recovered".into(),
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::EndTurn,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                _ => panic!("unexpected recovery request"),
+            };
+            let (tx, rx) = mpsc::channel(8);
+            for event in events {
+                tx.send(event).await.expect("receiver");
+            }
+            Ok(rx)
+        }
+    }
+    let recovery = Arc::new(RecoverHuge(AtomicUsize::new(0)));
+    let mut runtime = RuntimeBuilder::new()
+        .provider(recovery.clone())
+        .workspace_root(root.path())
+        .model_context_limit(32_000)
+        .durable_session(reopened)
+        .build()
+        .expect("recovered runtime");
+    runtime
+        .submit("recover bounded fact")
+        .await
+        .expect("submit");
+    let status = tokio::time::timeout(
+        Duration::from_secs(10),
+        collect_until_turn_completed(&mut runtime),
+    )
+    .await
+    .expect("recovery deadline")
+    .expect("completion");
+    assert!(
+        matches!(status, TurnCompletionStatus::Success { .. }),
+        "{status:?}"
+    );
+    assert_eq!(recovery.0.load(Ordering::SeqCst), 4);
     runtime.shutdown().await.expect("shutdown");
 }

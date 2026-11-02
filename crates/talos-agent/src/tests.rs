@@ -2775,6 +2775,9 @@ async fn continuation_budget_recovers_without_reexecuting_tools_or_losing_histor
         execution_log: executions.clone(),
     }));
     let mut agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
+    // This regression targets whole-request recovery after tool projection, not
+    // the separate pre-entry output truncation gate.
+    agent.tool_output_threshold = 16_000;
     agent.set_request_budget_spec(crate::RequestBudgetSpec::new(1));
     let prepared = agent
         .prepare_turn_start(
