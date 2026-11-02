@@ -6249,8 +6249,11 @@ async fn fork_worker_busy_compact_receipt_and_interrupt_are_observed() {
         })
         .await
         .expect("retry");
+    // The retry performs real durable storage work with a ten-second production
+    // budget. Keep the two-second cancellation assertion above, but allow the
+    // operation budget plus receipt dispatch here on loaded native runners.
     assert!(
-        tokio::time::timeout(Duration::from_secs(2), result.recv())
+        tokio::time::timeout(Duration::from_secs(12), result.recv())
             .await
             .expect("retry deadline")
             .expect("result")
