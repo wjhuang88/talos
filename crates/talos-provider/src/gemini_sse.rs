@@ -89,9 +89,7 @@ impl GeminiSse {
                 return Ok(Vec::new());
             }
             let data = std::mem::take(&mut self.data);
-            let value = serde_json::from_str(data.trim_end_matches('\n'))
-                .map_err(|_| invalid("invalid Gemini SSE JSON"))?;
-            let events = self.state.apply(&value)?;
+            let events = self.state.apply_json(data.trim_end_matches('\n'))?;
             self.received_event = true;
             let mut visible = Vec::new();
             for event in events {
@@ -267,6 +265,98 @@ mod tests {
         text
     }
 
+    #[test]
+    fn original_arguments_survive_every_byte_split_and_parallel_call_binding() {
+        let raw = r#"{ "value":1, "\u0076alue":2, "text":"雪", "number":1e2 }"#;
+        let wire = format!(
+            "data: {{\"candidates\":[{{\"index\":0,\"content\":{{\"parts\":[{{\"text\":\"prefix\"}},{{\"functionCall\":{{\"name\":\"lookup\",\"args\":{raw}}},\"thoughtSignature\":\"private-signature\"}},{{\"functionCall\":{{\"id\":\"native\",\"name\":\"lookup\",\"args\":{{ \"q\" : 2 }} }} }},{{\"functionCall\":{{\"name\":\"ping\"}}}}]}},\"finishReason\":\"STOP\"}}]}}\n\n"
+        );
+        for split in 0..=wire.len() {
+            let mut decoder = GeminiSse::new();
+            for chunk in [&wire.as_bytes()[..split], &wire.as_bytes()[split..]] {
+                let early = decoder.push(chunk).expect("chunk");
+                assert!(
+                    early
+                        .iter()
+                        .all(|event| !matches!(event, GeminiOutput::FunctionCall { .. }))
+                );
+            }
+            let output = decoder.finish().expect("EOF");
+            let calls: Vec<_> = output
+                .iter()
+                .filter_map(|event| match event {
+                    GeminiOutput::FunctionCall {
+                        id,
+                        name,
+                        arguments,
+                    } => Some((id, name, arguments)),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(calls.len(), 3);
+            assert!(calls[0].0.starts_with("gemini_"));
+            assert!(calls[0].0.ends_with("_1"));
+            assert_eq!(calls[0].1, "lookup");
+            assert_eq!(calls[0].2, raw);
+            assert_eq!(calls[1].0, "native");
+            assert_eq!(calls[1].2, r#"{ "q" : 2 }"#);
+            assert_eq!(calls[2].1, "ping");
+            assert_eq!(calls[2].2, "{}");
+            assert_ne!(calls[0].0, calls[2].0);
+        }
+    }
+
+    #[test]
+    fn duplicate_routing_fields_abort_buffered_calls_without_disclosing_payloads() {
+        let valid = r#"{"candidates":[{"content":{"parts":[{"functionCall":{"name":"ping"}}]}}]}"#;
+        let call = |fields: &str| {
+            format!(
+                r#"{{"candidates":[{{"content":{{"parts":[{{"functionCall":{{{fields}}}}}]}}}}]}}"#
+            )
+        };
+        let records = [
+            r#"{"candidates":null,"candidates":[]}"#.to_owned(),
+            r#"{"candidates":[{"content":{},"content":{"parts":[]}}]}"#.into(),
+            r#"{"candidates":[{"index":0,"index":0}]}"#.into(),
+            r#"{"candidates":[{"finishReason":"STOP","finishReason":"STOP"}]}"#.into(),
+            r#"{"candidates":[{"content":{"parts":[],"parts":[]}}]}"#.into(),
+            r#"{"candidates":[{"content":{"parts":[{"functionCall":{},"functionCall":{"name":"ping"}}]}}]}"#.into(),
+            call(r#""name":"private-sentinel","\u006eame":"ping""#),
+            call(r#""name":"ping","id":"one","id":"two""#),
+            call(r#""name":"ping","args":null,"args":{}"#),
+            r#"{"candidates":[{"content":{"parts":[{"text":"private-sentinel","text":"other"}]}}]}"#.into(),
+        ];
+        for record in records {
+            assert!(GeminiStream::new().apply_json(&record).is_err());
+            // Normalization would accept every fixture: refusal must come from original syntax.
+            let normalized: serde_json::Value = serde_json::from_str(&record).expect("JSON");
+            assert!(GeminiStream::new().apply(&normalized).is_ok());
+            let wire = format!("data: {record}\n\n");
+            for split in 0..=wire.len() {
+                let mut decoder = GeminiSse::new();
+                assert!(
+                    decoder
+                        .push(format!("data: {valid}\n\n").as_bytes())
+                        .expect("buffer call")
+                        .is_empty()
+                );
+                let mut failed = false;
+                for chunk in [&wire.as_bytes()[..split], &wire.as_bytes()[split..]] {
+                    match decoder.push(chunk) {
+                        Ok(events) => assert!(events.is_empty()),
+                        Err(error) => {
+                            assert!(!error.to_string().contains("private-sentinel"));
+                            failed = true;
+                        }
+                    }
+                }
+                assert!(failed);
+                assert!(decoder.pending_tools.is_empty());
+                assert!(decoder.finish().is_err());
+            }
+        }
+    }
+
     #[tokio::test]
     async fn expired_budget_cannot_release_buffered_tool_response() {
         use std::time::{Duration, Instant};
@@ -392,7 +482,7 @@ mod tests {
                 } => calls.push(ToolCall {
                     id,
                     name,
-                    input: arguments,
+                    input: serde_json::from_str(&arguments).expect("arguments"),
                 }),
                 _ => {}
             }
