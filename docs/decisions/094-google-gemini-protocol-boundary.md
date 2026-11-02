@@ -86,3 +86,24 @@ signer Debug/error sources. catch_unwind cannot contain native aborts or suppres
 no such guarantee or private-key zeroization is claimed. Independent read-only source audit
 confirmed these limits. Exact implementation security review and CI remain merge gates;
 this candidate does not establish completed Gemini acceptance.
+
+## Reasoning controls — implementation candidate, 2026-11-02
+
+Primary contract checked at https://ai.google.dev/gemini-api/docs/generate-content/thinking:
+2.5 Pro budget 128..32768; 2.5 Flash 0..24576; 2.5 Flash-Lite 0 or 512..24576.
+Initial exact model IDs are gemini-2.5-pro, gemini-2.5-flash and gemini-2.5-flash-lite.
+Gemini 3.8 Flash and Gemini 4 Argon support low/medium/high levels; admit their exact IDs
+(gemini-3.8-flash, gemini-4-argon), not guessed prefixes, gateway aliases or preview variants.
+Existing ReasoningOptions.budget_tokens maps only to budget models; effort only to level models.
+Never send both fields. An absent budget preserves vendor dynamic thinking; Argon explicitly
+uses its documented medium default when an options block has no effort. includeThoughts=true
+requests summaries. maxOutputTokens remains a separate hard cap including thinking tokens.
+Unsupported explicit model/setting combinations fail before credentials or generation dispatch.
+
+No new public config field is introduced. replay=false is explicitly refused for this native
+adapter, because silently stripping positional function-call signatures would break the accepted
+replay contract. Isolated decisions use an independent minimum-latency policy (Flash/Lite budget 0, Pro budget
+128, level-based models low), includeThoughts=false, and private reasoning-output suppression;
+ordinary conversation settings remain unchanged. Model capability declarations
+continue to suppress unsupported explicit reasoning controls through the shared factory policy.
+These are bounded initial mappings, not a claim of all-model parameter support or live acceptance.
