@@ -833,6 +833,89 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn fork_handler_success_publishes_retained_child_with_original_history() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let workspace = canonical_workspace_root(root.path());
+        let parent = manager
+            .create_session("parent", &workspace)
+            .expect("parent");
+        parent
+            .append(&Message::User {
+                content: "original constraint".into(),
+            })
+            .expect("history");
+        let original = std::fs::read(&parent.file_path).expect("bytes");
+        let (raw_tx, raw_rx) = mpsc::channel(4);
+        drop(raw_rx);
+        let owner = SessionTransition::new(raw_tx.clone(), parent.clone()).expect("owner");
+        let transition = Arc::new(Mutex::new(owner));
+        let (ui_tx, _ui_rx) = mpsc::unbounded_channel();
+        let (session_tx, session_rx) = watch::channel(parent.clone());
+        let (route_tx, route_rx) = watch::channel(raw_tx);
+        let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel();
+        let builder = TuiRuntimeBuilder::new(
+            build_hook_registry(true),
+            root.path().to_path_buf(),
+            manager.clone(),
+            Arc::new(TuiApprovalHandler::new(
+                ui_tx.clone(),
+                root.path().to_path_buf(),
+            )),
+            Vec::new(),
+            false,
+            true,
+        );
+        let config = Config::default();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            handle_session_fork(
+                &transition,
+                &ui_tx,
+                &config,
+                &builder,
+                &manager,
+                &session_tx,
+                &route_tx,
+                &bridge_tx,
+                &session_rx,
+            ),
+        )
+        .await
+        .expect("fork completes");
+        let child = session_rx.borrow().clone();
+        assert_ne!(child.id, parent.id);
+        assert_eq!(transition.lock().await.active_session().id, child.id);
+        assert_eq!(
+            std::fs::read(&child.file_path).expect("retained child"),
+            original
+        );
+        assert_eq!(
+            child.read_messages().expect("child history"),
+            parent.read_messages().expect("parent history")
+        );
+        assert_eq!(
+            manager
+                .get_forks(&parent.id.to_string())
+                .expect("lineage")
+                .len(),
+            1
+        );
+        assert!(session_rx.has_changed().expect("session watch"));
+        assert!(route_rx.has_changed().expect("command watch"));
+        assert_eq!(bridge_rx.try_recv().expect("bridge").0.id, child.id);
+        transition.lock().await.shutdown().await;
+        assert!(
+            child.file_path.exists(),
+            "successful child is retained after shutdown"
+        );
+        assert_eq!(
+            std::fs::read(&parent.file_path).expect("parent bytes"),
+            original
+        );
+    }
+
+    #[tokio::test]
     async fn fork_handler_cancel_during_commit_cleans_child_and_finishes_retirement() {
         let root = tempfile::tempdir().expect("root");
         let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
