@@ -5460,8 +5460,13 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                 .is_none()
         );
         restarted_actor.set_durable_persistence(reopened.clone(), Default::default());
-        restarted_actor.set_recovered_history_sources(
-            reopened.read_history_snapshot().expect("fresh sources"),
+        assert!(
+            restarted_actor
+                .set_recovered_history_sources_until(
+                    reopened.read_history_snapshot().expect("fresh sources"),
+                    tokio::time::Instant::now() + Duration::from_secs(2),
+                )
+                .await
         );
         let restarted_task = tokio::spawn(async move {
             restarted_actor.run().await;
@@ -5536,7 +5541,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             PermissionDecision::Allow,
         ));
     }
-    let raw: Vec<_> = (0..30)
+    let mut raw: Vec<_> = (0..30)
         .flat_map(|_| {
             [
                 Message::User {
@@ -5550,6 +5555,12 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             ]
         })
         .collect();
+    // Exceed the former total-history source limit while retaining enough
+    // request budget to exercise voluntary model checkpointing, not rejection.
+    raw.extend((0..8300).map(|i| Message::User {
+        content: format!("prior {i}"),
+    }));
+    assert!(raw.len() > 8192);
     let durable = talos_session::DurableSession::open_or_create(root.path(), "checkpoint-recovery")
         .expect("durable");
     // Produce the only searchable fact through actual admission/execution, not a
@@ -5676,7 +5687,14 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         },
     );
     actor.set_durable_persistence(durable.clone(), Default::default());
-    actor.set_recovered_history_sources(durable.read_history_snapshot().expect("source snapshot"));
+    assert!(
+        actor
+            .set_recovered_history_sources_until(
+                durable.read_history_snapshot().expect("source snapshot"),
+                tokio::time::Instant::now() + Duration::from_secs(2),
+            )
+            .await
+    );
     let task = tokio::spawn(async move {
         actor.run().await;
         actor
@@ -5688,8 +5706,11 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         })
         .await
         .expect("submit");
+    // This scenario performs several independently bounded operations over
+    // 8300+ records. Bound the whole scenario separately from per-op deadlines;
+    // collect_until_completions still rejects a two-second event stall.
     let captured = tokio::time::timeout(
-        Duration::from_secs(10),
+        Duration::from_secs(30),
         collect_until_completions(&mut handle.eq_rx, 1),
     )
     .await

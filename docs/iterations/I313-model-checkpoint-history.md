@@ -2279,3 +2279,42 @@ for a restrictive read lease; dropping that writer passes the local targeted tes
 (`/private/tmp/i313-source-writer-close.log`), not native proof. Both fixes remain
 separate local test/probe work. Windows Actor history/checkpoint functionality
 remains unavailable and must be implemented, not skipped.
+
+### Actual long-history checkpoint acceptance increment
+
+The actual registered checkpoint A/B/fork/separate-process restart scenario now
+contains 8360 filler messages plus its genuinely executed original tool fact.
+Its first execution failed because SubmittedCheckpoint::matches_source and
+checkpoint_request still refused total message counts over 8192
+(`/private/tmp/i313-long-checkpoint-actor.log`). These scans now yield and check
+the caller deadline; fixed/eligible/byte/pairing/reference preparation also scans
+cooperatively. Generation/ID/digest and complete-tool-batch checks remain intact.
+The cumulative 2 MiB projected-text guard remains an explicit residual, and
+projection/estimation/clone/collection construction still include synchronous work.
+
+Real scenario passes (`/private/tmp/i313-long-checkpoint-fixed.log`): checkpoint
+estimates 81250→9281 and 81905→9942, actual source fact retrieval, fork and
+independent-process parent/child reopen. After completing cooperative preparation
+loops, full Agent tests pass 642/642 (`/private/tmp/i313-long-checkpoint-suite.log`).
+This scripted-model fixture proves execution and state retention, not autonomous
+model quality. Independent static review approves four-file diff SHA256
+`8163374c7f31a98550ad9c5138da03ff1d95bf1ead7c398b849ba5fba4fb8680`
+against `73ac2d398b81146fb56232ed5acb23820c9e4406`; reviewer did not run tests.
+
+Old published-head CI 41387946490 is terminal failure; its host preflight job
+passed but Windows and Issue reconciliation failed. Windows Desktop specifically
+failed unused import recovery::install_budget; the re-export now uses cfg(unix),
+matching all its durable.rs consumers. This does not activate Windows recovery.
+Native log: `/private/tmp/i313-windows-desktop-failure.log`. Standard host preflight
+`/private/tmp/i313-long-stage-preflight.log` terminated 101: 641/642 Agent tests,
+with the expanded long-history scenario exceeding its aggregate 10-second wait.
+That scenario now has a 30-second total wait for its multiple bounded operations;
+the helper's two-second event-stall check and production deadlines are unchanged.
+Fresh standard host preflight runs at `/private/tmp/i313-long-stage-preflight-retry.log`
+(session30556), with no pass claimed yet. Both standalone governance validators
+passed zero warnings (`/private/tmp/i313-long-checkpoint-{governance,claims}.log`).
+Native platform gates remain open. Whole queue stays Active.
+
+Independent static review also approves the isolated Unix re-export condition,
+diff SHA256 `ad05bb0aff10778177aee791d7568a5d8b53e127e99750f6656a2b2dace53ff2`;
+reviewer confirmed all five external consumers are Unix-only, without compiling.

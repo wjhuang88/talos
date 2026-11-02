@@ -1066,7 +1066,15 @@ mod tests {
         );
         let job = job.await.expect("dispatch").expect("job");
         let submitted = job.submitted_checkpoint.expect("model checkpoint");
-        assert!(submitted.matches_source(&source, raw.len()));
+        assert!(
+            submitted
+                .matches_source(
+                    &source,
+                    raw.len(),
+                    tokio::time::Instant::now() + std::time::Duration::from_secs(2)
+                )
+                .await
+        );
         let before = actor.agent.estimate_provider_request_tokens(&raw, &[]);
         let mut plan = crate::request_plan::ProviderRequestPlan {
             messages: raw.clone(),

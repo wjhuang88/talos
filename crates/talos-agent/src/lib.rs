@@ -112,15 +112,22 @@ pub(crate) struct SubmittedCheckpoint {
 }
 
 impl SubmittedCheckpoint {
-    fn matches_source(
+    async fn matches_source(
         &self,
         current: &crate::compaction::HistorySource,
         message_count: usize,
+        deadline: tokio::time::Instant,
     ) -> bool {
-        self.covered_end > 0
-            && self.covered_end <= message_count
-            && self.covered_end <= 8192
-            && (0..self.covered_end).all(|index| self.source.same_entry(current, index))
+        if self.covered_end == 0 || self.covered_end > message_count {
+            return false;
+        }
+        for index in 0..self.covered_end {
+            tokio::task::yield_now().await;
+            if tokio::time::Instant::now() >= deadline || !self.source.same_entry(current, index) {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -1986,7 +1993,10 @@ impl Agent {
                             *value = measured_before;
                         }
                         if let Some(submitted) = &job.submitted_checkpoint {
-                            if !submitted.matches_source(source, messages.len()) {
+                            if !submitted
+                                .matches_source(source, messages.len(), deadline)
+                                .await
+                            {
                                 return checkpoint_manual::ManualCheckpointResult::Outcome(
                                     talos_core::session::CompactOutcome::FailedWithEstimate {
                                         before: plan.estimated_tokens,

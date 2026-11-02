@@ -168,19 +168,16 @@ impl Agent {
                 "checkpoint payload exceeds byte limit".into(),
             ));
         }
-        if plan.messages.len() > 8192 {
-            return Err(CompactionError::CompactionFailed(
-                "checkpoint source scan limit exceeded".into(),
-            ));
-        }
         // No semantic compression can reclaim system instructions, schemas or
         // output reservations. Refuse before spending a summarizer invocation.
-        let fixed: Vec<Message> = plan
-            .messages
-            .iter()
-            .filter(|message| matches!(message, Message::System { .. }))
-            .cloned()
-            .collect();
+        let mut fixed = Vec::new();
+        for message in &plan.messages {
+            tokio::task::yield_now().await;
+            check_checkpoint_deadline(deadline)?;
+            if matches!(message, Message::System { .. }) {
+                fixed.push(message.clone());
+            }
+        }
         if self
             .estimate_provider_request_tokens(&fixed, &plan.tool_definitions)
             .saturating_add(plan.ephemeral_image_tokens)
@@ -198,22 +195,26 @@ impl Agent {
             ));
         };
         let split = submitted.map_or(split, |(_, end)| split.min(end));
-        let eligible: Vec<usize> = (0..split)
-            .filter(|&index| {
-                !matches!(plan.messages[index], Message::System { .. })
-                    && !(matches!(plan.messages[index], Message::Context { .. })
-                        && source.is_some_and(|source| {
-                            source
-                                .resolve(
-                                    source.generation(),
-                                    source.revision(),
-                                    index,
-                                    &plan.messages[index],
-                                )
-                                .is_none()
-                        }))
-            })
-            .collect();
+        let mut eligible = Vec::new();
+        for index in 0..split {
+            tokio::task::yield_now().await;
+            check_checkpoint_deadline(deadline)?;
+            if !matches!(plan.messages[index], Message::System { .. })
+                && !(matches!(plan.messages[index], Message::Context { .. })
+                    && source.is_some_and(|source| {
+                        source
+                            .resolve(
+                                source.generation(),
+                                source.revision(),
+                                index,
+                                &plan.messages[index],
+                            )
+                            .is_none()
+                    }))
+            {
+                eligible.push(index);
+            }
+        }
         if eligible.is_empty() {
             return Err(CompactionError::CompactionFailed(
                 "no eligible checkpoint prefix".into(),
@@ -221,41 +222,51 @@ impl Agent {
         }
         // Bound total projection allocation before cloning or serializing sources.
         // Sequential folds separately bound every provider request and output.
-        let source_bytes = eligible.iter().try_fold(0usize, |total, &index| {
-            let message = &plan.messages[index];
-            let size = match message {
-                Message::User { content } | Message::Context { content } => content.len(),
-                Message::Assistant {
-                    content,
-                    tool_calls,
-                    ..
-                } => {
-                    if tool_calls.len() > 32
-                        || tool_calls
-                            .iter()
-                            .any(|call| call.id.len() > 128 || call.name.len() > 128)
-                    {
-                        return None;
+        let mut source_bytes = Some(0usize);
+        for &index in &eligible {
+            tokio::task::yield_now().await;
+            check_checkpoint_deadline(deadline)?;
+            let size = (|| {
+                let message = &plan.messages[index];
+                let size = match message {
+                    Message::User { content } | Message::Context { content } => content.len(),
+                    Message::Assistant {
+                        content,
+                        tool_calls,
+                        ..
+                    } => {
+                        if tool_calls.len() > 32
+                            || tool_calls
+                                .iter()
+                                .any(|call| call.id.len() > 128 || call.name.len() > 128)
+                        {
+                            return None;
+                        }
+                        tool_calls.iter().fold(content.len(), |size, call| {
+                            size.saturating_add(call.id.len())
+                                .saturating_add(call.name.len())
+                        })
                     }
-                    tool_calls.iter().fold(content.len(), |size, call| {
-                        size.saturating_add(call.id.len())
-                            .saturating_add(call.name.len())
-                    })
-                }
-                Message::Tool { result } => result.content.len(),
-                Message::Multimodal { parts } => parts
-                    .iter()
-                    .map(|part| match part {
-                        talos_core::message::ContentPart::Text { text } => text.len(),
-                        _ => 0,
-                    })
-                    .fold(0usize, usize::saturating_add),
-                Message::System { .. } => 0,
-            };
-            total
-                .checked_add(size)
-                .filter(|&size| size <= 2 * 1024 * 1024)
-        });
+                    Message::Tool { result } => result.content.len(),
+                    Message::Multimodal { parts } => parts
+                        .iter()
+                        .map(|part| match part {
+                            talos_core::message::ContentPart::Text { text } => text.len(),
+                            _ => 0,
+                        })
+                        .fold(0usize, usize::saturating_add),
+                    Message::System { .. } => 0,
+                };
+                Some(size)
+            })();
+            source_bytes = source_bytes
+                .zip(size)
+                .and_then(|(total, size)| total.checked_add(size))
+                .filter(|&size| size <= 2 * 1024 * 1024);
+            if source_bytes.is_none() {
+                break;
+            }
+        }
         if source_bytes.is_none() {
             return Err(CompactionError::CompactionFailed(
                 "checkpoint source byte limit exceeded".into(),
@@ -266,12 +277,15 @@ impl Agent {
         // so pairing validation must happen before those paths diverge.
         let mut group_start = 0;
         while group_start < eligible.len() {
+            tokio::task::yield_now().await;
             check_checkpoint_deadline(deadline)?;
             group_start = checkpoint_group_end(&plan.messages, &eligible, group_start)?;
         }
-        let references: Vec<String> = eligible
-            .iter()
-            .map(|&index| match source {
+        let mut references = Vec::new();
+        for &index in &eligible {
+            tokio::task::yield_now().await;
+            check_checkpoint_deadline(deadline)?;
+            let reference = match source {
                 Some(source) => source
                     .resolve(
                         source.generation(),
@@ -284,10 +298,11 @@ impl Agent {
                         CompactionError::CompactionFailed(
                             "checkpoint source binding changed".into(),
                         )
-                    }),
-                None => Ok(format!("raw:{index}")),
-            })
-            .collect::<CompactionResult<_>>()?;
+                    })?,
+                None => format!("raw:{index}"),
+            };
+            references.push(reference);
+        }
         let rendered = if let Some((payload, _)) = submitted {
             if private.project(payload) != payload {
                 return Err(CompactionError::CompactionFailed(
@@ -850,8 +865,8 @@ mod tests {
             .collect()
     }
 
-    #[test]
-    fn submitted_snapshot_accepts_append_but_rejects_prefix_mutation_and_generation() {
+    #[tokio::test]
+    async fn submitted_snapshot_accepts_append_but_rejects_prefix_mutation_and_generation() {
         let mut raw = history();
         let bind = |generation, messages: &[Message]| {
             crate::compaction::HistorySource::bind(
@@ -870,12 +885,36 @@ mod tests {
         raw.push(Message::User {
             content: "appended".into(),
         });
-        assert!(submitted.matches_source(&bind(1, &raw), raw.len()));
-        assert!(!submitted.matches_source(&bind(2, &raw), raw.len()));
+        assert!(
+            submitted
+                .matches_source(
+                    &bind(1, &raw),
+                    raw.len(),
+                    tokio::time::Instant::now() + std::time::Duration::from_secs(2)
+                )
+                .await
+        );
+        assert!(
+            !submitted
+                .matches_source(
+                    &bind(2, &raw),
+                    raw.len(),
+                    tokio::time::Instant::now() + std::time::Duration::from_secs(2)
+                )
+                .await
+        );
         raw[0] = Message::User {
             content: "changed prefix".into(),
         };
-        assert!(!submitted.matches_source(&bind(1, &raw), raw.len()));
+        assert!(
+            !submitted
+                .matches_source(
+                    &bind(1, &raw),
+                    raw.len(),
+                    tokio::time::Instant::now() + std::time::Duration::from_secs(2)
+                )
+                .await
+        );
     }
 
     #[tokio::test]
