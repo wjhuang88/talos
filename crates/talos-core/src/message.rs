@@ -49,7 +49,7 @@ pub struct MessageToolResult {
 /// One provider-native reasoning block attached to an assistant message.
 ///
 /// See ADR-034 for the full boundary design.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ReasoningBlock {
     /// Signed thinking (Anthropic `thinking` block). `text` may be empty when
@@ -65,6 +65,28 @@ pub enum ReasoningBlock {
     Redacted { data: String },
     /// Plain reasoning text (OpenAI-compatible `reasoning_content`).
     Plain { text: String },
+}
+
+// Debug is a diagnostic projection, never a provider-private replay channel. Keeping this
+// boundary on the leaf type also protects derived Debug on messages and Agent events.
+impl std::fmt::Debug for ReasoningBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Thinking { signature, .. } => f
+                .debug_struct("Thinking")
+                .field("text", &"[redacted]")
+                .field("signature", &signature.as_ref().map(|_| "[redacted]"))
+                .finish(),
+            Self::Redacted { .. } => f
+                .debug_struct("Redacted")
+                .field("data", &"[redacted]")
+                .finish(),
+            Self::Plain { .. } => f
+                .debug_struct("Plain")
+                .field("text", &"[redacted]")
+                .finish(),
+        }
+    }
 }
 
 /// Reasoning payload for one assistant message, stamped with the identity
@@ -596,5 +618,64 @@ pub fn project_displayable_reasoning(ar: &AssistantReasoning) -> Option<String> 
         None
     } else {
         Some(parts.join("\n"))
+    }
+}
+
+#[cfg(test)]
+mod reasoning_debug_tests {
+    use super::*;
+
+    #[test]
+    fn private_reasoning_is_redacted_through_messages_and_events() {
+        let blocks = vec![
+            ReasoningBlock::Thinking {
+                text: "fixture-thinking".into(),
+                signature: Some("fixture-signature".into()),
+            },
+            ReasoningBlock::Redacted {
+                data: "fixture-envelope".into(),
+            },
+            ReasoningBlock::Plain {
+                text: "fixture-plain".into(),
+            },
+        ];
+        let message = Message::Assistant {
+            content: "visible-answer".into(),
+            tool_calls: vec![],
+            reasoning: Some(AssistantReasoning {
+                provider: "google".into(),
+                model: "model".into(),
+                blocks: blocks.clone(),
+            }),
+        };
+        let event = AgentEvent::ReasoningComplete {
+            blocks: blocks.clone(),
+        };
+        for debug in [
+            format!("{blocks:?}"),
+            format!("{message:?}"),
+            format!("{event:?}"),
+        ] {
+            for secret in [
+                "fixture-thinking",
+                "fixture-signature",
+                "fixture-envelope",
+                "fixture-plain",
+            ] {
+                assert!(
+                    !debug.contains(secret),
+                    "private reasoning leaked through Debug"
+                );
+            }
+            assert!(debug.contains("[redacted]"));
+        }
+        assert!(format!("{message:?}").contains("visible-answer"));
+        // Storage is still lossless; redaction applies to diagnostics only.
+        let stored = serde_json::to_string(&message).expect("serialize");
+        assert!(stored.contains("fixture-signature"));
+        assert_eq!(
+            serde_json::from_str::<Message>(&stored).expect("restore"),
+            message
+        );
     }
 }

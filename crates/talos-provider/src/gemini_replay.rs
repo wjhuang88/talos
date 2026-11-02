@@ -136,6 +136,10 @@ mod tests {
         ];
         let bindings = vec![("local-generated-id".into(), 1)];
         let encoded = encode("google", "model", &parts, &bindings).expect("encode");
+        let debug = format!("{encoded:?}");
+        assert!(!debug.contains("signature-a"));
+        assert!(!debug.contains("signature-b"));
+        assert!(!debug.contains("local-generated-id"));
         let replay = decode("google", "model", &encoded).expect("decode");
         assert_eq!(replay.parts, parts);
         assert_eq!(replay.bindings, bindings);

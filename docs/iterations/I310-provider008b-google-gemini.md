@@ -219,3 +219,16 @@ maintenance pruned the previous build environment. Pinned rustfmt and diff white
 This helper is not yet connected to SSE completion/request replay or Agent persistence; no passing
 new test, runtime or complete signature-replay claim. Next: finish validation and wire the envelope
 through response completion and identity-checked request history.
+
+### Replay diagnostic confidentiality fix — 2026-11-01
+
+Independent source review found that ReasoningBlock's derived Debug exposed Redacted envelope
+content, including Gemini signatures. Replaced it with variant-preserving redacted Debug for
+Thinking text/signature, Redacted data and Plain text, thereby protecting derived message/event
+Debug too. Serde and lossless persistence are unchanged. Added core nested-message/event and
+serialization regression plus concrete Gemini envelope Debug assertions. Independent read-only
+review confirmed the original leak path is closed; it is not a merge approval or a claim that
+all other message/tool strings are private. Rust 1.99.0 cargo test -p talos-core --lib --locked:
+123 passed, zero failed/ignored/filtered (0.02s). Provider replay tests restarted after earlier
+CONNECT proxy failure; no fresh Provider pass is claimed. SSE/request signed replay wiring remains
+pending. No Complete, release or parent acceptance claim.
