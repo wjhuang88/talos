@@ -4,8 +4,9 @@ Local fork now copies bounded raw pages and decodes messages/tail from one captu
 source version. Unpublished child ownership covers transcript, sidecar, index and
 lineage. Real handler cancellation tests cover metadata preparation and commit
 retirement; publication failure restores logical ownership before cleanup waits.
-These are local changes, not full T5 closure. Standard preflight is running at
-`/private/tmp/i313-fork-preflight.log`; native CI and final gates remain open.
+These are local changes, not full T5 closure. Standard preflight passed at
+`/private/tmp/i313-fork-preflight.log`; later test-only retry/success-handler
+follow-ups passed separately. Native CI and final gates remain open.
 See [I313 owner](../iterations/I313-model-checkpoint-history.md) for validation and
 platform/durability limits. First four queue stages remain merged; T5 is Partial,
 T1/T6 unimplemented. Preserve I309 → T8/I308 → T2+T3 → T4 → T5 → T1 → T6.

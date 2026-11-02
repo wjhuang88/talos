@@ -42,6 +42,15 @@ retaining two-second Busy/cancel/shutdown checks. It passed locally
 The running preflight's previously compiled Agent test does not certify this
 change; new native exact-head evidence remains required.
 
+Committed fork implementation: `75c155c03`; test-budget follow-up: `19053e850`;
+real handler successful publication regression: `8bb33de3f` (passed separately,
+`/private/tmp/i313-fork-success-handler.log`). Standard fork preflight exited 0,
+including both external Runtime SDK modes (`/private/tmp/i313-fork-preflight.log`).
+The latter two test-only follow-ups were verified separately from its already
+compiled test artifacts. Source implementation is unchanged since reviewed gates.
+Native latest-head CI and full T5 acceptance remain outstanding; no completion
+or merge is claimed.
+
 ## Lifecycle paging local increment — 2026-11-02
 
 Implementation `5bb33ccca` after `0b454998a`: `/resume` and model activation use one
