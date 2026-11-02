@@ -634,10 +634,29 @@ intents are retained and reported, and lock files intentionally remain. The Wind
 implementation candidate uses local-volume checks, write-through file creation and
 file flush before publication. It does not provide directory fsync or promise
 Unix-equivalent namespace durability after power loss. Native Windows crash,
-lock/cancellation and Actor fork/reopen validation are still pending. This is
-local I313 implementation pending full merge gates.
+lock/cancellation and Actor fork/reopen tests passed on candidate `5a80fe914`
+(run `41403698582`); remaining platform acceptance and full merge gates are open.
 
 Exhaustive consumers must handle additive `SessionOp::ForkDurable` and
 `SubmissionRejectionReason::SessionBusy` in the next minor migration (ADR-096).
 ForkDurable requires an in-process receipt channel; serialized wire requests are
 unsupported and emit an error. SessionBusy is a temporary refusal, not closure.
+
+
+### CLI startup history restoration (I313 candidate)
+
+TUI, interactive and inline startup restore Session messages using bounded pages
+on blocking workers. Ctrl-C cancels startup; corrupt/unavailable persisted history
+returns an error instead of silently starting with no history. No file is rewritten.
+The new SessionMessageScan API reuses message/tool pairing across pages and supports
+legacy JSONL message envelopes, but emits no durable search provenance.
+
+A page reads at most 2 MiB / 8192 entries with cooperative cancellation and a CLI
+two-second page deadline. Total restored history still occupies linear memory;
+blocked OS I/O may retain resources after caller cancellation. Malformed TLOG
+headers/records, invalid UTF-8, oversized records and unsupported source volumes
+fail explicitly. Incomplete final TLOG records and invalid JSONL lines are omitted
+as before. SessionStore implementers default to no paged encoding; opt into a
+built-in encoding only when it matches the actual store. There is no whole-file
+fallback. Existing session/model switching paths are not yet migrated, and legacy
+CLI storage still lacks the receipts needed for durable model history_search.

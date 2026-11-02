@@ -77,6 +77,40 @@ pub fn read_history_page(
     deadline: Instant,
     stopped: impl Fn() -> bool,
 ) -> Result<HistoryPage, HistoryPageError> {
+    read_page_impl(path, encoding, offset, source_end, deadline, stopped, None)
+}
+
+// Compatibility mode is private and produces no recovery authority. The caller
+// commits the synthetic counter only after a successfully validated whole page.
+pub(crate) fn read_message_page(
+    path: &Path,
+    encoding: HistoryEncoding,
+    offset: u64,
+    source_end: u64,
+    deadline: Instant,
+    stopped: impl Fn() -> bool,
+    synthetic_counter: &mut u64,
+) -> Result<HistoryPage, HistoryPageError> {
+    read_page_impl(
+        path,
+        encoding,
+        offset,
+        source_end,
+        deadline,
+        stopped,
+        Some(synthetic_counter),
+    )
+}
+
+fn read_page_impl(
+    path: &Path,
+    encoding: HistoryEncoding,
+    offset: u64,
+    source_end: u64,
+    deadline: Instant,
+    stopped: impl Fn() -> bool,
+    mut synthetic_counter: Option<&mut u64>,
+) -> Result<HistoryPage, HistoryPageError> {
     let check = || {
         if stopped() || Instant::now() >= deadline {
             Err(HistoryPageError::Stopped)
@@ -124,18 +158,47 @@ pub fn read_history_page(
     let mut record_ranges = Vec::new();
     while pos < bytes.len() && entries.len() < HISTORY_PAGE_ENTRIES {
         check()?;
-        if matches!(encoding, HistoryEncoding::Jsonl) && matches!(bytes[pos], b'\n' | b'\r') {
+        if (matches!(encoding, HistoryEncoding::Jsonl) || synthetic_counter.is_some())
+            && matches!(bytes[pos], b'\n' | b'\r')
+        {
             pos += 1;
             continue;
         }
-        let decoded = match encoding {
-            HistoryEncoding::Jsonl => {
-                json_record(&bytes[pos..], offset + bytes.len() as u64 == source_end)?
+        let at_eof = offset + bytes.len() as u64 == source_end;
+        let decoded = match (encoding, synthetic_counter.as_deref_mut()) {
+            (HistoryEncoding::Jsonl, Some(counter)) => {
+                let remaining = &bytes[pos..];
+                let newline = remaining.iter().position(|b| *b == b'\n');
+                let end = match newline {
+                    Some(end) => end,
+                    None if at_eof => remaining.len(),
+                    None => {
+                        if pos == 0 {
+                            return Err(HistoryPageError::RecordTooLarge);
+                        }
+                        break;
+                    }
+                };
+                let line = std::str::from_utf8(&remaining[..end])
+                    .map_err(|_| HistoryPageError::InvalidRecord)?;
+                let consumed = end + usize::from(newline.is_some());
+                if let Some(entry) = crate::store::decode_jsonl_history_line(line, counter) {
+                    Some((entry, consumed))
+                } else {
+                    pos += consumed;
+                    continue;
+                }
             }
-            HistoryEncoding::Tlog => tlog_record(&bytes[pos..])?,
+            (HistoryEncoding::Jsonl, None) => json_record(&bytes[pos..], at_eof)?,
+            (HistoryEncoding::Tlog, _) => tlog_record(&bytes[pos..])?,
         };
         let Some((entry, consumed)) = decoded else {
             if offset + bytes.len() as u64 == source_end {
+                if synthetic_counter.is_some() && matches!(encoding, HistoryEncoding::Tlog) {
+                    // An incomplete final record is not a completed message.
+                    pos = bytes.len();
+                    break;
+                }
                 return Err(HistoryPageError::InvalidRecord);
             }
             if entries.is_empty() && pos == 0 {

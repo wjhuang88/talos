@@ -44,6 +44,8 @@ mod history_receipt;
 pub use history_receipt::{HistoryRecoveryReceipt, RecoveryProjection};
 mod jsonl;
 mod manager;
+mod message_scan;
+pub use message_scan::SessionMessageScan;
 mod pending_submission;
 mod recovery_seal;
 mod recovery_stamp;

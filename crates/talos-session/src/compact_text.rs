@@ -116,6 +116,10 @@ impl crate::store::SessionStore for CompactTextSessionStore {
         std::fs::read(file_path).map_err(SessionError::IoError)
     }
 
+    fn history_encoding(&self) -> Option<crate::history_page::HistoryEncoding> {
+        Some(crate::history_page::HistoryEncoding::Tlog)
+    }
+
     fn file_extension(&self) -> &'static str {
         "tlog"
     }

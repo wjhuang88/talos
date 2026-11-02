@@ -159,7 +159,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
 
     set_todo_prompt_provider(&mut agent, &session_manager, &session);
 
-    let initial_history = session.read_messages().unwrap_or_default();
+    let initial_history = crate::history_restore::read_session_history(&session).await?;
 
     let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {

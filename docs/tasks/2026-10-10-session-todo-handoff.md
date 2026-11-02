@@ -1,3 +1,23 @@
+## T5 CLI startup candidate and native fork evidence — 2026-11-02
+
+Queue unchanged: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+First four stages merged/closed; T5 Review / Partial and unmerged; T1/T6 unimplemented.
+Published `5a80fe914` passed Windows workspace job `125140918390` in CI
+`41403698582`, including real checkpoint/fork/reopen, Actor stop/abort, Runtime
+fork/restart, lock ownership and six process-crash phases. Full I313 acceptance
+remains open. Issue #832 reconciliation was separately fixed by merged #839 at
+`d324c3348`; synchronize that target baseline before the next publication.
+
+Local CLI startup now uses cancellable message paging at the three real startup
+entrypoints. Nine storage regressions and two CLI/Actor-provider tests passed;
+provider-order assertions were then strengthened to check all 8300 entries.
+Static review and affected Clippy passed. Full preflight failed because ENOSPC
+left a non-executable MCP test artifact; package-specific cache cleanup/rebuild
+and fresh complete verification remain required. Details and compatibility limits
+are in [I313](../iterations/I313-model-checkpoint-history.md). Session/model switching,
+legacy CLI search provenance, Windows resumable scans and full composition remain
+open; these are not closed by initial-startup paging.
+
 ## T5 Windows fork candidate — 2026-11-02
 
 Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.

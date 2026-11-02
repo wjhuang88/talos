@@ -2839,3 +2839,72 @@ Clippy, full workspace tests and both standalone Runtime SDK modes. Log:
 `/private/tmp/i313-windows-fork-preflight.log`. Both governance validators also
 passed; their final synchronized-document rerun is required before publication.
 Windows CI has not yet tested this candidate; no native or full T5 closure claim.
+
+
+## CLI startup message paging — local candidate, 2026-11-02
+
+Closure ledger: replace actual TUI, interactive and inline initial history reads
+with cancellable bounded-page restoration, preserving raw files and decoder
+pairing. SessionMessageScan produces messages only, never durable search receipts.
+The existing shared decoder and JSONL envelope compatibility conversion are reused.
+SessionStore gains a default optional history_encoding method; existing custom
+implementers compile unchanged and must opt in to a built-in encoding to use this
+new API. Unknown stores have no whole-file fallback.
+
+CLI capture/page/finish run on blocking workers, with a two-second cooperative
+page deadline and cancellation-on-drop. Ctrl-C during startup returns cancelled.
+One worker is awaited at a time; cancellation may return before blocked kernel I/O
+releases its source lease. The final history vector remains O(history) memory.
+CLI initial read failures now propagate rather than silently becoming empty
+history. Existing model switches/session lifecycle paths remain to migrate.
+
+Compatibility: canonical TLOG/JSONL, legacy JSONL message envelopes and tool
+pairing cross actual byte/entry page boundaries; incomplete trailing TLOG records
+and invalid JSONL lines retain their existing non-message behavior. Malformed
+TLOG headers/records, invalid UTF-8, records above 2 MiB, unsupported volumes and
+unopted custom stores fail explicitly. This is not universal read_messages parity;
+files are never rewritten by this restore API. Missing persisted history is an
+error; only an unpersisted absent Session is empty. Local-source version validation
+is inherited from the existing typed handle/stamp boundary, not new authority.
+
+Nine Session regressions passed at `/private/tmp/i313-cli-message-scan-tests.log`:
+>8192 entries / >2 MiB, cross-page legacy tool pairing, cancellation/retry,
+append/replacement refusal, absent-file creation, no-final-newline JSONL, invalid
+UTF-8/header refusal, truncated tail and explicit store encoding. Windows writer
+exclusion/release test is enabled but not natively run. Two CLI tests passed at
+`/private/tmp/i313-cli-history-restore-tests.log`: cancellation/error propagation
+and actual Actor provider receiving 8300 restored messages followed by the new
+submission, with original file unchanged. Initial fixture compilation used private
+reexports and its completion wait observed the legacy event instead of TurnEvent;
+these test defects were fixed, not hidden by increasing timeouts.
+
+Independent static review found no new authorization bypass but requires final
+compatibility/CLI evidence before stable-candidate approval. Full locked preflight,
+final review, native CI and merge remain outstanding for this local increment.
+T5 remains Partial; legacy CLI durable search receipts, lifecycle switching,
+Windows resumable scans and full composition acceptance remain open. T1/T6 remain
+unimplemented. Published fork head 5a80fe914 has exact-head static candidate review;
+CI 41403698582 is still live and cannot certify these uncommitted CLI changes.
+
+
+Native evidence update: published head `5a80fe914b28ac0fcc92a7a2b36a5055ecf1bfdc`
+Windows workspace job `125140918390` and aggregate `125150884730` succeeded in run
+`41403698582`. Native log `/private/tmp/i313-windows-5a80.log` confirms the real
+checkpoint A/B→fork/reopen scenario, Actor Interrupt/Shutdown lease release,
+fork-worker Busy/Interrupt/Shutdown/abort/receipt-close, both Runtime fork tests,
+independent live-lock owner, publication cancellation and six process-crash phases
+all passed. This is Windows fork evidence for that published head only; the new
+CLI message-scan lease test and remaining platform acceptance are not certified.
+
+CLI candidate standard preflight failed after ENOSPC during rust-objcopy stripping:
+server_handshake-d1987985688d28d0 was a 656-byte non-executable artifact, so Cargo
+could not start it (exit 101). This is not a passing test run. Using the user's
+existing target-cleanup authorization, `cargo clean --locked -p talos-mcp` removed
+only that package's rebuildable artifacts (736.5 MiB); targeted rebuild and a fresh
+standard preflight are required. No worktree/source was removed.
+
+Affected all-target Clippy passed. Independent static CLI candidate review
+approved the storage/auth/cancellation boundary, with Windows/standard gates still
+pending. Its provider-order observation was addressed by asserting every one of
+8300 restored entries, not just count/first/last. Final verification must include
+that strengthened assertion.
