@@ -2709,3 +2709,20 @@ and Actor termination, not model search admission, forced Actor abort or localit
 Independent static review approved the prepared tests.rs SHA256
 `360cd0631316c01b5a96c16df752b2a7653cc6be7c200f0daa1403a09077790d`.
 Native execution remains pending; reviewer did not execute tests.
+
+### Responsive startup cancellation while a worker is blocked
+
+The cancellable builder now selects cancellation while awaiting capture, page and
+finish workers. Previously token cancellation was observed only after the worker
+returned. A controlled capture-worker gate now proves the caller receives
+StartupCancelled before that worker is released. The test always releases the
+worker before asserting, preventing an assertion from stranding its blocking task.
+Four startup cancellation/error regressions pass
+(`/private/tmp/i313-startup-responsive-final.log`). Kernel I/O is still not
+preemptible; cancellation does not prove that worker-owned resources are already
+released. Default synchronous startup and the other T5 residuals remain open.
+Independent static review approves diff
+`b90a90432bf2b539b45edfc127582f6115707d624f0aa0caa6222a88cc12743f`
+against `006d51a34`; reviewer did not run tests. The gate completion notification
+does not prove capture or lease release completed. Affected all-target Clippy
+passes (`/private/tmp/i313-startup-responsive-clippy.log`).

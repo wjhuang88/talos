@@ -1127,6 +1127,8 @@ pub struct RuntimeBuilder {
     prepared_history: Option<talos_session::DurableHistorySnapshot>,
     #[cfg(test)]
     startup_publication_gate: Option<Box<dyn FnOnce() + Send>>,
+    #[cfg(test)]
+    startup_capture_gate: Option<Box<dyn FnOnce() + Send>>,
     model_context_limit: u32,
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
     auto_assistance: bool,
@@ -1203,6 +1205,8 @@ impl RuntimeBuilder {
             prepared_history: None,
             #[cfg(test)]
             startup_publication_gate: None,
+            #[cfg(test)]
+            startup_capture_gate: None,
             model_context_limit: 128_000,
             approval_handler: None,
             auto_assistance: false,
@@ -1524,19 +1528,32 @@ impl RuntimeBuilder {
         }
         if let Some((session, _)) = &self.durable_session {
             let session = session.clone();
-            let mut scan =
-                tokio::task::spawn_blocking(move || session.begin_history_scan()).await??;
+            #[cfg(test)]
+            let capture_gate = self.startup_capture_gate.take();
+            let mut scan = tokio::select! {
+                biased;
+                _ = cancellation.cancelled() => return Err(RuntimeError::StartupCancelled),
+                result = tokio::task::spawn_blocking(move || {
+                    #[cfg(test)]
+                    if let Some(gate) = capture_gate { gate(); }
+                    session.begin_history_scan()
+                }) => result??,
+            };
             loop {
                 if cancellation.is_cancelled() {
                     return Err(RuntimeError::StartupCancelled);
                 }
                 let stopped = cancellation.clone();
-                let (returned, result) = tokio::task::spawn_blocking(move || {
+                let worker = tokio::task::spawn_blocking(move || {
                     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
                     let result = scan.step(deadline, || stopped.is_cancelled());
                     (scan, result)
-                })
-                .await?;
+                });
+                let (returned, result) = tokio::select! {
+                    biased;
+                    _ = cancellation.cancelled() => return Err(RuntimeError::StartupCancelled),
+                    result = worker => result?,
+                };
                 scan = returned;
                 if cancellation.is_cancelled() {
                     return Err(RuntimeError::StartupCancelled);
@@ -1546,8 +1563,11 @@ impl RuntimeBuilder {
                 }
                 tokio::task::yield_now().await;
             }
-            self.prepared_history =
-                Some(tokio::task::spawn_blocking(move || scan.finish()).await??);
+            self.prepared_history = Some(tokio::select! {
+                biased;
+                _ = cancellation.cancelled() => return Err(RuntimeError::StartupCancelled),
+                result = tokio::task::spawn_blocking(move || scan.finish()) => result??,
+            });
         }
         if cancellation.is_cancelled() {
             return Err(RuntimeError::StartupCancelled);
@@ -5165,6 +5185,40 @@ mod tests {
         assert!(matches!(
             future.as_mut().poll(&mut context),
             std::task::Poll::Ready(Err(RuntimeError::AsyncRuntimeUnavailable))
+        ));
+    }
+
+    #[tokio::test]
+    async fn cancellable_startup_returns_while_capture_worker_is_blocked() {
+        let root = tempfile::tempdir().expect("root");
+        let session =
+            DurableSession::open_or_create(root.path(), "capture-cancel").expect("session");
+        let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+        let mut builder = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new()))
+            .durable_session(session);
+        builder.startup_capture_gate = Some(Box::new(move || {
+            entered_tx.send(()).expect("entered");
+            release_rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("release gate");
+            let _ = done_tx.send(());
+        }));
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let task = tokio::spawn(builder.build_cancellable(cancel.clone()));
+        entered_rx.await.expect("worker reached capture");
+        cancel.cancel();
+        let result = tokio::time::timeout(Duration::from_secs(1), task).await;
+        // Always release the non-preemptible worker before asserting the result.
+        release_tx.send(()).expect("release worker");
+        done_rx.await.expect("worker released");
+        assert!(matches!(
+            result
+                .expect("cancellation must not wait for worker")
+                .expect("join"),
+            Err(RuntimeError::StartupCancelled)
         ));
     }
 
