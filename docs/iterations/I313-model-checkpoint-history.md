@@ -2204,3 +2204,30 @@ and expiry after crossing an entry batch. The last test proves deadline expiry,
 not every cancellation path. Independent static review approves source.rs diff
 SHA256 `f1c2b0c6416559243523f4964f7bc5dd59e24ceb3cda05a5a34253dd05e4d304`;
 reviewer did not run tests. Local changes remain uncommitted; no full T5 claim.
+
+### Cooperative live discovery and refresh ordering
+
+Production discovery refresh now yields per entry under a cooperative two-second
+deadline rather than rejecting all histories above 8192 messages. Test fixtures
+use the same async implementation; query-completion test hooks are async to avoid
+keeping a separate synchronous authority path. A 8300-message regression verifies
+8290 eligible references with bounded 20-reference discovery pages.
+Before yielding, refresh withdraws prior current authority. Independent review
+caught overlapping refresh resurrection; a unique refresh epoch now allows only
+the newest preparation to publish. Old-future/new-withdrawal and old-future/new-
+generation regressions pass. Source cloning is O(history), checked again after
+clone, and is not a hard-real-time operation. Dropped preparation returns no new
+snapshot. Synchronous commit/recovery snapshot limits remain unresolved.
+All 11 tool tests pass (`/private/tmp/i313-discovery-epoch.log`); real Actor
+checkpoint A/B/fork/restart passed before the epoch tightening
+(`/private/tmp/i313-discovery-actor.log`). Static review approves two-file diff
+SHA256 `5fa61e9d1822e254c908b4d9df7518088400544bba6c5e49b895e941272ffaef`;
+reviewer did not run tests. Subsequent test-only lexical lock scope fixes a Clippy
+await_holding_lock report; final Clippy rerun is pending. Delta remains local and
+uncommitted, not full T5 or platform evidence.
+
+Final cooperative-refresh convergence passes all 640 Agent library tests,
+including the real Actor checkpoint/fork/restart scenario after epoch correction
+(`/private/tmp/i313-discovery-agent-suite.log`). Warnings-denied all-target Clippy
+also passes (`/private/tmp/i313-discovery-clippy.log`), superseding pending notes.
+These remain local stage checks, not exact published-head CI or whole T5 closure.

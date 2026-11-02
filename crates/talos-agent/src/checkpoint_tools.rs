@@ -13,7 +13,8 @@ use talos_core::tool::{AgentTool, ToolFamily, ToolNature, ToolPermissionFacet, T
 use tokio::sync::{mpsc, oneshot};
 
 #[cfg(test)]
-type QueryCompletionHook = Box<dyn FnOnce() + Send>;
+type QueryCompletionHook =
+    Box<dyn FnOnce() -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send>;
 
 #[derive(Clone)]
 pub(crate) struct Execution {
@@ -25,6 +26,7 @@ pub(crate) struct Execution {
 }
 #[derive(Default)]
 struct State {
+    refresh_epoch: Option<uuid::Uuid>,
     generation: Option<u64>,
     current: Option<Snapshot>,
     recovery: Option<(String, String, PermissionLease)>,
@@ -75,20 +77,44 @@ impl Execution {
             after_history_query: Arc::new(Mutex::new(None)),
         }
     }
-    pub(crate) fn refresh(&self, source: Option<&HistorySource>, messages: &[Message]) {
-        let snapshot = source.and_then(|source| {
+    pub(crate) async fn refresh_cooperative(
+        &self,
+        source: Option<&HistorySource>,
+        messages: &[Message],
+    ) {
+        // Withdraw the previous live snapshot before the first yield. Dropping
+        // this preparation future must not leave stale compaction authority.
+        let epoch = uuid::Uuid::new_v4();
+        if let Ok(mut state) = self.state.lock() {
+            state.refresh_epoch = Some(epoch);
+            state.current = None;
+            let generation = source.map(HistorySource::generation);
+            if generation.is_none() || state.generation != generation {
+                state.issued = None;
+                state.recovery = None;
+                state.cursor = None;
+            }
+            state.generation = generation;
+        }
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+        let snapshot = async {
+            let source = source?;
             let permission = self.permission.as_ref()?;
             let authority = PermissionLease {
                 state: permission.clone(),
                 snapshot: permission.state_snapshot().ok()?,
             };
             let end = crate::checkpoint_request::eligible_prefix_end(messages)?;
-            if end == 0 || end > 8192 {
+            if end == 0 {
                 return None;
             }
             let mut refs = BTreeMap::new();
             let mut order = Vec::new();
             for (index, message) in messages[..end].iter().enumerate() {
+                tokio::task::yield_now().await;
+                if tokio::time::Instant::now() >= deadline {
+                    return None;
+                }
                 if matches!(message, Message::System { .. }) {
                     continue;
                 }
@@ -100,25 +126,27 @@ impl Execution {
                     order.push(reference);
                 }
             }
+            if tokio::time::Instant::now() >= deadline {
+                return None;
+            }
+            // Cloning metadata is synchronous and O(history), not hard real-time.
+            let source = source.clone();
+            if tokio::time::Instant::now() >= deadline {
+                return None;
+            }
             (!refs.is_empty()).then(|| Snapshot {
                 token: uuid::Uuid::new_v4().to_string(),
-                source: source.clone(),
+                source,
                 end,
                 refs,
                 order,
                 authority,
             })
-        });
-        if let Ok(mut state) = self.state.lock() {
-            let generation = source.map(HistorySource::generation);
-            // None explicitly withdraws source authority. A valid same-generation
-            // append may lack a compaction snapshot but retains recovery discovery.
-            if generation.is_none() || state.generation != generation {
-                state.issued = None;
-                state.recovery = None;
-                state.cursor = None;
-            }
-            state.generation = generation;
+        }
+        .await;
+        if let Ok(mut state) = self.state.lock()
+            && state.refresh_epoch == Some(epoch)
+        {
             state.current = snapshot;
         }
     }
@@ -258,7 +286,7 @@ impl AgentTool for HistorySearchTool {
                     .expect("query hook")
                     .take();
                 if let Some(hook) = hook {
-                    hook();
+                    hook().await;
                 }
             }
             // Revalidate after query construction. Keep execution state stable
@@ -555,7 +583,7 @@ mod tests {
             (Some(CompactOutcome::NotEligible { before: 10 }), false),
             (None, false),
         ] {
-            let (execution, _, _) = fixture();
+            let (execution, _, _) = fixture().await;
             let (sender, receiver) = oneshot::channel();
             execution.state.lock().expect("state").receipt = Some((7, receiver));
             if let Some(outcome) = outcome {
@@ -576,7 +604,7 @@ mod tests {
         }
     }
 
-    fn fixture() -> (
+    async fn fixture() -> (
         Execution,
         mpsc::UnboundedReceiver<crate::AgentActorRequest>,
         Vec<Message>,
@@ -598,7 +626,7 @@ mod tests {
             (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
         )
         .expect("source");
-        execution.refresh(Some(&source), &raw);
+        execution.refresh_cooperative(Some(&source), &raw).await;
         (execution, receiver, raw)
     }
     #[cfg(unix)]
@@ -613,7 +641,7 @@ mod tests {
                 "cancel",
                 "append",
             ] {
-                let (execution, _, mut raw) = fixture();
+                let (execution, _, mut raw) = fixture().await;
                 if recovery_only {
                     // A short source is valid for durable recovery but has no
                     // eligible compaction prefix.
@@ -625,7 +653,7 @@ mod tests {
                         (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
                     )
                     .expect("short recovery-only source");
-                    execution.refresh(Some(&source), &raw);
+                    execution.refresh_cooperative(Some(&source), &raw).await;
                     assert!(execution.state.lock().expect("state").current.is_none());
                 }
                 let root = tempfile::tempdir().expect("root");
@@ -649,7 +677,7 @@ mod tests {
                 let current_execution = execution.clone();
                 let path = durable.file_path().to_path_buf();
                 let cancelled = cancel.clone();
-                *execution.after_history_query.lock().expect("hook") = Some(Box::new(move || {
+                *execution.after_history_query.lock().expect("hook") = Some(Box::new(move || Box::pin(async move {
                     match change {
                         "source" => {
                             let mut bytes = std::fs::read(&path).expect("source");
@@ -658,19 +686,19 @@ mod tests {
                             bytes[offset] = b'X';
                             std::fs::write(&path, bytes).expect("same-size mutation");
                         }
-                        "execution" => current_execution.refresh(None, &[]),
+                        "execution" => current_execution.refresh_cooperative(None, &[]).await,
                         "generation" | "append" => {
                             if change == "append" { raw.push(Message::User { content: "later append".into() }); }
                             let generation = u64::from(change == "generation");
                             let source = HistorySource::bind(generation, raw.len() as u64, &raw,
                                 (0..raw.len()).map(|i| format!("raw-{i}")).collect()).expect("next generation");
-                            current_execution.refresh(Some(&source), &raw);
+                            current_execution.refresh_cooperative(Some(&source), &raw).await;
                         }
                         "permission" => current_execution.permission.as_ref().expect("permission").clear().expect("reset"),
                         "cancel" => cancelled.cancel(),
                         _ => unreachable!(),
                     }
-                }));
+                })));
                 let result = HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"authorized"})).await;
                 assert_eq!(result.is_error, change != "append", "change={change}, recovery_only={recovery_only}: {}", result.content);
                 if result.is_error { assert!(!result.content.contains("authorized source"), "no stale content"); }
@@ -682,7 +710,7 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn real_history_tool_search_detail_uses_host_prepared_durable_source() {
-        let (execution, _, raw) = fixture();
+        let (execution, _, raw) = fixture().await;
         let root = tempfile::tempdir().expect("root");
         let durable =
             talos_session::DurableSession::open_or_create(root.path(), "query").expect("session");
@@ -714,16 +742,131 @@ mod tests {
         })).await;
     }
 
+    #[tokio::test]
+    async fn older_refresh_cannot_restore_withdrawn_or_new_generation_authority() {
+        for replace in [false, true] {
+            let (execution, _, raw) = fixture().await;
+            let bind = |generation| {
+                HistorySource::bind(
+                    generation,
+                    raw.len() as u64,
+                    &raw,
+                    (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
+                )
+                .expect("source")
+            };
+            let old_source = bind(0);
+            let old = execution.refresh_cooperative(Some(&old_source), &raw);
+            tokio::pin!(old);
+            tokio::select! { biased;
+                _ = &mut old => panic!("older refresh must yield"),
+                _ = std::future::ready(()) => {},
+            }
+            let new_source = bind(1);
+            execution
+                .refresh_cooperative(replace.then_some(&new_source), &raw)
+                .await;
+            old.await;
+            let state = execution.state.lock().expect("state");
+            assert_eq!(state.generation, replace.then_some(1));
+            if replace {
+                assert_eq!(
+                    state
+                        .current
+                        .as_ref()
+                        .expect("new snapshot")
+                        .source
+                        .generation(),
+                    1
+                );
+            } else {
+                assert!(state.current.is_none());
+                assert!(state.issued.is_none());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn cancelled_discovery_refresh_withdraws_old_live_authority() {
+        let (execution, _, raw) = fixture().await;
+        let source = HistorySource::bind(
+            0,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
+        )
+        .expect("source");
+        assert!(execution.state.lock().expect("state").current.is_some());
+        {
+            let refresh = execution.refresh_cooperative(Some(&source), &raw);
+            tokio::pin!(refresh);
+            tokio::select! { biased;
+                _ = &mut refresh => panic!("refresh must yield"),
+                _ = std::future::ready(()) => {},
+            }
+        }
+        assert!(execution.state.lock().expect("state").current.is_none());
+        let result = EXECUTION
+            .scope(
+                execution,
+                HistorySearchTool.execute(json!({"mode":"discover"})),
+            )
+            .await;
+        assert!(
+            result.is_error,
+            "cancelled preparation cannot expose the old live snapshot"
+        );
+    }
+
+    #[tokio::test]
+    async fn cooperative_discovery_accepts_long_bound_history() {
+        let (execution, _, _) = fixture().await;
+        let raw: Vec<_> = (0..8300)
+            .map(|i| Message::User {
+                content: format!("fact {i}"),
+            })
+            .collect();
+        let source = HistorySource::bind_until(
+            0,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
+            tokio::time::Instant::now() + std::time::Duration::from_secs(10),
+        )
+        .await
+        .expect("bound history");
+        execution.refresh_cooperative(Some(&source), &raw).await;
+        {
+            let state = execution.state.lock().expect("state");
+            let current = state
+                .current
+                .as_ref()
+                .expect("long history remains compactable");
+            assert_eq!(current.end, 8290);
+            assert_eq!(current.order.len(), 8290);
+        }
+        let result = EXECUTION
+            .scope(
+                execution,
+                HistorySearchTool.execute(json!({"mode":"discover"})),
+            )
+            .await;
+        assert!(!result.is_error, "{}", result.content);
+        let page: Value = serde_json::from_str(&result.content).expect("page");
+        assert_eq!(page["sources"].as_array().expect("refs").len(), 20);
+        assert_eq!(page["complete"], false);
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn durable_discovery_searches_beyond_compaction_source_limit() {
-        let (execution, _, _) = fixture();
+        let (execution, _, _) = fixture().await;
         let raw: Vec<_> = (0..8300)
             .map(|i| Message::User {
                 content: format!("longhistory fact {i}"),
             })
             .collect();
-        execution.refresh(None, &raw);
+        execution.refresh_cooperative(None, &raw).await;
         let root = tempfile::tempdir().expect("root");
         let durable = talos_session::DurableSession::open_or_create(root.path(), "long-query")
             .expect("session");
@@ -770,7 +913,7 @@ mod tests {
     }
     #[tokio::test]
     async fn discovery_is_scoped_and_permission_reset_invalidates_submission() {
-        let (execution, mut receiver, _) = fixture();
+        let (execution, mut receiver, _) = fixture().await;
         let discovered = EXECUTION
             .scope(
                 execution.clone(),
@@ -782,7 +925,7 @@ mod tests {
         assert!(!discovered.content.contains("raw-"));
         let discovery: Value = serde_json::from_str(&discovered.content).expect("discovery");
         assert_eq!(discovery["sources"].as_array().expect("sources").len(), 20);
-        let (other, _, _) = fixture();
+        let (other, _, _) = fixture().await;
         assert!(
             EXECUTION
                 .scope(other, CompactContextTool.execute(submission(&discovery)))
@@ -817,7 +960,7 @@ mod tests {
     }
     #[tokio::test]
     async fn discovery_pages_preserve_snapshot_source_order_and_reject_replayed_cursor() {
-        let (execution, _, mut raw) = fixture();
+        let (execution, _, mut raw) = fixture().await;
         raw.push(Message::User {
             content: "later input".into(),
         });
@@ -828,7 +971,7 @@ mod tests {
             (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
         )
         .expect("source");
-        execution.refresh(Some(&source), &raw);
+        execution.refresh_cooperative(Some(&source), &raw).await;
         let first = EXECUTION
             .scope(
                 execution.clone(),
@@ -837,7 +980,7 @@ mod tests {
             .await;
         let first: Value = serde_json::from_str(&first.content).expect("first page");
         let cursor = first["next_cursor"].as_str().expect("next page");
-        let (other, _, _) = fixture();
+        let (other, _, _) = fixture().await;
         assert!(
             EXECUTION
                 .scope(
@@ -858,7 +1001,7 @@ mod tests {
             (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
         )
         .expect("source");
-        execution.refresh(Some(&source), &raw);
+        execution.refresh_cooperative(Some(&source), &raw).await;
         let second = EXECUTION
             .scope(
                 execution.clone(),
@@ -900,7 +1043,7 @@ mod tests {
     #[tokio::test]
     async fn discovery_cursor_revalidates_permission_generation_and_prefix() {
         for change in ["permission", "generation", "prefix", "rediscovery"] {
-            let (execution, _, mut raw) = fixture();
+            let (execution, _, mut raw) = fixture().await;
             raw.push(Message::User {
                 content: "extra".into(),
             });
@@ -913,7 +1056,9 @@ mod tests {
                 )
                 .expect("source")
             };
-            execution.refresh(Some(&bind(0, &raw)), &raw);
+            execution
+                .refresh_cooperative(Some(&bind(0, &raw)), &raw)
+                .await;
             let first = EXECUTION
                 .scope(
                     execution.clone(),
@@ -929,12 +1074,18 @@ mod tests {
                     .expect("permission")
                     .clear()
                     .expect("reset"),
-                "generation" => execution.refresh(Some(&bind(1, &raw)), &raw),
+                "generation" => {
+                    execution
+                        .refresh_cooperative(Some(&bind(1, &raw)), &raw)
+                        .await
+                }
                 "prefix" => {
                     raw[0] = Message::User {
                         content: "changed".into(),
                     };
-                    execution.refresh(Some(&bind(0, &raw)), &raw);
+                    execution
+                        .refresh_cooperative(Some(&bind(0, &raw)), &raw)
+                        .await;
                 }
                 _ => {
                     let replacement = EXECUTION
@@ -958,7 +1109,7 @@ mod tests {
 
     #[tokio::test]
     async fn prefix_mutation_invalidates_discovered_checkpoint_before_admission() {
-        let (execution, mut receiver, mut raw) = fixture();
+        let (execution, mut receiver, mut raw) = fixture().await;
         let discovered = EXECUTION
             .scope(
                 execution.clone(),
@@ -976,7 +1127,7 @@ mod tests {
             (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
         )
         .expect("changed");
-        execution.refresh(Some(&changed), &raw);
+        execution.refresh_cooperative(Some(&changed), &raw).await;
         assert!(
             EXECUTION
                 .scope(

@@ -1645,9 +1645,11 @@ impl Agent {
                 )
                 .await
                 .unwrap_or(false);
-                let _ = checkpoint_tools::EXECUTION.try_with(|execution| {
-                    execution.refresh(valid.then_some(&*source), &messages);
-                });
+                if let Ok(execution) = checkpoint_tools::EXECUTION.try_with(Clone::clone) {
+                    execution
+                        .refresh_cooperative(valid.then_some(&*source), &messages)
+                        .await;
+                }
             }
             messages.push(assistant_msg);
 
