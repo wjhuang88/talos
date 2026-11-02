@@ -3894,12 +3894,46 @@ async fn fresh_actor_admits_submit_without_recovery_sidecar_creation() {
 
 #[tokio::test]
 async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
+    exercise_actor_long_history_compaction(false, 20_000, true).await;
+}
+
+#[tokio::test]
+async fn registered_checkpoint_tools_share_manual_actor_compaction_and_raw_history() {
+    exercise_actor_long_history_compaction(true, 32_000, true).await;
+}
+
+#[tokio::test]
+async fn registered_checkpoint_tools_manual_failure_at_20k_preserves_raw_history() {
+    exercise_actor_long_history_compaction(true, 20_000, false).await;
+}
+
+async fn exercise_actor_long_history_compaction(
+    model_tools: bool,
+    capacity: u32,
+    expect_applied: bool,
+) {
     struct CheckpointModel {
+        model_tools: bool,
         summaries: AtomicUsize,
         ordinary: AtomicUsize,
     }
     #[async_trait]
     impl LanguageModel for CheckpointModel {
+        async fn stream_with_tools(
+            &self,
+            messages: &[Message],
+            tools: &[talos_core::provider::ToolDefinition],
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            let summary = matches!(messages, [Message::User { content }] if content.starts_with("Produce only a JSON checkpoint"));
+            let expected = usize::from(self.model_tools && !summary);
+            for name in ["compact_context", "history_search"] {
+                assert_eq!(
+                    tools.iter().filter(|tool| tool.name == name).count(),
+                    expected
+                );
+            }
+            self.stream(messages).await
+        }
         async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
             let summary = match messages {
                 [Message::User { content }]
@@ -3939,6 +3973,7 @@ async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
         }
     }
     let model = Arc::new(CheckpointModel {
+        model_tools,
         summaries: AtomicUsize::new(0),
         ordinary: AtomicUsize::new(0),
     });
@@ -3950,6 +3985,11 @@ async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
         "/tmp".into(),
         Arc::new(talos_plugin::HookRegistry::new()),
     );
+    if model_tools {
+        agent
+            .enable_model_checkpoint_tools()
+            .expect("registered tools");
+    }
     agent.workspace_context = Some("WORKSPACE_CONTEXT_MUST_REMAIN_VERBATIM".into());
     let raw: Vec<_> = (0..50)
         .flat_map(|index| {
@@ -3965,11 +4005,12 @@ async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
             ]
         })
         .collect();
+    // Registered tool schemas consume the same sealed request budget as history.
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: raw.clone(),
-        model_context_limit: 20_000,
+        model_context_limit: capacity,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
     let mut eq_rx = handle.eq_rx;
@@ -4006,8 +4047,30 @@ async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
             break outcome;
         }
     };
+    if !expect_applied {
+        assert!(
+            matches!(outcome, talos_core::session::CompactOutcome::FailedWithEstimate { before, .. } if before > capacity),
+            "{outcome:?}"
+        );
+        sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown after refusal");
+        let history = task.await.expect("actor exit");
+        assert_eq!(
+            history, raw,
+            "failed preparation cannot rewrite raw history"
+        );
+        assert_eq!(
+            model.ordinary.load(Ordering::SeqCst),
+            0,
+            "manual compaction must not dispatch a normal turn"
+        );
+        return;
+    }
     assert!(
-        matches!(outcome, talos_core::session::CompactOutcome::Applied { before, after } if after < before && after <= 20_000)
+        matches!(outcome, talos_core::session::CompactOutcome::Applied { before, after } if after < before && after <= capacity),
+        "{outcome:?}"
     );
     let summary_calls = model.summaries.load(Ordering::SeqCst);
     sq_tx

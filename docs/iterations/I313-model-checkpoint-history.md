@@ -1,3 +1,24 @@
+## Registered tools with manual Actor compaction — 2026-11-02
+
+Preserved the existing no-tools 20K fixture and added registered compact_context /
+history_search cases. At 32K, real manual Actor compaction applies, duplicate
+operation replays its terminal receipt without extra summaries, ordinary continuation
+exposes each registered tool once, workspace context stays intact and raw history
+is preserved. Summary requests expose neither tool. At 20K, preparation refuses
+with before70944; raw history is unchanged and ordinary provider calls remain zero.
+This capacity contrast does not independently identify every internal failure cause.
+No normal Turn is submitted in the failure fixture, so its zero ordinary calls
+prove manual-operation isolation, not over-limit normal-turn admission safety.
+Independent static review found no source blocker and requested this narrower
+failure-test name/claim. Both scope corrections are applied.
+Both new focused locked tests passed 2/2 (`/private/tmp/i313-manual-both-capacities.log`).
+This proves coexistence with manual compaction, not model-issued checkpoint,
+contention or emergency failure/cancellation. Those remaining acceptance gates stay
+open. Windows hook preflight76765 exited0 including both SDK modes; log
+`/private/tmp/i313-production-hook-preflight.log`. Later test additions are covered
+by the focused tests and all-target Clippy (`/private/tmp/i313-manual-both-clippy.log`),
+not retrospectively by that preflight. No new native hook CI or merge claim. T5 Partial; T1/T6 unimplemented.
+
 ## Windows production-hook candidate after native revalidation proof — 2026-11-02
 
 Test-only head d0721a1db CI41427581565 completed successfully, including Windows

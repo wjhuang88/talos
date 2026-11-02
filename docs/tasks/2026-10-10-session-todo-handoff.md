@@ -1,3 +1,13 @@
+## Registered tools/manual compaction capacity regressions — 2026-11-02
+
+Two new Actor regressions pass: 32K manual compaction/duplicate receipt/normal
+continuation with registered tools, and 20K refusal preserving raw history with
+zero ordinary dispatch. They do not close emergency failure/cancellation acceptance.
+I313 owner carries logs and limits; production hook preflight76765 passed including
+both SDK modes. The failure fixture submits no normal Turn, so its zero calls do
+not independently prove over-limit normal-turn admission safety.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
 ## Windows native revalidation proof and hook candidate — 2026-11-02
 
 CI41427581565 succeeded for d0721a1db (test-only Windows restoration). Local
