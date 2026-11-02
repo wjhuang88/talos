@@ -13,7 +13,7 @@ validators and incremental static review. These are not full final-delivery gate
 Legacy CLI durable receipt recovery remains unavailable; registration is not
 proof of that behavior. See I313 owner for exact tests and remaining acceptance.
 
-Windows work is uncommitted and remains fail-closed: restrictive read-sharing
+Windows preparation is locally committed and remains fail-closed: restrictive read-sharing
 handles are retained by file stamps and dropped on preparation timeout. Native
 Windows tests, writable-mapping semantics and Actor lifecycle coverage remain
 required. An isolated Windows module type check is not full-crate or native proof.

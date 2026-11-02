@@ -1444,3 +1444,63 @@ validators (zero warnings): `/private/tmp/i313-lease-agent-check.log`,
 `/private/tmp/i313-lease-governance.log`, `/private/tmp/i313-lease-claims.log`.
 Fetch completed; current implementation remains 37 local commits ahead and 21
 commits behind origin/main. Integration and final exact-head gates remain open.
+
+### Rebased native-validation preparation — 2026-11-02
+
+Read-lease preparation committed as `341791924`, then all 38 local commits rebased
+without conflicts onto `9ace8968603a67ada8d118459c81367611ad3fd2`; new lease head
+`886170426`. Earlier local SHA references describe pre-rebase validation history,
+not exact-head evidence for the rebased candidate. Standard workspace preflight is
+running at `/private/tmp/i313-rebased-preflight.log`.
+
+Added a native Windows CI diagnostic for an existing writable mapping after its
+original file handle closes. It attempts READ-only sharing and records whether
+mapped writes remain visible through that read handle; unexpected open errors or
+inconclusive visibility fail the probe. Read buffering is disabled. Syntax parses
+locally in PowerShell; native behavior has not run. This probe is evidence gathering,
+not recovery authorization; the production Windows path remains fail-closed.
+
+Rebase navigation map (not transferred exact-head test/review approval).
+Earlier local execution entries retain their original source SHA; the following
+rebased commits are their counterparts on the refreshed target baseline.
+
+| Historical local commit | Rebased commit |
+|---|---|
+| `b87ce4e6707a8304561e09b57bd7e331fb9d5836` | `9e3f58b327bd7fafa2f2f1f40c3480ac4db42144` |
+| `1dc42efe5f6a0b7941268b74c06123940e3f08b7` | `1eea0563a58dd772c3944926e218f1991476a582` |
+| `348163e01e8320eefb8dae4badedff249dc8fcf5` | `cf2ae2949af12ac18baa8c5358666a04daa427c5` |
+| `07cc2a6c9178cc75f6734c5d861a81977998979f` | `a949bd5d32adb5cdba641449ea7cfe70859d8935` |
+| `f77bb29c5af0d85c3b4a9fd6c728cbbffe04127a` | `9cfb6084afde0a0e097cbffbd0ed746c68129148` |
+| `0efa8eff9c833fb800020698eb0d9629d9c65330` | `8a84e9e51f22a9fb9518fbe70c75a48f48da6875` |
+| `b6ced20b4687d235d5150d83f634d1a818150b8e` | `ba5ec4e57591c7f2ae0877d15a71c5b6c1decc07` |
+| `a9feecd992b68c3b98043ece2f3c06c10fa31886` | `d9c4f4b84768db92fb8c6ce515b435a428d244fe` |
+| `4fd715133bd3f26a563e9caab329bdf9b997aefb` | `c9d4f84e0047e23c8680d04ceefbe6c9b6f157de` |
+| `63fd4d44f8dfbaac2022ae9360c65b7bc7281646` | `462bec08341522adad9551d0f3e4c49448703382` |
+| `2e90833e62a6cf6643790fecc0d2f54336ffa9b6` | `4063c762e0edc0d3a74840b6d5f212fc6cc00abc` |
+| `a4eb07c31cac25cb1b9b21e894f2c5bc8b9299d5` | `7aea88450513d255ceec8f576c1cea29a044e0fe` |
+| `577d79b6063128613d092a64da45322a1aa2e6b4` | `842aff438ad220d0bd57259bd070e55be71aa922` |
+| `4d7553df64cb1aae3438f02f557f8b1805b84ff1` | `b02fe62f944d933d689874c42806cd3793da9806` |
+| `07e98dab7609dd198ccbc95fca6c387f1513abed` | `81ffa374fcc475aa77f11ebef9c680072afe98c2` |
+| `404a838cd5734e12e3ec78e1b4a7f24316535b75` | `fc87e6c14d3e9bae9eab7021b5f9184ad806be9f` |
+| `43e753733475645fe45a65811bd2abfeffe4c0bf` | `f832ab1cbff8f094faab434f8858262a5842dae9` |
+| `b099e8253b6d05b0220315a247e2ffe881cc1a92` | `b2c7b22a386015c7cd01fcd11dc48da685673f7b` |
+| `e2c557bbb83d2ba2c3ec2de8f62c5ce0bd1c4513` | `9cce32a9c301922876712f976bce64ab697ec124` |
+| `3aff034f70bf71e9e42d8181c4f7a7968ee9371f` | `3470681097beaac276bd14a7b4322ce23b2f4c62` |
+| `d08b9799c226b3792b7f8ba3bebd4e149759b27c` | `91f64e64d3cc52f39452fb955e6eaed9db676a02` |
+| `c9ddf1360fbc710c087dd2eee12e78abd6545fbb` | `135cad7706b066c02b9672ec770ffae8a167f8fa` |
+| `11db5036a2462fe7aa219082bc2f7766c259144d` | `00d40f1a214edc75ee940f434551ada2670f2a67` |
+| `99d2a40b4a5333fb1ac2c42d39177b28b72d3cf3` | `7ba48dbb5c1b8da95db5c94f4abc23e9c95ed9aa` |
+| `3322e2dcb1d3979c81fec16d4ef314fe1b49f4f6` | `e6de30c14c81b391533a1ea8ef176b8064587245` |
+| `1a9437d76df13354cc6b773ce042866739aa973a` | `88659ba75dbe3f6782fbf48f3f042d83ab577afa` |
+| `b34c4ec9877dfe0e0da8779bae02b6cbb705558d` | `d7c1fad6fb1dfc5da27ab3461e611838774adf94` |
+| `cea39e7bc3c7a4fe90124b30c723aeb74122c8aa` | `339e5aba5b543e3f2ad2a8b4380a8f9e49c7727a` |
+| `c87d2452fa7ebfa0705352393f4c7b48dea368b4` | `711a3476d4d430d5160f8c165afb5058a7641c60` |
+| `3576e53ef6c15d61c6d25039604ebe5d8cc4e3ce` | `299415b25e88f38903942700e2e8a4c6c9f5979e` |
+| `e65bf45544c553e2a9147b09165c87989869710f` | `d8a0ae1357d0c045702af761f8804ca7800de3f0` |
+| `165e691094cebe5e4766cea041a8a4cf6c6aef82` | `4cc269004ff518fa297da26e4542061f739746aa` |
+| `ae475ebe57e3d72c86fc88846ac6f8ef27e13ef9` | `982c5df75fa4b8f163dd5d9f3fcd2c1e9b36e0fc` |
+| `1eaf3aa71b9117e41fd3d7fc6616fc25a0257b37` | `afecb0cbae9f0218ea2938598b809c90f327a786` |
+| `adcf93a4d3978dc24ec56779695c9c45122c0b19` | `c25e28bf4e4ae8ca6b067a97be7ab0047ea227b4` |
+| `188917ed21afca0c0dc88bbfcc3b66a49e81fc10` | `73ec499357047f13a8a3df6aa84787814dee8bff` |
+| `b9462d0fd8059f61a45b94f0e45cc1a0ccd9dedc` | `166f16131df29f0fef3044b56ef84840ba852caf` |
+| `34179192440768368f7902d53830b21063d75d1c` | `8861704261a58ae5767ec3d71918b556af472dc1` |
