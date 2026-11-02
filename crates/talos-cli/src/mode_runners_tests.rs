@@ -1496,6 +1496,52 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             }
         }).await.expect("switched Actor completes");
         assert!(completed);
+        // Switch again in the same persisted session, through the same production
+        // handler, and verify the prior completed turn survives reconstruction.
+        let prior_id = session_watch_rx.borrow().id;
+        let prior_messages = session_watch_rx.borrow().read_messages().expect("prior history");
+        assert!(prior_messages.iter().any(|message| matches!(message, talos_core::message::Message::User { content } if content == "verify switched model budget")));
+        let mut next_config = new_config.clone();
+        let next_limit = if context_limit == 64_000 { 32_000 } else { 64_000 };
+        next_config.providers.get_mut("target-gw").expect("provider").models.insert(
+            "next-model".into(), talos_config::ModelConfig {
+                context_limit: Some(next_limit), output_limit: Some(output_limit),
+                ..Default::default()
+            });
+        next_config.save().expect("persist next model");
+        let switched = tokio::time::timeout(std::time::Duration::from_secs(5), handle_session_model(
+            &transition, &ui_tx, &next_config, &runtime_builder, &session_watch_tx,
+            &sq_tx_watch_tx, &bridge_tx, &session_watch_rx,
+            "next-model".into(), Some("target-gw".into()),
+        )).await.expect("second switch deadline").expect("second switch succeeds");
+        assert_eq!(switched.model, "next-model");
+        assert_eq!(session_watch_rx.borrow().id, prior_id);
+        let after_messages = session_watch_rx.borrow().read_messages().expect("restored history");
+        assert_eq!(&after_messages[..prior_messages.len()], prior_messages.as_slice(), "switch preserves authoritative prefix");
+        let (_, mut next_events) = bridge_rx.try_recv().expect("second rebuilt route");
+        let next_sq = sq_rx_watch.borrow().clone();
+        next_sq.send(talos_core::session::SessionOp::Submit {
+            message: "continue after second switch".into(),
+        }).await.expect("second submit");
+        let mut next_budget = None;
+        let mut next_completed = false;
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            while let Some(event) = next_events.recv().await {
+                if let talos_core::session::SessionEvent::TurnEvent { payload, .. } = event {
+                    match payload {
+                        talos_core::session::TurnEventPayload::Progress { event: talos_core::message::AgentEvent::ContextBudget { budget } } => next_budget = Some(budget),
+                        talos_core::session::TurnEventPayload::Completed { status } => {
+                            assert!(matches!(status, talos_core::session::TurnCompletionStatus::Success { .. }), "{status:?}");
+                            next_completed = true;
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }).await.expect("second turn deadline");
+        assert!(next_completed);
+        assert_eq!(next_budget.expect("second actual request budget").limit, Some(next_limit));
         transition.lock().await.shutdown().await;
         let budget = budget.expect("real request budget event");
         assert_eq!(budget.limit, Some(context_limit));
