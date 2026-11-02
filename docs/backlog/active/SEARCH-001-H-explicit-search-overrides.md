@@ -1,6 +1,6 @@
 # SEARCH-001-H: Explicit Premium And Self-Hosted Search Overrides
 
-**Status**: Planned / Unclaimed
+**Status**: Active / Claimed
 **Type**: Implementation / Policy Child
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -9,24 +9,26 @@
 | Story ID | SEARCH-001-H |
 | Source Issue | [#832](https://github.com/wjhuang88/talos/issues/832) |
 | Depends on | Accepted ADR-085/ADR-090; SEARCH-001-C / #643 complete at #808 merge `eb870cdf0a63f45f20d89f1a50eba276f9198643` |
-| Selected Iteration | [I314](../../iterations/I314-search-explicit-overrides.md) — Planned / Unclaimed; no implementation authority |
-| Implementation PR | None |
+| Selected Iteration | [I314](../../iterations/I314-search-explicit-overrides.md) — Active / Claimed after this atomic activation reaches `main` |
+| Implementation PR | Not started; implementation must branch from the effective activation merge/current `main` |
 | Last Updated | 2026-11-02 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned; I314 is planning only until an atomic claim+activation is accepted |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-5.6 Sol |
+| Work Slice | SEARCH-001-H explicit premium/self-hosted override configuration and production composition; Tavily controlled transport; explicit fallback-to-auto; secret redaction. No SEARCH-001-E/F admission and no `rust-websearch` removal. |
+| Claimed At | 2026-11-02 |
 | Source Issue | #832 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Planning only; Story/iteration existence does not authorize production changes. |
-| Handoff / Release Condition | Re-run nonterminal iteration inventory and merge one effective claim+activation before implementation. Existing Active work remains independently owned; SEARCH-001-E/F stay separately blocked because D admission did not occur. |
+| Governance Claim PR | Pending draft PR number on `docs/i314-search-explicit-overrides-activate`; backfill before validation/merge |
+| Authorization Mode | Single-maintainer merge with explicit maintainer-authorized parallel execution |
+| Authorization Evidence | On 2026-11-02 the maintainer explicitly answered `允许并行` after being told that I314 would be activated and implemented in parallel with the currently Active I310 and I313 scopes. |
+| Handoff / Release Condition | Keep I314 ownership until implementation/acceptance closeout or an explicit handoff. Existing I310/I313 ownership remains unchanged; SEARCH-001-E/F stay separately blocked because D admission did not occur. |
+
+This claim/Active state is a candidate while its governance PR is open. It becomes effective only when the atomic activation PR reaches `main`; no production implementation branch may start before that merge.
 
 ## Goal
 
@@ -47,8 +49,8 @@ in the environment must not silently select paid usage or change the default sea
 
 ## Constraints
 
-- No implementation before an effective collaboration claim and Active iteration state.
-- I314 is currently Planned / Unclaimed only; selecting it does not reserve ownership or authorize a branch/implementation PR.
+- Production implementation starts only after this atomic claim+activation reaches `main`.
+- Parallel execution with I310/I313 is explicitly maintainer-authorized; their scopes and claims remain independent and unchanged.
 - Preserve the model-facing `web_search` schema and Network permission unless separately reviewed.
 - Do not create a second generic retry/backoff/circuit-breaker system; reuse SEARCH-001-C and
   NET-001/#199 boundaries.
@@ -85,4 +87,5 @@ in the environment must not silently select paid usage or change the default sea
 ## Rollback
 
 Retain the currently shipped compatibility configuration and provider adapters until an H
-implementation has explicit migration/rollback evidence. Planning alone changes no runtime behavior.
+implementation has explicit migration/rollback evidence. Reverting I314 implementation must restore
+the existing Auto-only production composition without requiring schema/data migration.
