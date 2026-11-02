@@ -2487,3 +2487,26 @@ reviewed three-file diff hash
 the only subsequent change to those files moves the ADR paragraph under the
 correct Windows section as requested. Reviewer did not run tests; activation,
 restrictive-handle construction invariant and native lifecycle coverage stay open.
+
+### Retained writable-view native evidence preparation
+
+The Windows mapping probe now runs two separate lifetimes: original file handle
+closed with mapping+view retained, and both file/mapping handles closed with only
+the view retained. Each proves the view remains writable before trying the
+read-only-share lease, reports which lifetime was exercised, and verifies write
+and rename availability after all leases/views are released. A Windows Rust
+regression also replaces a released source with identical bytes and requires a
+different volume/file identity. These are native tests awaiting execution, not
+proof of exclusion or activation. Local PowerShell syntax parsing and Rust format
+checks pass; Windows authorization remains closed. The previous probe's observed
+sharing violation must not be extrapolated to the newly added view-only case.
+Independent static review approves the two-file evidence-preparation diff
+`aa0f3ba9b9c63a448b4cab5168b3c8d6aaff6e43b3d3fdf61d961ead8be8d626`
+against `34a191806`; no native test was run by the reviewer. Probe JSON must be
+interpreted together with successful script completion (release checks follow
+the JSON) and the lease/mutation fields; script exit 0 alone is not authorization.
+The published CI Actor event timeout did not reproduce in the focused host run:
+the registered checkpoint scenario passed in 16.55 seconds with A/B request token
+estimates 745375→10001 and 746030→10662
+(`/private/tmp/i313-actor-ci-timeout-repro.log`). This single run neither fixes nor
+explains the CI failure; the two-second event-stall assertion remains unchanged.

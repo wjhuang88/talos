@@ -202,6 +202,27 @@ mod tests {
         drop(writer);
         assert!(crate::history_page::open_source(&path).is_ok());
     }
+
+    #[test]
+    fn replacing_source_after_lease_release_changes_identity() {
+        let dir = tempfile::tempdir().expect("temp directory");
+        let path = dir.path().join("history.jsonl");
+        let replacement = dir.path().join("replacement.jsonl");
+        std::fs::write(&path, b"same bytes").expect("source");
+        std::fs::write(&replacement, b"same bytes").expect("replacement");
+        let file = crate::history_page::open_source(&path).expect("source lease");
+        let stamp = from_file(&file).expect("source stamp");
+        // Keep only inert identity values; retaining the stamp would retain the
+        // lease and correctly prevent replacing the source in the first place.
+        let old_identity = (stamp.volume, stamp.identity);
+        drop(file);
+        drop(stamp);
+        std::fs::rename(&path, dir.path().join("old.jsonl")).expect("release old source");
+        std::fs::rename(&replacement, &path).expect("replace source");
+        let fresh = crate::history_page::open_source(&path).expect("fresh lease");
+        let fresh_stamp = from_file(&fresh).expect("fresh stamp");
+        assert_ne!(old_identity, (fresh_stamp.volume, fresh_stamp.identity));
+    }
 }
 
 /// Private source-version representation for host-owned scan checkpoints.
