@@ -2310,8 +2310,10 @@ Native log: `/private/tmp/i313-windows-desktop-failure.log`. Standard host prefl
 with the expanded long-history scenario exceeding its aggregate 10-second wait.
 That scenario now has a 30-second total wait for its multiple bounded operations;
 the helper's two-second event-stall check and production deadlines are unchanged.
-Fresh standard host preflight runs at `/private/tmp/i313-long-stage-preflight-retry.log`
-(session30556), with no pass claimed yet. Both standalone governance validators
+Fresh standard host preflight passed exit 0, including both external Runtime SDK
+modes (`/private/tmp/i313-long-stage-preflight-retry.log`, session30556 terminal).
+Validated executable source is committed through `889a86707`; this is local
+stage validation, not native Windows or complete T5 acceptance. Both standalone governance validators
 passed zero warnings (`/private/tmp/i313-long-checkpoint-{governance,claims}.log`).
 Native platform gates remain open. Whole queue stays Active.
 
