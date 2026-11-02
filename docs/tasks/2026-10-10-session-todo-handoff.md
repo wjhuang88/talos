@@ -1,3 +1,13 @@
+## Runtime output fix and Windows failure — 2026-11-02
+
+Local candidate bounds huge ordinary Runtime tool output while preserving validated
+builtin history JSON; identity/hook/original-protocol regressions and Clippy passed.
+Final Runtime tests passed2/2. Remaining filtering/storage acceptance is not closed.
+CI41434712578 failed on Windows independent-process Actor restart10s deadline;
+production saved-scan hook test passed. Local restart passed, root cause unresolved.
+I313 owner holds logs and diagnostic scope. Full queue retained; T5 Partial,
+T1/T6 unimplemented.
+
 ## Automatic checkpoint failure/cancellation composition — 2026-11-02
 
 Actor Submit regression with registered tools now covers five terminal outcomes,

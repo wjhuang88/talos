@@ -1868,7 +1868,12 @@ impl Agent {
                             content: compressed.content,
                             ..ui_result.clone()
                         }
-                    } else if projection.model_content.len() > self.tool_output_threshold {
+                    } else if projection.model_content.len() > self.tool_output_threshold
+                        && !(observed.call == *call
+                            && call.name == "history_search"
+                            && self.tools.is_builtin_instance("history_search")
+                            && projection.model_content.len() <= 16_384)
+                    {
                         let compressed = crate::tool_output::compress_tool_output(
                             &projection.model_content,
                             self.tool_output_threshold,

@@ -7043,3 +7043,133 @@ async fn ephemeral_tool_image_drives_real_continuation_checkpoint() {
         }
     }
 }
+
+#[tokio::test]
+async fn output_bounds_do_not_trust_names_or_change_original_protocol_results() {
+    struct OutputFixture {
+        original: bool,
+    }
+    #[async_trait]
+    impl AgentTool for OutputFixture {
+        fn name(&self) -> &str {
+            "history_search"
+        }
+        fn description(&self) -> &str {
+            "untrusted same-name fixture"
+        }
+        fn parameters(&self) -> Value {
+            serde_json::json!({"type":"object"})
+        }
+        fn requires_original_invocation(&self) -> bool {
+            self.original
+        }
+        async fn execute(&self, _: Value) -> ToolExecutionResult {
+            unreachable!()
+        }
+    }
+    for original in [false, true] {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(OutputFixture { original }));
+        let agent = Agent::new(Arc::new(MockModel::new(vec![])), registry);
+        let call = ToolCall {
+            id: "bounded-result".into(),
+            name: "history_search".into(),
+            input: serde_json::json!({}),
+        };
+        let content = serde_json::json!({"text":"x".repeat(6000)}).to_string();
+        let context = HookContext::new(TurnId::new(), PathBuf::from("."));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut messages = Vec::new();
+        agent
+            .observe_tool_result(
+                &context,
+                &call,
+                ToolExecutionResult::success(content.clone()),
+                &tx,
+                &mut messages,
+                &mut crate::transient_text::PrivateTokens::default(),
+            )
+            .await
+            .expect("observe");
+        let Message::Tool { result } = &messages[0] else {
+            panic!("paired result")
+        };
+        assert_eq!(result.tool_use_id, call.id);
+        if original {
+            assert_eq!(result.content, content);
+        } else {
+            assert!(result.content.len() < 4200);
+            assert!(result.content.contains("[truncated,"));
+        }
+        let AgentEvent::ToolResult { result, .. } = rx.try_recv().expect("UI event") else {
+            panic!("result event")
+        };
+        assert_eq!(
+            result.content, content,
+            "UI projection retains producer bytes"
+        );
+        assert_eq!(result.tool_use_id, call.id);
+    }
+}
+
+#[tokio::test]
+async fn observation_hook_cannot_grant_builtin_history_output_exemption() {
+    struct RenameObservation;
+    #[async_trait]
+    impl HookHandler for RenameObservation {
+        fn name(&self) -> &str {
+            "rename-observation"
+        }
+        fn subscribed(&self) -> &'static [HookEventKind] {
+            &[HookEventKind::OnToolResultObserved]
+        }
+        async fn on_event(&self, _: &HookContext, event: &mut HookEvent<'_>) -> HookResult {
+            if let HookEvent::OnToolResultObserved { observation } = event {
+                let mut changed = (*observation).clone();
+                changed.call.name = "history_search".into();
+                // HookResult owns a static event; this single fixture observation lives
+                // for the test process.
+                return HookResult::Modify(HookEvent::OnToolResultObserved {
+                    observation: Box::leak(Box::new(changed)),
+                });
+            }
+            HookResult::Continue
+        }
+    }
+    let mut hooks = HookRegistry::new();
+    hooks.register(Arc::new(RenameObservation));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(vec![])),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("."),
+        Arc::new(hooks),
+    );
+    agent.enable_model_checkpoint_tools().expect("real builtin");
+    let call = ToolCall {
+        id: "renamed-result".into(),
+        name: "ordinary_tool".into(),
+        input: serde_json::json!({}),
+    };
+    let content = serde_json::json!({"text":"x".repeat(6000)}).to_string();
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut messages = Vec::new();
+    agent
+        .observe_tool_result(
+            &HookContext::new(TurnId::new(), PathBuf::from(".")),
+            &call,
+            ToolExecutionResult::success(content),
+            &tx,
+            &mut messages,
+            &mut crate::transient_text::PrivateTokens::default(),
+        )
+        .await
+        .expect("observe");
+    let Message::Tool { result } = &messages[0] else {
+        panic!("result")
+    };
+    assert_eq!(result.tool_use_id, call.id);
+    assert!(result.content.len() < 4200);
+    assert!(result.content.contains("[truncated,"));
+}

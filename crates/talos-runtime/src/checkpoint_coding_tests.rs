@@ -186,7 +186,25 @@ impl LanguageModel for CodingModel {
                     );
                     call("verify", "verify_fixture", json!({}))
                 }
-                4 => {
+                4 => call(
+                    "long-search",
+                    "history_search",
+                    json!({"mode":"search", "snapshot":result(messages,"discover")["snapshot"], "query":"longdetailfact"}),
+                ),
+                5 => {
+                    let found = result(messages, "long-search");
+                    call(
+                        "long-detail",
+                        "history_search",
+                        json!({"mode":"detail", "snapshot":result(messages,"discover")["snapshot"], "reference":found["results"][0]["reference"]}),
+                    )
+                }
+                6 => {
+                    let detail = result(messages, "long-detail");
+                    let text = detail["text"].as_str().expect("large JSON detail intact");
+                    assert!(text.len() > 4096 && text.len() <= 8192);
+                    assert!(text.starts_with("longdetailfact"));
+                    assert!(!text.contains("[truncated,"));
                     assert!(messages.iter().any(|message| matches!(message, Message::Tool { result } if result.tool_use_id == "verify" && !result.is_error && result.content == "addition source verified; deployment remains unverified")));
                     vec![
                         AgentEvent::TextDelta {
@@ -376,6 +394,10 @@ async fn runtime_coding_artifact_survives_two_checkpoints_and_fork_recovery() {
             content: format!("prior {i} {}", "x".repeat(256)),
         })
         .collect();
+    let mut filler = filler;
+    filler[0] = Message::User {
+        content: format!("longdetailfact {}", "evidence ".repeat(650)),
+    };
     session
         .commit_turn("older-context", &filler, &Default::default())
         .expect("filler");
@@ -483,7 +505,7 @@ async fn runtime_coding_artifact_survives_two_checkpoints_and_fork_recovery() {
     resumed.shutdown().await.expect("shutdown");
     assert_eq!(repairs.load(Ordering::SeqCst), 1);
     assert_eq!(verifies.load(Ordering::SeqCst), 1);
-    assert_eq!(recovery_model.step.load(Ordering::SeqCst), 5);
+    assert_eq!(recovery_model.step.load(Ordering::SeqCst), 7);
     assert!(
         std::fs::read(child_path)
             .expect("after recovery")
@@ -494,5 +516,106 @@ async fn runtime_coding_artifact_survives_two_checkpoints_and_fork_recovery() {
             .expect("parent")
             .starts_with(&raw)
     );
-    println!("coding repairs=1 verifications=1 checkpoints=2 recovery_calls=3");
+    println!("coding repairs=1 verifications=1 checkpoints=2 recovery_calls=5");
+}
+
+#[tokio::test]
+async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continuation() {
+    struct HugeTool;
+    #[async_trait]
+    impl AgentTool for HugeTool {
+        fn name(&self) -> &str {
+            "huge_fixture"
+        }
+        fn description(&self) -> &str {
+            "Return bounded-fixture evidence"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type":"object"})
+        }
+        fn is_read_only(&self) -> bool {
+            true
+        }
+        async fn execute(&self, _: Value) -> ToolResult {
+            ToolResult::success(format!(
+                "visible-fact {} hidden-tail",
+                "x".repeat(2 * 1024 * 1024)
+            ))
+        }
+    }
+    struct HugeModel(AtomicUsize);
+    #[async_trait]
+    impl LanguageModel for HugeModel {
+        async fn stream(&self, _: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+            panic!("normal requests must carry tool definitions")
+        }
+        async fn stream_with_tools(
+            &self,
+            messages: &[Message],
+            tools: &[talos_core::provider::ToolDefinition],
+        ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+            for name in ["compact_context", "history_search", "huge_fixture"] {
+                assert_eq!(tools.iter().filter(|tool| tool.name == name).count(), 1);
+            }
+            let events = match self.0.fetch_add(1, Ordering::SeqCst) {
+                0 => call("huge", "huge_fixture", json!({})),
+                1 => {
+                    let results: Vec<_> = messages
+                        .iter()
+                        .filter_map(|message| match message {
+                            Message::Tool { result } if result.tool_use_id == "huge" => {
+                                Some(result)
+                            }
+                            _ => None,
+                        })
+                        .collect();
+                    assert_eq!(results.len(), 1);
+                    let content = &results[0].content;
+                    assert!(content.starts_with("visible-fact"));
+                    assert!(content.len() < 4200);
+                    assert_eq!(content.matches("[truncated,").count(), 1);
+                    assert!(!content.contains("hidden-tail"));
+                    assert_eq!(messages.iter().filter(|message| matches!(message, Message::Assistant { tool_calls, .. } if tool_calls.iter().any(|call| call.id == "huge"))).count(), 1);
+                    vec![
+                        AgentEvent::TextDelta {
+                            delta: "bounded continuation".into(),
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::EndTurn,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                _ => panic!("unexpected provider call"),
+            };
+            let (tx, rx) = mpsc::channel(8);
+            for event in events {
+                tx.send(event).await.expect("receiver");
+            }
+            Ok(rx)
+        }
+    }
+    let root = tempfile::tempdir().expect("workspace");
+    let model = Arc::new(HugeModel(AtomicUsize::new(0)));
+    let mut runtime = RuntimeBuilder::new()
+        .provider(model.clone())
+        .workspace_root(root.path())
+        .model_context_limit(32_000)
+        .tool(Arc::new(HugeTool))
+        .build()
+        .expect("runtime");
+    runtime.submit("read huge result").await.expect("submit");
+    let status = tokio::time::timeout(
+        Duration::from_secs(10),
+        collect_until_turn_completed(&mut runtime),
+    )
+    .await
+    .expect("deadline")
+    .expect("completion");
+    assert!(
+        matches!(status, TurnCompletionStatus::Success { .. }),
+        "{status:?}"
+    );
+    assert_eq!(model.0.load(Ordering::SeqCst), 2);
+    runtime.shutdown().await.expect("shutdown");
 }

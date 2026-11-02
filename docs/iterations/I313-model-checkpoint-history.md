@@ -1,3 +1,30 @@
+## Runtime output-boundary correction and Windows residual — 2026-11-02
+
+Real Runtime execution of a >2MiB ordinary tool result exposed missing generic
+model-output bounds in the event delivery path (663625 estimated tokens against
+32K capacity). Candidate restores bounded model projection while leaving UI content
+unchanged. Builtin history_search retains its <=16KiB structured response only when
+the observation call equals the original call and registry identity is builtin;
+name impersonation or hook rename does not qualify. Original-invocation-only tools
+retain their existing event-path behavior. This does not assert parity with their
+legacy no-event path or a new universal structured-output policy.
+Real checkpoint A/B plus fork/reopen recovers >4096-byte detail as valid JSON.
+Additional regressions cover same-name impersonation, hook rename, original-only
+bytes and UI/result IDs. Independent static review approved the implementation;
+final Runtime validation passed2/2 (`/private/tmp/i313-output-final-runtime.log`). Affected all-target Clippy passed at
+`/private/tmp/i313-output-final-clippy.log`; focused boundaries passed in
+`/private/tmp/i313-output-identity.log` and `/private/tmp/i313-hook-output.log`.
+MEM-007 metadata/store uniqueness and truncated durable receipt coverage remain open.
+
+Published79b9c05d5 CI41434712578 is terminal failure: Windows production saved-scan
+Preparation regression passed, but independent-process Actor recovery hit its10s
+restart deadline; 624 Agent library tests passed, one failed. Log:
+`/private/tmp/i313-production-hook-windows.log`. Local reproduction passed16.67s
+for the complete multi-process fixture; this does not explain the Windows timeout.
+Added content-free identity/provider-step/verification-count/actor-status diagnostics
+without increasing its deadline. No native hook acceptance or merge is claimed.
+T5 Partial; T1/T6 unimplemented; full queue retained.
+
 ## Automatic checkpoint lifecycle with registered tools — 2026-11-02
 
 Extended real Actor Submit fixtures with registered checkpoint tools: applied,
