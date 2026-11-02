@@ -5302,6 +5302,11 @@ mod tests {
                         _ => {
                             let found = result("recover-1");
                             assert_eq!(
+                                found["results"].as_array().expect("results").len(),
+                                1,
+                                "parent/sibling suffix must be excluded"
+                            );
+                            assert_eq!(
                                 found["results"][0]["text"],
                                 "originalfact unique constraint"
                             );
@@ -5346,108 +5351,199 @@ mod tests {
                 Ok(rx)
             }
         }
-        let root = tempfile::tempdir().expect("root");
-        let manager = SessionManager::with_dir(root.path().join("sessions"));
-        let durable = manager
-            .create_or_open_session("runtime-recovery")
-            .expect("session");
-        let raw: Vec<_> = (0..30)
-            .map(|i| Message::User {
-                content: format!("other {i}"),
-            })
-            .collect();
-        durable
-            .commit_turn("prior", &raw, &Default::default())
-            .expect("commit");
-        struct RecoverableFact(Arc<AtomicUsize>);
-        #[async_trait]
-        impl AgentTool for RecoverableFact {
-            fn name(&self) -> &str {
-                "recoverable_fact"
-            }
-            fn description(&self) -> &str {
-                "read original constraint"
-            }
-            fn parameters(&self) -> Value {
-                serde_json::json!({"type":"object"})
-            }
-            fn is_read_only(&self) -> bool {
-                true
-            }
-            fn recovery_projection(&self, result: &ToolResult) -> Option<String> {
-                Some(result.content.clone())
-            }
-            async fn execute(&self, _: Value) -> ToolResult {
-                self.0.fetch_add(1, Ordering::SeqCst);
-                ToolResult::success("originalfact unique constraint")
-            }
-        }
-        let calls = Arc::new(AtomicUsize::new(0));
-        let mut producer = RuntimeBuilder::new()
-            .provider(Arc::new(
-                MockProvider::new()
-                    .with_tool_call("recoverable_fact", serde_json::json!({}))
-                    .with_response("recorded"),
-            ))
-            .workspace_root(root.path())
-            .permission_rule(PermissionRule::new_nature(
-                ToolNature::Read,
-                None,
-                None,
-                PermissionDecision::Allow,
-            ))
-            .tool(Arc::new(RecoverableFact(calls.clone())))
-            .durable_session(durable.clone())
-            .build()
-            .expect("producer");
-        producer.submit("read constraint").await.expect("submit");
-        assert!(matches!(
-            collect_until_turn_completed(&mut producer)
+        async fn recover(root: &std::path::Path, reopened: DurableSession) {
+            let mut runtime = RuntimeBuilder::new()
+                .provider(Arc::new(RecoveryModel {
+                    step: AtomicUsize::new(0),
+                }))
+                .workspace_root(root)
+                .permission_rule(PermissionRule::new_nature(
+                    ToolNature::Read,
+                    None,
+                    None,
+                    PermissionDecision::Allow,
+                ))
+                .durable_session(reopened)
+                .build()
+                .expect("runtime");
+            runtime
+                .submit("recover original constraint")
                 .await
-                .expect("completion"),
-            TurnCompletionStatus::Success { .. }
-        ));
-        producer.shutdown().await.expect("shutdown producer");
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
-        drop(durable);
-        let reopened = manager
-            .get_session_by_external_id("runtime-recovery")
-            .expect("lookup")
-            .expect("reopened");
-        let mut runtime = RuntimeBuilder::new()
-            .provider(Arc::new(RecoveryModel {
-                step: AtomicUsize::new(0),
-            }))
-            .workspace_root(root.path())
-            .permission_rule(PermissionRule::new_nature(
-                ToolNature::Read,
-                None,
-                None,
-                PermissionDecision::Allow,
-            ))
-            .durable_session(reopened)
-            .build()
-            .expect("runtime");
-        runtime
-            .submit("recover original constraint")
+                .expect("submit");
+            let status = tokio::time::timeout(
+                Duration::from_secs(15),
+                collect_until_turn_completed(&mut runtime),
+            )
             .await
-            .expect("submit");
-        let status = tokio::time::timeout(
-            Duration::from_secs(15),
-            collect_until_turn_completed(&mut runtime),
-        )
-        .await
-        .expect("timeout")
-        .expect("completion");
-        assert!(
-            matches!(status, TurnCompletionStatus::Success { final_text, .. } if final_text == "recovered and continued")
-        );
-        runtime.shutdown().await.expect("shutdown");
-        assert_eq!(
-            calls.load(Ordering::SeqCst),
-            1,
-            "recovery must not execute the original tool"
-        );
+            .expect("timeout")
+            .expect("completion");
+            assert!(
+                matches!(status, TurnCompletionStatus::Success { final_text, .. } if final_text == "recovered and continued")
+            );
+            runtime.shutdown().await.expect("shutdown");
+        }
+        if let Some(root) = std::env::var_os("TALOS_TEST_FORK_FACT_ROOT") {
+            let root = std::path::PathBuf::from(root);
+            let parent: u32 = std::env::var("TALOS_TEST_FORK_FACT_PARENT")
+                .expect("parent pid")
+                .parse()
+                .expect("pid");
+            assert_ne!(parent, std::process::id());
+            let manager = SessionManager::with_dir(root.join("sessions"));
+            let child = manager
+                .get_session_by_external_id("recovery-child")
+                .expect("lookup")
+                .expect("child");
+            recover(&root, child).await;
+            println!("FORK_ANCESTOR_TOOL_FACT_RECOVERED");
+            return;
+        }
+        for fork in [false, true] {
+            let root = tempfile::tempdir().expect("root");
+            let manager = SessionManager::with_dir(root.path().join("sessions"));
+            let durable = manager
+                .create_or_open_session("runtime-recovery")
+                .expect("session");
+            let raw: Vec<_> = (0..30)
+                .map(|i| Message::User {
+                    content: format!("other {i}"),
+                })
+                .collect();
+            durable
+                .commit_turn("prior", &raw, &Default::default())
+                .expect("commit");
+            struct RecoverableFact(Arc<AtomicUsize>);
+            #[async_trait]
+            impl AgentTool for RecoverableFact {
+                fn name(&self) -> &str {
+                    "recoverable_fact"
+                }
+                fn description(&self) -> &str {
+                    "read original constraint"
+                }
+                fn parameters(&self) -> Value {
+                    serde_json::json!({"type":"object"})
+                }
+                fn is_read_only(&self) -> bool {
+                    true
+                }
+                fn recovery_projection(&self, result: &ToolResult) -> Option<String> {
+                    Some(result.content.clone())
+                }
+                async fn execute(&self, _: Value) -> ToolResult {
+                    self.0.fetch_add(1, Ordering::SeqCst);
+                    ToolResult::success("originalfact unique constraint")
+                }
+            }
+            let calls = Arc::new(AtomicUsize::new(0));
+            let mut producer = RuntimeBuilder::new()
+                .provider(Arc::new(
+                    MockProvider::new()
+                        .with_tool_call("recoverable_fact", serde_json::json!({}))
+                        .with_response("recorded"),
+                ))
+                .workspace_root(root.path())
+                .permission_rule(PermissionRule::new_nature(
+                    ToolNature::Read,
+                    None,
+                    None,
+                    PermissionDecision::Allow,
+                ))
+                .tool(Arc::new(RecoverableFact(calls.clone())))
+                .durable_session(durable.clone())
+                .build()
+                .expect("producer");
+            producer.submit("read constraint").await.expect("submit");
+            assert!(matches!(
+                collect_until_turn_completed(&mut producer)
+                    .await
+                    .expect("completion"),
+                TurnCompletionStatus::Success { .. }
+            ));
+            if fork {
+                let parent_bytes = std::fs::read(durable.file_path()).expect("parent bytes");
+                producer
+                    .fork_durable("recovery-child")
+                    .await
+                    .expect("actual runtime fork");
+                producer
+                    .fork_durable("recovery-sibling")
+                    .await
+                    .expect("actual sibling fork");
+                let sibling = manager
+                    .get_session_by_external_id("recovery-sibling")
+                    .expect("lookup sibling")
+                    .expect("sibling");
+                for (owner, text) in [
+                    (&durable, "originalfact parent private suffix"),
+                    (&sibling, "originalfact sibling private suffix"),
+                ] {
+                    owner
+                        .commit_turn(
+                            "private-suffix",
+                            &[Message::User {
+                                content: text.into(),
+                            }],
+                            &Default::default(),
+                        )
+                        .expect("separate suffix");
+                }
+                assert!(
+                    std::fs::read(durable.file_path())
+                        .expect("parent prefix")
+                        .starts_with(&parent_bytes)
+                );
+            }
+            producer.shutdown().await.expect("shutdown producer");
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            drop(durable);
+            let reopened = manager
+                .get_session_by_external_id(if fork {
+                    "recovery-child"
+                } else {
+                    "runtime-recovery"
+                })
+                .expect("lookup")
+                .expect("reopened");
+            if fork {
+                drop(reopened);
+                let mut command =
+                    tokio::process::Command::new(std::env::current_exe().expect("test binary"));
+                command
+                    .args([
+                        "--exact",
+                        "tests::runtime_recovers_original_history_after_reopen",
+                        "--nocapture",
+                    ])
+                    .env("TALOS_TEST_FORK_FACT_ROOT", root.path())
+                    .env(
+                        "TALOS_TEST_FORK_FACT_PARENT",
+                        std::process::id().to_string(),
+                    )
+                    .kill_on_drop(true);
+                let output = tokio::time::timeout(Duration::from_secs(20), command.output())
+                    .await
+                    .expect("child timeout")
+                    .expect("child process");
+                assert!(
+                    output.status.success(),
+                    "independent child must recover ancestor fact: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                assert!(
+                    String::from_utf8_lossy(&output.stdout)
+                        .contains("FORK_ANCESTOR_TOOL_FACT_RECOVERED"),
+                    "child test must actually run"
+                );
+            } else {
+                recover(root.path(), reopened).await;
+            }
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                1,
+                "recovery must not execute the original tool"
+            );
+        }
     }
 
     #[tokio::test]

@@ -5302,8 +5302,11 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         }
     }
     async fn recover_in_fresh_process(root: &std::path::Path) {
-        let reopened = talos_session::DurableSession::open_or_create(root, "checkpoint-recovery")
-            .expect("reopen after two checkpoints");
+        let identity =
+            std::env::var("TALOS_TEST_CHECKPOINT_IDENTITY").expect("explicit recovery identity");
+        let reopened = talos_session::DurableSession::open_existing(root, &identity)
+            .expect("reopen after two checkpoints")
+            .expect("existing recovery binding");
         let persisted = std::fs::read(reopened.file_path()).expect("child initial transcript");
         let recovered_raw = reopened.read_messages().expect("durable replay");
         let mut engine = PermissionEngine::empty();
@@ -5423,17 +5426,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         ));
     }
     let raw: Vec<_> = (0..30)
-        .flat_map(|i| {
+        .flat_map(|_| {
             [
                 Message::User {
-                    content: if i == 0 {
-                        format!(
-                            "omittedfact original constraint {}",
-                            "constraint ".repeat(400)
-                        )
-                    } else {
-                        "constraint ".repeat(400)
-                    },
+                    content: "constraint ".repeat(400),
                 },
                 Message::Assistant {
                     content: "recorded".into(),
@@ -5445,9 +5441,103 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         .collect();
     let durable = talos_session::DurableSession::open_or_create(root.path(), "checkpoint-recovery")
         .expect("durable");
+    // Produce the only searchable fact through actual admission/execution, not a
+    // seeded user message or a manually constructed recovery receipt.
+    struct OriginalFact(Arc<AtomicUsize>);
+    #[async_trait]
+    impl talos_core::tool::AgentTool for OriginalFact {
+        fn name(&self) -> &str {
+            "original_fact"
+        }
+        fn description(&self) -> &str {
+            "Read the original constraint"
+        }
+        fn parameters(&self) -> serde_json::Value {
+            serde_json::json!({"type":"object"})
+        }
+        fn is_read_only(&self) -> bool {
+            true
+        }
+        fn recovery_projection(&self, result: &talos_core::tool::ToolResult) -> Option<String> {
+            Some(result.content.clone())
+        }
+        async fn execute(&self, _: serde_json::Value) -> talos_core::tool::ToolResult {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            talos_core::tool::ToolResult::success("omittedfact original constraint")
+        }
+    }
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut tools = ToolRegistry::new();
+    tools.register(Arc::new(OriginalFact(calls.clone())));
+    let producer_model = Arc::new(MockModel::new(vec![
+        vec![
+            AgentEvent::ToolCall {
+                call: talos_core::message::ToolCall {
+                    id: "original-fact-call".into(),
+                    name: "original_fact".into(),
+                    input: serde_json::json!({}),
+                },
+                provenance: talos_core::tool::ToolProvenance::Native,
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Default::default(),
+            },
+        ],
+        success_events("recorded"),
+    ]));
+    let engine = Arc::new(engine);
+    let producer = Agent::with_security_and_hooks(
+        producer_model,
+        tools,
+        Some(engine.clone()),
+        None,
+        root.path().into(),
+        Arc::new(talos_plugin::HookRegistry::new()),
+    );
+    let (mut producer_handle, mut producer_actor) = AppServerSession::new(
+        producer,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    producer_actor.set_durable_persistence(durable.clone(), Default::default());
+    let producer_task = tokio::spawn(async move {
+        producer_actor.run().await;
+    });
+    producer_handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "read the constraint".into(),
+        })
+        .await
+        .expect("produce fact");
+    let produced = tokio::time::timeout(
+        Duration::from_secs(10),
+        collect_until_completions(&mut producer_handle.eq_rx, 1),
+    )
+    .await
+    .expect("producer deadline");
+    assert!(produced.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    producer_handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("producer shutdown");
+    producer_task.await.expect("producer joined");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
     durable
         .commit_turn("prior", &raw, &Default::default())
         .expect("commit original history");
+
+    let raw = durable.read_messages().expect("actual persisted tool turn");
     let original_bytes = std::fs::read(durable.file_path()).expect("original transcript");
     let model = Arc::new(CheckpointModel {
         step: AtomicUsize::new(0),
@@ -5455,7 +5545,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     let mut agent = Agent::with_security_and_hooks(
         model.clone(),
         ToolRegistry::new(),
-        Some(Arc::new(engine)),
+        Some(engine),
         None,
         root.path().into(),
         Arc::new(talos_plugin::HookRegistry::new()),
@@ -5519,6 +5609,30 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         outcome,
         talos_core::session::CompactOutcome::Applied { .. }
     )));
+    let (fork_receipt, mut fork_result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkDurable {
+            external_id: "checkpoint-child".into(),
+            receipt_tx: Some(fork_receipt),
+        })
+        .await
+        .expect("fork after Applied A and B");
+    let child_id = tokio::time::timeout(Duration::from_secs(10), fork_result.recv())
+        .await
+        .expect("fork deadline")
+        .expect("receipt")
+        .expect("fork accepted");
+    let forked = talos_session::DurableSession::open_existing(root.path(), "checkpoint-child")
+        .expect("child lookup")
+        .expect("child");
+    assert_eq!(child_id, forked.id().to_string());
+    assert_ne!(forked.id(), durable.id());
+    assert_eq!(
+        std::fs::read(forked.file_path()).expect("fork bytes"),
+        std::fs::read(durable.file_path()).expect("parent bytes")
+    );
+    drop(forked);
     handle
         .sq_tx
         .send(SessionOp::Shutdown)
@@ -5573,33 +5687,36 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     // this boundary. Join shutdown before starting it so committed bytes are final.
     drop(actor);
     drop(durable);
-    let mut child = tokio::process::Command::new(std::env::current_exe().expect("test binary"));
-    child.args(["--exact", "session::tests::registered_model_checkpoint_discovers_admits_and_applies_through_actor", "--nocapture"])
+    for identity in ["checkpoint-recovery", "checkpoint-child"] {
+        let mut child = tokio::process::Command::new(std::env::current_exe().expect("test binary"));
+        child.args(["--exact", "session::tests::registered_model_checkpoint_discovers_admits_and_applies_through_actor", "--nocapture"])
         .env("TALOS_TEST_CHECKPOINT_RESTART_ROOT", root.path())
+        .env("TALOS_TEST_CHECKPOINT_IDENTITY", identity)
         .env("TALOS_TEST_CHECKPOINT_PARENT_PID", std::process::id().to_string())
         .kill_on_drop(true);
-    let output = tokio::time::timeout(Duration::from_secs(30), child.output())
-        .await
-        .expect("bounded child recovery")
-        .expect("launch child");
-    assert!(
-        output.status.success(),
-        "child failed: stdout={} stderr={}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(
-        String::from_utf8_lossy(&output.stdout).contains("TALOS_CHECKPOINT_RESTART_VERIFIED"),
-        "child must actually execute recovery, not pass an empty test selection"
-    );
-    let reopened = talos_session::DurableSession::open_existing(root.path(), "checkpoint-recovery")
-        .expect("reopen after child")
-        .expect("durable binding");
-    assert!(
-        std::fs::read(reopened.file_path())
-            .expect("child transcript")
-            .starts_with(&persisted)
-    );
+        let output = tokio::time::timeout(Duration::from_secs(30), child.output())
+            .await
+            .expect("bounded child recovery")
+            .expect("launch child");
+        assert!(
+            output.status.success(),
+            "child failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("TALOS_CHECKPOINT_RESTART_VERIFIED"),
+            "child must actually execute recovery, not pass an empty test selection"
+        );
+        let reopened = talos_session::DurableSession::open_existing(root.path(), identity)
+            .expect("reopen after child")
+            .expect("durable binding");
+        assert!(
+            std::fs::read(reopened.file_path())
+                .expect("child transcript")
+                .starts_with(&persisted)
+        );
+    }
 }
 
 #[test]
@@ -5857,7 +5974,7 @@ async fn fork_worker_busy_compact_receipt_and_interrupt_are_observed() {
 #[cfg(unix)]
 #[tokio::test]
 async fn fork_worker_shutdown_and_actor_abort_retire_before_publication() {
-    for abort in [false, true] {
+    for cancellation in ["shutdown", "abort", "receipt_closed"] {
         let workspace = tempfile::tempdir().expect("workspace");
         let durable = talos_session::DurableSession::open_or_create(workspace.path(), "parent")
             .expect("parent");
@@ -5891,7 +6008,32 @@ async fn fork_worker_shutdown_and_actor_abort_retire_before_publication() {
         tokio::time::timeout(Duration::from_secs(2), reached.notified())
             .await
             .expect("worker entered");
-        if abort {
+        if cancellation == "receipt_closed" {
+            // Closing admission to the receipt independently cancels the worker.
+            // Keep the receiver to witness every sender retiring before shutdown,
+            // so shutdown cannot accidentally be the cause of cancellation.
+            result.close();
+            assert!(
+                tokio::time::timeout(Duration::from_secs(2), result.recv())
+                    .await
+                    .expect("closed receipt worker retirement")
+                    .is_none()
+            );
+            assert!(
+                talos_session::DurableSession::open_existing(workspace.path(), "child")
+                    .expect("lookup before shutdown")
+                    .is_none()
+            );
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown after retirement");
+            tokio::time::timeout(Duration::from_secs(2), task)
+                .await
+                .expect("Actor remains responsive")
+                .expect("join");
+        } else if cancellation == "abort" {
             task.abort();
             assert!(task.await.expect_err("aborted Actor").is_cancelled());
             // The blocking worker owns the remaining sender. Channel closure

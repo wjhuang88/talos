@@ -2026,3 +2026,57 @@ governance validators pass with zero warnings (`/private/tmp/i313-fork-governanc
 `/private/tmp/i313-fork-claims.log`). Staged code/lock/ADR/owner diff reviewed; SDK
 contract records host usage and next-minor enum migration. These are stage-local
 checks, not standard final preflight/platform CI/merge evidence.
+
+### Actual Runtime tool fact across fork and independent process
+
+Extended the existing recovery fixture to retain ordinary reopen and add a real
+Runtime-produced recoverable tool fact, Runtime child/sibling fork, and separate
+parent/sibling suffixes containing the same query keyword. Child recovery runs in
+a distinct test process, discovers/searches/details the original tool fact, and
+requires exactly one search result. The original tool executes once and is not
+registered in the recovery runtime. Parent raw prefix remains unchanged. Parent
+and child tests pass (`/private/tmp/i313-fork-tool-process.log`). This is actual
+fork/restart/tool-projection evidence, but does not yet combine checkpoint A→B
+with fork; that final combined scenario and full T5 gates remain open. Delta is
+uncommitted pending test review.
+
+Runtime subprocess regression now requires child-only success marker as well as
+exit zero, closing the zero-selected-tests false-positive gap; passes at
+`/private/tmp/i313-fork-tool-marker.log`. Existing Actor A→B fixture now invokes
+real ForkDurable after both Applied terminals, verifies new identity/raw equality,
+and independently reopens both parent and child using explicit existing binding
+identity and required success marker. This passes at
+`/private/tmp/i313-checkpoint-fork-process.log`.
+Independent static review approves the two-test delta (SHA256
+`d8d9c2ba8acbe6cdd904e37fda4560b0cf688bd7fa690b667ce891e2a2291022`);
+reviewer did not run tests. Runtime covers tool fact/sibling exclusion; Actor covers
+A→B/fork/original user fact. Combined tool fact+A→B+fork remains unverified, and
+these separate tests must not be represented as that single scenario.
+
+Combined Actor regression now produces the sole omitted fact through an admitted
+registered read tool (execution count exactly one), persists that real tool turn,
+then appends older-context filler before checkpoint A→B. The existing assertion
+requires the fact to leave the projected request; discovery/search/detail recovers
+it, actual ForkDurable copies the committed tip, and independent processes reopen
+both parent and child with required success markers. Locked targeted test passes
+(`/private/tmp/i313-combined-tool-checkpoint-fork.log`). An initial fixture put the
+fact in the retained recent turn and correctly failed the omission assertion;
+chronological placement was corrected, not the assertion. This combined delta is
+uncommitted and awaits independent review; full I313 acceptance/platform/final
+preflight/remote gates remain outstanding.
+
+Fork lifecycle regression additionally closes the receipt receiver while the
+worker is held before publication, awaits channel exhaustion (all senders retired)
+without Shutdown/Interrupt, and confirms no child binding before shutting down
+the responsive Actor. Locked targeted test passes
+(`/private/tmp/i313-fork-receipt-retirement.log`). This covers receipt cancellation
+before publication; cancellation concurrent with committed publication remains a
+separate race boundary and is not certified by this test.
+
+Independent static review approves the combined two-file test delta against
+`cec780133`, SHA256
+`8ac43bb3f7fd8ee82677a12eec751fad45a79a2a64a579186d77be37fb4835b9`.
+Reviewer did not run tests and does not approve full I313. On reopen, ordinary
+raw history includes earlier recovery outputs: fresh call IDs and results prove
+new history_search/detail execution, not absence of the fact from every ordinary
+replayed message. Both governance validators are running for this local evidence stage.
