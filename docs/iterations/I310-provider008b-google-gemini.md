@@ -165,3 +165,17 @@ Rust 1.99.0 cargo test -p talos-provider --lib --locked: 226 passed, zero failed
 (6.55s). This validates latest ADC selection/path tests, endpoint tests and three HTTP transport
 mocks. No live vendor/metadata request, full workspace validation or Gemini acceptance is claimed.
 Independent transport source review requested. Next: native request mapping and SSE/Agent wiring.
+
+### Native request mapping checkpoint — 2026-11-01
+
+Added stateless contents/parts request mapping for system/context/user/model messages, ordered
+inlineData images through the existing TOCTOU guard, functionDeclarations.parametersJsonSchema,
+functionCall/functionResponse association by unique call ID and maxOutputTokens. Reject orphan,
+duplicate and unresolved tool history. Native signed/thinking history replay remains explicitly
+unavailable: this checkpoint rejects reasoning-bearing messages rather than relocating signatures.
+Schema source: https://ai.google.dev/api/generate-content (FunctionDeclaration JSON Schema field
+verified against official reference/Google SDK). No server-side session/caching fields are used.
+Pinned locked Provider lib tests: 229 passed, zero failed/ignored/filtered (5.44s). Includes two
+independent images with exact byte/order assertions and same-name parallel tools/results reversed
+in completion order. Prior transport status-classification correction also passes in this run.
+Request mapping is not yet factory/SSE/Agent connected; full Gemini acceptance remains pending.
