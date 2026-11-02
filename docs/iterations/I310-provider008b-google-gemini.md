@@ -354,3 +354,25 @@ Final Rust1.99.0 cargo test -p talos-provider --lib --locked: 257 passed, zero f
 filtered (5.06s). Source and tests formatted; no claim of a new Desktop UI result (prior log lost
 with workspace maintenance). Remaining ephemeral/browser compatibility, host/UI/catalog, vendor
 fixtures, full preflight and precise CI/review continue to block Gemini/parent completion.
+
+### Request-owned Gemini PNG checkpoint — 2026-11-02 (not accepted)
+
+Restored remote 5cd7380ee6d6cd3b5b32e239b76e16a08776c1e0 and rebased all 43
+Gemini checkpoints onto main 9ace8968603a67ada8d118459c81367611ad3fd2; range-diff
+retains each existing change. Original dirty workspace is untouched. Native PNG ingress now
+consumes request-owned EphemeralImage values into contents/inlineData using shared 32-image /
+16 MiB admission. Earliest expiry bounds lazy ADC, token acquisition, headers and same-wire
+retry/backoff; an admitted SSE response retains its original request/idle deadlines. History
+and preview projections receive no image payload. Unsupported protocol/browser combinations
+still fail before dispatch; browser original-argument support remains pending.
+
+Added controlled tests for ordered two-image HTTP projection/no subsequent replay, expired and
+unsupported admission, count/aggregate size limits, stalled headers versus delayed SSE body,
+stalled Vertex token cancellation/no generation dispatch, and expiry during retry backoff.
+Pinned Rust 1.99.0 restored; Provider --lib --locked test command started after downloading
+fresh dependencies and is still compiling. No current test pass, full preflight or CI result
+is claimed by this checkpoint. Initial independent read-only source review found no blocker
+and requested the two deadline regressions now added; final source/test review remains pending.
+Git CLI push dry-run failed because this host has no GitHub username credentials; use the
+connected GitHub Git-data API with exact expected-head lease to persist checkpoints.
+Completion Commit: Pending. No Gemini/parent completion, PR merge, release or tag.
