@@ -114,6 +114,9 @@ pub enum CatalogProviderProtocol {
     /// OpenAI Responses-compatible API.
     #[serde(rename = "openai-responses")]
     OpenAIResponses,
+    /// Native Google Gemini generateContent API.
+    #[serde(rename = "google-gemini")]
+    GoogleGemini,
 }
 
 /// Static metadata for a known model.
