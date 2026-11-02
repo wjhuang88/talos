@@ -260,3 +260,15 @@ Independent review raised backpressure/stream-mode findings; corresponding fixes
 added. Pinned rustfmt/diff checks pass, but Cargo is still restoring Git dependencies after toolchain
 recovery: these new tests have not yet completed. Factory/config and real Agent acceptance remain
 pending; this internal adapter is not a public completed integration or merge candidate.
+
+### Internal adapter validation and shared retry — 2026-11-01
+
+Rust 1.99.0 cargo test -p talos-provider --lib --locked completed: 250 passed,
+zero failed/ignored/filtered (4.74s). Validates internal LanguageModel HTTP signed-tool/usage
+composition, stalled-consumer deadline closure without late tool release, transport model/stream
+admission and bounded 429 retry/progress ordering. Latest adapter reuses shared retry classification
+and backoff only before response headers, preserving one total deadline across acquisition, sends
+and backoffs. First-event timing starts at the successful dispatch attempt; no SSE/body error is
+retried, no cross-wire fallback. fmt/diff checks pass. Independent current-source follow-up requested.
+This remains an internal adapter: configuration/factory, capabilities/catalog, browser/ephemeral/
+decision completeness, real permission-gated Agent validation and full CI/preflight remain pending.
