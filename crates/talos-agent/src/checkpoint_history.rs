@@ -1569,6 +1569,50 @@ mod tests {
 mod windows_lease_tests {
     use super::*;
 
+    #[tokio::test]
+    async fn expired_preparation_drops_pending_lease_before_normal_persistence() {
+        let root = tempfile::tempdir().expect("root");
+        let session =
+            DurableSession::open_or_create(root.path(), "expired-lease").expect("session");
+        session
+            .commit_turn(
+                "seed",
+                &[talos_core::message::Message::User {
+                    content: "original fact".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("seed");
+        let cancel = CancellationToken::new();
+        let work = Preparation::begin(&session, &cancel, Instant::now() + Duration::from_secs(10))
+            .expect("prepared lease");
+        assert!(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(session.file_path())
+                .is_err()
+        );
+        let pending = tokio::sync::Mutex::new(Some(work));
+        assert!(
+            History::prepare_until(&session, &cancel, &pending, Instant::now())
+                .await
+                .is_none()
+        );
+        assert!(
+            pending.lock().await.is_none(),
+            "expired preparation must not retain custody"
+        );
+        session
+            .commit_turn(
+                "after-timeout",
+                &[talos_core::message::Message::User {
+                    content: "normal continuation".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("persistence after actual timeout path");
+    }
+
     #[test]
     fn dropping_partial_preparation_releases_before_next_commit() {
         let root = tempfile::tempdir().expect("root");

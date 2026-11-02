@@ -2657,3 +2657,17 @@ Host `cargo check --locked -p talos-session --tests` passes
 that host check. Independent static review approves two-file diff
 `88d66540856529158fbeb340a412a35e0426fe729382b6e30ae8c7e22337cbcb`
 against `f495119cd`; reviewer did not run native tests.
+
+### Actual preparation expiry lease regression
+
+Windows regression now invokes History::prepare_until with a pending Preparation
+and an expired deadline, verifies pending is emptied, then commits a normal turn.
+This exercises expiry after acquiring an uncontended preparation mutex, not only
+manual destruction. Pinned Tokio polls the ready lock before its timer. Contended
+lock timeout and pre-cancellation return before pending.take and are not covered;
+their owner cleanup remains part of the lifecycle audit. Native execution remains
+pending. Host locked Agent test check passes
+(`/private/tmp/i313-preparation-expiry-check.log`), without compiling this Windows
+test. Independent static review approves diff
+`07f4c7b8b61ef5b3c3d932c1078a53322786b71183ae92aaf99f99178d7b7ec1`;
+reviewer did not run native tests. No Windows activation or T5 completion claimed.
