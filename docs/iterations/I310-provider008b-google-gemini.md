@@ -272,3 +272,16 @@ and backoffs. First-event timing starts at the successful dispatch attempt; no S
 retried, no cross-wire fallback. fmt/diff checks pass. Independent current-source follow-up requested.
 This remains an internal adapter: configuration/factory, capabilities/catalog, browser/ephemeral/
 decision completeness, real permission-gated Agent validation and full CI/preflight remain pending.
+
+### Explicit profile/factory checkpoint — 2026-11-01
+
+Implementation e83501a18c54812ee0d6db4ae803b44a44682c10 adds google-gemini configuration
+with explicit AI Studio or Vertex project/location/metadata-opt-in profile. Existing provider
+literals retain gemini=None; no catalog/default auto-activation. Shared factory refuses arbitrary
+AI Studio origins and all replacement Vertex ADC URLs before credential discovery. Vertex validates
+resources synchronously and lazily initializes/caches admitted transport during request deadline,
+including OnceCell wait. Unsupported reasoning options are explicitly rejected, not silently ignored.
+Added config round-trip/unknown-field/old-default and factory profile/relocation/missing-profile tests.
+Pinned rustfmt/diff checks pass. Locked config/provider check is compiling; tests await build lock.
+No new passing result, public host/CLI credential flow or full Gemini acceptance is claimed.
+Next: resolve compilation/tests, host credential and capability integration, actual Agent acceptance.
