@@ -2132,3 +2132,26 @@ Windows inspection reconfirms same_file_version deliberately rejects authorizati
 retained READ-only sharing does not yet have native evidence excluding an existing
 writable mapping. Do not activate from stamp equality alone. Platform implementation
 and native validation remain required, independently of these passing local tests.
+
+### Stable Partial candidate preparation
+
+Current implementation head `0514fec35461e2e87aa6d57e080a8b03a7963fbc`
+against base `9ace8968603a67ada8d118459c81367611ad3fd2` has independent static
+approval for Partial stage publication to obtain native platform evidence only;
+full diff SHA256 `41086d19b690fb64cf8b0d60ef88682c56fe965711456c29a52ed0a701985c72`.
+Review inherits continuous incremental reviews plus current critical-boundary
+inspection, not a fresh line-by-line review of all changes; reviewer ran no tests
+and shares Agent/GitHub identity. It does not approve merge/release/full I313.
+Standard preflight is running in `/private/tmp/i313-stable-stage-preflight.log`.
+README en/zh now expose stable tool registration, distinct admission/final outcome,
+permitted recovery projections and unavailable Windows support as unreleased/partial.
+New audit residual: Execution::refresh refuses live compaction discovery above
+8192 eligible messages. Verify/fix long-session model compaction separately from
+already-paged durable history queries; no whole-session scalability claim.
+
+Stable-stage preflight exited 101: talos-tools had 1056 passes and one Git Push
+process-observation EPERM failure under the sandbox. This is not a successful
+workspace gate. The authorized standard host rerun is live at
+`/private/tmp/i313-stable-stage-preflight-host.log`; no pass is claimed.
+Four-file documentation review approved after clarifying that legacy CLI durable
+search/detail remains unavailable; no expansion of stage publication authority.

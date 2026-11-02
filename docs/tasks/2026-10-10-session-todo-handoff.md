@@ -1,3 +1,22 @@
+## T5 stable-stage preparation — 2026-11-02
+
+The queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+The first four stages are merged; I313/T5 remains Active/Partial and unmerged;
+T1/T6 are unimplemented. Local implementation head `0514fec35` includes real
+Actor/Runtime durable fork, bounded recovery, original tool-fact recovery through
+A→B checkpoints and separate-process parent/child reopen, and deterministic
+categorized task-state retention. Latest stage tests/reviews are in the I313 owner.
+Standard stable-stage preflight failed at the Git Push process-observation test
+with sandbox EPERM (`/private/tmp/i313-stable-stage-preflight.log`). Authorized
+host preflight is running at `/private/tmp/i313-stable-stage-preflight-host.log`;
+no pass or remote CI is claimed.
+Independent static review permits publishing a Partial stage candidate to obtain
+native Windows evidence, not merge or full acceptance. Windows authorization and
+fork remain unavailable. Long-session live compaction discovery above 8192 eligible
+messages needs an explicit acceptance audit; durable paged history recovery does
+not alone prove that separate live-compaction path. Full issue-row scenarios,
+platform implementation, final validation and merge remain outstanding.
+
 ## T5 local implementation checkpoint — 2026-11-02
 
 The first four queue stages are merged; T5/I313 remains Active/Partial and

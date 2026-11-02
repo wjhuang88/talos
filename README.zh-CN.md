@@ -29,6 +29,7 @@ Talos 已发布第一条稳定的 pre-1.0 release 线。当前工作区版本是
 - **持久会话与记忆**：SQLite 会话历史、搜索、分支/分叉、导出、语义记忆固化和保留策略预览。
 - **渐进式上下文**：运行时 Skill 发现和显式 Skill 主体/引用激活，不把隐藏内容直接倒入可见历史。
 - **请求上下文预算**：TUI 在取得准入证据前显示 `?`，之后显示本地估算 `~N%`，包含工具定义、安全余量和输出预留，不使用计费量计算。超限时仅从当前请求中有界移除较旧的完整工具交换，保留指令与最新完整交换；无法恢复则明确拒绝，不重放工具。未发布的整请求 checkpoint 保留 Actor 原始历史，派生投影可重建；TUI/inline 提供手动压缩入口。自动压缩尝试显示临时进度、token 估算和有界失败原因，不展示 checkpoint 内容。
+- **模型主动 checkpoint（未发布、部分实现）**：Runtime 与 CLI 注册 `compact_context` 和 `history_search`。模型先发现不透明 snapshot；压缩受理后另有最终结果，有界搜索/详情用于恢复符合权限与持久化策略的原始历史，不重跑原工具。持久历史恢复目前要求受支持的 Unix 存储与获准恢复投影；旧的未验证工具结果可能不可恢复。持久恢复通过 Runtime/Session 存储提供；旧 CLI 存储尚不提供恢复凭据，因此其持久搜索/详情仍不可用。Windows 持久恢复与 fork 仍不可用。参见 [Runtime SDK 契约](docs/reference/RUNTIME-SDK-CONTRACT.md)与 [I313 验收状态](docs/iterations/I313-model-checkpoint-history.md)。
 - **可扩展表面**：MCP 工具、Hooks、JSON-RPC、工程治理状态和显式本地只读 WASM 包已实现；远程插件分发与浏览器控制面仍单独受限。
 
 ## 当前 Release 边界
