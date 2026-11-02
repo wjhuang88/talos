@@ -1,3 +1,17 @@
+## Huge output through applied checkpoint and recovery — 2026-11-02
+
+Commit `eba8b8e89` extends the real Runtime fixture through a >2 MiB tool result,
+bounded persisted projection, a registered `compact_context` operation with one
+confirmed Applied terminal event, and post-install `history_search` discovery,
+search and detail recovery without re-registering the producer tool. The test
+asserts successful completion, lower request tokens after installation, unchanged
+raw transcript prefix, one authoritative huge result, one truncation marker and
+no hidden tail. The twelve later exchanges are direct durable-history seed records,
+not twelve model-executed turns. Focused test and Runtime Clippy passed
+(`/private/tmp/i313-huge-checkpoint-final.log`, `/private/tmp/i313-huge-checkpoint-final-clippy.log`).
+This supports rows 22/23 composition but does not prove MEM-007 metadata-store
+uniqueness, cross-process recovery or all emergency paths. Full T5 remains Partial.
+
 ## Sequential model-switch continuation — 2026-11-02
 
 Commit `960b4b646` extends the production handler regression through a second
