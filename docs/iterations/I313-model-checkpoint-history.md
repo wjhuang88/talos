@@ -2614,3 +2614,30 @@ pass (`/private/tmp/i313-async-startup-final-clippy.log`). Independent API/secur
 review approves diff `f724735c4acb6722444014d98cd307f98db1ad71cafb3abcf65c902e1c19d017`
 against `fa5afe478`; reviewer did not run tests. No final preflight, exact-head CI
 or full T5 completion is inferred for this local increment.
+
+### Actor timeout phase diagnostics
+
+Two published host CI candidates failed at the shared two-second event wait,
+without identifying which of producer/checkpoint/restart phases was waiting.
+The test helper now captures its caller before creating the async future and
+reports that location, received-event count and last event discriminant on
+timeout. It does not log event content or relax the deadline. A paused-time
+regression confirms silent-channel timeout diagnostics; the full registered
+checkpoint scenario passes locally in 16.05 seconds
+(`/private/tmp/i313-wait-diagnostic-regression.log`,
+`/private/tmp/i313-checkpoint-wait-diagnostic.log`). This is diagnostic coverage,
+not a fix or explanation of the remote timeout; the failing CI remains unresolved.
+Independent static review approves test diff
+`264afb3fb89a0fcc789ef94ff3be27e6a00d5471c0f228b0c1dcc306e68f119b`
+against `627d82355`; reviewer did not run tests. Affected all-target Clippy passes
+(`/private/tmp/i313-wait-diagnostic-clippy.log`).
+
+Windows job125117216878 is now terminal failure; full log is
+`/private/tmp/i313-windows-cc05.log`. Both native probe lifetimes (mapping handle
+retained and view-only) refused lease acquisition with sharing violation HRESULT
+-2147024864; script completed successfully, including release/write/rename checks.
+The false mutation field is still due to failed lease acquisition, not a successful
+lease mutation experiment. Native same-byte replacement identity and retained-last-
+clone exclusion tests passed. The workspace failure remains registered Actor
+checkpoint recovery unavailable. This supersedes the live-job note above; actual
+Actor lifecycle/platform activation and the full T5 gates remain outstanding.

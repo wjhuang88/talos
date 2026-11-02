@@ -310,24 +310,50 @@ fn structured_submission_rejects_unbounded_image_metadata() {
     );
 }
 
-async fn collect_until_completions(
+#[track_caller]
+fn collect_until_completions(
     eq_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
     completion_count: usize,
-) -> Vec<SessionEvent> {
-    let mut events = Vec::new();
-    while events
-        .iter()
-        .filter(|event| completed_status(event).is_some())
-        .count()
-        < completion_count
-    {
-        let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
+) -> impl std::future::Future<Output = Vec<SessionEvent>> + '_ {
+    let caller = std::panic::Location::caller();
+    async move {
+        let mut events = Vec::new();
+        while events
+            .iter()
+            .filter(|event| completed_status(event).is_some())
+            .count()
+            < completion_count
+        {
+            let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
             .await
-            .expect("turn completion event timeout")
+            .unwrap_or_else(|_| panic!(
+                "turn completion event timeout at {caller}; received {} events; last kind {:?}",
+                events.len(), events.last().map(std::mem::discriminant)
+            ))
             .expect("session event channel closed before completion");
-        events.push(event);
+            events.push(event);
+        }
+        events
     }
-    events
+}
+
+#[tokio::test(start_paused = true)]
+async fn completion_timeout_reports_awaiting_phase_without_event_content() {
+    let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+    let task = tokio::spawn(async move {
+        collect_until_completions(&mut receiver, 1).await;
+    });
+    let error = task.await.expect_err("silent channel must time out");
+    let payload = error.into_panic();
+    let message = payload
+        .downcast_ref::<String>()
+        .expect("timeout diagnostic");
+    assert!(
+        message
+            .contains("turn completion event timeout at crates/talos-agent/src/session/tests.rs:")
+    );
+    assert!(message.contains("received 0 events; last kind None"));
+    drop(sender);
 }
 
 #[tokio::test]
