@@ -1,3 +1,12 @@
+## T5 registered oversize refusal — 2026-11-02
+
+Runtime coding regression now proves a real oversized compact_context call is
+refused without installing projection or losing source; subsequent legal A/B
+still applies exactly twice. Focused locked test, Clippy and incremental review
+passed. This covers ingress bytes before the first installed projection only.
+Published Windows candidate CI41418548863 is running; local test increments are
+not certified by that head. Full queue retained; T5 Partial, T1/T6 unimplemented.
+
 ## T5 Runtime coding composition — 2026-11-02
 
 Local RuntimeBuilder fixture now repairs an actual source artifact, applies two

@@ -2,6 +2,22 @@
 
 
 
+## Registered oversized checkpoint refusal — local increment, 2026-11-02
+
+The Runtime coding fixture now first submits a 40 KiB compact_context payload
+through the actual registry/permission path. Its next provider request requires
+the byte-limit refusal, no installed derived checkpoint, and the original tool
+fact still present. It then reuses the issued discovery for successful A/B and
+requires exactly two Applied terminals: rejected input cannot masquerade as
+admission or discard the source. Locked focused regression passed
+(`/private/tmp/i313-runtime-oversized.log`). This proves the early byte-limit
+branch before the first projection, not all schema/reclamation/cancellation
+requirements or preservation of an already-installed projection. The oversized
+payload is not itself a complete checkpoint schema. Affected all-target Clippy
+passed (`/private/tmp/i313-runtime-oversized-clippy.log`); independent static review
+approved source diff `4770673bef09d77164b6af335e211bb1b0b4c5a491d12fb4cac991beadbf153d`
+without builds. T5 remains Partial; no new whole-workspace gate is claimed.
+
 ## Runtime coding composition — local increment, 2026-11-02
 
 The real RuntimeBuilder now has a deterministic coding-artifact regression:
