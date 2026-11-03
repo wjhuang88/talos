@@ -1,3 +1,40 @@
+## Acceptance convergence audit — 2026-11-03
+
+This execution map supplements, and does not replace, the published 30-row
+allocation below. A located regression is not a completion verdict. PR #837's
+successful run `41579196634` certifies `7f3a184e4`, not the subsequent local
+test increments. Full-candidate review, validation and merge are still required.
+
+| Rows | Current concrete evidence / next verification |
+|---|---|
+| 1, 2, 3 | `request_plan::tests::actual_provider_receives_pressure_without_persisting_it` captures six real provider requests, checks 0/1/0 pressure changes, stable definitions, successful ordinary continuation and no added summarizer calls. The companion dynamic-budget test checks numeric-only metadata. |
+| 4 | `registered_model_checkpoint_discovers_admits_and_applies_through_actor` proves model-selected A/B and Applied after paired batches. Explicit natural EndTurn-boundary coverage still needs separate verification; ToolUse must not be relabelled EndTurn. |
+| 5 | Actual provider input captures the default ten-user window: nine persisted complete User/Assistant(call)/Tool(result)/Assistant exchanges plus current submission. Both Applied A/B requests must contain that identical contiguous tail. Final combined run passed; old exchanges are seeded, not nine new tool executions. Other window sizes/multimodal shapes are not covered. |
+| 6 | Existing controlled registered-checkpoint/manual contention evidence is recorded above. Verify its exact safe-boundary and unsafe-batch assertions before closure. |
+| 7, 8 | The registered Actor A/B fixture now compares each provider-visible checkpoint with typed canonical rendering and repeats rendering after pretty-JSON roundtrip. Final focused run passed 1/1 in `/private/tmp/i313-canonical-actor.log`. This is current-version fixture coverage, not arbitrary-version equivalence. |
+| 9, 10 | Runtime coding fixtures include oversized-checkpoint refusal and `registered_checkpoint_rejects_insufficient_reclaim_preserving_installed_projection`; audit unchanged-projection assertions against both initial and replacement cases. |
+| 11, 12, 13 | Actor A/B fixture checks task-state fields, separates facts/assumptions, performs pending verification once and records source/missing-source operations exactly once. The final run reports collection=1, verification=1, known-failed attempts=1. |
+| 14, 15, 18 | Registered Actor fixture performs fresh search/detail after A/B and after independent-process parent/child recovery, comparing original task JSON. Separate old-user-message coverage still needs confirmation; tool-fact evidence alone does not prove row 14. |
+| 16, 17 | Existing branch-scoped index, receipt/privacy and Runtime fork tests are candidate evidence; final Actor delivery-level sibling/session and private-payload assertions remain to map explicitly. |
+| 19, 20 | Actor fixture starts independent recovery processes without projection state and asserts original transcript byte prefix is retained. Export-command behavior still needs its own evidence check. |
+| 21 | Pressure fixture checks unchanged system instructions/tool definitions; exact stable-prefix hash across Applied projection changes still needs explicit verification. |
+| 22 | `registered_checkpoint_runtime_bounds_huge_tool_before_provider_continuation` is the actual Runtime huge-result/checkpoint/recovery fixture; see its recorded execution above. |
+| 23 | Actual MEM-007 Actor compression/Applied/restart fixture plus physical index uniqueness/retry fixture. The latter receives prefiltered input and cannot independently prove compression. |
+| 24, 25, 26 | `registered_checkpoint_tools_preserve_automatic_terminal_outcomes` composes registered tools with automatic terminal cases. Confirm one terminal, no over-limit normal dispatch, failure and cancellation assertions before final acceptance. |
+| 27, 28 | Real CLI model-switch wire fixture is recorded above; request-plan fixture varies capacity and output reserve. Reasoning-reserve composition still needs explicit evidence mapping. |
+| 29 | Durable Actor fork/restart and Session multipage/rebuild regressions exist. Enumerate supported TLOG/JSONL host paths and Windows saved-scan limitations before closure. |
+| 30 | Actor research run records A/B token counts, recovery calls, actual local verification and no repeated failed/completed work; Runtime coding fixture changes a real artifact. These are deterministic scenarios, not live-model quality measurements. |
+
+Combined canonical/recent-tail assertions received independent static approval for scoped diff
+`6856beb87781d207fff1a91ceebfc610218ff6c7a3ac4550464e9b73045b0ef6`
+on `bd703166de02c268c66555d8627792760f3cb649`; reviewer did not execute tests.
+Actual final A/B request estimates were 745735→9607 and 746394→10272; the
+same scenario completed both independent restart processes in 17.11 seconds
+(`/private/tmp/i313-paired-recent-actor.log`). Locked Agent test-target
+warnings-denied Clippy passed (`/private/tmp/i313-paired-recent-clippy.log`).
+Next uncovered assertion target is row 21, followed by delivery-level
+privacy/scope mapping. T5 remains Review/Partial; T1/T6 and the whole queue remain open.
+
 ## Filtered-result busy/cancellation recovery — 2026-11-03
 
 The index fixture now holds a real independent SQLite writer lock and requires

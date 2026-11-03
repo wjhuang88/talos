@@ -5388,12 +5388,30 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     }
     struct CheckpointModel {
         step: AtomicUsize,
+        recent_tail: std::sync::Mutex<Option<Vec<Message>>>,
     }
     #[async_trait]
     impl LanguageModel for CheckpointModel {
         async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
             let step = self.step.fetch_add(1, Ordering::SeqCst);
+            if step == 0 {
+                let start = messages
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .filter(|(_, message)| matches!(message, Message::User { .. }))
+                    .nth(9)
+                    .expect("ten recent user exchanges")
+                    .0;
+                *self.recent_tail.lock().expect("recent tail") = Some(messages[start..].to_vec());
+            }
             if step == 2 || step == 4 {
+                let tail = self.recent_tail.lock().expect("recent tail");
+                let tail = tail.as_ref().expect("captured before checkpoint A");
+                assert!(
+                    messages.windows(tail.len()).any(|window| window == tail),
+                    "both installed checkpoints preserve the ten recent exchanges verbatim and in order"
+                );
                 let checkpoint = messages
                     .iter()
                     .find_map(|message| match message {
@@ -5401,7 +5419,27 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                             .strip_prefix(
                                 "[Derived checkpoint; source history remains authoritative]\n",
                             )
-                            .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok()),
+                            .map(|text| {
+                                let checkpoint: crate::compaction::Checkpoint =
+                                    serde_json::from_str(text).expect("typed installed checkpoint");
+                                let canonical =
+                                    checkpoint.render(1_000_000).expect("canonical rendering");
+                                assert_eq!(
+                                    text, canonical,
+                                    "actual provider receives canonical bytes"
+                                );
+                                let pretty = serde_json::to_string_pretty(&checkpoint)
+                                    .expect("alternate serialization");
+                                let roundtrip: crate::compaction::Checkpoint =
+                                    serde_json::from_str(&pretty)
+                                        .expect("same structured checkpoint");
+                                assert_eq!(
+                                    roundtrip.render(1_000_000).expect("repeat rendering"),
+                                    canonical
+                                );
+                                serde_json::from_str::<serde_json::Value>(text)
+                                    .expect("checkpoint JSON")
+                            }),
                         _ => None,
                     })
                     .expect("installed checkpoint in actual provider request");
@@ -5777,6 +5815,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         ));
         let restarted_model = Arc::new(CheckpointModel {
             step: AtomicUsize::new(8),
+            recent_tail: std::sync::Mutex::new(None),
         });
         let verification_calls = Arc::new(AtomicUsize::new(0));
         let mut restarted_agent = Agent::with_security_and_hooks(
@@ -5941,6 +5980,37 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     raw.extend((0..8300).map(|i| Message::User {
         content: format!("prior {i}: {}", "x".repeat(256)),
     }));
+    // Nine closed tool exchanges plus the live submission form the default
+    // ten-user recent window observed by the real checkpoint continuations.
+    for i in 0..9 {
+        let call_id = format!("recent-paired-{i}");
+        raw.extend([
+            Message::User {
+                content: format!("recent task {i}"),
+            },
+            Message::Assistant {
+                content: String::new(),
+                reasoning: None,
+                tool_calls: vec![talos_core::message::ToolCall {
+                    id: call_id.clone(),
+                    name: "recent_fixture".into(),
+                    input: serde_json::json!({"ordinal": i}),
+                }],
+            },
+            Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: call_id,
+                    content: format!("recent result {i}"),
+                    is_error: false,
+                },
+            },
+            Message::Assistant {
+                content: format!("recent task {i} completed"),
+                reasoning: None,
+                tool_calls: vec![],
+            },
+        ]);
+    }
     assert!(raw.len() > 8192);
     assert!(serde_json::to_vec(&raw).expect("history bytes").len() > 2 * 1024 * 1024);
     let durable = talos_session::DurableSession::open_or_create(root.path(), "checkpoint-recovery")
@@ -6084,6 +6154,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     let original_bytes = std::fs::read(durable.file_path()).expect("original transcript");
     let model = Arc::new(CheckpointModel {
         step: AtomicUsize::new(0),
+        recent_tail: std::sync::Mutex::new(None),
     });
     let verification_calls = Arc::new(AtomicUsize::new(0));
     let mut agent = Agent::with_security_and_hooks(
