@@ -59,6 +59,21 @@ gates remain outstanding. T5 stays Partial.
 
 ## Acceptance convergence audit — 2026-11-03
 
+Natural completed-task boundary increment: the same Actor first receives an
+ordinary model EndTurn, emits successful Completed, persists its completion text,
+and emits no model-checkpoint terminal. A subsequent ordinary request to continue
+the report lets the model choose discovery and compact A/B. Full scenario including
+both independent restart processes passed 1/1 (19.82 seconds,
+`/private/tmp/i313-natural-boundary.log`). The compact tool calls remain ToolUse;
+this proves model selection on the next user turn after completed work, not tool
+execution inside an EndTurn event or autonomous background model invocation.
+Independent static review approved code diff
+`d3d683d0ca8739691ccd3fd39d38bb774509f30f58817885dc33a118def2b007`
+on `7c75e7b193bf655f522d064894225bc3d5afb416`; reviewer read the passing log,
+ran no builds, and requested the recent-window description correction below.
+Agent test-target warnings-denied Clippy passed
+(`/private/tmp/i313-natural-boundary-clippy.log`).
+
 Initial insufficient-reclaim increment: the registered Runtime fixture now runs
 both existing-projection and no-prior-projection scenarios. The latter requires
 no installed projection and the original task-0 User message after a valid-schema,
@@ -112,8 +127,8 @@ test increments. Full-candidate review, validation and merge are still required.
 | Rows | Current concrete evidence / next verification |
 |---|---|
 | 1, 2, 3 | `request_plan::tests::actual_provider_receives_pressure_without_persisting_it` captures six real provider requests, checks 0/1/0 pressure changes, stable definitions, successful ordinary continuation and no added summarizer calls. The companion dynamic-budget test checks numeric-only metadata. |
-| 4 | `registered_model_checkpoint_discovers_admits_and_applies_through_actor` proves model-selected A/B and Applied after paired batches. Explicit natural EndTurn-boundary coverage still needs separate verification; ToolUse must not be relabelled EndTurn. |
-| 5 | Actual provider input captures the default ten-user window: nine persisted complete User/Assistant(call)/Tool(result)/Assistant exchanges plus current submission. Both Applied A/B requests must contain that identical contiguous tail. Final combined run passed; old exchanges are seeded, not nine new tool executions. Other window sizes/multimodal shapes are not covered. |
+| 4 | `registered_model_checkpoint_discovers_admits_and_applies_through_actor` completes an ordinary EndTurn on the same Actor before the next ordinary continuation request lets the model select A/B. Applied still follows paired ToolUse batches; no tool execution inside EndTurn or autonomous background model call is claimed. |
+| 5 | Actual provider input captures the default ten-user window: eight seeded complete User/Assistant(call)/Tool(result)/Assistant exchanges, one actual completed baseline review, and current submission. Both Applied A/B requests must contain that identical contiguous tail. Other window sizes/multimodal shapes are not covered. |
 | 6 | Existing controlled registered-checkpoint/manual contention evidence is recorded above. Verify its exact safe-boundary and unsafe-batch assertions before closure. |
 | 7, 8 | The registered Actor A/B fixture now compares each provider-visible checkpoint with typed canonical rendering and repeats rendering after pretty-JSON roundtrip. Final focused run passed 1/1 in `/private/tmp/i313-canonical-actor.log`. This is current-version fixture coverage, not arbitrary-version equivalence. |
 | 9, 10 | Runtime coding fixtures include oversized-checkpoint refusal and `registered_checkpoint_rejects_insufficient_reclaim_preserving_installed_projection`; audit unchanged-projection assertions against both initial and replacement cases. |

@@ -5893,6 +5893,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                         ]
                     }
                 }
+                100 => {
+                    self.step.store(0, Ordering::SeqCst);
+                    success_events("baseline review complete; report remains pending")
+                }
                 12 => research_report_events(messages),
                 _ => panic!("unexpected extra provider request"),
             };
@@ -6087,7 +6091,8 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     raw.extend((0..8300).map(|i| Message::User {
         content: format!("prior {i}: {}", "x".repeat(256)),
     }));
-    // Nine closed tool exchanges plus the live submission form the default
+    // Eight of these closed tool exchanges, the completed baseline review, and
+    // the live continuation submission form the default
     // ten-user recent window observed by the real checkpoint continuations.
     for i in 0..9 {
         let call_id = format!("recent-paired-{i}");
@@ -6269,7 +6274,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     .expect("original export JSON");
     let original_markdown = talos_session::export_markdown(&original_entries);
     let model = Arc::new(CheckpointModel {
-        step: AtomicUsize::new(0),
+        step: AtomicUsize::new(100),
         recent_tail: std::sync::Mutex::new(None),
         stable_prefix_hash: std::sync::Mutex::new(None),
     });
@@ -6310,7 +6315,31 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     handle
         .sq_tx
         .send(SessionOp::Submit {
-            message: "checkpoint and continue".into(),
+            message: "finish reviewing the baseline before continuing the report".into(),
+        })
+        .await
+        .expect("baseline review submission");
+    let completed_boundary = tokio::time::timeout(
+        Duration::from_secs(15),
+        collect_until_completions_with_idle_timeout(&mut handle.eq_rx, 1, Duration::from_secs(15)),
+    )
+    .await
+    .expect("completed task boundary");
+    assert!(completed_boundary.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    assert!(
+        !completed_boundary
+            .iter()
+            .any(|event| matches!(event, SessionEvent::ModelCheckpointTerminal { .. })),
+        "ordinary EndTurn must not emit a model-checkpoint terminal"
+    );
+    assert!(durable.read_messages().expect("completed task persisted").iter().any(|message| matches!(message, Message::Assistant { content, .. } if content == "baseline review complete; report remains pending")));
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "continue the remaining report".into(),
         })
         .await
         .expect("submit");
