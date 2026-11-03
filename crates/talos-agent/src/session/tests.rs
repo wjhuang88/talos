@@ -6665,6 +6665,18 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             },
         )
         .expect("commit");
+    durable
+        .session()
+        .append_with_metadata(
+            &Message::User {
+                content: "public legacy attachment summary".into(),
+            },
+            talos_session::SessionMetadata {
+                raw_content: Some("originalfact private raw-content sentinel".into()),
+                ..Default::default()
+            },
+        )
+        .expect("persist legacy raw-content metadata");
     let persisted =
         serde_json::to_string(&durable.session().read_entries().expect("persisted entries"))
             .expect("serialized persisted evidence");
@@ -6676,6 +6688,7 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
         "originalfact private reasoning sentinel",
         "originalfact opaque signature sentinel",
         "originalfact redacted reasoning sentinel",
+        "originalfact private raw-content sentinel",
     ] {
         assert!(
             persisted.contains(marker),
