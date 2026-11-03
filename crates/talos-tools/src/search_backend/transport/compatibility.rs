@@ -14,6 +14,7 @@ pub(in crate::search_backend) mod invocation;
 pub(in crate::search_backend) mod plan;
 pub(in crate::search_backend) mod probe;
 pub(in crate::search_backend) mod searxng;
+pub(in crate::search_backend) mod tavily;
 pub(in crate::search_backend) mod wikipedia;
 
 use crate::search_backend::{SearchBackendId, bing_parser, ddg_parser, instant_answer};

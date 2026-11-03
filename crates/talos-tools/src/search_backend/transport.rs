@@ -399,6 +399,11 @@ impl BodyFormat {
     }
 }
 
+struct ExecutionOptions {
+    authorization: Option<reqwest::header::HeaderValue>,
+    status_only: bool,
+}
+
 fn encode_form(fields: &[(String, String)]) -> Result<Vec<u8>, TransportError> {
     encode_form_with_limit(fields, 16_384)
 }
@@ -457,6 +462,7 @@ pub(super) struct PreparedTransportRequest {
     body: Option<Vec<u8>>,
     format: BodyFormat,
     headers: Option<compatibility::headers::CompatibilityHeaders>,
+    authorization: Option<reqwest::header::HeaderValue>,
     status_only: bool,
 }
 
@@ -548,6 +554,7 @@ impl PreparedTransportRequest {
             body,
             format,
             headers: None,
+            authorization: None,
             status_only: false,
         })
     }
@@ -649,7 +656,17 @@ impl SearchTransport {
         if request.invocation_id != self.manifest.invocation_id() {
             return Err(TransportError::Unauthorized);
         }
+        // Authorization is deliberately limited to non-redirecting scopes. This check occurs
+        // before DNS or request-budget reservation, so a credential can never be replayed to a
+        // redirected endpoint even if a future caller constructs a credentialed request directly.
+        if request.authorization.is_some() && self.manifest.scope().redirect_limit() != 0 {
+            return Err(TransportError::InvalidRequest);
+        }
         self.budget.check_live()?;
+        let options = ExecutionOptions {
+            authorization: request.authorization,
+            status_only: request.status_only,
+        };
         let result = timeout_at(
             self.budget.deadline,
             self.execute_inner(
@@ -658,7 +675,7 @@ impl SearchTransport {
                 request.body,
                 request.format,
                 request.headers,
-                request.status_only,
+                options,
             ),
         )
         .await
@@ -698,7 +715,7 @@ impl SearchTransport {
         body: Option<Vec<u8>>,
         format: BodyFormat,
         headers: Option<compatibility::headers::CompatibilityHeaders>,
-        status_only: bool,
+        options: ExecutionOptions,
     ) -> Result<TransportResponse, TransportError> {
         let mut redirects = 0;
         loop {
@@ -782,8 +799,11 @@ impl SearchTransport {
             let mut request = client
                 .request(method.clone(), url.clone())
                 .header(reqwest::header::ACCEPT_ENCODING, "identity");
-            if let Some(headers) = headers {
+            if let Some(headers) = headers.as_ref() {
                 request = headers.apply(request);
+            }
+            if let Some(authorization) = options.authorization.as_ref() {
+                request = request.header(reqwest::header::AUTHORIZATION, authorization.clone());
             }
             if let Some(body) = body.as_ref() {
                 request = request
@@ -812,7 +832,7 @@ impl SearchTransport {
                 return Err(TransportError::ResponseLimit);
             }
             let status = response.status().as_u16();
-            if status_only {
+            if options.status_only {
                 return Ok(TransportResponse {
                     status,
                     body: Vec::new(),
