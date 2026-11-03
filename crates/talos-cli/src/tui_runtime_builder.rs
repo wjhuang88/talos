@@ -33,8 +33,8 @@ use crate::mode_runtime::{
 use crate::model_lifecycle::materialize_runtime_model_config;
 use crate::provider_setup::build_provider;
 use crate::registry::{
-    TuiApprovalHandler, build_tui_tool_registry_with_language_provider, load_explicit_plugin_tools,
-    register_loaded_tui_plugins, register_tui_permission_aware_tools,
+    TuiApprovalHandler, load_explicit_plugin_tools, register_loaded_tui_plugins,
+    register_tui_permission_aware_tools,
 };
 use crate::skill_runtime::{RuntimeSkills, apply_runtime_skills, discover_runtime_skills};
 use talos_tools::CapStdAtomicCreateCapability;
@@ -184,14 +184,17 @@ impl TuiRuntimeBuilder {
         let language_provider_context = loaded_plugins
             .iter()
             .find_map(|(_, _, context)| context.clone());
-        let mut registry = build_tui_tool_registry_with_language_provider(
-            self.approval_handler.clone(),
+        let search = crate::mode_print::search_configuration::project_search_configuration(
+            &runtime_config,
+        )?;
+        let mut registry = crate::mode_print::configured_registry::build_tui_tool_registry_with_search(
             self.workspace_root.clone(),
             session.id,
             Vec::new(),
             atomic_create_capability.clone(),
             language_provider_context,
-        );
+            search,
+        )?;
         let pending_scheduler = crate::registry::register_builtin_scheduler(&mut registry)?;
         register_tui_permission_aware_tools(
             &mut registry,
