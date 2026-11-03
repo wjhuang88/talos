@@ -1,3 +1,19 @@
+## Full candidate baseline validation — 2026-11-03
+
+Standard `./scripts/release_preflight.sh` passed on clean implementation
+`c517c143470b26a354fba73dab1978a81ba1b5e6`, including workspace checks,
+warnings-denied Clippy, workspace tests/doc-tests and both independent Runtime
+SDK modes. Log: `/private/tmp/i313-final-c517-preflight-unsandboxed.log`.
+The earlier sandboxed run failed the real Push process-observation fixture with
+EPERM; the authorized unsandboxed run passed that test and the complete script.
+Independent storage/privacy/security static review approved the increment from
+`7f3a184e4edb13482a38c7f1254f4d6dde667c30` to this implementation (diff SHA256
+`d4d34e30513db97fd14ce95c36accf8f619c4813a7f4d258e77625a237beb03e`).
+Reviewer ran no builds. This is not exact-head remote CI or full T5 completion.
+T1's unactivated candidate is preserved in stash
+`59fe5c5ea0293d519c30dbac1148064402d82dbd`, with backup
+`/private/tmp/i313-t1-candidate-before-final-gates.patch`; restore after T5 disposition.
+
 ## Reasoning persistence defect found by recovery acceptance — 2026-11-03
 
 The new actual Actor recovery fixture failed its disk-presence assertion even with
@@ -43,6 +59,15 @@ gates remain outstanding. T5 stays Partial.
 
 ## Acceptance convergence audit — 2026-11-03
 
+Forged-reference delivery increment: the actual Actor fixture changes one byte of
+the secret-bound tag in a real search reference under the current snapshot. It
+requires the exact provider-visible refusal (including the standard retry hint),
+then successfully reads the original reference. Focused locked test passed 1/1
+(`/private/tmp/i313-forged-reference-actor.log`). Independent static review approved
+the patch SHA256 `754d0be29a6c53cc7e27ec244b98e998150ff9e0d665a7b534a9b1ff3a7cd7c4`
+on c517c1434 before formatting; reviewer ran no builds. This does not cover every
+forgery variant, foreign-session references or old-discovery replay.
+
 Export/emergency increment: full registered Actor A/B/restart scenario passed 1/1
 with JSON/Markdown export preservation assertions (17.60 seconds,
 `/private/tmp/i313-checkpoint-export.log`). The registered automatic-terminal
@@ -76,7 +101,7 @@ test increments. Full-candidate review, validation and merge are still required.
 | 11, 12, 13 | Actor A/B fixture checks task-state fields, separates facts/assumptions, performs pending verification once and records source/missing-source operations exactly once. The final run reports collection=1, verification=1, known-failed attempts=1. |
 | 14, 15, 18 | Registered Actor fixture performs fresh search/detail after A/B and after independent-process parent/child recovery, comparing original task JSON. It now submits an old User constraint through the producer Actor, asserts that constraint is absent from the Applied B request, then recovers its exact original text via search and the returned detail reference in all three runs. |
 | 16 | `runtime_recovers_original_history_after_reopen` exercises registered Runtime search/detail with parent/sibling suffixes and an unrelated session containing 64 matching messages in the same storage root. Ordinary reopen and independent-process fork recovery return exactly the original tool fact; unrelated transcript bytes stay unchanged. This fixture is Unix-only and does not prewarm foreign recovery indexes or forge references. |
-| 17 | `durable_actor_history_search_and_detail_reach_real_provider_continuation` persists matching hidden tool arguments, an unverified tool result, reasoning/signatures and legacy raw_content metadata; asserts these exist on disk, verifies credential redaction, and requires actual search/detail to return only the allowed User fact. This Unix fixture proves recovery projection exclusion, not removal from original provider history. Forged-reference delivery remains to map explicitly. |
+| 17 | `durable_actor_history_search_and_detail_reach_real_provider_continuation` persists matching hidden tool arguments, an unverified tool result, reasoning/signatures and legacy raw_content metadata; asserts these exist on disk, verifies credential redaction, and requires actual search/detail to return only the allowed User fact. It rejects one altered reference tag through actual delivery and subsequently accepts the original reference. This Unix fixture proves recovery projection exclusion, not removal from original provider history. |
 | 19, 20 | Actor fixture starts independent recovery processes without projection state and asserts original transcript byte prefix is retained. After Applied A/B, JSON export preserves the complete original entry prefix including metadata/timestamps; Markdown preserves its original prefix and old user/tool facts. The export service is exercised against actual durable entries, not a CLI export command. |
 | 21 | Pressure fixture checks unchanged system instructions/tool definitions. The actual Actor A/B fixture now hashes the nonempty provider-visible cache-marker content ranges on every request and requires the same SHA-256 through discovery, Applied A/B and recovery. Each restarted model establishes its own baseline; this does not compare hashes across processes or provider HTTP encoding. |
 | 22 | `registered_checkpoint_runtime_bounds_huge_tool_before_provider_continuation` is the actual Runtime huge-result/checkpoint/recovery fixture; see its recorded execution above. |

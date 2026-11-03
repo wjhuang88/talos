@@ -6560,13 +6560,13 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
                 assert!(!result.is_error, "{}", result.content);
                 serde_json::from_str(&result.content).expect("result JSON")
             };
-            let events = if step < 3 {
+            let events = if step < 4 {
                 let input = match step {
                     0 => serde_json::json!({"mode":"discover"}),
                     1 => {
                         serde_json::json!({"mode":"search","snapshot":result("recover-0")["snapshot"],"query":"originalfact"})
                     }
-                    _ => {
+                    2 => {
                         let found = result("recover-1");
                         assert_eq!(
                             found["results"].as_array().expect("results").len(),
@@ -6577,6 +6577,30 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
                             found["results"][0]["text"],
                             "originalfact unique constraint"
                         );
+                        let reference = found["results"][0]["reference"]
+                            .as_str()
+                            .expect("reference");
+                        let mut forged = reference.as_bytes().to_vec();
+                        let last = forged.last_mut().expect("nonempty reference");
+                        *last = if *last == b'0' { b'1' } else { b'0' };
+                        serde_json::json!({"mode":"detail","snapshot":result("recover-0")["snapshot"],"reference":String::from_utf8(forged).expect("ASCII reference")})
+                    }
+                    _ => {
+                        let refusal = messages
+                            .iter()
+                            .find_map(|message| match message {
+                                Message::Tool { result } if result.tool_use_id == "recover-2" => {
+                                    Some(result)
+                                }
+                                _ => None,
+                            })
+                            .expect("paired forged-reference refusal");
+                        assert!(refusal.is_error, "forged reference must be refused");
+                        assert_eq!(
+                            refusal.content,
+                            "history recovery Unavailable\n\n[Analyze the error above and try a different approach.]"
+                        );
+                        let found = result("recover-1");
                         serde_json::json!({"mode":"detail","snapshot":result("recover-0")["snapshot"],"reference":found["results"][0]["reference"]})
                     }
                 };
@@ -6596,9 +6620,9 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
                     },
                 ]
             } else {
-                assert_eq!(step, 3);
+                assert_eq!(step, 4);
                 assert_eq!(
-                    result("recover-2")["text"],
+                    result("recover-3")["text"],
                     "originalfact unique constraint"
                 );
                 success_events("recovered and continued")
