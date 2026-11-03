@@ -1,6 +1,6 @@
 # Iteration I315: Model Validation And Read-Only Agile Tools
 
-> Document status: Planned (atomic claim draft; ineffective until merge)
+> Document status: Active (proposed in #845; ineffective until target-branch merge)
 > Published plan date: 2026-11-03
 > Planned objective: complete handoff T1 using shared validation and supported read-only governance services.
 > Baseline rule: preserve all published acceptance; no completion by documentation alone.
@@ -10,13 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | VALIDATION-003 / handoff T1: shared model validation and read-only agile tools, CLI/Runtime host composition, bounded Unix/Windows execution and acceptance |
 | Claimed At | 2026-11-03 |
 | Source Issue | #844 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #845 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized full ordered handoff delivery; independent API/process-security review, exact-head CI, validators and CAS required |
 | Implementation PR | Not started |
@@ -78,3 +78,7 @@ SHA and actual acceptance, not this claim. T6 remains next; full goal Active.
 
 2026-11-03: governance-only draft from current main; no production implementation,
 new dependency, implementation tests or effective activation in this record.
+
+Finalized atomic proposal: #845 carries the actual PR number and proposed
+Claimed/Active record. Both remain ineffective until this finalized head merges.
+Independent review, validators, exact-head CI and CAS precede merge.

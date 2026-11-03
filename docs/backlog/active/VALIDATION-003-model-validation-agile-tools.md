@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Story ID | VALIDATION-003 |
-| Status | Planned / Unclaimed (atomic proposal only) |
+| Status | In Progress (proposed in #845; ineffective until merge) |
 | Priority | P1 |
 | Source Issue | #844 |
 | Owner | I315 |

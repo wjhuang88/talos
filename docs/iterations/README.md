@@ -2,7 +2,7 @@
 
 I315 / VALIDATION-003 / #844 proposes model-callable validation and read-only agile
 summary after merged I313/T5. Claim/activation are ineffective until finalized
-claim PR merge. Supported CLI/Runtime and Unix/Windows execution, applicability,
+claim PR #845 merge. Supported CLI/Runtime and Unix/Windows execution, applicability,
 permissions, cancellation and output bounds are binding acceptance. T6 remains
 later and unimplemented; full handoff Active. I310/I314 retain independent owners.
 
