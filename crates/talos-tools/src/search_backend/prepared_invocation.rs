@@ -165,14 +165,17 @@ fn format_routed_results(
                 }
             }
         }
+        SearchBackendId::Tavily => Ok(crate::web_search::format_tavily_results(
+            query,
+            success.results,
+            include_snippets,
+        )),
         SearchBackendId::SearXng => Ok(crate::web_search::format_searxng_results(
             query,
             success.results,
             include_snippets,
         )),
-        SearchBackendId::Tavily | SearchBackendId::Wikipedia => {
-            Err("search_router_unexpected_prepared_backend")
-        }
+        SearchBackendId::Wikipedia => Err("search_router_unexpected_prepared_backend"),
     }
 }
 
@@ -294,19 +297,37 @@ mod tests {
         assert!(wikipedia.contains("Source: Wikipedia (fallback)"));
         assert!(!wikipedia.contains("Source: DuckDuckGo"));
 
-        for backend in [SearchBackendId::Tavily, SearchBackendId::Wikipedia] {
-            assert_eq!(
-                format_routed_results(
-                    "rust",
-                    SearchRouterSuccess {
-                        backend,
-                        results: Vec::<SearchBackendResult>::new(),
-                    },
-                    true,
-                ),
-                Err("search_router_unexpected_prepared_backend")
-            );
-        }
+        let tavily_rows = vec![SearchBackendResult {
+            backend: SearchBackendId::Tavily,
+            title: "Tavily Rust".into(),
+            url: "https://example.com/rust".into(),
+            snippet: "tavily result".into(),
+        }];
+        let expected_tavily =
+            crate::web_search::format_tavily_results("rust", tavily_rows.clone(), true);
+        let tavily = format_routed_results(
+            "rust",
+            SearchRouterSuccess {
+                backend: SearchBackendId::Tavily,
+                results: tavily_rows,
+            },
+            true,
+        )
+        .expect("tavily display");
+        assert_eq!(tavily, expected_tavily);
+        assert!(tavily.contains("Source: Tavily"));
+
+        assert_eq!(
+            format_routed_results(
+                "rust",
+                SearchRouterSuccess {
+                    backend: SearchBackendId::Wikipedia,
+                    results: Vec::<SearchBackendResult>::new(),
+                },
+                true,
+            ),
+            Err("search_router_unexpected_prepared_backend")
+        );
     }
 
     #[test]

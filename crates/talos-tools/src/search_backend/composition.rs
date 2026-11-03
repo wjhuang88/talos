@@ -12,14 +12,18 @@ use talos_core::tool::{
 use thiserror::Error;
 use tokio::time::Instant;
 
+use super::selection::{
+    SearchBackendAvailability, SearchBackendSelection, SearchBackendSelectionError,
+};
 use super::transport::compatibility::{
     CompatibilityError,
     chain::CompatibilityChainError,
     plan::{CompatibilityPlanError, DirectCompatibilityConfiguration, PreparedCompatibilityPlan},
     searxng::{PreparedSearXng, SearXngConfiguration, SearXngError},
     shared_budget_deadline,
+    tavily::{PreparedTavily, TavilyConfiguration, TavilyError},
 };
-use super::transport::{TransportBudget, TransportError, TransportLimits};
+use super::transport::{TransportBudget, TransportError, TransportLimits, TransportProxy};
 use super::{
     SearchBackendError, SearchBackendId, SearchBackendResult, bing_parser::BingParseError,
     ddg_parser::DdgParseError,
@@ -27,8 +31,10 @@ use super::{
 
 /// Stable query-independent configuration for the dormant public-search candidate set.
 pub(crate) struct SearchCompositionConfiguration {
-    direct: DirectCompatibilityConfiguration,
+    direct: Option<DirectCompatibilityConfiguration>,
+    tavily: Option<TavilyConfiguration>,
     searxng: Option<SearXngConfiguration>,
+    candidate_order: Vec<SearchBackendId>,
     scope: ToolNetworkScope,
 }
 
@@ -39,32 +45,107 @@ impl std::fmt::Debug for SearchCompositionConfiguration {
 }
 
 impl SearchCompositionConfiguration {
-    /// Builds the zero-key direct candidate plus an optional explicitly supplied SearXNG route.
-    /// Credential discovery and production selection are intentionally outside this stage.
+    /// Builds the legacy staged direct candidate plus an optional explicitly supplied SearXNG
+    /// route. New explicit override composition should use `selected` so selection policy owns the
+    /// exact candidate order.
     pub(crate) fn new(searxng: Option<SearXngConfiguration>) -> Result<Self, TransportError> {
-        Self::from_direct(DirectCompatibilityConfiguration::new()?, searxng)
-    }
-
-    /// Production freezes supported environment-proxy state once at tool construction. Optional
-    /// providers are deliberately absent so their proxy policy cannot be accidentally widened.
-    pub(crate) fn new_production() -> Result<Self, TransportError> {
-        Self::from_direct(
-            DirectCompatibilityConfiguration::new_with_environment_proxy()?,
+        let candidate_order = if searxng.is_some() {
+            vec![SearchBackendId::DuckDuckGo, SearchBackendId::SearXng]
+        } else {
+            vec![SearchBackendId::DuckDuckGo]
+        };
+        Self::from_parts(
+            Some(DirectCompatibilityConfiguration::new()?),
             None,
+            searxng,
+            candidate_order,
         )
     }
 
-    fn from_direct(
-        direct: DirectCompatibilityConfiguration,
+    /// Production freezes supported environment-proxy state exactly once against the complete
+    /// selected endpoint union. Auto is still direct-only and zero-key.
+    pub(crate) fn new_production() -> Result<Self, TransportError> {
+        Self::new(None)?.with_environment_proxy()
+    }
+
+    /// Compose exactly the candidates admitted by explicit selection policy.
+    ///
+    /// Optional provider configuration establishes availability only. Any supplied provider that is
+    /// not selected is discarded before scope construction, so mere availability cannot widen the
+    /// manifest or activate metered/self-hosted traffic. Auto therefore remains direct-only even if
+    /// both optional configurations are present.
+    pub(crate) fn selected(
+        selection: SearchBackendSelection,
+        tavily: Option<TavilyConfiguration>,
         searxng: Option<SearXngConfiguration>,
+    ) -> Result<Self, SearchCompositionConfigurationError> {
+        let availability = SearchBackendAvailability::new(tavily.is_some(), searxng.is_some());
+        let candidate_order = selection.resolve(availability)?;
+        let direct = if candidate_order.contains(&SearchBackendId::DuckDuckGo) {
+            Some(DirectCompatibilityConfiguration::new()?)
+        } else {
+            None
+        };
+        let tavily = if candidate_order.contains(&SearchBackendId::Tavily) {
+            tavily
+        } else {
+            None
+        };
+        let searxng = if candidate_order.contains(&SearchBackendId::SearXng) {
+            searxng
+        } else {
+            None
+        };
+        Self::from_parts(direct, tavily, searxng, candidate_order)
+            .map_err(SearchCompositionConfigurationError::from)
+    }
+
+    fn with_environment_proxy(self) -> Result<Self, TransportError> {
+        let proxy = TransportProxy::from_environment(self.scope.endpoints())?;
+        self.with_proxy(proxy)
+    }
+
+    fn with_proxy(self, proxy: Option<Arc<TransportProxy>>) -> Result<Self, TransportError> {
+        let direct = self
+            .direct
+            .map(|configuration| configuration.with_proxy(proxy.clone()))
+            .transpose()?;
+        let tavily = self
+            .tavily
+            .map(|configuration| configuration.with_proxy(proxy.clone()))
+            .transpose()?;
+        let searxng = self
+            .searxng
+            .map(|configuration| configuration.with_proxy(proxy.clone()))
+            .transpose()?;
+        Self::from_parts(direct, tavily, searxng, self.candidate_order)
+    }
+
+    fn from_parts(
+        direct: Option<DirectCompatibilityConfiguration>,
+        tavily: Option<TavilyConfiguration>,
+        searxng: Option<SearXngConfiguration>,
+        candidate_order: Vec<SearchBackendId>,
     ) -> Result<Self, TransportError> {
-        let scope = combined_scope(
-            direct.scope(),
-            searxng.as_ref().map(SearXngConfiguration::scope),
-        )?;
+        let mut scopes = Vec::with_capacity(candidate_order.len());
+        for backend in &candidate_order {
+            let scope = match backend {
+                SearchBackendId::DuckDuckGo => {
+                    direct.as_ref().map(DirectCompatibilityConfiguration::scope)
+                }
+                SearchBackendId::Tavily => tavily.as_ref().map(TavilyConfiguration::scope),
+                SearchBackendId::SearXng => searxng.as_ref().map(SearXngConfiguration::scope),
+                SearchBackendId::Wikipedia => None,
+            }
+            .ok_or(TransportError::InvalidRequest)?;
+            scopes.push(scope);
+        }
+        let scope = combined_scope(&scopes)?;
         Ok(Self {
             direct,
+            tavily,
             searxng,
+            candidate_order,
             scope,
         })
     }
@@ -81,23 +162,44 @@ impl SearchCompositionConfiguration {
         limits: TransportLimits,
     ) -> Result<PreparedSearchComposition, SearchCompositionPreparationError> {
         let manifest = ToolNetworkManifest::new(self.scope.clone());
-        let direct = self
-            .direct
-            .prepare_with_manifest(&manifest, query, max_results)?;
-        let facets = direct.permission_profile().to_vec();
-        let mut candidates = vec![PreparedSearchCandidate::Direct(Box::new(direct))];
+        let mut facets = None;
+        let mut candidates = Vec::with_capacity(self.candidate_order.len());
 
-        if let Some(configuration) = &self.searxng {
-            let prepared = configuration.prepare_with_manifest(&manifest, query, max_results)?;
-            if prepared.permission_profile() != facets.as_slice() {
-                return Err(TransportError::InvalidRequest.into());
+        for backend in &self.candidate_order {
+            match backend {
+                SearchBackendId::DuckDuckGo => {
+                    let configuration =
+                        self.direct.as_ref().ok_or(TransportError::InvalidRequest)?;
+                    let prepared =
+                        configuration.prepare_with_manifest(&manifest, query, max_results)?;
+                    freeze_facets(&mut facets, prepared.permission_profile())?;
+                    candidates.push(PreparedSearchCandidate::Direct(Box::new(prepared)));
+                }
+                SearchBackendId::Tavily => {
+                    let configuration =
+                        self.tavily.as_ref().ok_or(TransportError::InvalidRequest)?;
+                    let prepared =
+                        configuration.prepare_with_manifest(&manifest, query, max_results)?;
+                    freeze_facets(&mut facets, prepared.permission_profile())?;
+                    candidates.push(PreparedSearchCandidate::Tavily(Box::new(prepared)));
+                }
+                SearchBackendId::SearXng => {
+                    let configuration = self
+                        .searxng
+                        .as_ref()
+                        .ok_or(TransportError::InvalidRequest)?;
+                    let prepared =
+                        configuration.prepare_with_manifest(&manifest, query, max_results)?;
+                    freeze_facets(&mut facets, prepared.permission_profile())?;
+                    candidates.push(PreparedSearchCandidate::SearXng(Box::new(prepared)));
+                }
+                SearchBackendId::Wikipedia => return Err(TransportError::InvalidRequest.into()),
             }
-            candidates.push(PreparedSearchCandidate::SearXng(Box::new(prepared)));
         }
 
         Ok(PreparedSearchComposition {
             manifest,
-            facets,
+            facets: facets.ok_or(TransportError::InvalidRequest)?,
             candidates,
             limits,
             max_results,
@@ -105,27 +207,47 @@ impl SearchCompositionConfiguration {
     }
 }
 
-fn combined_scope(
-    direct: &ToolNetworkScope,
-    searxng: Option<&ToolNetworkScope>,
-) -> Result<ToolNetworkScope, TransportError> {
-    let mut endpoints = direct.endpoints().to_vec();
-    if let Some(searxng) = searxng {
-        if direct.proxy() != searxng.proxy()
-            || direct.private_addresses() != searxng.private_addresses()
-            || direct.redirect_limit() != searxng.redirect_limit()
+fn freeze_facets(
+    frozen: &mut Option<Vec<ToolPermissionFacet>>,
+    candidate: &[ToolPermissionFacet],
+) -> Result<(), TransportError> {
+    match frozen {
+        Some(existing) if existing.as_slice() != candidate => Err(TransportError::InvalidRequest),
+        Some(_) => Ok(()),
+        None => {
+            *frozen = Some(candidate.to_vec());
+            Ok(())
+        }
+    }
+}
+
+fn combined_scope(scopes: &[&ToolNetworkScope]) -> Result<ToolNetworkScope, TransportError> {
+    let first = *scopes.first().ok_or(TransportError::InvalidRequest)?;
+    let mut endpoints = Vec::new();
+    for scope in scopes {
+        if first.proxy() != scope.proxy()
+            || first.private_addresses() != scope.private_addresses()
+            || first.redirect_limit() != scope.redirect_limit()
         {
             return Err(TransportError::InvalidRequest);
         }
-        endpoints.extend_from_slice(searxng.endpoints());
+        endpoints.extend_from_slice(scope.endpoints());
     }
     ToolNetworkScope::new_configuration(
         endpoints,
-        direct.proxy().cloned(),
-        direct.private_addresses().to_vec(),
-        direct.redirect_limit(),
+        first.proxy().cloned(),
+        first.private_addresses().to_vec(),
+        first.redirect_limit(),
     )
     .map_err(|_| TransportError::InvalidRequest)
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum SearchCompositionConfigurationError {
+    #[error(transparent)]
+    Selection(#[from] SearchBackendSelectionError),
+    #[error(transparent)]
+    Transport(#[from] TransportError),
 }
 
 #[derive(Debug, Error)]
@@ -232,6 +354,7 @@ impl RunningSearchComposition {
 
 enum PreparedSearchCandidate {
     Direct(Box<PreparedCompatibilityPlan>),
+    Tavily(Box<PreparedTavily>),
     SearXng(Box<PreparedSearXng>),
 }
 
@@ -239,6 +362,7 @@ impl PreparedSearchCandidate {
     fn id(&self) -> SearchBackendId {
         match self {
             Self::Direct(_) => SearchBackendId::DuckDuckGo,
+            Self::Tavily(_) => SearchBackendId::Tavily,
             Self::SearXng(_) => SearchBackendId::SearXng,
         }
     }
@@ -272,6 +396,11 @@ impl RunningSearchCandidate {
                 .await
                 .map(|rows| rows.into_results())
                 .map_err(SearchCandidateExecutionError::Compatibility),
+            PreparedSearchCandidate::Tavily(plan) => (*plan)
+                .execute(self.authority, self.budget)
+                .await
+                .map(|rows| rows.into_results())
+                .map_err(SearchCandidateExecutionError::Tavily),
             PreparedSearchCandidate::SearXng(plan) => (*plan)
                 .execute(self.authority, self.budget)
                 .await
@@ -291,6 +420,8 @@ pub(crate) enum SearchCandidateExecutionError {
     #[error(transparent)]
     Compatibility(CompatibilityPlanError),
     #[error(transparent)]
+    Tavily(TavilyError),
+    #[error(transparent)]
     SearXng(SearXngError),
 }
 
@@ -300,6 +431,7 @@ impl SearchCandidateExecutionError {
     pub(crate) fn into_backend_error(self) -> SearchBackendError {
         match self {
             Self::Compatibility(error) => compatibility_plan_backend_error(error),
+            Self::Tavily(error) => tavily_backend_error(error),
             Self::SearXng(error) => searxng_backend_error(error),
         }
     }
@@ -348,8 +480,6 @@ fn compatibility_backend_error(error: CompatibilityError) -> SearchBackendError 
                 SearchBackendError::RequestFailed("bing compatibility source unavailable".into())
             }
         },
-        // Admission failures are already inside the controlled candidate boundary. Preserve a
-        // conservative semantic failure rather than guessing a backend availability condition.
         CompatibilityError::Admission(_) => SearchBackendError::Parse,
     }
 }
@@ -370,6 +500,17 @@ fn compatibility_plan_backend_error(error: CompatibilityPlanError) -> SearchBack
             }
         }
         CompatibilityPlanError::Wikipedia(error) => compatibility_backend_error(error),
+    }
+}
+
+fn tavily_backend_error(error: TavilyError) -> SearchBackendError {
+    match error {
+        TavilyError::Transport(error) => transport_backend_error(error),
+        TavilyError::Admission(error) => compatibility_backend_error(error),
+        TavilyError::Auth => SearchBackendError::Auth,
+        TavilyError::RateLimited => SearchBackendError::RateLimited,
+        TavilyError::Status => SearchBackendError::RequestFailed("tavily status failure".into()),
+        TavilyError::Parse | TavilyError::Limit => SearchBackendError::Parse,
     }
 }
 
@@ -465,7 +606,137 @@ mod tests {
     }
 
     #[test]
+    fn auto_discards_optional_availability_before_scope_construction() {
+        let configuration = SearchCompositionConfiguration::selected(
+            SearchBackendSelection::Auto,
+            Some(TavilyConfiguration::new("fixture-tavily-key").expect("tavily")),
+            Some(SearXngConfiguration::new("https://search.example/").expect("searxng")),
+        )
+        .expect("auto config");
+        let prepared = configuration
+            .prepare("private query", 2, limits())
+            .expect("prepared");
+
+        assert_eq!(prepared.manifest().scope().endpoints().len(), 9);
+        let running = prepared.start(Arc::new(RejectAuthority));
+        assert_eq!(running.candidates().len(), 1);
+        assert_eq!(running.candidates()[0].id(), SearchBackendId::DuckDuckGo);
+    }
+
+    #[test]
+    fn explicit_tavily_auto_fallback_is_override_then_direct() {
+        let configuration = SearchCompositionConfiguration::selected(
+            SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::Tavily),
+            Some(TavilyConfiguration::new("fixture-tavily-key").expect("tavily")),
+            None,
+        )
+        .expect("explicit config");
+        let prepared = configuration
+            .prepare("private query", 2, limits())
+            .expect("prepared");
+        let running = prepared.start(Arc::new(RejectAuthority));
+
+        assert_eq!(running.candidates().len(), 2);
+        assert_eq!(running.candidates()[0].id(), SearchBackendId::Tavily);
+        assert_eq!(running.candidates()[1].id(), SearchBackendId::DuckDuckGo);
+    }
+
+    #[test]
+    fn explicit_searxng_without_fallback_excludes_direct() {
+        let configuration = SearchCompositionConfiguration::selected(
+            SearchBackendSelection::explicit(SearchBackendId::SearXng),
+            None,
+            Some(SearXngConfiguration::new("https://search.example/").expect("searxng")),
+        )
+        .expect("explicit config");
+        let prepared = configuration
+            .prepare("private query", 2, limits())
+            .expect("prepared");
+        let running = prepared.start(Arc::new(RejectAuthority));
+
+        assert_eq!(running.candidates().len(), 1);
+        assert_eq!(running.candidates()[0].id(), SearchBackendId::SearXng);
+    }
+
+    #[test]
+    fn selected_candidates_share_one_proxy_snapshot_in_scope_and_facets() {
+        for (selection, tavily, searxng, expected_candidates) in [
+            (
+                SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::Tavily),
+                Some(TavilyConfiguration::new("fixture-tavily-key").expect("tavily")),
+                None,
+                vec![SearchBackendId::Tavily, SearchBackendId::DuckDuckGo],
+            ),
+            (
+                SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::SearXng),
+                None,
+                Some(SearXngConfiguration::new("https://search.example/").expect("searxng")),
+                vec![SearchBackendId::SearXng, SearchBackendId::DuckDuckGo],
+            ),
+        ] {
+            let configuration =
+                SearchCompositionConfiguration::selected(selection, tavily, searxng)
+                    .expect("selected config");
+            let secret = "proxy-fixture-secret";
+            let proxy = TransportProxy::from_snapshot(
+                &format!("http://fixture-user:{secret}@proxy.example:8080"),
+                "",
+                configuration.scope().endpoints(),
+            )
+            .expect("proxy snapshot")
+            .expect("proxy applies");
+            let proxy_endpoint = proxy.endpoint().clone();
+            let configuration = configuration
+                .with_proxy(Some(proxy))
+                .expect("shared proxy config");
+            assert_eq!(configuration.scope().proxy(), Some(&proxy_endpoint));
+            assert!(!format!("{configuration:?}").contains(secret));
+
+            let prepared = configuration
+                .prepare("private query", 2, limits())
+                .expect("prepared with shared proxy");
+            assert_eq!(prepared.manifest().scope().proxy(), Some(&proxy_endpoint));
+            assert!(prepared
+                .permission_profile()
+                .iter()
+                .any(|facet| format!("{facet:?}").contains("proxy.example")));
+            assert!(!format!("{prepared:?}").contains(secret));
+            let running = prepared.start(Arc::new(RejectAuthority));
+            assert_eq!(
+                running
+                    .candidates()
+                    .iter()
+                    .map(RunningSearchCandidate::id)
+                    .collect::<Vec<_>>(),
+                expected_candidates
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_missing_configuration_fails_before_scope_construction() {
+        assert!(matches!(
+            SearchCompositionConfiguration::selected(
+                SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::Tavily),
+                None,
+                None,
+            ),
+            Err(SearchCompositionConfigurationError::Selection(
+                SearchBackendSelectionError::Unavailable(SearchBackendId::Tavily)
+            ))
+        ));
+    }
+
+    #[test]
     fn execution_errors_map_without_guessing_router_control() {
+        assert_eq!(
+            SearchCandidateExecutionError::Tavily(TavilyError::Auth).into_backend_error(),
+            SearchBackendError::Auth
+        );
+        assert_eq!(
+            SearchCandidateExecutionError::Tavily(TavilyError::RateLimited).into_backend_error(),
+            SearchBackendError::RateLimited
+        );
         assert_eq!(
             SearchCandidateExecutionError::SearXng(SearXngError::Transport(
                 TransportError::Deadline
