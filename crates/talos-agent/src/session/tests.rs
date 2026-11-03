@@ -6467,6 +6467,11 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
                     _ => {
                         let found = result("recover-1");
                         assert_eq!(
+                            found["results"].as_array().expect("results").len(),
+                            1,
+                            "hidden arguments and unverified tool output must not contribute search hits"
+                        );
+                        assert_eq!(
                             found["results"][0]["text"],
                             "originalfact unique constraint"
                         );
@@ -6506,7 +6511,7 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
     let root = tempfile::tempdir().expect("root");
     let durable =
         talos_session::DurableSession::open_or_create(root.path(), "recovery").expect("durable");
-    let raw: Vec<_> = (0..30)
+    let mut raw: Vec<_> = (0..30)
         .map(|i| Message::User {
             content: if i == 0 {
                 "originalfact unique constraint".into()
@@ -6515,9 +6520,32 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             },
         })
         .collect();
+    raw.extend([
+        Message::Assistant {
+            content: "public assistant response".into(),
+            reasoning: None,
+            tool_calls: vec![talos_core::message::ToolCall {
+                id: "hidden-recovery-input".into(),
+                name: "private_fixture".into(),
+                input: serde_json::json!({"argument":"originalfact hidden input sentinel"}),
+            }],
+        },
+        Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: "hidden-recovery-input".into(),
+                content: "originalfact unverified output sentinel".into(),
+                is_error: false,
+            },
+        },
+    ]);
     durable
         .commit_turn("prior", &raw, &Default::default())
         .expect("commit");
+    let persisted =
+        serde_json::to_string(&durable.session().read_entries().expect("persisted entries"))
+            .expect("serialized persisted evidence");
+    assert!(persisted.contains("originalfact hidden input sentinel"));
+    assert!(persisted.contains("originalfact unverified output sentinel"));
     let mut engine = talos_permission::PermissionEngine::empty();
     engine.set_workspace_root(root.path().into());
     engine.add_rule(talos_permission::PermissionRule::new_nature(

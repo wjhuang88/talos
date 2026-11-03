@@ -16,7 +16,7 @@ test increments. Full-candidate review, validation and merge are still required.
 | 11, 12, 13 | Actor A/B fixture checks task-state fields, separates facts/assumptions, performs pending verification once and records source/missing-source operations exactly once. The final run reports collection=1, verification=1, known-failed attempts=1. |
 | 14, 15, 18 | Registered Actor fixture performs fresh search/detail after A/B and after independent-process parent/child recovery, comparing original task JSON. Separate old-user-message coverage still needs confirmation; tool-fact evidence alone does not prove row 14. |
 | 16 | `runtime_recovers_original_history_after_reopen` exercises registered Runtime search/detail with parent/sibling suffixes and an unrelated session containing 64 matching messages in the same storage root. Ordinary reopen and independent-process fork recovery return exactly the original tool fact; unrelated transcript bytes stay unchanged. This fixture is Unix-only and does not prewarm foreign recovery indexes or forge references. |
-| 17 | Existing receipt/privacy tests are candidate evidence; final Actor delivery-level reasoning/raw-content/credential/hidden-input assertions remain to map explicitly. |
+| 17 | `durable_actor_history_search_and_detail_reach_real_provider_continuation` now persists matching hidden tool arguments and an unverified tool result, asserts both really exist on disk, and requires actual search/detail to return only the allowed User fact. This Unix fixture proves recovery projection exclusion, not removal from the original provider history. Reasoning signatures/raw-content/credentials and forged-reference delivery remain to map explicitly. |
 | 19, 20 | Actor fixture starts independent recovery processes without projection state and asserts original transcript byte prefix is retained. Export-command behavior still needs its own evidence check. |
 | 21 | Pressure fixture checks unchanged system instructions/tool definitions. The actual Actor A/B fixture now hashes the nonempty provider-visible cache-marker content ranges on every request and requires the same SHA-256 through discovery, Applied A/B and recovery. Each restarted model establishes its own baseline; this does not compare hashes across processes or provider HTTP encoding. |
 | 22 | `registered_checkpoint_runtime_bounds_huge_tool_before_provider_continuation` is the actual Runtime huge-result/checkpoint/recovery fixture; see its recorded execution above. |
@@ -49,6 +49,15 @@ scoped diff `0846b07e68aad84c499087d2bdb3a15e27d944513198fb51e4b84a68841a6b39`
 on `11d438c7cb13e7919265a926a9b9e352a9ff7ecb`; reviewer read the log but did
 not run builds. This proves the checked returned page/detail and foreign-file
 preservation, not arbitrary global ranking invariance or Windows execution.
+
+Actor recovery privacy increment: final locked test passed 1/1
+(`/private/tmp/i313-private-recovery-final.log`); Agent test-target warnings-denied
+Clippy passed (`/private/tmp/i313-private-recovery-clippy.log`). Independent static
+review approved diff `b66ff3cbb2aee97ae4b3b000365a344302e12f1a1745da84fe8c6e77f26fbb94`
+on `f77b19c4e31fb8ccd915c8daaa0786e7c109e941`, reading logs but not running builds.
+The fixture's initial history still contains the original arguments/result; the
+claim is strictly that they cannot contribute history-search hits or the returned
+User detail. It does not test all private metadata classes or forged references.
 
 ## Filtered-result busy/cancellation recovery — 2026-11-03
 
