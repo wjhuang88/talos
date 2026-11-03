@@ -871,5 +871,170 @@ async fn mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reo
         if permit {
             assert_eq!(compressed_receipts[0].2, compressed.trim_end_matches('\n'));
         }
+        assert_compressed_history_recovery(root.path(), reopened, permit, compressed).await;
     }
+}
+
+// Reconstruct the execution owner and registry; no process-local producer receipt survives.
+async fn assert_compressed_history_recovery(
+    root: &std::path::Path,
+    durable: talos_session::DurableSession,
+    permit: bool,
+    compressed: String,
+) {
+    struct RecoveryModel {
+        step: AtomicUsize,
+        permit: bool,
+        expected: String,
+    }
+    #[async_trait]
+    impl LanguageModel for RecoveryModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let step = self.step.fetch_add(1, Ordering::SeqCst);
+            let result = |id: &str| {
+                let result = messages
+                    .iter()
+                    .find_map(|message| match message {
+                        Message::Tool { result } if result.tool_use_id == id => Some(result),
+                        _ => None,
+                    })
+                    .expect("real recovery result");
+                assert!(!result.is_error, "step={step} id={id}: {}", result.content);
+                serde_json::from_str::<Value>(&result.content).expect("recovery JSON")
+            };
+            let input = match step {
+                0 => Some(json!({"mode":"discover"})),
+                1 => Some(
+                    json!({"mode":"search","snapshot":result("mem007-recover-0")["snapshot"],"query":"\"row-049\""}),
+                ),
+                2 => {
+                    let found = result("mem007-recover-1");
+                    let rows = found["results"].as_array().expect("results");
+                    assert_eq!(rows.len(), usize::from(self.permit), "{found}");
+                    if self.permit {
+                        Some(
+                            json!({"mode":"detail","snapshot":result("mem007-recover-0")["snapshot"],"reference":rows[0]["reference"]}),
+                        )
+                    } else {
+                        None
+                    }
+                }
+                3 if self.permit => {
+                    let detail = result("mem007-recover-2");
+                    assert_eq!(
+                        detail["text"].as_str(),
+                        Some(self.expected.trim_end_matches('\n'))
+                    );
+                    assert!(!detail.to_string().contains("row-000"));
+                    assert_eq!(
+                        detail["text"]
+                            .as_str()
+                            .expect("text")
+                            .matches("first 20 lines omitted")
+                            .count(),
+                        1
+                    );
+                    None
+                }
+                _ => panic!("unexpected recovery step {step}"),
+            };
+            let events = if let Some(input) = input {
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: format!("mem007-recover-{step}"),
+                            name: "history_search".into(),
+                            input,
+                        },
+                        provenance: Default::default(),
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else {
+                success_events("recovery policy checked")
+            };
+            let (tx, rx) = mpsc::channel(8);
+            for event in events {
+                tx.send(event).await.expect("fixture stream");
+            }
+            Ok(rx)
+        }
+    }
+    let mut engine = talos_permission::PermissionEngine::empty();
+    engine.set_workspace_root(root.into());
+    engine.add_rule(talos_permission::PermissionRule::new_nature(
+        talos_core::tool::ToolNature::Read,
+        None,
+        None,
+        talos_permission::PermissionDecision::Allow,
+    ));
+    let model = Arc::new(RecoveryModel {
+        step: AtomicUsize::new(0),
+        permit,
+        expected: compressed,
+    });
+    let mut agent = Agent::with_security_and_hooks(
+        model.clone(),
+        ToolRegistry::new(),
+        Some(Arc::new(engine)),
+        None,
+        root.into(),
+        Arc::new(talos_plugin::HookRegistry::new()),
+    );
+    agent
+        .enable_model_checkpoint_tools()
+        .expect("recovery tools");
+    let raw = durable.read_messages().expect("recovered messages");
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.into(),
+            initial_history: raw.clone(),
+            model_context_limit: LIMIT,
+        },
+    );
+    actor.set_durable_persistence(
+        durable.clone(),
+        PersistencePolicy {
+            persist_reasoning: false,
+            persist_raw_tool_output: permit,
+        },
+    );
+    assert!(
+        actor
+            .set_recovered_history_sources_until(
+                durable.read_history_snapshot().expect("recovered sources"),
+                tokio::time::Instant::now() + Duration::from_secs(10),
+            )
+            .await
+    );
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor
+    });
+    tokio::time::timeout(
+        Duration::from_secs(30),
+        complete_turn(&mut handle, "recover prior shell result".into()),
+    )
+    .await
+    .expect("bounded recovery");
+    assert_eq!(
+        model.step.load(Ordering::SeqCst),
+        if permit { 4 } else { 3 }
+    );
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    let actor = tokio::time::timeout(Duration::from_secs(10), task)
+        .await
+        .expect("bounded shutdown")
+        .expect("actor");
+    assert_eq!(&actor.history[..raw.len()], raw.as_slice());
 }

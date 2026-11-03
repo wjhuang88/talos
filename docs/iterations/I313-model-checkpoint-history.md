@@ -1,3 +1,26 @@
+## MEM-007 reopened Actor recovery — 2026-11-03
+
+Following the Applied correction in `06a1f29e6`, the same regression now reconstructs
+a new Agent/Actor from the reopened durable session without registering the bash
+producer. Actual model tool calls perform discovery, quoted-phrase search and detail.
+With tool persistence allowed, search returns exactly one result and detail equals
+the compressed projection with one omission marker and no discarded first row.
+With persistence denied, the valid search returns zero results. The restored Actor
+raw-history prefix is unchanged after recovery; preparation, recovery and shutdown
+have explicit bounds. This is same-process reconstruction, not an independent OS
+process restart, SQLite physical-index uniqueness, or general fork isolation proof.
+
+Focused test passed (`/private/tmp/i313-mem007-reopen-search.log`), the complete
+checkpoint_acceptance group passed 5/5 (`/private/tmp/i313-mem007-reopen-suite.log`),
+and agent/runtime all-target locked Clippy passed
+(`/private/tmp/i313-mem007-reopen-clippy.log`). Formatting/diff checks passed.
+Independent static review approved baseline `06a1f29e6` plus test-file blob
+`0c8928166f2844ffefd4962a168cade68ee141d7`; reviewer read logs, did not run builds.
+The first failed search used an unquoted hyphenated FTS term; quoting it conforms
+to the existing query contract, without changing production search semantics.
+Full T5 acceptance mapping, final validation/exact-head CI and merge remain open.
+T1/T6 are unimplemented; the full handoff objective remains Active.
+
 ## MEM-007 Applied composition correction — 2026-11-03
 
 The local correction to `mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reopen`

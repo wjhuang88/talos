@@ -1,3 +1,14 @@
+## MEM-007 model recovery after reopen — 2026-11-03
+
+I313 Applied correction `06a1f29e6` is pushed to #837. A subsequent local increment
+now rebuilds the Actor without the bash producer and runs actual discovery/search/
+detail against the reopened durable source. Allowed persistence returns one exact
+compressed result; denied persistence returns none. Focused test, five-test
+acceptance group, locked agent/runtime Clippy and independent static review passed.
+See I313 owner for logs and boundaries. Same-process reopen is not cross-process
+restart or physical-index uniqueness. T5 final mapping/CI/merge remain open, T1/T6
+remain unimplemented, and the entire accepted queue is retained.
+
 ## MEM-007 checkpoint evidence correction — 2026-11-03
 
 I313 commit `7686c49dc` used an invalid empty checkpoint request; its passing test
