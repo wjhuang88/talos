@@ -18,6 +18,9 @@ jobs:
           ref: tmp/i314-ci3796-fix-20261103
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+          components: rustfmt
       - name: Apply MCP fail-closed correction
         shell: python
         run: |
