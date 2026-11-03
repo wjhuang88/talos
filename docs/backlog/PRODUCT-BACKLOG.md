@@ -1,3 +1,11 @@
+## T1 atomic claim proposal — 2026-11-03
+
+I315 / VALIDATION-003 / #844 proposes model-callable validation and read-only agile
+summary after merged I313/T5. Claim/activation are ineffective until finalized
+claim PR merge. Supported CLI/Runtime and Unix/Windows execution, applicability,
+permissions, cancellation and output bounds are binding acceptance. T6 remains
+later and unimplemented; full handoff Active. I310/I314 retain independent owners.
+
 ## MODEL-014 complete; T4 preparation — 2026-10-30
 
 [I311](../iterations/I311-model014-capability-inference.md) and MODEL-014 are Complete/Closed. Completion Commit:
