@@ -14,8 +14,8 @@ use talos_core::tool::{
     AgentTool, ToolContribution, ToolContributionSource, ToolFamily, ToolRegistry, ToolResult,
 };
 use talos_runtime::composition::{
-    SharedToolContributions, SharedToolProfile, contribution_groups_with_language_provider_and_search,
-    contribution_groups_with_search,
+    SharedToolContributions, SharedToolProfile,
+    contribution_groups_with_language_provider_and_search, contribution_groups_with_search,
 };
 use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
 use talos_tools::SearchToolConfiguration;
