@@ -15,7 +15,8 @@ test increments. Full-candidate review, validation and merge are still required.
 | 9, 10 | Runtime coding fixtures include oversized-checkpoint refusal and `registered_checkpoint_rejects_insufficient_reclaim_preserving_installed_projection`; audit unchanged-projection assertions against both initial and replacement cases. |
 | 11, 12, 13 | Actor A/B fixture checks task-state fields, separates facts/assumptions, performs pending verification once and records source/missing-source operations exactly once. The final run reports collection=1, verification=1, known-failed attempts=1. |
 | 14, 15, 18 | Registered Actor fixture performs fresh search/detail after A/B and after independent-process parent/child recovery, comparing original task JSON. Separate old-user-message coverage still needs confirmation; tool-fact evidence alone does not prove row 14. |
-| 16, 17 | Existing branch-scoped index, receipt/privacy and Runtime fork tests are candidate evidence; final Actor delivery-level sibling/session and private-payload assertions remain to map explicitly. |
+| 16 | `runtime_recovers_original_history_after_reopen` exercises registered Runtime search/detail with parent/sibling suffixes and an unrelated session containing 64 matching messages in the same storage root. Ordinary reopen and independent-process fork recovery return exactly the original tool fact; unrelated transcript bytes stay unchanged. This fixture is Unix-only and does not prewarm foreign recovery indexes or forge references. |
+| 17 | Existing receipt/privacy tests are candidate evidence; final Actor delivery-level reasoning/raw-content/credential/hidden-input assertions remain to map explicitly. |
 | 19, 20 | Actor fixture starts independent recovery processes without projection state and asserts original transcript byte prefix is retained. Export-command behavior still needs its own evidence check. |
 | 21 | Pressure fixture checks unchanged system instructions/tool definitions. The actual Actor A/B fixture now hashes the nonempty provider-visible cache-marker content ranges on every request and requires the same SHA-256 through discovery, Applied A/B and recovery. Each restarted model establishes its own baseline; this does not compare hashes across processes or provider HTTP encoding. |
 | 22 | `registered_checkpoint_runtime_bounds_huge_tool_before_provider_continuation` is the actual Runtime huge-result/checkpoint/recovery fixture; see its recorded execution above. |
@@ -41,6 +42,13 @@ Marker offsets/types, dynamic system suffixes and tool schemas are not part of
 this hash; pressure transitions use the separate request-plan fixture above.
 Next work is delivery-level privacy/scope and natural-boundary mapping, then
 stable-candidate convergence. T5 remains Review/Partial; T1/T6 and the whole queue remain open.
+
+Cross-session Runtime increment: final locked test passed 1/1 in 9.83 seconds
+(`/private/tmp/i313-foreign-session.log`). Independent static review approved
+scoped diff `0846b07e68aad84c499087d2bdb3a15e27d944513198fb51e4b84a68841a6b39`
+on `11d438c7cb13e7919265a926a9b9e352a9ff7ecb`; reviewer read the log but did
+not run builds. This proves the checked returned page/detail and foreign-file
+preservation, not arbitrary global ranking invariance or Windows execution.
 
 ## Filtered-result busy/cancellation recovery — 2026-11-03
 

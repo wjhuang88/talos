@@ -5641,7 +5641,7 @@ mod tests {
                             assert_eq!(
                                 found["results"].as_array().expect("results").len(),
                                 1,
-                                "parent/sibling suffix must be excluded"
+                                "parent/sibling suffix and unrelated sessions must be excluded"
                             );
                             assert_eq!(
                                 found["results"][0]["text"],
@@ -5741,6 +5741,18 @@ mod tests {
             let durable = manager
                 .create_or_open_session("runtime-recovery")
                 .expect("session");
+            let unrelated = manager
+                .create_or_open_session("unrelated-recovery")
+                .expect("unrelated session in the same storage root");
+            let foreign: Vec<_> = (0..64)
+                .map(|i| Message::User {
+                    content: format!("originalfact unrelated private result {i}"),
+                })
+                .collect();
+            unrelated
+                .commit_turn("foreign", &foreign, &Default::default())
+                .expect("foreign matching corpus larger than one search page");
+            let foreign_bytes = std::fs::read(unrelated.file_path()).expect("foreign transcript");
             let raw: Vec<_> = (0..8300)
                 .map(|i| Message::User {
                     content: format!("other {i}"),
@@ -5879,6 +5891,11 @@ mod tests {
                 calls.load(Ordering::SeqCst),
                 1,
                 "recovery must not execute the original tool"
+            );
+            assert_eq!(
+                std::fs::read(unrelated.file_path()).expect("retained foreign transcript"),
+                foreign_bytes,
+                "current-session recovery must not modify unrelated history"
             );
         }
     }
