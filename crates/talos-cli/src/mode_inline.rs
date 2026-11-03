@@ -68,10 +68,11 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
     let search = crate::mode_print::search_configuration::project_search_configuration(&config)?;
-    let mut registry = crate::mode_print::configured_registry::build_print_tool_registry_with_search(
-        Vec::new(),
-        search,
-    )?;
+    let mut registry =
+        crate::mode_print::configured_registry::build_print_tool_registry_with_search(
+            Vec::new(),
+            search,
+        )?;
     let sched_pending = crate::registry::register_builtin_scheduler(&mut registry)?;
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
