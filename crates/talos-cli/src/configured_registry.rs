@@ -70,11 +70,8 @@ pub(crate) fn build_print_tool_registry_with_search(
     scheduler_tools: Vec<Arc<dyn AgentTool>>,
     search: SearchToolConfiguration,
 ) -> Result<ToolRegistry> {
-    let shared = contribution_groups_with_search(
-        SharedToolProfile::Product,
-        PathBuf::from("."),
-        search,
-    )?;
+    let shared =
+        contribution_groups_with_search(SharedToolProfile::Product, PathBuf::from("."), search)?;
     build_product_registry(
         shared,
         scheduler_tools,
@@ -165,11 +162,9 @@ mod tests {
 
     #[test]
     fn configured_product_and_mcp_keep_web_search_builtin_identity() {
-        let product = build_print_tool_registry_with_search(
-            Vec::new(),
-            SearchToolConfiguration::DuckDuckGo,
-        )
-        .expect("configured product registry");
+        let product =
+            build_print_tool_registry_with_search(Vec::new(), SearchToolConfiguration::DuckDuckGo)
+                .expect("configured product registry");
         let mcp = build_mcp_tool_registry_with_search(SearchToolConfiguration::DuckDuckGo)
             .expect("configured mcp registry");
         assert!(product.is_builtin_instance("web_search"));
