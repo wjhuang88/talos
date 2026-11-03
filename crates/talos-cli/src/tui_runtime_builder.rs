@@ -187,14 +187,15 @@ impl TuiRuntimeBuilder {
         let search = crate::mode_print::search_configuration::project_search_configuration(
             &runtime_config,
         )?;
-        let mut registry = crate::mode_print::configured_registry::build_tui_tool_registry_with_search(
-            self.workspace_root.clone(),
-            session.id,
-            Vec::new(),
-            atomic_create_capability.clone(),
-            language_provider_context,
-            search,
-        )?;
+        let mut registry =
+            crate::mode_print::configured_registry::build_tui_tool_registry_with_search(
+                self.workspace_root.clone(),
+                session.id,
+                Vec::new(),
+                atomic_create_capability.clone(),
+                language_provider_context,
+                search,
+            )?;
         let pending_scheduler = crate::registry::register_builtin_scheduler(&mut registry)?;
         register_tui_permission_aware_tools(
             &mut registry,
