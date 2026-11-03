@@ -59,6 +59,25 @@ gates remain outstanding. T5 stays Partial.
 
 ## Acceptance convergence audit — 2026-11-03
 
+Initial insufficient-reclaim increment: the registered Runtime fixture now runs
+both existing-projection and no-prior-projection scenarios. The latter requires
+no installed projection and the original task-0 User message after a valid-schema,
+within-render-cap checkpoint fails Preparation, followed by successful Applied
+with a smaller checkpoint. Both focused tests passed 2/2
+(`/private/tmp/i313-initial-reclaim-fixed.log`). The first fixture attempt reused
+two consecutive failed submissions and stopped at provider step 5 instead of 7;
+the final scenario directly tests initial failure followed by valid recovery.
+The earlier stop is consistent with the third identical discovery hitting the
+existing repeated-call guard (only Applied clears its discovery counter); that
+original run did not record the guard's terminal reason, so this is a source-based
+explanation rather than independently reproduced evidence. Independent static
+review approved scoped diff `630a49c7268f1ce3bb91b687a6f5021ef2373e9d413046b421f46958cdc5314d`
+on `e5e8c3feff70399a6ba986f0c29f5c048123e8a0`; reviewer ran no builds.
+Runtime test-target warnings-denied Clippy passed
+(`/private/tmp/i313-initial-reclaim-clippy.log`). Preparation is a broad failure
+category and the old-history assertion checks a representative message, not
+complete durable byte equality. Final candidate publication remains pending.
+
 Forged-reference delivery increment: the actual Actor fixture changes one byte of
 the secret-bound tag in a real search reference under the current snapshot. It
 requires the exact provider-visible refusal (including the standard retry hint),

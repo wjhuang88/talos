@@ -852,6 +852,15 @@ async fn registered_checkpoint_runtime_bounds_huge_tool_before_provider_continua
 
 #[tokio::test]
 async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed_projection() {
+    exercise_insufficient_checkpoint_reclaim(false).await;
+}
+
+#[tokio::test]
+async fn registered_checkpoint_rejects_initial_insufficient_reclaim_then_recovers() {
+    exercise_insufficient_checkpoint_reclaim(true).await;
+}
+
+async fn exercise_insufficient_checkpoint_reclaim(initial_failure: bool) {
     struct BatchGate(Arc<tokio::sync::Notify>);
     #[async_trait]
     impl AgentTool for BatchGate {
@@ -875,6 +884,7 @@ async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed
     struct Model {
         step: AtomicUsize,
         installed: std::sync::Mutex<Option<String>>,
+        initial_failure: bool,
     }
     #[async_trait]
     impl LanguageModel for Model {
@@ -889,11 +899,30 @@ async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed
                 })
             };
             let events = match step {
+                4 if self.initial_failure => {
+                    assert!(
+                        projection()
+                            .expect("recovery checkpoint installed")
+                            .contains("checkpoint 3")
+                    );
+                    vec![AgentEvent::TurnEnd {
+                        stop_reason: StopReason::EndTurn,
+                        usage: Default::default(),
+                    }]
+                }
                 0 | 2 | 4 => {
                     if step == 2 {
                         assert!(messages.iter().any(|message| matches!(message, Message::Tool { result } if result.tool_use_id == "gate" && result.content == "batch completed")), "checkpoint continuation keeps complete paired batch");
-                        *self.installed.lock().expect("projection") =
-                            Some(projection().expect("A installed"));
+                        if self.initial_failure {
+                            assert!(
+                                projection().is_none(),
+                                "failed initial checkpoint cannot install a projection"
+                            );
+                            assert!(messages.iter().any(|message| matches!(message, Message::User { content } if content.starts_with("task 0 "))), "original history survives initial refusal");
+                        } else {
+                            *self.installed.lock().expect("projection") =
+                                Some(projection().expect("A installed"));
+                        }
                     }
                     if step == 4 {
                         assert_eq!(
@@ -936,7 +965,9 @@ async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed
                     let discovery = result(messages, &format!("discover-{}", step - 1));
                     let item =
                         |text: &str| json!({"text":text,"sources":[discovery["sources"][0]]});
-                    let text = if step == 3 {
+                    let text = if (step == 3 && !self.initial_failure)
+                        || (step == 1 && self.initial_failure)
+                    {
                         "x".repeat(3900)
                     } else {
                         format!("checkpoint {step}")
@@ -1003,6 +1034,7 @@ async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed
     let model = Arc::new(Model {
         step: AtomicUsize::new(0),
         installed: std::sync::Mutex::new(None),
+        initial_failure,
     });
     let mut runtime = RuntimeBuilder::new()
         .provider(model.clone())
@@ -1099,13 +1131,34 @@ async fn registered_checkpoint_rejects_insufficient_reclaim_preserving_installed
     .await
     .expect("deadline");
     assert!(completed_success, "successful Turn completion is required");
-    assert_eq!(model.step.load(Ordering::SeqCst), 7);
+    assert_eq!(
+        model.step.load(Ordering::SeqCst),
+        if initial_failure { 5 } else { 7 }
+    );
     assert_eq!(manual_busy, 1);
-    assert_eq!(outcomes.len(), 3);
-    assert!(matches!(
-        outcomes[0],
-        talos_core::session::CompactOutcome::Applied { .. }
-    ));
+    assert_eq!(outcomes.len(), if initial_failure { 2 } else { 3 });
+    if initial_failure {
+        assert!(matches!(
+            outcomes[0],
+            talos_core::session::CompactOutcome::FailedWithEstimate {
+                reason: talos_core::session::CompactFailureReason::Preparation,
+                ..
+            }
+        ));
+    } else {
+        assert!(matches!(
+            outcomes[0],
+            talos_core::session::CompactOutcome::Applied { .. }
+        ));
+    }
+    if initial_failure {
+        assert!(matches!(
+            outcomes[1],
+            talos_core::session::CompactOutcome::Applied { .. }
+        ));
+        runtime.shutdown().await.expect("shutdown");
+        return;
+    }
     assert!(matches!(
         outcomes[1],
         talos_core::session::CompactOutcome::FailedWithEstimate {
