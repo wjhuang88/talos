@@ -1,3 +1,16 @@
+## MEM-007 checkpoint evidence correction — 2026-11-03
+
+I313 commit `7686c49dc` used an invalid empty checkpoint request; its passing test
+proved compressed-output persistence, not Applied composition. The local correction
+now drives actual discovery and valid checkpoint through the Actor, requires Applied
+in the provider continuation, and preserves the durable raw prefix across compression.
+Focused test and agent/runtime Clippy passed; see I313 owner for logs and limits.
+Independent static code review passed; the five-test acceptance group passed.
+Publication/exact-head CI and full T5 closure remain pending. T1/T6 are still
+unimplemented; the complete I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6
+queue remains the objective. Do not treat a tool invocation or tool-name string in
+storage as successful operation evidence; assert the operation's terminal outcome.
+
 ## I313 stage convergence — 2026-11-02
 
 Local tests `7c6a819dd`, `09532dc93`, and `960b4b646` add reclamation refusal,

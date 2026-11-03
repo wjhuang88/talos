@@ -629,43 +629,132 @@ async fn mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reo
         let key = format!("mem007-{permit}");
         let durable =
             talos_session::DurableSession::open_or_create(root.path(), &key).expect("durable");
-        let model = Arc::new(MockModel::new(vec![
-            vec![
-                AgentEvent::ToolCall {
-                    call: talos_core::message::ToolCall {
-                        id: "compressed-shell".into(),
-                        name: "bash".into(),
-                        input: json!({}),
-                    },
-                    provenance: Default::default(),
-                    summary_fields: vec![],
-                },
-                AgentEvent::TurnEnd {
-                    stop_reason: StopReason::ToolUse,
-                    usage: Default::default(),
-                },
-            ],
-            vec![
-                AgentEvent::ToolCall {
-                    call: talos_core::message::ToolCall {
-                        id: "compact-after-shell".into(),
-                        name: "compact_context".into(),
-                        input: json!({}),
-                    },
-                    provenance: Default::default(),
-                    summary_fields: vec![],
-                },
-                AgentEvent::TurnEnd {
-                    stop_reason: StopReason::ToolUse,
-                    usage: Default::default(),
-                },
-            ],
-            success_events("compressed result accepted"),
-        ]));
+        struct CompressionModel(AtomicUsize);
+        #[async_trait]
+        impl LanguageModel for CompressionModel {
+            async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+                let step = self.0.fetch_add(1, Ordering::SeqCst);
+                let events = match step {
+                    0 | 14 | 15 => {
+                        let (id, name, input) = match step {
+                            0 => ("compressed-shell", "bash", json!({})),
+                            14 => (
+                                "discover-compressed",
+                                "history_search",
+                                json!({"mode":"discover"}),
+                            ),
+                            _ => {
+                                let discovery = messages
+                                    .iter()
+                                    .find_map(|message| match message {
+                                        Message::Tool { result }
+                                            if result.tool_use_id == "discover-compressed" =>
+                                        {
+                                            assert!(!result.is_error, "{}", result.content);
+                                            Some(
+                                                serde_json::from_str::<Value>(&result.content)
+                                                    .expect("discovery"),
+                                            )
+                                        }
+                                        _ => None,
+                                    })
+                                    .expect("actual discovery result");
+                                assert!(discovery["snapshot"].is_string(), "{discovery}");
+                                let source = discovery["sources"]
+                                    .as_array()
+                                    .expect("source references")
+                                    .first()
+                                    .expect("eligible prefix");
+                                let item = json!({"text":"Preserve the local output task", "sources":[source]});
+                                let checkpoint = json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                                    "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                                    "facts":[],"assumptions":[],"resources":[],"open_loops":[]});
+                                (
+                                    "compact-after-shell",
+                                    "compact_context",
+                                    json!({"snapshot":discovery["snapshot"],"checkpoint":checkpoint}),
+                                )
+                            }
+                        };
+                        vec![
+                            AgentEvent::ToolCall {
+                                call: talos_core::message::ToolCall {
+                                    id: id.into(),
+                                    name: name.into(),
+                                    input,
+                                },
+                                provenance: Default::default(),
+                                summary_fields: vec![],
+                            },
+                            AgentEvent::TurnEnd {
+                                stop_reason: StopReason::ToolUse,
+                                usage: Default::default(),
+                            },
+                        ]
+                    }
+                    1..=13 => success_events("ordinary turn complete"),
+                    16 => {
+                        assert!(messages.iter().any(|message| matches!(message,
+                            Message::Context { content } if content.starts_with("[Derived checkpoint; source history remains authoritative]"))),
+                            "checkpoint must reach the actual provider continuation");
+                        assert!(
+                            !messages.iter().any(|message| matches!(message,
+                            Message::Tool { result } if result.tool_use_id == "compressed-shell")),
+                            "the old compressed result must actually be covered"
+                        );
+                        let applied = messages.iter().any(|message| match message {
+                            Message::Multimodal { parts } => parts.iter().any(|part| match part {
+                                talos_core::message::ContentPart::Text { text } => {
+                                    serde_json::from_str::<Value>(text)
+                                        .ok()
+                                        .is_some_and(|value| {
+                                            value.get("checkpoint_operation").is_some()
+                                                && value["outcome"].as_str().is_some_and(
+                                                    |outcome| outcome.starts_with("Applied {"),
+                                                )
+                                        })
+                                }
+                                _ => false,
+                            }),
+                            _ => false,
+                        });
+                        assert!(applied, "real Applied terminal receipt required");
+                        success_events("checkpoint applied after compressed shell output")
+                    }
+                    _ => panic!("unexpected provider call {step}"),
+                };
+                let (tx, rx) = mpsc::channel(8);
+                for event in events {
+                    tx.send(event).await.expect("fixture stream");
+                }
+                Ok(rx)
+            }
+        }
+        let model = Arc::new(CompressionModel(AtomicUsize::new(0)));
         let mut tools = ToolRegistry::new();
         tools.register(Arc::new(ShellOutput));
-        #[allow(deprecated)]
-        let mut agent = Agent::new(model, tools).with_bash_compression(true);
+        let mut engine = talos_permission::PermissionEngine::empty();
+        engine.set_workspace_root(root.path().into());
+        for nature in [
+            talos_core::tool::ToolNature::Read,
+            talos_core::tool::ToolNature::Write,
+        ] {
+            engine.add_rule(talos_permission::PermissionRule::new_nature(
+                nature,
+                None,
+                None,
+                talos_permission::PermissionDecision::Allow,
+            ));
+        }
+        let mut agent = Agent::with_security_and_hooks(
+            model.clone(),
+            tools,
+            Some(Arc::new(engine)),
+            None,
+            root.path().into(),
+            Arc::new(talos_plugin::HookRegistry::new()),
+        )
+        .with_bash_compression(true);
         agent
             .enable_model_checkpoint_tools()
             .expect("checkpoint tools");
@@ -690,9 +779,25 @@ async fn mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reo
             actor
         });
         assert_eq!(
-            complete_turn(&mut handle, "produce shell output".into()).await,
+            complete_turn(
+                &mut handle,
+                format!("produce shell output {}", "task context ".repeat(600))
+            )
+            .await,
             0
         );
+        // Exercise ordinary Actor turns so the compressed source enters the eligible prefix.
+        for i in 0..12 {
+            assert_eq!(
+                complete_turn(&mut handle, format!("ordinary follow-up {i}")).await,
+                0
+            );
+        }
+        let raw_before = durable.read_messages().expect("raw before checkpoint");
+        complete_turn(&mut handle, "checkpoint the earlier task".into()).await;
+        assert_eq!(model.0.load(Ordering::SeqCst), 17);
+        let raw_after = durable.read_messages().expect("raw after checkpoint");
+        assert_eq!(&raw_after[..raw_before.len()], raw_before);
         handle
             .sq_tx
             .send(SessionOp::Shutdown)

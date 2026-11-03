@@ -1,3 +1,29 @@
+## MEM-007 Applied composition correction — 2026-11-03
+
+The local correction to `mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reopen`
+replaces the invalid empty checkpoint call with a real permission-backed Actor
+sequence: executed bash output, twelve ordinary completed turns, registered
+history discovery, and a schema-valid checkpoint bound to the returned snapshot.
+The next actual provider continuation must contain both a derived checkpoint and
+an Applied terminal receipt, with the old compressed tool exchange covered.
+Parsed durable raw history before checkpoint remains an unchanged prefix afterward.
+Reopen is byte-identical; each persistence-policy setting verifies the expected
+unique compressed-result receipt and omission of the discarded rows/raw metadata.
+Compression is explicitly enabled in this fixture; its product default stays off.
+
+Focused locked test passed (`/private/tmp/i313-mem007-applied.log`); locked
+agent/runtime all-target warnings-denied Clippy passed
+(`/private/tmp/i313-mem007-applied-clippy.log`). These are deterministic Actor
+composition checks, not actual shell execution, independent-process restart,
+SQLite index uniqueness, or post-reopen history_search recovery evidence.
+The entire checkpoint_acceptance test group passed 5/5
+(`/private/tmp/i313-checkpoint-acceptance-correction.log`). Independent static
+review approved the test diff on baseline `7686c49dc`, file blob
+`b82d09dce2fe380bbfa7eba75d33496e0c5f5e9e`; reviewer ran no tests. Final candidate
+publication/exact-head CI remain pending.
+The full 30-row T5 mapping, final gates and merge remain open; T1/T6 remain
+unimplemented. No completion status or queue scope changes.
+
 ## Remaining acceptance composition — 2026-11-03
 
 Local implementation/test commits extend the published Partial stage:
@@ -26,13 +52,11 @@ Local implementation/test commits extend the published Partial stage:
   Clippy passed before the final explicit tool-array assertions. BeforeProviderCall
   hooks were unsuitable for this observation because they run before pressure
   metadata is appended; the final test captures actual HTTP request bodies.
-- Uncommitted MEM-007 composition regression: a real Actor executes default-off
-  bash compression, then a registered model checkpoint operation in the same
-  turn; it reopens the DurableSession byte-identically and verifies the compressed
-  projection against exactly one source receipt when raw-tool persistence is
-  permitted. The denied policy yields no such receipt, while omitted raw rows are
-  absent from persisted records. Focused locked test and agent/runtime all-target
-  Clippy pass. This does not complete the full I313 30-row mapping.
+- `7686c49dc` adds an Actor bash-compression/persistence/reopen regression.
+  Correction: its `compact_context` input was `{}` and the fixture did not assert
+  successful admission or Applied. It proves compressed source/receipt persistence
+  under both policy settings, not applied-checkpoint composition. The earlier
+  description of a checkpoint operation must not be used as Applied evidence.
 
 All three increments received independent static review; reviewers did not run
 builds. Published head remains `defee4422`, CI `41468073726` in progress at this
