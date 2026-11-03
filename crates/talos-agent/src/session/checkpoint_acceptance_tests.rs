@@ -872,7 +872,9 @@ async fn mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reo
             assert_eq!(compressed_receipts[0].2, compressed.trim_end_matches('\n'));
         }
         drop(reopened);
-        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        let mut child = tokio::process::Command::new(std::env::current_exe().expect("test binary"));
+        child
+            .kill_on_drop(true)
             .args([
                 "--exact",
                 "session::tests::checkpoint_acceptance::mem007_actor_compression_process_restart_child",
@@ -880,8 +882,12 @@ async fn mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reo
             ])
             .env("TALOS_TEST_MEM007_RESTART_ROOT", root.path())
             .env("TALOS_TEST_MEM007_RESTART_KEY", &key)
-            .env("TALOS_TEST_MEM007_RESTART_PERMIT", permit.to_string())
-            .output()
+            .env("TALOS_TEST_MEM007_RESTART_PERMIT", permit.to_string());
+        // Bound the process owner too: Actor deadlines cannot contain a child
+        // stuck before runtime startup or after its final assertion.
+        let output = tokio::time::timeout(Duration::from_secs(60), child.output())
+            .await
+            .expect("independent recovery process exceeded its outer deadline")
             .expect("launch independent Actor recovery process");
         assert!(
             output.status.success(),

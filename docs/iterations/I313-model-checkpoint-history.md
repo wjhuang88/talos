@@ -1,3 +1,22 @@
+## Filtered-result index retry evidence — 2026-11-03
+
+Local T5 tests now directly check one source row, one matching FTS projection and
+one source-location row after three index reopen/maintenance cycles over an atomic
+filtered tool turn. The original transcript stays byte-identical and omitted text
+is absent from the projection table. Focused locked Session test passed (1/1).
+This is a prefiltered persistence/index fixture, not the actual MEM-007 compressor
+or a proof of every scope's storage uniqueness.
+
+The existing actual Actor compression/restart test now uses an asynchronous child
+process with kill-on-drop and a 60-second outer deadline. Internal preparation,
+recovery and shutdown deadlines are unchanged. Its focused locked tests passed
+(2/2). Normal child execution is verified; deliberate child-hang/kill behavior
+has not been separately exercised. Independent static review approved the scoped
+test diff (`890ae5124345ff2927ef0fb827c7e27445a0afffcc59e28c9ef7752490082003`)
+on baseline `7f3a184e4edb13482a38c7f1254f4d6dde667c30`; the reviewer did not run
+tests. Locked all-target Clippy for Agent and Session passed. T5 remains Partial;
+no new CI/merge claim.
+
 ## MEM-007 reopened Actor recovery — 2026-11-03
 
 Following the Applied correction in `06a1f29e6`, the same regression now reconstructs

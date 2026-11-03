@@ -1067,6 +1067,88 @@ mod tests {
     }
 
     #[test]
+    fn filtered_tool_source_has_one_index_projection_after_reopen_and_retry() {
+        use talos_core::message::{Message, MessageToolResult, ToolCall};
+        let dir = tempfile::tempdir().expect("directory");
+        let session =
+            crate::DurableSession::open_or_create(dir.path(), "filtered").expect("durable session");
+        let filtered = "[first 20 lines omitted]\nrow-049";
+        let commit = session
+            .finalize_turn_with_recovery(
+                "turn",
+                &[
+                    Message::Assistant {
+                        content: String::new(),
+                        reasoning: None,
+                        tool_calls: vec![ToolCall {
+                            id: "call".into(),
+                            name: "bash".into(),
+                            input: serde_json::json!({}),
+                        }],
+                    },
+                    Message::Tool {
+                        result: MessageToolResult {
+                            tool_use_id: "call".into(),
+                            content: filtered.into(),
+                            is_error: false,
+                        },
+                    },
+                ],
+                &crate::PersistencePolicy::default(),
+                crate::TurnTranscriptOutcome::Success,
+                &[crate::RecoveryProjection {
+                    message_index: 1,
+                    tool_call_id: "call".into(),
+                    tool_name: "bash".into(),
+                    content: filtered.into(),
+                }],
+            )
+            .expect("atomic filtered turn");
+        let original = session.session().snapshot_bytes().expect("raw transcript");
+        let source = session.capture_recovery_source().expect("source");
+        let path = dir.path().join("index.db");
+        {
+            let host = SessionIndex::new(&path).expect("index");
+            host.init_recovery_schema().expect("schema");
+            host.begin_recovery_build(
+                "scope",
+                source.source_end(),
+                &RecoveryWorkBudget::new(Duration::from_secs(10)),
+            )
+            .expect("begin");
+        }
+        for _ in 0..3 {
+            let mut host = SessionIndex::new(&path).expect("reopen index");
+            let budget = RecoveryWorkBudget::new(Duration::from_secs(10));
+            while !host
+                .maintain_recovery_source("scope", &source, &budget)
+                .expect("bounded maintenance")
+            {}
+            let (sources, projections, locations): (i64, i64, i64) = host.conn.query_row(
+                "SELECT (SELECT count(*) FROM recovery_sources WHERE scope='scope' AND entry_id=?1),
+                        (SELECT count(*) FROM recovery_projection_fts f JOIN recovery_sources s ON s.id=f.rowid WHERE s.scope='scope' AND s.entry_id=?1 AND f.content=?2),
+                        (SELECT count(*) FROM recovery_locations l JOIN recovery_sources s ON s.id=l.source_id WHERE s.scope='scope' AND s.entry_id=?1)",
+                params![commit.entry_ids[1], filtered],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            ).expect("physical index rows");
+            assert_eq!((sources, projections, locations), (1, 1, 1));
+            let hidden: i64 = host
+                .conn
+                .query_row(
+                    "SELECT count(*) FROM recovery_projection_fts WHERE content LIKE '%row-000%'",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("hidden rows");
+            assert_eq!(hidden, 0);
+            assert_eq!(
+                session.session().snapshot_bytes().expect("preserved raw"),
+                original
+            );
+        }
+    }
+
+    #[test]
     fn actual_tlog_later_page_marker_recovers_committed_tool_fact() {
         use talos_core::message::{Message, MessageToolResult, ToolCall};
         let dir = tempfile::tempdir().expect("directory");
