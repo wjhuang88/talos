@@ -23,7 +23,7 @@ use super::transport::compatibility::{
     shared_budget_deadline,
     tavily::{PreparedTavily, TavilyConfiguration, TavilyError},
 };
-use super::transport::{TransportBudget, TransportError, TransportLimits};
+use super::transport::{TransportBudget, TransportError, TransportLimits, TransportProxy};
 use super::{
     SearchBackendError, SearchBackendId, SearchBackendResult, bing_parser::BingParseError,
     ddg_parser::DdgParseError,
@@ -62,15 +62,10 @@ impl SearchCompositionConfiguration {
         )
     }
 
-    /// Production freezes supported environment-proxy state once at tool construction. Optional
-    /// providers are deliberately absent so their proxy policy cannot be accidentally widened.
+    /// Production freezes supported environment-proxy state exactly once against the complete
+    /// selected endpoint union. Auto is still direct-only and zero-key.
     pub(crate) fn new_production() -> Result<Self, TransportError> {
-        Self::from_parts(
-            Some(DirectCompatibilityConfiguration::new_with_environment_proxy()?),
-            None,
-            None,
-            vec![SearchBackendId::DuckDuckGo],
-        )
+        Self::new(None)?.with_environment_proxy()
     }
 
     /// Compose exactly the candidates admitted by explicit selection policy.
@@ -103,6 +98,27 @@ impl SearchCompositionConfiguration {
         };
         Self::from_parts(direct, tavily, searxng, candidate_order)
             .map_err(SearchCompositionConfigurationError::from)
+    }
+
+    fn with_environment_proxy(self) -> Result<Self, TransportError> {
+        let proxy = TransportProxy::from_environment(self.scope.endpoints())?;
+        self.with_proxy(proxy)
+    }
+
+    fn with_proxy(self, proxy: Option<Arc<TransportProxy>>) -> Result<Self, TransportError> {
+        let direct = self
+            .direct
+            .map(|configuration| configuration.with_proxy(proxy.clone()))
+            .transpose()?;
+        let tavily = self
+            .tavily
+            .map(|configuration| configuration.with_proxy(proxy.clone()))
+            .transpose()?;
+        let searxng = self
+            .searxng
+            .map(|configuration| configuration.with_proxy(proxy.clone()))
+            .transpose()?;
+        Self::from_parts(direct, tavily, searxng, self.candidate_order)
     }
 
     fn from_parts(
@@ -640,6 +656,61 @@ mod tests {
 
         assert_eq!(running.candidates().len(), 1);
         assert_eq!(running.candidates()[0].id(), SearchBackendId::SearXng);
+    }
+
+    #[test]
+    fn selected_candidates_share_one_proxy_snapshot_in_scope_and_facets() {
+        for (selection, tavily, searxng, expected_candidates) in [
+            (
+                SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::Tavily),
+                Some(TavilyConfiguration::new("fixture-tavily-key").expect("tavily")),
+                None,
+                vec![SearchBackendId::Tavily, SearchBackendId::DuckDuckGo],
+            ),
+            (
+                SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::SearXng),
+                None,
+                Some(SearXngConfiguration::new("https://search.example/").expect("searxng")),
+                vec![SearchBackendId::SearXng, SearchBackendId::DuckDuckGo],
+            ),
+        ] {
+            let configuration =
+                SearchCompositionConfiguration::selected(selection, tavily, searxng)
+                    .expect("selected config");
+            let secret = "proxy-fixture-secret";
+            let proxy = TransportProxy::from_snapshot(
+                &format!("http://fixture-user:{secret}@proxy.example:8080"),
+                "",
+                configuration.scope().endpoints(),
+            )
+            .expect("proxy snapshot")
+            .expect("proxy applies");
+            let proxy_endpoint = proxy.endpoint().clone();
+            let configuration = configuration
+                .with_proxy(Some(proxy))
+                .expect("shared proxy config");
+            assert_eq!(configuration.scope().proxy(), Some(&proxy_endpoint));
+            assert!(!format!("{configuration:?}").contains(secret));
+
+            let prepared = configuration
+                .prepare("private query", 2, limits())
+                .expect("prepared with shared proxy");
+            assert_eq!(prepared.manifest().scope().proxy(), Some(&proxy_endpoint));
+            assert!(prepared
+                .permission_profile()
+                .iter()
+                .any(|facet| format!("{facet:?}").contains("proxy.example")));
+            assert!(!format!("{prepared:?}").contains(secret));
+            let running = prepared.start(Arc::new(RejectAuthority));
+            assert_eq!(
+                running
+                    .candidates()
+                    .iter()
+                    .map(RunningSearchCandidate::id)
+                    .collect::<Vec<_>>(),
+                expected_candidates
+            );
+        }
     }
 
     #[test]
