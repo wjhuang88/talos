@@ -1,3 +1,46 @@
+## Remaining acceptance composition — 2026-11-03
+
+Local implementation/test commits extend the published Partial stage:
+
+- `f2b09b261`: actual durable entries and verified receipts retain one bounded
+  source entry/receipt across checkpoint/recovery, same source ID and projected
+  content, no raw_content copy or hidden tail. Focused Runtime test and Clippy
+  passed (`/private/tmp/i313-storage-composition.log`,
+  `/private/tmp/i313-storage-composition-clippy.log`). This is generic truncation,
+  not default-off MEM-007 bash compression or SQLite-index uniqueness; malformed
+  receipt extensions are not exhaustively detected by this fixture.
+- `6f54a69dd`: registered checkpoint and a Notify-blocked tool share one batch.
+  Actual Admitted receipt precedes a manual request receiving Busy; only then is
+  the tool released. Its result precedes model terminal, and continuation retains
+  its paired result. Focused final test passed
+  (`/private/tmp/i313-batch-contention-final.log`); Clippy passed before the final
+  Admitted assertion. This covers one controlled contention ordering, not all races.
+- `91b7fa314`: real model-switch handler rebuilds the Actor and dispatches to a
+  bounded loopback OpenAI Chat fixture. Shrinking from 64K to a capacity calculated
+  from the first request's cost produces pressure on the second wire request;
+  32K-to-64K cases remain without pressure. This supersedes the earlier fixed
+  64K-to-32K test description. Tool definitions are arrays containing each builtin
+  checkpoint tool exactly once and are byte-equivalent as JSON values across the
+  two requests. Same-session parsed history and successful completion checks remain.
+  Final focused test passed (`/private/tmp/i313-switch-pressure-final.log`), and
+  Clippy passed before the final explicit tool-array assertions. BeforeProviderCall
+  hooks were unsuitable for this observation because they run before pressure
+  metadata is appended; the final test captures actual HTTP request bodies.
+- Uncommitted MEM-007 composition regression: a real Actor executes default-off
+  bash compression, then a registered model checkpoint operation in the same
+  turn; it reopens the DurableSession byte-identically and verifies the compressed
+  projection against exactly one source receipt when raw-tool persistence is
+  permitted. The denied policy yields no such receipt, while omitted raw rows are
+  absent from persisted records. Focused locked test and agent/runtime all-target
+  Clippy pass. This does not complete the full I313 30-row mapping.
+
+All three increments received independent static review; reviewers did not run
+builds. Published head remains `defee4422`, CI `41468073726` in progress at this
+checkpoint. Earlier head `77d15d3c6` run `41462704265` is terminal cancelled despite
+all listed jobs succeeding; it is not overall CI success and cannot certify later
+heads. T5 remains Partial; MEM-007 interaction, final acceptance mapping, exact-head
+CI/review/CAS/merge remain open. T1/T6 remain unimplemented; full queue unchanged.
+
 ## Huge output through applied checkpoint and recovery — 2026-11-02
 
 Commit `eba8b8e89` extends the real Runtime fixture through a >2 MiB tool result,

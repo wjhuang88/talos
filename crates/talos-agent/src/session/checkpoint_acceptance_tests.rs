@@ -597,3 +597,174 @@ async fn text_heavy_manual_fold(fork: bool, cli_persistence: bool) {
         assert_eq!(durable.read_messages().expect("parent history"), raw);
     }
 }
+
+#[tokio::test]
+async fn mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reopen() {
+    struct ShellOutput;
+    #[async_trait]
+    impl AgentTool for ShellOutput {
+        fn name(&self) -> &str {
+            "bash"
+        }
+        fn description(&self) -> &str {
+            "Return deterministic shell-shaped output without host execution"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type":"object"})
+        }
+        fn is_read_only(&self) -> bool {
+            true
+        }
+        async fn execute(&self, _: Value) -> ToolResult {
+            ToolResult::success(
+                (0..50)
+                    .map(|i| format!("row-{i:03}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            )
+        }
+    }
+    let root = tempfile::tempdir().expect("root");
+    for permit in [true, false] {
+        let key = format!("mem007-{permit}");
+        let durable =
+            talos_session::DurableSession::open_or_create(root.path(), &key).expect("durable");
+        let model = Arc::new(MockModel::new(vec![
+            vec![
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "compressed-shell".into(),
+                        name: "bash".into(),
+                        input: json!({}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Default::default(),
+                },
+            ],
+            vec![
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "compact-after-shell".into(),
+                        name: "compact_context".into(),
+                        input: json!({}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Default::default(),
+                },
+            ],
+            success_events("compressed result accepted"),
+        ]));
+        let mut tools = ToolRegistry::new();
+        tools.register(Arc::new(ShellOutput));
+        #[allow(deprecated)]
+        let mut agent = Agent::new(model, tools).with_bash_compression(true);
+        agent
+            .enable_model_checkpoint_tools()
+            .expect("checkpoint tools");
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: LIMIT,
+            },
+        );
+        actor.set_durable_persistence(
+            durable.clone(),
+            PersistencePolicy {
+                persist_reasoning: false,
+                persist_raw_tool_output: permit,
+            },
+        );
+        let task = tokio::spawn(async move {
+            actor.run().await;
+            actor
+        });
+        assert_eq!(
+            complete_turn(&mut handle, "produce shell output".into()).await,
+            0
+        );
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        let actor = task.await.expect("actor");
+        let compressed = actor
+            .history
+            .iter()
+            .find_map(|message| match message {
+                Message::Tool { result } if result.tool_use_id == "compressed-shell" => {
+                    Some(result.content.clone())
+                }
+                _ => None,
+            })
+            .expect("executed result");
+        assert_eq!(compressed.matches("first 20 lines omitted").count(), 1);
+        assert!(compressed.contains("row-049"));
+        assert!(!compressed.contains("row-000"));
+        drop(actor);
+        let original = durable.session().snapshot_bytes().expect("original bytes");
+        drop(durable);
+        let reopened = talos_session::DurableSession::open_existing(root.path(), &key)
+            .expect("reopen")
+            .expect("exists");
+        assert_eq!(
+            reopened.session().snapshot_bytes().expect("bytes"),
+            original
+        );
+        let entries = reopened.session().read_entries().expect("entries");
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.content.contains("compact-after-shell"))
+        );
+        let receipts: Vec<_> = entries
+            .iter()
+            .flat_map(|entry| {
+                talos_session::HistoryRecoveryReceipt::from_terminal_entry(entry)
+                    .unwrap_or_default()
+            })
+            .collect();
+        let compressed_receipts: Vec<_> = receipts
+            .iter()
+            .filter_map(|receipt| {
+                let source = entries
+                    .iter()
+                    .find(|entry| entry.id == receipt.entry_id())?;
+                receipt
+                    .verified_content(source)
+                    .filter(|content| content.contains("first 20 lines omitted"))
+                    .map(|content| (receipt, source, content))
+            })
+            .collect();
+        assert_eq!(compressed_receipts.len(), usize::from(permit));
+        assert!(
+            entries
+                .iter()
+                .all(|entry| entry.metadata.raw_content.is_none())
+        );
+        let encoded = serde_json::to_string(&entries).expect("records");
+        assert!(
+            !encoded.contains("row-000"),
+            "omitted raw output must not be copied into metadata"
+        );
+        assert_eq!(
+            encoded.matches("row-049").count(),
+            usize::from(permit),
+            "the model-visible suffix is stored once and not copied into receipt metadata"
+        );
+        if permit {
+            assert_eq!(compressed_receipts[0].2, compressed.trim_end_matches('\n'));
+        }
+    }
+}
