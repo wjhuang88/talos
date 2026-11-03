@@ -10,9 +10,9 @@ use talos_core::tool::SharedAtomicCreateCapability;
 use talos_core::tool::ToolContribution;
 use talos_tools::{
     SearchToolConfiguration, SearchToolConfigurationError, git_mutation_tool_contributions,
-    git_read_tool_contributions, network_tool_contributions,
-    network_tool_contributions_with_search, ordinary_file_tool_contributions,
-    read_image_tool_contribution, shell_tool_contributions, workspace_tool_contributions,
+    git_read_tool_contributions, network_tool_contributions_with_search,
+    ordinary_file_tool_contributions, read_image_tool_contribution, shell_tool_contributions,
+    workspace_tool_contributions,
 };
 
 /// Explicit consumer profile for the shared built-in contribution inventory.
@@ -254,8 +254,6 @@ mod tests {
 
     #[test]
     fn shared_profiles_reject_uninventoried_native_operations() {
-        // Coverage inventory, never an admission allowlist. Equality between two
-        // profiles alone would miss an unreviewed addition shared by both.
         let shared = [
             "exec",
             "read",
