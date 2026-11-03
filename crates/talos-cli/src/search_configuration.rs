@@ -7,7 +7,7 @@ use talos_tools::SearchToolConfiguration;
 /// Optional provider material is consulted only after the corresponding backend was explicitly
 /// selected. Ambient `TAVILY_API_KEY` / `SEARXNG_URL` are deliberately not read here.
 pub(crate) fn project_search_configuration(config: &Config) -> Result<SearchToolConfiguration> {
-    match config.search.backend {
+    match &config.search.backend {
         SearchBackendConfig::Auto => {
             reject_inapplicable_search_options(config)?;
             Ok(SearchToolConfiguration::Auto)
@@ -25,9 +25,11 @@ pub(crate) fn project_search_configuration(config: &Config) -> Result<SearchTool
                 .get("tavily")
                 .and_then(|provider| provider.api_key.as_deref())
                 .filter(|value| !value.is_empty())
-                .ok_or_else(|| anyhow::anyhow!(
-                    "explicit Tavily search requires a configured tavily credential"
-                ))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "explicit Tavily search requires a configured tavily credential"
+                    )
+                })?;
             Ok(SearchToolConfiguration::Tavily {
                 api_key: api_key.to_owned(),
                 fallback_to_auto: config.search.fallback_to_auto,
@@ -39,9 +41,9 @@ pub(crate) fn project_search_configuration(config: &Config) -> Result<SearchTool
                 .url
                 .as_deref()
                 .filter(|value| !value.is_empty())
-                .ok_or_else(|| anyhow::anyhow!(
-                    "explicit SearXNG search requires search.url"
-                ))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("explicit SearXNG search requires search.url")
+                })?;
             Ok(SearchToolConfiguration::SearXng {
                 url: url.to_owned(),
                 fallback_to_auto: config.search.fallback_to_auto,
