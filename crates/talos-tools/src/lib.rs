@@ -104,7 +104,7 @@ pub use browser_page::{
     BrowserPageConnector, BrowserPageLink, BrowserPageRecord, MockBrowserPageConnector,
 };
 #[cfg(feature = "network")]
-pub use contributions::network_tool_contributions;
+pub use contributions::{network_tool_contributions, network_tool_contributions_with_search};
 #[cfg(feature = "image")]
 pub use contributions::read_image_tool_contribution;
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]

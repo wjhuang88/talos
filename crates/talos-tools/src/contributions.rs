@@ -32,7 +32,9 @@ use crate::{BashTool, ExecTool};
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
 use crate::{DiffTool, StatTool};
 #[cfg(feature = "network")]
-use crate::{FetchUrlTool, HttpRequestTool};
+use crate::{
+    FetchUrlTool, HttpRequestTool, SearchToolConfiguration, SearchToolConfigurationError,
+};
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
 use crate::{GlobTool, GrepTool};
 
@@ -170,13 +172,26 @@ pub fn workspace_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribu
     contributions
 }
 
-/// Builds the network/web tool group.
+/// Builds the network/web tool group with zero-key Auto search.
 ///
 /// The production `web_search` contribution is the ADR-090 prepared SearchRouter composition.
 /// Permission wrapping remains an explicit outer-product decision.
 #[must_use]
 #[cfg(feature = "network")]
 pub fn network_tool_contributions() -> Vec<ToolContribution> {
+    network_tool_contributions_with_search(SearchToolConfiguration::Auto)
+        .expect("static Auto search configuration must be valid")
+}
+
+/// Builds the network/web tool group with one explicit protected-search configuration.
+///
+/// Provider intent is supplied by `search`; optional-provider availability never changes Auto.
+/// Invalid explicit provider configuration fails before any tool registry is constructed.
+#[must_use]
+#[cfg(feature = "network")]
+pub fn network_tool_contributions_with_search(
+    search: SearchToolConfiguration,
+) -> Result<Vec<ToolContribution>, SearchToolConfigurationError> {
     let mut contributions = Vec::new();
     #[cfg(feature = "file-write")]
     contributions.push(contribution(
@@ -191,10 +206,10 @@ pub fn network_tool_contributions() -> Vec<ToolContribution> {
         ),
         contribution(
             NETWORK_CONTRIBUTION_SOURCE,
-            crate::search_backend::production_search_router_tool(),
+            crate::search_backend::production_search_router_tool_with_search_configuration(search)?,
         ),
     ]);
-    contributions
+    Ok(contributions)
 }
 
 /// Builds the core file tool group with one shared model-private snapshot registry.
@@ -392,6 +407,26 @@ mod tests {
     #[test]
     fn network_group_has_stable_inventory_and_source() {
         let contributions = network_tool_contributions();
+
+        assert_eq!(
+            names(&contributions),
+            ["save_url", "fetch_url", "http_request", "web_search"]
+        );
+        assert_source(&contributions, NETWORK_CONTRIBUTION_SOURCE);
+        let search = contributions
+            .iter()
+            .find(|contribution| contribution.name() == "web_search")
+            .expect("web_search contribution");
+        assert!(search.tool().requires_network_invocation());
+    }
+
+    #[test]
+    fn explicit_network_group_preserves_inventory_source_and_prepared_search() {
+        let contributions = network_tool_contributions_with_search(SearchToolConfiguration::Tavily {
+            api_key: "fixture-tavily-key".into(),
+            fallback_to_auto: true,
+        })
+        .expect("configured network group");
 
         assert_eq!(
             names(&contributions),
