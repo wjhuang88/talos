@@ -1,3 +1,31 @@
+## Reasoning persistence defect found by recovery acceptance — 2026-11-03
+
+The new actual Actor recovery fixture failed its disk-presence assertion even with
+`persist_reasoning=true`: durable finalization discarded filtered reasoning while
+constructing SessionEntry metadata. The production correction preserves that
+existing metadata field after policy/redaction and includes it in same-turn
+idempotency comparison. Default-off behavior is unchanged. Older missing-metadata
+commits remain readable without backfill; retries carrying reasoning conflict
+without rewriting bytes. The Runtime SDK contract documents this compatibility
+boundary and forbids using a fresh turn ID merely to repeat committed effects.
+
+Actor recovery now verifies persisted Thinking text/signature and Redacted data
+containing the query cannot add search hits. The focused Actor and Session
+policy/roundtrip/retry tests passed 1/1 each; full Session library passed 301/301;
+Agent/Session test-target warnings-denied Clippy passed. Logs:
+`/private/tmp/i313-reasoning-{recovery-fixed,roundtrip,session-suite,clippy}.log`.
+Independent storage/privacy static review approved two-file diff
+`deab00c930c8df1ff3a00b2925909f87fadb10a73d65490d031ec2263cb30dc9`
+on `2c3a92200c774babf991c7baffd806d0bc9f3e65`; reviewer read logs, ran no builds.
+This excludes reasoning from recovery results, not from original provider history.
+The legacy-shaped missing-metadata regression now reopens the committed session,
+checks enabled-policy retry conflicts and default-off retry remains idempotent,
+and verifies unchanged transcript bytes. The focused reasoning selection passed
+4/4 (`/private/tmp/i313-reasoning-legacy.log`); this fixture uses the current writer
+with absent metadata, not an archived older-version binary.
+Raw-content metadata, credential-filter composition and final full-candidate
+gates remain outstanding. T5 stays Partial.
+
 ## Acceptance convergence audit — 2026-11-03
 
 This execution map supplements, and does not replace, the published 30-row

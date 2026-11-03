@@ -1381,6 +1381,13 @@ impl DurableSession {
             )?;
             if prior.outcome == outcome
                 && prior_parts == requested_parts
+                && prior_entries.iter().zip(&filtered).all(|(entry, message)| {
+                    let reasoning = match message {
+                        Message::Assistant { reasoning, .. } => reasoning.as_ref(),
+                        _ => None,
+                    };
+                    entry.metadata.reasoning.as_ref() == reasoning
+                })
                 && stored_receipts == requested_receipts
             {
                 return Ok(TurnCommit {
@@ -1416,6 +1423,10 @@ impl DurableSession {
                 content,
                 metadata: SessionMetadata {
                     turn_id: Some(turn_id.to_string()),
+                    reasoning: match message {
+                        Message::Assistant { reasoning, .. } => reasoning.clone(),
+                        _ => None,
+                    },
                     ..SessionMetadata::default()
                 },
             });
@@ -3404,6 +3415,133 @@ mod tests {
                 .read_turn_transcript_outcomes()
                 .expect("outcomes")
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn reasoning_persistence_roundtrips_and_retry_checks_filtered_metadata() {
+        for persist_reasoning in [false, true] {
+            let directory = tempfile::tempdir().expect("directory");
+            let session = create_or_open(directory.path(), "reasoning").expect("session");
+            let policy = PersistencePolicy {
+                persist_reasoning,
+                persist_raw_tool_output: true,
+            };
+            let mut message = Message::Assistant {
+                content: "public answer".into(),
+                tool_calls: vec![],
+                reasoning: Some(AssistantReasoning {
+                    provider: "fixture".into(),
+                    model: "fixture".into(),
+                    blocks: vec![ReasoningBlock::Thinking {
+                        text: "private thought".into(),
+                        signature: Some("opaque signature".into()),
+                    }],
+                }),
+            };
+            session
+                .commit_turn("turn", &[message.clone()], &policy)
+                .expect("commit");
+            let bytes = session.session().snapshot_bytes().expect("bytes");
+            let entry = session.session().read_entries().expect("entries").remove(0);
+            assert_eq!(entry.metadata.reasoning.is_some(), persist_reasoning);
+            assert!(
+                !session
+                    .commit_turn("turn", &[message.clone()], &policy)
+                    .expect("identical retry")
+                    .newly_committed
+            );
+            if let Message::Assistant {
+                reasoning: Some(reasoning),
+                ..
+            } = &mut message
+            {
+                reasoning.blocks = vec![ReasoningBlock::Plain {
+                    text: "different thought".into(),
+                }];
+            }
+            let retry = session.commit_turn("turn", &[message], &policy);
+            if persist_reasoning {
+                assert!(matches!(
+                    retry,
+                    Err(SessionError::DurableTurnConflict { .. })
+                ));
+            } else {
+                assert!(
+                    !retry
+                        .expect("omitted metadata is not persisted identity")
+                        .newly_committed
+                );
+            }
+            assert_eq!(
+                session.session().snapshot_bytes().expect("unchanged bytes"),
+                bytes
+            );
+            drop(session);
+            let reopened = create_or_open(directory.path(), "reasoning").expect("reopen");
+            assert_eq!(
+                reopened.session().read_entries().expect("reopened entries")[0]
+                    .metadata
+                    .reasoning,
+                entry.metadata.reasoning
+            );
+        }
+    }
+
+    #[test]
+    fn reasoning_retry_preserves_legacy_missing_metadata_after_reopen() {
+        let directory = tempfile::tempdir().expect("directory");
+        let session = create_or_open(directory.path(), "legacy-reasoning").expect("session");
+        let mut message = Message::Assistant {
+            content: "already committed answer".into(),
+            tool_calls: vec![],
+            reasoning: None,
+        };
+        session
+            .commit_turn(
+                "legacy-turn",
+                &[message.clone()],
+                &PersistencePolicy::default(),
+            )
+            .expect("legacy-shaped commit without reasoning metadata");
+        let bytes = session.session().snapshot_bytes().expect("bytes");
+        drop(session);
+        let reopened = create_or_open(directory.path(), "legacy-reasoning").expect("reopen");
+        assert!(
+            reopened.session().read_entries().expect("entries")[0]
+                .metadata
+                .reasoning
+                .is_none()
+        );
+        if let Message::Assistant { reasoning, .. } = &mut message {
+            *reasoning = Some(AssistantReasoning {
+                provider: "fixture".into(),
+                model: "fixture".into(),
+                blocks: vec![ReasoningBlock::Plain {
+                    text: "new metadata".into(),
+                }],
+            });
+        }
+        let enabled = PersistencePolicy {
+            persist_reasoning: true,
+            persist_raw_tool_output: true,
+        };
+        assert!(matches!(
+            reopened.commit_turn("legacy-turn", &[message.clone()], &enabled),
+            Err(SessionError::DurableTurnConflict { .. })
+        ));
+        assert!(
+            !reopened
+                .commit_turn("legacy-turn", &[message], &PersistencePolicy::default())
+                .expect("default-off retry retains the original identity")
+                .newly_committed
+        );
+        assert_eq!(
+            reopened
+                .session()
+                .snapshot_bytes()
+                .expect("unchanged bytes"),
+            bytes
         );
     }
 

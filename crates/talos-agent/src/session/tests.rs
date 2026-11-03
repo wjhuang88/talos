@@ -6523,7 +6523,19 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
     raw.extend([
         Message::Assistant {
             content: "public assistant response".into(),
-            reasoning: None,
+            reasoning: Some(talos_core::message::AssistantReasoning {
+                provider: "fixture".into(),
+                model: "fixture".into(),
+                blocks: vec![
+                    talos_core::message::ReasoningBlock::Thinking {
+                        text: "originalfact private reasoning sentinel".into(),
+                        signature: Some("originalfact opaque signature sentinel".into()),
+                    },
+                    talos_core::message::ReasoningBlock::Redacted {
+                        data: "originalfact redacted reasoning sentinel".into(),
+                    },
+                ],
+            }),
             tool_calls: vec![talos_core::message::ToolCall {
                 id: "hidden-recovery-input".into(),
                 name: "private_fixture".into(),
@@ -6539,13 +6551,30 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
         },
     ]);
     durable
-        .commit_turn("prior", &raw, &Default::default())
+        .commit_turn(
+            "prior",
+            &raw,
+            &talos_session::PersistencePolicy {
+                persist_reasoning: true,
+                persist_raw_tool_output: true,
+            },
+        )
         .expect("commit");
     let persisted =
         serde_json::to_string(&durable.session().read_entries().expect("persisted entries"))
             .expect("serialized persisted evidence");
     assert!(persisted.contains("originalfact hidden input sentinel"));
     assert!(persisted.contains("originalfact unverified output sentinel"));
+    for marker in [
+        "originalfact private reasoning sentinel",
+        "originalfact opaque signature sentinel",
+        "originalfact redacted reasoning sentinel",
+    ] {
+        assert!(
+            persisted.contains(marker),
+            "private metadata must actually be persisted: {marker}"
+        );
+    }
     let mut engine = talos_permission::PermissionEngine::empty();
     engine.set_workspace_root(root.path().into());
     engine.add_rule(talos_permission::PermissionRule::new_nature(

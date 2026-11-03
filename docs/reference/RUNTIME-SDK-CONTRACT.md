@@ -84,6 +84,16 @@ Their origin crates need not be direct dependencies for these embedding operatio
 | `BackgroundJobId`, `BackgroundJobState`, `BackgroundJobRequest`, `BackgroundJobPermit`, `BackgroundJobLauncher`, `LaunchedBackgroundJob`, `ToolExecutionAdmission` | `talos-core` | Background-job signature types for admitted tool execution |
 | `BackgroundCleanupOutcome`, `BackgroundJobTerminalSummary`, `BackgroundOutputChunk`, `BackgroundOutputStream`, `BackgroundProcessControl`, `BackgroundProcessEvent`, `BackgroundProcessExit` | `talos-core` | Typed background-process control, output and terminal outcomes |
 
+Durable commits preserve assistant reasoning metadata only when
+`PersistencePolicy.persist_reasoning` is explicitly enabled (default: disabled),
+after the existing credential redaction. Recovery search does not index that
+metadata. Same-turn retries compare the filtered metadata as well as role/content.
+Older commits that lost reasoning remain readable and are not backfilled: retrying
+such a committed turn with reasoning now returns `DurableTurnConflict` rather than
+silently accepting different persisted state. Treat the existing committed outcome
+as authoritative; do not change turn IDs and repeat effects merely to bypass this
+conflict.
+
 The single-direct-dependency promise covers custom provider/tool/approval/sandbox implementations,
 typed event consumption and runtime composition. For durable sessions it covers
 `SessionManager::with_dir`, `SessionManager::create_or_open_session`, `DurableSession`
