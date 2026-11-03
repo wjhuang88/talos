@@ -579,6 +579,15 @@ pub(crate) fn format_wikipedia_fallback_results(
     format_admitted_results(query, results, ResultSource::Wikipedia, include_snippets)
 }
 
+/// Fixed-source display conversion for already-admitted Tavily rows, not admission.
+pub(crate) fn format_tavily_results(
+    query: &str,
+    results: Vec<SearchBackendResult>,
+    include_snippets: bool,
+) -> String {
+    format_admitted_results(query, results, ResultSource::Tavily, include_snippets)
+}
+
 /// Fixed-source display conversion for already-admitted SearXNG rows, not admission.
 pub(crate) fn format_searxng_results(
     query: &str,
@@ -779,6 +788,31 @@ mod tests {
                 format_results("q\"中", &legacy, ResultSource::SearXNG, include)
             );
             assert!(output.contains("Source: SearXNG\n"));
+            assert_eq!(output.contains(&format!("{}中…", "a".repeat(299))), include);
+        }
+    }
+
+    #[test]
+    fn shared_tavily_formatter_preserves_legacy_bytes_and_utf8_boundary() {
+        let snippet = format!("{}中文", "a".repeat(299));
+        let legacy = [WebResult {
+            title: "Title".into(),
+            url: "https://example.invalid/".into(),
+            snippet: snippet.clone(),
+        }];
+        for include in [false, true] {
+            let rows = vec![SearchBackendResult {
+                backend: SearchBackendId::Tavily,
+                title: legacy[0].title.clone(),
+                url: legacy[0].url.clone(),
+                snippet: snippet.clone(),
+            }];
+            let output = format_tavily_results("q\"中", rows, include);
+            assert_eq!(
+                output,
+                format_results("q\"中", &legacy, ResultSource::Tavily, include)
+            );
+            assert!(output.contains("Source: Tavily\n"));
             assert_eq!(output.contains(&format!("{}中…", "a".repeat(299))), include);
         }
     }
