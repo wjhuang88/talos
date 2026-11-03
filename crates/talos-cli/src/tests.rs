@@ -305,6 +305,36 @@ mod tests {
         else {
             panic!("expected generation-bound Compact, got {op:?}");
         };
+        // Same numeric ID in the model namespace must not finish the manual
+        // operation. The subsequent Cancel must still address manual Compact.
+        for generation in [41, 42] {
+            agent_tx
+                .send(SessionEvent::ModelCheckpointTerminal {
+                    session_id: "session".into(),
+                    session_generation: generation,
+                    operation_id,
+                    outcome: CompactOutcome::Applied {
+                        before: generation as u32,
+                        after: 17,
+                    },
+                })
+                .expect("model terminal");
+        }
+        loop {
+            let output = tokio::time::timeout(std::time::Duration::from_secs(3), ui_rx.recv())
+                .await
+                .expect("model status deadline")
+                .expect("output");
+            if let UiOutput::Tip { text, .. } = output {
+                assert!(
+                    !text.contains("41 →"),
+                    "stale model terminal must not display"
+                );
+                if text.starts_with("Model ") && text.contains("42 → 17") {
+                    break;
+                }
+            }
+        }
         user_tx.send(UserInput::Cancel).expect("cancel compact");
         let cancel = tokio::time::timeout(std::time::Duration::from_secs(3), command_rx.recv())
             .await

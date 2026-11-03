@@ -516,6 +516,25 @@ impl PermissionSessionState {
         })
     }
 
+    /// Execute a short synchronous commit only while the exact permission snapshot
+    /// remains current. Contention fails closed rather than waiting on another fence.
+    ///
+    /// The permission state lock covers both comparison and commit. The callback
+    /// must not await, perform blocking I/O, or call back into this Session state.
+    pub fn with_current_snapshot<T>(
+        &self,
+        expected: PermissionStateSnapshot,
+        commit: impl FnOnce() -> T,
+    ) -> Result<Option<T>, GrantError> {
+        let state = self.try_lock_state()?;
+        if state.session_id != expected.session_id || state.revisions != expected.revisions {
+            return Ok(None);
+        }
+        let result = commit();
+        drop(state);
+        Ok(Some(result))
+    }
+
     /// Starts a new unrelated permission Session at a successful runtime
     /// publication boundary.
     pub fn rebind_session(&self) -> Result<(), GrantError> {
@@ -1728,6 +1747,65 @@ mod tests {
         assert!(schema_json.contains("session_grant_allow"));
         assert!(schema_json.contains("interactive_human"));
         assert!(!schema_json.contains("report-secret-sentinel"));
+    }
+
+    #[test]
+    fn snapshot_commit_rejects_stale_and_contended_authority() {
+        let state = PermissionSessionState::new(PermissionEngine::new());
+        let snapshot = state.state_snapshot().expect("snapshot");
+        state.with_state_fence_held(|| {
+            assert!(
+                state
+                    .with_current_snapshot(snapshot, || panic!("contended must refuse"))
+                    .is_err()
+            );
+        });
+        state.clear().expect("reset");
+        assert_eq!(
+            state
+                .with_current_snapshot(snapshot, || panic!("stale must refuse"))
+                .expect("fence"),
+            None::<()>
+        );
+    }
+
+    #[test]
+    fn snapshot_commit_fences_concurrent_permission_reset() {
+        use std::sync::{Arc, mpsc};
+        let state = Arc::new(PermissionSessionState::new(PermissionEngine::new()));
+        let snapshot = state.state_snapshot().expect("snapshot");
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let committing = state.clone();
+        let commit = std::thread::spawn(move || {
+            committing
+                .with_current_snapshot(snapshot, || {
+                    entered_tx.send(()).expect("entered");
+                    release_rx.recv().expect("release");
+                    42
+                })
+                .expect("commit fence")
+        });
+        entered_rx.recv().expect("commit started");
+        let resetting = state.clone();
+        let (attempt_tx, attempt_rx) = mpsc::channel();
+        let (done_tx, done_rx) = mpsc::channel();
+        let reset = std::thread::spawn(move || {
+            attempt_tx.send(()).expect("attempt");
+            resetting.clear().expect("reset");
+            done_tx.send(()).expect("reset finished");
+        });
+        attempt_rx.recv().expect("reset attempted");
+        assert!(
+            done_rx
+                .recv_timeout(std::time::Duration::from_millis(25))
+                .is_err()
+        );
+        release_tx.send(()).expect("release commit");
+        assert_eq!(commit.join().expect("commit thread"), Some(42));
+        done_rx.recv().expect("reset after commit");
+        reset.join().expect("reset thread");
+        assert_ne!(state.state_snapshot().expect("new snapshot"), snapshot);
     }
 
     #[test]

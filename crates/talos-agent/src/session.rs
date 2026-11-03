@@ -31,10 +31,7 @@ use talos_session::PendingSubmissionStore;
 
 #[doc(hidden)]
 pub use crate::background_jobs::BackgroundJobFinalizerHandle;
-use crate::{
-    ActivatedSkillContext, Agent, SteeringBoundaryAcknowledgement, SteeringBoundaryBatch,
-    SteeringBoundaryRequest,
-};
+use crate::{ActivatedSkillContext, Agent, SteeringBoundaryAcknowledgement, SteeringBoundaryBatch};
 
 mod custody;
 mod lifecycle;
@@ -79,7 +76,7 @@ struct StartedTurn {
     handle: JoinHandle<Option<TurnRecord>>,
     token: CancellationToken,
     structured: Option<ActiveStructuredTurn>,
-    boundary_rx: mpsc::UnboundedReceiver<SteeringBoundaryRequest>,
+    boundary_rx: mpsc::UnboundedReceiver<crate::AgentActorRequest>,
     boundary_ack_rx: mpsc::UnboundedReceiver<SteeringBoundaryAcknowledgement>,
 }
 
@@ -113,6 +110,8 @@ fn immediate_started_turn(
             },
         });
         Some(TurnRecord {
+            committed_source: None,
+            completion_events: Vec::new(),
             persisted_entry_ids: Vec::new(),
             new_messages: Vec::new(),
             status,
@@ -152,6 +151,8 @@ pub struct AppServerSession {
     runtime_admission: Option<RuntimeAdmissionControl>,
     #[cfg(test)]
     start_commit_gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
+    #[cfg(test)]
+    fork_worker_gate: Option<(Arc<tokio::sync::Notify>, Arc<std::sync::atomic::AtomicBool>)>,
     #[cfg(test)]
     boundary_ack_cancel_gate: Option<Arc<tokio::sync::Notify>>,
 }
@@ -203,6 +204,8 @@ impl AppServerSession {
             runtime_admission: None,
             #[cfg(test)]
             start_commit_gate: None,
+            #[cfg(test)]
+            fork_worker_gate: None,
             #[cfg(test)]
             boundary_ack_cancel_gate: None,
         };
@@ -278,7 +281,11 @@ impl AppServerSession {
         self.session_id = session_id;
         self.background_jobs
             .set_identity(self.session_id.clone(), self.session_generation);
-        self.durable_persistence = Some(DurableTurnPersistence { session, policy });
+        self.durable_persistence = Some(DurableTurnPersistence {
+            session,
+            policy,
+            recovery_preparation: Arc::new(tokio::sync::Mutex::new(None)),
+        });
     }
 
     /// Bind recovered messages to entries in the configured durable session.
@@ -293,7 +300,7 @@ impl AppServerSession {
             return;
         };
         let entries = snapshot.entries();
-        if snapshot.session_id() != durable.session.id()
+        if !durable.session.owns_history_snapshot(&snapshot)
             || entries.len() > 8192
             || entries.len() != self.history.len()
             || entries
@@ -314,6 +321,49 @@ impl AppServerSession {
             &self.history,
             ids,
         );
+    }
+
+    /// Bind a storage-issued recovered snapshot cooperatively before running the Actor.
+    ///
+    /// Unlike the bounded synchronous compatibility setter, this accepts long
+    /// histories under a caller-owned deadline. A dropped or expired operation
+    /// leaves recovery identity reuse disabled. Metadata grows with history;
+    /// individual comparisons and allocations are not hard-real-time operations.
+    pub async fn set_recovered_history_sources_until(
+        &mut self,
+        snapshot: talos_session::DurableHistorySnapshot,
+        deadline: tokio::time::Instant,
+    ) -> bool {
+        self.recovered_source = None;
+        if tokio::time::Instant::now() >= deadline {
+            return false;
+        }
+        let Some(durable) = &self.durable_persistence else {
+            return false;
+        };
+        if !durable.session.owns_history_snapshot(&snapshot)
+            || snapshot.entries().len() != self.history.len()
+        {
+            return false;
+        }
+        let namespace = durable.session.id();
+        let mut ids = Vec::new();
+        for ((id, message), raw) in snapshot.entries().iter().zip(&self.history) {
+            tokio::task::yield_now().await;
+            if tokio::time::Instant::now() >= deadline || message != raw {
+                return false;
+            }
+            ids.push(format!("tlog:{namespace}:{id}"));
+        }
+        self.recovered_source = crate::compaction::HistorySource::bind_until(
+            self.session_generation,
+            self.history.len() as u64,
+            &self.history,
+            ids,
+            deadline,
+        )
+        .await;
+        self.recovered_source.is_some()
     }
 
     /// Runs the session actor until shutdown or SQ disconnect.
@@ -382,6 +432,17 @@ impl AppServerSession {
             return;
         }
 
+        struct ForkWork {
+            task: JoinHandle<Result<String, String>>,
+            cancel: CancellationToken,
+            receipt: mpsc::UnboundedSender<Result<String, String>>,
+        }
+        impl Drop for ForkWork {
+            fn drop(&mut self) {
+                self.cancel.cancel();
+            }
+        }
+        let mut fork_work: Option<ForkWork> = None;
         let mut turn_counter: u64 = 0;
         let mut submission_counter: u64 = 0;
         let mut pending = VecDeque::<StructuredSubmission>::new();
@@ -396,7 +457,7 @@ impl AppServerSession {
         let mut current_structured: Option<ActiveStructuredTurn> = None;
         let mut injected_structured = Vec::<BoundaryStructuredTurn>::new();
         let mut delivered_boundary: Option<BoundaryStructuredTurn> = None;
-        let mut current_boundary_rx: Option<mpsc::UnboundedReceiver<SteeringBoundaryRequest>> =
+        let mut current_boundary_rx: Option<mpsc::UnboundedReceiver<crate::AgentActorRequest>> =
             None;
         let mut current_boundary_ack_rx: Option<
             mpsc::UnboundedReceiver<SteeringBoundaryAcknowledgement>,
@@ -418,11 +479,15 @@ impl AppServerSession {
         loop {
             if shutting_down {
                 compact.cancel(self);
+                if let Some(work) = &fork_work {
+                    work.cancel.cancel();
+                }
             }
-            if current_turn.is_none() && !shutting_down {
+            if current_turn.is_none() && fork_work.is_none() && !shutting_down {
                 compact.start(self);
             }
             if current_turn.is_none()
+                && fork_work.is_none()
                 && !compact.is_running()
                 && !paused
                 && let Some(submission) = pending.pop_front()
@@ -482,6 +547,7 @@ impl AppServerSession {
             }
 
             if shutting_down
+                && fork_work.is_none()
                 && current_turn.is_none()
                 && !compact.is_running()
                 && pending.is_empty()
@@ -490,7 +556,16 @@ impl AppServerSession {
             }
 
             tokio::select! {
-                result = compact.wait(), if compact.is_running() => {
+                result = async { match fork_work.as_mut() {
+                    Some(work) => Some((&mut work.task).await),
+                    None => None,
+                } }, if fork_work.is_some() => {
+                    if let Some(work) = fork_work.take() {
+                        let result = result.and_then(Result::ok).unwrap_or_else(|| Err("durable fork worker failed".into()));
+                        let _ = work.receipt.send(result);
+                    }
+                }
+                result = compact.wait(), if compact.has_pending_work() => {
                     compact.complete(self, result);
                 }
                 completed = async {
@@ -500,6 +575,7 @@ impl AppServerSession {
                     }
                 }, if current_turn.is_some() => {
                     current_turn = None;
+                    compact.cancel_queued_model(self);
                     cancel_token = None;
                     current_boundary_rx = None;
                     if let Some(rx) = current_boundary_ack_rx.as_mut() {
@@ -520,7 +596,8 @@ impl AppServerSession {
                     }
                     let structured = current_structured.take();
                     match completed.and_then(Result::ok).flatten() {
-                        Some(record) => {
+                        Some(mut record) => {
+                            let completion_events = std::mem::take(&mut record.completion_events);
                             let status = record.status;
                             let completion = record.completion.clone();
                             self.commit_turn_record(record);
@@ -554,6 +631,9 @@ impl AppServerSession {
                             }
                             if let Some(admission) = &self.runtime_admission {
                                 admission.finish_active(Some(&completion));
+                            }
+                            for event in completion_events {
+                                let _ = self.eq_tx.send(event);
                             }
                             let resume_queued_user = resume_user_after_cancel
                                 && status == TurnRecordStatus::Cancelled
@@ -642,6 +722,38 @@ impl AppServerSession {
                         pending_image_bytes = current_submission_size.map_or(0, |size| size.3);
                         continue;
                     };
+                    if let Some(work) = &fork_work {
+                        if matches!(&op, SessionOp::Interrupt | SessionOp::Shutdown) {
+                            work.cancel.cancel();
+                        } else {
+                            match &op {
+                                SessionOp::Compact { session_generation, operation_id } => {
+                                    let _ = self.eq_tx.send(SessionEvent::CompactStatus {
+                                        session_id: self.session_id.clone(), session_generation: self.session_generation,
+                                        operation_id: *operation_id,
+                                        state: if *session_generation == self.session_generation { talos_core::session::CompactState::Busy } else { talos_core::session::CompactState::StaleGeneration },
+                                    });
+                                    continue;
+                                }
+                                SessionOp::SubmitStructured { submission } => self.emit_admission_rejection(submission, SubmissionRejectionReason::SessionBusy, None),
+                                SessionOp::SubmitStructuredTracked { submission, receipt_tx } => self.emit_admission_rejection(submission, SubmissionRejectionReason::SessionBusy, receipt_tx.as_ref()),
+                                SessionOp::ReconcileStructured { submission } | SessionOp::SubmitStructuredReconcile { submission } => {
+                                    self.reconcile_submission(submission, None);
+                                    continue;
+                                }
+                                SessionOp::ReconcileStructuredTracked { submission, receipt_tx } | SessionOp::SubmitStructuredReconcileTracked { submission, receipt_tx } => {
+                                    self.reconcile_submission(submission, receipt_tx.as_ref());
+                                    continue;
+                                }
+                                _ => {}
+                            }
+                            if let SessionOp::ForkDurable { receipt_tx: Some(receipt), .. } = &op {
+                                let _ = receipt.send(Err("durable fork is already running".into()));
+                            }
+                            let _ = self.eq_tx.send(SessionEvent::Error { message: "session is busy creating a durable fork".into() });
+                            continue;
+                        }
+                    }
                     match op {
                         SessionOp::CancelCompact { session_generation, operation_id } => {
                             compact.cancel_operation(self, session_generation, operation_id);
@@ -808,6 +920,49 @@ impl AppServerSession {
                                 paused = false;
                             }
                         }
+                        SessionOp::ForkDurable { external_id, receipt_tx } => {
+                            let Some(receipt_tx) = receipt_tx else {
+                                let _ = self.eq_tx.send(SessionEvent::Error { message: "durable fork requires an in-process receipt channel".into() });
+                                continue;
+                            };
+                            if current_turn.is_some() || !compact.is_idle_for_fork() || !pending.is_empty() || shutting_down {
+                                let _ = receipt_tx.send(Err("durable fork requires an idle session".into()));
+                                continue;
+                            }
+                            if receipt_tx.is_closed() { continue; }
+                            #[cfg(any(unix, windows))]
+                            if let Some(durable) = &self.durable_persistence {
+                                let session = durable.session.clone();
+                                let observer = receipt_tx.clone();
+                                let admission = self.runtime_admission.clone();
+                                let cancel = CancellationToken::new();
+                                let stopped = cancel.clone();
+                                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+                                #[cfg(test)]
+                                let gate = self.fork_worker_gate.clone();
+                                let task = tokio::task::spawn_blocking(move || {
+                                    #[cfg(test)]
+                                    if let Some((reached, release)) = gate {
+                                        reached.notify_one();
+                                        while !release.load(std::sync::atomic::Ordering::SeqCst) {
+                                            if stopped.is_cancelled() || observer.is_closed() || std::time::Instant::now() >= deadline {
+                                                return Err("durable fork cancelled at test gate".into());
+                                            }
+                                            std::thread::park_timeout(std::time::Duration::from_millis(1));
+                                        }
+                                    }
+                                    session.fork_committed_tip(&external_id,
+                                        deadline,
+                                        move || stopped.is_cancelled() || observer.is_closed() || admission.as_ref().is_some_and(|control| !control.is_open())
+                                    ).map(|child| child.id().to_string()).map_err(|_| "durable fork storage unavailable".to_owned())
+                                });
+                                fork_work = Some(ForkWork { task, cancel, receipt: receipt_tx });
+                            } else {
+                                let _ = receipt_tx.send(Err("durable fork requires configured durable storage".into()));
+                            }
+                            #[cfg(not(any(unix, windows)))]
+                            { let _ = external_id; let _ = receipt_tx.send(Err("durable fork unavailable on this platform".into())); }
+                        }
                         SessionOp::SetSkillContext { name, content } => {
                             if current_turn.is_some() || compact.is_running() || !pending.is_empty() {
                                 let _ = self.eq_tx.send(SessionEvent::Error {
@@ -872,6 +1027,22 @@ impl AppServerSession {
                     }
                 }, if current_boundary_rx.is_some() => {
                     if let Some(request) = request {
+                        let request = match request {
+                            crate::AgentActorRequest::AdmitModel { submission, response } => {
+                                if response.is_closed() || shutting_down {
+                                    let _ = submission.receipt.send(talos_core::session::CompactOutcome::Cancelled);
+                                } else if let Some(token) = cancel_token.as_ref() {
+                                    let admitted = compact.admit_model(self, submission, token);
+                                    if response.send(admitted).is_err() && admitted.is_ok() {
+                                        compact.cancel_queued_model(self);
+                                    }
+                                } else {
+                                    let _ = submission.receipt.send(talos_core::session::CompactOutcome::Cancelled);
+                                }
+                                continue;
+                            }
+                            crate::AgentActorRequest::Boundary(request) => request,
+                        };
                         // The previous acknowledgement precedes this request in
                         // Agent execution, but the two channels can be selected
                         // in either order by the Actor.
@@ -1030,17 +1201,25 @@ impl AppServerSession {
     fn commit_turn_record(&mut self, record: TurnRecord) {
         let start = self.history.len();
         self.history.extend(record.new_messages);
-        self.recovered_source = crate::compaction::HistorySource::bind_committed(
-            self.session_generation,
-            &self.history,
-            self.recovered_source.as_ref(),
-            start,
-            self.durable_persistence
-                .as_ref()
-                .map(|durable| durable.session.id().to_string())
-                .as_deref(),
-            &record.persisted_entry_ids,
-        );
+        self.recovered_source = record
+            .committed_source
+            .unwrap_or_else(|| {
+                crate::compaction::HistorySource::bind_committed(
+                    self.session_generation,
+                    &self.history,
+                    self.recovered_source.as_ref(),
+                    start,
+                    self.durable_persistence
+                        .as_ref()
+                        .map(|durable| durable.session.id().to_string())
+                        .as_deref(),
+                    &record.persisted_entry_ids,
+                )
+            })
+            .filter(|source| {
+                source.generation() == self.session_generation
+                    && source.revision() == self.history.len() as u64
+            });
     }
 
     async fn start_submission(
@@ -1272,6 +1451,8 @@ impl AppServerSession {
                             },
                         });
                         return Some(TurnRecord {
+                            committed_source: None,
+                            completion_events: Vec::new(),
                             persisted_entry_ids: Vec::new(),
                             new_messages: Vec::new(),
                             status: TurnRecordStatus::Cancelled,
@@ -1345,6 +1526,8 @@ impl AppServerSession {
                     },
                 });
                 Some(TurnRecord {
+                    committed_source: None,
+                    completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: record_status,
@@ -1382,15 +1565,22 @@ impl AppServerSession {
         let (boundary_ack_tx, boundary_ack_rx) = mpsc::unbounded_channel();
         #[cfg(test)]
         let boundary_ack_cancel_gate = self.boundary_ack_cancel_gate.clone();
+        let mut source_history = self.history.clone();
+        let previous_source = self.recovered_source.clone();
+        let source_generation = self.session_generation;
+        let source_namespace = durable_persistence
+            .as_ref()
+            .map(|p| p.session.id().to_string());
         let handle = tokio::spawn(async move {
             let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
             let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
-            let _ = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
+            let (worker_eq_tx, mut worker_eq_rx) = mpsc::unbounded_channel();
+            let forwarding = AssertUnwindSafe(run_turn_with_forwarding(TurnForwarding {
                 agent,
                 prepared,
                 event_tx,
                 event_rx,
-                eq_tx,
+                eq_tx: worker_eq_tx,
                 cancel_token: token_clone,
                 turn_id,
                 session_id,
@@ -1403,9 +1593,52 @@ impl AppServerSession {
                 #[cfg(test)]
                 boundary_ack_cancel_gate,
             }))
-            .catch_unwind()
-            .await;
-            result_rx.await.ok()
+            .catch_unwind();
+            tokio::pin!(forwarding);
+            let mut completion_events = Vec::new();
+            loop {
+                tokio::select! {
+                    _ = &mut forwarding => break,
+                    Some(event) = worker_eq_rx.recv() => {
+                        if matches!(&event, SessionEvent::TurnEvent { payload: TurnEventPayload::Completed { .. }, .. }) {
+                            completion_events.push(event);
+                        } else {
+                            let _ = eq_tx.send(event);
+                        }
+                    }
+                }
+            }
+            while let Ok(event) = worker_eq_rx.try_recv() {
+                if matches!(
+                    &event,
+                    SessionEvent::TurnEvent {
+                        payload: TurnEventPayload::Completed { .. },
+                        ..
+                    }
+                ) {
+                    completion_events.push(event);
+                } else {
+                    let _ = eq_tx.send(event);
+                }
+            }
+            let mut record = result_rx.await.ok()?;
+            record.completion_events = completion_events;
+            let start = source_history.len();
+            source_history.extend(record.new_messages.iter().cloned());
+            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+            record.committed_source = Some(
+                crate::compaction::HistorySource::bind_committed_until(
+                    source_generation,
+                    &source_history,
+                    previous_source.as_ref(),
+                    start,
+                    source_namespace.as_deref(),
+                    &record.persisted_entry_ids,
+                    deadline,
+                )
+                .await,
+            );
+            Some(record)
         });
         Ok(StartedTurn {
             handle,

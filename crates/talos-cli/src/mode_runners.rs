@@ -203,6 +203,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
         ),
         None,
     );
+    agent.enable_model_checkpoint_tools()?;
     agent.set_tool_protocol(config.tool_protocol());
     crate::mode_runtime::set_image_input_capability(&mut agent, &config);
     crate::mode_runtime::set_request_budget_spec(&mut agent, &config);
@@ -397,7 +398,7 @@ pub(crate) async fn run_tui_mode(
     .with_auto_control(auto_control.clone())
     .with_auto_report_sink(auto_report_sink);
 
-    let initial_history = session.read_messages().unwrap_or_default();
+    let initial_history = crate::history_restore::read_session_history(&session).await?;
     let visible_history = initial_history.clone();
     let built_runtime = initial_runtime_builder
         .build(&config, &session, initial_history)

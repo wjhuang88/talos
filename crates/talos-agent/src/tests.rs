@@ -2775,6 +2775,9 @@ async fn continuation_budget_recovers_without_reexecuting_tools_or_losing_histor
         execution_log: executions.clone(),
     }));
     let mut agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
+    // This regression targets whole-request recovery after tool projection, not
+    // the separate pre-entry output truncation gate.
+    agent.tool_output_threshold = 16_000;
     agent.set_request_budget_spec(crate::RequestBudgetSpec::new(1));
     let prepared = agent
         .prepare_turn_start(
@@ -2826,6 +2829,7 @@ async fn continuation_budget_recovers_without_reexecuting_tools_or_losing_histor
     let mut complete_snapshot = false;
     while let Ok(snapshot) = snapshots_rx.try_recv() {
         complete_snapshot |= snapshot
+            .messages
             .iter()
             .filter(|message| matches!(message, Message::Tool { .. }))
             .count()
@@ -6754,8 +6758,8 @@ mod edit_auto;
 mod recovery_dispatch;
 mod scheduler_auto;
 
-#[test]
-fn checkpoint_projection_excludes_arguments_reasoning_unknown_and_duplicate_provenance() {
+#[tokio::test]
+async fn checkpoint_projection_excludes_arguments_reasoning_unknown_and_duplicate_provenance() {
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(ProjectedMockTool));
     let agent = Agent::new(Arc::new(MockModel::new(vec![])), registry);
@@ -6790,15 +6794,17 @@ fn checkpoint_projection_excludes_arguments_reasoning_unknown_and_duplicate_prov
             },
         },
     ];
-    let recovered =
-        agent.checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default());
+    let recovered = agent
+        .checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default())
+        .await;
     assert!(!format!("{recovered:?}").contains("model-visible text"));
     if let Message::Tool { result } = &messages[1] {
         agent.record_checkpoint_result("projected_read", result);
     }
     let raw = messages.clone();
-    let projected =
-        agent.checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default());
+    let projected = agent
+        .checkpoint_projection(&messages, &crate::transient_text::PrivateTokens::default())
+        .await;
     let text = format!("{projected:?}");
     for excluded in [
         "PRIVATE_ARGUMENT",
@@ -6813,8 +6819,9 @@ fn checkpoint_projection_excludes_arguments_reasoning_unknown_and_duplicate_prov
     assert_eq!(messages, raw);
     // Recovered history cannot infer a tool result producer from a duplicate ID.
     let duplicate = [messages.clone(), messages].concat();
-    let projected =
-        agent.checkpoint_projection(&duplicate, &crate::transient_text::PrivateTokens::default());
+    let projected = agent
+        .checkpoint_projection(&duplicate, &crate::transient_text::PrivateTokens::default())
+        .await;
     assert!(!format!("{projected:?}").contains("model-visible text"));
 }
 
@@ -6849,16 +6856,22 @@ async fn checkpoint_receipt_from_live_observation_rejects_tampering_and_same_nam
         .await
         .expect("observe actual result");
     assert!(
-        format!("{:?}", agent.checkpoint_projection(&messages, &private))
-            .contains("model-visible verified output")
+        format!(
+            "{:?}",
+            agent.checkpoint_projection(&messages, &private).await
+        )
+        .contains("model-visible verified output")
     );
     let mut tampered = messages.clone();
     if let Message::Tool { result } = &mut tampered[1] {
         result.content.push_str(" altered");
     }
     assert!(
-        !format!("{:?}", agent.checkpoint_projection(&tampered, &private))
-            .contains("verified output")
+        !format!(
+            "{:?}",
+            agent.checkpoint_projection(&tampered, &private).await
+        )
+        .contains("verified output")
     );
     // Weak identity receipts keep allocation identity distinct without retaining
     // the original tool object after registry replacement.
@@ -6882,8 +6895,11 @@ async fn checkpoint_receipt_from_live_observation_rejects_tampering_and_same_nam
         )
     );
     assert!(
-        !format!("{:?}", agent.checkpoint_projection(&messages, &private))
-            .contains("verified output")
+        !format!(
+            "{:?}",
+            agent.checkpoint_projection(&messages, &private).await
+        )
+        .contains("verified output")
     );
 }
 
@@ -7029,4 +7045,134 @@ async fn ephemeral_tool_image_drives_real_continuation_checkpoint() {
             assert!(budget.estimated_tokens <= limit);
         }
     }
+}
+
+#[tokio::test]
+async fn output_bounds_do_not_trust_names_or_change_original_protocol_results() {
+    struct OutputFixture {
+        original: bool,
+    }
+    #[async_trait]
+    impl AgentTool for OutputFixture {
+        fn name(&self) -> &str {
+            "history_search"
+        }
+        fn description(&self) -> &str {
+            "untrusted same-name fixture"
+        }
+        fn parameters(&self) -> Value {
+            serde_json::json!({"type":"object"})
+        }
+        fn requires_original_invocation(&self) -> bool {
+            self.original
+        }
+        async fn execute(&self, _: Value) -> ToolExecutionResult {
+            unreachable!()
+        }
+    }
+    for original in [false, true] {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(OutputFixture { original }));
+        let agent = Agent::new(Arc::new(MockModel::new(vec![])), registry);
+        let call = ToolCall {
+            id: "bounded-result".into(),
+            name: "history_search".into(),
+            input: serde_json::json!({}),
+        };
+        let content = serde_json::json!({"text":"x".repeat(6000)}).to_string();
+        let context = HookContext::new(TurnId::new(), PathBuf::from("."));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let mut messages = Vec::new();
+        agent
+            .observe_tool_result(
+                &context,
+                &call,
+                ToolExecutionResult::success(content.clone()),
+                &tx,
+                &mut messages,
+                &mut crate::transient_text::PrivateTokens::default(),
+            )
+            .await
+            .expect("observe");
+        let Message::Tool { result } = &messages[0] else {
+            panic!("paired result")
+        };
+        assert_eq!(result.tool_use_id, call.id);
+        if original {
+            assert_eq!(result.content, content);
+        } else {
+            assert!(result.content.len() < 4200);
+            assert!(result.content.contains("[truncated,"));
+        }
+        let AgentEvent::ToolResult { result, .. } = rx.try_recv().expect("UI event") else {
+            panic!("result event")
+        };
+        assert_eq!(
+            result.content, content,
+            "UI projection retains producer bytes"
+        );
+        assert_eq!(result.tool_use_id, call.id);
+    }
+}
+
+#[tokio::test]
+async fn observation_hook_cannot_grant_builtin_history_output_exemption() {
+    struct RenameObservation;
+    #[async_trait]
+    impl HookHandler for RenameObservation {
+        fn name(&self) -> &str {
+            "rename-observation"
+        }
+        fn subscribed(&self) -> &'static [HookEventKind] {
+            &[HookEventKind::OnToolResultObserved]
+        }
+        async fn on_event(&self, _: &HookContext, event: &mut HookEvent<'_>) -> HookResult {
+            if let HookEvent::OnToolResultObserved { observation } = event {
+                let mut changed = (*observation).clone();
+                changed.call.name = "history_search".into();
+                // HookResult owns a static event; this single fixture observation lives
+                // for the test process.
+                return HookResult::Modify(HookEvent::OnToolResultObserved {
+                    observation: Box::leak(Box::new(changed)),
+                });
+            }
+            HookResult::Continue
+        }
+    }
+    let mut hooks = HookRegistry::new();
+    hooks.register(Arc::new(RenameObservation));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(MockModel::new(vec![])),
+        ToolRegistry::new(),
+        None,
+        None,
+        PathBuf::from("."),
+        Arc::new(hooks),
+    );
+    agent.enable_model_checkpoint_tools().expect("real builtin");
+    let call = ToolCall {
+        id: "renamed-result".into(),
+        name: "ordinary_tool".into(),
+        input: serde_json::json!({}),
+    };
+    let content = serde_json::json!({"text":"x".repeat(6000)}).to_string();
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut messages = Vec::new();
+    agent
+        .observe_tool_result(
+            &HookContext::new(TurnId::new(), PathBuf::from(".")),
+            &call,
+            ToolExecutionResult::success(content),
+            &tx,
+            &mut messages,
+            &mut crate::transient_text::PrivateTokens::default(),
+        )
+        .await
+        .expect("observe");
+    let Message::Tool { result } = &messages[0] else {
+        panic!("result")
+    };
+    assert_eq!(result.tool_use_id, call.id);
+    assert!(result.content.len() < 4200);
+    assert!(result.content.contains("[truncated,"));
 }

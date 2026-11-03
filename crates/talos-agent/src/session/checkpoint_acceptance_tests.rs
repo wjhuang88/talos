@@ -352,6 +352,24 @@ async fn fifty_tool_turns_preserve_semantics_raw_export_and_durable_restart() {
         .expect("lookup")
         .expect("reopen");
     assert_eq!(reopened.session().snapshot_bytes().expect("bytes"), saved);
+    let recovered_entries = reopened.session().read_entries().expect("receipt source");
+    let receipts = recovered_entries
+        .iter()
+        .filter_map(talos_session::HistoryRecoveryReceipt::from_terminal_entry)
+        .flatten()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        receipts.len(),
+        50,
+        "each actual completed tool execution has durable provenance"
+    );
+    for receipt in receipts {
+        let source = recovered_entries
+            .iter()
+            .find(|entry| entry.id == receipt.entry_id())
+            .expect("source");
+        assert!(receipt.verified_content(source).is_some());
+    }
     let model = Arc::new(RetentionModel::new(50, false));
     let (mut handle, mut actor) =
         actor_for_history(model.clone(), calls.clone(), raw.clone(), directory.path());
@@ -578,4 +596,503 @@ async fn text_heavy_manual_fold(fork: bool, cli_persistence: bool) {
         );
         assert_eq!(durable.read_messages().expect("parent history"), raw);
     }
+}
+
+#[tokio::test]
+async fn mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reopen() {
+    struct ShellOutput;
+    #[async_trait]
+    impl AgentTool for ShellOutput {
+        fn name(&self) -> &str {
+            "bash"
+        }
+        fn description(&self) -> &str {
+            "Return deterministic shell-shaped output without host execution"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type":"object"})
+        }
+        fn is_read_only(&self) -> bool {
+            true
+        }
+        async fn execute(&self, _: Value) -> ToolResult {
+            ToolResult::success(
+                (0..50)
+                    .map(|i| format!("row-{i:03}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            )
+        }
+    }
+    let root = tempfile::tempdir().expect("root");
+    for permit in [true, false] {
+        let key = format!("mem007-{permit}");
+        let durable =
+            talos_session::DurableSession::open_or_create(root.path(), &key).expect("durable");
+        struct CompressionModel(AtomicUsize);
+        #[async_trait]
+        impl LanguageModel for CompressionModel {
+            async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+                let step = self.0.fetch_add(1, Ordering::SeqCst);
+                let events = match step {
+                    0 | 14 | 15 => {
+                        let (id, name, input) = match step {
+                            0 => ("compressed-shell", "bash", json!({})),
+                            14 => (
+                                "discover-compressed",
+                                "history_search",
+                                json!({"mode":"discover"}),
+                            ),
+                            _ => {
+                                let discovery = messages
+                                    .iter()
+                                    .find_map(|message| match message {
+                                        Message::Tool { result }
+                                            if result.tool_use_id == "discover-compressed" =>
+                                        {
+                                            assert!(!result.is_error, "{}", result.content);
+                                            Some(
+                                                serde_json::from_str::<Value>(&result.content)
+                                                    .expect("discovery"),
+                                            )
+                                        }
+                                        _ => None,
+                                    })
+                                    .expect("actual discovery result");
+                                assert!(discovery["snapshot"].is_string(), "{discovery}");
+                                let source = discovery["sources"]
+                                    .as_array()
+                                    .expect("source references")
+                                    .first()
+                                    .expect("eligible prefix");
+                                let item = json!({"text":"Preserve the local output task", "sources":[source]});
+                                let checkpoint = json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                                    "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                                    "facts":[],"assumptions":[],"resources":[],"open_loops":[]});
+                                (
+                                    "compact-after-shell",
+                                    "compact_context",
+                                    json!({"snapshot":discovery["snapshot"],"checkpoint":checkpoint}),
+                                )
+                            }
+                        };
+                        vec![
+                            AgentEvent::ToolCall {
+                                call: talos_core::message::ToolCall {
+                                    id: id.into(),
+                                    name: name.into(),
+                                    input,
+                                },
+                                provenance: Default::default(),
+                                summary_fields: vec![],
+                            },
+                            AgentEvent::TurnEnd {
+                                stop_reason: StopReason::ToolUse,
+                                usage: Default::default(),
+                            },
+                        ]
+                    }
+                    1..=13 => success_events("ordinary turn complete"),
+                    16 => {
+                        assert!(messages.iter().any(|message| matches!(message,
+                            Message::Context { content } if content.starts_with("[Derived checkpoint; source history remains authoritative]"))),
+                            "checkpoint must reach the actual provider continuation");
+                        assert!(
+                            !messages.iter().any(|message| matches!(message,
+                            Message::Tool { result } if result.tool_use_id == "compressed-shell")),
+                            "the old compressed result must actually be covered"
+                        );
+                        let applied = messages.iter().any(|message| match message {
+                            Message::Multimodal { parts } => parts.iter().any(|part| match part {
+                                talos_core::message::ContentPart::Text { text } => {
+                                    serde_json::from_str::<Value>(text)
+                                        .ok()
+                                        .is_some_and(|value| {
+                                            value.get("checkpoint_operation").is_some()
+                                                && value["outcome"].as_str().is_some_and(
+                                                    |outcome| outcome.starts_with("Applied {"),
+                                                )
+                                        })
+                                }
+                                _ => false,
+                            }),
+                            _ => false,
+                        });
+                        assert!(applied, "real Applied terminal receipt required");
+                        success_events("checkpoint applied after compressed shell output")
+                    }
+                    _ => panic!("unexpected provider call {step}"),
+                };
+                let (tx, rx) = mpsc::channel(8);
+                for event in events {
+                    tx.send(event).await.expect("fixture stream");
+                }
+                Ok(rx)
+            }
+        }
+        let model = Arc::new(CompressionModel(AtomicUsize::new(0)));
+        let mut tools = ToolRegistry::new();
+        tools.register(Arc::new(ShellOutput));
+        let mut engine = talos_permission::PermissionEngine::empty();
+        engine.set_workspace_root(root.path().into());
+        for nature in [
+            talos_core::tool::ToolNature::Read,
+            talos_core::tool::ToolNature::Write,
+        ] {
+            engine.add_rule(talos_permission::PermissionRule::new_nature(
+                nature,
+                None,
+                None,
+                talos_permission::PermissionDecision::Allow,
+            ));
+        }
+        let mut agent = Agent::with_security_and_hooks(
+            model.clone(),
+            tools,
+            Some(Arc::new(engine)),
+            None,
+            root.path().into(),
+            Arc::new(talos_plugin::HookRegistry::new()),
+        )
+        .with_bash_compression(true);
+        agent
+            .enable_model_checkpoint_tools()
+            .expect("checkpoint tools");
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: LIMIT,
+            },
+        );
+        actor.set_durable_persistence(
+            durable.clone(),
+            PersistencePolicy {
+                persist_reasoning: false,
+                persist_raw_tool_output: permit,
+            },
+        );
+        let task = tokio::spawn(async move {
+            actor.run().await;
+            actor
+        });
+        assert_eq!(
+            complete_turn(
+                &mut handle,
+                format!("produce shell output {}", "task context ".repeat(600))
+            )
+            .await,
+            0
+        );
+        // Exercise ordinary Actor turns so the compressed source enters the eligible prefix.
+        for i in 0..12 {
+            assert_eq!(
+                complete_turn(&mut handle, format!("ordinary follow-up {i}")).await,
+                0
+            );
+        }
+        let raw_before = durable.read_messages().expect("raw before checkpoint");
+        complete_turn(&mut handle, "checkpoint the earlier task".into()).await;
+        assert_eq!(model.0.load(Ordering::SeqCst), 17);
+        let raw_after = durable.read_messages().expect("raw after checkpoint");
+        assert_eq!(&raw_after[..raw_before.len()], raw_before);
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        let actor = task.await.expect("actor");
+        let compressed = actor
+            .history
+            .iter()
+            .find_map(|message| match message {
+                Message::Tool { result } if result.tool_use_id == "compressed-shell" => {
+                    Some(result.content.clone())
+                }
+                _ => None,
+            })
+            .expect("executed result");
+        assert_eq!(compressed.matches("first 20 lines omitted").count(), 1);
+        assert!(compressed.contains("row-049"));
+        assert!(!compressed.contains("row-000"));
+        drop(actor);
+        let original = durable.session().snapshot_bytes().expect("original bytes");
+        drop(durable);
+        let reopened = talos_session::DurableSession::open_existing(root.path(), &key)
+            .expect("reopen")
+            .expect("exists");
+        assert_eq!(
+            reopened.session().snapshot_bytes().expect("bytes"),
+            original
+        );
+        let entries = reopened.session().read_entries().expect("entries");
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.content.contains("compact-after-shell"))
+        );
+        let receipts: Vec<_> = entries
+            .iter()
+            .flat_map(|entry| {
+                talos_session::HistoryRecoveryReceipt::from_terminal_entry(entry)
+                    .unwrap_or_default()
+            })
+            .collect();
+        let compressed_receipts: Vec<_> = receipts
+            .iter()
+            .filter_map(|receipt| {
+                let source = entries
+                    .iter()
+                    .find(|entry| entry.id == receipt.entry_id())?;
+                receipt
+                    .verified_content(source)
+                    .filter(|content| content.contains("first 20 lines omitted"))
+                    .map(|content| (receipt, source, content))
+            })
+            .collect();
+        assert_eq!(compressed_receipts.len(), usize::from(permit));
+        assert!(
+            entries
+                .iter()
+                .all(|entry| entry.metadata.raw_content.is_none())
+        );
+        let encoded = serde_json::to_string(&entries).expect("records");
+        assert!(
+            !encoded.contains("row-000"),
+            "omitted raw output must not be copied into metadata"
+        );
+        assert_eq!(
+            encoded.matches("row-049").count(),
+            usize::from(permit),
+            "the model-visible suffix is stored once and not copied into receipt metadata"
+        );
+        if permit {
+            assert_eq!(compressed_receipts[0].2, compressed.trim_end_matches('\n'));
+        }
+        drop(reopened);
+        let mut child = tokio::process::Command::new(std::env::current_exe().expect("test binary"));
+        child
+            .kill_on_drop(true)
+            .args([
+                "--exact",
+                "session::tests::checkpoint_acceptance::mem007_actor_compression_process_restart_child",
+                "--nocapture",
+            ])
+            .env("TALOS_TEST_MEM007_RESTART_ROOT", root.path())
+            .env("TALOS_TEST_MEM007_RESTART_KEY", &key)
+            .env("TALOS_TEST_MEM007_RESTART_PERMIT", permit.to_string());
+        // Bound the process owner too: Actor deadlines cannot contain a child
+        // stuck before runtime startup or after its final assertion.
+        let output = tokio::time::timeout(Duration::from_secs(60), child.output())
+            .await
+            .expect("independent recovery process exceeded its outer deadline")
+            .expect("launch independent Actor recovery process");
+        assert!(
+            output.status.success(),
+            "child failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout)
+                .contains("TALOS_MEM007_PROCESS_RECOVERY_VERIFIED"),
+            "child must execute recovery rather than pass an empty test selection"
+        );
+    }
+}
+
+#[tokio::test]
+async fn mem007_actor_compression_process_restart_child() {
+    let (Some(root), Some(key), Some(permit)) = (
+        std::env::var_os("TALOS_TEST_MEM007_RESTART_ROOT"),
+        std::env::var_os("TALOS_TEST_MEM007_RESTART_KEY"),
+        std::env::var_os("TALOS_TEST_MEM007_RESTART_PERMIT"),
+    ) else {
+        return;
+    };
+    let root = std::path::PathBuf::from(root);
+    let key = key.to_string_lossy().into_owned();
+    let permit = permit.to_string_lossy() == "true";
+    let durable = talos_session::DurableSession::open_existing(&root, &key)
+        .expect("open after process restart")
+        .expect("durable source exists");
+    let compressed = durable
+        .read_messages()
+        .expect("read source history")
+        .into_iter()
+        .find_map(|message| match message {
+            Message::Tool { result } if result.tool_use_id == "compressed-shell" => {
+                Some(result.content)
+            }
+            _ => None,
+        })
+        .expect("compressed tool result");
+    assert_compressed_history_recovery(&root, durable, permit, compressed).await;
+    println!("TALOS_MEM007_PROCESS_RECOVERY_VERIFIED");
+}
+
+// Reconstruct the execution owner and registry; no process-local receipt survives.
+async fn assert_compressed_history_recovery(
+    root: &std::path::Path,
+    durable: talos_session::DurableSession,
+    permit: bool,
+    compressed: String,
+) {
+    struct RecoveryModel {
+        step: AtomicUsize,
+        permit: bool,
+        expected: String,
+    }
+    #[async_trait]
+    impl LanguageModel for RecoveryModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let step = self.step.fetch_add(1, Ordering::SeqCst);
+            let result = |id: &str| {
+                let result = messages
+                    .iter()
+                    .find_map(|message| match message {
+                        Message::Tool { result } if result.tool_use_id == id => Some(result),
+                        _ => None,
+                    })
+                    .expect("real recovery result");
+                assert!(!result.is_error, "step={step} id={id}: {}", result.content);
+                serde_json::from_str::<Value>(&result.content).expect("recovery JSON")
+            };
+            let input = match step {
+                0 => Some(json!({"mode":"discover"})),
+                1 => Some(
+                    json!({"mode":"search","snapshot":result("mem007-recover-0")["snapshot"],"query":"\"row-049\""}),
+                ),
+                2 => {
+                    let found = result("mem007-recover-1");
+                    let rows = found["results"].as_array().expect("results");
+                    assert_eq!(rows.len(), usize::from(self.permit), "{found}");
+                    if self.permit {
+                        Some(
+                            json!({"mode":"detail","snapshot":result("mem007-recover-0")["snapshot"],"reference":rows[0]["reference"]}),
+                        )
+                    } else {
+                        None
+                    }
+                }
+                3 if self.permit => {
+                    let detail = result("mem007-recover-2");
+                    assert_eq!(
+                        detail["text"].as_str(),
+                        Some(self.expected.trim_end_matches('\n'))
+                    );
+                    assert!(!detail.to_string().contains("row-000"));
+                    assert_eq!(
+                        detail["text"]
+                            .as_str()
+                            .expect("text")
+                            .matches("first 20 lines omitted")
+                            .count(),
+                        1
+                    );
+                    None
+                }
+                _ => panic!("unexpected recovery step {step}"),
+            };
+            let events = if let Some(input) = input {
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: format!("mem007-recover-{step}"),
+                            name: "history_search".into(),
+                            input,
+                        },
+                        provenance: Default::default(),
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else {
+                success_events("recovery policy checked")
+            };
+            let (tx, rx) = mpsc::channel(8);
+            for event in events {
+                tx.send(event).await.expect("fixture stream");
+            }
+            Ok(rx)
+        }
+    }
+    let mut engine = talos_permission::PermissionEngine::empty();
+    engine.set_workspace_root(root.into());
+    engine.add_rule(talos_permission::PermissionRule::new_nature(
+        talos_core::tool::ToolNature::Read,
+        None,
+        None,
+        talos_permission::PermissionDecision::Allow,
+    ));
+    let model = Arc::new(RecoveryModel {
+        step: AtomicUsize::new(0),
+        permit,
+        expected: compressed,
+    });
+    let mut agent = Agent::with_security_and_hooks(
+        model.clone(),
+        ToolRegistry::new(),
+        Some(Arc::new(engine)),
+        None,
+        root.into(),
+        Arc::new(talos_plugin::HookRegistry::new()),
+    );
+    agent
+        .enable_model_checkpoint_tools()
+        .expect("recovery tools");
+    let raw = durable.read_messages().expect("recovered messages");
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.into(),
+            initial_history: raw.clone(),
+            model_context_limit: LIMIT,
+        },
+    );
+    actor.set_durable_persistence(
+        durable.clone(),
+        PersistencePolicy {
+            persist_reasoning: false,
+            persist_raw_tool_output: permit,
+        },
+    );
+    assert!(
+        actor
+            .set_recovered_history_sources_until(
+                durable.read_history_snapshot().expect("recovered sources"),
+                tokio::time::Instant::now() + Duration::from_secs(10),
+            )
+            .await
+    );
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor
+    });
+    tokio::time::timeout(
+        Duration::from_secs(30),
+        complete_turn(&mut handle, "recover prior shell result".into()),
+    )
+    .await
+    .expect("bounded recovery");
+    assert_eq!(
+        model.step.load(Ordering::SeqCst),
+        if permit { 4 } else { 3 }
+    );
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    let actor = tokio::time::timeout(Duration::from_secs(10), task)
+        .await
+        .expect("bounded shutdown")
+        .expect("actor");
+    assert_eq!(&actor.history[..raw.len()], raw.as_slice());
 }

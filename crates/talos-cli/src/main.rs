@@ -21,6 +21,7 @@ mod event_loop;
 mod exploration_cli;
 mod governance;
 mod governance_mutation;
+mod history_restore;
 mod image_authorization;
 mod image_validation;
 mod init_wizard;

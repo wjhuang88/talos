@@ -43,6 +43,12 @@ pub trait SessionStore: Send + Sync + std::fmt::Debug {
     /// Read the session file as raw bytes.
     fn read_bytes(&self, file_path: &Path) -> Result<Vec<u8>, SessionError>;
 
+    /// Built-in encoding available to bounded message recovery. Custom stores
+    /// default to unavailable; this never falls back to a whole-file read.
+    fn history_encoding(&self) -> Option<crate::history_page::HistoryEncoding> {
+        None
+    }
+
     /// The file extension for this store's format (e.g., `"jsonl"`).
     fn file_extension(&self) -> &'static str;
 }
@@ -163,6 +169,10 @@ impl SessionStore for JsonlSessionStore {
         std::fs::read(file_path).map_err(SessionError::IoError)
     }
 
+    fn history_encoding(&self) -> Option<crate::history_page::HistoryEncoding> {
+        Some(crate::history_page::HistoryEncoding::Jsonl)
+    }
+
     fn file_extension(&self) -> &'static str {
         "jsonl"
     }
@@ -210,36 +220,41 @@ fn read_entries_from_path(path: &Path) -> Result<Vec<SessionEntry>, SessionError
             continue;
         }
 
-        if let Ok(entry) = serde_json::from_str::<SessionEntry>(&line) {
+        if let Some(entry) = decode_jsonl_history_line(&line, &mut synthetic_counter) {
             entries.push(entry);
-            continue;
-        }
-
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line)
-            && value.get("type").and_then(|t| t.as_str()) == Some("message")
-            && let Some(data) = value.get("data")
-            && let Ok(msg) = serde_json::from_value::<Message>(data.clone())
-        {
-            let (role, content) = crate::jsonl::message_parts(&msg);
-            let id = format!("synthetic-{synthetic_counter}");
-            let parent_id = if synthetic_counter > 0 {
-                Some(format!("synthetic-{}", synthetic_counter - 1))
-            } else {
-                None
-            };
-
-            entries.push(SessionEntry {
-                id,
-                parent_id,
-                timestamp: Utc::now(),
-                role,
-                content,
-                metadata: SessionMetadata::default(),
-            });
-            synthetic_counter += 1;
         }
         // Invalid lines are silently skipped (crash-safety guarantee)
     }
 
     Ok(entries)
+}
+
+// Compatibility decoder for message restoration only. Synthetic IDs and skipped
+// corrupt lines must never become durable search/projection authorization.
+pub(crate) fn decode_jsonl_history_line(
+    line: &str,
+    synthetic_counter: &mut u64,
+) -> Option<SessionEntry> {
+    if let Ok(entry) = serde_json::from_str::<SessionEntry>(line) {
+        return Some(entry);
+    }
+    let value = serde_json::from_str::<serde_json::Value>(line).ok()?;
+    if value.get("type").and_then(|t| t.as_str()) != Some("message") {
+        return None;
+    }
+    let msg = serde_json::from_value::<Message>(value.get("data")?.clone()).ok()?;
+    let (role, content) = crate::jsonl::message_parts(&msg);
+    let id = format!("synthetic-{synthetic_counter}");
+    let parent_id = synthetic_counter
+        .checked_sub(1)
+        .map(|n| format!("synthetic-{n}"));
+    *synthetic_counter += 1;
+    Some(SessionEntry {
+        id,
+        parent_id,
+        timestamp: Utc::now(),
+        role,
+        content,
+        metadata: SessionMetadata::default(),
+    })
 }

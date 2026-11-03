@@ -1355,11 +1355,47 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
         new_config: Config,
         bridge_update_ok: bool,
         bridge_second_err: bool,
+        budget: talos_core::message::ContextBudget,
     }
 
     let _lock = HOME_ENV_MUTEX.lock().await;
-    let result = with_isolated_home(|| async {
+    let mut budgets = Vec::new();
+    for (context_limit, output_limit) in [(64_000, 1024), (32_000, 1024), (32_000, 8192)] {
+        let result = with_isolated_home(|| async {
         let workspace = tempfile::tempdir().expect("operation should succeed");
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("loopback");
+        let endpoint = format!("http://{}", listener.local_addr().expect("address"));
+        let server = tokio::spawn(async move {
+            tokio::time::timeout(std::time::Duration::from_secs(20), async {
+                let mut requests = Vec::new();
+                for _ in 0..2 {
+                    let (mut socket, _) = listener.accept().await.expect("accept");
+                    let mut bytes = Vec::new();
+                    let mut chunk = [0; 4096];
+                    loop {
+                        let count = socket.read(&mut chunk).await.expect("request read");
+                        assert_ne!(count, 0);
+                        bytes.extend_from_slice(&chunk[..count]);
+                        assert!(bytes.len() < 512 * 1024);
+                        if let Some(end) = bytes.windows(4).position(|part| part == b"\r\n\r\n") {
+                            let length: usize = std::str::from_utf8(&bytes[..end]).expect("headers").lines().find_map(|line| {
+                                let (name, value) = line.split_once(':')?;
+                                name.eq_ignore_ascii_case("content-length").then(|| value.trim().parse().expect("length"))
+                            }).expect("content length");
+                            if bytes.len() >= end + 4 + length {
+                                requests.push(serde_json::from_slice::<serde_json::Value>(&bytes[end + 4..end + 4 + length]).expect("body"));
+                                break;
+                            }
+                        }
+                    }
+                    let events = "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n";
+                    socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{events}", events.len()).as_bytes()).await.expect("response");
+                }
+                requests
+            }).await.expect("server deadline")
+        });
+
         let mut config = Config {
             model: "original-model".to_string(),
             provider: "original-gw".to_string(),
@@ -1369,7 +1405,7 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             "original-gw".to_string(),
             ProviderConfig {
                 protocol: ProviderProtocol::OpenAIChat,
-                base_url: Some("https://mock.example.com/v1".to_string()),
+                base_url: Some(endpoint.clone()),
                 api_key: Some("orig-key".to_string()),
                 ..Default::default()
             },
@@ -1378,7 +1414,7 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             "target-gw".to_string(),
             ProviderConfig {
                 protocol: ProviderProtocol::OpenAIChat,
-                base_url: Some("https://mock.example.com/v1".to_string()),
+                base_url: Some(endpoint.clone()),
                 api_key: Some("target-key".to_string()),
                 ..Default::default()
             },
@@ -1388,10 +1424,13 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             .get_mut("target-gw")
             .expect("operation should succeed")
             .models
-            .insert("target-model".to_string(), Default::default());
+            .insert("target-model".to_string(), talos_config::ModelConfig {
+                context_limit: Some(context_limit), output_limit: Some(output_limit),
+                ..Default::default()
+            });
         config.save().expect("persist runtime baseline");
 
-        let (ui_tx, _ui_rx) = mpsc::unbounded_channel::<UiOutput>();
+        let (ui_tx, mut ui_rx) = mpsc::unbounded_channel::<UiOutput>();
         let hooks = Arc::new(HookRegistry::new());
         let session_manager =
             talos_session::SessionManager::with_dir(workspace.path().join("sessions"));
@@ -1400,7 +1439,7 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             .expect("operation should succeed");
         let (session_watch_tx, session_watch_rx) = tokio::sync::watch::channel(session.clone());
         let (sq_tx, mut sq_rx) = mpsc::channel::<talos_core::session::SessionOp>(4);
-        let (sq_tx_watch_tx, _sq_rx_watch) = tokio::sync::watch::channel(sq_tx.clone());
+        let (sq_tx_watch_tx, sq_rx_watch) = tokio::sync::watch::channel(sq_tx.clone());
         let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel::<(
             talos_session::Session,
             mpsc::UnboundedReceiver<talos_core::session::SessionEvent>,
@@ -1434,7 +1473,7 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
             approval_handler,
             Vec::new(),
             false,
-            true,
+            false,
         );
 
         let model_result = tokio::time::timeout(
@@ -1455,27 +1494,136 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
         .await
         .expect("production-equivalent model switch must not hang");
 
-        let new_config = model_result.expect("model switch to mock must succeed");
-        let bridge_update_ok = bridge_rx.try_recv().is_ok();
+        let new_config = model_result.unwrap_or_else(|| {
+            let mut errors = Vec::new();
+            while let Ok(output) = ui_rx.try_recv() {
+                if let UiOutput::Content(ContentOutput::Block { text, .. }) = output {
+                    errors.push(text);
+                }
+            }
+            panic!("model switch to mock must succeed: {errors:?}");
+        });
+        let (_, mut events) = bridge_rx.try_recv().expect("rebuilt Actor event receiver");
+        let bridge_update_ok = true;
+        let current_sq = sq_rx_watch.borrow().clone();
+        current_sq.send(talos_core::session::SessionOp::Submit {
+            message: "verify switched model budget".into(),
+        }).await.expect("submit to rebuilt Actor");
+        let mut budget = None;
+        let mut completed = false;
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            while let Some(event) = events.recv().await {
+                if let talos_core::session::SessionEvent::TurnEvent { payload, .. } = event {
+                    match payload {
+                        talos_core::session::TurnEventPayload::Progress { event: talos_core::message::AgentEvent::ContextBudget { budget: measured } } => {
+                            budget = Some(measured);
+                        }
+                        talos_core::session::TurnEventPayload::Completed { status } => {
+                            assert!(matches!(status, talos_core::session::TurnCompletionStatus::Success { .. }), "{status:?}");
+                            completed = true;
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }).await.expect("switched Actor completes");
+        assert!(completed);
+        // Switch again in the same persisted session, through the same production
+        // handler, and verify the prior completed turn survives reconstruction.
+        let prior_id = session_watch_rx.borrow().id;
+        let prior_messages = session_watch_rx.borrow().read_messages().expect("prior history");
+        assert!(prior_messages.iter().any(|message| matches!(message, talos_core::message::Message::User { content } if content == "verify switched model budget")));
+        let mut next_config = new_config.clone();
+        let next_limit = if context_limit == 64_000 {
+            budget.expect("first request cost").estimated_tokens * 10 / 9
+        } else { 64_000 };
+        next_config.providers.get_mut("target-gw").expect("provider").models.insert(
+            "next-model".into(), talos_config::ModelConfig {
+                context_limit: Some(next_limit), output_limit: Some(output_limit),
+                ..Default::default()
+            });
+        next_config.save().expect("persist next model");
+        let switched = tokio::time::timeout(std::time::Duration::from_secs(5), handle_session_model(
+            &transition, &ui_tx, &next_config, &runtime_builder, &session_watch_tx,
+            &sq_tx_watch_tx, &bridge_tx, &session_watch_rx,
+            "next-model".into(), Some("target-gw".into()),
+        )).await.expect("second switch deadline").expect("second switch succeeds");
+        assert_eq!(switched.model, "next-model");
+        assert_eq!(session_watch_rx.borrow().id, prior_id);
+        let after_messages = session_watch_rx.borrow().read_messages().expect("restored history");
+        assert_eq!(&after_messages[..prior_messages.len()], prior_messages.as_slice(), "switch preserves authoritative prefix");
+        let (_, mut next_events) = bridge_rx.try_recv().expect("second rebuilt route");
+        let next_sq = sq_rx_watch.borrow().clone();
+        next_sq.send(talos_core::session::SessionOp::Submit {
+            message: "continue after second switch".into(),
+        }).await.expect("second submit");
+        let mut next_budget = None;
+        let mut next_completed = false;
+        tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            while let Some(event) = next_events.recv().await {
+                if let talos_core::session::SessionEvent::TurnEvent { payload, .. } = event {
+                    match payload {
+                        talos_core::session::TurnEventPayload::Progress { event: talos_core::message::AgentEvent::ContextBudget { budget } } => next_budget = Some(budget),
+                        talos_core::session::TurnEventPayload::Completed { status } => {
+                            assert!(matches!(status, talos_core::session::TurnCompletionStatus::Success { .. }), "{status:?}");
+                            next_completed = true;
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }).await.expect("second turn deadline");
+        assert!(next_completed);
+        assert_eq!(next_budget.expect("second actual request budget").limit, Some(next_limit));
+        {
+            let requests = server.await.expect("server joined");
+            let pressure = |request: &serde_json::Value| request["messages"].to_string().contains("context_pressure");
+            assert!(!pressure(&requests[0]));
+            assert_eq!(pressure(&requests[1]), context_limit == 64_000, "pressure follows switched capacity: {next_limit}, first={budget:?}, second={next_budget:?}");
+            let tools = requests[0]["tools"].as_array().expect("wire tool definitions");
+            for name in ["compact_context", "history_search"] {
+                assert_eq!(tools.iter().filter(|tool| tool["function"]["name"] == name).count(), 1);
+            }
+            assert_eq!(requests[0]["tools"], requests[1]["tools"], "pressure does not change registered tool definitions");
+        }
+        transition.lock().await.shutdown().await;
+        let budget = budget.expect("real request budget event");
+        assert_eq!(budget.limit, Some(context_limit));
+        assert!(budget.estimated_tokens < context_limit);
+
         let bridge_second_err = bridge_rx.try_recv().is_err();
 
         SuccessResult {
             new_config,
             bridge_update_ok,
             bridge_second_err,
+            budget,
         }
     })
     .await;
 
-    assert_eq!(result.new_config.model, "target-model");
-    assert_eq!(result.new_config.provider, "target-gw");
+        assert_eq!(result.new_config.model, "target-model");
+        assert_eq!(result.new_config.provider, "target-gw");
+        assert!(
+            result.bridge_update_ok,
+            "bridge_rx_update_tx must receive exactly one update after successful rebuild"
+        );
+        assert!(
+            result.bridge_second_err,
+            "bridge_rx_update_tx must receive exactly ONE update, not more"
+        );
+        budgets.push(result.budget);
+    }
+    // The production switch resolves the new model's context and output policy,
+    // rebuilds the Actor/registered tools, then measures an actual admitted turn.
+    assert_eq!(budgets[0].limit, Some(64_000));
+    assert_eq!(budgets[1].limit, Some(32_000));
+    assert_eq!(budgets[2].limit, Some(32_000));
     assert!(
-        result.bridge_update_ok,
-        "bridge_rx_update_tx must receive exactly one update after successful rebuild"
-    );
-    assert!(
-        result.bridge_second_err,
-        "bridge_rx_update_tx must receive exactly ONE update, not more"
+        budgets[2].estimated_tokens > budgets[1].estimated_tokens + 6000,
+        "larger output reservation must reduce available request capacity: {budgets:?}"
     );
 }
 

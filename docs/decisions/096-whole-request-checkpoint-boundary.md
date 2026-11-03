@@ -114,3 +114,252 @@ manual runtime reachability and raw export/replay preservation. Independent API
 and privacy review, locked full preflight including external SDKs, exact-head
 platform CI and CAS remain required. Rollback discards derived projection state
 without deleting raw records or changing permission policy.
+
+## I313 bounded recovery source opening — 2026-11-01 implementation amendment
+
+Recovery reads must not block opening a special file before cancellation checks.
+The Session bounded-page reader uses the repository's existing platform strategy:
+Unix `O_NONBLOCK | O_NOFOLLOW` followed by opened-handle regular-file validation;
+Windows local absolute drive paths only, `FILE_FLAG_OPEN_REPARSE_POINT`, and
+opened-handle regular-file/non-reparse validation. Device/pipe/network namespaces
+are unsupported; parent-directory identity and source lineage remain host-owned
+checks, not guarantees of this raw reader. Filesystem/kernel operations are still
+synchronous, with cooperative cancellation between bounded reads, not hard-real-
+time I/O deadlines. No model may choose the filesystem path.
+
+This adds Session's direct target-specific use of already-locked `libc` and
+`windows-sys` constants, matching the existing tools recovery implementation.
+No package versions change, no new native implementation or Talos-authored unsafe
+is introduced. It refines the original no-new-dependency assumption solely for
+safe OS opening; independent platform/privacy review and native CI are required.
+
+## I313 recovery provenance storage increment — 2026-11-01
+
+The existing atomic terminal marker JSON may carry an optional `history_recovery`
+array. Its entries bind format version, original entry/turn/call/tool identity and
+SHA-256 digests of the final stored representation and eligible model projection.
+The public terminal outcome struct and SessionEntry fields are unchanged; legacy
+readers ignore the additive JSON field. No second transcript or cleartext result
+copy is created by this increment. Conversation exports omit internal terminal
+markers while preserving original conversation entries.
+
+The additive `finalize_turn_with_recovery` API accepts runtime-owner projections,
+then binds only exact matches to the final PersistencePolicy-filtered Tool text.
+Omitted or redacted mismatches receive no recovery receipt. Storage cannot infer
+runtime provenance from text/tool names in an existing transcript. Retry requires
+the same filtered entries and receipt set; disagreement fails without rewriting.
+An unsupported receipt version or source digest mismatch fails closed. These are
+runtime provenance records, not signatures protecting against arbitrary host log
+editing, and do not authorize session/branch membership.
+
+This first storage increment deliberately does not recover a model projection
+that differs from the stored tool text. Such cases require an explicitly permitted
+projection representation and the execution-owner envelope before T5 acceptance;
+they are not silently treated as delivered. Actor admission, snapshot lineage,
+index maintenance and model-facing query remain separate unfinished integration.
+
+### I313 explicit tool recovery view
+
+A tool whose model and persistence views differ may explicitly implement the
+additive, default-refusing AgentTool recovery_projection hook. Execution-owner
+provenance remains mandatory. The current path accepts this view only after
+private-token filtering and equality with the tool's permitted persistence view;
+Session persistence denial and sensitive-line redaction still prevent receipts.
+Read opts into its existing numbered, snapshot/anchor-free persistence view.
+CLI/Runtime permission wrappers forward the hook without granting execution or
+persistence permission. Callback panic refuses recovery. Durable receipt binding
+permits the existing line-ending normalization only and hashes final stored text.
+
+This enables recovery of sanitized Read results without retaining transient edit
+capabilities. It does not implement a separate permitted recovery representation
+whose text differs from the persisted tool entry; that acceptance remains open.
+
+### I313 Runtime default tool names — next-minor migration
+
+RuntimeBuilder enables the built-in `compact_context` and `history_search` tools
+by default. These names are reserved: existing caller tools using either name
+must be renamed before migration; construction returns a tool registration error
+rather than replacing caller code or conferring builtin trust. Low-level Agent
+hosts retain explicit opt-in. Registration does not grant permission or imply
+that unsupported storage can provide durable recovery.
+
+## I313 Windows recovery file identity — implementation amendment
+
+Windows recovery uses the already-locked windows-sys OS ABI to query
+GetFileInformationByHandleEx(FileIdInfo/FileBasicInfo) on a borrowed live File.
+Rust 1.99's equivalent MetadataExt identity/change-time methods remain unstable.
+The narrowly scoped unsafe boundary is limited to these two synchronous calls:
+initialized repr(C) output structs, exact matching information classes/sizes,
+writable stack storage valid for the call, and a handle borrowed for the full
+call. No ownership transfer, callback, retained pointer or model-selected path.
+Calls fail closed on unsupported filesystems/errors; panic containment surrounds
+the boundary. Compare volume/file ID, size, creation/write/change times, excluding
+access time so reads do not invalidate their own evidence. Existing local-drive,
+non-reparse, regular-file opening remains mandatory. This is OS access, not an
+additional C/C++ library or runtime. Independent unsafe/security/API review and
+native Windows CI are required before merge. Until those gates pass, Windows
+support remains unverified; timestamps are not protection against arbitrary host
+or filesystem tampering. Replace the ABI calls with stable std equivalents when
+all required identity/change fields become stable.
+
+References: [Rust 1.99 MetadataExt](https://doc.rust-lang.org/1.99.0/std/os/windows/fs/trait.MetadataExt.html),
+[GetFileInformationByHandleEx](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileinformationbyhandleex).
+
+Review limitation: the timestamp-based stamp alone is **not accepted as Windows
+recovery authorization**. Windows may defer timestamp updates while write handles
+remain open ([File Times](https://learn.microsoft.com/en-us/windows/win32/sysinfo/file-times)).
+The implementation must keep Windows recovery fail-closed until a stable-handle
+sharing/lifetime design prevents concurrent writes/deletion across verified reads.
+The ABI safety analysis above does not waive this content-stability requirement.
+
+The current unmerged preparation increment opens Windows recovery sources with
+FILE_SHARE_READ only and retains a cloned read handle in each FileStamp. Copies
+share its lifetime through Arc. Preparation expiry drops that in-memory lease on
+Windows; persisted cursor metadata must be freshly revalidated on a later attempt.
+Actor task-local recovery drops before normal finalization; cancellation aborts
+and joins the task before finalization. Independent static review accepts this
+increment only while authorization remains fail-closed. Pre-existing writable
+mapping behavior still requires native investigation; share-mode exclusion alone
+is not accepted as proof that all byte mutations are impossible. Native lifetime,
+write/delete and actual Actor success/cancel/timeout regressions remain required.
+
+Windows source locality additionally uses `GetFinalPathNameByHandleW` with
+`VOLUME_NAME_GUID` on the opened handle. This ADR permits that OS ABI call with
+a live borrowed handle and an initialized 32768-unit UTF-16 output buffer whose
+exact capacity is passed to Windows. Zero, truncated/oversized, invalid UTF-16,
+embedded NUL and non-volume-GUID results fail closed without DOS/NT fallback.
+The GUID namespace must contain a canonical 36-character hexadecimal GUID and
+a rooted suffix. Network shares have no volume GUID path; unsupported volume
+drivers are also refused. This check prevents authorization of remote sources,
+not remote opening/I/O before the handle check. Native tests and independent
+security review remain required; this addition does not activate Windows recovery.
+Reference: [GetFinalPathNameByHandleW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew).
+
+I313 unmerged Windows activation candidate: version comparison may use equality
+only for FileStamp values constructed from typed SourceFile handles. Construction
+checks opened-handle local volume identity and retains FILE_SHARE_READ-only custody
+through every clone. Native CI on `cc05a907f` rejected leases for both retained
+mapping and view-only writable mappings, and passed writer/delete exclusion and
+replacement-identity tests. This supports testing the production candidate, not
+final activation approval. Exact-head native Actor success/cancellation/timeout,
+locality rejection, independent security review and merge gates remain mandatory.
+No test-only authorization branch may substitute for those production-path tests.
+
+## Model terminal delivery
+
+The additive `SessionEvent::ModelCheckpointTerminal` variant reports one terminal
+per admitted model operation from the Actor ledger, even when its oneshot receipt
+has no receiver or no subsequent provider request consumes it. Its event kind
+separates model operation IDs from manual CompactStatus IDs. Existing non-exhaustive
+SessionEvent consumers may ignore the new event; clients wanting model status
+must handle it, without treating it as a manual command or whole-turn completion.
+CLI inline/TUI display content-free outcome metadata. Dynamic provider receipt
+consumption remains separate and does not synthesize raw transcript messages.
+
+## Initial-scan restart authority (I313, approved design; activation pending)
+
+Untrusted search-index continuation metadata cannot certify bytes read by an
+exited process. Persist only completed-page scan checkpoints in the existing
+host-owned durable bindings database, separate from the disposable search index.
+This deliberately extends that database's existing session-identity authority to
+host scan provenance; it is not a new raw-history/projection store. No cached
+search row or model input may mint or import this authority.
+
+A checkpoint binds the configured durable session UUID/external identity, branch,
+fixed cutoff, completed-page offset/digest, format version, and opened-file
+identity/version. Session alone exports it after pre/post source checks and saves
+it atomically under the existing storage boundary. Restore checks exact configured
+owner and source version before using the offset. Changed versions (including
+append) rebuild/revalidate; length growth alone cannot prove prefix preservation.
+Missing/corrupt/unknown checkpoints fall back to fresh bounded scanning. Never
+publish query authority before the entire captured prefix completes. Clear state
+on cancellation/retirement and use bounded, cancellation-aware SQLite operations.
+
+Threat boundary: the host-owned bindings database already determines durable
+session identities and is itself trusted storage. There is no cryptographic
+integrity guarantee against a host modifying provenance rows alone, bindings,
+or source files; arbitrary host tampering is outside this boundary. It must reject tampering
+in the separate untrusted search cache and cross-owner/branch substitution.
+If bindings storage cannot be treated as host authority by the security review,
+use a separately protected integrity mechanism instead; do not activate restoration.
+Initial support requires reliable Unix device/inode/size/mtime/ctime matching.
+Windows production-hook restoration is a local candidate, not yet accepted. Native test-only head
+b8a80873b (run41418548863, job125196764203) demonstrated a same-length overwrite
+whose volume/file ID/size/creation/write/change fields remained identical.
+These fields alone therefore cannot certify an unchanged source across released
+leases. Do not mask this counterexample with sleeps or weakened assertions.
+The local activation candidate was withdrawn. The replacement test candidate
+recomputes the saved-prefix digest in bounded pages under a fresh retained lease
+before reusing progress; metadata equality alone never skips these reads. Pending
+revalidation cannot export progress or mint a seal. This preserves bounded work
+per step but rereads the saved prefix after process restart. Production activation
+still requires independent review and native proof. Test-only head d0721a1db
+passed native Windows CI41427581565. The new Agent hook candidate retains the
+exact cleanup receipt during revalidation and saves only verified progress; its
+own native validation is still required.
+Live retained-handle source checks are a distinct boundary and are unchanged.
+
+
+Required proof: nonzero-offset continuation across independent processes with
+bounded work, exact digest equivalence, source replacement/mutation/append refusal,
+wrong owner/branch/version/offset rejection, cancelled writes and transaction crash
+consistency, plus no authority from index-only forged progress. This proposal is
+not implementation or acceptance evidence and does not close I313.
+
+Durable root identity migration: the two durable factories now derive their
+single root branch identity from the existing durable UUID. Earlier random
+in-memory root IDs are not stable across opens and any cached provenance carrying
+one is rejected/rebuilt. Raw transcript bytes and entry IDs are not rewritten.
+This changes the observable durable branch ID; consumers must discard old branch
+caches in the next-minor migration. Canonical branch identity is not owner
+authority: an independently opened or copied handle still cannot export another
+handle's scan, and restoring requires configured host bindings and source version.
+Generic Session branch/fork constructors retain their existing behavior.
+
+## Durable fork host protocol (I313 implementation draft)
+
+The proposed Runtime fork uses an Actor-owned busy worker: only an idle Actor may
+start it, new execution is refused until it joins, and Interrupt/Shutdown signal
+cooperative cancellation. A ten-second budget begins at Actor admission, including
+blocking-pool queue time. Blocking kernel calls are not forcibly interruptible.
+Cancellation racing committed publication may leave a valid child; callers must
+reconcile the external identity rather than assume rollback.
+
+Public protocol migration: SessionOp gains ForkDurable and structured admission
+reasons gain SessionBusy. Downstream exhaustive matches must handle these variants
+in the next minor release. ForkDurable requires an in-process receipt sender;
+deserialized wire requests without it are explicitly unsupported and emit Error.
+SessionBusy means retry after maintenance finishes, not permanent session closure.
+Compaction rejected during fork emits operation-specific Busy/StaleGeneration.
+
+This draft is not approval to publish: crash reconciliation, full lifecycle tests,
+independent review and Runtime fork/history acceptance remain required.
+
+Fork stage now implements Actor-owned worker, intent/lock publication and bounded
+paged startup recovery, with independent stage review. Lock files intentionally
+remain to prevent inode replacement races. Failed/busy records are retained;
+sweep budget exhaustion does not persist its cursor, so arbitrary backlog eventual
+cleanup is not guaranteed. Published recovery validates identity/lineage/length
+and preserves the file, not transcript content integrity. Unix process-exit tests
+cover intent/copy/sync/precommit/postcommit, including partial copying; they do not
+prove power-loss behavior. Full fork/checkpoint/tool-recovery composition and
+Windows support remain open, and this stage cannot close I313.
+
+
+### Windows fork candidate (I313, unmerged)
+
+The host fork/intent protocol now has a Windows implementation candidate using
+Rust File locking, retained lock names, final-reparse refusal and opened-handle
+local-volume checks for lock and newly created child files. Lock handles deny
+delete sharing. Child files use create-new and WRITE_THROUGH, then sync_all before
+SQLite binding publication. Recovery refuses reparse child entries and retains
+unresolved intents. These checks do not prevent I/O before the opened-handle
+locality check, nor protect against an arbitrary host replacing ancestor paths.
+
+Windows has no portable directory fsync in this implementation. The supported
+validation target is process-exit recovery, not a guarantee of Unix-equivalent
+namespace durability across power loss. Existing Unix directory sync remains.
+The six process-exit phases, independent live-lock owner, cancellation/publication
+race and parent/child/sibling isolation tests are now enabled on both platforms.
+Their Windows execution, full Actor fork/reopen composition and independent
+exact-head review remain required before merging this candidate.

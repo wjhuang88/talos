@@ -148,6 +148,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         ),
         Some(resolver),
     );
+    agent.enable_model_checkpoint_tools()?;
     agent.set_tool_protocol(config.tool_protocol());
     crate::mode_runtime::set_request_budget_spec(&mut agent, &config);
     if !loaded_plugin_packages.is_empty() {
@@ -185,7 +186,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         agent.set_append_prompt(append_prompt.clone());
     }
 
-    let initial_history = session.read_messages().unwrap_or_default();
+    let initial_history = crate::history_restore::read_session_history(&session).await?;
 
     let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {

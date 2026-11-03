@@ -1784,3 +1784,90 @@ fn recovered_message_sources_preserve_ids_across_filtered_entries() {
         serde_json::to_value(entries).expect("serialize")
     );
 }
+
+#[test]
+fn paged_history_decoder_preserves_tool_pairing_across_page_boundary() {
+    use crate::history_page::{HISTORY_PAGE_ENTRIES, HistoryEncoding, read_history_page};
+    let dir = tempfile::tempdir().expect("directory");
+    let manager = SessionManager::with_dir(dir.path().join("sessions"));
+    let session = manager
+        .create_session("paged-pairing", "")
+        .expect("session");
+    session.append_event(&AgentEvent::TurnStart).expect("event");
+    session
+        .append(&Message::Assistant {
+            content: "inspect".into(),
+            tool_calls: vec![ToolCall {
+                id: "page-call".into(),
+                name: "read".into(),
+                input: serde_json::json!({}),
+            }],
+            reasoning: None,
+        })
+        .expect("call");
+    session
+        .append(&Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "page-call".into(),
+                content: "original evidence".into(),
+                is_error: false,
+            },
+        })
+        .expect("result");
+    let entries = session.read_entries().expect("entries");
+    let path = dir.path().join("pages.jsonl");
+    let mut output = std::io::BufWriter::new(std::fs::File::create(&path).expect("fixture"));
+    for _ in 0..HISTORY_PAGE_ENTRIES - 1 {
+        serde_json::to_writer(&mut output, &entries[0]).expect("event JSON");
+        writeln!(output).expect("newline");
+    }
+    // Duplicate result must not resurrect a consumed call after the page split.
+    for entry in [&entries[1], &entries[2], &entries[2]] {
+        serde_json::to_writer(&mut output, entry).expect("entry JSON");
+        writeln!(output).expect("newline");
+    }
+    output.flush().expect("flush");
+    drop(output);
+    let end = std::fs::metadata(&path).expect("metadata").len();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let first = read_history_page(&path, HistoryEncoding::Jsonl, 0, end, deadline, || false)
+        .expect("first page");
+    assert_eq!(first.entries.len(), HISTORY_PAGE_ENTRIES);
+    assert!(!first.complete);
+    let mut decoder = crate::jsonl::HistoryMessageDecoder::default();
+    let mut messages: Vec<_> = first
+        .entries
+        .into_iter()
+        .filter_map(|e| decoder.decode(e))
+        .collect();
+    assert_eq!(messages.len(), 1);
+    let second = read_history_page(
+        &path,
+        HistoryEncoding::Jsonl,
+        first.next_offset,
+        end,
+        deadline,
+        || false,
+    )
+    .expect("second page");
+    assert!(second.complete);
+    messages.extend(second.entries.into_iter().filter_map(|e| decoder.decode(e)));
+    assert_eq!(messages.len(), 2);
+    assert_eq!(messages[1].0, entries[2].id);
+    assert_eq!(
+        messages[1].1,
+        Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "page-call".into(),
+                content: "original evidence".into(),
+                is_error: false,
+            },
+        }
+    );
+    assert_eq!(
+        messages,
+        session
+            .read_messages_with_entry_ids()
+            .expect("reference history")
+    );
+}

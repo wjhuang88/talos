@@ -1,3 +1,12 @@
+## T5 stable-stage review — 2026-11-02
+
+I313 is Review/Partial with effective claim #819. Unix Actor/Runtime checkpoint,
+recovery and fork implementation remains unmerged; standard host preflight passed
+including both SDK modes. Native Windows evidence, long-session live compaction
+binding and remaining acceptance are open. First four queue stages are merged;
+T1/T6 remain unimplemented. See I313 owner for evidence and limitations; historical
+activation-proposal snapshots below do not override current owner truth.
+
 ## T4 merged; T5 activation proposal — 2026-11-01
 
 I312 is Complete/Closed with Completion Commit:

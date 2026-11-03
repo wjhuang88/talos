@@ -36,7 +36,16 @@ dashboard, broader dotagents compatibility, plugin carriers, and advanced docume
 - **Durable sessions and memory**: SQLite-backed session history, search, branch/fork support, export, semantic memory consolidation, and retention previews.
 - **Progressive context**: runtime Skill discovery plus explicit Skill body/reference activation without dumping hidden content into visible history.
 - **Request context budget**: the TUI shows `?` before admission evidence and `~N%` for the local request estimate, including tool definitions, safety margin and output reservation, not billing usage. Bounded recovery omits older complete tool exchanges from a request only, retaining instructions and the latest complete exchange; irreducible requests are rejected without replaying tools. Unreleased whole-request checkpoints preserve original Actor history; derived projections remain rebuildable and manual compaction is available in TUI/inline. Automatic attempts show transient progress, token estimates and bounded failure reasons without displaying checkpoint content.
+- **Model-directed checkpoints (unreleased, partial)**: Runtime and CLI register `compact_context` and `history_search`. The model first discovers an opaque snapshot; compaction admission is followed by a separate final outcome, while bounded search/detail recover eligible original history without rerunning the original tool. Durable recovery requires supported local storage and permitted recovery projections; legacy unverified tool results may be unavailable. Durable recovery uses Runtime/Session storage; legacy CLI storage does not yet provide recovery receipts, so its durable search/detail remains unavailable. Windows durable recovery/fork has an unmerged candidate with passing native workspace tests; full platform acceptance remains open. See [Runtime SDK contract](docs/reference/RUNTIME-SDK-CONTRACT.md) and [I313 acceptance status](docs/iterations/I313-model-checkpoint-history.md).
 - **Extensible surface**: MCP tools, hooks, JSON-RPC, governance-aware project status, and explicit local read-only WASM packages are implemented; remote plugin distribution and browser control remain bounded separately.
+
+Unreleased CLI startup history restoration uses cancellable bounded pages in TUI,
+interactive and inline modes. Read failures now stop startup instead of silently
+using empty history. Oversized individual records and malformed/unsupported sources
+return errors; raw history is preserved. `/resume` and model switching also use
+paged restoration; failed resume retains the active session. CLI fork stages
+bounded raw-byte pages from the same captured history, with cleanup on cancellation;
+it requires filesystem hard-link support. See the [startup compatibility limits](docs/reference/RUNTIME-SDK-CONTRACT.md#cli-startup-history-restoration-i313-candidate).
 
 ### TUI thinking and activity
 

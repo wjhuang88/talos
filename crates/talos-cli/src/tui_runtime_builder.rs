@@ -262,6 +262,7 @@ impl TuiRuntimeBuilder {
             ),
             Some(resolver),
         );
+        agent.enable_model_checkpoint_tools()?;
         agent.set_tool_protocol(runtime_config.tool_protocol());
         set_image_input_capability(&mut agent, &runtime_config);
         set_request_budget_spec(&mut agent, &runtime_config);

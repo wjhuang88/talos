@@ -667,6 +667,30 @@ async fn handle_session_event(
                 });
             }
         }
+        SessionEvent::ModelCheckpointTerminal {
+            session_generation,
+            operation_id,
+            outcome,
+            ..
+        } => {
+            if authoritative_generation_for_sender(&sq_tx_watch.borrow())
+                == Some(session_generation)
+            {
+                let _ = ui_tx.send(UiOutput::Tip {
+                    text: format!(
+                        "Model {}",
+                        talos_conversation::format_compact_status(
+                            operation_id,
+                            talos_core::session::CompactState::Completed {
+                                outcome,
+                                replayed: false
+                            }
+                        )
+                    ),
+                    kind: TipKind::Info,
+                });
+            }
+        }
         SessionEvent::CompactStatus {
             session_generation,
             operation_id,

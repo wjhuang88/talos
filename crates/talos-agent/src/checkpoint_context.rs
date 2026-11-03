@@ -19,11 +19,33 @@ fn result_identity(name: &str, result: &MessageToolResult) -> [u8; 32] {
 }
 
 pub(crate) struct ResultReceipt {
+    execution: Option<uuid::Uuid>,
     digest: [u8; 32],
     instance: std::sync::Weak<dyn talos_core::tool::AgentTool>,
 }
 
 impl Agent {
+    pub(crate) fn has_checkpoint_result(&self, name: &str, result: &MessageToolResult) -> bool {
+        let Ok(execution) = crate::persistence_snapshot::RECOVERY_EXECUTION.try_with(|id| *id)
+        else {
+            return false;
+        };
+        let Some(instance) = self.tools.instance_handle(name) else {
+            return false;
+        };
+        let digest = result_identity(name, result);
+        self.checkpoint_result_receipts
+            .lock()
+            .map(|receipts| {
+                receipts.iter().any(|receipt| {
+                    receipt.execution == Some(execution)
+                        && receipt.digest == digest
+                        && receipt.instance.ptr_eq(&instance)
+                })
+            })
+            .unwrap_or(false)
+    }
+
     /// Authorize only exact model-facing bytes observed at the execution boundary.
     /// Receipts are process-local and bounded; recovered history has no authority.
     pub(crate) fn record_checkpoint_result(&self, name: &str, result: &MessageToolResult) {
@@ -35,6 +57,9 @@ impl Agent {
                 receipts.pop_front();
             }
             receipts.push_back(ResultReceipt {
+                execution: crate::persistence_snapshot::RECOVERY_EXECUTION
+                    .try_with(|id| *id)
+                    .ok(),
                 digest: result_identity(name, result),
                 instance,
             });
@@ -43,16 +68,18 @@ impl Agent {
 
     /// Project canonical messages for checkpoint generation. Arguments, reasoning
     /// and unverifiable tool payloads are excluded, including on recovered history.
-    pub(crate) fn checkpoint_projection(
+    pub(crate) async fn prepare_checkpoint_projection<'a>(
         &self,
-        messages: &[Message],
+        messages: &'a [Message],
         private_tokens: &PrivateTokens,
-    ) -> crate::compaction::CompactionResult<Vec<Message>> {
+        deadline: tokio::time::Instant,
+    ) -> crate::compaction::CompactionResult<PreparedProjection<'a>> {
         let mut private = private_tokens.clone();
         let mut pending = HashMap::new();
         let mut seen = HashSet::new();
         let mut ambiguous = HashSet::new();
         for message in messages {
+            projection_step(deadline).await?;
             if let Message::Assistant { tool_calls, .. } = message {
                 for call in tool_calls {
                     if !seen.insert(call.id.as_str()) {
@@ -65,6 +92,7 @@ impl Agent {
         let mut results = HashMap::new();
         let mut projection_bytes = 0usize;
         for (index, message) in messages.iter().enumerate() {
+            projection_step(deadline).await?;
             match message {
                 Message::Assistant { tool_calls, .. } => {
                     pending.clear();
@@ -108,73 +136,119 @@ impl Agent {
                         // This is already canonical model-facing input. Never read
                         // external raw_content or display/export-only data here.
                         let content = tool.project_result(&execution).model_content;
-                        charge_projection_bytes(&mut projection_bytes, content.len())?;
+                        let content = if content == result.content {
+                            std::borrow::Cow::Borrowed(result.content.as_str())
+                        } else {
+                            charge_projection_bytes(&mut projection_bytes, content.len())?;
+                            std::borrow::Cow::Owned(content)
+                        };
                         results.insert(index, content);
                     }
                 }
                 _ => pending.clear(),
             }
         }
+        projection_step(deadline).await?;
+        Ok(PreparedProjection { private, results })
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn checkpoint_projection(
+        &self,
+        messages: &[Message],
+        private: &PrivateTokens,
+    ) -> crate::compaction::CompactionResult<Vec<Message>> {
+        let prepared = self
+            .prepare_checkpoint_projection(
+                messages,
+                private,
+                tokio::time::Instant::now() + std::time::Duration::from_secs(120),
+            )
+            .await?;
         Ok(messages
             .iter()
             .enumerate()
-            .map(|(index, message)| match message {
-                Message::Assistant {
-                    content,
-                    tool_calls,
-                    ..
-                } => Message::Assistant {
-                    content: private.project(content),
-                    tool_calls: tool_calls
-                        .iter()
-                        .map(|call| talos_core::message::ToolCall {
-                            id: call.id.clone(),
-                            name: call.name.clone(),
-                            input: serde_json::json!({}),
-                        })
-                        .collect(),
-                    reasoning: None,
-                },
-                Message::Tool { result } => Message::Tool {
-                    result: MessageToolResult {
-                        tool_use_id: result.tool_use_id.clone(),
-                        content: results
-                            .get(&index)
-                            .map(|content| private.project(content))
-                            .unwrap_or_else(|| {
-                                "[tool payload excluded: unverifiable provenance]".into()
-                            }),
-                        is_error: result.is_error,
-                    },
-                },
-                Message::User { content } => Message::User {
-                    content: private.project(content),
-                },
-                Message::Context { content } => Message::Context {
-                    content: private.project(content),
-                },
-                Message::System { content, .. } => {
-                    let mut projected = message.clone();
-                    if let Message::System { content: text, .. } = &mut projected {
-                        *text = private.project(content);
-                    }
-                    projected
-                }
-                Message::Multimodal { parts } => Message::Multimodal {
-                    // Summarization sees text only; it does not reload image payloads.
-                    parts: parts
-                        .iter()
-                        .filter_map(|part| match part {
-                            ContentPart::Text { text } => Some(ContentPart::Text {
-                                text: private.project(text),
-                            }),
-                            _ => None,
-                        })
-                        .collect(),
-                },
-            })
+            .map(|(index, message)| prepared.message(index, message))
             .collect())
     }
+}
+
+pub(crate) struct PreparedProjection<'a> {
+    private: PrivateTokens,
+    results: HashMap<usize, std::borrow::Cow<'a, str>>,
+}
+
+impl PreparedProjection<'_> {
+    pub(crate) fn message(&self, index: usize, message: &Message) -> Message {
+        match message {
+            Message::Assistant {
+                content,
+                tool_calls,
+                ..
+            } => Message::Assistant {
+                content: self.private.project(content),
+                tool_calls: tool_calls
+                    .iter()
+                    .map(|call| talos_core::message::ToolCall {
+                        id: call.id.clone(),
+                        name: call.name.clone(),
+                        input: serde_json::json!({}),
+                    })
+                    .collect(),
+                reasoning: None,
+            },
+            Message::Tool { result } => Message::Tool {
+                result: MessageToolResult {
+                    tool_use_id: result.tool_use_id.clone(),
+                    content: self
+                        .results
+                        .get(&index)
+                        .map(|content| self.private.project(content))
+                        .unwrap_or_else(|| {
+                            "[tool payload excluded: unverifiable provenance]".into()
+                        }),
+                    is_error: result.is_error,
+                },
+            },
+            Message::User { content } => Message::User {
+                content: self.private.project(content),
+            },
+            Message::Context { content } => Message::Context {
+                content: self.private.project(content),
+            },
+            Message::System { content, .. } => {
+                let mut projected = message.clone();
+                if let Message::System { content: text, .. } = &mut projected {
+                    *text = self.private.project(content);
+                }
+                projected
+            }
+            Message::Multimodal { parts } => Message::Multimodal {
+                // Summarization sees text only; it does not reload image payloads.
+                parts: parts
+                    .iter()
+                    .filter_map(|part| match part {
+                        ContentPart::Text { text } => Some(ContentPart::Text {
+                            text: self.private.project(text),
+                        }),
+                        _ => None,
+                    })
+                    .collect(),
+            },
+        }
+    }
+}
+
+async fn projection_step(
+    deadline: tokio::time::Instant,
+) -> crate::compaction::CompactionResult<()> {
+    tokio::task::yield_now().await;
+    if tokio::time::Instant::now() >= deadline {
+        return Err(crate::compaction::CompactionError::CompactionFailed(
+            "checkpoint projection deadline exceeded".into(),
+        ));
+    }
+    Ok(())
 }
 
 // Tool callbacks own their returned allocation. Reject excessive aggregate
@@ -248,8 +322,83 @@ mod tests {
         }
     }
 
-    #[test]
-    fn rejects_tool_projection_expansion_and_private_token_expansion() {
+    #[tokio::test(start_paused = true)]
+    async fn late_private_declaration_filters_earlier_pages_and_expiry_refuses_preparation() {
+        struct LatePrivateTool;
+        #[async_trait::async_trait]
+        impl AgentTool for LatePrivateTool {
+            fn name(&self) -> &str {
+                "late_private"
+            }
+            fn description(&self) -> &str {
+                "late declaration fixture"
+            }
+            fn parameters(&self) -> serde_json::Value {
+                serde_json::json!({})
+            }
+            async fn execute(&self, _: serde_json::Value) -> ToolResult {
+                ToolResult::success("visible")
+            }
+            fn model_private_tokens(&self, _: &ToolResult) -> Vec<String> {
+                vec!["AFTER_PAGE_SECRET".into()]
+            }
+        }
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(LatePrivateTool));
+        let agent = Agent::new(Arc::new(NeverCalledModel), registry);
+        let mut messages = vec![Message::User {
+            content: "prior echo AFTER_PAGE_SECRET".into(),
+        }];
+        messages.extend((0..8300).map(|i| Message::User {
+            content: format!("filler {i}"),
+        }));
+        messages.push(Message::Assistant {
+            content: String::new(),
+            reasoning: None,
+            tool_calls: vec![ToolCall {
+                id: "late".into(),
+                name: "late_private".into(),
+                input: serde_json::json!({}),
+            }],
+        });
+        let result = MessageToolResult {
+            tool_use_id: "late".into(),
+            content: "visible".into(),
+            is_error: false,
+        };
+        agent.record_checkpoint_result("late_private", &result);
+        messages.push(Message::Tool { result });
+        let private = PrivateTokens::default();
+        let deadline = || tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        let prepared = agent
+            .prepare_checkpoint_projection(&messages, &private, deadline())
+            .await
+            .expect("global privacy scan");
+        assert!(!format!("{:?}", prepared.message(0, &messages[0])).contains("AFTER_PAGE_SECRET"));
+        assert!(matches!(
+            prepared.results.get(&(messages.len() - 1)),
+            Some(std::borrow::Cow::Borrowed("visible"))
+        ));
+        assert!(
+            format!("{:?}", messages[0]).contains("AFTER_PAGE_SECRET"),
+            "raw history remains unchanged"
+        );
+        let work = agent.prepare_checkpoint_projection(&messages, &private, deadline());
+        tokio::pin!(work);
+        tokio::select! {
+            biased;
+            _ = &mut work => panic!("privacy scan must yield"),
+            _ = std::future::ready(()) => {},
+        }
+        tokio::time::advance(std::time::Duration::from_secs(11)).await;
+        assert!(
+            work.await.is_err(),
+            "partial scan cannot authorize any projection"
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_tool_projection_expansion_and_private_token_expansion() {
         for tokens in [false, true] {
             let mut registry = ToolRegistry::new();
             registry.register(Arc::new(ExpandingTool { tokens }));
@@ -276,6 +425,7 @@ mod tests {
             let original = messages.clone();
             let error = agent
                 .checkpoint_projection(&messages, &PrivateTokens::default())
+                .await
                 .expect_err("aggregate bound");
             assert!(
                 error

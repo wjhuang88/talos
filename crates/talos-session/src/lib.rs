@@ -38,9 +38,18 @@ mod diagnostic;
 mod durable;
 mod durable_recovery;
 mod error;
+pub mod history_page;
+pub mod history_projection;
+mod history_receipt;
+pub use history_receipt::{HistoryRecoveryReceipt, RecoveryProjection};
 mod jsonl;
 mod manager;
+mod message_scan;
+pub use message_scan::SessionMessageScan;
 mod pending_submission;
+mod recovery_seal;
+mod recovery_stamp;
+pub use recovery_seal::{RecoveryPrefixExpectation, RecoveryPrefixScan, RecoveryPrefixSeal};
 mod runtime_state;
 mod segment_chain;
 pub mod sqlite;
@@ -62,8 +71,8 @@ pub use artifacts::{
 };
 pub use diagnostic::{ProviderTerminalDiagnostic, ProviderTerminalOutcome, ProviderTerminalSource};
 pub use durable::{
-    DurableHistorySnapshot, DurableSession, DurableTranscriptEntry, PersistencePolicy,
-    SessionCapabilities, TurnCommit,
+    DurableHistoryScan, DurableHistorySnapshot, DurableRecoveryRecord, DurableRecoverySource,
+    DurableSession, DurableTranscriptEntry, PersistencePolicy, SessionCapabilities, TurnCommit,
 };
 pub use error::SessionError;
 pub use manager::{
@@ -94,3 +103,6 @@ pub use types::{Session, SessionBranch, SessionEntry, SessionInfo, SessionMetada
 #[cfg(test)]
 #[allow(warnings)]
 mod tests;
+
+#[cfg(any(unix, windows))]
+pub use durable::{RecoveryScanReceipt, RecoveryScanResume};
