@@ -6521,6 +6521,9 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
         })
         .collect();
     raw.extend([
+        Message::User {
+            content: "Authorization: Bearer originalfact credential sentinel".into(),
+        },
         Message::Assistant {
             content: "public assistant response".into(),
             reasoning: Some(talos_core::message::AssistantReasoning {
@@ -6565,6 +6568,8 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             .expect("serialized persisted evidence");
     assert!(persisted.contains("originalfact hidden input sentinel"));
     assert!(persisted.contains("originalfact unverified output sentinel"));
+    assert!(!persisted.contains("originalfact credential sentinel"));
+    assert!(persisted.contains("[REDACTED]"));
     for marker in [
         "originalfact private reasoning sentinel",
         "originalfact opaque signature sentinel",

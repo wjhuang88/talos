@@ -3433,10 +3433,18 @@ mod tests {
                 reasoning: Some(AssistantReasoning {
                     provider: "fixture".into(),
                     model: "fixture".into(),
-                    blocks: vec![ReasoningBlock::Thinking {
-                        text: "private thought".into(),
-                        signature: Some("opaque signature".into()),
-                    }],
+                    blocks: vec![
+                        ReasoningBlock::Thinking {
+                            text: "private thought\nAuthorization: Bearer reasoning-secret".into(),
+                            signature: Some("opaque signature\napi_key=signature-secret".into()),
+                        },
+                        ReasoningBlock::Redacted {
+                            data: "opaque data\nCookie: redacted-block-secret".into(),
+                        },
+                        ReasoningBlock::Plain {
+                            text: "plain thought\nx-api-key: plain-block-secret".into(),
+                        },
+                    ],
                 }),
             };
             session
@@ -3445,6 +3453,27 @@ mod tests {
             let bytes = session.session().snapshot_bytes().expect("bytes");
             let entry = session.session().read_entries().expect("entries").remove(0);
             assert_eq!(entry.metadata.reasoning.is_some(), persist_reasoning);
+            let serialized = serde_json::to_string(&entry).expect("serialized entry");
+            for secret in [
+                "reasoning-secret",
+                "signature-secret",
+                "redacted-block-secret",
+                "plain-block-secret",
+            ] {
+                assert!(!serialized.contains(secret));
+                assert!(!String::from_utf8_lossy(&bytes).contains(secret));
+            }
+            if persist_reasoning {
+                for preserved in [
+                    "private thought",
+                    "opaque signature",
+                    "opaque data",
+                    "plain thought",
+                ] {
+                    assert!(serialized.contains(preserved));
+                }
+                assert!(serialized.contains("[REDACTED]"));
+            }
             assert!(
                 !session
                     .commit_turn("turn", &[message.clone()], &policy)

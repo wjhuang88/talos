@@ -23,7 +23,17 @@ checks enabled-policy retry conflicts and default-off retry remains idempotent,
 and verifies unchanged transcript bytes. The focused reasoning selection passed
 4/4 (`/private/tmp/i313-reasoning-legacy.log`); this fixture uses the current writer
 with absent metadata, not an archived older-version binary.
-Raw-content metadata, credential-filter composition and final full-candidate
+The persistence roundtrip fixture additionally covers credential-bearing Thinking
+text/signatures, Redacted data and Plain text: secrets are absent from serialized
+entries and raw transcript bytes, non-sensitive lines survive when enabled, and
+reopened metadata equals committed metadata. The focused locked test passed 1/1
+(`/private/tmp/i313-reasoning-credentials.log`). This checks the existing credential
+patterns, not arbitrary secret detection. The actual Actor recovery fixture now
+also commits a credential-bearing User message matching the search query, checks
+its sentinel was removed from persisted entries, and still requires only the one
+public fact in search/detail. That focused locked test passed 1/1
+(`/private/tmp/i313-actor-credentials.log`).
+Raw-content metadata and final full-candidate
 gates remain outstanding. T5 stays Partial.
 
 ## Acceptance convergence audit — 2026-11-03
