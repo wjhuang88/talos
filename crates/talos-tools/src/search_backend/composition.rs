@@ -100,7 +100,7 @@ impl SearchCompositionConfiguration {
             .map_err(SearchCompositionConfigurationError::from)
     }
 
-    fn with_environment_proxy(self) -> Result<Self, TransportError> {
+    pub(crate) fn with_environment_proxy(self) -> Result<Self, TransportError> {
         let proxy = TransportProxy::from_environment(self.scope.endpoints())?;
         self.with_proxy(proxy)
     }
@@ -546,6 +546,19 @@ mod tests {
         TransportLimits::new(Duration::from_secs(5), 5, 1_048_576).expect("limits")
     }
 
+    fn running_candidates(
+        configuration: SearchCompositionConfiguration,
+    ) -> Vec<SearchBackendId> {
+        configuration
+            .prepare("private query", 2, limits())
+            .expect("prepared")
+            .start(Arc::new(RejectAuthority))
+            .candidates()
+            .iter()
+            .map(RunningSearchCandidate::id)
+            .collect()
+    }
+
     #[test]
     fn combined_configuration_identity_is_stable_across_queries() {
         let searxng = SearXngConfiguration::new("https://search.example/prefix/").expect("searxng");
@@ -624,6 +637,20 @@ mod tests {
     }
 
     #[test]
+    fn explicit_tavily_without_fallback_excludes_direct() {
+        let configuration = SearchCompositionConfiguration::selected(
+            SearchBackendSelection::explicit(SearchBackendId::Tavily),
+            Some(TavilyConfiguration::new("fixture-tavily-key").expect("tavily")),
+            None,
+        )
+        .expect("explicit config");
+        assert_eq!(
+            running_candidates(configuration),
+            vec![SearchBackendId::Tavily]
+        );
+    }
+
+    #[test]
     fn explicit_tavily_auto_fallback_is_override_then_direct() {
         let configuration = SearchCompositionConfiguration::selected(
             SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::Tavily),
@@ -631,14 +658,10 @@ mod tests {
             None,
         )
         .expect("explicit config");
-        let prepared = configuration
-            .prepare("private query", 2, limits())
-            .expect("prepared");
-        let running = prepared.start(Arc::new(RejectAuthority));
-
-        assert_eq!(running.candidates().len(), 2);
-        assert_eq!(running.candidates()[0].id(), SearchBackendId::Tavily);
-        assert_eq!(running.candidates()[1].id(), SearchBackendId::DuckDuckGo);
+        assert_eq!(
+            running_candidates(configuration),
+            vec![SearchBackendId::Tavily, SearchBackendId::DuckDuckGo]
+        );
     }
 
     #[test]
@@ -649,13 +672,38 @@ mod tests {
             Some(SearXngConfiguration::new("https://search.example/").expect("searxng")),
         )
         .expect("explicit config");
-        let prepared = configuration
-            .prepare("private query", 2, limits())
-            .expect("prepared");
-        let running = prepared.start(Arc::new(RejectAuthority));
+        assert_eq!(
+            running_candidates(configuration),
+            vec![SearchBackendId::SearXng]
+        );
+    }
 
-        assert_eq!(running.candidates().len(), 1);
-        assert_eq!(running.candidates()[0].id(), SearchBackendId::SearXng);
+    #[test]
+    fn explicit_searxng_auto_fallback_is_override_then_direct() {
+        let configuration = SearchCompositionConfiguration::selected(
+            SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::SearXng),
+            None,
+            Some(SearXngConfiguration::new("https://search.example/").expect("searxng")),
+        )
+        .expect("explicit config");
+        assert_eq!(
+            running_candidates(configuration),
+            vec![SearchBackendId::SearXng, SearchBackendId::DuckDuckGo]
+        );
+    }
+
+    #[test]
+    fn explicit_direct_auto_fallback_does_not_duplicate_candidate() {
+        let configuration = SearchCompositionConfiguration::selected(
+            SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::DuckDuckGo),
+            None,
+            None,
+        )
+        .expect("explicit direct config");
+        assert_eq!(
+            running_candidates(configuration),
+            vec![SearchBackendId::DuckDuckGo]
+        );
     }
 
     #[test]
@@ -696,10 +744,12 @@ mod tests {
                 .prepare("private query", 2, limits())
                 .expect("prepared with shared proxy");
             assert_eq!(prepared.manifest().scope().proxy(), Some(&proxy_endpoint));
-            assert!(prepared
-                .permission_profile()
-                .iter()
-                .any(|facet| format!("{facet:?}").contains("proxy.example")));
+            assert!(
+                prepared
+                    .permission_profile()
+                    .iter()
+                    .any(|facet| facet.resource.as_deref() == Some("proxy.example"))
+            );
             assert!(!format!("{prepared:?}").contains(secret));
             let running = prepared.start(Arc::new(RejectAuthority));
             assert_eq!(

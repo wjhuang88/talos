@@ -77,6 +77,8 @@ pub mod read_image_tool;
 pub mod save_url;
 #[cfg(feature = "network")]
 mod search_backend;
+#[cfg(feature = "network")]
+pub mod search_configuration;
 #[cfg(feature = "search")]
 pub mod search_engine;
 #[cfg(feature = "search")]
@@ -164,6 +166,8 @@ pub use save_url::{SaveUrlError, SaveUrlInput, SaveUrlTool};
 pub use search_backend::integration_test::{
     SearchRouterIntegrationProbe, i293_guarded_search_router_tool_fixture,
 };
+#[cfg(feature = "network")]
+pub use search_configuration::{SearchToolConfiguration, SearchToolConfigurationError};
 #[cfg(feature = "search")]
 pub use search_tools::{GlobInput, GlobTool, GrepInput, GrepTool};
 #[cfg(feature = "file-read")]
