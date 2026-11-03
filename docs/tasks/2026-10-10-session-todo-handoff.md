@@ -7071,3 +7071,13 @@ for logs, discovered defects and validation boundaries. This remains local/unmer
 Partial work: history_search search/detail/pagination, durable branch recovery,
 CLI/Runtime default activation and full gates are not delivered. T5 → T1 → T6
 remain the outstanding queue; the whole goal remains Active.
+## T1 validation execution boundary foundation — 2026-11-03
+
+The shared validation service now runs allowlisted host checks through a bounded
+spawn/wait adapter: stdin is closed, execution is capped at 30 seconds, a timed-out
+child is killed, and stdout/stderr are capped at 16 KiB before evidence recording.
+This is a prerequisite for model-callable validation and does not expose a model
+tool, implement agile read-only summaries, or provide caller cancellation yet.
+Focused validation tests pass 15/15 and conversation all-target warnings-denied
+Clippy passes. T1 remains Partial/Unimplemented until tool registration, permission
+facets, cancellation, discovery, invalid-input and failure evidence are delivered.

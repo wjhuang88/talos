@@ -2,7 +2,8 @@
 
 use std::fmt;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use serde_json::json;
 
@@ -583,11 +584,7 @@ fn run_validation_check(
         };
     };
 
-    match Command::new(program)
-        .args(check.args)
-        .current_dir(workspace)
-        .output()
-    {
+    match run_bounded_host_check(program, check.args, workspace) {
         Ok(output) => {
             let status = if output.status.success() {
                 EvidenceStatus::Passed
@@ -622,6 +619,52 @@ fn run_validation_check(
             stderr_summary: err.to_string(),
         },
     }
+}
+
+const HOST_CHECK_TIMEOUT: Duration = Duration::from_secs(30);
+const HOST_OUTPUT_LIMIT: usize = 16 * 1024;
+
+fn run_bounded_host_check(
+    program: &str,
+    args: &[&str],
+    workspace: &Path,
+) -> std::io::Result<std::process::Output> {
+    let mut child = Command::new(program)
+        .args(args)
+        .current_dir(workspace)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let deadline = Instant::now() + HOST_CHECK_TIMEOUT;
+    loop {
+        if let Some(status) = child.try_wait()? {
+            let output = child.wait_with_output()?;
+            return Ok(std::process::Output {
+                status,
+                stdout: bound_host_output(output.stdout),
+                stderr: bound_host_output(output.stderr),
+            });
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let status = child.wait()?;
+            return Ok(std::process::Output {
+                status,
+                stdout: Vec::new(),
+                stderr: b"validation host command timed out after 30s".to_vec(),
+            });
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn bound_host_output(mut output: Vec<u8>) -> Vec<u8> {
+    if output.len() > HOST_OUTPUT_LIMIT {
+        output.truncate(HOST_OUTPUT_LIMIT);
+        output.extend_from_slice(b"\n[output truncated]");
+    }
+    output
 }
 
 fn run_internal_validation_check(
