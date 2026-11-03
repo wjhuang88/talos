@@ -5389,11 +5389,48 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     struct CheckpointModel {
         step: AtomicUsize,
         recent_tail: std::sync::Mutex<Option<Vec<Message>>>,
+        stable_prefix_hash: std::sync::Mutex<Option<Vec<u8>>>,
     }
     #[async_trait]
     impl LanguageModel for CheckpointModel {
         async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
             let step = self.step.fetch_add(1, Ordering::SeqCst);
+            {
+                use sha2::Digest;
+                let mut prefixes = Vec::new();
+                for message in messages {
+                    if let Message::System {
+                        content,
+                        cache_markers,
+                    } = message
+                    {
+                        for marker in cache_markers {
+                            assert!(marker.length > 0);
+                            prefixes.push(
+                                content
+                                    .get(marker.offset..marker.offset + marker.length)
+                                    .expect("valid provider-visible stable prefix range"),
+                            );
+                        }
+                    }
+                }
+                assert!(
+                    !prefixes.is_empty(),
+                    "actual request must expose a stable prefix"
+                );
+                let hash =
+                    sha2::Sha256::digest(serde_json::to_vec(&prefixes).expect("prefix encoding"))
+                        .to_vec();
+                let mut original = self.stable_prefix_hash.lock().expect("stable prefix hash");
+                if let Some(original) = original.as_ref() {
+                    assert_eq!(
+                        &hash, original,
+                        "checkpoint discovery, Applied A/B and recovery must preserve the stable prefix"
+                    );
+                } else {
+                    *original = Some(hash);
+                }
+            }
             if step == 0 {
                 let start = messages
                     .iter()
@@ -5816,6 +5853,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
         let restarted_model = Arc::new(CheckpointModel {
             step: AtomicUsize::new(8),
             recent_tail: std::sync::Mutex::new(None),
+            stable_prefix_hash: std::sync::Mutex::new(None),
         });
         let verification_calls = Arc::new(AtomicUsize::new(0));
         let mut restarted_agent = Agent::with_security_and_hooks(
@@ -6155,6 +6193,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     let model = Arc::new(CheckpointModel {
         step: AtomicUsize::new(0),
         recent_tail: std::sync::Mutex::new(None),
+        stable_prefix_hash: std::sync::Mutex::new(None),
     });
     let verification_calls = Arc::new(AtomicUsize::new(0));
     let mut agent = Agent::with_security_and_hooks(

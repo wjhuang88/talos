@@ -17,7 +17,7 @@ test increments. Full-candidate review, validation and merge are still required.
 | 14, 15, 18 | Registered Actor fixture performs fresh search/detail after A/B and after independent-process parent/child recovery, comparing original task JSON. Separate old-user-message coverage still needs confirmation; tool-fact evidence alone does not prove row 14. |
 | 16, 17 | Existing branch-scoped index, receipt/privacy and Runtime fork tests are candidate evidence; final Actor delivery-level sibling/session and private-payload assertions remain to map explicitly. |
 | 19, 20 | Actor fixture starts independent recovery processes without projection state and asserts original transcript byte prefix is retained. Export-command behavior still needs its own evidence check. |
-| 21 | Pressure fixture checks unchanged system instructions/tool definitions; exact stable-prefix hash across Applied projection changes still needs explicit verification. |
+| 21 | Pressure fixture checks unchanged system instructions/tool definitions. The actual Actor A/B fixture now hashes the nonempty provider-visible cache-marker content ranges on every request and requires the same SHA-256 through discovery, Applied A/B and recovery. Each restarted model establishes its own baseline; this does not compare hashes across processes or provider HTTP encoding. |
 | 22 | `registered_checkpoint_runtime_bounds_huge_tool_before_provider_continuation` is the actual Runtime huge-result/checkpoint/recovery fixture; see its recorded execution above. |
 | 23 | Actual MEM-007 Actor compression/Applied/restart fixture plus physical index uniqueness/retry fixture. The latter receives prefiltered input and cannot independently prove compression. |
 | 24, 25, 26 | `registered_checkpoint_tools_preserve_automatic_terminal_outcomes` composes registered tools with automatic terminal cases. Confirm one terminal, no over-limit normal dispatch, failure and cancellation assertions before final acceptance. |
@@ -32,8 +32,15 @@ Actual final A/B request estimates were 745735→9607 and 746394→10272; the
 same scenario completed both independent restart processes in 17.11 seconds
 (`/private/tmp/i313-paired-recent-actor.log`). Locked Agent test-target
 warnings-denied Clippy passed (`/private/tmp/i313-paired-recent-clippy.log`).
-Next uncovered assertion target is row 21, followed by delivery-level
-privacy/scope mapping. T5 remains Review/Partial; T1/T6 and the whole queue remain open.
+The subsequent stable-prefix increment passed the same actual Actor scenario
+(1/1, 16.82 seconds, `/private/tmp/i313-stable-prefix-actor.log`). Independent
+static review approved scoped diff
+`cd3172058dd1bdfab48406c3de6750d330d7aae6df5feaa7db9307c08639e64b`
+on `d3024bdba687d7369fec5a5cc4537b8172c22b27`; reviewer did not run tests.
+Marker offsets/types, dynamic system suffixes and tool schemas are not part of
+this hash; pressure transitions use the separate request-plan fixture above.
+Next work is delivery-level privacy/scope and natural-boundary mapping, then
+stable-candidate convergence. T5 remains Review/Partial; T1/T6 and the whole queue remain open.
 
 ## Filtered-result busy/cancellation recovery — 2026-11-03
 
