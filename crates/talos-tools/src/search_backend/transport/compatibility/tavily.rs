@@ -328,7 +328,10 @@ mod tests {
         .expect("fixture");
         let rows = parse(TransportResponse { status: 200, body }).expect("parsed");
         assert_eq!(rows.len(), 2);
-        assert!(rows.iter().all(|row| row.backend == SearchBackendId::Tavily));
+        assert!(
+            rows.iter()
+                .all(|row| row.backend == SearchBackendId::Tavily)
+        );
 
         let oversized = serde_json::to_vec(&serde_json::json!({
             "results": (0..=admission::MAX_CANDIDATES)
