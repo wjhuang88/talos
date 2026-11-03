@@ -184,9 +184,8 @@ impl TuiRuntimeBuilder {
         let language_provider_context = loaded_plugins
             .iter()
             .find_map(|(_, _, context)| context.clone());
-        let search = crate::mode_print::search_configuration::project_search_configuration(
-            &runtime_config,
-        )?;
+        let search =
+            crate::mode_print::search_configuration::project_search_configuration(&runtime_config)?;
         let mut registry =
             crate::mode_print::configured_registry::build_tui_tool_registry_with_search(
                 self.workspace_root.clone(),
