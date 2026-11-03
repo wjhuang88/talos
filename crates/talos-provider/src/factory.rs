@@ -239,6 +239,79 @@ mod tests {
     use talos_core::tool::{CapabilityProbe, ProtocolCapabilities};
 
     #[test]
+    fn gemini_factory_preview_preserves_configured_wire_and_masks_credentials() {
+        use talos_config::{GeminiTransportConfig, ModelConfig, ProviderConfig, ReasoningOptions};
+        for profile in [
+            GeminiTransportConfig::AiStudio,
+            GeminiTransportConfig::Vertex {
+                project: "fixture-project".into(),
+                location: "global".into(),
+                allow_metadata: false,
+            },
+        ] {
+            let vertex = matches!(&profile, GeminiTransportConfig::Vertex { .. });
+            let config = Config {
+                provider: "fixture-google".into(),
+                model: "gemini-2.5-flash".into(),
+                providers: std::collections::HashMap::from([(
+                    "fixture-google".into(),
+                    ProviderConfig {
+                        protocol: ProviderProtocol::GoogleGemini,
+                        gemini: Some(profile),
+                        api_key: (!vertex).then(|| "private-fixture-key".into()),
+                        models: std::collections::HashMap::from([(
+                            "gemini-2.5-flash".into(),
+                            ModelConfig {
+                                output_limit: Some(2048),
+                                reasoning_supported: Some(true),
+                                reasoning: Some(ReasoningOptions {
+                                    budget_tokens: Some(1024),
+                                    ..Default::default()
+                                }),
+                                ..Default::default()
+                            },
+                        )]),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            };
+            config.validate().expect("explicit profile");
+            let key = config.api_key().expect("host credential admission");
+            let provider = build_configured_provider(&config, &key).expect("host factory");
+            let preview = provider
+                .request_preview(&[talos_core::message::Message::User {
+                    content: "visible prompt".into(),
+                }])
+                .expect("host diagnostic preview");
+            assert!(preview.get("error").is_none(), "{preview}");
+            assert_eq!(preview["body"]["generationConfig"]["maxOutputTokens"], 2048);
+            assert_eq!(
+                preview["body"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
+                1024
+            );
+            assert_eq!(
+                preview["body"]["contents"][0]["parts"][0]["text"],
+                "visible prompt"
+            );
+            let url = preview["url"].as_str().expect("wire URL");
+            if vertex {
+                assert!(url.starts_with("https://aiplatform.googleapis.com/v1/projects/fixture-project/locations/global/"));
+                assert_eq!(preview["headers"]["Authorization"], "Bearer ***");
+                assert!(preview["headers"].get("x-goog-api-key").is_none());
+            } else {
+                assert!(
+                    url.starts_with("https://generativelanguage.googleapis.com/v1beta/models/")
+                );
+                assert_eq!(preview["headers"]["x-goog-api-key"], "***");
+                assert!(preview["headers"].get("Authorization").is_none());
+            }
+            assert!(url.ends_with(":streamGenerateContent?alt=sse"));
+            assert!(!preview.to_string().contains("private-fixture-key"));
+        }
+    }
+
+    #[test]
     fn vertex_factory_defers_isolated_adc_and_never_masks_invalid_explicit_file() {
         let directory = tempfile::tempdir().expect("fixture directory");
         let path = directory.path().join("private-fixture-account.json");
