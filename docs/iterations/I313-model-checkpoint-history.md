@@ -21,6 +21,24 @@ to the existing query contract, without changing production search semantics.
 Full T5 acceptance mapping, final validation/exact-head CI and merge remain open.
 T1/T6 are unimplemented; the full handoff objective remains Active.
 
+## MEM-007 recovery in an independent process — 2026-11-03
+
+The compressed-result recovery fixture now launches its exact test in a separate
+test process after the producer Actor and durable handle are dropped. The child
+receives only the durable directory, session key and persistence-policy setting,
+reopens the store, reconstructs an Actor without the bash producer, and runs real
+history discovery/search/detail calls. The parent requires a child verification
+marker, so an empty test selection cannot pass. Permitted persistence returns the
+single bounded compressed result; denied persistence returns none. This closes
+the prior same-process-only limitation for this MEM-007 scenario. It does not prove
+SQLite physical-index uniqueness or general fork/sibling isolation.
+
+Focused locked test passed for both persistence settings and the normal child-test
+entry (`cargo test --locked -p talos-agent --lib mem007_actor_compression --
+--nocapture`, 2 passed). The complete checkpoint-acceptance group, all-target
+Clippy, independent review and new exact-head CI remain required before publication
+or broader T5 claims. Full T5 acceptance remains Partial; T1/T6 are unimplemented.
+
 ## MEM-007 Applied composition correction — 2026-11-03
 
 The local correction to `mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reopen`

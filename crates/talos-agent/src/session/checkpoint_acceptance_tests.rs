@@ -871,11 +871,63 @@ async fn mem007_actor_compression_keeps_one_durable_source_and_receipt_after_reo
         if permit {
             assert_eq!(compressed_receipts[0].2, compressed.trim_end_matches('\n'));
         }
-        assert_compressed_history_recovery(root.path(), reopened, permit, compressed).await;
+        drop(reopened);
+        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .args([
+                "--exact",
+                "session::tests::checkpoint_acceptance::mem007_actor_compression_process_restart_child",
+                "--nocapture",
+            ])
+            .env("TALOS_TEST_MEM007_RESTART_ROOT", root.path())
+            .env("TALOS_TEST_MEM007_RESTART_KEY", &key)
+            .env("TALOS_TEST_MEM007_RESTART_PERMIT", permit.to_string())
+            .output()
+            .expect("launch independent Actor recovery process");
+        assert!(
+            output.status.success(),
+            "child failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout)
+                .contains("TALOS_MEM007_PROCESS_RECOVERY_VERIFIED"),
+            "child must execute recovery rather than pass an empty test selection"
+        );
     }
 }
 
-// Reconstruct the execution owner and registry; no process-local producer receipt survives.
+#[tokio::test]
+async fn mem007_actor_compression_process_restart_child() {
+    let (Some(root), Some(key), Some(permit)) = (
+        std::env::var_os("TALOS_TEST_MEM007_RESTART_ROOT"),
+        std::env::var_os("TALOS_TEST_MEM007_RESTART_KEY"),
+        std::env::var_os("TALOS_TEST_MEM007_RESTART_PERMIT"),
+    ) else {
+        return;
+    };
+    let root = std::path::PathBuf::from(root);
+    let key = key.to_string_lossy().into_owned();
+    let permit = permit.to_string_lossy() == "true";
+    let durable = talos_session::DurableSession::open_existing(&root, &key)
+        .expect("open after process restart")
+        .expect("durable source exists");
+    let compressed = durable
+        .read_messages()
+        .expect("read source history")
+        .into_iter()
+        .find_map(|message| match message {
+            Message::Tool { result } if result.tool_use_id == "compressed-shell" => {
+                Some(result.content)
+            }
+            _ => None,
+        })
+        .expect("compressed tool result");
+    assert_compressed_history_recovery(&root, durable, permit, compressed).await;
+    println!("TALOS_MEM007_PROCESS_RECOVERY_VERIFIED");
+}
+
+// Reconstruct the execution owner and registry; no process-local receipt survives.
 async fn assert_compressed_history_recovery(
     root: &std::path::Path,
     durable: talos_session::DurableSession,

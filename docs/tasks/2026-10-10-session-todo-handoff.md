@@ -1,3 +1,15 @@
+## MEM-007 independent-process recovery regression — 2026-11-03
+
+The compressed-result recovery test now runs its discovery/search/detail Actor in a
+separate test process after the producer Actor is dropped. The child receives only
+durable location, session key and persistence policy; the parent checks an explicit
+child verification marker. Both persistence-allowed and denied cases pass in the
+focused locked test. This removes the prior same-process-only limitation for this
+scenario, but does not prove SQLite physical-index uniqueness or general fork
+isolation. T5 remains Partial; full acceptance, independent review, exact-head CI
+and merge are outstanding. T1/T6 and the rest of the ordered queue remain active.
+See `docs/iterations/I313-model-checkpoint-history.md` for implementation detail.
+
 ## MEM-007 model recovery after reopen — 2026-11-03
 
 I313 Applied correction `06a1f29e6` is pushed to #837. A subsequent local increment
