@@ -41,9 +41,7 @@ pub(crate) fn project_search_configuration(config: &Config) -> Result<SearchTool
                 .url
                 .as_deref()
                 .filter(|value| !value.is_empty())
-                .ok_or_else(|| {
-                    anyhow::anyhow!("explicit SearXNG search requires search.url")
-                })?;
+                .ok_or_else(|| anyhow::anyhow!("explicit SearXNG search requires search.url"))?;
             Ok(SearchToolConfiguration::SearXng {
                 url: url.to_owned(),
                 fallback_to_auto: config.search.fallback_to_auto,
