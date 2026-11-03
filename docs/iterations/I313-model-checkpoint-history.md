@@ -38,6 +38,13 @@ gates remain outstanding. T5 stays Partial.
 
 ## Acceptance convergence audit — 2026-11-03
 
+Export/emergency increment: full registered Actor A/B/restart scenario passed 1/1
+with JSON/Markdown export preservation assertions (17.60 seconds,
+`/private/tmp/i313-checkpoint-export.log`). The registered automatic-terminal
+scenario passed 1/1 covering five outcomes with exactly one summary attempt each
+(`/private/tmp/i313-emergency-single-attempt.log`). These are deterministic service
+and Actor fixtures; they do not constitute CLI export-command or live-model evidence.
+
 Old-user recovery increment: the complete registered Actor scenario passed 1/1,
 including two Applied checkpoints and two independent restart processes
 (`/private/tmp/i313-old-user-checkpoint-final.log`, 18.35 seconds). Agent test-target
@@ -65,11 +72,11 @@ test increments. Full-candidate review, validation and merge are still required.
 | 14, 15, 18 | Registered Actor fixture performs fresh search/detail after A/B and after independent-process parent/child recovery, comparing original task JSON. It now submits an old User constraint through the producer Actor, asserts that constraint is absent from the Applied B request, then recovers its exact original text via search and the returned detail reference in all three runs. |
 | 16 | `runtime_recovers_original_history_after_reopen` exercises registered Runtime search/detail with parent/sibling suffixes and an unrelated session containing 64 matching messages in the same storage root. Ordinary reopen and independent-process fork recovery return exactly the original tool fact; unrelated transcript bytes stay unchanged. This fixture is Unix-only and does not prewarm foreign recovery indexes or forge references. |
 | 17 | `durable_actor_history_search_and_detail_reach_real_provider_continuation` now persists matching hidden tool arguments and an unverified tool result, asserts both really exist on disk, and requires actual search/detail to return only the allowed User fact. This Unix fixture proves recovery projection exclusion, not removal from the original provider history. Reasoning signatures/raw-content/credentials and forged-reference delivery remain to map explicitly. |
-| 19, 20 | Actor fixture starts independent recovery processes without projection state and asserts original transcript byte prefix is retained. Export-command behavior still needs its own evidence check. |
+| 19, 20 | Actor fixture starts independent recovery processes without projection state and asserts original transcript byte prefix is retained. After Applied A/B, JSON export preserves the complete original entry prefix including metadata/timestamps; Markdown preserves its original prefix and old user/tool facts. The export service is exercised against actual durable entries, not a CLI export command. |
 | 21 | Pressure fixture checks unchanged system instructions/tool definitions. The actual Actor A/B fixture now hashes the nonempty provider-visible cache-marker content ranges on every request and requires the same SHA-256 through discovery, Applied A/B and recovery. Each restarted model establishes its own baseline; this does not compare hashes across processes or provider HTTP encoding. |
 | 22 | `registered_checkpoint_runtime_bounds_huge_tool_before_provider_continuation` is the actual Runtime huge-result/checkpoint/recovery fixture; see its recorded execution above. |
 | 23 | Actual MEM-007 Actor compression/Applied/restart fixture plus physical index uniqueness/retry fixture. The latter receives prefiltered input and cannot independently prove compression. |
-| 24, 25, 26 | `registered_checkpoint_tools_preserve_automatic_terminal_outcomes` composes registered tools with automatic terminal cases. Confirm one terminal, no over-limit normal dispatch, failure and cancellation assertions before final acceptance. |
+| 24, 25, 26 | `registered_checkpoint_tools_preserve_automatic_terminal_outcomes` exercises Applied, invalid summary, over-limit failure, transport failure and interrupt during a blocked provider. Each asserts exactly one summary attempt, one Started and one terminal event, unchanged raw history, no projection on failure/cancel, and zero ordinary requests for over-limit failure/transport failure/cancellation. |
 | 27, 28 | Real CLI model-switch wire fixture is recorded above; request-plan fixture varies capacity and output reserve. Reasoning-reserve composition still needs explicit evidence mapping. |
 | 29 | Durable Actor fork/restart and Session multipage/rebuild regressions exist. Enumerate supported TLOG/JSONL host paths and Windows saved-scan limitations before closure. |
 | 30 | Actor research run records A/B token counts, recovery calls, actual local verification and no repeated failed/completed work; Runtime coding fixture changes a real artifact. These are deterministic scenarios, not live-model quality measurements. |

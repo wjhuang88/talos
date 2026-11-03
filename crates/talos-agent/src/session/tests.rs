@@ -5188,9 +5188,10 @@ async fn exercise_automatic_checkpoint_terminal_outcomes(model_tools: bool) {
             }
             _ => panic!("unexpected outcome: {outcome}, {states:?}"),
         }
-        assert!(
-            model.summaries.load(Ordering::SeqCst) > 0,
-            "{outcome}: must exercise the actual summary provider boundary"
+        assert_eq!(
+            model.summaries.load(Ordering::SeqCst),
+            1,
+            "{outcome}: one emergency summary attempt, without retry loops"
         );
         assert_eq!(
             model.ordinary.load(Ordering::SeqCst),
@@ -6258,6 +6259,15 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
 
     let raw = durable.read_messages().expect("actual persisted tool turn");
     let original_bytes = std::fs::read(durable.file_path()).expect("original transcript");
+    let original_entries = durable
+        .session()
+        .read_entries()
+        .expect("original export source");
+    let original_export: serde_json::Value = serde_json::from_str(
+        &talos_session::export_json(&original_entries).expect("original JSON export"),
+    )
+    .expect("original export JSON");
+    let original_markdown = talos_session::export_markdown(&original_entries);
     let model = Arc::new(CheckpointModel {
         step: AtomicUsize::new(0),
         recent_tail: std::sync::Mutex::new(None),
@@ -6390,6 +6400,30 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     assert!(
         persisted.starts_with(&original_bytes),
         "checkpoint must not rewrite the original transcript"
+    );
+    let exported_entries = durable
+        .session()
+        .read_entries()
+        .expect("post-checkpoint export source");
+    let exported: serde_json::Value = serde_json::from_str(
+        &talos_session::export_json(&exported_entries).expect("post-checkpoint JSON export"),
+    )
+    .expect("export JSON");
+    let original_export = original_export.as_array().expect("original entries");
+    assert_eq!(
+        &exported.as_array().expect("exported entries")[..original_export.len()],
+        original_export.as_slice(),
+        "JSON export must retain every original role/content/timestamp/metadata entry"
+    );
+    let markdown = talos_session::export_markdown(&exported_entries);
+    assert!(markdown.starts_with(original_markdown.trim_end_matches('\n')));
+    assert!(markdown.contains("userconstraintfact report must use metric units"));
+    assert!(markdown.contains("omittedfact original constraint"));
+    assert!(
+        !exported_entries.iter().any(|entry| entry
+            .content
+            .starts_with("[Derived checkpoint; source history remains authoritative]")),
+        "derived provider projection must not replace exported source entries"
     );
     let tool_calls: Vec<_> = actor
         .history
