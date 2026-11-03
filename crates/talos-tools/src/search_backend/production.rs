@@ -21,9 +21,7 @@ use super::composition::SearchCompositionConfiguration;
 use super::router::SearchRouterPolicy;
 use super::router_tool::GuardedSearchRouterTool;
 use super::selection::SearchBackendSelection;
-use super::transport::compatibility::{
-    searxng::SearXngConfiguration, tavily::TavilyConfiguration,
-};
+use super::transport::compatibility::{searxng::SearXngConfiguration, tavily::TavilyConfiguration};
 use super::transport::{TransportError, TransportLimits};
 
 // Legacy zero-key compatibility first performs parallel query-free DDG/Bing reachability probes:

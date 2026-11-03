@@ -164,10 +164,11 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
     let search = crate::mode_print::search_configuration::project_search_configuration(&config)?;
-    let mut registry = crate::mode_print::configured_registry::build_print_tool_registry_with_search(
-        Vec::new(),
-        search,
-    )?;
+    let mut registry =
+        crate::mode_print::configured_registry::build_print_tool_registry_with_search(
+            Vec::new(),
+            search,
+        )?;
     let sched_pending = crate::registry::register_builtin_scheduler(&mut registry)?;
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
@@ -875,18 +876,11 @@ pub(crate) fn dashboard_failure_tip(message: &str) -> UiOutput {
 }
 
 pub(crate) async fn run_mcp_server() -> Result<()> {
-    let config_for_logging = Config::load().ok();
-    init_logger(
-        config_for_logging.as_ref().map(|config| &config.log),
-        false,
-        None,
-    );
+    let config_for_logging = Config::load().context("failed to load configuration")?;
+    init_logger(Some(&config_for_logging.log), false, None);
 
-    let search = config_for_logging
-        .as_ref()
-        .map(crate::mode_print::search_configuration::project_search_configuration)
-        .transpose()?
-        .unwrap_or(talos_tools::SearchToolConfiguration::Auto);
+    let search =
+        crate::mode_print::search_configuration::project_search_configuration(&config_for_logging)?;
     let tool_registry = Arc::new(
         crate::mode_print::configured_registry::build_mcp_tool_registry_with_search(search)?,
     );

@@ -103,8 +103,6 @@ pub use browser_page::HttpBrowserPageConnector;
 pub use browser_page::{
     BrowserPageConnector, BrowserPageLink, BrowserPageRecord, MockBrowserPageConnector,
 };
-#[cfg(feature = "network")]
-pub use contributions::{network_tool_contributions, network_tool_contributions_with_search};
 #[cfg(feature = "image")]
 pub use contributions::read_image_tool_contribution;
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
@@ -120,6 +118,8 @@ pub use contributions::workspace_tool_contributions;
 pub use contributions::{bash_tool_contribution, shell_tool_contributions};
 #[cfg(feature = "git")]
 pub use contributions::{git_mutation_tool_contributions, git_read_tool_contributions};
+#[cfg(feature = "network")]
+pub use contributions::{network_tool_contributions, network_tool_contributions_with_search};
 #[cfg(all(feature = "file-read", feature = "file-write"))]
 pub use contributions::{
     ordinary_file_tool_contributions, snapshot_aware_file_tool_contributions,

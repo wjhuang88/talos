@@ -75,7 +75,10 @@ mod tests {
 
     #[test]
     fn default_is_zero_key_auto() {
-        assert_eq!(SearchToolConfiguration::default(), SearchToolConfiguration::Auto);
+        assert_eq!(
+            SearchToolConfiguration::default(),
+            SearchToolConfiguration::Auto
+        );
     }
 
     #[test]

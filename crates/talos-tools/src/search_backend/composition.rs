@@ -546,9 +546,7 @@ mod tests {
         TransportLimits::new(Duration::from_secs(5), 5, 1_048_576).expect("limits")
     }
 
-    fn running_candidates(
-        configuration: SearchCompositionConfiguration,
-    ) -> Vec<SearchBackendId> {
+    fn running_candidates(configuration: SearchCompositionConfiguration) -> Vec<SearchBackendId> {
         configuration
             .prepare("private query", 2, limits())
             .expect("prepared")

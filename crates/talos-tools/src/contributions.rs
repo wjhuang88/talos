@@ -32,9 +32,7 @@ use crate::{BashTool, ExecTool};
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
 use crate::{DiffTool, StatTool};
 #[cfg(feature = "network")]
-use crate::{
-    FetchUrlTool, HttpRequestTool, SearchToolConfiguration, SearchToolConfigurationError,
-};
+use crate::{FetchUrlTool, HttpRequestTool, SearchToolConfiguration, SearchToolConfigurationError};
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
 use crate::{GlobTool, GrepTool};
 
@@ -422,11 +420,12 @@ mod tests {
 
     #[test]
     fn explicit_network_group_preserves_inventory_source_and_prepared_search() {
-        let contributions = network_tool_contributions_with_search(SearchToolConfiguration::Tavily {
-            api_key: "fixture-tavily-key".into(),
-            fallback_to_auto: true,
-        })
-        .expect("configured network group");
+        let contributions =
+            network_tool_contributions_with_search(SearchToolConfiguration::Tavily {
+                api_key: "fixture-tavily-key".into(),
+                fallback_to_auto: true,
+            })
+            .expect("configured network group");
 
         assert_eq!(
             names(&contributions),
