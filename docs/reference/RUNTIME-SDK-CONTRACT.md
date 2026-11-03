@@ -629,14 +629,17 @@ again; this is not protection against modification of the trusted host database.
 `DurableSession` root branch IDs are now stable for a durable UUID; discard cached
 random root IDs from earlier opens, while retaining original transcript/entry IDs.
 The opaque scan receipt permits exact-record cleanup only for its issuing handle;
-it does not authorize history queries. The Windows implementation candidate
+it does not authorize history queries. The Windows implementation
 restores saved progress only after bounded content revalidation under a new retained
 lease. Metadata equality cannot certify unchanged content across released leases:
 native testing observed a same-length overwrite with identical version fields.
 Restoration rereads the saved prefix; each step stays bounded but restart does not
 skip that I/O. Until verification finishes, no saved progress grants query authority.
-Test-only native CI passed; production-hook native validation and full I313
-acceptance remain outstanding. Cancellation cleanup is bounded best effort; a
+I313 production-hook native Windows validation and full acceptance passed at
+implementation `322574bc9707492ea6e9d5232794f73e687071d9` (PR #837), with
+exact-head CI `41608342151` and independent API/privacy/storage/security review.
+These are deterministic regressions, not live-model quality probes.
+Cancellation cleanup is bounded best effort; a
 persistent bindings-store failure may retain a receipt and emit a warning.
 
 Unix and Windows durable hosts can call `RuntimeHandle::fork_durable(external_id)` at an idle
@@ -648,11 +651,12 @@ shutdown and dropping the receipt request cooperative cancellation; publication
 may win that race, so reconcile the target identity before retrying. Kernel I/O
 has no hard abort guarantee. Startup performs bounded intent recovery; unresolved
 intents are retained and reported, and lock files intentionally remain. The Windows
-implementation candidate uses local-volume checks, write-through file creation and
+implementation uses local-volume checks, write-through file creation and
 file flush before publication. It does not provide directory fsync or promise
 Unix-equivalent namespace durability after power loss. Native Windows crash,
-lock/cancellation and Actor fork/reopen tests passed on candidate `5a80fe914`
-(run `41403698582`); remaining platform acceptance and full merge gates are open.
+lock/cancellation and Actor fork/reopen tests passed in final exact-head run
+`41608342151` before PR #837 merged as `322574bc9707492ea6e9d5232794f73e687071d9`.
+Earlier candidate `5a80fe914` / run `41403698582` is historical evidence.
 
 Exhaustive consumers must handle additive `SessionOp::ForkDurable` and
 `SubmissionRejectionReason::SessionBusy` in the next minor migration (ADR-096).
@@ -660,7 +664,7 @@ ForkDurable requires an in-process receipt channel; serialized wire requests are
 unsupported and emit an error. SessionBusy is a temporary refusal, not closure.
 
 
-### CLI startup history restoration (I313 candidate)
+### CLI startup history restoration (I313)
 
 TUI, interactive and inline startup restore Session messages using bounded pages
 on blocking workers. Ctrl-C cancels startup; corrupt/unavailable persisted history

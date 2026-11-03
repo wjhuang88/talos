@@ -4,9 +4,32 @@
 |-------|-------|
 | Story ID | MEM-005 |
 | Priority | P2 |
-| Status | In Progress / Partial (T4 complete via I312; T5 proposed in I313) |
+| Status | Complete (T4 I312 and T5 I313 merged acceptance) |
 | Depends On | MEM-002; MEM-003 for full LLM layers |
 | Origin | User feedback 2026-06-18 — context compaction needs explicit trigger and runtime logic |
+
+## T5 merged acceptance — 2026-11-03
+
+Completion Commit: `322574bc9707492ea6e9d5232794f73e687071d9` (PR #837).
+Exact head `e235c8ddedd4c82e133314eff1b7a09387881e43` passed all eight checks
+in CI `41608342151`, including native Windows workspace/Desktop, Linux Desktop
+and primary preflight. Local standard preflight passed workspace checks,
+warnings-denied Clippy, tests and both external Runtime SDK modes; log:
+`/private/tmp/i313-stage-final-preflight.log`. Both governance validators passed
+with zero warnings.
+
+Independent Agent API/privacy/storage/security review audited all 30 published
+rows and additional contracts against actual source/assertions:
+[APPROVE](https://github.com/wjhuang88/talos/pull/837#issuecomment-6599740642).
+Reviewer did not run builds. Exact head/base and ownership were checked in
+[CAS](https://github.com/wjhuang88/talos/pull/837#issuecomment-6600154234).
+T5 is Complete; earlier Partial/local/pending snapshots are preserved history.
+
+Deterministic fixtures do not prove live-model quality. Legacy CLI storage does
+not mint durable tool authority; Windows saved-prefix resume rereads source bytes.
+Export evidence is service-level. Recovery privacy does not imply removal from
+original provider history or arbitrary secret detection. T1/T6 remain unimplemented;
+the full handoff remains Active with its original queue intact.
 
 ## Merged T4 acceptance and remaining T5 — 2026-11-01
 
