@@ -114,9 +114,9 @@ impl SearchCompositionConfiguration {
         let mut scopes = Vec::with_capacity(candidate_order.len());
         for backend in &candidate_order {
             let scope = match backend {
-                SearchBackendId::DuckDuckGo => direct
-                    .as_ref()
-                    .map(DirectCompatibilityConfiguration::scope),
+                SearchBackendId::DuckDuckGo => {
+                    direct.as_ref().map(DirectCompatibilityConfiguration::scope)
+                }
                 SearchBackendId::Tavily => tavily.as_ref().map(TavilyConfiguration::scope),
                 SearchBackendId::SearXng => searxng.as_ref().map(SearXngConfiguration::scope),
                 SearchBackendId::Wikipedia => None,
@@ -152,20 +152,16 @@ impl SearchCompositionConfiguration {
         for backend in &self.candidate_order {
             match backend {
                 SearchBackendId::DuckDuckGo => {
-                    let configuration = self
-                        .direct
-                        .as_ref()
-                        .ok_or(TransportError::InvalidRequest)?;
+                    let configuration =
+                        self.direct.as_ref().ok_or(TransportError::InvalidRequest)?;
                     let prepared =
                         configuration.prepare_with_manifest(&manifest, query, max_results)?;
                     freeze_facets(&mut facets, prepared.permission_profile())?;
                     candidates.push(PreparedSearchCandidate::Direct(Box::new(prepared)));
                 }
                 SearchBackendId::Tavily => {
-                    let configuration = self
-                        .tavily
-                        .as_ref()
-                        .ok_or(TransportError::InvalidRequest)?;
+                    let configuration =
+                        self.tavily.as_ref().ok_or(TransportError::InvalidRequest)?;
                     let prepared =
                         configuration.prepare_with_manifest(&manifest, query, max_results)?;
                     freeze_facets(&mut facets, prepared.permission_profile())?;
