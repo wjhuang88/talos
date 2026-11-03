@@ -1,3 +1,18 @@
+## Filtered-result busy/cancellation recovery — 2026-11-03
+
+The index fixture now holds a real independent SQLite writer lock and requires
+maintenance to fail specifically with `database is locked`, leaving its cursor
+unchanged. After releasing the lock, a pre-cancelled budget also refuses without
+cursor advance. Reopening and completing maintenance then retains the existing
+one-source/one-projection/one-location assertions and unchanged raw transcript.
+The final strengthened locked Session regression passed (1/1); format/diff checks
+passed. Independent static review approved scoped diff
+`a0ac9080b0a4fac355c2a67305084d4315648c93ca7906108088d0793e771f93`
+on baseline `e817f3f5086d841b2a6e4b513d8a1111508a8f17`, without running tests.
+This covers busy before first write and cancellation before invocation, not
+mid-write rollback, in-flight cancellation, crash or all concurrent/multipage
+scenarios. T5 remains Review/Partial; fresh candidate CI and merge remain open.
+
 ## Filtered-result index retry evidence — 2026-11-03
 
 Local T5 tests now directly check one source row, one matching FTS projection and

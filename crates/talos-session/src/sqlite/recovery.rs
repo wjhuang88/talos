@@ -1117,6 +1117,40 @@ mod tests {
             )
             .expect("begin");
         }
+        {
+            let mut host = SessionIndex::new(&path).expect("retry host");
+            let budget = RecoveryWorkBudget::new(Duration::from_secs(10));
+            let before = host
+                .recovery_build_cursor("scope", &budget)
+                .expect("cursor");
+            let blocker = rusqlite::Connection::open(&path).expect("independent connection");
+            blocker
+                .execute_batch("BEGIN IMMEDIATE")
+                .expect("hold writer lock");
+            let busy = host
+                .maintain_recovery_source("scope", &source, &budget)
+                .expect_err("writer lock must prevent maintenance");
+            assert!(busy.to_string().contains("database is locked"), "{busy}");
+            assert_eq!(
+                host.recovery_build_cursor("scope", &budget)
+                    .expect("unchanged cursor"),
+                before
+            );
+            blocker
+                .execute_batch("ROLLBACK")
+                .expect("release writer lock");
+            let cancelled = RecoveryWorkBudget::new(Duration::from_secs(10));
+            cancelled.cancel();
+            assert!(
+                host.maintain_recovery_source("scope", &source, &cancelled)
+                    .is_err()
+            );
+            assert_eq!(
+                host.recovery_build_cursor("scope", &budget)
+                    .expect("cancelled cursor"),
+                before
+            );
+        }
         for _ in 0..3 {
             let mut host = SessionIndex::new(&path).expect("reopen index");
             let budget = RecoveryWorkBudget::new(Duration::from_secs(10));
