@@ -35,8 +35,10 @@ SQLite physical-index uniqueness or general fork/sibling isolation.
 
 Focused locked test passed for both persistence settings and the normal child-test
 entry (`cargo test --locked -p talos-agent --lib mem007_actor_compression --
---nocapture`, 2 passed). The complete checkpoint-acceptance group, all-target
-Clippy, independent review and new exact-head CI remain required before publication
+--nocapture`, 2 passed). The complete `checkpoint_acceptance` group also passed
+6/6 with the independent child process (`cargo test --locked -p talos-agent --lib
+checkpoint_acceptance -- --nocapture`). All-target Clippy, independent review and
+new exact-head CI remain required before publication
 or broader T5 claims. Full T5 acceptance remains Partial; T1/T6 are unimplemented.
 
 ## MEM-007 Applied composition correction — 2026-11-03

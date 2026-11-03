@@ -4,7 +4,7 @@ The compressed-result recovery test now runs its discovery/search/detail Actor i
 separate test process after the producer Actor is dropped. The child receives only
 durable location, session key and persistence policy; the parent checks an explicit
 child verification marker. Both persistence-allowed and denied cases pass in the
-focused locked test. This removes the prior same-process-only limitation for this
+focused locked test; the complete `checkpoint_acceptance` group passes 6/6. This removes the prior same-process-only limitation for this
 scenario, but does not prove SQLite physical-index uniqueness or general fork
 isolation. T5 remains Partial; full acceptance, independent review, exact-head CI
 and merge are outstanding. T1/T6 and the rest of the ordered queue remain active.
