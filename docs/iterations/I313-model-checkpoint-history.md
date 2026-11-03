@@ -38,6 +38,16 @@ gates remain outstanding. T5 stays Partial.
 
 ## Acceptance convergence audit — 2026-11-03
 
+Old-user recovery increment: the complete registered Actor scenario passed 1/1,
+including two Applied checkpoints and two independent restart processes
+(`/private/tmp/i313-old-user-checkpoint-final.log`, 18.35 seconds). Agent test-target
+locked warnings-denied Clippy passed (`/private/tmp/i313-old-user-clippy.log`).
+The first attempt retained the old five-call expectation despite adding two calls;
+the next exposed that persisted recovery tool outputs also match the keyword after
+restart. The final assertion selects exactly one original-text match and follows
+its returned reference; it does not claim the entire result set has one hit.
+Full-candidate independent review, CI and merge remain pending.
+
 This execution map supplements, and does not replace, the published 30-row
 allocation below. A located regression is not a completion verdict. PR #837's
 successful run `41579196634` certifies `7f3a184e4`, not the subsequent local
@@ -52,7 +62,7 @@ test increments. Full-candidate review, validation and merge are still required.
 | 7, 8 | The registered Actor A/B fixture now compares each provider-visible checkpoint with typed canonical rendering and repeats rendering after pretty-JSON roundtrip. Final focused run passed 1/1 in `/private/tmp/i313-canonical-actor.log`. This is current-version fixture coverage, not arbitrary-version equivalence. |
 | 9, 10 | Runtime coding fixtures include oversized-checkpoint refusal and `registered_checkpoint_rejects_insufficient_reclaim_preserving_installed_projection`; audit unchanged-projection assertions against both initial and replacement cases. |
 | 11, 12, 13 | Actor A/B fixture checks task-state fields, separates facts/assumptions, performs pending verification once and records source/missing-source operations exactly once. The final run reports collection=1, verification=1, known-failed attempts=1. |
-| 14, 15, 18 | Registered Actor fixture performs fresh search/detail after A/B and after independent-process parent/child recovery, comparing original task JSON. Separate old-user-message coverage still needs confirmation; tool-fact evidence alone does not prove row 14. |
+| 14, 15, 18 | Registered Actor fixture performs fresh search/detail after A/B and after independent-process parent/child recovery, comparing original task JSON. It now submits an old User constraint through the producer Actor, asserts that constraint is absent from the Applied B request, then recovers its exact original text via search and the returned detail reference in all three runs. |
 | 16 | `runtime_recovers_original_history_after_reopen` exercises registered Runtime search/detail with parent/sibling suffixes and an unrelated session containing 64 matching messages in the same storage root. Ordinary reopen and independent-process fork recovery return exactly the original tool fact; unrelated transcript bytes stay unchanged. This fixture is Unix-only and does not prewarm foreign recovery indexes or forge references. |
 | 17 | `durable_actor_history_search_and_detail_reach_real_provider_continuation` now persists matching hidden tool arguments and an unverified tool result, asserts both really exist on disk, and requires actual search/detail to return only the allowed User fact. This Unix fixture proves recovery projection exclusion, not removal from the original provider history. Reasoning signatures/raw-content/credentials and forged-reference delivery remain to map explicitly. |
 | 19, 20 | Actor fixture starts independent recovery processes without projection state and asserts original transcript byte prefix is retained. Export-command behavior still needs its own evidence check. |

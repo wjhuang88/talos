@@ -5616,6 +5616,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                         let request = serde_json::to_string(messages).expect("request B");
                         assert!(request.contains("SECOND_CHECKPOINT"));
                         assert!(!request.contains("omittedfact original constraint"));
+                        assert!(
+                            !request.contains("userconstraintfact"),
+                            "old user fact must be covered before recovery"
+                        );
                         let applied = messages.iter().any(|message| match message {
                             Message::Multimodal { parts } => parts.iter().any(|part| match part {
                                 talos_core::message::ContentPart::Text { text } => {
@@ -5677,6 +5681,15 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                     vec![
                         AgentEvent::ToolCall {
                             call: talos_core::message::ToolCall {
+                                id: format!("recover-user-{step}"),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"userconstraintfact"}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
                                 id: (if step >= 8 {
                                     "recover-omitted-reopened"
                                 } else {
@@ -5696,6 +5709,33 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                     ]
                 }
                 6 | 10 => {
+                    let user_result = messages
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Tool { result }
+                                if result.tool_use_id == format!("recover-user-{}", step - 1) =>
+                            {
+                                Some(result)
+                            }
+                            _ => None,
+                        })
+                        .expect("old user search result");
+                    assert!(!user_result.is_error, "{}", user_result.content);
+                    let user_found: serde_json::Value =
+                        serde_json::from_str(&user_result.content).expect("user search JSON");
+                    // After restart, prior search/detail outputs are also valid
+                    // persisted tool facts. Select the original message, not an
+                    // embedded copy in their JSON output.
+                    let original_user_hits: Vec<_> = user_found["results"]
+                        .as_array()
+                        .expect("user hits")
+                        .iter()
+                        .filter(|hit| {
+                            hit["text"] == "userconstraintfact report must use metric units"
+                        })
+                        .collect();
+                    assert_eq!(original_user_hits.len(), 1);
                     let result = messages
                         .iter()
                         .rev()
@@ -5742,6 +5782,15 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                     vec![
                         AgentEvent::ToolCall {
                             call: talos_core::message::ToolCall {
+                                id: format!("detail-user-{step}"),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"detail", "snapshot":discovery["snapshot"], "reference":original_user_hits[0]["reference"]}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
                                 id: (if step >= 8 {
                                     "detail-omitted-reopened"
                                 } else {
@@ -5761,6 +5810,25 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                     ]
                 }
                 7 | 11 => {
+                    let user_result = messages
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Tool { result }
+                                if result.tool_use_id == format!("detail-user-{}", step - 1) =>
+                            {
+                                Some(result)
+                            }
+                            _ => None,
+                        })
+                        .expect("old user detail result");
+                    assert!(!user_result.is_error, "{}", user_result.content);
+                    let user_detail: serde_json::Value =
+                        serde_json::from_str(&user_result.content).expect("user detail JSON");
+                    assert_eq!(
+                        user_detail["text"],
+                        "userconstraintfact report must use metric units"
+                    );
                     let result = messages
                         .iter()
                         .rev()
@@ -6163,7 +6231,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
     producer_handle
         .sq_tx
         .send(SessionOp::Submit {
-            message: "read the constraint".into(),
+            message: "userconstraintfact report must use metric units".into(),
         })
         .await
         .expect("produce fact");
@@ -6345,7 +6413,7 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             .iter()
             .filter(|name| **name == "history_search")
             .count(),
-        5
+        7
     );
 
     assert_eq!(
