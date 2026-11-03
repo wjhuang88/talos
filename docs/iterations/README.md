@@ -1,3 +1,22 @@
+## T5 completed — 2026-11-03
+
+I313 and MEM-005 are Complete with Completion Commit:
+`322574bc9707492ea6e9d5232794f73e687071d9` (#837). All eight exact-head checks in `41608342151`,
+independent full T5 API/privacy/storage/security review and merge CAS passed.
+Owners preserve fixture/platform/privacy limits. Earlier pending snapshots are
+historical. T1 and T6 remain unimplemented and unactivated.
+Full queue: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+Full handoff remains Active; next is T1's own governed activation.
+
+## T5 stable-stage review — 2026-11-02
+
+I313 is Review/Partial with effective claim #819. Unix Actor/Runtime checkpoint,
+recovery and fork implementation remains unmerged; standard host preflight passed
+including both SDK modes. Native Windows evidence, long-session live compaction
+binding and remaining acceptance are open. First four queue stages are merged;
+T1/T6 remain unimplemented. See I313 owner for evidence and limitations; historical
+activation-proposal snapshots below do not override current owner truth.
+
 ## T4 merged; T5 activation proposal — 2026-11-01
 
 I312 is Complete/Closed with Completion Commit:

@@ -180,13 +180,37 @@ fn verify_compact_outcome_contract() -> Result<()> {
 }
 
 async fn run_durable_session() -> Result<()> {
+    struct RecoveredContextProvider(MockProvider);
+    #[async_trait]
+    impl LanguageModel for RecoveredContextProvider {
+        async fn stream(
+            &self,
+            messages: &[talos_runtime::Message],
+        ) -> talos_runtime::ProviderResult<talos_runtime::Receiver<talos_runtime::AgentEvent>> {
+            use talos_runtime::Message;
+            let original_user = messages.iter().position(|m| matches!(m,
+                Message::User { content } if content == "persist this fixture turn"))
+                .expect("original user turn reaches reopened provider");
+            let original_answer = messages.iter().position(|m| matches!(m,
+                Message::Assistant { content, .. } if content == "durable fixture turn"))
+                .expect("original assistant answer reaches reopened provider");
+            let continuation = messages.iter().position(|m| matches!(m,
+                Message::User { content } if content == "continue after reopen"))
+                .expect("new continuation reaches provider");
+            assert!(original_user < original_answer && original_answer < continuation);
+            assert_eq!(messages.iter().filter(|m| matches!(m,
+                Message::User { content } if content == "persist this fixture turn")).count(), 1);
+            self.0.stream(messages).await
+        }
+    }
     let directory = tempfile::tempdir()?;
     let manager = SessionManager::with_dir(directory.path().to_path_buf());
     let session = manager.create_or_open_session("fixture:durable")?;
     let mut runtime = RuntimeBuilder::new()
         .provider(provider("durable fixture turn"))
         .durable_session(session)
-        .build()?;
+        .build_async()
+        .await?;
     runtime.submit("persist this fixture turn").await?;
     let status = collect_until_turn_completed(&mut runtime)
         .await
@@ -199,6 +223,24 @@ async fn run_durable_session() -> Result<()> {
     let reopened = manager.create_or_open_session("fixture:durable")?;
     let messages = reopened.read_messages()?;
     assert!(serde_json::to_string(&messages)?.contains("durable fixture turn"));
+    let mut resumed = RuntimeBuilder::new()
+        .provider(Arc::new(RecoveredContextProvider(MockProvider::new().with_response("resumed durable fixture"))))
+        .durable_session(reopened)
+        .build_async()
+        .await?;
+    resumed.submit("continue after reopen").await?;
+    let status = collect_until_turn_completed(&mut resumed)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("reopened fixture ended before completion"))?;
+    assert!(matches!(
+        status,
+        RuntimeTurnCompletionStatus::Success { .. }
+    ));
+    resumed.shutdown().await?;
+    let recovered = manager
+        .create_or_open_session("fixture:durable")?
+        .read_messages()?;
+    assert!(serde_json::to_string(&recovered)?.contains("resumed durable fixture"));
     Ok(())
 }
 

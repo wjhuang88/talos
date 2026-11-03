@@ -310,24 +310,169 @@ fn structured_submission_rejects_unbounded_image_metadata() {
     );
 }
 
-async fn collect_until_completions(
+#[cfg(windows)]
+#[tokio::test]
+async fn actor_interrupt_and_shutdown_release_recovery_source_before_persistence() {
+    struct HeldModel(Arc<tokio::sync::Notify>);
+    #[async_trait]
+    impl LanguageModel for HeldModel {
+        async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            self.0.notify_one();
+            std::future::pending().await
+        }
+    }
+    for shutdown in [false, true] {
+        let root = tempfile::tempdir().expect("root");
+        let durable = talos_session::DurableSession::open_or_create(root.path(), "actor-lease")
+            .expect("session");
+        durable
+            .commit_turn(
+                "seed",
+                &[Message::User {
+                    content: "original constraint".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("seed");
+        let ready = Arc::new(tokio::sync::Notify::new());
+        #[allow(deprecated)]
+        let mut agent = Agent::new(Arc::new(HeldModel(ready.clone())), ToolRegistry::new());
+        agent
+            .enable_model_checkpoint_tools()
+            .expect("builtin recovery tools");
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: durable.read_messages().expect("history"),
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_durable_persistence(durable.clone(), Default::default());
+        let task = tokio::spawn(async move {
+            actor.run().await;
+        });
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "continue".into(),
+            })
+            .await
+            .expect("submit");
+        tokio::time::timeout(Duration::from_secs(10), ready.notified())
+            .await
+            .expect("model reached after recovery preparation");
+        assert!(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(durable.file_path())
+                .is_err(),
+            "live recovery must retain source"
+        );
+        handle
+            .sq_tx
+            .send(if shutdown {
+                SessionOp::Shutdown
+            } else {
+                SessionOp::Interrupt
+            })
+            .await
+            .expect("stop");
+        let events = tokio::time::timeout(
+            Duration::from_secs(10),
+            collect_until_completions(&mut handle.eq_rx, 1),
+        )
+        .await
+        .expect("terminal deadline");
+        assert!(events.iter().any(|event| matches!(
+            completed_status(event),
+            Some(TurnCompletionStatus::Cancelled)
+        )));
+        assert!(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(durable.file_path())
+                .is_ok(),
+            "terminal must follow lease release"
+        );
+        if !shutdown {
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+        }
+        tokio::time::timeout(Duration::from_secs(10), task)
+            .await
+            .expect("join deadline")
+            .expect("Actor joined");
+        durable
+            .commit_turn(
+                "after-stop",
+                &[Message::User {
+                    content: "normal continuation".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit after stop");
+    }
+}
+
+#[track_caller]
+fn collect_until_completions(
     eq_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
     completion_count: usize,
-) -> Vec<SessionEvent> {
-    let mut events = Vec::new();
-    while events
-        .iter()
-        .filter(|event| completed_status(event).is_some())
-        .count()
-        < completion_count
-    {
-        let event = tokio::time::timeout(Duration::from_secs(2), eq_rx.recv())
+) -> impl std::future::Future<Output = Vec<SessionEvent>> + '_ {
+    collect_until_completions_with_idle_timeout(eq_rx, completion_count, Duration::from_secs(2))
+}
+
+#[track_caller]
+fn collect_until_completions_with_idle_timeout(
+    eq_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
+    completion_count: usize,
+    idle_timeout: Duration,
+) -> impl std::future::Future<Output = Vec<SessionEvent>> + '_ {
+    let caller = std::panic::Location::caller();
+    async move {
+        let mut events = Vec::new();
+        while events
+            .iter()
+            .filter(|event| completed_status(event).is_some())
+            .count()
+            < completion_count
+        {
+            let event = tokio::time::timeout(idle_timeout, eq_rx.recv())
             .await
-            .expect("turn completion event timeout")
+            .unwrap_or_else(|_| panic!(
+                "turn completion event timeout at {caller}; received {} events; last kind {:?}",
+                events.len(), events.last().map(std::mem::discriminant)
+            ))
             .expect("session event channel closed before completion");
-        events.push(event);
+            events.push(event);
+        }
+        events
     }
-    events
+}
+
+#[tokio::test(start_paused = true)]
+async fn completion_timeout_reports_awaiting_phase_without_event_content() {
+    let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+    let task = tokio::spawn(async move {
+        collect_until_completions(&mut receiver, 1).await;
+    });
+    let error = task.await.expect_err("silent channel must time out");
+    let payload = error.into_panic();
+    let message = payload
+        .downcast_ref::<String>()
+        .expect("timeout diagnostic");
+    assert!(
+        message
+            .replace('\\', "/")
+            .contains("turn completion event timeout at crates/talos-agent/src/session/tests.rs:")
+    );
+    assert!(message.contains("received 0 events; last kind None"));
+    drop(sender);
 }
 
 #[tokio::test]
@@ -3426,6 +3571,7 @@ async fn fixture_durable_failed_turn_replays_closed_prefix_and_error_outcome() {
             talos_session::TurnTranscriptOutcome::Error,
         )]
     );
+    assert_recovery_receipts_verify(&durable_session, 1);
 }
 
 #[tokio::test]
@@ -3524,6 +3670,7 @@ async fn fixture_durable_cancelled_turn_replays_latest_closed_prefix() {
             talos_session::TurnTranscriptOutcome::Cancelled,
         )]
     );
+    assert_recovery_receipts_verify(&reopened, 1);
 }
 
 #[cfg(unix)]
@@ -3747,12 +3894,46 @@ async fn fresh_actor_admits_submit_without_recovery_sidecar_creation() {
 
 #[tokio::test]
 async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
+    exercise_actor_long_history_compaction(false, 20_000, true).await;
+}
+
+#[tokio::test]
+async fn registered_checkpoint_tools_share_manual_actor_compaction_and_raw_history() {
+    exercise_actor_long_history_compaction(true, 32_000, true).await;
+}
+
+#[tokio::test]
+async fn registered_checkpoint_tools_manual_failure_at_20k_preserves_raw_history() {
+    exercise_actor_long_history_compaction(true, 20_000, false).await;
+}
+
+async fn exercise_actor_long_history_compaction(
+    model_tools: bool,
+    capacity: u32,
+    expect_applied: bool,
+) {
     struct CheckpointModel {
+        model_tools: bool,
         summaries: AtomicUsize,
         ordinary: AtomicUsize,
     }
     #[async_trait]
     impl LanguageModel for CheckpointModel {
+        async fn stream_with_tools(
+            &self,
+            messages: &[Message],
+            tools: &[talos_core::provider::ToolDefinition],
+        ) -> ProviderResult<Receiver<AgentEvent>> {
+            let summary = matches!(messages, [Message::User { content }] if content.starts_with("Produce only a JSON checkpoint"));
+            let expected = usize::from(self.model_tools && !summary);
+            for name in ["compact_context", "history_search"] {
+                assert_eq!(
+                    tools.iter().filter(|tool| tool.name == name).count(),
+                    expected
+                );
+            }
+            self.stream(messages).await
+        }
         async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
             let summary = match messages {
                 [Message::User { content }]
@@ -3792,6 +3973,7 @@ async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
         }
     }
     let model = Arc::new(CheckpointModel {
+        model_tools,
         summaries: AtomicUsize::new(0),
         ordinary: AtomicUsize::new(0),
     });
@@ -3803,6 +3985,11 @@ async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
         "/tmp".into(),
         Arc::new(talos_plugin::HookRegistry::new()),
     );
+    if model_tools {
+        agent
+            .enable_model_checkpoint_tools()
+            .expect("registered tools");
+    }
     agent.workspace_context = Some("WORKSPACE_CONTEXT_MUST_REMAIN_VERBATIM".into());
     let raw: Vec<_> = (0..50)
         .flat_map(|index| {
@@ -3818,11 +4005,12 @@ async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
             ]
         })
         .collect();
+    // Registered tool schemas consume the same sealed request budget as history.
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
         workspace_root: "/tmp".into(),
         initial_history: raw.clone(),
-        model_context_limit: 20_000,
+        model_context_limit: capacity,
     };
     let (handle, mut actor) = AppServerSession::new(agent, config);
     let mut eq_rx = handle.eq_rx;
@@ -3859,8 +4047,30 @@ async fn actor_compacts_long_recovered_text_without_replacing_raw_history() {
             break outcome;
         }
     };
+    if !expect_applied {
+        assert!(
+            matches!(outcome, talos_core::session::CompactOutcome::FailedWithEstimate { before, .. } if before > capacity),
+            "{outcome:?}"
+        );
+        sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown after refusal");
+        let history = task.await.expect("actor exit");
+        assert_eq!(
+            history, raw,
+            "failed preparation cannot rewrite raw history"
+        );
+        assert_eq!(
+            model.ordinary.load(Ordering::SeqCst),
+            0,
+            "manual compaction must not dispatch a normal turn"
+        );
+        return;
+    }
     assert!(
-        matches!(outcome, talos_core::session::CompactOutcome::Applied { before, after } if after < before && after <= 20_000)
+        matches!(outcome, talos_core::session::CompactOutcome::Applied { before, after } if after < before && after <= capacity),
+        "{outcome:?}"
     );
     let summary_calls = model.summaries.load(Ordering::SeqCst);
     sq_tx
@@ -4620,6 +4830,25 @@ async fn recovered_actor_sources_are_session_scoped_and_clear_on_rebinding() {
             model_context_limit: 128_000,
         },
     );
+    actor.set_durable_persistence(durable.clone(), PersistencePolicy::default());
+    let reopened =
+        talos_session::DurableSession::open_existing(directory.path(), "source-original")
+            .expect("open")
+            .expect("existing");
+    let reopened_snapshot = reopened.read_history_snapshot().expect("reopened snapshot");
+    assert_eq!(reopened_snapshot.session_id(), entries.session_id());
+    assert_eq!(reopened_snapshot.entries(), entries.entries());
+    actor.set_recovered_history_sources(reopened_snapshot.clone());
+    assert!(
+        actor.recovered_source.is_none(),
+        "equal IDs, entries and path are not configured-owner provenance"
+    );
+    actor.set_durable_persistence(reopened, PersistencePolicy::default());
+    actor.set_recovered_history_sources(reopened_snapshot);
+    assert!(
+        actor.recovered_source.is_some(),
+        "restart works when snapshot and configured owner agree"
+    );
     actor.set_durable_persistence(durable, PersistencePolicy::default());
     let foreign = manager
         .create_or_open_session("source-foreign")
@@ -4761,9 +4990,21 @@ async fn durable_turn_receipts_bind_live_actor_history_for_success_error_and_can
 
 #[tokio::test]
 async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messages() {
+    exercise_automatic_checkpoint_terminal_outcomes(false).await;
+}
+
+#[tokio::test]
+async fn registered_checkpoint_tools_preserve_automatic_terminal_outcomes() {
+    exercise_automatic_checkpoint_terminal_outcomes(true).await;
+}
+
+async fn exercise_automatic_checkpoint_terminal_outcomes(model_tools: bool) {
     use talos_core::session::AutomaticCompactState;
     struct ProgressModel {
         invalid: bool,
+        transport_error: bool,
+        ordinary: AtomicUsize,
+        summaries: AtomicUsize,
         block: bool,
         entered: tokio::sync::Notify,
     }
@@ -4773,9 +5014,15 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
             let events = if let [Message::User { content }] = messages
                 && content.starts_with("Produce only a JSON checkpoint")
             {
+                self.summaries.fetch_add(1, Ordering::SeqCst);
                 self.entered.notify_one();
                 if self.block {
                     return std::future::pending().await;
+                }
+                if self.transport_error {
+                    return Err(talos_core::provider::ProviderError::NetworkError(
+                        "private-checkpoint-transport-detail".into(),
+                    ));
                 }
                 if self.invalid {
                     success_events("invalid checkpoint")
@@ -4789,6 +5036,7 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
                         "facts":[],"assumptions":[],"resources":[],"open_loops":[]}).to_string())
                 }
             } else {
+                self.ordinary.fetch_add(1, Ordering::SeqCst);
                 success_events("ordinary reply")
             };
             let (tx, rx) = mpsc::channel(8);
@@ -4798,15 +5046,29 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
             Ok(rx)
         }
     }
-    for outcome in ["applied", "failed", "cancelled"] {
+    for outcome in [
+        "applied",
+        "failed",
+        "cancelled",
+        "over_limit_failure",
+        "transport_failure",
+    ] {
         let directory = tempfile::tempdir().expect("directory");
         let model = Arc::new(ProgressModel {
-            invalid: outcome == "failed",
+            invalid: matches!(outcome, "failed" | "over_limit_failure"),
+            transport_error: outcome == "transport_failure",
+            ordinary: AtomicUsize::new(0),
+            summaries: AtomicUsize::new(0),
             block: outcome == "cancelled",
             entered: tokio::sync::Notify::new(),
         });
         #[allow(deprecated)]
-        let agent = Agent::new(model.clone(), ToolRegistry::new());
+        let mut agent = Agent::new(model.clone(), ToolRegistry::new());
+        if model_tools {
+            agent
+                .enable_model_checkpoint_tools()
+                .expect("registered checkpoint tools");
+        }
         let raw: Vec<_> = (0..20)
             .flat_map(|index| {
                 [
@@ -4832,7 +5094,11 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
             )
             .await
             .expect("probe");
-        let limit = probe.initial_plan.estimated_tokens * 100 / 96;
+        let limit = if matches!(outcome, "over_limit_failure" | "transport_failure") {
+            probe.initial_plan.estimated_tokens * 9 / 10
+        } else {
+            probe.initial_plan.estimated_tokens * 100 / 96
+        };
         let (mut handle, mut actor) = AppServerSession::new(
             agent,
             SessionConfig {
@@ -4871,11 +5137,19 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
                     control.interrupt_active();
                 }
             }
+            assert!(
+                !format!("{event:?}").contains("private-checkpoint-transport-detail"),
+                "transient lifecycle must not expose provider internals"
+            );
             if let Some(status) = completed_status(&event) {
                 assert!(
                     matches!(
                         (outcome, status),
                         ("cancelled", TurnCompletionStatus::Cancelled)
+                            | (
+                                "over_limit_failure" | "transport_failure",
+                                TurnCompletionStatus::Error { .. }
+                            )
                             | ("applied" | "failed", TurnCompletionStatus::Success { .. })
                     ),
                     "{outcome}: {status:?}"
@@ -4905,12 +5179,25 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
                 assert_eq!(prior, before);
                 assert!(after < before && after <= limit);
             }
-            ("failed", AutomaticCompactState::Failed { before: prior, .. })
+            (
+                "failed" | "over_limit_failure" | "transport_failure",
+                AutomaticCompactState::Failed { before: prior, .. },
+            )
             | ("cancelled", AutomaticCompactState::Cancelled { before: prior }) => {
                 assert_eq!(prior, before)
             }
             _ => panic!("unexpected outcome: {outcome}, {states:?}"),
         }
+        assert_eq!(
+            model.summaries.load(Ordering::SeqCst),
+            1,
+            "{outcome}: one emergency summary attempt, without retry loops"
+        );
+        assert_eq!(
+            model.ordinary.load(Ordering::SeqCst),
+            usize::from(matches!(outcome, "applied" | "failed")),
+            "{outcome}: failed over-limit preparation cannot dispatch a normal request"
+        );
         assert_eq!(&actor.history[..raw.len()], raw);
         assert!(
             !serde_json::to_string(&actor.history)
@@ -4932,3 +5219,1921 @@ async fn automatic_checkpoint_reports_terminal_outcomes_without_transcript_messa
 
 #[path = "checkpoint_acceptance_tests.rs"]
 mod checkpoint_acceptance;
+
+fn assert_recovery_receipts_verify(durable: &talos_session::DurableSession, expected: usize) {
+    let entries = durable
+        .session()
+        .read_entries()
+        .expect("read receipt source");
+    let receipts = entries
+        .iter()
+        .filter_map(talos_session::HistoryRecoveryReceipt::from_terminal_entry)
+        .flatten()
+        .collect::<Vec<_>>();
+    assert_eq!(receipts.len(), expected);
+    for receipt in receipts {
+        let entry = entries
+            .iter()
+            .find(|entry| entry.id == receipt.entry_id())
+            .expect("original entry");
+        assert!(receipt.verified_content(entry).is_some());
+    }
+}
+
+#[tokio::test]
+async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor() {
+    use talos_core::tool::ToolNature;
+    use talos_permission::{PermissionDecision, PermissionEngine, PermissionRule};
+    const TASK_STATE: &str = r#"{"completed":"baseline scan done","in_progress":"local recount active","pending":"final report pending","open_loops":"missing-source.json unavailable; do not retry","facts":"local count verified as 42","assumptions":"recount may be necessary; unverified","next_step":"verify final total locally"}"#;
+    fn task_checkpoint(
+        messages: &[Message],
+        discovery: &serde_json::Value,
+        summary: &str,
+    ) -> serde_json::Value {
+        // Carry only state actually present in this request: initial tool evidence
+        // for A, then the installed checkpoint for B. Missing state fails the test.
+        let state = messages
+            .iter()
+            .find_map(|message| match message {
+                Message::Context { content } => content
+                    .strip_prefix("[Derived checkpoint; source history remains authoritative]\n")
+                    .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok()),
+                _ => None,
+            })
+            .unwrap_or_else(|| {
+                assert!(
+                    !summary.starts_with("SECOND_CHECKPOINT"),
+                    "B must read installed A, never raw-tool fallback"
+                );
+                messages
+                    .iter()
+                    .find_map(|message| match message {
+                        Message::Tool { result } => result
+                            .content
+                            .strip_prefix("omittedfact original constraint ")
+                            .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok()),
+                        _ => None,
+                    })
+                    .expect("original task evidence must reach the model")
+            });
+        let item =
+            |text: &str| serde_json::json!({"text":text,"sources":[discovery["sources"][0]]});
+        let mut checkpoint = serde_json::json!({"schema_version":1,"summary":item(summary),"goal":item("deliver offline report"),"next_step":item("placeholder"),
+            "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+            "facts":[],"assumptions":[],"resources":[],"open_loops":[]});
+        for field in [
+            "completed",
+            "in_progress",
+            "pending",
+            "open_loops",
+            "facts",
+            "assumptions",
+            "next_step",
+        ] {
+            let text = state[field]
+                .as_str()
+                .or_else(|| {
+                    if field == "next_step" {
+                        state[field]["text"].as_str()
+                    } else {
+                        state[field][0]["text"].as_str()
+                    }
+                })
+                .expect("typed task state survived previous request");
+            checkpoint[field] = if field == "next_step" {
+                item(text)
+            } else {
+                serde_json::json!([item(text)])
+            };
+        }
+        checkpoint
+    }
+    fn assert_task_state(checkpoint: &serde_json::Value) {
+        let expected: serde_json::Value = serde_json::from_str(TASK_STATE).expect("fixture state");
+        for field in [
+            "completed",
+            "in_progress",
+            "pending",
+            "open_loops",
+            "facts",
+            "assumptions",
+            "next_step",
+        ] {
+            let actual = if field == "next_step" {
+                &checkpoint[field]["text"]
+            } else {
+                &checkpoint[field][0]["text"]
+            };
+            assert_eq!(actual, &expected[field], "lost or misclassified {field}");
+        }
+        assert!(!checkpoint["facts"].to_string().contains("unverified"));
+    }
+    struct VerifyResearchTotal(std::path::PathBuf, Arc<AtomicUsize>);
+    #[async_trait]
+    impl talos_core::tool::AgentTool for VerifyResearchTotal {
+        fn name(&self) -> &str {
+            "verify_research_total"
+        }
+        fn description(&self) -> &str {
+            "Verify the pending local research total"
+        }
+        fn parameters(&self) -> serde_json::Value {
+            serde_json::json!({"type":"object","properties":{},"additionalProperties":false})
+        }
+        fn is_read_only(&self) -> bool {
+            true
+        }
+        async fn execute(&self, _: serde_json::Value) -> talos_core::tool::ToolResult {
+            self.1.fetch_add(1, Ordering::SeqCst);
+            let bytes = tokio::fs::read(&self.0)
+                .await
+                .expect("verify actual source");
+            let observations: Vec<u64> = serde_json::from_slice(&bytes).expect("observations");
+            talos_core::tool::ToolResult::success(
+                serde_json::json!({
+                    "verified_total": observations.iter().sum::<u64>(),
+                    "observations": observations.len()
+                })
+                .to_string(),
+            )
+        }
+    }
+    fn continuation_tools(root: &std::path::Path, calls: Arc<AtomicUsize>) -> ToolRegistry {
+        let mut tools = ToolRegistry::new();
+        // Completed collection and its failed alternative are deliberately absent.
+        tools.register(Arc::new(VerifyResearchTotal(
+            root.join("observations.json"),
+            calls,
+        )));
+        tools
+    }
+    fn research_report_events(messages: &[Message]) -> Vec<AgentEvent> {
+        let result = messages
+            .iter()
+            .rev()
+            .find_map(|message| match message {
+                Message::Tool { result } if result.tool_use_id == "verify-pending-next-step" => {
+                    Some(result)
+                }
+                _ => None,
+            })
+            .expect("actual next-step result");
+        assert!(!result.is_error, "{}", result.content);
+        let report: serde_json::Value = serde_json::from_str(&result.content).expect("report");
+        assert_eq!(report["verified_total"], 42);
+        assert_eq!(report["observations"], 5);
+        success_events(&format!(
+            "research report: verified total {} from {} observations; missing-source route not retried",
+            report["verified_total"], report["observations"]
+        ))
+    }
+    struct CheckpointModel {
+        step: AtomicUsize,
+        recent_tail: std::sync::Mutex<Option<Vec<Message>>>,
+        stable_prefix_hash: std::sync::Mutex<Option<Vec<u8>>>,
+    }
+    #[async_trait]
+    impl LanguageModel for CheckpointModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let step = self.step.fetch_add(1, Ordering::SeqCst);
+            {
+                use sha2::Digest;
+                let mut prefixes = Vec::new();
+                for message in messages {
+                    if let Message::System {
+                        content,
+                        cache_markers,
+                    } = message
+                    {
+                        for marker in cache_markers {
+                            assert!(marker.length > 0);
+                            prefixes.push(
+                                content
+                                    .get(marker.offset..marker.offset + marker.length)
+                                    .expect("valid provider-visible stable prefix range"),
+                            );
+                        }
+                    }
+                }
+                assert!(
+                    !prefixes.is_empty(),
+                    "actual request must expose a stable prefix"
+                );
+                let hash =
+                    sha2::Sha256::digest(serde_json::to_vec(&prefixes).expect("prefix encoding"))
+                        .to_vec();
+                let mut original = self.stable_prefix_hash.lock().expect("stable prefix hash");
+                if let Some(original) = original.as_ref() {
+                    assert_eq!(
+                        &hash, original,
+                        "checkpoint discovery, Applied A/B and recovery must preserve the stable prefix"
+                    );
+                } else {
+                    *original = Some(hash);
+                }
+            }
+            if step == 0 {
+                let start = messages
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .filter(|(_, message)| matches!(message, Message::User { .. }))
+                    .nth(9)
+                    .expect("ten recent user exchanges")
+                    .0;
+                *self.recent_tail.lock().expect("recent tail") = Some(messages[start..].to_vec());
+            }
+            if step == 2 || step == 4 {
+                let tail = self.recent_tail.lock().expect("recent tail");
+                let tail = tail.as_ref().expect("captured before checkpoint A");
+                assert!(
+                    messages.windows(tail.len()).any(|window| window == tail),
+                    "both installed checkpoints preserve the ten recent exchanges verbatim and in order"
+                );
+                let checkpoint = messages
+                    .iter()
+                    .find_map(|message| match message {
+                        Message::Context { content } => content
+                            .strip_prefix(
+                                "[Derived checkpoint; source history remains authoritative]\n",
+                            )
+                            .map(|text| {
+                                let checkpoint: crate::compaction::Checkpoint =
+                                    serde_json::from_str(text).expect("typed installed checkpoint");
+                                let canonical =
+                                    checkpoint.render(1_000_000).expect("canonical rendering");
+                                assert_eq!(
+                                    text, canonical,
+                                    "actual provider receives canonical bytes"
+                                );
+                                let pretty = serde_json::to_string_pretty(&checkpoint)
+                                    .expect("alternate serialization");
+                                let roundtrip: crate::compaction::Checkpoint =
+                                    serde_json::from_str(&pretty)
+                                        .expect("same structured checkpoint");
+                                assert_eq!(
+                                    roundtrip.render(1_000_000).expect("repeat rendering"),
+                                    canonical
+                                );
+                                serde_json::from_str::<serde_json::Value>(text)
+                                    .expect("checkpoint JSON")
+                            }),
+                        _ => None,
+                    })
+                    .expect("installed checkpoint in actual provider request");
+                assert_task_state(&checkpoint);
+            }
+            let events = match step {
+                0 | 1 => {
+                    let (name, input) = if step == 0 {
+                        ("history_search", serde_json::json!({"mode":"discover"}))
+                    } else {
+                        let result = messages
+                            .iter()
+                            .rev()
+                            .find_map(|message| match message {
+                                Message::Tool { result }
+                                    if result.tool_use_id == "checkpoint-0" =>
+                                {
+                                    Some(result)
+                                }
+                                _ => None,
+                            })
+                            .expect("discovery result in real continuation");
+                        assert!(!result.is_error, "{}", result.content);
+                        let discovery: serde_json::Value =
+                            serde_json::from_str(&result.content).expect("discovery JSON");
+                        let checkpoint = task_checkpoint(
+                            messages,
+                            &discovery,
+                            "Keep the constraint and proceed",
+                        );
+                        (
+                            "compact_context",
+                            serde_json::json!({"snapshot":discovery["snapshot"], "checkpoint": checkpoint}),
+                        )
+                    };
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: format!("checkpoint-{step}"),
+                                name: name.into(),
+                                input,
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                2 => {
+                    let request = serde_json::to_string(messages).expect("request");
+                    assert!(
+                        request.contains("Admitted"),
+                        "admission must remain in paired batch: {request}"
+                    );
+                    let terminal = messages
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Multimodal { parts } => {
+                                parts.iter().find_map(|part| match part {
+                                    talos_core::message::ContentPart::Text { text } => {
+                                        serde_json::from_str::<serde_json::Value>(text).ok().filter(
+                                            |value| value.get("checkpoint_operation").is_some(),
+                                        )
+                                    }
+                                    _ => None,
+                                })
+                            }
+                            _ => None,
+                        })
+                        .expect("actual terminal metadata, not tool description");
+                    assert_eq!(terminal["checkpoint_operation"], 0);
+                    assert!(
+                        terminal["outcome"]
+                            .as_str()
+                            .expect("outcome")
+                            .starts_with("Applied {"),
+                        "{terminal}"
+                    );
+                    assert!(
+                        !request.contains("omittedfact original constraint"),
+                        "covered fact must actually leave projected request"
+                    );
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: "rediscover".into(),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"discover"}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                3 => {
+                    let discovery = messages
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Tool { result } if result.tool_use_id == "rediscover" => {
+                                serde_json::from_str::<serde_json::Value>(&result.content).ok()
+                            }
+                            _ => None,
+                        })
+                        .expect("second checkpoint discovery");
+                    let checkpoint = task_checkpoint(
+                        messages,
+                        &discovery,
+                        "SECOND_CHECKPOINT Continue with original evidence",
+                    );
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: "checkpoint-b".into(),
+                                name: "compact_context".into(),
+                                input: serde_json::json!({"snapshot":discovery["snapshot"], "checkpoint": checkpoint}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                4 | 8 => {
+                    if step == 4 {
+                        let request = serde_json::to_string(messages).expect("request B");
+                        assert!(request.contains("SECOND_CHECKPOINT"));
+                        assert!(!request.contains("omittedfact original constraint"));
+                        assert!(
+                            !request.contains("userconstraintfact"),
+                            "old user fact must be covered before recovery"
+                        );
+                        let applied = messages.iter().any(|message| match message {
+                            Message::Multimodal { parts } => parts.iter().any(|part| match part {
+                                talos_core::message::ContentPart::Text { text } => {
+                                    serde_json::from_str::<serde_json::Value>(text)
+                                        .ok()
+                                        .is_some_and(|value| {
+                                            value["checkpoint_operation"] == 1
+                                                && value["outcome"].as_str().is_some_and(
+                                                    |outcome| outcome.starts_with("Applied {"),
+                                                )
+                                        })
+                                }
+                                _ => false,
+                            }),
+                            _ => false,
+                        });
+                        assert!(applied, "second checkpoint must actually apply");
+                    }
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: (if step >= 8 {
+                                    "rediscover-reopened"
+                                } else {
+                                    "rediscover-b"
+                                })
+                                .into(),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"discover"}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                5 | 9 => {
+                    let discovery = messages
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Tool { result }
+                                if result.tool_use_id
+                                    == if step >= 8 {
+                                        "rediscover-reopened"
+                                    } else {
+                                        "rediscover-b"
+                                    } =>
+                            {
+                                assert!(!result.is_error, "{}", result.content);
+                                serde_json::from_str::<serde_json::Value>(&result.content).ok()
+                            }
+                            _ => None,
+                        })
+                        .expect("post-checkpoint discovery");
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: format!("recover-user-{step}"),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"userconstraintfact"}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: (if step >= 8 {
+                                    "recover-omitted-reopened"
+                                } else {
+                                    "recover-omitted"
+                                })
+                                .into(),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"omittedfact"}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                6 | 10 => {
+                    let user_result = messages
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Tool { result }
+                                if result.tool_use_id == format!("recover-user-{}", step - 1) =>
+                            {
+                                Some(result)
+                            }
+                            _ => None,
+                        })
+                        .expect("old user search result");
+                    assert!(!user_result.is_error, "{}", user_result.content);
+                    let user_found: serde_json::Value =
+                        serde_json::from_str(&user_result.content).expect("user search JSON");
+                    // After restart, prior search/detail outputs are also valid
+                    // persisted tool facts. Select the original message, not an
+                    // embedded copy in their JSON output.
+                    let original_user_hits: Vec<_> = user_found["results"]
+                        .as_array()
+                        .expect("user hits")
+                        .iter()
+                        .filter(|hit| {
+                            hit["text"] == "userconstraintfact report must use metric units"
+                        })
+                        .collect();
+                    assert_eq!(original_user_hits.len(), 1);
+                    let result = messages
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Tool { result }
+                                if result.tool_use_id
+                                    == if step >= 8 {
+                                        "recover-omitted-reopened"
+                                    } else {
+                                        "recover-omitted"
+                                    } =>
+                            {
+                                Some(result)
+                            }
+                            _ => None,
+                        })
+                        .expect("recovery result");
+                    assert!(!result.is_error, "{}", result.content);
+                    let found: serde_json::Value =
+                        serde_json::from_str(&result.content).expect("found");
+                    assert!(
+                        found["results"][0]["text"]
+                            .as_str()
+                            .expect("snippet")
+                            .starts_with("omittedfact original constraint")
+                    );
+                    let discovery = messages
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Tool { result }
+                                if result.tool_use_id
+                                    == if step >= 8 {
+                                        "rediscover-reopened"
+                                    } else {
+                                        "rediscover-b"
+                                    } =>
+                            {
+                                serde_json::from_str::<serde_json::Value>(&result.content).ok()
+                            }
+                            _ => None,
+                        })
+                        .expect("discovery");
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: format!("detail-user-{step}"),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"detail", "snapshot":discovery["snapshot"], "reference":original_user_hits[0]["reference"]}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: (if step >= 8 {
+                                    "detail-omitted-reopened"
+                                } else {
+                                    "detail-omitted"
+                                })
+                                .into(),
+                                name: "history_search".into(),
+                                input: serde_json::json!({"mode":"detail", "snapshot":discovery["snapshot"], "reference":found["results"][0]["reference"]}),
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                }
+                7 | 11 => {
+                    let user_result = messages
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Tool { result }
+                                if result.tool_use_id == format!("detail-user-{}", step - 1) =>
+                            {
+                                Some(result)
+                            }
+                            _ => None,
+                        })
+                        .expect("old user detail result");
+                    assert!(!user_result.is_error, "{}", user_result.content);
+                    let user_detail: serde_json::Value =
+                        serde_json::from_str(&user_result.content).expect("user detail JSON");
+                    assert_eq!(
+                        user_detail["text"],
+                        "userconstraintfact report must use metric units"
+                    );
+                    let result = messages
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Tool { result }
+                                if result.tool_use_id
+                                    == if step >= 8 {
+                                        "detail-omitted-reopened"
+                                    } else {
+                                        "detail-omitted"
+                                    } =>
+                            {
+                                Some(result)
+                            }
+                            _ => None,
+                        })
+                        .expect("detail result");
+                    assert!(!result.is_error, "{}", result.content);
+                    let detail: serde_json::Value =
+                        serde_json::from_str(&result.content).expect("detail");
+                    assert!(
+                        detail["text"]
+                            .as_str()
+                            .expect("text")
+                            .starts_with("omittedfact original constraint")
+                    );
+                    let recovered: serde_json::Value = serde_json::from_str(
+                        detail["text"]
+                            .as_str()
+                            .expect("detail text")
+                            .strip_prefix("omittedfact original constraint ")
+                            .expect("original source marker"),
+                    )
+                    .expect("recovered task state");
+                    assert_eq!(
+                        recovered,
+                        serde_json::from_str::<serde_json::Value>(TASK_STATE)
+                            .expect("expected task")
+                    );
+                    assert_eq!(recovered["next_step"], "verify final total locally");
+                    if step == 11 {
+                        // The persisted successful verification is completed work.
+                        // Reopening must reuse it instead of re-reading the input.
+                        research_report_events(messages)
+                    } else {
+                        self.step.store(12, Ordering::SeqCst);
+                        vec![
+                            AgentEvent::ToolCall {
+                                call: talos_core::message::ToolCall {
+                                    id: "verify-pending-next-step".into(),
+                                    name: "verify_research_total".into(),
+                                    input: serde_json::json!({}),
+                                },
+                                provenance: talos_core::tool::ToolProvenance::Native,
+                                summary_fields: vec![],
+                            },
+                            AgentEvent::TurnEnd {
+                                stop_reason: StopReason::ToolUse,
+                                usage: Default::default(),
+                            },
+                        ]
+                    }
+                }
+                100 => {
+                    self.step.store(0, Ordering::SeqCst);
+                    success_events("baseline review complete; report remains pending")
+                }
+                12 => research_report_events(messages),
+                _ => panic!("unexpected extra provider request"),
+            };
+            let (tx, rx) = mpsc::channel(16);
+            for event in events {
+                tx.send(event).await.expect("receiver");
+            }
+            Ok(rx)
+        }
+    }
+    async fn recover_in_fresh_process(root: &std::path::Path) {
+        let identity =
+            std::env::var("TALOS_TEST_CHECKPOINT_IDENTITY").expect("explicit recovery identity");
+        let reopened = talos_session::DurableSession::open_existing(root, &identity)
+            .expect("reopen after two checkpoints")
+            .expect("existing recovery binding");
+        let persisted = std::fs::read(reopened.file_path()).expect("child initial transcript");
+        let recovered_raw = reopened.read_messages().expect("durable replay");
+        let mut engine = PermissionEngine::empty();
+        engine.set_workspace_root(root.into());
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Read,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ));
+        let restarted_model = Arc::new(CheckpointModel {
+            step: AtomicUsize::new(8),
+            recent_tail: std::sync::Mutex::new(None),
+            stable_prefix_hash: std::sync::Mutex::new(None),
+        });
+        let verification_calls = Arc::new(AtomicUsize::new(0));
+        let mut restarted_agent = Agent::with_security_and_hooks(
+            restarted_model.clone(),
+            continuation_tools(root, verification_calls.clone()),
+            Some(Arc::new(engine)),
+            None,
+            root.into(),
+            Arc::new(talos_plugin::HookRegistry::new()),
+        );
+        restarted_agent
+            .enable_model_checkpoint_tools()
+            .expect("restart tools");
+        let (mut restarted_handle, mut restarted_actor) = AppServerSession::new(
+            restarted_agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.into(),
+                initial_history: recovered_raw.clone(),
+                model_context_limit: 1_000_000,
+            },
+        );
+        assert!(
+            restarted_actor
+                .agent
+                .checkpoint_projection_state
+                .lock()
+                .expect("fresh projection")
+                .is_none()
+        );
+        restarted_actor.set_durable_persistence(reopened.clone(), Default::default());
+        assert!(
+            restarted_actor
+                .set_recovered_history_sources_until(
+                    reopened.read_history_snapshot().expect("fresh sources"),
+                    tokio::time::Instant::now() + Duration::from_secs(2),
+                )
+                .await
+        );
+        let restarted_task = tokio::spawn(async move {
+            restarted_actor.run().await;
+            restarted_actor
+        });
+        restarted_handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "recover the original constraint after restart".into(),
+            })
+            .await
+            .expect("restart submit");
+        let events = tokio::time::timeout(
+            Duration::from_secs(10),
+            // Recovery may bind multiple disk pages without emitting an event.
+            // Keep the outer ten-second total bound rather than imposing the
+            // ordinary helper's shorter two-second idle bound on native CI.
+            collect_until_completions_with_idle_timeout(
+                &mut restarted_handle.eq_rx,
+                1,
+                Duration::from_secs(10),
+            ),
+        )
+        .await
+        .unwrap_or_else(|error| {
+            panic!(
+                "restart deadline: {error}; identity={identity}; provider_step={}; verification_calls={}; actor_finished={}",
+                restarted_model.step.load(Ordering::SeqCst),
+                verification_calls.load(Ordering::SeqCst),
+                restarted_task.is_finished(),
+            )
+        });
+        assert!(events.iter().any(|event| matches!(
+            completed_status(event),
+            Some(TurnCompletionStatus::Success { .. })
+        )));
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, SessionEvent::ModelCheckpointTerminal { .. })),
+            "restart must not replay or reexecute completed checkpoints"
+        );
+        restarted_handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("restart shutdown");
+        let restarted_actor = restarted_task.await.expect("restart actor");
+        assert_eq!(
+            &restarted_actor.history[..recovered_raw.len()],
+            recovered_raw.as_slice()
+        );
+        assert_eq!(
+            restarted_model.step.load(Ordering::SeqCst),
+            12,
+            "fresh recovery reuses completed verification without another checkpoint"
+        );
+        assert!(
+            std::fs::read(reopened.file_path())
+                .expect("restart transcript")
+                .starts_with(&persisted)
+        );
+        assert_eq!(
+            restarted_actor
+                .history
+                .iter()
+                .filter_map(|message| match message {
+                    Message::Assistant { tool_calls, .. } => Some(tool_calls),
+                    _ => None,
+                })
+                .flatten()
+                .filter(|call| call.name == "verify_research_total")
+                .count(),
+            1,
+            "restart must not repeat the completed verification"
+        );
+        assert_eq!(
+            verification_calls.load(Ordering::SeqCst),
+            0,
+            "completed verification must not execute after restart"
+        );
+        println!("TALOS_CHECKPOINT_RESTART_VERIFIED");
+    }
+    if let Some(root) = std::env::var_os("TALOS_TEST_CHECKPOINT_RESTART_ROOT") {
+        let parent: u32 = std::env::var("TALOS_TEST_CHECKPOINT_PARENT_PID")
+            .expect("parent pid")
+            .parse()
+            .expect("pid");
+        assert_ne!(
+            parent,
+            std::process::id(),
+            "must execute in an independent process"
+        );
+        recover_in_fresh_process(std::path::Path::new(&root)).await;
+        return;
+    }
+    let root = tempfile::tempdir().expect("workspace");
+    let mut engine = PermissionEngine::empty();
+    engine.set_workspace_root(root.path().into());
+    for nature in [ToolNature::Read, ToolNature::Write] {
+        engine.add_rule(PermissionRule::new_nature(
+            nature,
+            None,
+            None,
+            PermissionDecision::Allow,
+        ));
+    }
+    let mut raw: Vec<_> = (0..30)
+        .flat_map(|_| {
+            [
+                Message::User {
+                    content: "constraint ".repeat(400),
+                },
+                Message::Assistant {
+                    content: "recorded".into(),
+                    tool_calls: vec![],
+                    reasoning: None,
+                },
+            ]
+        })
+        .collect();
+    // Exceed the former total-history source limit while retaining enough
+    // request budget to exercise voluntary model checkpointing, not rejection.
+    raw.extend((0..8300).map(|i| Message::User {
+        content: format!("prior {i}: {}", "x".repeat(256)),
+    }));
+    // Eight of these closed tool exchanges, the completed baseline review, and
+    // the live continuation submission form the default
+    // ten-user recent window observed by the real checkpoint continuations.
+    for i in 0..9 {
+        let call_id = format!("recent-paired-{i}");
+        raw.extend([
+            Message::User {
+                content: format!("recent task {i}"),
+            },
+            Message::Assistant {
+                content: String::new(),
+                reasoning: None,
+                tool_calls: vec![talos_core::message::ToolCall {
+                    id: call_id.clone(),
+                    name: "recent_fixture".into(),
+                    input: serde_json::json!({"ordinal": i}),
+                }],
+            },
+            Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: call_id,
+                    content: format!("recent result {i}"),
+                    is_error: false,
+                },
+            },
+            Message::Assistant {
+                content: format!("recent task {i} completed"),
+                reasoning: None,
+                tool_calls: vec![],
+            },
+        ]);
+    }
+    assert!(raw.len() > 8192);
+    assert!(serde_json::to_vec(&raw).expect("history bytes").len() > 2 * 1024 * 1024);
+    let durable = talos_session::DurableSession::open_or_create(root.path(), "checkpoint-recovery")
+        .expect("durable");
+    // Produce the only searchable fact through actual admission/execution, not a
+    // seeded user message or a manually constructed recovery receipt.
+    struct OriginalFact {
+        calls: Arc<AtomicUsize>,
+        source: std::path::PathBuf,
+        missing: std::path::PathBuf,
+        operations: Arc<std::sync::Mutex<Vec<&'static str>>>,
+    }
+    #[async_trait]
+    impl talos_core::tool::AgentTool for OriginalFact {
+        fn name(&self) -> &str {
+            "original_fact"
+        }
+        fn description(&self) -> &str {
+            "Read the original constraint"
+        }
+        fn parameters(&self) -> serde_json::Value {
+            serde_json::json!({"type":"object"})
+        }
+        fn is_read_only(&self) -> bool {
+            true
+        }
+        fn recovery_projection(&self, result: &talos_core::tool::ToolResult) -> Option<String> {
+            Some(result.content.clone())
+        }
+        async fn execute(&self, _: serde_json::Value) -> talos_core::tool::ToolResult {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.operations.lock().expect("ledger").push("read-source");
+            let bytes = tokio::fs::read(&self.source)
+                .await
+                .expect("local research source");
+            let observations: Vec<u64> = serde_json::from_slice(&bytes).expect("observations");
+            let total: u64 = observations.iter().sum();
+            self.operations
+                .lock()
+                .expect("ledger")
+                .push("try-missing-source");
+            let failure = tokio::fs::read(&self.missing)
+                .await
+                .expect_err("missing route");
+            assert_eq!(failure.kind(), std::io::ErrorKind::NotFound);
+            let state = serde_json::json!({
+                "completed":"baseline scan done",
+                "in_progress":"local recount active",
+                "pending":"final report pending",
+                "open_loops":"missing-source.json unavailable; do not retry",
+                "facts":format!("local count verified as {total}"),
+                "assumptions":"recount may be necessary; unverified",
+                "next_step":"verify final total locally"
+            });
+            talos_core::tool::ToolResult::success(format!(
+                "omittedfact original constraint {state}"
+            ))
+        }
+    }
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut tools = ToolRegistry::new();
+    let source = root.path().join("observations.json");
+    let source_bytes = b"[3,5,8,11,15]";
+    std::fs::write(&source, source_bytes).expect("research input artifact");
+    let operations = Arc::new(std::sync::Mutex::new(Vec::new()));
+    tools.register(Arc::new(OriginalFact {
+        calls: calls.clone(),
+        source: source.clone(),
+        missing: root.path().join("missing-source.json"),
+        operations: operations.clone(),
+    }));
+    let producer_model = Arc::new(MockModel::new(vec![
+        vec![
+            AgentEvent::ToolCall {
+                call: talos_core::message::ToolCall {
+                    id: "original-fact-call".into(),
+                    name: "original_fact".into(),
+                    input: serde_json::json!({}),
+                },
+                provenance: talos_core::tool::ToolProvenance::Native,
+                summary_fields: vec![],
+            },
+            AgentEvent::TurnEnd {
+                stop_reason: StopReason::ToolUse,
+                usage: Default::default(),
+            },
+        ],
+        success_events("recorded"),
+    ]));
+    let engine = Arc::new(engine);
+    let producer = Agent::with_security_and_hooks(
+        producer_model,
+        tools,
+        Some(engine.clone()),
+        None,
+        root.path().into(),
+        Arc::new(talos_plugin::HookRegistry::new()),
+    );
+    let (mut producer_handle, mut producer_actor) = AppServerSession::new(
+        producer,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 1_000_000,
+        },
+    );
+    producer_actor.set_durable_persistence(durable.clone(), Default::default());
+    let producer_task = tokio::spawn(async move {
+        producer_actor.run().await;
+    });
+    producer_handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "userconstraintfact report must use metric units".into(),
+        })
+        .await
+        .expect("produce fact");
+    let produced = tokio::time::timeout(
+        Duration::from_secs(10),
+        collect_until_completions(&mut producer_handle.eq_rx, 1),
+    )
+    .await
+    .expect("producer deadline");
+    assert!(produced.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    producer_handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("producer shutdown");
+    producer_task.await.expect("producer joined");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    durable
+        .commit_turn("prior", &raw, &Default::default())
+        .expect("commit original history");
+
+    let raw = durable.read_messages().expect("actual persisted tool turn");
+    let original_bytes = std::fs::read(durable.file_path()).expect("original transcript");
+    let original_entries = durable
+        .session()
+        .read_entries()
+        .expect("original export source");
+    let original_export: serde_json::Value = serde_json::from_str(
+        &talos_session::export_json(&original_entries).expect("original JSON export"),
+    )
+    .expect("original export JSON");
+    let original_markdown = talos_session::export_markdown(&original_entries);
+    let model = Arc::new(CheckpointModel {
+        step: AtomicUsize::new(100),
+        recent_tail: std::sync::Mutex::new(None),
+        stable_prefix_hash: std::sync::Mutex::new(None),
+    });
+    let verification_calls = Arc::new(AtomicUsize::new(0));
+    let mut agent = Agent::with_security_and_hooks(
+        model.clone(),
+        continuation_tools(root.path(), verification_calls.clone()),
+        Some(engine),
+        None,
+        root.path().into(),
+        Arc::new(talos_plugin::HookRegistry::new()),
+    );
+    agent
+        .enable_model_checkpoint_tools()
+        .expect("enable model tools");
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: raw.clone(),
+            model_context_limit: 1_000_000,
+        },
+    );
+    actor.set_durable_persistence(durable.clone(), Default::default());
+    assert!(
+        actor
+            .set_recovered_history_sources_until(
+                durable.read_history_snapshot().expect("source snapshot"),
+                tokio::time::Instant::now() + Duration::from_secs(2),
+            )
+            .await
+    );
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor
+    });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "finish reviewing the baseline before continuing the report".into(),
+        })
+        .await
+        .expect("baseline review submission");
+    let completed_boundary = tokio::time::timeout(
+        Duration::from_secs(15),
+        collect_until_completions_with_idle_timeout(&mut handle.eq_rx, 1, Duration::from_secs(15)),
+    )
+    .await
+    .expect("completed task boundary");
+    assert!(completed_boundary.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    assert!(
+        !completed_boundary
+            .iter()
+            .any(|event| matches!(event, SessionEvent::ModelCheckpointTerminal { .. })),
+        "ordinary EndTurn must not emit a model-checkpoint terminal"
+    );
+    assert!(durable.read_messages().expect("completed task persisted").iter().any(|message| matches!(message, Message::Assistant { content, .. } if content == "baseline review complete; report remains pending")));
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "continue the remaining report".into(),
+        })
+        .await
+        .expect("submit");
+    // This scenario performs several independently bounded operations over
+    // 8300+ records. Bound the whole scenario separately from per-op deadlines;
+    // No progress event is required between bounded recovery pages. The outer
+    // deadline bounds total completion, including admission/batch deadlocks.
+    let captured = tokio::time::timeout(
+        Duration::from_secs(30),
+        collect_until_completions_with_idle_timeout(&mut handle.eq_rx, 1, Duration::from_secs(30)),
+    )
+    .await
+    .expect("no circular admission/batch wait");
+    assert!(captured.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    let terminals: Vec<_> = captured
+        .iter()
+        .filter_map(|event| match event {
+            SessionEvent::ModelCheckpointTerminal {
+                operation_id,
+                outcome,
+                ..
+            } => Some((*operation_id, *outcome)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        terminals.len(),
+        2,
+        "one Session terminal per admitted checkpoint"
+    );
+    assert_eq!(
+        terminals.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+        vec![0, 1]
+    );
+    assert!(terminals.iter().all(|(_, outcome)| matches!(
+        outcome,
+        talos_core::session::CompactOutcome::Applied { .. }
+    )));
+    for (operation, outcome) in &terminals {
+        if let talos_core::session::CompactOutcome::Applied { before, after } = outcome {
+            assert!(after < before, "actual request must reclaim context");
+            println!(
+                "checkpoint_operation={operation} request_tokens_before={before} request_tokens_after={after}"
+            );
+        }
+    }
+    let (fork_receipt, mut fork_result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkDurable {
+            external_id: "checkpoint-child".into(),
+            receipt_tx: Some(fork_receipt),
+        })
+        .await
+        .expect("fork after Applied A and B");
+    let child_id = tokio::time::timeout(Duration::from_secs(10), fork_result.recv())
+        .await
+        .expect("fork deadline")
+        .expect("receipt")
+        .expect("fork accepted");
+    let forked = talos_session::DurableSession::open_existing(root.path(), "checkpoint-child")
+        .expect("child lookup")
+        .expect("child");
+    assert_eq!(child_id, forked.id().to_string());
+    assert_ne!(forked.id(), durable.id());
+    assert_eq!(
+        std::fs::read(forked.file_path()).expect("fork bytes"),
+        std::fs::read(durable.file_path()).expect("parent bytes")
+    );
+    drop(forked);
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    let actor = task.await.expect("actor");
+    assert_eq!(&actor.history[..raw.len()], raw.as_slice());
+    assert_eq!(
+        model.step.load(Ordering::SeqCst),
+        13,
+        "two checkpoints, recovery and pending verification with no repeated collection"
+    );
+    let persisted = std::fs::read(durable.file_path()).expect("persisted transcript");
+    assert!(
+        persisted.starts_with(&original_bytes),
+        "checkpoint must not rewrite the original transcript"
+    );
+    let exported_entries = durable
+        .session()
+        .read_entries()
+        .expect("post-checkpoint export source");
+    let exported: serde_json::Value = serde_json::from_str(
+        &talos_session::export_json(&exported_entries).expect("post-checkpoint JSON export"),
+    )
+    .expect("export JSON");
+    let original_export = original_export.as_array().expect("original entries");
+    assert_eq!(
+        &exported.as_array().expect("exported entries")[..original_export.len()],
+        original_export.as_slice(),
+        "JSON export must retain every original role/content/timestamp/metadata entry"
+    );
+    let markdown = talos_session::export_markdown(&exported_entries);
+    assert!(markdown.starts_with(original_markdown.trim_end_matches('\n')));
+    assert!(markdown.contains("userconstraintfact report must use metric units"));
+    assert!(markdown.contains("omittedfact original constraint"));
+    assert!(
+        !exported_entries.iter().any(|entry| entry
+            .content
+            .starts_with("[Derived checkpoint; source history remains authoritative]")),
+        "derived provider projection must not replace exported source entries"
+    );
+    let tool_calls: Vec<_> = actor
+        .history
+        .iter()
+        .filter_map(|message| match message {
+            Message::Assistant { tool_calls, .. } => Some(tool_calls),
+            _ => None,
+        })
+        .flatten()
+        .map(|call| call.name.as_str())
+        .collect();
+    assert_eq!(
+        tool_calls
+            .iter()
+            .filter(|name| **name == "compact_context")
+            .count(),
+        2
+    );
+    assert_eq!(
+        tool_calls
+            .iter()
+            .filter(|name| **name == "history_search")
+            .count(),
+        7
+    );
+
+    assert_eq!(
+        tool_calls
+            .iter()
+            .filter(|name| **name == "verify_research_total")
+            .count(),
+        1
+    );
+    assert_eq!(
+        tool_calls
+            .iter()
+            .filter(|name| **name == "original_fact")
+            .count(),
+        1
+    );
+
+    assert!(
+        actor
+            .agent
+            .checkpoint_projection_state
+            .lock()
+            .expect("projection")
+            .is_some()
+    );
+    // The child receives only a disk path; no Actor/projection/query state crosses
+    // this boundary. Join shutdown before starting it so committed bytes are final.
+    drop(actor);
+    drop(durable);
+    for identity in ["checkpoint-recovery", "checkpoint-child"] {
+        let mut child = tokio::process::Command::new(std::env::current_exe().expect("test binary"));
+        child.args(["--exact", "session::tests::registered_model_checkpoint_discovers_admits_and_applies_through_actor", "--nocapture"])
+        .env("TALOS_TEST_CHECKPOINT_RESTART_ROOT", root.path())
+        .env("TALOS_TEST_CHECKPOINT_IDENTITY", identity)
+        .env("TALOS_TEST_CHECKPOINT_PARENT_PID", std::process::id().to_string())
+        .kill_on_drop(true);
+        let output = tokio::time::timeout(Duration::from_secs(30), child.output())
+            .await
+            .expect("bounded child recovery")
+            .expect("launch child");
+        assert!(
+            output.status.success(),
+            "child failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("TALOS_CHECKPOINT_RESTART_VERIFIED"),
+            "child must actually execute recovery, not pass an empty test selection"
+        );
+        let reopened = talos_session::DurableSession::open_existing(root.path(), identity)
+            .expect("reopen after child")
+            .expect("durable binding");
+        assert!(
+            std::fs::read(reopened.file_path())
+                .expect("child transcript")
+                .starts_with(&persisted)
+        );
+    }
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "original work must not rerun"
+    );
+    assert_eq!(
+        *operations.lock().expect("operation ledger"),
+        ["read-source", "try-missing-source"],
+        "completed and known-failed operations must execute only once"
+    );
+    assert_eq!(std::fs::read(source).expect("retained input"), source_bytes);
+    assert_eq!(
+        verification_calls.load(Ordering::SeqCst),
+        1,
+        "pending verification executes once"
+    );
+    println!(
+        "research_collection_reads=1 verification_reads=1 known_failed_attempts=1 checkpoints=2 restart_processes=2"
+    );
+}
+
+#[test]
+fn model_checkpoint_enable_reports_collision_without_partial_registration() {
+    let mut tools = ToolRegistry::new();
+    tools.register(Arc::new(crate::checkpoint_tools::HistorySearchTool));
+    let mut agent = Agent::new(Arc::new(MockModel::new(vec![])), tools);
+    assert!(agent.enable_model_checkpoint_tools().is_err());
+    assert!(agent.tools.get("history_search").is_some());
+    assert!(!agent.tools.is_builtin_instance("history_search"));
+    assert!(agent.tools.get("compact_context").is_none());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn durable_actor_history_search_and_detail_reach_real_provider_continuation() {
+    struct RecoveryModel {
+        step: AtomicUsize,
+    }
+    #[async_trait]
+    impl LanguageModel for RecoveryModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let step = self.step.fetch_add(1, Ordering::SeqCst);
+            let result = |id: &str| -> serde_json::Value {
+                let result = messages
+                    .iter()
+                    .find_map(|message| match message {
+                        Message::Tool { result } if result.tool_use_id == id => Some(result),
+                        _ => None,
+                    })
+                    .expect("real paired result");
+                assert!(!result.is_error, "{}", result.content);
+                serde_json::from_str(&result.content).expect("result JSON")
+            };
+            let events = if step < 4 {
+                let input = match step {
+                    0 => serde_json::json!({"mode":"discover"}),
+                    1 => {
+                        serde_json::json!({"mode":"search","snapshot":result("recover-0")["snapshot"],"query":"originalfact"})
+                    }
+                    2 => {
+                        let found = result("recover-1");
+                        assert_eq!(
+                            found["results"].as_array().expect("results").len(),
+                            1,
+                            "hidden arguments and unverified tool output must not contribute search hits"
+                        );
+                        assert_eq!(
+                            found["results"][0]["text"],
+                            "originalfact unique constraint"
+                        );
+                        let reference = found["results"][0]["reference"]
+                            .as_str()
+                            .expect("reference");
+                        let mut forged = reference.as_bytes().to_vec();
+                        let last = forged.last_mut().expect("nonempty reference");
+                        *last = if *last == b'0' { b'1' } else { b'0' };
+                        serde_json::json!({"mode":"detail","snapshot":result("recover-0")["snapshot"],"reference":String::from_utf8(forged).expect("ASCII reference")})
+                    }
+                    _ => {
+                        let refusal = messages
+                            .iter()
+                            .find_map(|message| match message {
+                                Message::Tool { result } if result.tool_use_id == "recover-2" => {
+                                    Some(result)
+                                }
+                                _ => None,
+                            })
+                            .expect("paired forged-reference refusal");
+                        assert!(refusal.is_error, "forged reference must be refused");
+                        assert_eq!(
+                            refusal.content,
+                            "history recovery Unavailable\n\n[Analyze the error above and try a different approach.]"
+                        );
+                        let found = result("recover-1");
+                        serde_json::json!({"mode":"detail","snapshot":result("recover-0")["snapshot"],"reference":found["results"][0]["reference"]})
+                    }
+                };
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: format!("recover-{step}"),
+                            name: "history_search".into(),
+                            input,
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else {
+                assert_eq!(step, 4);
+                assert_eq!(
+                    result("recover-3")["text"],
+                    "originalfact unique constraint"
+                );
+                success_events("recovered and continued")
+            };
+            let (tx, rx) = mpsc::channel(16);
+            for event in events {
+                tx.send(event).await.expect("receiver");
+            }
+            Ok(rx)
+        }
+    }
+    let root = tempfile::tempdir().expect("root");
+    let durable =
+        talos_session::DurableSession::open_or_create(root.path(), "recovery").expect("durable");
+    let mut raw: Vec<_> = (0..30)
+        .map(|i| Message::User {
+            content: if i == 0 {
+                "originalfact unique constraint".into()
+            } else {
+                format!("other {i}")
+            },
+        })
+        .collect();
+    raw.extend([
+        Message::User {
+            content: "Authorization: Bearer originalfact credential sentinel".into(),
+        },
+        Message::Assistant {
+            content: "public assistant response".into(),
+            reasoning: Some(talos_core::message::AssistantReasoning {
+                provider: "fixture".into(),
+                model: "fixture".into(),
+                blocks: vec![
+                    talos_core::message::ReasoningBlock::Thinking {
+                        text: "originalfact private reasoning sentinel".into(),
+                        signature: Some("originalfact opaque signature sentinel".into()),
+                    },
+                    talos_core::message::ReasoningBlock::Redacted {
+                        data: "originalfact redacted reasoning sentinel".into(),
+                    },
+                ],
+            }),
+            tool_calls: vec![talos_core::message::ToolCall {
+                id: "hidden-recovery-input".into(),
+                name: "private_fixture".into(),
+                input: serde_json::json!({"argument":"originalfact hidden input sentinel"}),
+            }],
+        },
+        Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: "hidden-recovery-input".into(),
+                content: "originalfact unverified output sentinel".into(),
+                is_error: false,
+            },
+        },
+    ]);
+    durable
+        .commit_turn(
+            "prior",
+            &raw,
+            &talos_session::PersistencePolicy {
+                persist_reasoning: true,
+                persist_raw_tool_output: true,
+            },
+        )
+        .expect("commit");
+    durable
+        .session()
+        .append_with_metadata(
+            &Message::User {
+                content: "public legacy attachment summary".into(),
+            },
+            talos_session::SessionMetadata {
+                raw_content: Some("originalfact private raw-content sentinel".into()),
+                ..Default::default()
+            },
+        )
+        .expect("persist legacy raw-content metadata");
+    let persisted =
+        serde_json::to_string(&durable.session().read_entries().expect("persisted entries"))
+            .expect("serialized persisted evidence");
+    assert!(persisted.contains("originalfact hidden input sentinel"));
+    assert!(persisted.contains("originalfact unverified output sentinel"));
+    assert!(!persisted.contains("originalfact credential sentinel"));
+    assert!(persisted.contains("[REDACTED]"));
+    for marker in [
+        "originalfact private reasoning sentinel",
+        "originalfact opaque signature sentinel",
+        "originalfact redacted reasoning sentinel",
+        "originalfact private raw-content sentinel",
+    ] {
+        assert!(
+            persisted.contains(marker),
+            "private metadata must actually be persisted: {marker}"
+        );
+    }
+    let mut engine = talos_permission::PermissionEngine::empty();
+    engine.set_workspace_root(root.path().into());
+    engine.add_rule(talos_permission::PermissionRule::new_nature(
+        talos_core::tool::ToolNature::Read,
+        None,
+        None,
+        talos_permission::PermissionDecision::Allow,
+    ));
+    let mut agent = Agent::with_security_and_hooks(
+        Arc::new(RecoveryModel {
+            step: AtomicUsize::new(0),
+        }),
+        ToolRegistry::new(),
+        Some(Arc::new(engine)),
+        None,
+        root.path().into(),
+        Arc::new(talos_plugin::HookRegistry::new()),
+    );
+    agent.enable_model_checkpoint_tools().expect("enable");
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: raw.clone(),
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_durable_persistence(durable.clone(), Default::default());
+    actor.set_recovered_history_sources(durable.read_history_snapshot().expect("snapshot"));
+    let task = tokio::spawn(async move {
+        actor.run().await;
+        actor
+    });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "recover prior constraint".into(),
+        })
+        .await
+        .expect("submit");
+    let events = tokio::time::timeout(
+        Duration::from_secs(15),
+        collect_until_completions(&mut handle.eq_rx, 1),
+    )
+    .await
+    .expect("bounded turn");
+    assert!(events.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    let actor = task.await.expect("actor");
+    assert_eq!(&actor.history[..raw.len()], raw.as_slice());
+}
+
+#[cfg(any(unix, windows))]
+#[tokio::test]
+async fn fork_worker_busy_compact_receipt_and_interrupt_are_observed() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let durable =
+        talos_session::DurableSession::open_or_create(workspace.path(), "parent").expect("parent");
+    let agent = make_agent(CountingModel {
+        calls: Arc::new(AtomicUsize::new(0)),
+    });
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: workspace.path().to_path_buf(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_durable_persistence(durable, Default::default());
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    actor.fork_worker_gate = Some((reached.clone(), release.clone()));
+    let task = tokio::spawn(async move { actor.run().await });
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkDurable {
+            external_id: "child".into(),
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("fork");
+    tokio::time::timeout(Duration::from_secs(2), reached.notified())
+        .await
+        .expect("worker entered");
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 77,
+        })
+        .await
+        .expect("compact");
+    let event = tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+        .await
+        .expect("receipt deadline")
+        .expect("event");
+    assert!(matches!(
+        event,
+        SessionEvent::CompactStatus {
+            operation_id: 77,
+            state: talos_core::session::CompactState::Busy,
+            ..
+        }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("interrupt");
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), result.recv())
+            .await
+            .expect("cancel deadline")
+            .expect("result")
+            .is_err()
+    );
+    assert!(
+        talos_session::DurableSession::open_existing(workspace.path(), "child")
+            .expect("lookup")
+            .is_none()
+    );
+    release.store(true, Ordering::SeqCst);
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkDurable {
+            external_id: "child".into(),
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("retry");
+    // The retry performs real durable storage work with a ten-second production
+    // budget. Keep the two-second cancellation assertion above, but allow the
+    // operation budget plus receipt dispatch here on loaded native runners.
+    assert!(
+        tokio::time::timeout(Duration::from_secs(12), result.recv())
+            .await
+            .expect("retry deadline")
+            .expect("result")
+            .is_ok()
+    );
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(2), task)
+        .await
+        .expect("join deadline")
+        .expect("join");
+}
+
+#[cfg(any(unix, windows))]
+#[tokio::test]
+async fn fork_worker_shutdown_and_actor_abort_retire_before_publication() {
+    for cancellation in ["shutdown", "abort", "receipt_closed"] {
+        let workspace = tempfile::tempdir().expect("workspace");
+        let durable = talos_session::DurableSession::open_or_create(workspace.path(), "parent")
+            .expect("parent");
+        let (handle, mut actor) = AppServerSession::new(
+            make_agent(CountingModel {
+                calls: Arc::new(AtomicUsize::new(0)),
+            }),
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: workspace.path().to_path_buf(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_durable_persistence(durable, Default::default());
+        let reached = Arc::new(tokio::sync::Notify::new());
+        actor.fork_worker_gate = Some((
+            reached.clone(),
+            Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        ));
+        let task = tokio::spawn(async move { actor.run().await });
+        let (receipt, mut result) = mpsc::unbounded_channel();
+        handle
+            .sq_tx
+            .send(SessionOp::ForkDurable {
+                external_id: "child".into(),
+                receipt_tx: Some(receipt),
+            })
+            .await
+            .expect("fork");
+        tokio::time::timeout(Duration::from_secs(2), reached.notified())
+            .await
+            .expect("worker entered");
+        if cancellation == "receipt_closed" {
+            // Closing admission to the receipt independently cancels the worker.
+            // Keep the receiver to witness every sender retiring before shutdown,
+            // so shutdown cannot accidentally be the cause of cancellation.
+            result.close();
+            assert!(
+                tokio::time::timeout(Duration::from_secs(2), result.recv())
+                    .await
+                    .expect("closed receipt worker retirement")
+                    .is_none()
+            );
+            assert!(
+                talos_session::DurableSession::open_existing(workspace.path(), "child")
+                    .expect("lookup before shutdown")
+                    .is_none()
+            );
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown after retirement");
+            tokio::time::timeout(Duration::from_secs(2), task)
+                .await
+                .expect("Actor remains responsive")
+                .expect("join");
+        } else if cancellation == "abort" {
+            task.abort();
+            assert!(task.await.expect_err("aborted Actor").is_cancelled());
+            // The blocking worker owns the remaining sender. Channel closure
+            // therefore witnesses its exit, not merely the Actor's cancellation.
+            assert!(
+                tokio::time::timeout(Duration::from_secs(2), result.recv())
+                    .await
+                    .expect("worker exit")
+                    .is_none()
+            );
+        } else {
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+            assert!(
+                tokio::time::timeout(Duration::from_secs(2), result.recv())
+                    .await
+                    .expect("worker receipt")
+                    .expect("result")
+                    .is_err()
+            );
+            tokio::time::timeout(Duration::from_secs(2), task)
+                .await
+                .expect("Actor joined after worker")
+                .expect("join");
+        }
+        assert!(
+            talos_session::DurableSession::open_existing(workspace.path(), "child")
+                .expect("lookup")
+                .is_none()
+        );
+    }
+}
+
+#[tokio::test]
+async fn cooperative_recovered_sources_bind_long_history_and_refuse_foreign_or_expired() {
+    let root = tempfile::tempdir().expect("root");
+    let durable = talos_session::DurableSession::open_or_create(root.path(), "long-recovery")
+        .expect("session");
+    let raw: Vec<_> = (0..8300)
+        .map(|i| Message::User {
+            content: format!("original {i}"),
+        })
+        .collect();
+    durable
+        .commit_turn("original", &raw, &Default::default())
+        .expect("commit");
+    let snapshot = durable.read_history_snapshot().expect("snapshot");
+    let expected = format!("tlog:{}:{}", durable.id(), snapshot.entries()[8299].0);
+    let (_handle, mut actor) = AppServerSession::new(
+        make_agent(MockModel::new(vec![success_events("continued")])),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: raw.clone(),
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_durable_persistence(durable.clone(), Default::default());
+    let deadline = || tokio::time::Instant::now() + Duration::from_secs(10);
+    assert!(
+        actor
+            .set_recovered_history_sources_until(snapshot.clone(), deadline())
+            .await
+    );
+    assert_eq!(
+        actor
+            .recovered_source
+            .as_ref()
+            .expect("source")
+            .resolve(0, 8300, 8299, &raw[8299]),
+        Some(expected.as_str())
+    );
+    // Poll into the cooperative scan, then drop it while it owns the mutable
+    // Actor borrow. Previously installed authority must not survive cancellation.
+    {
+        let mut binding =
+            Box::pin(actor.set_recovered_history_sources_until(snapshot.clone(), deadline()));
+        let pending = std::future::poll_fn(|cx| {
+            std::task::Poll::Ready(binding.as_mut().poll(cx).is_pending())
+        })
+        .await;
+        assert!(pending, "long binding must yield before publication");
+    }
+    assert!(actor.recovered_source.is_none());
+    assert!(
+        actor
+            .set_recovered_history_sources_until(snapshot.clone(), deadline())
+            .await
+    );
+    assert!(
+        !actor
+            .set_recovered_history_sources_until(snapshot.clone(), tokio::time::Instant::now())
+            .await
+    );
+    assert!(actor.recovered_source.is_none());
+    let reopened = talos_session::DurableSession::open_existing(root.path(), "long-recovery")
+        .expect("lookup")
+        .expect("existing");
+    assert!(
+        !actor
+            .set_recovered_history_sources_until(
+                reopened.read_history_snapshot().expect("foreign owner"),
+                deadline()
+            )
+            .await
+    );
+    actor.history[8299] = Message::User {
+        content: "changed".into(),
+    };
+    assert!(
+        !actor
+            .set_recovered_history_sources_until(snapshot.clone(), deadline())
+            .await
+    );
+    assert!(actor.recovered_source.is_none());
+    actor.history[8299] = raw[8299].clone();
+    assert!(
+        actor
+            .set_recovered_history_sources_until(snapshot, deadline())
+            .await
+    );
+    let started = actor
+        .start_submission(
+            structured_submission(
+                "long-next",
+                "long-item",
+                0,
+                "continue",
+                SubmissionSource::Compatibility,
+            ),
+            1,
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("long turn admission"));
+    let record = started.handle.await.expect("worker").expect("turn record");
+    assert!(
+        record
+            .committed_source
+            .as_ref()
+            .is_some_and(Option::is_some)
+    );
+    actor.commit_turn_record(record);
+    let revision = actor.history.len() as u64;
+    let source = actor
+        .recovered_source
+        .as_ref()
+        .expect("long committed source");
+    assert_eq!(
+        source.resolve(0, revision, 8299, &raw[8299]),
+        Some(expected.as_str())
+    );
+    let committed = durable.read_history_snapshot().expect("updated snapshot");
+    let last = actor.history.len() - 1;
+    let last_id = format!("tlog:{}:{}", durable.id(), committed.entries()[last].0);
+    assert_eq!(
+        source.resolve(0, revision, last, &actor.history[last]),
+        Some(last_id.as_str())
+    );
+}

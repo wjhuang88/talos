@@ -128,6 +128,7 @@ impl SessionCommandTarget {
             | SessionOp::SubmitStructuredReconcile { .. }
             | SessionOp::SubmitStructuredReconcileTracked { .. }
             | SessionOp::SetSkillContext { .. }
+            | SessionOp::ForkDurable { .. }
             | SessionOp::InterruptTurn { .. }
             | SessionOp::Compact { .. }
             | SessionOp::CancelCompact { .. }
@@ -182,6 +183,7 @@ pub struct SessionTransition {
     active_session: Session,
     permission_state: Option<Arc<talos_permission::PermissionSessionState>>,
     active_runtime: Option<ActiveRuntime>,
+    retiring_runtime: Option<JoinHandle<()>>,
     prepared: Option<PreparedSession>,
     quiesced_generation: Option<u64>,
     prepared_mcp_runtime: Option<McpSessionRuntime>,
@@ -201,6 +203,7 @@ impl SessionTransition {
             active_session: session,
             permission_state: None,
             active_runtime: None,
+            retiring_runtime: None,
             prepared: None,
             quiesced_generation: None,
             prepared_mcp_runtime: None,
@@ -393,6 +396,9 @@ impl SessionTransition {
             .take()
             .expect("prepared transition was checked before the durable fence");
         let old_target = self.active_target.clone();
+        // Keep prepared resources in this future so cancellation during retirement
+        // cannot leave a stale MCP preparation blocking a retry.
+        let prepared_mcp_runtime = self.prepared_mcp_runtime.take();
 
         if quiesced_generation.is_none() {
             self.retire_active_runtime().await;
@@ -438,7 +444,7 @@ impl SessionTransition {
             scheduler_cancel,
             scheduler_join,
             publication_abort,
-            _mcp_runtime: self.prepared_mcp_runtime.take(),
+            _mcp_runtime: prepared_mcp_runtime,
         });
         self.active_target = new_target;
         let old_session = std::mem::replace(&mut self.active_session, prepared.session);
@@ -500,10 +506,15 @@ impl SessionTransition {
             }
             Err(error) => {
                 let failed_session = self.active_session.clone();
-                self.abort_committed_publication().await;
+                let cleanup = self.begin_abort_committed_publication();
                 self.active_target = old_target;
                 self.active_session = old_session.clone();
                 session_watch_tx.send_replace(old_session.clone());
+                // Logical ownership must be restored before an await: callers
+                // can drop this future and remove the unpublished child.
+                if let Some(cleanup) = cleanup {
+                    let _ = cleanup.await;
+                }
                 Err(format!(
                     "replacement publication failed after the durable fence: {error}. Failed Session {} is stopped; logical ownership was restored to Session {} at generation {}. Resume or retry the lifecycle operation",
                     failed_session.id,
@@ -514,35 +525,51 @@ impl SessionTransition {
         }
     }
 
-    async fn abort_committed_publication(&mut self) {
+    fn begin_abort_committed_publication(&mut self) -> Option<JoinHandle<()>> {
         self.active_target.cancel_routes();
-        if let Some(runtime) = self.active_runtime.take() {
+        self.active_runtime.take().map(|runtime| {
             runtime.publication_abort.cancel();
             runtime.scheduler_cancel.cancel();
-            if let Err(error) = runtime.scheduler_join.await {
-                tracing::warn!(%error, "aborted Session Scheduler task did not join cleanly");
-            }
-            if let Err(error) = runtime.actor_join.await {
-                tracing::warn!(%error, "aborted Session Actor task did not join cleanly");
-            }
-        }
+            tokio::spawn(async move {
+                if let Err(error) = runtime.scheduler_join.await {
+                    tracing::warn!(%error, "aborted Session Scheduler task did not join cleanly");
+                }
+                if let Err(error) = runtime.actor_join.await {
+                    tracing::warn!(%error, "aborted Session Actor task did not join cleanly");
+                }
+            })
+        })
     }
 
     async fn retire_active_runtime(&mut self) {
         self.active_target.cancel_routes();
-        if let Some(runtime) = self.active_runtime.take() {
-            runtime.publication_abort.cancel();
-            runtime.scheduler_cancel.cancel();
-            if let Err(error) = runtime.scheduler_join.await {
-                tracing::warn!(%error, "retired Session Scheduler task did not join cleanly");
-            }
-            self.active_target.shutdown_actor().await;
-            if let Err(error) = runtime.actor_join.await {
-                tracing::warn!(%error, "retired Session Actor task did not join cleanly");
-            }
-        } else {
-            self.active_target.shutdown_actor().await;
+        if self.retiring_runtime.is_none() {
+            let runtime = self.active_runtime.take();
+            let target = self.active_target.clone();
+            // Retirement must continue if the host drops a transition while
+            // awaiting shutdown. A retry joins the same task before publication.
+            self.retiring_runtime = Some(tokio::spawn(async move {
+                if let Some(runtime) = runtime {
+                    runtime.publication_abort.cancel();
+                    runtime.scheduler_cancel.cancel();
+                    if let Err(error) = runtime.scheduler_join.await {
+                        tracing::warn!(%error, "retired Session Scheduler task did not join cleanly");
+                    }
+                    target.shutdown_actor().await;
+                    if let Err(error) = runtime.actor_join.await {
+                        tracing::warn!(%error, "retired Session Actor task did not join cleanly");
+                    }
+                } else {
+                    target.shutdown_actor().await;
+                }
+            }));
         }
+        if let Some(task) = self.retiring_runtime.as_mut()
+            && let Err(error) = task.await
+        {
+            tracing::warn!(%error, "Session retirement task did not join cleanly");
+        }
+        self.retiring_runtime = None;
     }
 
     /// Stops the active Scheduler and Actor before process-level teardown.
@@ -561,6 +588,54 @@ impl SessionTransition {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn cancelled_retirement_keeps_shutdown_owned_until_retry_joins() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let session = manager
+            .create_session("parent", "workspace")
+            .expect("session");
+        let (tx, mut rx) = mpsc::channel(1);
+        let mut owner = SessionTransition::new(tx, session).expect("owner");
+        let route = owner.bind_active_sender();
+        let (done_tx, mut done_rx) = tokio::sync::oneshot::channel();
+        let actor = tokio::spawn(async move {
+            assert!(matches!(rx.recv().await, Some(SessionOp::Shutdown)));
+            let _ = done_tx.send(());
+        });
+        let stop = CancellationToken::new();
+        let stopped = stop.clone();
+        let release = Arc::new(tokio::sync::Notify::new());
+        let scheduler_release = release.clone();
+        let scheduler = tokio::spawn(async move {
+            stopped.cancelled().await;
+            scheduler_release.notified().await;
+        });
+        owner
+            .attach_active_runtime(actor, stop.clone(), scheduler)
+            .expect("attach");
+        {
+            let retirement = owner.retire_active_runtime();
+            tokio::pin!(retirement);
+            tokio::select! {
+                () = &mut retirement => panic!("scheduler has not released"),
+                () = stop.cancelled() => {},
+            }
+        }
+        assert!(owner.retiring_runtime.is_some());
+        assert!(done_rx.try_recv().is_err());
+        release.notify_one();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            owner.retire_active_runtime(),
+        )
+        .await
+        .expect("retry joins");
+        done_rx.await.expect("actor shutdown completed");
+        route.closed().await;
+        assert!(owner.retiring_runtime.is_none());
+    }
 
     #[tokio::test]
     async fn coalesced_watch_updates_resolve_latest_authoritative_generation() {
@@ -739,6 +814,59 @@ mod tests {
         assert!(!sqlite.exists());
         assert!(!std::path::PathBuf::from(format!("{}-wal", sqlite.display())).exists());
         assert!(!std::path::PathBuf::from(format!("{}-shm", sqlite.display())).exists());
+    }
+
+    #[tokio::test]
+    async fn cancelled_failed_publication_restores_owner_before_cleanup_wait() {
+        let (_temp, manager, mut transition, result, old_session, new_session, _) =
+            publication_failure_fixture("publication-cancel-cleanup").await;
+        let runtime = transition
+            .active_runtime
+            .as_mut()
+            .expect("replacement runtime");
+        runtime.scheduler_join.abort();
+        let stopped = runtime.scheduler_cancel.clone();
+        let reached = Arc::new(tokio::sync::Notify::new());
+        let signal = reached.clone();
+        let release = Arc::new(tokio::sync::Notify::new());
+        let released = release.clone();
+        let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+        runtime.scheduler_join = tokio::spawn(async move {
+            stopped.cancelled().await;
+            signal.notify_one();
+            released.notified().await;
+            let _ = done_tx.send(());
+        });
+        let (session_tx, session_rx) = watch::channel(old_session.clone());
+        let (placeholder, _rx) = mpsc::channel(1);
+        let (route_tx, _route_rx) = watch::channel(placeholder);
+        let (bridge_tx, bridge_rx) = mpsc::unbounded_channel();
+        drop(bridge_rx);
+        {
+            let publication = transition.publish_commit(
+                result,
+                new_session.clone(),
+                &session_tx,
+                &route_tx,
+                &bridge_tx,
+            );
+            tokio::pin!(publication);
+            tokio::select! {
+                result = &mut publication => panic!("cleanup should wait: {result:?}"),
+                () = reached.notified() => {},
+                () = tokio::time::sleep(std::time::Duration::from_secs(2)) => panic!("cleanup did not start"),
+            }
+        }
+        manager
+            .rollback_session_artifacts(&new_session)
+            .expect("child guard cleanup");
+        assert_eq!(transition.active_session().id, old_session.id);
+        assert_eq!(session_rx.borrow().id, old_session.id);
+        release.notify_one();
+        tokio::time::timeout(std::time::Duration::from_secs(2), done_rx)
+            .await
+            .expect("cleanup continues")
+            .expect("scheduler done");
     }
 
     #[tokio::test]

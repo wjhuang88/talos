@@ -594,15 +594,50 @@ pub fn extract_tool_calls_from_text(text: &str) -> Vec<ToolCall> {
     calls
 }
 
-pub fn strip_tool_syntax(text: &str) -> String {
-    let mut result = text.to_string();
-    while let Some(start) = result.find("```json-tool") {
-        let inner_start = start + "```json-tool".len();
-        let inner = &result[inner_start..];
-        let end = inner_start + inner.find("```").unwrap_or(inner.len()) + 3;
-        result.replace_range(start..end, "");
+/// Remove serialized JSON tool blocks while preserving surrounding visible text.
+/// Fences inside JSON strings are arguments, not block terminators. Malformed or
+/// truncated blocks are excluded through EOF rather than exposing their payload.
+pub fn strip_tool_syntax(mut text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    while let Some(start) = text.find("```json-tool") {
+        output.push_str(&text[..start]);
+        let inner = &text[start + "```json-tool".len()..];
+        let mut stream = serde_json::Deserializer::from_str(inner).into_iter::<serde_json::Value>();
+        if !matches!(stream.next(), Some(Ok(_))) {
+            return output.trim().to_owned();
+        }
+        let remainder = inner[stream.byte_offset()..].trim_start();
+        let Some(rest) = remainder.strip_prefix("```") else {
+            return output.trim().to_owned();
+        };
+        text = rest;
     }
-    result.trim().to_string()
+    output.push_str(text);
+    output.trim().to_owned()
+}
+
+#[cfg(test)]
+mod tool_syntax_regressions {
+    use super::strip_tool_syntax;
+
+    #[test]
+    fn truncated_blocks_are_excluded_without_panicking() {
+        for suffix in ["", "\n", "隐藏参数", "\n{\"private\":true}"] {
+            assert_eq!(
+                strip_tool_syntax(&format!("保留 ```json-tool{suffix}")),
+                "保留"
+            );
+        }
+    }
+
+    #[test]
+    fn multiple_blocks_preserve_visible_unicode_and_order() {
+        assert_eq!(
+            strip_tool_syntax(" 开始```json-tool\n{} ```中间```json-tool{} ```结束 "),
+            "开始中间结束"
+        );
+        assert_eq!(strip_tool_syntax(" ordinary text "), "ordinary text");
+    }
 }
 
 pub fn project_displayable_reasoning(ar: &AssistantReasoning) -> Option<String> {

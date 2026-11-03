@@ -115,6 +115,36 @@ pub(crate) fn fingerprint<T: serde::Serialize + ?Sized>(
     Some(sink.0.finish())
 }
 
+/// Hash every request component without imposing a cumulative transcript byte
+/// limit. Each component retains its serialization bound; only complete scans
+/// produce a key. Domain tags/counts preserve sequence and category boundaries.
+pub(crate) async fn fingerprint_request<
+    M: serde::Serialize,
+    D: serde::Serialize,
+    C: serde::Serialize,
+>(
+    messages: &[M],
+    definitions: &[D],
+    context: &C,
+    deadline: tokio::time::Instant,
+) -> Option<u64> {
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    hash.write(b"checkpoint-request-v2");
+    hash.write_u64(fingerprint(context, deadline)?);
+    hash.write_usize(messages.len());
+    for message in messages {
+        tokio::task::yield_now().await;
+        hash.write_u64(fingerprint(message, deadline)?);
+    }
+    hash.write(b"tools");
+    hash.write_usize(definitions.len());
+    for definition in definitions {
+        tokio::task::yield_now().await;
+        hash.write_u64(fingerprint(definition, deadline)?);
+    }
+    (tokio::time::Instant::now() < deadline).then(|| hash.finish())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,6 +195,60 @@ mod tests {
             .is_some()
         );
     }
+    #[tokio::test(start_paused = true)]
+    async fn request_fingerprint_scans_large_histories_and_preserves_all_components() {
+        let mut messages = vec!["x".repeat(1_000_000); 5];
+        let definitions = vec!["tool schema"];
+        let deadline = || tokio::time::Instant::now() + Duration::from_secs(10);
+        let key = fingerprint_request(&messages, &definitions, &42, deadline())
+            .await
+            .expect("aggregate over 4 MiB");
+        assert_eq!(
+            fingerprint_request(&messages, &definitions, &42, deadline()).await,
+            Some(key)
+        );
+        messages[4].push('y');
+        let changed = fingerprint_request(&messages, &definitions, &42, deadline())
+            .await
+            .expect("changed suffix");
+        assert_ne!(changed, key);
+        messages.swap(0, 4);
+        assert_ne!(
+            fingerprint_request(&messages, &definitions, &42, deadline()).await,
+            Some(changed)
+        );
+        assert_ne!(
+            fingerprint_request(&messages, &["changed tool schema"], &42, deadline()).await,
+            fingerprint_request(&messages, &definitions, &42, deadline()).await
+        );
+        assert_ne!(
+            fingerprint_request(&messages, &definitions, &43, deadline()).await,
+            fingerprint_request(&messages, &definitions, &42, deadline()).await
+        );
+        assert!(
+            fingerprint_request(
+                &["x".repeat(4 * 1024 * 1024)],
+                &definitions,
+                &42,
+                deadline()
+            )
+            .await
+            .is_none()
+        );
+        let work = fingerprint_request(&messages, &definitions, &42, deadline());
+        tokio::pin!(work);
+        tokio::select! {
+            biased;
+            _ = &mut work => panic!("large identity scan must yield"),
+            _ = std::future::ready(()) => {},
+        }
+        tokio::time::advance(Duration::from_secs(11)).await;
+        assert!(
+            work.await.is_none(),
+            "expired partial scan must not produce a key"
+        );
+    }
+
     #[test]
     fn expired_fingerprint_budget_refuses_before_hashing() {
         assert!(fingerprint(&"source", tokio::time::Instant::now()).is_none());

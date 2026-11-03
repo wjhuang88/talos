@@ -17,10 +17,17 @@ schemars = "1.2.2"
 thiserror = "2.0.20"
 uuid = { version = "1.26.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
-rusqlite = { version = "0.40.2", features = ["backup", "bundled"] }
+rusqlite = { version = "0.40.2", features = ["backup", "bundled", "hooks"] }
 sha2 = "0.11"
 hex = "0.4"
 zstd = { version = "0.14", optional = true }
+
+# OS open flags only; no Talos-authored unsafe or new native implementation.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Storage_FileSystem", "Win32_Foundation"] }
 
 [features]
 default = ["archive-compress-zstd"]
@@ -28,7 +35,7 @@ archive-compress-zstd = ["dep:zstd"]
 
 [dev-dependencies]
 tempfile = "3"
-tokio = { version = "1.53.1", features = ["macros", "rt"] }
+tokio = { version = "1.53.1", features = ["macros", "rt", "sync", "time"] }
 
 [lints]
 workspace = true

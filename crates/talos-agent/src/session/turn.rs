@@ -11,7 +11,7 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::session::{SessionEvent, TurnCompletionStatus, TurnEventPayload};
 use talos_session::{TurnTranscriptOutcome, TurnTranscriptOutcomeRecord};
 
-use crate::{Agent, PreparedSessionTurn, SteeringBoundaryAcknowledgement, SteeringBoundaryRequest};
+use crate::{Agent, PreparedSessionTurn, SteeringBoundaryAcknowledgement};
 
 #[derive(Clone)]
 pub(super) struct TurnPersistence {
@@ -23,9 +23,16 @@ pub(super) struct TurnPersistence {
 pub(super) struct DurableTurnPersistence {
     pub(super) session: talos_session::DurableSession,
     pub(super) policy: talos_session::PersistencePolicy,
+    pub(super) recovery_preparation:
+        Arc<tokio::sync::Mutex<Option<crate::checkpoint_history::Preparation>>>,
 }
 
 pub(super) struct TurnRecord {
+    // None: compatibility path has not attempted binding. Some(None): worker
+    // refused or exhausted its budget; never retry synchronously in the Actor.
+    // Some(Some(source)): complete worker-owned snapshot for atomic installation.
+    pub(super) committed_source: Option<Option<crate::compaction::HistorySource>>,
+    pub(super) completion_events: Vec<SessionEvent>,
     pub(super) new_messages: Vec<Message>,
     pub(super) persisted_entry_ids: Vec<String>,
     pub(super) status: TurnRecordStatus,
@@ -52,7 +59,7 @@ pub(super) struct TurnForwarding {
     pub(super) persistence: Option<TurnPersistence>,
     pub(super) durable_persistence: Option<DurableTurnPersistence>,
     pub(super) result_tx: tokio::sync::oneshot::Sender<TurnRecord>,
-    pub(super) boundary_tx: mpsc::UnboundedSender<SteeringBoundaryRequest>,
+    pub(super) boundary_tx: mpsc::UnboundedSender<crate::AgentActorRequest>,
     pub(super) boundary_ack_tx: mpsc::UnboundedSender<SteeringBoundaryAcknowledgement>,
     #[cfg(test)]
     pub(super) boundary_ack_cancel_gate: Option<Arc<tokio::sync::Notify>>,
@@ -89,7 +96,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let diagnostic_failures = Arc::new(Mutex::new(Vec::<String>::new()));
     let progress_diagnostic_failures = diagnostic_failures.clone();
     let diagnostic_turn_id = turn_id.clone();
-    let (snapshot_tx, mut snapshot_rx) = mpsc::unbounded_channel::<Vec<Message>>();
+    let (snapshot_tx, mut snapshot_rx) =
+        mpsc::unbounded_channel::<crate::persistence_snapshot::PersistenceSnapshot>();
     let (agent_ack_tx, mut agent_ack_rx) =
         mpsc::unbounded_channel::<SteeringBoundaryAcknowledgement>();
 
@@ -178,14 +186,33 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         .sandbox
         .as_ref()
         .and_then(|sandbox| sandbox.cleanup_receipt());
+    let history_owner = durable_persistence.clone();
+    let history_cancel = cancel_token.clone();
     let mut agent_task = tokio::spawn(async move {
-        agent
-            .run_prepared_session_turn(
-                prepared,
-                event_tx,
-                Some(snapshot_tx),
-                Some(boundary_tx),
-                Some(agent_ack_tx),
+        let recovery = if agent.tools.is_builtin_instance("history_search") {
+            if let Some(owner) = &history_owner {
+                crate::checkpoint_history::History::prepare_cached(
+                    &owner.session,
+                    &history_cancel,
+                    &owner.recovery_preparation,
+                )
+                .await
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        crate::checkpoint_history::HISTORY
+            .scope(
+                recovery,
+                agent.run_prepared_session_turn(
+                    prepared,
+                    event_tx,
+                    Some(snapshot_tx),
+                    Some(boundary_tx),
+                    Some(agent_ack_tx),
+                ),
             )
             .await
     });
@@ -208,8 +235,10 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             let tool_cleanup_error = tool_cleanup.wait(cleanup_turn_id, cleanup_deadline.saturating_duration_since(tokio::time::Instant::now())).await.err();
             let _ = forwarder.await;
             let mut stable_prefix = Vec::new();
+            let mut recovery = Vec::new();
             while let Ok(snapshot) = snapshot_rx.try_recv() {
-                stable_prefix = snapshot;
+                stable_prefix = snapshot.messages;
+                recovery = snapshot.recovery;
             }
             if !stable_prefix.is_empty() {
                 // Preserve completed effects, but close the cancelled request before
@@ -243,10 +272,11 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             }
             let mut persisted_entry_ids = Vec::new();
             if let Some(durable) = &durable_persistence {
-                match durable.session.finalize_turn(
+                match durable.session.finalize_turn_with_recovery(
                     &turn_id, &stable_prefix, &durable.policy,
                     if cancellation_error.is_some() { TurnTranscriptOutcome::Error }
                     else { TurnTranscriptOutcome::Cancelled },
+                    &recovery,
                 ) {
                     Ok(commit) => persisted_entry_ids = commit.entry_ids,
                     Err(error) => {
@@ -290,6 +320,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    committed_source: None,
+                    completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
@@ -308,6 +340,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                committed_source: None,
+                completion_events: Vec::new(),
                 persisted_entry_ids,
                 new_messages: stable_prefix,
                 status: TurnRecordStatus::Cancelled,
@@ -375,6 +409,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    committed_source: None,
+                    completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
@@ -413,6 +449,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    committed_source: None,
+                    completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
@@ -439,6 +477,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     },
                 });
                 let _ = result_tx.send(TurnRecord {
+                    committed_source: None,
+                    completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
                     status: TurnRecordStatus::Error,
@@ -446,11 +486,23 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 });
                 return;
             }
+            let mut recovery = Vec::new();
+            while let Ok(snapshot) = snapshot_rx.try_recv() {
+                // Only the final matching execution snapshot can attest this commit.
+                recovery = if snapshot.messages == new_messages {
+                    snapshot.recovery
+                } else {
+                    Vec::new()
+                };
+            }
             let persisted_entry_ids = if let Some(persistence) = &durable_persistence {
-                match persistence
-                    .session
-                    .commit_turn(&turn_id, &new_messages, &persistence.policy)
-                {
+                match persistence.session.finalize_turn_with_recovery(
+                    &turn_id,
+                    &new_messages,
+                    &persistence.policy,
+                    TurnTranscriptOutcome::Success,
+                    &recovery,
+                ) {
                     Ok(commit) => commit.entry_ids,
                     Err(error) => {
                         let mut message = format!("failed to persist completed turn: {error}");
@@ -475,6 +527,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                             },
                         });
                         let _ = result_tx.send(TurnRecord {
+                            committed_source: None,
+                            completion_events: Vec::new(),
                             persisted_entry_ids: Vec::new(),
                             new_messages: Vec::new(),
                             status: TurnRecordStatus::Error,
@@ -507,6 +561,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                committed_source: None,
+                completion_events: Vec::new(),
                 persisted_entry_ids,
                 new_messages,
                 status: TurnRecordStatus::Success,
@@ -514,6 +570,14 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             });
         }
         Ok((Err(e), partial_messages)) => {
+            let mut recovery = Vec::new();
+            while let Ok(snapshot) = snapshot_rx.try_recv() {
+                recovery = if snapshot.messages == partial_messages {
+                    snapshot.recovery
+                } else {
+                    Vec::new()
+                };
+            }
             let mut error_message = e.to_string();
             if diagnostic_failure.is_some() {
                 error_message
@@ -541,11 +605,12 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             }
             let mut persisted_entry_ids = Vec::new();
             if transcript_persisted && let Some(durable) = &durable_persistence {
-                match durable.session.finalize_turn(
+                match durable.session.finalize_turn_with_recovery(
                     &turn_id,
                     &partial_messages,
                     &durable.policy,
                     TurnTranscriptOutcome::Error,
+                    &recovery,
                 ) {
                     Ok(commit) => persisted_entry_ids = commit.entry_ids,
                     Err(persist_err) => {
@@ -581,6 +646,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                committed_source: None,
+                completion_events: Vec::new(),
                 persisted_entry_ids,
                 new_messages: partial_messages,
                 status: TurnRecordStatus::Error,
@@ -611,6 +678,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 },
             });
             let _ = result_tx.send(TurnRecord {
+                committed_source: None,
+                completion_events: Vec::new(),
                 persisted_entry_ids: Vec::new(),
                 new_messages: Vec::new(),
                 status: TurnRecordStatus::Error,

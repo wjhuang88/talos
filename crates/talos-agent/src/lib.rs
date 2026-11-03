@@ -40,6 +40,8 @@
 
 mod background_jobs;
 pub(crate) mod bounded_model;
+mod checkpoint_history;
+mod checkpoint_tools;
 pub mod compaction;
 pub mod compression;
 mod execution_ledger;
@@ -67,6 +69,7 @@ pub mod context;
 pub mod evaluator;
 mod helpers;
 pub mod permission_pipeline;
+mod persistence_snapshot;
 pub mod prompt;
 mod request_plan;
 mod scheduler;
@@ -102,12 +105,54 @@ pub use compression::{CompressionMetrics, RetrievalMetrics};
 pub use prompt::{ActivatedSkillContext, ContextFile, SystemPromptBuilder, ToolDescription};
 pub(crate) use request_plan::PreparedSessionTurn;
 
+pub(crate) struct SubmittedCheckpoint {
+    pub(crate) payload: String,
+    pub(crate) source: crate::compaction::HistorySource,
+    pub(crate) covered_end: usize,
+}
+
+impl SubmittedCheckpoint {
+    async fn matches_source(
+        &self,
+        current: &crate::compaction::HistorySource,
+        message_count: usize,
+        deadline: tokio::time::Instant,
+    ) -> bool {
+        if self.covered_end == 0 || self.covered_end > message_count {
+            return false;
+        }
+        for index in 0..self.covered_end {
+            tokio::task::yield_now().await;
+            if tokio::time::Instant::now() >= deadline || !self.source.same_entry(current, index) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 pub(crate) struct BoundaryCompactJob {
+    pub(crate) submitted_checkpoint: Option<SubmittedCheckpoint>,
     pub(crate) measurement: Arc<std::sync::Mutex<Option<u32>>>,
     pub(crate) result: tokio::sync::oneshot::Sender<checkpoint_manual::ManualCheckpointResult>,
 }
 
+pub(crate) struct ModelBoundarySubmission {
+    pub(crate) authority: Option<checkpoint_tools::PermissionLease>,
+    pub(crate) checkpoint: SubmittedCheckpoint,
+    pub(crate) receipt: tokio::sync::oneshot::Sender<talos_core::session::CompactOutcome>,
+}
+
+pub(crate) enum AgentActorRequest {
+    Boundary(SteeringBoundaryRequest),
+    AdmitModel {
+        submission: ModelBoundarySubmission,
+        response: tokio::sync::oneshot::Sender<Result<u64, talos_core::session::CompactOutcome>>,
+    },
+}
+
 pub(crate) struct SteeringBoundaryRequest {
+    pub(crate) submitted: Option<ModelBoundarySubmission>,
     pub(crate) compact: tokio::sync::oneshot::Sender<Option<BoundaryCompactJob>>,
     pub(crate) response: tokio::sync::oneshot::Sender<Option<SteeringBoundaryBatch>>,
 }
@@ -419,6 +464,36 @@ impl Agent {
         host: Arc<dyn talos_core::background_job::BackgroundJobHost>,
     ) {
         self.background_jobs = Some(host);
+    }
+
+    /// Enable stable model checkpoint/discovery tools for an Actor-hosted Agent.
+    ///
+    /// Checkpoint admission requires the Actor and a permission pipeline. History
+    /// search/detail require host-prepared durable storage and a discovered snapshot.
+    /// Unsupported storage and standalone execution fail closed. Search supports
+    /// opaque cursor pages, including discovery beyond compaction source bounds.
+    /// Explicit opt-in for standalone Agent hosts; RuntimeBuilder enables these tools.
+    pub fn enable_model_checkpoint_tools(
+        &mut self,
+    ) -> Result<(), talos_core::tool::ToolRegistrationError> {
+        self.tools.register_builtin_contributions([
+            talos_core::tool::ToolContribution::new(
+                talos_core::tool::ToolContributionSource::new("talos-agent:checkpoint"),
+                Arc::new(crate::checkpoint_tools::CompactContextTool),
+            ),
+            talos_core::tool::ToolContribution::new(
+                talos_core::tool::ToolContributionSource::new("talos-agent:history"),
+                Arc::new(crate::checkpoint_tools::HistorySearchTool),
+            ),
+        ])?;
+        let (descriptions, definitions, names) = crate::configuration::describe_presented_tools(
+            &self.tools,
+            &self.tool_presentation_policy,
+        );
+        self.tool_definitions = definitions;
+        self.presented_tool_names = names;
+        self.update_prompt_builder(true, |builder| builder.with_tools(descriptions));
+        Ok(())
     }
 
     pub(crate) fn register_process_tool(
@@ -823,8 +898,44 @@ impl Agent {
         &self,
         prepared: PreparedSessionTurn,
         event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
-        snapshot_tx: Option<mpsc::UnboundedSender<Vec<Message>>>,
-        boundary_tx: Option<mpsc::UnboundedSender<SteeringBoundaryRequest>>,
+        snapshot_tx: Option<mpsc::UnboundedSender<persistence_snapshot::PersistenceSnapshot>>,
+        boundary_tx: Option<mpsc::UnboundedSender<crate::AgentActorRequest>>,
+        boundary_ack_tx: Option<mpsc::UnboundedSender<SteeringBoundaryAcknowledgement>>,
+    ) -> (AgentResult<String>, Vec<Message>) {
+        let checkpoint_execution = boundary_tx
+            .clone()
+            .filter(|_| self.tools.is_builtin_instance("compact_context"))
+            .map(|sender| {
+                checkpoint_tools::Execution::new(
+                    sender,
+                    self.permission_pipeline
+                        .as_ref()
+                        .map(|pipeline| pipeline.state()),
+                )
+            });
+        let run = persistence_snapshot::RECOVERY_EXECUTION.scope(
+            uuid::Uuid::new_v4(),
+            self.run_prepared_inner_scoped(
+                prepared,
+                event_tx,
+                snapshot_tx,
+                boundary_tx,
+                boundary_ack_tx,
+            ),
+        );
+        if let Some(execution) = checkpoint_execution {
+            checkpoint_tools::EXECUTION.scope(execution, run).await
+        } else {
+            run.await
+        }
+    }
+
+    async fn run_prepared_inner_scoped(
+        &self,
+        prepared: PreparedSessionTurn,
+        event_tx: Option<mpsc::UnboundedSender<AgentEvent>>,
+        snapshot_tx: Option<mpsc::UnboundedSender<persistence_snapshot::PersistenceSnapshot>>,
+        boundary_tx: Option<mpsc::UnboundedSender<crate::AgentActorRequest>>,
         boundary_ack_tx: Option<mpsc::UnboundedSender<SteeringBoundaryAcknowledgement>>,
     ) -> (AgentResult<String>, Vec<Message>) {
         let PreparedSessionTurn {
@@ -888,14 +999,12 @@ impl Agent {
         }
 
         if let Some(snapshot_tx) = &snapshot_tx {
-            let _ =
-                snapshot_tx.send(self.persistence_projection_with_tokens(
-                    &messages[persist_start..],
-                    &private_tokens,
-                ));
+            let _ = snapshot_tx
+                .send(self.persistence_snapshot(&messages[persist_start..], &private_tokens));
         }
 
         let mut boundary_observed_plan = None;
+        let mut pending_checkpoint_receipt = None;
         let mut boundary_observation_error = None;
         let (result, final_status) = 'turn_loop: loop {
             if let Some(error) = boundary_observation_error.take() {
@@ -924,6 +1033,15 @@ impl Agent {
                 };
                 let sealed = match observed {
                     Ok(mut observed) => {
+                        if let Some(text) = pending_checkpoint_receipt.take() {
+                            observed.messages.push(Message::Multimodal {
+                                parts: vec![talos_core::message::ContentPart::Text { text }],
+                            });
+                            observed.estimated_tokens = self.estimate_provider_request_tokens(
+                                &observed.messages,
+                                &observed.tool_definitions,
+                            );
+                        }
                         match self.reserve_ephemeral_images(&mut observed, &pending_images) {
                             Ok(()) => {
                                 self.seal_observed_request_plan(
@@ -1524,6 +1642,22 @@ impl Agent {
                 tool_calls: effective_tool_calls.clone(),
                 reasoning,
             };
+            if checkpoint_tools::EXECUTION.try_with(|_| ()).is_ok()
+                && let Some(source) = history_source.as_mut()
+            {
+                let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+                let valid = tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    source.bind_continuation_until(&messages, persist_start, deadline),
+                )
+                .await
+                .unwrap_or(false);
+                if let Ok(execution) = checkpoint_tools::EXECUTION.try_with(Clone::clone) {
+                    execution
+                        .refresh_cooperative(valid.then_some(&*source), &messages)
+                        .await;
+                }
+            }
             messages.push(assistant_msg);
 
             let tool_results = if !original_calls.is_empty() {
@@ -1734,7 +1868,12 @@ impl Agent {
                             content: compressed.content,
                             ..ui_result.clone()
                         }
-                    } else if projection.model_content.len() > self.tool_output_threshold {
+                    } else if projection.model_content.len() > self.tool_output_threshold
+                        && !(observed.call == *call
+                            && call.name == "history_search"
+                            && self.tools.is_builtin_instance("history_search")
+                            && projection.model_content.len() <= 16_384)
+                    {
                         let compressed = crate::tool_output::compress_tool_output(
                             &projection.model_content,
                             self.tool_output_threshold,
@@ -1785,16 +1924,18 @@ impl Agent {
             if let Some(snapshot_tx) = &snapshot_tx {
                 // This is the first safe boundary after a complete tool batch:
                 // the projection excludes private fields and incomplete calls.
-                let _ = snapshot_tx.send(self.persistence_projection_with_tokens(
-                    &messages[persist_start..],
-                    &private_tokens,
-                ));
+                let _ = snapshot_tx
+                    .send(self.persistence_snapshot(&messages[persist_start..], &private_tokens));
             }
             if let Some(boundary_tx) = &boundary_tx {
                 let (response, injected) = tokio::sync::oneshot::channel();
                 let (compact, compact_job) = tokio::sync::oneshot::channel();
                 if boundary_tx
-                    .send(SteeringBoundaryRequest { response, compact })
+                    .send(AgentActorRequest::Boundary(SteeringBoundaryRequest {
+                        response,
+                        compact,
+                        submitted: None,
+                    }))
                     .is_ok()
                     && let Ok(Some(mut job)) = compact_job.await
                 {
@@ -1856,14 +1997,67 @@ impl Agent {
                         if let Ok(mut value) = job.measurement.lock() {
                             *value = measured_before;
                         }
-                        self.prepare_manual_checkpoint(
-                            &mut plan,
-                            limit,
-                            &private_tokens,
-                            source,
-                            deadline,
-                        )
-                        .await
+                        if let Some(submitted) = &job.submitted_checkpoint {
+                            if !submitted
+                                .matches_source(source, messages.len(), deadline)
+                                .await
+                            {
+                                return checkpoint_manual::ManualCheckpointResult::Outcome(
+                                    talos_core::session::CompactOutcome::FailedWithEstimate {
+                                        before: plan.estimated_tokens,
+                                        reason:
+                                            talos_core::session::CompactFailureReason::Preparation,
+                                    },
+                                );
+                            }
+                            let deadline = source
+                                .deadline()
+                                .map_or(deadline, |bound| bound.min(deadline));
+                            let deadline = submitted
+                                .source
+                                .deadline()
+                                .map_or(deadline, |bound| bound.min(deadline));
+                            let before = plan.estimated_tokens;
+                            let mut projection = None;
+                            let result = self
+                                .checkpoint_submitted_deferred(
+                                    &mut plan,
+                                    limit,
+                                    &private_tokens,
+                                    source,
+                                    deadline,
+                                    &submitted.payload,
+                                    submitted.covered_end,
+                                    &mut projection,
+                                )
+                                .await;
+                            match (result, projection) {
+                                (Ok(()), Some(projection)) => {
+                                    checkpoint_manual::ManualCheckpointResult::Candidate {
+                                        projection: Box::new(projection),
+                                        before,
+                                        after: plan.estimated_tokens,
+                                        deadline,
+                                    }
+                                }
+                                _ => checkpoint_manual::ManualCheckpointResult::Outcome(
+                                    talos_core::session::CompactOutcome::FailedWithEstimate {
+                                        before,
+                                        reason:
+                                            talos_core::session::CompactFailureReason::Preparation,
+                                    },
+                                ),
+                            }
+                        } else {
+                            self.prepare_manual_checkpoint(
+                                &mut plan,
+                                limit,
+                                &private_tokens,
+                                source,
+                                deadline,
+                            )
+                            .await
+                        }
                     };
                     tokio::select! { biased;
                         () = job.result.closed() => {},
@@ -1887,10 +2081,9 @@ impl Agent {
                     let (_, injected_messages) = Self::structured_session_inputs(&batch.items);
                     messages.extend(injected_messages);
                     if let Some(snapshot_tx) = &snapshot_tx {
-                        let _ = snapshot_tx.send(self.persistence_projection_with_tokens(
-                            &messages[persist_start..],
-                            &private_tokens,
-                        ));
+                        let _ = snapshot_tx.send(
+                            self.persistence_snapshot(&messages[persist_start..], &private_tokens),
+                        );
                     }
                     if let Some(boundary_ack_tx) = &boundary_ack_tx {
                         let (projected, confirmation) = tokio::sync::oneshot::channel();
@@ -1906,6 +2099,20 @@ impl Agent {
                     }
                 }
             }
+            if let Ok(execution) = checkpoint_tools::EXECUTION.try_with(Clone::clone)
+                && let Some((receipt, applied)) = execution.terminal().await
+            {
+                // Applied checkpoints consume discovery snapshots. Rediscovery is
+                // new state progress; unrelated repeated tool calls remain counted.
+                if applied && self.tools.is_builtin_instance("history_search") {
+                    doom_tracker.retain(|(name, input), _| {
+                        name != "history_search"
+                            || !serde_json::from_str::<serde_json::Value>(input)
+                                .is_ok_and(|value| value["mode"] == "discover")
+                    });
+                }
+                pending_checkpoint_receipt = Some(receipt);
+            }
         };
 
         self.emit_turn_complete(&hook_ctx, final_status).await;
@@ -1916,8 +2123,11 @@ impl Agent {
         // persist. Incomplete streamed assistant fragments are never pushed to
         // `messages` — only finalized assistant messages with complete tool
         // calls are (SESSION-006 / I135).
-        let partial_messages =
-            self.persistence_projection_with_tokens(&messages[persist_start..], &private_tokens);
+        let final_snapshot = self.persistence_snapshot(&messages[persist_start..], &private_tokens);
+        let partial_messages = final_snapshot.messages.clone();
+        if let Some(snapshot_tx) = &snapshot_tx {
+            let _ = snapshot_tx.send(final_snapshot);
+        }
         if let (Some(observer), Some(limit), Some((mut plan, appended_start))) = (
             checkpoint_observer.as_ref(),
             request_context_limit,

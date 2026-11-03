@@ -22,6 +22,15 @@ pub use crate::submission::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionOp {
+    /// Host-only durable tip fork, admitted only while the Actor is idle.
+    /// This is not a model tool and does not change the active session.
+    ForkDurable {
+        /// New logical durable identity; existing identities must be rejected.
+        external_id: String,
+        /// Direct completion receipt (child UUID or content-free failure).
+        #[serde(skip)]
+        receipt_tx: Option<mpsc::UnboundedSender<Result<String, String>>>,
+    },
     Submit {
         message: String,
     },
@@ -199,6 +208,19 @@ pub enum SessionEvent {
         session_generation: u64,
         /// Bounded metadata for the automatic attempt.
         state: AutomaticCompactState,
+    },
+    /// Exactly one terminal event for an admitted model checkpoint, independent
+    /// of whether a subsequent provider request consumes its receipt.
+    /// Operation IDs belong to the model namespace, never the manual namespace.
+    ModelCheckpointTerminal {
+        /// Owning session identity.
+        session_id: String,
+        /// Owning runtime generation.
+        session_generation: u64,
+        /// Model operation identity within this generation.
+        operation_id: u64,
+        /// Content-free terminal result; admission alone is not success.
+        outcome: CompactOutcome,
     },
     /// Content-free manual checkpoint progress, never persisted as a user turn.
     CompactStatus {

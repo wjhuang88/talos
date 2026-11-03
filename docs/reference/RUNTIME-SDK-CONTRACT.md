@@ -84,6 +84,16 @@ Their origin crates need not be direct dependencies for these embedding operatio
 | `BackgroundJobId`, `BackgroundJobState`, `BackgroundJobRequest`, `BackgroundJobPermit`, `BackgroundJobLauncher`, `LaunchedBackgroundJob`, `ToolExecutionAdmission` | `talos-core` | Background-job signature types for admitted tool execution |
 | `BackgroundCleanupOutcome`, `BackgroundJobTerminalSummary`, `BackgroundOutputChunk`, `BackgroundOutputStream`, `BackgroundProcessControl`, `BackgroundProcessEvent`, `BackgroundProcessExit` | `talos-core` | Typed background-process control, output and terminal outcomes |
 
+Durable commits preserve assistant reasoning metadata only when
+`PersistencePolicy.persist_reasoning` is explicitly enabled (default: disabled),
+after the existing credential redaction. Recovery search does not index that
+metadata. Same-turn retries compare the filtered metadata as well as role/content.
+Older commits that lost reasoning remain readable and are not backfilled: retrying
+such a committed turn with reasoning now returns `DurableTurnConflict` rather than
+silently accepting different persisted state. Treat the existing committed outcome
+as authoritative; do not change turn IDs and repeat effects merely to bypass this
+conflict.
+
 The single-direct-dependency promise covers custom provider/tool/approval/sandbox implementations,
 typed event consumption and runtime composition. For durable sessions it covers
 `SessionManager::with_dir`, `SessionManager::create_or_open_session`, `DurableSession`
@@ -580,3 +590,107 @@ manual operation receipt and does not complete the turn or write transcript text
 Cancellation before the shared Runtime checkpoint commit gate prevents installation;
 cancellation after Applied does not undo that projection. Provider error strings,
 summary content and image bytes are never included in these status events.
+
+### Pending I313 recovery receipt compatibility
+
+The local I313 implementation adds version-two recovery receipts for tools that
+explicitly permit a bounded recovery view different from their ordinary persisted
+result. The Session persistence policy and private/redaction filters still apply;
+this does not enable model history search by default. Equal views continue using
+version-one digest-only receipts. A version-one-only reader refuses a receipt set
+containing version two; it can still read the original transcript. Rollback may
+therefore make those tool facts unavailable for model recovery, without deleting
+raw history. See the I313 owner for current implementation and validation status.
+
+### Model checkpoint tool registration (I313, next minor)
+
+RuntimeBuilder registers `compact_context` and `history_search` by default.
+A caller registration using either reserved name makes construction fail; it is
+not silently replaced. Low-level Agent hosts explicitly enable these tools.
+Permission checks still govern calls. Model compaction requires Actor admission;
+history queries require prepared durable storage and a discovered snapshot.
+Unsupported storage returns Unavailable. Durable discovery may return
+`compact_available: false` with no compaction sources while permitting history
+search; this does not authorize compaction of an unsupported source range.
+
+Observe `SessionEvent::ModelCheckpointTerminal` for the final result of each
+admitted model operation, including when no provider continuation consumes its
+receipt. Correlate by session, generation and model operation ID. Model and manual
+operation IDs are separate namespaces: a model terminal must not complete a
+pending manual `Compact` command or a whole turn. The event contains only
+`CompactOutcome` metadata; it is not a raw transcript entry. Existing consumers of
+the non-exhaustive SessionEvent enum may ignore the additive event; status-aware
+hosts should handle it and discard stale-generation events.
+
+Unix host preparation can resume initial history verification from completed
+pages saved in the existing trusted durable-bindings store. The disposable search
+index cannot supply this provenance. Changed source versions require verification
+again; this is not protection against modification of the trusted host database.
+`DurableSession` root branch IDs are now stable for a durable UUID; discard cached
+random root IDs from earlier opens, while retaining original transcript/entry IDs.
+The opaque scan receipt permits exact-record cleanup only for its issuing handle;
+it does not authorize history queries. The Windows implementation
+restores saved progress only after bounded content revalidation under a new retained
+lease. Metadata equality cannot certify unchanged content across released leases:
+native testing observed a same-length overwrite with identical version fields.
+Restoration rereads the saved prefix; each step stays bounded but restart does not
+skip that I/O. Until verification finishes, no saved progress grants query authority.
+I313 production-hook native Windows validation and full acceptance passed at
+implementation `322574bc9707492ea6e9d5232794f73e687071d9` (PR #837), with
+exact-head CI `41608342151` and independent API/privacy/storage/security review.
+These are deterministic regressions, not live-model quality probes.
+Cancellation cleanup is bounded best effort; a
+persistent bindings-store failure may retain a receipt and emit a warning.
+
+Unix and Windows durable hosts can call `RuntimeHandle::fork_durable(external_id)` at an idle
+Actor boundary. It returns a fresh child UUID, preserves the committed raw prefix
+and keeps the original runtime active; existing target identities and busy Actors
+are rejected. Open the child through the same durable root for a separate runtime.
+The operation does not inherit search-index or checkpoint authority. Interrupt,
+shutdown and dropping the receipt request cooperative cancellation; publication
+may win that race, so reconcile the target identity before retrying. Kernel I/O
+has no hard abort guarantee. Startup performs bounded intent recovery; unresolved
+intents are retained and reported, and lock files intentionally remain. The Windows
+implementation uses local-volume checks, write-through file creation and
+file flush before publication. It does not provide directory fsync or promise
+Unix-equivalent namespace durability after power loss. Native Windows crash,
+lock/cancellation and Actor fork/reopen tests passed in final exact-head run
+`41608342151` before PR #837 merged as `322574bc9707492ea6e9d5232794f73e687071d9`.
+Earlier candidate `5a80fe914` / run `41403698582` is historical evidence.
+
+Exhaustive consumers must handle additive `SessionOp::ForkDurable` and
+`SubmissionRejectionReason::SessionBusy` in the next minor migration (ADR-096).
+ForkDurable requires an in-process receipt channel; serialized wire requests are
+unsupported and emit an error. SessionBusy is a temporary refusal, not closure.
+
+
+### CLI startup history restoration (I313)
+
+TUI, interactive and inline startup restore Session messages using bounded pages
+on blocking workers. Ctrl-C cancels startup; corrupt/unavailable persisted history
+returns an error instead of silently starting with no history. No file is rewritten.
+The new SessionMessageScan API reuses message/tool pairing across pages and supports
+legacy JSONL message envelopes, but emits no durable search provenance.
+Host message restoration also accepts historical headerless TLOG records beginning
+with `E\t`; strict history authority readers still require the creation header.
+Empty persisted sessions restore as empty, and their first append writes the header.
+
+A page reads at most 2 MiB / 8192 entries with cooperative cancellation and a CLI
+two-second page deadline. Total restored history still occupies linear memory;
+blocked OS I/O may retain resources after caller cancellation. Malformed TLOG
+headers/records, invalid UTF-8, oversized records and unsupported source volumes
+fail explicitly. Incomplete final TLOG records and invalid JSONL lines are omitted
+as before. SessionStore implementers default to no paged encoding; opt into a
+built-in encoding only when it matches the actual store. There is no whole-file
+fallback. `/resume` and model switching use the same paged message/tail snapshot.
+The tail is the last successfully decoded entry, not proof of the final physical
+bytes; skipped JSONL or incomplete TLOG suffixes do not become activation evidence.
+Failed resume leaves the original command route active. Model switching retains
+the existing retirement/activation fence and retries the exact committed marker
+without duplicating it. Dropping a transition read cancels its worker cooperatively,
+without adding another Ctrl-C handler. CLI fork stages raw bytes in bounded pages
+from that same source version and installs without overwriting an existing child.
+Dropping an unpublished fork cleans its transcript, sidecar, index and lineage;
+cleanup failures require storage recovery. Filesystems without hard-link support
+fail explicitly. This does not add process-crash atomicity or directory-fsync
+guarantees. Legacy CLI storage still lacks durable model history_search receipts.

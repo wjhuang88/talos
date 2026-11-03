@@ -107,6 +107,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         ),
         None,
     );
+    agent.enable_model_checkpoint_tools()?;
     agent.set_tool_protocol(config.tool_protocol());
     crate::mode_runtime::set_request_budget_spec(&mut agent, &config);
     if !loaded_plugin_packages.is_empty() {
@@ -158,7 +159,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
 
     set_todo_prompt_provider(&mut agent, &session_manager, &session);
 
-    let initial_history = session.read_messages().unwrap_or_default();
+    let initial_history = crate::history_restore::read_session_history(&session).await?;
 
     let (model_context_limit, _) = config.resolve_model_limits();
     let session_config = SessionConfig {
@@ -244,6 +245,22 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
                     println!(
                         "{}",
                         talos_conversation::format_automatic_compact_status(state)
+                    );
+                }
+                SessionEvent::ModelCheckpointTerminal {
+                    operation_id,
+                    outcome,
+                    ..
+                } => {
+                    println!(
+                        "Model {}",
+                        talos_conversation::format_compact_status(
+                            operation_id,
+                            talos_core::session::CompactState::Completed {
+                                outcome,
+                                replayed: false
+                            }
+                        )
                     );
                 }
                 SessionEvent::CompactStatus {

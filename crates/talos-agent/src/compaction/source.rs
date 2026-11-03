@@ -35,17 +35,18 @@ impl HistorySource {
         raw: &[Message],
         deadline: tokio::time::Instant,
     ) -> Option<Self> {
-        if raw.len() > 8192 {
+        if tokio::time::Instant::now() >= deadline {
             return None;
         }
-        let mut source = Self::bind_until(
-            generation,
-            revision,
-            raw,
-            (0..raw.len()).map(|index| index.to_string()).collect(),
-            deadline,
-        )
-        .await?;
+        let mut entry_ids = Vec::new();
+        for index in 0..raw.len() {
+            tokio::task::yield_now().await;
+            if tokio::time::Instant::now() >= deadline {
+                return None;
+            }
+            entry_ids.push(index.to_string());
+        }
+        let mut source = Self::bind_until(generation, revision, raw, entry_ids, deadline).await?;
         for (index, digest) in source.digests.iter().enumerate() {
             tokio::task::yield_now().await;
             if tokio::time::Instant::now() >= deadline {
@@ -121,6 +122,61 @@ impl HistorySource {
         {
             return None;
         }
+        Some(source)
+    }
+
+    /// Build a completed-turn binding outside the Actor command loop.
+    pub(crate) async fn bind_committed_until(
+        generation: u64,
+        raw: &[Message],
+        previous: Option<&Self>,
+        start: usize,
+        namespace: Option<&str>,
+        committed_ids: &[String],
+        deadline: tokio::time::Instant,
+    ) -> Option<Self> {
+        if start > raw.len() {
+            return None;
+        }
+        let mut source =
+            Self::bind_content_until(generation, raw.len() as u64, raw, deadline).await?;
+        if let Some(previous) = previous.filter(|old| old.generation == generation) {
+            for index in 0..start.min(previous.digests.len()) {
+                tokio::task::yield_now().await;
+                if tokio::time::Instant::now() >= deadline {
+                    return None;
+                }
+                if source.digests[index] != previous.digests[index] {
+                    break;
+                }
+                source.entry_ids[index] = previous.entry_ids[index].clone();
+            }
+        }
+        if let Some(namespace) = namespace.filter(|name| !name.is_empty())
+            && committed_ids.len() == raw.len() - start
+            && committed_ids.iter().all(|id| !id.is_empty())
+        {
+            for (index, id) in committed_ids.iter().enumerate() {
+                tokio::task::yield_now().await;
+                if tokio::time::Instant::now() >= deadline
+                    || namespace.len() > 128
+                    || id.len() > 128
+                {
+                    return None;
+                }
+                source.entry_ids[start + index] = format!("tlog:{namespace}:{id}");
+            }
+        }
+        let mut seen = std::collections::HashSet::new();
+        for id in &source.entry_ids {
+            tokio::task::yield_now().await;
+            if tokio::time::Instant::now() >= deadline || id.len() > 128 || !seen.insert(id) {
+                return None;
+            }
+        }
+        // This is a committed snapshot; the worker budget must not become the
+        // lifetime of its identity. Each later attempt owns a fresh deadline.
+        source.deadline = None;
         Some(source)
     }
 
@@ -202,6 +258,8 @@ impl HistorySource {
 
     /// Bind a production snapshot cooperatively under a caller-owned deadline.
     /// Dropping this future discards partial bindings; no partial source is returned.
+    /// Work yields between records; retained identity metadata grows with history.
+    /// This is not a fixed-memory or persistently resumable scan.
     pub async fn bind_until(
         generation: u64,
         revision: u64,
@@ -209,13 +267,13 @@ impl HistorySource {
         entry_ids: Vec<String>,
         deadline: tokio::time::Instant,
     ) -> Option<Self> {
-        if raw.len() > 8192 || raw.len() != entry_ids.len() {
+        if tokio::time::Instant::now() >= deadline || raw.len() != entry_ids.len() {
             return None;
         }
         let mut seen = std::collections::HashSet::new();
         let mut remaining = 2 * 1024 * 1024;
-        let mut digests = Vec::with_capacity(raw.len());
-        for (message, id) in raw.iter().zip(&entry_ids) {
+        let mut digests = Vec::new();
+        for (index, (message, id)) in raw.iter().zip(&entry_ids).enumerate() {
             tokio::task::yield_now().await;
             if tokio::time::Instant::now() >= deadline
                 || id.is_empty()
@@ -224,7 +282,22 @@ impl HistorySource {
             {
                 return None;
             }
-            digests.push(message_digest_bounded(message, &mut remaining)?);
+            if index % 8192 == 0 {
+                remaining = 2 * 1024 * 1024;
+            }
+            let digest = if let Some(digest) = message_digest_bounded(message, &mut remaining) {
+                digest
+            } else {
+                // Start the next byte-bounded batch. A single oversized record
+                // still fails; no partial binding is returned on cancellation.
+                tokio::task::yield_now().await;
+                if tokio::time::Instant::now() >= deadline {
+                    return None;
+                }
+                remaining = 2 * 1024 * 1024;
+                message_digest_bounded(message, &mut remaining)?
+            };
+            digests.push(digest);
         }
         if tokio::time::Instant::now() >= deadline {
             return None;
@@ -256,7 +329,7 @@ impl HistorySource {
     ) -> bool {
         if persist_start < self.digests.len()
             || persist_start > messages.len()
-            || messages.len() > 8192
+            || messages.len().saturating_sub(persist_start) > 8192
         {
             return false;
         }
@@ -425,6 +498,96 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn long_committed_sources_reject_aliases_expiry_and_changed_prefix() {
+        let mut raw: Vec<_> = (0..8300)
+            .map(|i| Message::User {
+                content: i.to_string(),
+            })
+            .collect();
+        let deadline = || tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        let previous = HistorySource::bind_until(
+            5,
+            8300,
+            &raw,
+            (0..8300).map(|i| format!("tlog:session:{i}")).collect(),
+            deadline(),
+        )
+        .await
+        .expect("long source");
+        raw.push(Message::User {
+            content: "new".into(),
+        });
+        let bound = HistorySource::bind_committed_until(
+            5,
+            &raw,
+            Some(&previous),
+            8300,
+            Some("session"),
+            &["new".into()],
+            deadline(),
+        )
+        .await
+        .expect("long commit");
+        assert_eq!(
+            bound.resolve(5, 8301, 8299, &raw[8299]),
+            Some("tlog:session:8299")
+        );
+        assert_eq!(
+            bound.resolve(5, 8301, 8300, &raw[8300]),
+            Some("tlog:session:new")
+        );
+        assert!(bound.deadline().is_none());
+        assert!(
+            HistorySource::bind_committed_until(
+                5,
+                &raw,
+                Some(&previous),
+                8300,
+                Some("session"),
+                &["8299".into()],
+                deadline()
+            )
+            .await
+            .is_none()
+        );
+        assert!(
+            HistorySource::bind_committed_until(
+                5,
+                &raw,
+                Some(&previous),
+                8300,
+                Some("session"),
+                &["new".into()],
+                tokio::time::Instant::now()
+            )
+            .await
+            .is_none()
+        );
+        raw[0] = Message::User {
+            content: "changed ancestry".into(),
+        };
+        let changed = HistorySource::bind_committed_until(
+            5,
+            &raw,
+            Some(&previous),
+            8300,
+            Some("session"),
+            &[],
+            deadline(),
+        )
+        .await
+        .expect("content-only fallback");
+        for index in [0, 8299, 8300] {
+            assert!(
+                changed
+                    .resolve(5, 8301, index, &raw[index])
+                    .expect("source")
+                    .starts_with("generation:")
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn recovered_sources_require_generation_and_unchanged_prefix() {
         let raw = vec![
             Message::User {
@@ -530,7 +693,7 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn production_content_binding_obeys_cumulative_bounds_and_cancellation() {
+    async fn production_content_binding_batches_history_and_obeys_cancellation() {
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
         let raw = vec![
             Message::User {
@@ -541,7 +704,7 @@ mod tests {
         assert!(
             HistorySource::bind_content_until(7, 4, &raw, deadline)
                 .await
-                .is_none()
+                .is_some()
         );
         assert!(
             HistorySource::bind_content_until(7, 3, &raw[..3], tokio::time::Instant::now())
@@ -563,6 +726,88 @@ mod tests {
             let expected = HistorySource::stable_entry_id(7, index, message).expect("id");
             assert_eq!(bound.resolve(7, 3, index, message), Some(expected.as_str()));
         }
+    }
+
+    #[tokio::test]
+    async fn asynchronous_source_binding_crosses_entry_pages_without_aliasing() {
+        let raw: Vec<_> = (0..8300)
+            .map(|i| Message::User {
+                content: format!("entry {i}"),
+            })
+            .collect();
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        let source = HistorySource::bind_content_until(9, raw.len() as u64, &raw, deadline)
+            .await
+            .expect("multi-page history");
+        for index in [0, 8191, 8192, 8299] {
+            let expected = HistorySource::stable_entry_id(9, index, &raw[index]).expect("id");
+            assert_eq!(
+                source.resolve(9, 8300, index, &raw[index]),
+                Some(expected.as_str())
+            );
+            assert!(
+                source
+                    .resolve(
+                        9,
+                        8300,
+                        index,
+                        &Message::User {
+                            content: "replacement".into()
+                        }
+                    )
+                    .is_none()
+            );
+        }
+        let oversized = vec![Message::User {
+            content: "x".repeat(2 * 1024 * 1024),
+        }];
+        assert!(
+            HistorySource::bind_content_until(9, 1, &oversized, deadline)
+                .await
+                .is_none()
+        );
+        let ids = (0..8300)
+            .map(|i| if i == 8299 { "0".into() } else { i.to_string() })
+            .collect();
+        assert!(
+            HistorySource::bind_until(9, 8300, &raw, ids, deadline)
+                .await
+                .is_none(),
+            "cross-page duplicate IDs rejected"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn asynchronous_binding_expires_after_crossing_an_entry_batch() {
+        use std::future::Future;
+        use std::task::Poll;
+        let raw = vec![
+            Message::User {
+                content: "bounded record".into()
+            };
+            8300
+        ];
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        let ids = (0..raw.len()).map(|i| format!("entry-{i}")).collect();
+        let binding = HistorySource::bind_until(1, raw.len() as u64, &raw, ids, deadline);
+        tokio::pin!(binding);
+        // Each poll advances past the prior cooperative yield and reaches the
+        // next one. Stop after a complete entry batch, then expire the budget.
+        for _ in 0..8200 {
+            std::future::poll_fn(|cx| {
+                assert!(
+                    binding.as_mut().poll(cx).is_pending(),
+                    "must not expose partial source"
+                );
+                Poll::Ready(())
+            })
+            .await;
+        }
+        tokio::time::advance(std::time::Duration::from_secs(10)).await;
+        assert!(
+            binding.await.is_none(),
+            "late cancellation cannot return a partially bound source"
+        );
     }
 
     #[test]
@@ -629,6 +874,47 @@ mod tests {
             .expect("valid binding");
         assert_eq!(source.resolve(1, 1, 0, &raw[0]), Some("a"));
     }
+    #[tokio::test]
+    async fn continuation_bounds_new_work_instead_of_synthetic_prefix_length() {
+        let raw = vec![Message::User {
+            content: "original".into(),
+        }];
+        let mut source = HistorySource::bind(7, 1, &raw, vec!["old-id".into()]).expect("source");
+        let mut messages = raw.clone();
+        messages.extend((0..8300).map(|_| Message::Context {
+            content: "synthetic gap".into(),
+        }));
+        let start = messages.len();
+        messages.push(Message::User {
+            content: "new canonical input".into(),
+        });
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        assert!(
+            source
+                .bind_continuation_until(&messages, start, deadline)
+                .await
+        );
+        assert!(source.resolve(7, 1, start, &messages[start]).is_some());
+        assert!(
+            source
+                .resolve(7, 1, start - 1, &messages[start - 1])
+                .is_none(),
+            "synthetic gap is not source authority"
+        );
+        messages.extend((0..8192).map(|_| Message::User {
+            content: "too much new work".into(),
+        }));
+        assert!(
+            !source
+                .bind_continuation_until(&messages, start, deadline)
+                .await
+        );
+        assert!(
+            source.resolve(7, 1, start, &messages[start]).is_some(),
+            "failed replacement preserves previous mapping"
+        );
+    }
+
     #[tokio::test(start_paused = true)]
     async fn continuation_carries_its_binding_deadline_and_failed_rebinding_is_atomic() {
         let raw = vec![Message::User {

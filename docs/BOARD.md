@@ -1,3 +1,22 @@
+## T5 completed — 2026-11-03
+
+I313 and MEM-005 are Complete with Completion Commit:
+`322574bc9707492ea6e9d5232794f73e687071d9` (#837). All eight exact-head checks in `41608342151`,
+independent full T5 API/privacy/storage/security review and merge CAS passed.
+Owners preserve fixture/platform/privacy limits. Earlier pending snapshots are
+historical. T1 and T6 remain unimplemented and unactivated.
+Full queue: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+Full handoff remains Active; next is T1's own governed activation.
+
+## T5 stable-stage review — 2026-11-02
+
+I313 is Review/Partial with effective claim #819. Unix Actor/Runtime checkpoint,
+recovery and fork implementation remains unmerged; standard host preflight passed
+including both SDK modes. Native Windows evidence, long-session live compaction
+binding and remaining acceptance are open. First four queue stages are merged;
+T1/T6 remain unimplemented. See I313 owner for evidence and limitations; historical
+activation-proposal snapshots below do not override current owner truth.
+
 ## T4 merged; T5 activation proposal — 2026-11-01
 
 I312 is Complete/Closed with Completion Commit:
@@ -95,7 +114,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
 | Whole-request compaction / T4 | Complete / Closed | [I312](iterations/I312-whole-request-compaction.md) | #818 merged `65500a869`; eight CI jobs, independent review and CAS passed. |
-| Actor checkpoint/history / T5 | Active / Claimed (proposed) | [I313](iterations/I313-model-checkpoint-history.md) | Proposed #819 atomic claim; ineffective before target-branch merge. |
+| Actor checkpoint/history / T5 | Review / Partial / Claimed | [I313](iterations/I313-model-checkpoint-history.md) | Effective #819 claim; stable stage local preflight passed, implementation unmerged and acceptance incomplete. |
 | Protocol architecture / OpenAI Responses | Complete / Closed | [PROVIDER-008-A](backlog/active/PROVIDER-008-A-openai-responses-protocol.md) / [I306](iterations/I306-provider008a-openai-responses.md) / #748 | Implementation through #803 `dd6c5f8`; all 52 reviewed HTTP pairs active. CI3570 8/8 and technical acceptance review passed. #748 closes after owner closure merge; #724 stays open for unimplemented B/C/D. |
 | Windows known-resource acceptance | Complete / Closed | [TEST-004](backlog/active/TEST-004-windows-known-resource-acceptance.md) / [I305](iterations/I305-windows-known-resource-acceptance.md) / #729 | #716 merged `b5b8241e`; I305/TEST004 cite existing Completion Commit. CI3221 all6jobs and protected review/CAS passed; only known-resource criterion closed, #717 residual open. |
 | Absent-journal pause without initialization | Complete / Closed | [RUNTIME-011](backlog/active/RUNTIME-011-absent-journal-pause.md) / [I304](iterations/I304-absent-journal-pause.md) | #726 implementation `aa1c477f` merged `c869a9af`; CI3203/review/CAS and CI3206 post-repair2220/2220 passed. I304 retains local failures; #705 retains broader timeout residuals. |

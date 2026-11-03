@@ -4570,6 +4570,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util",
+ "tracing",
  "uuid",
 ]
 
@@ -4604,6 +4605,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "hex",
+ "libc",
  "rusqlite",
  "schemars",
  "serde",
@@ -4612,6 +4614,7 @@ dependencies = [
  "talos-core",
  "thiserror",
  "uuid",
+ "windows-sys 0.61.2",
  "zstd",
 ]
 

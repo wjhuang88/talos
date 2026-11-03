@@ -1,3 +1,352 @@
+## T5 completed — 2026-11-03
+
+I313 and MEM-005 are Complete with Completion Commit:
+`322574bc9707492ea6e9d5232794f73e687071d9` (#837). All eight exact-head checks in `41608342151`,
+independent full T5 API/privacy/storage/security review and merge CAS passed.
+Owners preserve fixture/platform/privacy limits. Earlier pending snapshots are
+historical. T1 and T6 remain unimplemented and unactivated.
+Full queue: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+Full handoff remains Active; next is T1's own governed activation.
+
+## MEM-007 independent-process recovery regression — 2026-11-03
+
+The compressed-result recovery test now runs its discovery/search/detail Actor in a
+separate test process after the producer Actor is dropped. The child receives only
+durable location, session key and persistence policy; the parent checks an explicit
+child verification marker. Both persistence-allowed and denied cases pass in the
+focused locked test; the complete `checkpoint_acceptance` group passes 6/6. This removes the prior same-process-only limitation for this
+scenario, but does not prove SQLite physical-index uniqueness or general fork
+isolation. T5 remains Partial; full acceptance, independent review, exact-head CI
+and merge are outstanding. T1/T6 and the rest of the ordered queue remain active.
+See `docs/iterations/I313-model-checkpoint-history.md` for implementation detail.
+
+## MEM-007 model recovery after reopen — 2026-11-03
+
+I313 Applied correction `06a1f29e6` is pushed to #837. A subsequent local increment
+now rebuilds the Actor without the bash producer and runs actual discovery/search/
+detail against the reopened durable source. Allowed persistence returns one exact
+compressed result; denied persistence returns none. Focused test, five-test
+acceptance group, locked agent/runtime Clippy and independent static review passed.
+See I313 owner for logs and boundaries. Same-process reopen is not cross-process
+restart or physical-index uniqueness. T5 final mapping/CI/merge remain open, T1/T6
+remain unimplemented, and the entire accepted queue is retained.
+
+## MEM-007 checkpoint evidence correction — 2026-11-03
+
+I313 commit `7686c49dc` used an invalid empty checkpoint request; its passing test
+proved compressed-output persistence, not Applied composition. The local correction
+now drives actual discovery and valid checkpoint through the Actor, requires Applied
+in the provider continuation, and preserves the durable raw prefix across compression.
+Focused test and agent/runtime Clippy passed; see I313 owner for logs and limits.
+Independent static code review passed; the five-test acceptance group passed.
+Publication/exact-head CI and full T5 closure remain pending. T1/T6 are still
+unimplemented; the complete I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6
+queue remains the objective. Do not treat a tool invocation or tool-name string in
+storage as successful operation evidence; assert the operation's terminal outcome.
+
+## I313 stage convergence — 2026-11-02
+
+Local tests `7c6a819dd`, `09532dc93`, and `960b4b646` add reclamation refusal,
+resolved model budgets, and same-session sequential capacity switching with parsed
+history preservation and successful continuation. Independent static reviews and
+focused tests passed. Standard preflight passed through `7c6a819dd`, including
+both SDK modes; later CLI tests passed separately. See I313 owner for exact logs
+and boundaries. New exact-head remote CI/Windows evidence remains required; T5
+stays Partial and T1/T6 stay unimplemented. Entire accepted queue is unchanged.
+
+## Durable bounded-output recovery and main sync — 2026-11-02
+
+I313 test commit `9105791e1` proves real huge-tool output remains bounded through
+persistence/reopen and registered search/detail without the producer tool installed.
+Runtime coding regressions and continuation recovery regression pass; independent
+static review approved. Owner records exact scope and logs. Main #841 is included
+locally via `bcfa93932`; governance validators passed. PR #837 published head still
+has failed Windows CI; full T5 acceptance and merge remain open. Full queue retained:
+I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6; T1/T6 unimplemented.
+
+## Runtime output fix and Windows failure — 2026-11-02
+
+Local candidate bounds huge ordinary Runtime tool output while preserving validated
+builtin history JSON; identity/hook/original-protocol regressions and Clippy passed.
+Final Runtime tests passed2/2. Remaining filtering/storage acceptance is not closed.
+CI41434712578 failed on Windows independent-process Actor restart10s deadline;
+production saved-scan hook test passed. Local restart passed, root cause unresolved.
+I313 owner holds logs and diagnostic scope. Full queue retained; T5 Partial,
+T1/T6 unimplemented.
+
+## Automatic checkpoint failure/cancellation composition — 2026-11-02
+
+Actor Submit regression with registered tools now covers five terminal outcomes,
+including invalid-summary and injected provider-error failures over capacity with zero ordinary dispatch.
+Both new and baseline wrappers and all-target Clippy passed; independent static
+review found no blocker. Provider-boundary error injection is covered; actual network faults/tool execution failures are not. See I313 owner.
+Production-hook CI41434712578 remains pending for79b9c05d5, not these local tests.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
+## Registered tools/manual compaction capacity regressions — 2026-11-02
+
+Two new Actor regressions pass: 32K manual compaction/duplicate receipt/normal
+continuation with registered tools, and 20K refusal preserving raw history with
+zero ordinary dispatch. They do not close emergency failure/cancellation acceptance.
+I313 owner carries logs and limits; production hook preflight76765 passed including
+both SDK modes. The failure fixture submits no normal Turn, so its zero calls do
+not independently prove over-limit normal-turn admission safety.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
+## Windows native revalidation proof and hook candidate — 2026-11-02
+
+CI41427581565 succeeded for d0721a1db (test-only Windows restoration). Local
+production-hook candidate now connects saved scan restoration and cancellation
+cleanup, with focused Unix integration test passed. Independent static review
+permits candidate publication after local gates; final small cfg-test correction
+and production-hook native evidence remain pending. See I313 owner and SDK.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
+## Main synchronization — 2026-11-02
+
+Local I313 branch merged main069c5da19 / PR840 at6123fe9 without conflicts;
+I314 remains independently Planned/Unclaimed. Canonical rendering integration
+regression8b6b2a2d3 passed focused test and Clippy, with independent review.
+See I313 owner for evidence limits. Published d0721a1db CI41427581565 remains
+in progress; local follow-up commits are not certified by that run.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
+## T5 output-reserve composition — 2026-11-02
+
+Actual-provider regression now covers reserve-triggered advisory appearance and
+removal with stable tools/no persisted notice, and oversized reserve refusal before
+dispatch. Focused locked test passed; independent static review approved. Actual
+model-switch/reasoning-policy composition remains open. See I313 owner for evidence.
+Windows correction preflight17638 remains in progress; no new native CI claim.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
+## T5 bounded prefix revalidation candidate — 2026-11-02
+
+Implemented test-only Windows restoration by bounded content revalidation under
+a fresh retained lease; saved offsets cannot grant authority before digest match.
+Portable mutation-collision, cancellation, multi-page and partial-EOF regressions
+pass. Session299 tests and Clippy passed before final boundary extension, which
+passed separately. Windows native execution and production activation remain open;
+CI41418548863 is terminal failure for the prior metadata-only candidate.
+Final process-resume regressions passed 5/5. Independent static review permits
+local commit and test-only draft publication, not production activation or merge.
+New correction preflight session17638 is running; log
+`/private/tmp/i313-prefix-final-preflight.log`. Native evidence remains required.
+Full queue retained; T5 Partial, T1/T6 unimplemented.
+
+## Native Windows counterexample — activation withdrawn, 2026-11-02
+
+Test-only b8a80873b Windows job125196764203 in run41418548863 failed two Session
+regressions (278 passed). Same-length overwrite retained identical six version
+fields; metadata equality cannot safely resume a persisted offset after lease
+release. Keep that regression intact; no timing delay/waiver is accepted. Local
+activation commit ceef9369c was never published; its production cfg changes are
+withdrawn in the current correction. Agent hooks remain Unix-only. New shared
+Preparation regression remains Unix-only until a valid Windows design exists.
+
+The other failure required Err for sharing conflict although the restore contract
+also permits safe None. Its assertion now rejects every Ok(Some(scan)) outcome,
+preserving the no-authority-on-conflict boundary. Native counterexample log:
+`/private/tmp/i313-windows-b8a808-log.txt`. A reliable change authority or bounded
+content revalidation needs upstream research, independent review and native proof.
+Existing retained-live-lease checks remain unchanged. T5 stays Partial.
+
+Composition preflight session77258 exited0 with both SDK modes, but began before
+activation changes and does not certify native Windows. Current source correction
+has no new full preflight claim. T1/T6 remain unimplemented; full queue retained.
+
+## T5 Windows production scan-hook candidate — local, unpublished
+
+Uncommitted implementation now connects Windows persisted scan APIs to Agent
+save/restore/cancellation cleanup, with a real shared Preparation regression.
+Native test-only CI41418548863 and independent review remain gates; production
+activation is not published. Focused test15185 passed; earlier composition preflight
+77258 remains live with a different source scope. Static review found no new
+source blocker, but native validation and activation approval remain outstanding. Full queue retained; T5 Partial,
+T1/T6 unimplemented. See I313 owner for validation boundaries.
+
+## T5 installed checkpoint refusal preservation — 2026-11-02
+
+Local Runtime test now rejects complete-shaped oversized payloads before A and
+between A/B; first run passed. Exact rendered-A preservation assertion, Clippy and incremental review
+passed. Accumulated standard preflight is running at
+`/private/tmp/i313-composition-stage-preflight.log`. Published Windows CI41418548863 is in workspace tests;
+production Windows scan persistence remains disabled. Full queue unchanged;
+T5 Partial, T1/T6 unimplemented.
+
+## T5 registered oversize refusal — 2026-11-02
+
+Runtime coding regression now proves a real oversized compact_context call is
+refused without installing projection or losing source; subsequent legal A/B
+still applies exactly twice. Focused locked test, Clippy and incremental review
+passed. This covers ingress bytes before the first installed projection only.
+Published Windows candidate CI41418548863 is running; local test increments are
+not certified by that head. Full queue retained; T5 Partial, T1/T6 unimplemented.
+
+## T5 Runtime coding composition — 2026-11-02
+
+Local RuntimeBuilder fixture now repairs an actual source artifact, applies two
+registered checkpoints over long history, forks/reopens, recovers original tool
+facts and executes pending source verification. Focused locked test passed;
+Clippy and incremental review passed; reviewer-requested successful completion
+assertion also passed focused validation. This verifies source text, not compiler/model quality.
+Owner contract9 permits explicit legacy CLI Unavailable; do not expand scope into
+mandatory legacy receipts. Windows candidate b8a80873b CI41418548863 is pending;
+superseded CI41415936931 still reports in_progress after cancellation request.
+Full queue unchanged; T5 Partial and T1/T6 unimplemented.
+
+## T5 research artifact regression — 2026-11-02
+
+Local Actor A→B/fork/restart fixture now reads a real local observation artifact,
+records an actual failed alternate source, executes pending verification and
+reuses its persisted result after reopen. Initial focused test and Clippy passed;
+final independent execution counters also passed focused validation. No model
+quality/full Runtime/CLI acceptance or full T5 completion is claimed.
+Published Windows test candidate remains `b8a80873b`, CI `41418548863` pending
+when checked. Cancellation requested for superseded run `41415936931`; terminal
+state still requires checking. Owner I313 carries exact validation boundaries.
+Full queue preserved; T5 Partial, T1/T6 unimplemented.
+
+## T5 Windows saved-scan test candidate — 2026-11-02
+
+Test-only Windows version/scan persistence paths and cross-process, mutation,
+owner, malformed checkpoint and lease regressions are locally implemented. Unix
+tests passed; Windows native execution remains pending and production hooks remain
+closed. Independent static review permits a test candidate, not activation.
+Standard preflight is running at `/private/tmp/i313-windows-scan-test-preflight.log`.
+Full queue remains I309 → T8/I308 → T2+T3 → T4 → T5 → T1 → T6; T5 Partial,
+T1/T6 unimplemented. See I313 owner for exact evidence boundaries.
+
+Saved-scan test commit: `194cbbfe6`. Stale-receipt cleanup coverage was also
+extended from Unix to the Windows test candidate and passed locally; native
+Windows execution and the running standard preflight remain outstanding.
+
+Local test-candidate preflight now passed (including both SDK modes); follow-up
+regressions passed separately. Implementation `209195fc6` is independently approved
+for draft publication, not activation/merge. Windows native evidence remains open.
+
+## T5 fork paging local increment — 2026-11-02
+
+Local fork now copies bounded raw pages and decodes messages/tail from one captured
+source version. Unpublished child ownership covers transcript, sidecar, index and
+lineage. Real handler cancellation tests cover metadata preparation and commit
+retirement; publication failure restores logical ownership before cleanup waits.
+These are local changes, not full T5 closure. Standard preflight passed at
+`/private/tmp/i313-fork-preflight.log`; later test-only retry/success-handler
+follow-ups passed separately. Native CI and final gates remain open.
+See [I313 owner](../iterations/I313-model-checkpoint-history.md) for validation and
+platform/durability limits. First four queue stages remain merged; T5 is Partial,
+T1/T6 unimplemented. Preserve I309 → T8/I308 → T2+T3 → T4 → T5 → T1 → T6.
+
+## T5 lifecycle paging local increment — 2026-11-02
+
+Queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+First four stages are merged/closed; T5 remains Partial/unmerged and T1/T6
+unimplemented. Local resume/model-switch paging now has cancellation/retry,
+revoked-route and failed-resume preservation regressions. Affected suites passed
+388 CLI and 292 Session tests before the final focused headerless-compatibility
+regression, which also passed. Latest Clippy and independent source review passed.
+Full standard preflight passed at `/private/tmp/i313-lifecycle-preflight.log`.
+Published `0b454998a` CI host job failed in real Chinese TUI resume; the rebuilt
+local CLI now passes Chinese/English/Japanese initial/resumed/rotated real-TUI
+fixtures. Its Windows job failed at the checkpoint restart test's shorter idle
+timeout; a separately reviewed test-only adjustment still needs native evidence.
+CLI fork remains full-copy. Owner evidence and
+remaining boundaries are in [I313](../iterations/I313-model-checkpoint-history.md).
+
+## T5 CLI startup candidate and native fork evidence — 2026-11-02
+
+Queue unchanged: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+First four stages merged/closed; T5 Review / Partial and unmerged; T1/T6 unimplemented.
+Published `5a80fe914` passed Windows workspace job `125140918390` in CI
+`41403698582`, including real checkpoint/fork/reopen, Actor stop/abort, Runtime
+fork/restart, lock ownership and six process-crash phases. Full I313 acceptance
+remains open. Issue #832 reconciliation was separately fixed by merged #839 at
+`d324c3348`; current local candidate `1b84ad9ff` is rebased onto that target.
+
+Local CLI startup now uses cancellable message paging at the three real startup
+entrypoints. Nine storage regressions and two CLI/Actor-provider tests passed;
+provider-order assertions were then strengthened to check all 8300 entries.
+Static review and affected Clippy passed. Initial preflight failed because ENOSPC
+left a non-executable MCP test artifact. Package-specific cleanup/rebuild restored
+that target; the full standard preflight then passed with single-job building,
+including both external SDK modes (`/private/tmp/i313-cli-history-preflight-rebased.log`).
+Fresh native CI for this CLI candidate remains required. Details and compatibility limits
+are in [I313](../iterations/I313-model-checkpoint-history.md). Session/model switching,
+legacy CLI search provenance, Windows resumable scans and full composition remain
+open; these are not closed by initial-startup paging.
+
+## T5 Windows fork candidate — 2026-11-02
+
+Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+The first four stages are merged/closed. T5/I313 remains Review / Partial and
+unmerged; T1/T6 are unimplemented. PR #837 published head `ca13dc3f9` has terminal
+failed CI `41399661902`: Windows reached both checkpoints then lacked durable
+fork; host long-history fixture hit its inner two-second event wait. Neither is
+pending CI anymore. Issue/owner reconciliation also failed independently.
+
+Local candidate now implements Windows fork and startup intent recovery, expands
+native crash/lock/Actor/Runtime tests, normalizes diagnostic path assertions and
+aligns the multipage scenario wait with its 30-second total deadline. The real
+Actor checkpoint/fork/reopen test passed locally (16.30 seconds); standard full
+preflight passed, including both external SDK modes, with log
+`/private/tmp/i313-windows-fork-preflight.log`. Static review
+permits native validation, not final merge. Windows native validation, latest-head
+CI, final acceptance and merge remain open. Owner details and durability limits:
+[I313](../iterations/I313-model-checkpoint-history.md). CLI full-read startup and
+Windows resumable-scan support remain outstanding, alongside full T5 composition.
+
+## T5 stable-stage local gate passed — 2026-11-02
+
+Standard host preflight exited 0, including both external SDK modes:
+`/private/tmp/i313-stable-stage-preflight-host.log`. I313 is Review/Partial,
+unmerged and preparing a draft candidate for native platform evidence. The first
+four queue stages remain merged; T5 acceptance residuals and T1/T6 remain open.
+This supersedes the running-validation snapshot below, not the full scope.
+
+## T5 stable-stage preparation — 2026-11-02
+
+The queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+The first four stages are merged; I313/T5 remains Active/Partial and unmerged;
+T1/T6 are unimplemented. Local implementation head `0514fec35` includes real
+Actor/Runtime durable fork, bounded recovery, original tool-fact recovery through
+A→B checkpoints and separate-process parent/child reopen, and deterministic
+categorized task-state retention. Latest stage tests/reviews are in the I313 owner.
+Standard stable-stage preflight failed at the Git Push process-observation test
+with sandbox EPERM (`/private/tmp/i313-stable-stage-preflight.log`). Authorized
+host preflight is running at `/private/tmp/i313-stable-stage-preflight-host.log`;
+no pass or remote CI is claimed.
+Independent static review permits publishing a Partial stage candidate to obtain
+native Windows evidence, not merge or full acceptance. Windows authorization and
+fork remain unavailable. Long-session live compaction discovery above 8192 eligible
+messages needs an explicit acceptance audit; durable paged history recovery does
+not alone prove that separate live-compaction path. Full issue-row scenarios,
+platform implementation, final validation and merge remain outstanding.
+
+## T5 local implementation checkpoint — 2026-11-02
+
+The first four queue stages are merged; T5/I313 remains Active/Partial and
+unmerged; T1/T6 remain unimplemented. Full queue:
+I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
+Current local committed evidence includes Runtime/CLI checkpoint tool registration
+(`1eaf3aa71`), retained bounded preparation (`adcf93a4d`), append and independent
+process restart recovery (`188917ed2`), and actual Actor A→B checkpoint followed
+by rediscovery/search/detail of an omitted original fact (`b9462d0fd`). Latest
+committed Agent suite passes 627/627 with affected Clippy, both governance
+validators and incremental static review. These are not full final-delivery gates.
+Legacy CLI durable receipt recovery remains unavailable; registration is not
+proof of that behavior. See I313 owner for exact tests and remaining acceptance.
+
+Windows preparation is locally committed and remains fail-closed: restrictive read-sharing
+handles are retained by file stamps and dropped on preparation timeout. Native
+Windows tests, writable-mapping semantics and Actor lifecycle coverage remain
+required. An isolated Windows module type check is not full-crate or native proof.
+Other outstanding T5 work includes branch/concurrency and all Issue #390 row
+coverage, bounded initial verification/resumption limits, final user docs,
+workspace preflight, platform CI, independent final review, CAS and merge.
+Earlier snapshots below are historical and do not override current owner evidence.
+
 ## T4 merged; T5 activation proposal — 2026-11-01
 
 I312 is Complete/Closed with Completion Commit:
@@ -6723,3 +7072,22 @@ MODEL-014 local checkpoint (2026-10-30): I311 claim #813 is merged at
 reasoning-negative requests and preserved tool pairing across three protocols.
 See I311 owner for exact commands/logs and unimplemented/unverified acceptance.
 Overall handoff remains Active; retain I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+
+I313 local execution checkpoint: the explicitly enabled registered model tools now
+exercise discovery → Actor admission → complete-batch checkpoint installation →
+actual terminal metadata in provider continuation. Agent 606/606 and Permission
+169/169 pass, with two-crate Clippy and independent static review; see I313 owner
+for logs, discovered defects and validation boundaries. This remains local/unmerged
+Partial work: history_search search/detail/pagination, durable branch recovery,
+CLI/Runtime default activation and full gates are not delivered. T5 → T1 → T6
+remain the outstanding queue; the whole goal remains Active.
+## T1 validation execution boundary foundation — 2026-11-03
+
+The shared validation service now runs allowlisted host checks through a bounded
+spawn/wait adapter: stdin is closed, execution is capped at 30 seconds, a timed-out
+child is killed, and stdout/stderr are capped at 16 KiB before evidence recording.
+This is a prerequisite for model-callable validation and does not expose a model
+tool, implement agile read-only summaries, or provide caller cancellation yet.
+Focused validation tests pass 15/15 and conversation all-target warnings-denied
+Clippy passes. T1 remains Partial/Unimplemented until tool registration, permission
+facets, cancellation, discovery, invalid-input and failure evidence are delivered.

@@ -217,6 +217,12 @@ impl AgentTool for ReadTool {
         &["path"]
     }
 
+    fn recovery_projection(&self, result: &talos_core::tool::ToolResult) -> Option<String> {
+        // Snapshot IDs and anchors are transient edit capabilities. Recovery may
+        // expose only the same ordinary numbered text allowed in the transcript.
+        Some(self.project_result(result).persistence_content)
+    }
+
     fn project_result(
         &self,
         result: &talos_core::tool::ToolResult,

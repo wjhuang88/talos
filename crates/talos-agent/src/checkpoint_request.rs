@@ -41,11 +41,12 @@ impl Agent {
             .iter()
             .map(|tool| (&tool.name, &tool.description, &tool.parameters))
             .collect();
-        let key = crate::checkpoint_attempts::fingerprint(
+        let key = crate::checkpoint_attempts::fingerprint_request(
+            &plan.messages,
+            &definitions,
             &(
-                &plan.messages,
-                &definitions,
                 context_limit,
+                plan.tool_protocol,
                 plan.ephemeral_image_tokens,
                 source.map(|source| (source.generation(), source.revision())),
                 self.request_budget_spec.requested_output_tokens,
@@ -54,6 +55,7 @@ impl Agent {
             ),
             deadline,
         )
+        .await
         .ok_or_else(|| {
             CompactionError::CompactionFailed("checkpoint identity unavailable".into())
         })?;
@@ -70,6 +72,7 @@ impl Agent {
                 source,
                 deadline,
                 deferred,
+                None,
             )
             .await;
         if result.is_ok() {
@@ -104,8 +107,46 @@ impl Agent {
         source: Option<&crate::compaction::HistorySource>,
         deadline: tokio::time::Instant,
     ) -> CompactionResult<()> {
-        self.checkpoint_request_bound_deferred(plan, context_limit, private, source, deadline, None)
-            .await
+        self.checkpoint_request_bound_deferred(
+            plan,
+            context_limit,
+            private,
+            source,
+            deadline,
+            None,
+            None,
+        )
+        .await
+    }
+
+    /// Prepare a submitted semantic checkpoint using the same coverage, budget
+    /// and candidate pipeline. The Actor must authorize the discovery snapshot
+    /// and own admission before dispatching this at a complete tool-batch boundary.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn checkpoint_submitted_deferred(
+        &self,
+        plan: &mut ProviderRequestPlan,
+        context_limit: u32,
+        private: &PrivateTokens,
+        source: &crate::compaction::HistorySource,
+        deadline: tokio::time::Instant,
+        payload: &str,
+        covered_end: usize,
+        deferred: &mut Option<crate::checkpoint_projection::CheckpointProjection>,
+    ) -> CompactionResult<()> {
+        let deadline = source
+            .deadline()
+            .map_or(deadline, |bound| bound.min(deadline));
+        self.checkpoint_request_bound_deferred(
+            plan,
+            context_limit,
+            private,
+            Some(source),
+            deadline,
+            Some(deferred),
+            Some((payload, covered_end)),
+        )
+        .await
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -117,21 +158,28 @@ impl Agent {
         source: Option<&crate::compaction::HistorySource>,
         deadline: tokio::time::Instant,
         deferred: Option<&mut Option<crate::checkpoint_projection::CheckpointProjection>>,
+        submitted: Option<(&str, usize)>,
     ) -> CompactionResult<()> {
         check_checkpoint_deadline(deadline)?;
-        if plan.messages.len() > 8192 {
+        if submitted.is_some_and(|(payload, end)| {
+            payload.len() > crate::compaction::MAX_CHECKPOINT_BYTES
+                || end == 0
+                || end > plan.messages.len()
+        }) {
             return Err(CompactionError::CompactionFailed(
-                "checkpoint source scan limit exceeded".into(),
+                "checkpoint payload exceeds byte limit".into(),
             ));
         }
         // No semantic compression can reclaim system instructions, schemas or
         // output reservations. Refuse before spending a summarizer invocation.
-        let fixed: Vec<Message> = plan
-            .messages
-            .iter()
-            .filter(|message| matches!(message, Message::System { .. }))
-            .cloned()
-            .collect();
+        let mut fixed = Vec::new();
+        for message in &plan.messages {
+            tokio::task::yield_now().await;
+            check_checkpoint_deadline(deadline)?;
+            if matches!(message, Message::System { .. }) {
+                fixed.push(message.clone());
+            }
+        }
         if self
             .estimate_provider_request_tokens(&fixed, &plan.tool_definitions)
             .saturating_add(plan.ephemeral_image_tokens)
@@ -148,72 +196,98 @@ impl Agent {
                 "no eligible checkpoint prefix".into(),
             ));
         };
-        let eligible: Vec<usize> = (0..split)
-            .filter(|&index| {
-                !matches!(plan.messages[index], Message::System { .. })
-                    && !(matches!(plan.messages[index], Message::Context { .. })
-                        && source.is_some_and(|source| {
-                            source
-                                .resolve(
-                                    source.generation(),
-                                    source.revision(),
-                                    index,
-                                    &plan.messages[index],
-                                )
-                                .is_none()
-                        }))
-            })
-            .collect();
+        let split = submitted.map_or(split, |(_, end)| split.min(end));
+        let mut eligible = Vec::new();
+        for index in 0..split {
+            tokio::task::yield_now().await;
+            check_checkpoint_deadline(deadline)?;
+            if !matches!(plan.messages[index], Message::System { .. })
+                && !(matches!(plan.messages[index], Message::Context { .. })
+                    && source.is_some_and(|source| {
+                        source
+                            .resolve(
+                                source.generation(),
+                                source.revision(),
+                                index,
+                                &plan.messages[index],
+                            )
+                            .is_none()
+                    }))
+            {
+                eligible.push(index);
+            }
+        }
         if eligible.is_empty() {
             return Err(CompactionError::CompactionFailed(
                 "no eligible checkpoint prefix".into(),
             ));
         }
-        // Bound total projection allocation before cloning or serializing sources.
+        // Validate each source record under the shared deadline. Automatic
+        // summaries project bounded complete groups after the global privacy scan.
         // Sequential folds separately bound every provider request and output.
-        let source_bytes = eligible.iter().try_fold(0usize, |total, &index| {
-            let message = &plan.messages[index];
-            let size = match message {
-                Message::User { content } | Message::Context { content } => content.len(),
-                Message::Assistant {
-                    content,
-                    tool_calls,
-                    ..
-                } => {
-                    if tool_calls.len() > 32
-                        || tool_calls
-                            .iter()
-                            .any(|call| call.id.len() > 128 || call.name.len() > 128)
-                    {
-                        return None;
+        let mut source_bytes = Some(0usize);
+        for &index in &eligible {
+            tokio::task::yield_now().await;
+            check_checkpoint_deadline(deadline)?;
+            let size = (|| {
+                let message = &plan.messages[index];
+                let size = match message {
+                    Message::User { content } | Message::Context { content } => content.len(),
+                    Message::Assistant {
+                        content,
+                        tool_calls,
+                        ..
+                    } => {
+                        if tool_calls.len() > 32
+                            || tool_calls
+                                .iter()
+                                .any(|call| call.id.len() > 128 || call.name.len() > 128)
+                        {
+                            return None;
+                        }
+                        tool_calls.iter().fold(content.len(), |size, call| {
+                            size.saturating_add(call.id.len())
+                                .saturating_add(call.name.len())
+                        })
                     }
-                    tool_calls.iter().fold(content.len(), |size, call| {
-                        size.saturating_add(call.id.len())
-                            .saturating_add(call.name.len())
-                    })
-                }
-                Message::Tool { result } => result.content.len(),
-                Message::Multimodal { parts } => parts
-                    .iter()
-                    .map(|part| match part {
-                        talos_core::message::ContentPart::Text { text } => text.len(),
-                        _ => 0,
-                    })
-                    .fold(0usize, usize::saturating_add),
-                Message::System { .. } => 0,
-            };
-            total
-                .checked_add(size)
-                .filter(|&size| size <= 2 * 1024 * 1024)
-        });
+                    Message::Tool { result } => result.content.len(),
+                    Message::Multimodal { parts } => parts
+                        .iter()
+                        .map(|part| match part {
+                            talos_core::message::ContentPart::Text { text } => text.len(),
+                            _ => 0,
+                        })
+                        .fold(0usize, usize::saturating_add),
+                    Message::System { .. } => 0,
+                };
+                (size <= 2 * 1024 * 1024).then_some(size)
+            })();
+            source_bytes = source_bytes
+                .zip(size)
+                .and_then(|(total, size)| total.checked_add(size));
+            if source_bytes.is_none() {
+                break;
+            }
+        }
         if source_bytes.is_none() {
             return Err(CompactionError::CompactionFailed(
                 "checkpoint source byte limit exceeded".into(),
             ));
         }
-        let references: Vec<String> = eligible
-            .iter()
-            .map(|&index| match source {
+        // Both provider-generated and submitted checkpoints require complete
+        // source batches. Submitted payloads skip the summarizer packing loop,
+        // so pairing validation must happen before those paths diverge.
+        let mut group_start = 0;
+        while group_start < eligible.len() {
+            tokio::task::yield_now().await;
+            check_checkpoint_deadline(deadline)?;
+            group_start = checkpoint_group_end(&plan.messages, &eligible, group_start)?;
+        }
+        let mut references = Vec::new();
+        for &index in &eligible {
+            tokio::task::yield_now().await;
+            check_checkpoint_deadline(deadline)?;
+            let reference = match source {
                 Some(source) => source
                     .resolve(
                         source.generation(),
@@ -226,179 +300,219 @@ impl Agent {
                         CompactionError::CompactionFailed(
                             "checkpoint source binding changed".into(),
                         )
-                    }),
-                None => Ok(format!("raw:{index}")),
-            })
-            .collect::<CompactionResult<_>>()?;
-        let projected = self.checkpoint_projection(&plan.messages[..split], private)?;
-        let schema = serde_json::to_string(&schemars::schema_for!(Checkpoint)).map_err(|_| {
-            CompactionError::CompactionFailed("checkpoint schema serialization failed".into())
-        })?;
-        check_checkpoint_deadline(deadline)?;
-        let mut allowed = HashSet::new();
-        let mut rendered = String::new();
-        let mut generated_bytes = 0usize;
-        let mut calls = 0usize;
-        let mut cursor = 0usize;
-        let mut text_offset = 0usize;
-        while cursor < eligible.len() {
-            let mut sources = Vec::new();
-            let mut next = cursor;
-            let mut next_offset = text_offset;
-            while next < eligible.len() && text_offset == 0 {
-                tokio::task::yield_now().await;
-                check_checkpoint_deadline(deadline)?;
-                let group_end = checkpoint_group_end(&projected, &eligible, next)?;
-                // Bound repeated whole-prompt serialization during greedy packing.
-                // A complete parallel batch (at most 33 entries) stays together.
-                if !sources.is_empty() && sources.len() + group_end - next > 64 {
-                    break;
-                }
-                let old_len = sources.len();
-                for (position, &index) in eligible[next..group_end].iter().enumerate() {
-                    let reference = &references[next + position];
-                    sources
-                        .push(serde_json::json!({"source":reference,"message":projected[index]}));
-                }
-                let prompt = checkpoint_prompt(&schema, &rendered, &sources, context_limit)?;
-                if self.estimate_provider_request_tokens(&prompt, &[]) > context_limit {
-                    sources.truncate(old_len);
-                    break;
-                }
-                next = group_end;
+                    })?,
+                None => format!("raw:{index}"),
+            };
+            references.push(reference);
+        }
+        let rendered = if let Some((payload, _)) = submitted {
+            if private.project(payload) != payload {
+                return Err(CompactionError::CompactionFailed(
+                    "checkpoint contains private content".into(),
+                ));
             }
-            if sources.is_empty() {
-                let index = eligible[cursor];
-                // Raw and projected offsets differ after privacy filtering.
-                // Bind changed projections to the complete raw entry, and label
-                // segment offsets explicitly as projected. Never slice raw secrets.
-                let group_end = checkpoint_group_end(&projected, &eligible, cursor)?;
-                let batch = group_end > cursor + 1;
-                let (raw, text) = if batch {
-                    // Serialize only eligible projected messages, never arguments,
-                    // reasoning or unverified original result payloads.
-                    let group: Vec<_> = eligible[cursor..group_end]
-                        .iter()
-                        .map(|&index| &projected[index])
-                        .collect();
-                    let serialized = serde_json::to_string(&group).map_err(|_| {
-                        CompactionError::CompactionFailed(
-                            "checkpoint batch serialization failed".into(),
-                        )
-                    })?;
-                    (
-                        std::borrow::Cow::Borrowed(""),
-                        std::borrow::Cow::Owned(serialized),
+            let allowed: HashSet<_> = references.iter().map(String::as_str).collect();
+            let checkpoint = Checkpoint::parse(payload, |reference| allowed.contains(reference))
+                .map_err(|error| CompactionError::CompactionFailed(error.to_string()))?;
+            // Inspect decoded strings: rendering escapes quotes, backslashes and
+            // newlines again and therefore cannot detect every private token.
+            let decoded = serde_json::to_value(&checkpoint).map_err(|_| {
+                CompactionError::CompactionFailed("checkpoint serialization failed".into())
+            })?;
+            let mut sanitized = decoded.clone();
+            private.project_value(&mut sanitized);
+            if sanitized != decoded {
+                return Err(CompactionError::CompactionFailed(
+                    "checkpoint contains private content".into(),
+                ));
+            }
+            checkpoint
+                .render(context_limit)
+                .map_err(|error| CompactionError::CompactionFailed(error.to_string()))?
+        } else {
+            let projected = self
+                .prepare_checkpoint_projection(&plan.messages[..split], private, deadline)
+                .await?;
+            let schema =
+                serde_json::to_string(&schemars::schema_for!(Checkpoint)).map_err(|_| {
+                    CompactionError::CompactionFailed(
+                        "checkpoint schema serialization failed".into(),
                     )
-                } else {
-                    (
-                        segment_text(&plan.messages[index]).ok_or_else(|| {
-                            CompactionError::CompactionFailed(
-                                "irreducible checkpoint exchange".into(),
-                            )
-                        })?,
-                        segment_text(&projected[index]).ok_or_else(|| {
-                            CompactionError::CompactionFailed(
-                                "checkpoint text offsets unavailable".into(),
-                            )
-                        })?,
-                    )
-                };
-                let multipart = matches!(plan.messages[index], Message::Multimodal { .. });
-                let mut end = text.len();
-                loop {
+                })?;
+            check_checkpoint_deadline(deadline)?;
+            let mut allowed = HashSet::new();
+            let mut rendered = String::new();
+            let mut generated_bytes = 0usize;
+            let mut calls = 0usize;
+            let mut cursor = 0usize;
+            let mut text_offset = 0usize;
+            while cursor < eligible.len() {
+                let mut sources = Vec::new();
+                let mut next = cursor;
+                let mut next_offset = text_offset;
+                while next < eligible.len() && text_offset == 0 {
                     tokio::task::yield_now().await;
                     check_checkpoint_deadline(deadline)?;
-                    while end > text_offset && !text.is_char_boundary(end) {
-                        end -= 1;
+                    let group_end = checkpoint_group_end(&plan.messages, &eligible, next)?;
+                    // Bound repeated whole-prompt serialization during greedy packing.
+                    // A complete parallel batch (at most 33 entries) stays together.
+                    if !sources.is_empty() && sources.len() + group_end - next > 64 {
+                        break;
                     }
-                    if end <= text_offset {
-                        return Err(CompactionError::CompactionFailed(
-                            "irreducible checkpoint text".into(),
-                        ));
+                    let old_len = sources.len();
+                    for (position, &index) in eligible[next..group_end].iter().enumerate() {
+                        let reference = &references[next + position];
+                        sources.push(
+                            serde_json::json!({"source":reference,"message":projected.message(index, &plan.messages[index])}),
+                        );
                     }
-                    let segment = if batch {
-                        serde_json::json!({"source":format!("{}:batch:{text_offset}:{end}", references[cursor]),
+                    let prompt = checkpoint_prompt(&schema, &rendered, &sources, context_limit)?;
+                    if self.estimate_provider_request_tokens(&prompt, &[]) > context_limit {
+                        sources.truncate(old_len);
+                        break;
+                    }
+                    next = group_end;
+                }
+                if sources.is_empty() {
+                    let index = eligible[cursor];
+                    // Raw and projected offsets differ after privacy filtering.
+                    // Bind changed projections to the complete raw entry, and label
+                    // segment offsets explicitly as projected. Never slice raw secrets.
+                    let group_end = checkpoint_group_end(&plan.messages, &eligible, cursor)?;
+                    let batch = group_end > cursor + 1;
+                    let projected_message = projected.message(index, &plan.messages[index]);
+                    let (raw, text) = if batch {
+                        // Serialize only eligible projected messages, never arguments,
+                        // reasoning or unverified original result payloads.
+                        let group: Vec<_> = eligible[cursor..group_end]
+                            .iter()
+                            .map(|&index| projected.message(index, &plan.messages[index]))
+                            .collect();
+                        let serialized = serde_json::to_string(&group).map_err(|_| {
+                            CompactionError::CompactionFailed(
+                                "checkpoint batch serialization failed".into(),
+                            )
+                        })?;
+                        (
+                            std::borrow::Cow::Borrowed(""),
+                            std::borrow::Cow::Owned(serialized),
+                        )
+                    } else {
+                        (
+                            segment_text(&plan.messages[index]).ok_or_else(|| {
+                                CompactionError::CompactionFailed(
+                                    "irreducible checkpoint exchange".into(),
+                                )
+                            })?,
+                            segment_text(&projected_message).ok_or_else(|| {
+                                CompactionError::CompactionFailed(
+                                    "checkpoint text offsets unavailable".into(),
+                                )
+                            })?,
+                        )
+                    };
+                    let multipart = matches!(plan.messages[index], Message::Multimodal { .. });
+                    let mut end = text.len();
+                    loop {
+                        tokio::task::yield_now().await;
+                        check_checkpoint_deadline(deadline)?;
+                        while end > text_offset && !text.is_char_boundary(end) {
+                            end -= 1;
+                        }
+                        if end <= text_offset {
+                            return Err(CompactionError::CompactionFailed(
+                                "irreducible checkpoint text".into(),
+                            ));
+                        }
+                        let segment = if batch {
+                            serde_json::json!({"source":format!("{}:batch:{text_offset}:{end}", references[cursor]),
                             "source_scope":"complete_tool_batch","raw_sources":&references[cursor..group_end],
                             "projection_format":"projected_messages_json_fragment_v1",
                             "projection_byte_start":text_offset,"projection_byte_end":end,
                             "projection_total_bytes":text.len(),"text":&text[text_offset..end]})
-                    } else if multipart {
-                        serde_json::json!({"source":format!("{}:text:{text_offset}:{end}", references[cursor]),
+                        } else if multipart {
+                            serde_json::json!({"source":format!("{}:text:{text_offset}:{end}", references[cursor]),
                             "raw_entry":index,"source_scope":"whole_multimodal_entry",
                             "projection_format":"text_parts_joined_with_newline_v1",
                             "projection_byte_start":text_offset,"projection_byte_end":end,
                             "text":&text[text_offset..end]})
-                    } else if text == raw {
-                        serde_json::json!({"source":format!("{}:{text_offset}:{end}", references[cursor]),
+                        } else if text == raw {
+                            serde_json::json!({"source":format!("{}:{text_offset}:{end}", references[cursor]),
                             "raw_entry":index,"byte_start":text_offset,"byte_end":end,"text":&text[text_offset..end]})
-                    } else {
-                        serde_json::json!({"source":format!("{}:projected:{text_offset}:{end}", references[cursor]),
+                        } else {
+                            serde_json::json!({"source":format!("{}:projected:{text_offset}:{end}", references[cursor]),
                             "raw_entry":index,"raw_byte_start":0,"raw_byte_end":raw.len(),
                             "projection_byte_start":text_offset,"projection_byte_end":end,
                             "text":&text[text_offset..end]})
-                    };
-                    sources = vec![segment];
-                    let prompt = checkpoint_prompt(&schema, &rendered, &sources, context_limit)?;
-                    if self.estimate_provider_request_tokens(&prompt, &[]) <= context_limit {
-                        break;
+                        };
+                        sources = vec![segment];
+                        let prompt =
+                            checkpoint_prompt(&schema, &rendered, &sources, context_limit)?;
+                        if self.estimate_provider_request_tokens(&prompt, &[]) <= context_limit {
+                            break;
+                        }
+                        end = text_offset + (end - text_offset) / 2;
                     }
-                    end = text_offset + (end - text_offset) / 2;
+                    if end == text.len() {
+                        next = group_end;
+                        next_offset = 0;
+                    } else {
+                        next = cursor;
+                        next_offset = end;
+                    }
                 }
-                if end == text.len() {
-                    next = group_end;
-                    next_offset = 0;
-                } else {
-                    next = cursor;
-                    next_offset = end;
+                if calls >= 64 || tokio::time::Instant::now() >= deadline {
+                    return Err(CompactionError::CompactionFailed(
+                        "checkpoint folding limit exceeded".into(),
+                    ));
                 }
-            }
-            if calls >= 64 || tokio::time::Instant::now() >= deadline {
-                return Err(CompactionError::CompactionFailed(
-                    "checkpoint folding limit exceeded".into(),
-                ));
-            }
-            let prompt = checkpoint_prompt(&schema, &rendered, &sources, context_limit)?;
-            // Exact prompt, output reserve and margins are admitted before each call.
-            if self.estimate_provider_request_tokens(&prompt, &[]) > context_limit {
-                return Err(CompactionError::CompactionFailed(
-                    "checkpoint request exceeds capacity".into(),
-                ));
-            }
-            let payload = tokio::time::timeout_at(deadline, async {
-                let (progress_tx, progress_rx) = tokio::sync::mpsc::unbounded_channel();
-                drop(progress_rx);
-                let mut stream = self
-                    .provider
-                    .stream_with_protocol(&prompt, &[], plan.tool_protocol, progress_tx)
-                    .await
-                    .map_err(|_| {
-                        CompactionError::ProviderError("checkpoint provider request failed".into())
-                    })?;
-                crate::compaction::read_summary_stream(&mut stream).await
-            })
-            .await
-            .map_err(|_| CompactionError::ProviderError("checkpoint deadline exceeded".into()))??;
-            calls += 1;
-            generated_bytes += payload.len();
-            if generated_bytes > 256 * 1024 {
-                return Err(CompactionError::CompactionFailed(
-                    "checkpoint aggregate output limit exceeded".into(),
-                ));
-            }
-            for source in &sources {
-                if let Some(reference) = source["source"].as_str() {
-                    allowed.insert(reference.to_owned());
+                let prompt = checkpoint_prompt(&schema, &rendered, &sources, context_limit)?;
+                // Exact prompt, output reserve and margins are admitted before each call.
+                if self.estimate_provider_request_tokens(&prompt, &[]) > context_limit {
+                    return Err(CompactionError::CompactionFailed(
+                        "checkpoint request exceeds capacity".into(),
+                    ));
                 }
+                let payload = tokio::time::timeout_at(deadline, async {
+                    let (progress_tx, progress_rx) = tokio::sync::mpsc::unbounded_channel();
+                    drop(progress_rx);
+                    let mut stream = self
+                        .provider
+                        .stream_with_protocol(&prompt, &[], plan.tool_protocol, progress_tx)
+                        .await
+                        .map_err(|_| {
+                            CompactionError::ProviderError(
+                                "checkpoint provider request failed".into(),
+                            )
+                        })?;
+                    crate::compaction::read_summary_stream(&mut stream).await
+                })
+                .await
+                .map_err(|_| {
+                    CompactionError::ProviderError("checkpoint deadline exceeded".into())
+                })??;
+                calls += 1;
+                generated_bytes += payload.len();
+                if generated_bytes > 256 * 1024 {
+                    return Err(CompactionError::CompactionFailed(
+                        "checkpoint aggregate output limit exceeded".into(),
+                    ));
+                }
+                for source in &sources {
+                    if let Some(reference) = source["source"].as_str() {
+                        allowed.insert(reference.to_owned());
+                    }
+                }
+                let checkpoint = Checkpoint::parse(&payload, |source| allowed.contains(source))
+                    .map_err(|error| CompactionError::CompactionFailed(error.to_string()))?;
+                rendered = checkpoint
+                    .render(context_limit)
+                    .map_err(|error| CompactionError::CompactionFailed(error.to_string()))?;
+                cursor = next;
+                text_offset = next_offset;
             }
-            let checkpoint = Checkpoint::parse(&payload, |source| allowed.contains(source))
-                .map_err(|error| CompactionError::CompactionFailed(error.to_string()))?;
-            rendered = checkpoint
-                .render(context_limit)
-                .map_err(|error| CompactionError::CompactionFailed(error.to_string()))?;
-            cursor = next;
-            text_offset = next_offset;
-        }
+            rendered
+        };
         let old_tokens = eligible.iter().fold(0u32, |sum, &index| {
             sum.saturating_add(
                 TokenEstimator::new().estimate(std::slice::from_ref(&plan.messages[index])),
@@ -754,6 +868,428 @@ mod tests {
                 ]
             })
             .collect()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn submitted_snapshot_accepts_append_but_rejects_prefix_mutation_and_generation() {
+        let mut raw = history();
+        let bind = |generation, messages: &[Message]| {
+            crate::compaction::HistorySource::bind(
+                generation,
+                messages.len() as u64,
+                messages,
+                (0..messages.len()).map(|n| format!("entry-{n}")).collect(),
+            )
+            .expect("binding")
+        };
+        let submitted = crate::SubmittedCheckpoint {
+            payload: String::new(),
+            source: bind(1, &raw),
+            covered_end: 20,
+        };
+        raw.push(Message::User {
+            content: "appended".into(),
+        });
+        assert!(
+            submitted
+                .matches_source(
+                    &bind(1, &raw),
+                    raw.len(),
+                    tokio::time::Instant::now() + std::time::Duration::from_secs(2)
+                )
+                .await
+        );
+        assert!(
+            !submitted
+                .matches_source(
+                    &bind(2, &raw),
+                    raw.len(),
+                    tokio::time::Instant::now() + std::time::Duration::from_secs(2)
+                )
+                .await
+        );
+        let current = bind(1, &raw);
+        assert!(
+            !submitted
+                .matches_source(&current, raw.len(), tokio::time::Instant::now())
+                .await
+        );
+        {
+            let work = submitted.matches_source(
+                &current,
+                raw.len(),
+                tokio::time::Instant::now() + std::time::Duration::from_secs(2),
+            );
+            tokio::pin!(work);
+            tokio::select! {
+                biased;
+                _ = &mut work => panic!("identity comparison must yield"),
+                _ = std::future::ready(()) => {},
+            }
+            tokio::time::advance(std::time::Duration::from_secs(3)).await;
+            assert!(
+                !work.await,
+                "expiry during comparison must refuse authority"
+            );
+        }
+        assert!(
+            submitted
+                .matches_source(
+                    &current,
+                    raw.len(),
+                    tokio::time::Instant::now() + std::time::Duration::from_secs(2)
+                )
+                .await,
+            "expired comparison must not mutate either source"
+        );
+        raw[0] = Message::User {
+            content: "changed prefix".into(),
+        };
+        assert!(
+            !submitted
+                .matches_source(
+                    &bind(1, &raw),
+                    raw.len(),
+                    tokio::time::Instant::now() + std::time::Duration::from_secs(2)
+                )
+                .await
+        );
+    }
+
+    #[tokio::test]
+    async fn automatic_preparation_compacts_history_over_four_mib() {
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: false,
+            fail_after: None,
+        });
+        let agent = Agent::new(provider.clone(), ToolRegistry::new());
+        let mut raw: Vec<_> = (0..20)
+            .flat_map(|i| {
+                [
+                    Message::User {
+                        content: format!("old {i}: {}", "x".repeat(262_144)),
+                    },
+                    Message::Assistant {
+                        content: "recorded".into(),
+                        tool_calls: vec![],
+                        reasoning: None,
+                    },
+                ]
+            })
+            .collect();
+        raw.extend(history());
+        assert!(serde_json::to_vec(&raw).expect("bytes").len() > 4 * 1024 * 1024);
+        let items = vec![talos_core::session::SubmissionItem {
+            id: "large-restart".into(),
+            enqueue_sequence: 0,
+            kind: talos_core::session::SubmissionKind::UserTurn,
+            text: "continue from the recorded state".into(),
+            attachments: vec![],
+        }];
+        let prepared = agent
+            .prepare_session_turn(&items, raw.clone(), 128_000)
+            .await
+            .expect("large automatic preparation");
+        assert!(prepared.initial_plan.estimated_tokens <= 128_000);
+        assert!(prepared.initial_plan.messages.iter().any(|message| matches!(message, Message::Context { content } if content.starts_with("[Derived checkpoint;"))));
+        let requests = provider.requests.lock().expect("requests");
+        assert!(
+            requests.len() > 1,
+            "large history must fold across requests"
+        );
+        for request in requests.iter() {
+            assert!(agent.estimate_provider_request_tokens(request, &[]) <= 128_000);
+        }
+    }
+
+    #[tokio::test]
+    async fn submitted_checkpoint_refuses_incomplete_or_mismatched_source_batches() {
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: true,
+            fail_after: None,
+        });
+        let agent = Agent::new(provider.clone(), ToolRegistry::new());
+        for case in 0..5 {
+            let mut raw = history();
+            let call = talos_core::message::ToolCall {
+                id: "old-call".into(),
+                name: "read".into(),
+                input: serde_json::json!({}),
+            };
+            raw[1] = Message::Assistant {
+                content: String::new(),
+                reasoning: None,
+                tool_calls: if case == 1 {
+                    vec![call.clone(), call]
+                } else {
+                    vec![call]
+                },
+            };
+            // Missing result, duplicate call IDs, wrong result ID, orphan result,
+            // or an otherwise valid batch cut between its call and result.
+            if case == 2 || case == 4 {
+                raw[2] = Message::Tool {
+                    result: talos_core::message::MessageToolResult {
+                        tool_use_id: if case == 4 {
+                            "old-call"
+                        } else {
+                            "different-call"
+                        }
+                        .into(),
+                        content: "result".into(),
+                        is_error: false,
+                    },
+                };
+            } else if case == 3 {
+                raw[1] = Message::Tool {
+                    result: talos_core::message::MessageToolResult {
+                        tool_use_id: "orphan".into(),
+                        content: "result".into(),
+                        is_error: false,
+                    },
+                };
+            }
+            let source = crate::compaction::HistorySource::bind(
+                1,
+                raw.len() as u64,
+                &raw,
+                (0..raw.len()).map(|n| format!("source-{n}")).collect(),
+            )
+            .expect("source");
+            let before = agent.estimate_provider_request_tokens(&raw, &[]);
+            let mut plan = ProviderRequestPlan {
+                messages: raw.clone(),
+                tool_definitions: vec![],
+                estimated_tokens: before,
+                ephemeral_image_tokens: 0,
+                omitted_tool_exchanges: 0,
+                tool_protocol: ToolProtocol::Native,
+            };
+            let item = serde_json::json!({"text":"safe summary", "sources":["source-0"]});
+            let payload =
+                serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                "facts":[],"assumptions":[],"resources":[],"open_loops":[]})
+                .to_string();
+            let mut deferred = None;
+            let error = agent
+                .checkpoint_submitted_deferred(
+                    &mut plan,
+                    before * 2,
+                    &PrivateTokens::default(),
+                    &source,
+                    tokio::time::Instant::now() + Duration::from_secs(5),
+                    &payload,
+                    if case == 4 {
+                        2
+                    } else {
+                        eligible_prefix_end(&raw).expect("cutoff")
+                    },
+                    &mut deferred,
+                )
+                .await
+                .expect_err("unpaired source must refuse compaction");
+            assert!(error.to_string().contains("complete tool exchange"));
+            assert!(deferred.is_none());
+            assert_eq!(plan.messages, raw);
+            assert_eq!(plan.estimated_tokens, before);
+        }
+        assert!(provider.requests.lock().expect("requests").is_empty());
+    }
+
+    #[tokio::test]
+    async fn valid_submitted_checkpoint_reports_insufficient_reclamation_without_mutation() {
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: true,
+            fail_after: None,
+        });
+        let agent = Agent::new(provider.clone(), ToolRegistry::new());
+        // Same bounded candidate and seed size as the registered Runtime refusal.
+        let mut raw: Vec<_> = (0..20)
+            .flat_map(|index| {
+                [
+                    Message::User {
+                        content: format!("task {index} {}", "x".repeat(120)),
+                    },
+                    Message::Assistant {
+                        content: "completed".repeat(12),
+                        tool_calls: vec![],
+                        reasoning: None,
+                    },
+                ]
+            })
+            .collect();
+        raw.push(Message::User {
+            content: "exercise reclamation rejection and recovery".into(),
+        });
+        let end = eligible_prefix_end(&raw).expect("eligible prefix");
+        let source = crate::compaction::HistorySource::bind(
+            1,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|n| format!("source-{n}")).collect(),
+        )
+        .expect("bound source");
+        let item = serde_json::json!({"text":"x".repeat(3900),"sources":["source-0"]});
+        let payload =
+            serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+            "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+            "facts":[],"assumptions":[],"resources":[],"open_loops":[]})
+            .to_string();
+        let before = agent.estimate_provider_request_tokens(&raw, &[]);
+        let mut plan = ProviderRequestPlan {
+            messages: raw.clone(),
+            tool_definitions: vec![],
+            estimated_tokens: before,
+            ephemeral_image_tokens: 0,
+            omitted_tool_exchanges: 0,
+            tool_protocol: ToolProtocol::Native,
+        };
+        let mut deferred = None;
+        let error = agent
+            .checkpoint_submitted_deferred(
+                &mut plan,
+                64_000,
+                &PrivateTokens::default(),
+                &source,
+                tokio::time::Instant::now() + Duration::from_secs(5),
+                &payload,
+                end,
+                &mut deferred,
+            )
+            .await
+            .expect_err("must reject insufficient reclamation");
+        assert!(
+            matches!(error, CompactionError::CompactionFailed(ref reason) if reason == "checkpoint reclaims insufficient context"),
+            "{error}"
+        );
+        assert_eq!(plan.messages, raw);
+        assert_eq!(plan.estimated_tokens, before);
+        assert!(deferred.is_none());
+        assert!(provider.requests.lock().expect("requests").is_empty());
+    }
+
+    #[tokio::test]
+    async fn submitted_checkpoint_uses_shared_validation_without_provider_or_early_install() {
+        let provider = Arc::new(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: true,
+            fail_after: None,
+        });
+        let agent = Agent::new(provider.clone(), ToolRegistry::new());
+        let mut raw = history();
+        raw.push(Message::Assistant {
+            content: String::new(),
+            reasoning: None,
+            tool_calls: vec![talos_core::message::ToolCall {
+                id: "live-call".into(),
+                name: "read".into(),
+                input: serde_json::json!({}),
+            }],
+        });
+        raw.push(Message::Tool {
+            result: talos_core::message::MessageToolResult {
+                tool_use_id: "live-call".into(),
+                content: "live batch result".into(),
+                is_error: false,
+            },
+        });
+        let recent_start = eligible_prefix_end(&raw).expect("eligible");
+        // Discovery issued this cutoff before later complete user exchanges.
+        // Newly eligible history must not silently expand submitted coverage.
+        for _ in 0..12 {
+            raw.push(Message::User {
+                content: "later input".into(),
+            });
+            raw.push(Message::Assistant {
+                content: "later reply".into(),
+                reasoning: None,
+                tool_calls: vec![],
+            });
+        }
+        let source = crate::compaction::HistorySource::bind(
+            1,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|n| format!("source-{n}")).collect(),
+        )
+        .expect("source");
+        let before = agent.estimate_provider_request_tokens(&raw, &[]);
+        let payload = |text: &str, reference: &str| {
+            let item = serde_json::json!({"text": text, "sources": [reference]});
+            serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                "facts":[],"assumptions":[],"resources":[],"open_loops":[]})
+            .to_string()
+        };
+        let mut private = PrivateTokens::default();
+        private.extend(vec![
+            "PRIVATE_MARKER".into(),
+            "SECRET\"VALUE".into(),
+            "SECRET\\VALUE".into(),
+            "SECRET\nVALUE".into(),
+        ]);
+        for (submitted, valid) in [
+            (payload("Keep goal and next step", "source-0"), true),
+            (payload("invalid reference", "source-39"), false),
+            (payload("SECRET\"VALUE", "source-0"), false),
+            (payload("SECRET\\VALUE", "source-0"), false),
+            (payload("SECRET\nVALUE", "source-0"), false),
+            (
+                payload("PRIVATE_MARKER", "source-0")
+                    .replace("PRIVATE_MARKER", "\\u0050RIVATE_MARKER"),
+                false,
+            ),
+            (
+                "x".repeat(crate::compaction::MAX_CHECKPOINT_BYTES + 1),
+                false,
+            ),
+        ] {
+            let mut plan = ProviderRequestPlan {
+                messages: raw.clone(),
+                tool_definitions: vec![],
+                estimated_tokens: before,
+                ephemeral_image_tokens: 0,
+                omitted_tool_exchanges: 0,
+                tool_protocol: ToolProtocol::Native,
+            };
+            let mut deferred = None;
+            let result = agent
+                .checkpoint_submitted_deferred(
+                    &mut plan,
+                    before * 2,
+                    &private,
+                    &source,
+                    tokio::time::Instant::now() + Duration::from_secs(5),
+                    &submitted,
+                    recent_start,
+                    &mut deferred,
+                )
+                .await;
+            assert_eq!(result.is_ok(), valid);
+            assert_eq!(deferred.is_some(), valid);
+            assert!(
+                agent
+                    .checkpoint_projection_state
+                    .lock()
+                    .expect("projection")
+                    .is_none()
+            );
+            if valid {
+                assert_eq!(
+                    &plan.messages[plan.messages.len() - (raw.len() - recent_start)..],
+                    &raw[recent_start..]
+                );
+                assert!(plan.estimated_tokens < before);
+            } else {
+                assert_eq!(plan.messages, raw);
+                assert_eq!(plan.estimated_tokens, before);
+            }
+        }
+        assert!(provider.requests.lock().expect("requests").is_empty());
     }
 
     #[tokio::test]
@@ -1517,6 +2053,22 @@ mod tests {
                 .await
                 .is_err()
         );
+        let mut deferred = None;
+        let error = agent
+            .checkpoint_submitted_deferred(
+                &mut plan,
+                before,
+                &PrivateTokens::default(),
+                &source,
+                tokio::time::Instant::now() + Duration::from_secs(120),
+                "{}",
+                eligible_prefix_end(&original).expect("cutoff"),
+                &mut deferred,
+            )
+            .await
+            .expect_err("expired source deadline");
+        assert!(error.to_string().contains("deadline"));
+        assert!(deferred.is_none());
         assert!(provider.requests.lock().expect("capture lock").is_empty());
         assert_eq!(plan.messages, original);
         assert_eq!(plan.estimated_tokens, before);
@@ -1817,6 +2369,7 @@ mod tests {
         ];
         let projected = agent
             .checkpoint_projection(&batch, &PrivateTokens::default())
+            .await
             .expect("bounded projection");
         let mut messages = batch;
         messages.extend((0..10).map(|i| Message::User {

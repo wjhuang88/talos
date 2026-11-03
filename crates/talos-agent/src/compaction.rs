@@ -20,7 +20,7 @@ mod tests;
 
 pub use checkpoint::{Checkpoint, CheckpointError, CheckpointItem, MAX_CHECKPOINT_BYTES};
 pub use engine::Compactor;
-pub use operations::{CompactAdmission, CompactOperations, CompactOutcome};
+pub use operations::{CompactAdmission, CompactOperations, CompactOrigin, CompactOutcome};
 pub use policy::{CompactionPolicy, RequestPressure};
 pub use source::HistorySource;
 pub(crate) use summary_stream::read_summary_stream;

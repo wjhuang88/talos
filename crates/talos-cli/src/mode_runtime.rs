@@ -476,6 +476,163 @@ mod tests {
     use super::*;
     use talos_session::{CreateTodo, TodoPriority};
 
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn reasoning_wire_budget_matches_registered_agent_output_reservation() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let mut measured = Vec::new();
+        for (output, thinking) in [(4096, 1024), (8192, 6000)] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("loopback");
+            let url = format!("http://{}", listener.local_addr().expect("address"));
+            let server = tokio::spawn(async move {
+                tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                    let (mut socket, _) = listener.accept().await.expect("request");
+                    let mut bytes = Vec::new();
+                    let mut chunk = [0; 4096];
+                    let body = loop {
+                        let count = socket.read(&mut chunk).await.expect("read");
+                        assert_ne!(count, 0);
+                        bytes.extend_from_slice(&chunk[..count]);
+                        assert!(bytes.len() <= 128 * 1024, "bounded fixture request");
+                        if let Some(end) = bytes.windows(4).position(|b| b == b"\r\n\r\n") {
+                            let headers = std::str::from_utf8(&bytes[..end]).expect("headers");
+                            let length: usize = headers.lines().find_map(|line| {
+                                let (name, value) = line.split_once(':')?;
+                                name.eq_ignore_ascii_case("content-length").then(|| value.trim().parse().expect("length"))
+                            }).expect("content length");
+                            if bytes.len() >= end + 4 + length {
+                                break serde_json::from_slice::<serde_json::Value>(&bytes[end + 4..end + 4 + length]).expect("body");
+                            }
+                        }
+                    };
+                    let response = concat!(
+                        "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"fixture\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"model\":\"reasoning-fixture\",\"stop_reason\":null,\"usage\":{\"input_tokens\":1,\"output_tokens\":0}}}\n\n",
+                        "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n",
+                        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ok\"}}\n\n",
+                        "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+                        "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":1}}\n\n",
+                        "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+                    );
+                    let wire = format!("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", response.len());
+                    socket.write_all(wire.as_bytes()).await.expect("response");
+                    body
+                }).await.expect("fixture deadline")
+            });
+            let mut config = Config {
+                provider: "fixture".into(),
+                model: "reasoning-fixture".into(),
+                ..Default::default()
+            };
+            config.providers.insert(
+                "fixture".into(),
+                talos_config::ProviderConfig {
+                    protocol: talos_config::ProviderProtocol::AnthropicMessages,
+                    base_url: Some(url),
+                    models: std::collections::HashMap::from([(
+                        "reasoning-fixture".into(),
+                        talos_config::ModelConfig {
+                            context_limit: Some(32_000),
+                            output_limit: Some(output),
+                            reasoning_supported: Some(true),
+                            reasoning: Some(talos_config::ReasoningOptions {
+                                budget_tokens: Some(thinking),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            );
+            let provider = talos_provider::openai_responses::factory::build_configured_provider(
+                &config,
+                "fixture-key",
+            )
+            .expect("configured adapter");
+            let mut agent = Agent::new(provider.clone(), talos_core::tool::ToolRegistry::new());
+            agent
+                .enable_model_checkpoint_tools()
+                .expect("registered tools");
+            set_request_budget_spec(&mut agent, &config);
+            let reserved = agent.request_budget_spec().requested_output_tokens;
+            let root = tempfile::tempdir().expect("workspace");
+            let (handle, mut actor) = talos_agent::session::AppServerSession::new(
+                agent,
+                talos_core::session::SessionConfig {
+                    runtime_policy: talos_core::session::RuntimePolicy::interactive(),
+                    workspace_root: root.path().to_path_buf(),
+                    initial_history: vec![],
+                    model_context_limit: 32_000,
+                },
+            );
+            let join = tokio::spawn(async move { actor.run().await });
+            let mut events = handle.eq_rx;
+            handle
+                .sq_tx
+                .send(talos_core::session::SessionOp::Submit {
+                    message: "bounded thinking request".into(),
+                })
+                .await
+                .expect("submit");
+            let mut budget = None;
+            let mut completed = false;
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                while let Some(event) = events.recv().await {
+                    if let talos_core::session::SessionEvent::TurnEvent { payload, .. } = event {
+                        match payload {
+                            talos_core::session::TurnEventPayload::Progress { event: talos_core::message::AgentEvent::ContextBudget { budget: value } } => budget = Some(value),
+                            talos_core::session::TurnEventPayload::Completed { status } => {
+                                assert!(matches!(status, talos_core::session::TurnCompletionStatus::Success { .. }), "{status:?}");
+                                completed = true;
+                                break;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }).await.expect("Actor deadline");
+            assert!(completed);
+            let budget = budget.expect("actual admission budget");
+            assert_eq!(budget.limit, Some(32_000));
+            measured.push(budget.estimated_tokens);
+            handle
+                .sq_tx
+                .send(talos_core::session::SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+            tokio::time::timeout(std::time::Duration::from_secs(5), join)
+                .await
+                .expect("shutdown deadline")
+                .expect("Actor joined");
+            let body = server.await.expect("server");
+            for name in ["compact_context", "history_search"] {
+                assert_eq!(
+                    body["tools"]
+                        .as_array()
+                        .expect("registered wire tools")
+                        .iter()
+                        .filter(|tool| tool["name"] == name)
+                        .count(),
+                    1
+                );
+            }
+            assert_eq!(body["max_tokens"], reserved);
+            assert_eq!(body["thinking"]["budget_tokens"], thinking);
+            assert_eq!(reserved, output);
+            assert!(
+                thinking < reserved,
+                "thinking consumes the total output allocation; do not add it twice"
+            );
+        }
+        assert_eq!(
+            measured[1] - measured[0],
+            4096,
+            "only the total output reservation changes admission cost"
+        );
+    }
+
     #[test]
     fn todo_prompt_includes_only_active_items() {
         let dir = tempfile::tempdir().expect("operation should succeed");

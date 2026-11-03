@@ -365,6 +365,16 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
             send_stream(ui_tx, talos_conversation::MessageSource::Error, text);
             return false;
         }
+        Err(FinalHistoryError::Restore(error)) => {
+            send_stream(
+                ui_tx,
+                talos_conversation::MessageSource::Error,
+                format!(
+                    "[Error] Failed to restore canonical Session history: {error:#}. No replacement route was published. Retry the switch after resolving the source error.\n"
+                ),
+            );
+            return false;
+        }
         Err(FinalHistoryError::Persist(error)) => {
             let text = format!(
                 "[Error] Model switch fenced the old runtime but failed to durably commit the switch marker and final Session history: {error}. No replacement route was published. The Session runtime is stopped; retry the switch, start a new Session, or resume before continuing.
@@ -465,34 +475,36 @@ pub(crate) async fn rebuild_session_for_model(params: RebuildSessionParams<'_>) 
 enum FinalHistoryError {
     Fence(String),
     Persist(SessionError),
+    Restore(anyhow::Error),
 }
 
-fn model_activation_tail(
+async fn model_activation_tail(
     session: &Session,
 ) -> Result<Option<SessionModelActivation>, FinalHistoryError> {
-    Ok(session
-        .read_entries()
-        .map_err(FinalHistoryError::Persist)?
-        .last()
-        .and_then(|entry| {
-            crate::mode_runtime::session_model_activation_from_metadata(&entry.metadata)
-        }))
+    let (_, tail) = crate::history_restore::read_session_snapshot(session)
+        .await
+        .map_err(FinalHistoryError::Restore)?;
+    Ok(tail.as_ref().and_then(|entry| {
+        crate::mode_runtime::session_model_activation_from_metadata(&entry.metadata)
+    }))
 }
 
-fn verified_activation_history(
+async fn verified_activation_history(
     session: &Session,
     activation: &SessionModelActivation,
     marker: &Message,
 ) -> Result<Vec<Message>, FinalHistoryError> {
-    let tail = model_activation_tail(session)?;
-    if tail.as_ref() != Some(activation) {
+    let (history, tail) = crate::history_restore::read_session_snapshot(session)
+        .await
+        .map_err(FinalHistoryError::Restore)?;
+    let tail_activation = tail.as_ref().and_then(|entry| {
+        crate::mode_runtime::session_model_activation_from_metadata(&entry.metadata)
+    });
+    if tail_activation.as_ref() != Some(activation) {
         return Err(FinalHistoryError::Persist(SessionError::ParseError(
-            "durable model activation record is not the exact final Session entry".to_string(),
+            "durable model activation record is not the last decoded Session entry".to_string(),
         )));
     }
-    let history = session
-        .read_messages()
-        .map_err(FinalHistoryError::Persist)?;
     if !history
         .last()
         .is_some_and(|message| model_switch_markers_match(message, marker))
@@ -520,7 +532,7 @@ async fn establish_model_activation_and_read_final_history(
         previous.clone(),
         target.clone(),
     );
-    if model_activation_tail(session)?.as_ref() == Some(&recovered) {
+    if model_activation_tail(session).await?.as_ref() == Some(&recovered) {
         let store = talos_session::PendingSubmissionStore::for_session(session);
         let state = store.runtime_state().map_err(|error| {
             FinalHistoryError::Persist(SessionError::ParseError(format!(
@@ -540,7 +552,7 @@ async fn establish_model_activation_and_read_final_history(
                 })?;
         }
         let marker = model_switch_marker_for_activation(&recovered);
-        return verified_activation_history(session, &recovered, &marker);
+        return verified_activation_history(session, &recovered, &marker).await;
     }
 
     persist_model_activation_and_read_final_history(transition, session, previous, target).await
@@ -576,7 +588,7 @@ async fn persist_model_activation_and_read_final_history(
             )))
         })?;
 
-    if model_activation_tail(session)?.as_ref() != Some(&activation) {
+    if model_activation_tail(session).await?.as_ref() != Some(&activation) {
         session
             .append_with_metadata(&marker, marker_metadata)
             .map_err(FinalHistoryError::Persist)?;
@@ -589,7 +601,7 @@ async fn persist_model_activation_and_read_final_history(
             )))
         })?;
 
-    verified_activation_history(session, &activation, &marker)
+    verified_activation_history(session, &activation, &marker).await
 }
 
 /// Test-only compatibility harness for the earlier content marker regression
@@ -1293,6 +1305,147 @@ replay = false
             Some("low-reasoning")
         );
         assert_ne!(activations[0].activation_id, activations[1].activation_id);
+    }
+
+    #[tokio::test]
+    async fn model_activation_snapshot_cancellation_retries_without_duplicate_marker() {
+        use talos_session::SessionRuntimeActivationStatus;
+
+        // Each cut is at an actual paged-read await: before retirement, after
+        // retirement, and after marker/sidecar commit but before publication.
+        for cut in 1..=3 {
+            let temp = tempfile::tempdir().expect("root");
+            let manager = SessionManager::with_dir(temp.path().join("sessions"));
+            let durable = manager
+                .create_or_open_session("snapshot-cut")
+                .expect("session");
+            let session = durable.session().clone();
+            session
+                .append(&Message::User {
+                    content: "retained history".into(),
+                })
+                .expect("history");
+            let previous = SessionModelIdentity::new("openai", "o3", Some("low-reasoning"));
+            let target = SessionModelIdentity::new("openai", "o3", Some("high-reasoning"));
+            let (tx, mut rx) = mpsc::channel(4);
+            let mut transition = SessionTransition::new(tx, session.clone()).expect("transition");
+            let old_route = transition.bind_active_sender();
+            let (observed_tx, mut observed_rx) = mpsc::unbounded_channel();
+            let actor = tokio::spawn(async move {
+                while let Some(operation) = rx.recv().await {
+                    match operation {
+                        SessionOp::Shutdown => break,
+                        SessionOp::Submit { message } => {
+                            observed_tx.send(message).expect("observer")
+                        }
+                        _ => {}
+                    }
+                }
+            });
+            let scheduler_cancel = tokio_util::sync::CancellationToken::new();
+            let scheduler_stop = scheduler_cancel.clone();
+            let scheduler = tokio::spawn(async move { scheduler_stop.cancelled().await });
+            transition
+                .attach_active_runtime(actor, scheduler_cancel, scheduler)
+                .expect("runtime");
+            let initial_generation = transition.active_generation();
+            let reached = std::sync::Arc::new(tokio::sync::Notify::new());
+            {
+                let operation = crate::history_restore::SNAPSHOT_CUT.scope(
+                    (std::cell::Cell::new(cut), reached.clone()),
+                    establish_model_activation_and_read_final_history(
+                        &mut transition,
+                        &session,
+                        &previous,
+                        &target,
+                    ),
+                );
+                tokio::pin!(operation);
+                tokio::select! {
+                    result = &mut operation => panic!("transition finished before cut: {result:?}"),
+                    () = reached.notified() => {},
+                    () = tokio::time::sleep(std::time::Duration::from_secs(10)) => panic!("cut deadline"),
+                }
+                // Drop the transition future, retaining the host transition owner.
+            }
+            assert_eq!(
+                transition.active_generation(),
+                initial_generation,
+                "no replacement published"
+            );
+            let store = talos_session::PendingSubmissionStore::for_session(&session);
+            let state = store.runtime_state().expect("runtime state");
+            if cut == 1 {
+                assert!(state.is_none());
+                old_route
+                    .send(SessionOp::Submit {
+                        message: "still active".into(),
+                    })
+                    .await
+                    .expect("old admission");
+                assert_eq!(
+                    tokio::time::timeout(std::time::Duration::from_secs(2), observed_rx.recv())
+                        .await
+                        .expect("old route delivery")
+                        .as_deref(),
+                    Some("still active")
+                );
+            } else {
+                tokio::time::timeout(std::time::Duration::from_secs(2), old_route.closed())
+                    .await
+                    .expect("old route revoked");
+                assert!(
+                    old_route
+                        .send(SessionOp::Submit {
+                            message: "must not run".into()
+                        })
+                        .await
+                        .is_err()
+                );
+                assert_eq!(
+                    state.expect("staged activation").status,
+                    if cut == 2 {
+                        SessionRuntimeActivationStatus::PendingMarker
+                    } else {
+                        SessionRuntimeActivationStatus::Committed
+                    }
+                );
+            }
+            let history = establish_model_activation_and_read_final_history(
+                &mut transition,
+                &session,
+                &previous,
+                &target,
+            )
+            .await
+            .expect("retry");
+            assert!(
+                matches!(&history[0], Message::User { content } if content == "retained history")
+            );
+            tokio::time::timeout(std::time::Duration::from_secs(2), old_route.closed())
+                .await
+                .expect("retry keeps old route revoked");
+            let entries = session.read_entries().expect("entries");
+            let activations: Vec<_> = entries
+                .iter()
+                .filter_map(|entry| {
+                    crate::mode_runtime::session_model_activation_from_metadata(&entry.metadata)
+                })
+                .collect();
+            assert_eq!(activations.len(), 1, "cut {cut} must not duplicate marker");
+            assert_eq!(
+                activations[0],
+                SessionModelActivation::new(initial_generation + 1, previous, target)
+            );
+            assert_eq!(
+                store
+                    .runtime_state()
+                    .expect("state")
+                    .expect("activation")
+                    .status,
+                SessionRuntimeActivationStatus::Committed
+            );
+        }
     }
 
     #[tokio::test]

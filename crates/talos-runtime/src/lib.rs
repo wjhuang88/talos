@@ -936,6 +936,14 @@ pub enum RuntimeError {
     #[error("runtime construction requires an active Tokio runtime")]
     AsyncRuntimeUnavailable,
 
+    /// Startup was cancelled before publishing a runtime handle.
+    #[error("runtime startup cancelled")]
+    StartupCancelled,
+
+    /// A bounded history recovery step failed before runtime publication.
+    #[error("runtime history recovery failed: {0}")]
+    HistoryRecovery(#[from] talos_session::history_page::HistoryPageError),
+
     /// The runtime actor task failed to join.
     #[error("runtime actor failed: {0}")]
     ActorJoin(#[from] tokio::task::JoinError),
@@ -1116,6 +1124,11 @@ pub struct RuntimeBuilder {
     sandbox_fallback_policy: SandboxFallbackPolicy,
     preset: Option<RuntimePreset>,
     initial_history: Vec<Message>,
+    prepared_history: Option<talos_session::DurableHistorySnapshot>,
+    #[cfg(test)]
+    startup_publication_gate: Option<Box<dyn FnOnce() + Send>>,
+    #[cfg(test)]
+    startup_capture_gate: Option<Box<dyn FnOnce() + Send>>,
     model_context_limit: u32,
     approval_handler: Option<Arc<dyn ApprovalHandler>>,
     auto_assistance: bool,
@@ -1189,6 +1202,11 @@ impl RuntimeBuilder {
             sandbox_fallback_policy: SandboxFallbackPolicy::Deny,
             preset: None,
             initial_history: Vec::new(),
+            prepared_history: None,
+            #[cfg(test)]
+            startup_publication_gate: None,
+            #[cfg(test)]
+            startup_capture_gate: None,
             model_context_limit: 128_000,
             approval_handler: None,
             auto_assistance: false,
@@ -1486,13 +1504,99 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Build with bounded-page durable history preparation on blocking workers.
+    /// Dropping the future requests cancellation. Use [`Self::build_cancellable`]
+    /// when the host needs to request cancellation without dropping the future.
+    pub async fn build_async(self) -> RuntimeResult<RuntimeHandle> {
+        self.build_cancellable(tokio_util::sync::CancellationToken::new())
+            .await
+    }
+
+    /// Prepare durable history one bounded page at a time off the async executor,
+    /// then build the runtime. Dropping this future cancels pending preparation;
+    /// a kernel read already in progress can outlive the future until it returns.
+    /// Each page has a two-second cooperative deadline. No Actor or provider call
+    /// is created on preparation failure. Other construction work, including
+    /// history cloning and fork-intent recovery, still uses synchronous `build`.
+    /// Cancellation is checked again immediately before Actor creation; later
+    /// cancellation can race successful publication. Durable preparation fails
+    /// closed on platforms without enabled source-version authorization.
+    pub async fn build_cancellable(
+        mut self,
+        cancellation: tokio_util::sync::CancellationToken,
+    ) -> RuntimeResult<RuntimeHandle> {
+        tokio::runtime::Handle::try_current().map_err(|_| RuntimeError::AsyncRuntimeUnavailable)?;
+        if self.provider.is_none() {
+            return Err(RuntimeError::MissingProvider);
+        }
+        let cancellation = cancellation.child_token();
+        let _cancel_on_drop = cancellation.clone().drop_guard();
+        if cancellation.is_cancelled() {
+            return Err(RuntimeError::StartupCancelled);
+        }
+        if let Some((session, _)) = &self.durable_session {
+            let session = session.clone();
+            #[cfg(test)]
+            let capture_gate = self.startup_capture_gate.take();
+            let mut scan = tokio::select! {
+                biased;
+                _ = cancellation.cancelled() => return Err(RuntimeError::StartupCancelled),
+                result = tokio::task::spawn_blocking(move || {
+                    #[cfg(test)]
+                    if let Some(gate) = capture_gate { gate(); }
+                    session.begin_history_scan()
+                }) => result??,
+            };
+            loop {
+                if cancellation.is_cancelled() {
+                    return Err(RuntimeError::StartupCancelled);
+                }
+                let stopped = cancellation.clone();
+                let worker = tokio::task::spawn_blocking(move || {
+                    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+                    let result = scan.step(deadline, || stopped.is_cancelled());
+                    (scan, result)
+                });
+                let (returned, result) = tokio::select! {
+                    biased;
+                    _ = cancellation.cancelled() => return Err(RuntimeError::StartupCancelled),
+                    result = worker => result?,
+                };
+                scan = returned;
+                if cancellation.is_cancelled() {
+                    return Err(RuntimeError::StartupCancelled);
+                }
+                if result? {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+            self.prepared_history = Some(tokio::select! {
+                biased;
+                _ = cancellation.cancelled() => return Err(RuntimeError::StartupCancelled),
+                result = tokio::task::spawn_blocking(move || scan.finish()) => result??,
+            });
+        }
+        if cancellation.is_cancelled() {
+            return Err(RuntimeError::StartupCancelled);
+        }
+        self.build_inner(Some(cancellation))
+    }
+
     /// Builds and starts the runtime actor.
     ///
     /// The returned primary handle owns submission and event access. Dropping
     /// it initiates the non-blocking default shutdown plan; use
     /// [`RuntimeHandle::shutdown`] or [`RuntimeHandle::shutdown_with`] when the
     /// host must observe terminal cleanup.
-    pub fn build(mut self) -> RuntimeResult<RuntimeHandle> {
+    pub fn build(self) -> RuntimeResult<RuntimeHandle> {
+        self.build_inner(None)
+    }
+
+    fn build_inner(
+        mut self,
+        startup_cancellation: Option<tokio_util::sync::CancellationToken>,
+    ) -> RuntimeResult<RuntimeHandle> {
         let provider = self.provider.ok_or(RuntimeError::MissingProvider)?;
         let mut tools = self.tools;
         let mut builtin_contributions = Vec::new();
@@ -1582,6 +1686,9 @@ impl RuntimeBuilder {
                 fallback_handler,
             )
         };
+        agent
+            .enable_model_checkpoint_tools()
+            .map_err(|error| RuntimeError::Agent(AgentError::ToolError(error.to_string())))?;
         let permission_state = Arc::new(PermissionSessionState::new((*agent_engine).clone()));
         let fallback_resolver = approval_handler.clone().map(|handler| {
             Arc::new(RuntimeApprovalResolver { inner: handler }) as Arc<dyn ApprovalResolver>
@@ -1643,11 +1750,42 @@ impl RuntimeBuilder {
         if !self.skill_index.is_empty() {
             agent.set_skill_index(self.skill_index);
         }
-        let recovered_entries = self
-            .durable_session
-            .as_ref()
-            .map(|(session, _)| session.read_history_snapshot())
-            .transpose()?;
+        #[cfg(any(unix, windows))]
+        if let Some((session, _)) = &self.durable_session {
+            let budget =
+                talos_session::sqlite::RecoveryWorkBudget::new(std::time::Duration::from_secs(2));
+            let mut cursor = None;
+            loop {
+                match session.recover_fork_intents(&budget, cursor.as_deref()) {
+                    Ok((scanned, retired, failed, next)) => {
+                        if failed != 0 {
+                            tracing::warn!(
+                                scanned,
+                                retired,
+                                failed,
+                                "fork recovery retained unresolved intents"
+                            );
+                        }
+                        cursor = next;
+                        if cursor.is_none() {
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        tracing::warn!("fork startup recovery stopped; intents retained for retry");
+                        break;
+                    }
+                }
+            }
+        }
+        let recovered_entries = match self.prepared_history.take() {
+            Some(snapshot) => Some(snapshot),
+            None => self
+                .durable_session
+                .as_ref()
+                .map(|(session, _)| session.read_history_snapshot())
+                .transpose()?,
+        };
         let initial_history = if let Some(entries) = &recovered_entries {
             entries
                 .entries()
@@ -1673,9 +1811,6 @@ impl RuntimeBuilder {
         actor.set_runtime_admission(admission.clone());
         if let Some((session, policy)) = self.durable_session {
             actor.set_durable_persistence(session, policy);
-            if let Some(entries) = recovered_entries {
-                actor.set_recovered_history_sources(entries);
-            }
         }
         let runtime = tokio::runtime::Handle::try_current()
             .map_err(|_| RuntimeError::AsyncRuntimeUnavailable)?;
@@ -1683,8 +1818,33 @@ impl RuntimeBuilder {
             admission: admission.clone(),
         };
         let session_generation = actor.generation();
+        #[cfg(test)]
+        if let Some(gate) = self.startup_publication_gate.take() {
+            gate();
+        }
+        // Publication boundary: cancellation observed here wins over creating
+        // the Actor. Cancellation after this boundary can race successful build.
+        if startup_cancellation
+            .as_ref()
+            .is_some_and(|token| token.is_cancelled())
+        {
+            return Err(RuntimeError::StartupCancelled);
+        }
         let actor_task = runtime.spawn(async move {
             let _actor_exit_guard = actor_exit_guard;
+            if let Some(entries) = recovered_entries {
+                let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+                let bound = tokio::time::timeout_at(
+                    deadline,
+                    actor.set_recovered_history_sources_until(entries, deadline),
+                )
+                .await;
+                if !matches!(bound, Ok(true)) {
+                    tracing::warn!(
+                        "runtime recovered source binding unavailable within startup budget"
+                    );
+                }
+            }
             actor.run().await;
         });
         let coordinator = ShutdownCoordinator::new(
@@ -1721,6 +1881,27 @@ pub struct RuntimeHandle {
 }
 
 impl RuntimeHandle {
+    /// Fork the committed durable tip while the Actor is idle, returning the
+    /// child UUID. The active runtime remains bound to its original session.
+    /// Busy sessions and existing destination identities are rejected.
+    /// Dropping this future requests cooperative cancellation before publication;
+    /// cancellation racing publication may leave a completed child.
+    pub async fn fork_durable(&self, external_id: impl Into<String>) -> RuntimeResult<String> {
+        let (receipt_tx, mut receipt_rx) = mpsc::unbounded_channel();
+        self.send_admitted(SessionOp::ForkDurable {
+            external_id: external_id.into(),
+            receipt_tx: Some(receipt_tx),
+        })
+        .await?;
+        receipt_rx
+            .recv()
+            .await
+            .ok_or(RuntimeError::CommandChannelClosed)?
+            .map_err(|message| {
+                RuntimeError::Session(talos_session::SessionError::DurableTurn(message))
+            })
+    }
+
     /// Queue manual whole-request compaction without adding a transcript turn.
     ///
     /// IDs must increase within this runtime. Retained duplicate IDs return the
@@ -2067,6 +2248,10 @@ impl AgentTool for RuntimePermissionAwareTool {
         self.inner.project_result(result)
     }
 
+    fn recovery_projection(&self, result: &ToolResult) -> Option<String> {
+        self.inner.recovery_projection(result)
+    }
+
     fn produces_todo_presentation(&self) -> bool {
         self.inner.produces_todo_presentation()
     }
@@ -2115,6 +2300,121 @@ mod tests {
     use tokio::sync::Notify;
 
     use super::*;
+
+    #[tokio::test]
+    async fn reopened_large_history_automatically_compacts_before_normal_dispatch() {
+        struct EmergencyModel {
+            summaries: AtomicUsize,
+            normal: AtomicUsize,
+        }
+        #[async_trait::async_trait]
+        impl LanguageModel for EmergencyModel {
+            async fn stream(
+                &self,
+                messages: &[Message],
+            ) -> ProviderResult<tokio::sync::mpsc::Receiver<AgentEvent>> {
+                let summary = messages.first().and_then(|message| match message {
+                    Message::User { content }
+                        if content.starts_with("Produce only a JSON checkpoint") =>
+                    {
+                        Some(content)
+                    }
+                    _ => None,
+                });
+                let response = if let Some(prompt) = summary {
+                    self.summaries.fetch_add(1, Ordering::SeqCst);
+                    let sources: Vec<serde_json::Value> =
+                        serde_json::from_str(prompt.split("\nSources: ").last().expect("sources"))
+                            .expect("JSON");
+                    let item = serde_json::json!({"text":"Continue the recorded task", "sources":[sources[0]["source"]]});
+                    serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                        "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                        "facts":[],"assumptions":[],"resources":[],"open_loops":[]}).to_string()
+                } else {
+                    self.normal.fetch_add(1, Ordering::SeqCst);
+                    assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.starts_with("[Derived checkpoint;"))), "normal dispatch must use emergency checkpoint");
+                    assert!(!messages.iter().any(|message| matches!(message, Message::User { content } if content.starts_with("large old"))));
+                    "continued after emergency".into()
+                };
+                let (tx, rx) = tokio::sync::mpsc::channel(4);
+                tx.send(AgentEvent::TextDelta { delta: response })
+                    .await
+                    .expect("delta");
+                tx.send(AgentEvent::TurnEnd {
+                    stop_reason: talos_core::message::StopReason::EndTurn,
+                    usage: Default::default(),
+                })
+                .await
+                .expect("terminal");
+                Ok(rx)
+            }
+        }
+        let root = tempfile::tempdir().expect("root");
+        let durable = talos_session::DurableSession::open_or_create(root.path(), "large-emergency")
+            .expect("create");
+        let mut raw: Vec<_> = (0..20)
+            .flat_map(|i| {
+                [
+                    Message::User {
+                        content: format!("large old {i}: {}", "x".repeat(262_144)),
+                    },
+                    Message::Assistant {
+                        content: "recorded".into(),
+                        tool_calls: vec![],
+                        reasoning: None,
+                    },
+                ]
+            })
+            .collect();
+        raw.extend((0..20).map(|i| Message::User {
+            content: format!("recent {i}"),
+        }));
+        durable
+            .commit_turn("prior", &raw, &Default::default())
+            .expect("commit");
+        let path = durable.file_path().to_owned();
+        let original = std::fs::read(&path).expect("raw bytes");
+        assert!(original.len() > 4 * 1024 * 1024);
+        drop(durable);
+        let reopened = talos_session::DurableSession::open_existing(root.path(), "large-emergency")
+            .expect("lookup")
+            .expect("existing");
+        let model = Arc::new(EmergencyModel {
+            summaries: AtomicUsize::new(0),
+            normal: AtomicUsize::new(0),
+        });
+        let builder = RuntimeBuilder::new()
+            .provider(model.clone())
+            .workspace_root(root.path())
+            .model_context_limit(128_000)
+            .durable_session(reopened);
+        #[cfg(unix)]
+        let mut runtime = builder
+            .build_cancellable(tokio_util::sync::CancellationToken::new())
+            .await
+            .expect("reopen Runtime");
+        #[cfg(not(unix))]
+        let mut runtime = builder.build().expect("compatibility startup");
+        runtime.submit("continue").await.expect("submit");
+        let status = tokio::time::timeout(
+            Duration::from_secs(30),
+            collect_until_turn_completed(&mut runtime),
+        )
+        .await
+        .expect("deadline")
+        .expect("completion");
+        assert!(
+            matches!(status, talos_core::session::TurnCompletionStatus::Success { final_text, .. } if final_text == "continued after emergency")
+        );
+        runtime.shutdown().await.expect("shutdown");
+        assert!(model.summaries.load(Ordering::SeqCst) > 1);
+        assert_eq!(model.normal.load(Ordering::SeqCst), 1);
+        assert!(
+            std::fs::read(path)
+                .expect("final raw")
+                .starts_with(&original)
+        );
+    }
 
     fn evidence_subject() -> talos_core::evaluation::EvaluationSubject {
         talos_core::evaluation::EvaluationSubject {
@@ -4881,6 +5181,192 @@ mod tests {
         runtime.shutdown().await.expect("shutdown succeeds");
     }
 
+    #[test]
+    fn cancellable_startup_without_tokio_returns_typed_error() {
+        use std::future::Future;
+        let mut future = Box::pin(
+            RuntimeBuilder::new()
+                .provider(Arc::new(MockProvider::new()))
+                .build_cancellable(tokio_util::sync::CancellationToken::new()),
+        );
+        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+        assert!(matches!(
+            future.as_mut().poll(&mut context),
+            std::task::Poll::Ready(Err(RuntimeError::AsyncRuntimeUnavailable))
+        ));
+    }
+
+    #[tokio::test]
+    async fn cancellable_startup_returns_while_capture_worker_is_blocked() {
+        let root = tempfile::tempdir().expect("root");
+        let session =
+            DurableSession::open_or_create(root.path(), "capture-cancel").expect("session");
+        let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+        let mut builder = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new()))
+            .durable_session(session);
+        builder.startup_capture_gate = Some(Box::new(move || {
+            entered_tx.send(()).expect("entered");
+            release_rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("release gate");
+            let _ = done_tx.send(());
+        }));
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let task = tokio::spawn(builder.build_cancellable(cancel.clone()));
+        entered_rx.await.expect("worker reached capture");
+        cancel.cancel();
+        let result = tokio::time::timeout(Duration::from_secs(1), task).await;
+        // Always release the non-preemptible worker before asserting the result.
+        release_tx.send(()).expect("release worker");
+        done_rx.await.expect("worker released");
+        assert!(matches!(
+            result
+                .expect("cancellation must not wait for worker")
+                .expect("join"),
+            Err(RuntimeError::StartupCancelled)
+        ));
+    }
+
+    #[tokio::test]
+    async fn cancellable_startup_checks_cancellation_at_actor_publication() {
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        let at_publication = cancellation.clone();
+        let mut builder = RuntimeBuilder::new().provider(Arc::new(MockProvider::new()));
+        builder.startup_publication_gate = Some(Box::new(move || at_publication.cancel()));
+        assert!(matches!(
+            builder.build_cancellable(cancellation).await,
+            Err(RuntimeError::StartupCancelled)
+        ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn cancellable_startup_refuses_cancelled_and_malformed_history() {
+        let root = tempfile::tempdir().expect("root");
+        let session =
+            DurableSession::open_or_create(root.path(), "startup-errors").expect("session");
+        let path = session.file_path().to_owned();
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        cancellation.cancel();
+        assert!(matches!(
+            RuntimeBuilder::new()
+                .provider(Arc::new(MockProvider::new()))
+                .durable_session(session.clone())
+                .build_cancellable(cancellation)
+                .await,
+            Err(RuntimeError::StartupCancelled)
+        ));
+        std::fs::write(&path, b"malformed source\n").expect("corrupt fixture");
+        assert!(matches!(
+            RuntimeBuilder::new()
+                .provider(Arc::new(MockProvider::new()))
+                .durable_session(session)
+                .build_cancellable(tokio_util::sync::CancellationToken::new())
+                .await,
+            Err(RuntimeError::HistoryRecovery(_))
+        ));
+        assert_eq!(
+            std::fs::read(path).expect("unchanged source"),
+            b"malformed source\n"
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(any(unix, windows))]
+    async fn runtime_forks_durable_tip_without_changing_active_session() {
+        let directory =
+            std::env::temp_dir().join(format!("talos-runtime-fork-{}", uuid::Uuid::new_v4()));
+        let session = DurableSession::open_or_create(&directory, "parent").expect("parent");
+        let mut runtime = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new().with_response("done")))
+            .durable_session(session.clone())
+            .build()
+            .expect("runtime");
+        runtime.submit("ancestor fact").await.expect("submit");
+        collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("complete");
+        let id = runtime.fork_durable("child").await.expect("fork");
+        let child = DurableSession::open_existing(&directory, "child")
+            .expect("open")
+            .expect("child");
+        assert_eq!(id, child.id().to_string());
+        assert_ne!(child.id(), session.id());
+        assert_eq!(
+            child.read_messages().expect("child history"),
+            session.read_messages().expect("parent history")
+        );
+        assert!(runtime.fork_durable("child").await.is_err());
+        runtime.shutdown().await.expect("shutdown");
+        // The failed duplicate fork leaves its durable intent for maintenance.
+        // Rebuilding the actual runtime must retire it without touching child.
+        let resumed = RuntimeBuilder::new()
+            .provider(Arc::new(MockProvider::new().with_response("done")))
+            .durable_session(session.clone())
+            .build()
+            .expect("restart maintenance");
+        assert_eq!(
+            session
+                .recover_fork_intents(
+                    &talos_session::sqlite::RecoveryWorkBudget::new(Duration::from_secs(2)),
+                    None,
+                )
+                .expect("no pending intent after startup")
+                .0,
+            0
+        );
+        assert!(
+            DurableSession::open_existing(&directory, "child")
+                .expect("child lookup")
+                .is_some()
+        );
+        resumed.shutdown().await.expect("resumed shutdown");
+        std::fs::remove_dir_all(directory).expect("cleanup");
+    }
+
+    #[tokio::test]
+    #[cfg(any(unix, windows))]
+    async fn runtime_fork_rejects_active_turn_and_then_succeeds_when_idle() {
+        let directory =
+            std::env::temp_dir().join(format!("talos-runtime-busy-fork-{}", uuid::Uuid::new_v4()));
+        let session = DurableSession::open_or_create(&directory, "parent").expect("parent");
+        let entered = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let mut runtime = RuntimeBuilder::new()
+            .provider(Arc::new(GatedModel {
+                entered: entered.clone(),
+                release: release.clone(),
+            }))
+            .durable_session(session)
+            .build()
+            .expect("runtime");
+        runtime.submit("work").await.expect("submit");
+        tokio::time::timeout(Duration::from_secs(2), entered.notified())
+            .await
+            .expect("provider entered");
+        assert!(
+            tokio::time::timeout(Duration::from_secs(2), runtime.fork_durable("child"))
+                .await
+                .expect("busy receipt")
+                .is_err()
+        );
+        assert!(
+            DurableSession::open_existing(&directory, "child")
+                .expect("lookup")
+                .is_none()
+        );
+        release.notify_one();
+        collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("complete");
+        runtime.fork_durable("child").await.expect("idle fork");
+        runtime.shutdown().await.expect("shutdown");
+        std::fs::remove_dir_all(directory).expect("cleanup");
+    }
+
     #[tokio::test]
     async fn durable_runtime_restores_history_and_reports_committed_entries() {
         let directory = std::env::temp_dir().join(format!(
@@ -5117,6 +5603,357 @@ mod tests {
             std::fs::read_to_string(source).expect("read source"),
             "original\n"
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn runtime_recovers_original_history_after_reopen() {
+        use talos_core::message::StopReason;
+        struct RecoveryModel {
+            step: AtomicUsize,
+        }
+        #[async_trait]
+        impl LanguageModel for RecoveryModel {
+            async fn stream(
+                &self,
+                messages: &[Message],
+            ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+                let step = self.step.fetch_add(1, Ordering::SeqCst);
+                let result = |id: &str| -> serde_json::Value {
+                    let result = messages
+                        .iter()
+                        .find_map(|message| match message {
+                            Message::Tool { result } if result.tool_use_id == id => Some(result),
+                            _ => None,
+                        })
+                        .expect("real paired result");
+                    assert!(!result.is_error, "{}", result.content);
+                    serde_json::from_str(&result.content).expect("result JSON")
+                };
+                let events = if step < 3 {
+                    let input = match step {
+                        0 => serde_json::json!({"mode":"discover"}),
+                        1 => {
+                            serde_json::json!({"mode":"search","snapshot":result("recover-0")["snapshot"],"query":"originalfact"})
+                        }
+                        _ => {
+                            let found = result("recover-1");
+                            assert_eq!(
+                                found["results"].as_array().expect("results").len(),
+                                1,
+                                "parent/sibling suffix and unrelated sessions must be excluded"
+                            );
+                            assert_eq!(
+                                found["results"][0]["text"],
+                                "originalfact unique constraint"
+                            );
+                            serde_json::json!({"mode":"detail","snapshot":result("recover-0")["snapshot"],"reference":found["results"][0]["reference"]})
+                        }
+                    };
+                    vec![
+                        AgentEvent::ToolCall {
+                            call: talos_core::message::ToolCall {
+                                id: format!("recover-{step}"),
+                                name: "history_search".into(),
+                                input,
+                            },
+                            provenance: talos_core::tool::ToolProvenance::Native,
+                            summary_fields: vec![],
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::ToolUse,
+                            usage: Default::default(),
+                        },
+                    ]
+                } else {
+                    assert_eq!(step, 3);
+                    assert_eq!(
+                        result("recover-2")["text"],
+                        "originalfact unique constraint"
+                    );
+                    vec![
+                        AgentEvent::TextDelta {
+                            delta: "recovered and continued".into(),
+                        },
+                        AgentEvent::TurnEnd {
+                            stop_reason: StopReason::EndTurn,
+                            usage: Default::default(),
+                        },
+                    ]
+                };
+                let (tx, rx) = mpsc::channel(16);
+                for event in events {
+                    tx.send(event).await.expect("receiver");
+                }
+                Ok(rx)
+            }
+        }
+        async fn recover(root: &std::path::Path, reopened: DurableSession) {
+            let mut runtime = RuntimeBuilder::new()
+                .provider(Arc::new(RecoveryModel {
+                    step: AtomicUsize::new(0),
+                }))
+                .workspace_root(root)
+                .permission_rule(PermissionRule::new_nature(
+                    ToolNature::Read,
+                    None,
+                    None,
+                    PermissionDecision::Allow,
+                ))
+                .durable_session(reopened)
+                .build()
+                .expect("runtime");
+            runtime
+                .submit("recover original constraint")
+                .await
+                .expect("submit");
+            let status = tokio::time::timeout(
+                Duration::from_secs(15),
+                collect_until_turn_completed(&mut runtime),
+            )
+            .await
+            .expect("timeout")
+            .expect("completion");
+            assert!(
+                matches!(status, TurnCompletionStatus::Success { final_text, .. } if final_text == "recovered and continued")
+            );
+            runtime.shutdown().await.expect("shutdown");
+        }
+        if let Some(root) = std::env::var_os("TALOS_TEST_FORK_FACT_ROOT") {
+            let root = std::path::PathBuf::from(root);
+            let parent: u32 = std::env::var("TALOS_TEST_FORK_FACT_PARENT")
+                .expect("parent pid")
+                .parse()
+                .expect("pid");
+            assert_ne!(parent, std::process::id());
+            let manager = SessionManager::with_dir(root.join("sessions"));
+            let child = manager
+                .get_session_by_external_id("recovery-child")
+                .expect("lookup")
+                .expect("child");
+            recover(&root, child).await;
+            println!("FORK_ANCESTOR_TOOL_FACT_RECOVERED");
+            return;
+        }
+        for fork in [false, true] {
+            let root = tempfile::tempdir().expect("root");
+            let manager = SessionManager::with_dir(root.path().join("sessions"));
+            let durable = manager
+                .create_or_open_session("runtime-recovery")
+                .expect("session");
+            let unrelated = manager
+                .create_or_open_session("unrelated-recovery")
+                .expect("unrelated session in the same storage root");
+            let foreign: Vec<_> = (0..64)
+                .map(|i| Message::User {
+                    content: format!("originalfact unrelated private result {i}"),
+                })
+                .collect();
+            unrelated
+                .commit_turn("foreign", &foreign, &Default::default())
+                .expect("foreign matching corpus larger than one search page");
+            let foreign_bytes = std::fs::read(unrelated.file_path()).expect("foreign transcript");
+            let raw: Vec<_> = (0..8300)
+                .map(|i| Message::User {
+                    content: format!("other {i}"),
+                })
+                .collect();
+            durable
+                .commit_turn("prior", &raw, &Default::default())
+                .expect("commit");
+            struct RecoverableFact(Arc<AtomicUsize>);
+            #[async_trait]
+            impl AgentTool for RecoverableFact {
+                fn name(&self) -> &str {
+                    "recoverable_fact"
+                }
+                fn description(&self) -> &str {
+                    "read original constraint"
+                }
+                fn parameters(&self) -> Value {
+                    serde_json::json!({"type":"object"})
+                }
+                fn is_read_only(&self) -> bool {
+                    true
+                }
+                fn recovery_projection(&self, result: &ToolResult) -> Option<String> {
+                    Some(result.content.clone())
+                }
+                async fn execute(&self, _: Value) -> ToolResult {
+                    self.0.fetch_add(1, Ordering::SeqCst);
+                    ToolResult::success("originalfact unique constraint")
+                }
+            }
+            let calls = Arc::new(AtomicUsize::new(0));
+            let mut producer = RuntimeBuilder::new()
+                .provider(Arc::new(
+                    MockProvider::new()
+                        .with_tool_call("recoverable_fact", serde_json::json!({}))
+                        .with_response("recorded"),
+                ))
+                .workspace_root(root.path())
+                .permission_rule(PermissionRule::new_nature(
+                    ToolNature::Read,
+                    None,
+                    None,
+                    PermissionDecision::Allow,
+                ))
+                .tool(Arc::new(RecoverableFact(calls.clone())))
+                .durable_session(durable.clone())
+                .build()
+                .expect("producer");
+            producer.submit("read constraint").await.expect("submit");
+            assert!(matches!(
+                collect_until_turn_completed(&mut producer)
+                    .await
+                    .expect("completion"),
+                TurnCompletionStatus::Success { .. }
+            ));
+            if fork {
+                let parent_bytes = std::fs::read(durable.file_path()).expect("parent bytes");
+                producer
+                    .fork_durable("recovery-child")
+                    .await
+                    .expect("actual runtime fork");
+                producer
+                    .fork_durable("recovery-sibling")
+                    .await
+                    .expect("actual sibling fork");
+                let sibling = manager
+                    .get_session_by_external_id("recovery-sibling")
+                    .expect("lookup sibling")
+                    .expect("sibling");
+                for (owner, text) in [
+                    (&durable, "originalfact parent private suffix"),
+                    (&sibling, "originalfact sibling private suffix"),
+                ] {
+                    owner
+                        .commit_turn(
+                            "private-suffix",
+                            &[Message::User {
+                                content: text.into(),
+                            }],
+                            &Default::default(),
+                        )
+                        .expect("separate suffix");
+                }
+                assert!(
+                    std::fs::read(durable.file_path())
+                        .expect("parent prefix")
+                        .starts_with(&parent_bytes)
+                );
+            }
+            producer.shutdown().await.expect("shutdown producer");
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            drop(durable);
+            let reopened = manager
+                .get_session_by_external_id(if fork {
+                    "recovery-child"
+                } else {
+                    "runtime-recovery"
+                })
+                .expect("lookup")
+                .expect("reopened");
+            if fork {
+                drop(reopened);
+                let mut command =
+                    tokio::process::Command::new(std::env::current_exe().expect("test binary"));
+                command
+                    .args([
+                        "--exact",
+                        "tests::runtime_recovers_original_history_after_reopen",
+                        "--nocapture",
+                    ])
+                    .env("TALOS_TEST_FORK_FACT_ROOT", root.path())
+                    .env(
+                        "TALOS_TEST_FORK_FACT_PARENT",
+                        std::process::id().to_string(),
+                    )
+                    .kill_on_drop(true);
+                let output = tokio::time::timeout(Duration::from_secs(20), command.output())
+                    .await
+                    .expect("child timeout")
+                    .expect("child process");
+                assert!(
+                    output.status.success(),
+                    "independent child must recover ancestor fact: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                assert!(
+                    String::from_utf8_lossy(&output.stdout)
+                        .contains("FORK_ANCESTOR_TOOL_FACT_RECOVERED"),
+                    "child test must actually run"
+                );
+            } else {
+                recover(root.path(), reopened).await;
+            }
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                1,
+                "recovery must not execute the original tool"
+            );
+            assert_eq!(
+                std::fs::read(unrelated.file_path()).expect("retained foreign transcript"),
+                foreign_bytes,
+                "current-session recovery must not modify unrelated history"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn runtime_refuses_caller_checkpoint_name_conflicts() {
+        struct Conflict(&'static str);
+        #[async_trait]
+        impl AgentTool for Conflict {
+            fn name(&self) -> &str {
+                self.0
+            }
+            fn description(&self) -> &str {
+                "caller tool"
+            }
+            fn parameters(&self) -> Value {
+                serde_json::json!({"type":"object"})
+            }
+            async fn execute(&self, _: Value) -> ToolResult {
+                ToolResult::success("caller")
+            }
+        }
+        for name in ["compact_context", "history_search"] {
+            let result = RuntimeBuilder::new()
+                .provider(Arc::new(MockProvider::new()))
+                .tool(Arc::new(Conflict(name)))
+                .build();
+            assert!(matches!(
+                result,
+                Err(RuntimeError::Agent(AgentError::ToolError(_)))
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn runtime_default_prompt_discloses_checkpoint_and_history_tools() {
+        let provider = Arc::new(MockProvider::new().with_request_debug_builder(|messages| {
+            serde_json::to_string(messages).expect("messages")
+        }));
+        let mut runtime = RuntimeBuilder::new()
+            .provider(provider)
+            .build()
+            .expect("runtime");
+        runtime
+            .preview_request("inspect tools")
+            .await
+            .expect("preview");
+        let status = collect_until_turn_completed(&mut runtime)
+            .await
+            .expect("completion");
+        match status {
+            TurnCompletionStatus::Success { final_text, .. } => {
+                assert!(final_text.contains("compact_context"), "{final_text}");
+                assert!(final_text.contains("history_search"), "{final_text}");
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+        runtime.shutdown().await.expect("shutdown");
     }
 
     #[tokio::test]
@@ -5379,3 +6216,6 @@ mod owned_process_shutdown_tests {
         }
     }
 }
+
+#[cfg(all(test, any(unix, windows)))]
+mod checkpoint_coding_tests;

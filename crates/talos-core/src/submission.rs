@@ -260,6 +260,8 @@ pub enum SubmissionRejectionReason {
     ContextBudgetExceeded,
     /// The Actor is shutting down or no longer accepts work.
     SessionClosed,
+    /// Temporary host maintenance prevents admission; retry after it completes.
+    SessionBusy,
 }
 
 /// Result of durable Actor acceptance or reconciliation.
