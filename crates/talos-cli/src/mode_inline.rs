@@ -25,8 +25,7 @@ use crate::mode_runtime::{
 };
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
-    build_print_tool_registry, register_explicit_permission_aware_plugins,
-    register_permission_aware_tools,
+    register_explicit_permission_aware_plugins, register_permission_aware_tools,
 };
 use crate::session_setup::{
     ResumeSelection, canonical_workspace_root, resolve_session_for_workspace,
@@ -68,7 +67,11 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     apply_mcp_fixture_config(&mut config, &cli);
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
-    let mut registry = build_print_tool_registry(Vec::new());
+    let search = crate::mode_print::search_configuration::project_search_configuration(&config)?;
+    let mut registry = crate::mode_print::configured_registry::build_print_tool_registry_with_search(
+        Vec::new(),
+        search,
+    )?;
     let sched_pending = crate::registry::register_builtin_scheduler(&mut registry)?;
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
