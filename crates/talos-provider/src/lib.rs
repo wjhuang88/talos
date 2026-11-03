@@ -15,6 +15,7 @@
 
 mod copilot;
 mod gemini_auth;
+mod gemini_compat;
 mod gemini_endpoint;
 mod gemini_provider;
 mod gemini_reasoning;

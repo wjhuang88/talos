@@ -107,3 +107,15 @@ replay contract. Isolated decisions use an independent minimum-latency policy (F
 ordinary conversation settings remain unchanged. Model capability declarations
 continue to suppress unsupported explicit reasoning controls through the shared factory policy.
 These are bounded initial mappings, not a claim of all-model parameter support or live acceptance.
+
+## Textual tool compatibility — implementation candidate, 2026-11-03
+
+Explicit Compat and TalosStrict use the existing shared textual-tool parser over Gemini SSE,
+without native declarations or cross-wire fallback. Parsed tool metadata is separate from signed
+model text: preserve that text and its original signed parts exactly, and send tool results as
+compatibility user text. Verify parsed name/argument order against stored calls before replay;
+the existing Gemini request builder then verifies signed text and identity. Generated textual
+call IDs are local association keys, not added to signed parts. Signed native-tool history cannot
+switch to textual mode by rewriting the envelope; reject that transition before HTTP. Unresolved
+Auto and all browser ingress remain refused. Browser support still requires the separately pending
+run-local replay/persistence boundary. This stage changes no public API or credential destination.

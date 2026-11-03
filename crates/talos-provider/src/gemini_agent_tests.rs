@@ -206,3 +206,76 @@ async fn run(vertex: bool) {
     second.assert_async().await;
     token.assert_async().await;
 }
+
+#[tokio::test]
+async fn textual_modes_complete_real_permission_gated_agent_with_signed_continuation() {
+    use talos_core::tool::ToolProtocol;
+    for protocol in [ToolProtocol::Compat, ToolProtocol::TalosStrict] {
+        let temp = tempfile::tempdir().expect("workspace");
+        let workspace = temp.path().canonicalize().expect("canonical");
+        std::fs::write(workspace.join("note"), "GEMINI_COMPAT_OK").expect("note");
+        let text = r#"<tool_call>{"name":"read","id":"r","args":{"path":"note"}}</tool_call>"#;
+        let signed = json!({"text":text,"thoughtSignature":"compat-private-signature"});
+        let mut server = mockito::Server::new_async().await;
+        let first = server
+            .mock("POST", "/")
+            .match_header("x-goog-api-key", "fixture-key")
+            .match_request(|request| {
+                let body: serde_json::Value =
+                    serde_json::from_slice(request.body().expect("body")).expect("JSON");
+                body.get("tools").is_none() && !body.to_string().contains("<tool_result")
+            })
+            .with_body(format!(
+                "data: {}\n\n",
+                json!({"candidates":[{"content":{"parts":[signed.clone()]},"finishReason":"STOP"}]})
+            ))
+            .expect(1)
+            .create_async()
+            .await;
+        let second = server.mock("POST", "/").match_header("x-goog-api-key", "fixture-key")
+            .match_request(move |request| {
+                let body: serde_json::Value = serde_json::from_slice(request.body().expect("body")).expect("JSON");
+                body.get("tools").is_none() && body["contents"].as_array().expect("contents").iter().any(|item| item["role"] == "model" && item["parts"] == json!([signed]))
+                    && body.to_string().contains("GEMINI_COMPAT_OK") && !body.to_string().contains("functionResponse")
+            })
+            .with_body(format!("data: {}\n\n",json!({"candidates":[{"content":{"parts":[{"text":"done"}]},"finishReason":"STOP"}]})))
+            .expect(1).create_async().await;
+        let provider = GeminiProvider::new(
+            GeminiTransport::ai_studio("model", "fixture-key", true)
+                .expect("transport")
+                .with_test_endpoint(server.url()),
+            "google".into(),
+            "model".into(),
+            Some(512),
+            Default::default(),
+        )
+        .expect("provider");
+        let mut tools = ToolRegistry::new();
+        tools.register(Arc::new(talos_tools::file_tools::ReadTool::new(
+            workspace.clone(),
+        )));
+        let mut agent = talos_agent::Agent::with_security(
+            Arc::new(provider),
+            tools,
+            Some(Arc::new(
+                talos_permission::PermissionEngine::with_workspace_root(workspace.clone()),
+            )),
+            None,
+            workspace,
+        )
+        .with_reasoning_identity(Some("google".into()), Some("model".into()), true);
+        agent.set_tool_protocol(protocol);
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (answer, history) = tokio::time::timeout(
+            Duration::from_secs(10),
+            agent.run_streaming("Read note".into(), vec![], tx),
+        )
+        .await
+        .expect("bounded")
+        .expect("round");
+        assert_eq!(answer, "done");
+        assert!(history.iter().any(|item| matches!(item, Message::Tool {result} if !result.is_error && result.content.contains("GEMINI_COMPAT_OK"))));
+        first.assert_async().await;
+        second.assert_async().await;
+    }
+}
