@@ -1,3 +1,26 @@
+## T5 merged acceptance — 2026-11-03
+
+Completion Commit: `322574bc9707492ea6e9d5232794f73e687071d9` (PR #837).
+Exact head `e235c8ddedd4c82e133314eff1b7a09387881e43` passed all eight checks
+in CI `41608342151`, including native Windows workspace/Desktop, Linux Desktop
+and primary preflight. Local standard preflight passed workspace checks,
+warnings-denied Clippy, tests and both external Runtime SDK modes; log:
+`/private/tmp/i313-stage-final-preflight.log`. Both governance validators passed
+with zero warnings.
+
+Independent Agent API/privacy/storage/security review audited all 30 published
+rows and additional contracts against actual source/assertions:
+[APPROVE](https://github.com/wjhuang88/talos/pull/837#issuecomment-6599740642).
+Reviewer did not run builds. Exact head/base and ownership were checked in
+[CAS](https://github.com/wjhuang88/talos/pull/837#issuecomment-6600154234).
+T5 is Complete; earlier Partial/local/pending snapshots are preserved history.
+
+Deterministic fixtures do not prove live-model quality. Legacy CLI storage does
+not mint durable tool authority; Windows saved-prefix resume rereads source bytes.
+Export evidence is service-level. Recovery privacy does not imply removal from
+original provider history or arbitrary secret detection. T1/T6 remain unimplemented;
+the full handoff remains Active with its original queue intact.
+
 ## Full candidate baseline validation — 2026-11-03
 
 Standard `./scripts/release_preflight.sh` passed on clean implementation
@@ -873,7 +896,7 @@ published-head run `41409161521` is terminal failure, not a pending gate.
 Fetched target remains `d324c3348f1bb64a3a7b0a0682e14fc97c6293c3`; the local
 stage is ready for fresh native CI, not final merge or full T5 completion.
 
-> Document status: Review / Partial (#819 merged; stable stage candidate, full implementation remains unmerged)
+> Document status: Complete (implementation #837 merged; completion evidence recorded)
 > Published plan date: 2026-11-01
 > Baseline rule: preserve all T5 and Issue #390 acceptance; preparation is not implementation.
 > Planned objective: complete handoff T5 and remaining Issue #390 model-directed checkpoint/recovery acceptance, consuming I312 without creating another compaction or history authority.
@@ -883,7 +906,7 @@ stage is ready for fresh native CI, not final merge or full T5 completion.
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | Handoff T5: Actor model checkpoints, stable tool discovery, bounded branch-scoped authoritative history recovery and persistence/privacy regressions |
@@ -891,9 +914,9 @@ stage is ready for fresh native CI, not final merge or full T5 completion.
 | Source Issue | #390 (remaining T5 acceptance) |
 | Governance Claim PR | #819 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Exact-head independent governance/API/privacy review, CI, validators and CAS required before activation |
-| Implementation PR | #837 (draft, Partial stage) |
-| Last Updated | 2026-11-02 |
+| Authorization Evidence | Independent APPROVE 6599740642; all-eight-success CI 41608342151; validators zero warnings; CAS 6600154234 |
+| Implementation PR | #837 merged as `322574bc9707492ea6e9d5232794f73e687071d9` |
+| Last Updated | 2026-11-03 |
 | Handoff / Release Condition | Effective target-branch claim and merged T4 completion evidence before implementation |
 
 The draft does not reserve ownership. Finalized Claimed/Active state becomes

@@ -1,3 +1,13 @@
+## T5 completed — 2026-11-03
+
+I313 and MEM-005 are Complete with Completion Commit:
+`322574bc9707492ea6e9d5232794f73e687071d9` (#837). All eight exact-head checks in `41608342151`,
+independent full T5 API/privacy/storage/security review and merge CAS passed.
+Owners preserve fixture/platform/privacy limits. Earlier pending snapshots are
+historical. T1 and T6 remain unimplemented and unactivated.
+Full queue: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+Full handoff remains Active; next is T1's own governed activation.
+
 ## T5 stable-stage review — 2026-11-02
 
 I313 is Review/Partial with effective claim #819. Unix Actor/Runtime checkpoint,
