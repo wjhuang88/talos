@@ -62,6 +62,15 @@ This snapshot is not a proof of supported regional endpoints, provider terms, or
 - No competing global lifecycle, retry system or circuit breaker independent of ADR-072 and #199.
 - Do not pre-open all proposed future child Issues or select the Epic itself as an iteration.
 
+## SEARCH-001-H Completion Checkpoint — 2026-11-04
+
+I314 / SEARCH-001-H / #832 is **Complete / Closed** after implementation #842 merged as
+Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e`. CI3800 passed 8/8, independent security/API
+review reported no blockers, and merge CAS passed. Tavily and SearXNG are
+explicit opt-in only; Auto remains zero-key and `rust-websearch` is retained.
+The wider parent #624 remains open, SEARCH-001-E/F/G remain blocked after the
+D ZERO-ADMISSION outcome, and SEARCH-001-I remains separately gated.
+
 ## Child Dependency Map
 
 The table is a proposal for child **outcomes**, not blanket implementation authorization. Completed
@@ -77,12 +86,12 @@ accepted claims before executable work.
 | SEARCH-001-E | First Talos-native zero-key provider with fixtures | C + D admission | **Blocked** — D admission did not occur; no implementation authorization |
 | SEARCH-001-F | Second meaningfully independent native zero-key provider | C + D admission + E interface | **Blocked** — D admission did not occur; no implementation authorization |
 | SEARCH-001-G | Global auto-routing, change recovery, smoke/soak validation | E / F | Blocked on E/F |
-| SEARCH-001-H | Opt-in premium and self-hosted overrides, secret and fallback policy | C | [#832](https://github.com/wjhuang88/talos/issues/832) / [owner](SEARCH-001-H-explicit-search-overrides.md), Proposed / Unclaimed; dependency-ready intake only |
-| SEARCH-001-I | Evidence-based `rust-websearch` de-risk/retirement gate | G / H | Proposed only; blocked on G and incomplete H |
+| SEARCH-001-H | Opt-in premium and self-hosted overrides, secret and fallback policy | C | [#832](https://github.com/wjhuang88/talos/issues/832) / [owner](SEARCH-001-H-explicit-search-overrides.md), **Complete / Closed** at I314; existing Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e` (#842), CI3800 8/8, independent review |
+| SEARCH-001-I | Evidence-based `rust-websearch` de-risk/retirement gate | G / H | Proposed only; H complete but G blocked on E/F, so I is not activated and `rust-websearch` remains |
 
-After A is accepted, create only the next independently deliverable, dependency-ready children as linked Issues and owner documents. Each needs its own selected iteration, claim, tests, review and release-compatible rollback. The existence of #832/H is intake only and does not authorize implementation.
+Each child needs its own selection, claim, tests, review and rollback. SEARCH-001-H was separately authorized via #841 and merged in #842; this does **not** authorize E/F/G/I, which retain their own unfulfilled gates.
 
-## Current Coordination Checkpoint — 2026-11-01
+## Historical Coordination Checkpoint — 2026-11-01
 
 SEARCH-001-C is complete at #808. SEARCH-001-D is also complete as a research gate, but its final
 #831 disposition admitted **zero** native providers. Therefore E/F remain unauthorized and G cannot
@@ -111,12 +120,12 @@ real target-network observations; CI cannot stand in for missing geographic evid
 - Architecture decision: [SEARCH-001-A](SEARCH-001-A-architecture-migration-contract.md) / #625 and accepted ADR-085.
 - Completed router child: [SEARCH-001-C](SEARCH-001-C-search-router.md) / #643.
 - Completed blocked provider-evidence child: [SEARCH-001-D](SEARCH-001-D-provider-evidence-gate.md) / #644.
-- Dependency-ready intake: [SEARCH-001-H](SEARCH-001-H-explicit-search-overrides.md) / #832.
+- Completed explicit opt-in child: [SEARCH-001-H](SEARCH-001-H-explicit-search-overrides.md) / #832, Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e`.
 - Compact inventory: `docs/backlog/PRODUCT-BACKLOG.md`; selected work only on `docs/BOARD.md`.
 
 ## Required Reads
 
-- [Issue #624](https://github.com/wjhuang88/talos/issues/624), completed children #625/#642/#643/#644, proposed child #832, network #199 and CAP-001 #466.
+- [Issue #624](https://github.com/wjhuang88/talos/issues/624), completed children #625/#642/#643/#644/#832, network #199 and CAP-001 #466.
 - `docs/sop/REQUIREMENT-INTAKE.md`, `docs/sop/AGENT-COLLABORATION.md`, `docs/sop/START-ITERATION.md`, `AGENTS.md`.
 - `docs/backlog/active/TOOL-009-internet-search-tool.md`, `docs/decisions/072-capability-provider-bundle-boundary.md`, ADR-085 and ADR-090.
 - `crates/talos-tools/src/web_search.rs`, `crates/talos-tools/Cargo.toml`, `Cargo.lock`.
