@@ -7,9 +7,10 @@
 use thiserror::Error;
 
 /// Explicit product intent for the protected `web_search` contribution.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub enum SearchToolConfiguration {
     /// Zero-key automatic search. Optional-provider configuration is ignored.
+    #[default]
     Auto,
     /// Explicitly select the zero-key DuckDuckGo compatibility candidate.
     DuckDuckGo,
@@ -27,12 +28,6 @@ pub enum SearchToolConfiguration {
         /// After a selected SearXNG candidate fails or yields no valid result, try Auto.
         fallback_to_auto: bool,
     },
-}
-
-impl Default for SearchToolConfiguration {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 impl std::fmt::Debug for SearchToolConfiguration {

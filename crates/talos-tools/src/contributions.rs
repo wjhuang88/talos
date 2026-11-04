@@ -185,7 +185,6 @@ pub fn network_tool_contributions() -> Vec<ToolContribution> {
 ///
 /// Provider intent is supplied by `search`; optional-provider availability never changes Auto.
 /// Invalid explicit provider configuration fails before any tool registry is constructed.
-#[must_use]
 #[cfg(feature = "network")]
 pub fn network_tool_contributions_with_search(
     search: SearchToolConfiguration,

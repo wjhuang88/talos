@@ -26,9 +26,7 @@ mod health;
 mod selection;
 // Production composition and explicit activation boundary.
 mod production;
-pub(crate) use production::{
-    production_search_router_tool, production_search_router_tool_with_search_configuration,
-};
+pub(crate) use production::production_search_router_tool_with_search_configuration;
 // Explicit opt-in bridge for cross-crate caller-boundary tests; never built by default.
 #[cfg(feature = "search-integration-test")]
 pub(crate) mod integration_test;
