@@ -1,6 +1,6 @@
 # SEARCH-001-H: Explicit Premium And Self-Hosted Search Overrides
 
-**Status**: In Progress / Claimed
+**Status**: Complete / Closed
 **Type**: Implementation / Policy Child
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -9,15 +9,15 @@
 | Story ID | SEARCH-001-H |
 | Source Issue | [#832](https://github.com/wjhuang88/talos/issues/832) |
 | Depends on | Accepted ADR-085/ADR-090; SEARCH-001-C / #643 complete at #808 merge `eb870cdf0a63f45f20d89f1a50eba276f9198643` |
-| Selected Iteration | [I314](../../iterations/I314-search-explicit-overrides.md) — Active / Claimed via #841 merge `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a` |
-| Implementation PR | #842 — Draft / in progress |
-| Last Updated | 2026-11-02 |
+| Selected Iteration | [I314](../../iterations/I314-search-explicit-overrides.md) — Complete / Closed; claim #841 merged `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a` |
+| Implementation PR | [#842](https://github.com/wjhuang88/talos/pull/842) — merged as `9ba327728bfc87775ed31740d58636ba73a5c68e` |
+| Last Updated | 2026-11-04 |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-5.6 Sol |
 | Work Slice | SEARCH-001-H explicit premium/self-hosted override configuration and production composition; Tavily controlled transport; explicit fallback-to-auto; secret redaction. No SEARCH-001-E/F admission and no `rust-websearch` removal. |
@@ -26,9 +26,20 @@
 | Governance Claim PR | #841 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | On 2026-11-02 the maintainer explicitly answered `允许并行` after being told that I314 would be activated and implemented in parallel with the currently Active I310 and I313 scopes. |
-| Handoff / Release Condition | Keep I314 ownership until implementation/acceptance closeout or an explicit handoff. Existing I310/I313 ownership remains unchanged; SEARCH-001-E/F stay separately blocked because D admission did not occur. |
+| Handoff / Release Condition | Closed upon existing implementation merge `9ba327728bfc87775ed31740d58636ba73a5c68e` and acceptance reconciliation. No scope transfer; I310 and other owners remain independent. SEARCH-001-E/F stay blocked. |
 
-This claim is effective on `main` via #841 merge `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a`. Production implementation is owned by Draft PR #842 and remains subject to exact-head validation, review and merge-time CAS.
+Original claim #841 became effective at `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a`; implementation #842 subsequently merged to main as `9ba327728bfc87775ed31740d58636ba73a5c68e`. This owner now records the terminal delivery and collaboration states, effective after this governance closeout merges.
+
+## Completion Evidence — 2026-11-04
+
+Completion Commit: `9ba327728bfc87775ed31740d58636ba73a5c68e` (existing main implementation merge commit, [PR #842](https://github.com/wjhuang88/talos/pull/842)).
+
+- Final implementation head `46a5aef08f0b078b3ec46de0be66fddda04fa9ef` passed [CI3800](https://github.com/wjhuang88/talos/actions/runs/41787775314) **8/8**, including workspace Rust + Windows, Linux/Windows Desktop, release preflight, governance/owner reconciliation, installer and real CLI/TUI acceptance.
+- Independent read-only security/API/config reviewer [Copilot comment 6624584293](https://github.com/wjhuang88/talos/pull/842#issuecomment-6624584293) reported **no blocking findings** on that exact head against main `261602242e49e6f921f5d3e4eac96eebbe92f8b3`. The proxied fallback request budget and old legacy constructor ambient-activation issues were corrected before merge.
+- Network-feature search tests [run 41788026350](https://github.com/wjhuang88/talos/actions/runs/41788026350): 484/484 passed, including fallback budget and isolated environment-variable regression. That optional run was **not green overall** because an additional all-targets Clippy command found two pre-existing `search_backend/health.rs` test lints identical to main.
+- Optional all-features run [41788314305](https://github.com/wjhuang88/talos/actions/runs/41788314305) had 1039 passes and 45 Git-executable-path identity test failures in unchanged Git test files, outside I314. Neither optional experiment substitutes for the fully green production CI.
+- Actual-binary six-case zero-key/explicit/invalid/fallback/rollback smoke is incorporated into main CI; no paid Tavily or external SearXNG request was made. Provider-live verification is **not** claimed.
+- Fallback stays ordered, Auto zero-key, credentials/URLs redacted, model-facing schema and Network permission stable. `rust-websearch` retained; E/F/Mwmbl/Purili not admitted. No migration required for rollback.
 
 ## Goal
 
@@ -85,7 +96,7 @@ in the environment must not silently select paid usage or change the default sea
 
 ## Operator Documentation
 
-[Explicit search override configuration, privacy, fallback and rollback](../../reference/SEARCH-001-H-EXPLICIT-OVERRIDES.md) describes the additive persisted `[search]` contract. This document is an implementation artifact; acceptance/merge remains gated by I314 exact-head CI, review and CAS.
+[Explicit search override configuration, privacy, fallback and rollback](../../reference/SEARCH-001-H-EXPLICIT-OVERRIDES.md) describes the shipped additive persisted `[search]` contract. Exact-head CI3800, independent security review and merge CAS passed for #842. This closes only SEARCH-001-H, not the parent SEARCH-001 or E/F/G/I.
 
 ## Rollback
 
