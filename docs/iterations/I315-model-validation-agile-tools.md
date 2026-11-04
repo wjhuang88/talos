@@ -2,6 +2,16 @@
 
 ## Current validation checkpoint — 2026-11-04
 
+Rebase completed onto `9ba327728` with reviewed CLI/Runtime conflict resolution.
+Current implementation sequence is `34df43d51`, `15a2ae0f6`, `489c12d0b`;
+earlier SHA references below describe pre-rebase evidence. New configured-search
+and selected-workspace regression passed 1/1 (81910). Independent reviewer approved
+the increment at head `aabad0ad39e7369121c977dcb6239420a5ea8cb8` against that base,
+without running tests. Rebased full preflight 5343 exited 0, including workspace
+check/Clippy/tests and both external SDK modes, at
+`/private/tmp/i315-rebased-preflight.log`. Latest governance validators 31048/81162
+exited 0 with zero warnings. Native CI and merge are still pending.
+
 Latest gate: repaired standard preflight 66373 exited 0, including workspace
 check/Clippy/tests and both external SDK modes. Governance validators 84281/31162
 also exited 0. Independent staged review approved 36 files (diff SHA-256
