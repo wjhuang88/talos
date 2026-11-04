@@ -4693,6 +4693,7 @@ async fn manual_boundary_applies_checkpoint_before_continuation_and_preserves_ra
             raw.len() as u64,
             None,
             None,
+            Default::default(),
         )
         .await
         .expect("estimate initial request");
