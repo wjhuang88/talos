@@ -1,6 +1,6 @@
 # Iteration I314: Explicit Premium And Self-Hosted Search Overrides
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-11-02
 > Planned objective: implement SEARCH-001-H as an explicit user-controlled premium/keyed and self-hosted search override layer without changing the zero-config default route or admitting native zero-key providers.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-5.6 Sol |
 | Work Slice | SEARCH-001-H explicit premium/self-hosted override configuration and production composition; Tavily controlled transport; explicit fallback-to-auto; secret redaction. Excludes SEARCH-001-E/F admission and `rust-websearch` removal. |
@@ -19,11 +19,27 @@
 | Governance Claim PR | #841 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly answered `允许并行` on 2026-11-02 after the activation gate was explained as I314 running concurrently with the currently Active I310 and I313 scopes. |
-| Implementation PR | #842 — Draft / in progress |
-| Last Updated | 2026-11-02 |
-| Handoff / Release Condition | Keep the claim until SEARCH-001-H implementation and acceptance closeout or an explicit handoff. Parallel I310/I313 ownership is retained unchanged. |
+| Implementation PR | #842 — merged as `9ba327728bfc87775ed31740d58636ba73a5c68e` |
+| Last Updated | 2026-11-04 |
+| Handoff / Release Condition | Closed after existing implementation merge `9ba327728bfc87775ed31740d58636ba73a5c68e` and post-merge owner/Issue reconciliation; no scope transferred to I310/I313. |
 
-This Claimed/Active state is effective on `main` via #841 merge `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a`. Production implementation is now owned by Draft PR #842; no completion or acceptance is implied until its full I314 gates pass.
+The original Active/Claimed state became effective on main at #841 merge `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a`. Implementation #842 subsequently merged as `9ba327728bfc87775ed31740d58636ba73a5c68e`. Complete / Closed in this owner is proposed by the separate governance closeout and takes effect after its own merge.
+
+## Post-merge Acceptance And Closure — 2026-11-04
+
+Completion Commit: `9ba327728bfc87775ed31740d58636ba73a5c68e` (already exists on main, implementation PR #842).
+Exact implementation head: `46a5aef08f0b078b3ec46de0be66fddda04fa9ef`.
+
+- [CI3800](https://github.com/wjhuang88/talos/actions/runs/41787775314): **8/8 success**, exact head, including release preflight and real CLI/TUI Auto / configured search smoke, Windows Rust workspace/Desktop, Linux Desktop, installer, classification and governance owner reconciliation. Both project and collaboration governance validators passed in the required workflow.
+- Independent [security/API/config review](https://github.com/wjhuang88/talos/pull/842#issuecomment-6624584293): **no blocking findings** on that head, following corrections for proxied fallback 24→26 units and zero-key public legacy construction. Auto still 135s/24; opted-in Tavily/SearXNG + ordered fallback 150s/26; one shared request budget, no hidden race/paid activation.
+- Additional `--features network --lib` search test run [41788026350](https://github.com/wjhuang88/talos/actions/runs/41788026350) passed 484/484 including three new boundary/ambient regressions. Its optional all-targets Clippy failed only on two pre-existing `health.rs` test lints identical to main; **do not label the optional workflow green**.
+- Additional `--all-features --lib` run [41788314305](https://github.com/wjhuang88/talos/actions/runs/41788314305) passed 1039 and failed 45 existing Git subprocess identity fixtures due to `/usr/bin/git` vs `/usr/lib/git-core/git`; unchanged Git source files and outside I314. This optional run is **not** acceptance authority for I314.
+- Offline real-binary six-case evidence (run `41746957277`) covered inert ambient keys, fail-closed missing explicit configuration, explicit stored credentials/endpoints and Auto rollback without paid-provider network calls. Separate live Tavily/SearXNG integration was not executed and is not claimed.
+- Merge-time CAS: #842 was Ready, exact head unchanged, 0 behind main, mergeable clean, zero unresolved review threads and independent claim #841 effective. GitHub merged #842 with expected head SHA, yielding `9ba327728bfc87775ed31740d58636ba73a5c68e`.
+- Bounded outcome: only SEARCH-001-H / I314 closes. SEARCH-001-E/F remain unauthorized after D's BLOCKED/ZERO-ADMISSION research disposition, G remains blocked, I still requires its own dependency gates; parent #624 remains Open. `rust-websearch`, model-facing schema, network permissions and rollback are retained.
+- Operator reference: [SEARCH-001-H explicit overrides](../reference/SEARCH-001-H-EXPLICIT-OVERRIDES.md).
+
+Historical implementation-stage snapshots below are retained for audit, not current status.
 
 ## Published Baseline
 
@@ -132,7 +148,7 @@ I314 is non-overlapping with I310/I313. On 2026-11-02 the maintainer explicitly 
 
 ## Verification Evidence
 
-### 2026-11-04 implementation evidence — pending full acceptance
+### 2026-11-04 implementation candidate evidence — historical, superseded by merged acceptance
 
 - Current candidate implementation commit: `8f065c962d0f05ea6e83489b4f3ceb19430886b7` on PR #842 (Draft; not merged). This is **not a Completion Commit**.
 - Latest effective main last verified for this checkpoint: `261602242e49e6f921f5d3e4eac96eebbe92f8b3`. Historical safety archive `archive/i314-pre-main-sync-20261103` remains unmodified.
@@ -148,7 +164,7 @@ I314 is non-overlapping with I310/I313. On 2026-11-02 the maintainer explicitly 
 - This confirms real print-mode persisted-config loading and registry construction **without** invoking a search query or consuming paid provider quota. It complements the selected-candidate/transport/permission/router unit fixtures, not an actual external-provider live integration claim.
 - CI3799/run `41746709995` passed **all eight exact-head checks** on `8f065c962d0f05ea6e83489b4f3ceb19430886b7`; this is historical, not acceptance evidence for any later changed head.
 - Independent Copilot review [PR #842 comment 6619286884](https://github.com/wjhuang88/talos/pull/842#issuecomment-6619286884) found two issues: a 24 vs 26 proxied request-unit envelope for explicit + Auto fallback, and ambient optional-provider selection in the legacy public constructor. The subsequent unmerged candidate corrects both and adds regression coverage; renewed exact-head CI/review are required.
-- **Pending gates**: exact-head full CI and independent read-only security/API re-review after these corrections, latest-main/owner/review-thread CAS and merge authorization.
+- **Historical gate status at earlier head**: exact-head full CI and independent read-only security/API re-review were pending at that time; all completed on later head as recorded in the Post-merge Acceptance section above.
 - Operator contract and rollback: `docs/reference/SEARCH-001-H-EXPLICIT-OVERRIDES.md`. No native Mwmbl/Purili admission or SEARCH-001-E/F authorization, no `rust-websearch` removal.
 
 - Activation: #841 merge `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a`; CI3756/run `41439465737` success; both governance validators zero warnings; exact-head Copilot gate review approved.
@@ -156,17 +172,17 @@ I314 is non-overlapping with I310/I313. On 2026-11-02 the maintainer explicitly 
 
 ## Completion Evidence
 
-- Completion Commit: Pending
-- Status-only documentation commits must not cite themselves. I314 cannot become Complete without already-existing implementation evidence.
+- Completion Commit: `9ba327728bfc87775ed31740d58636ba73a5c68e` — existing main implementation merge commit from #842.
+- The separate governance closeout only records already-existing implementation evidence; this status-only change never cites itself as the implementation completion.
 
 ## Variance And Residuals
 
-- Production implementation is active in Draft PR #842; full I314 acceptance remains pending.
+- Production implementation #842 is merged as `9ba327728bfc87775ed31740d58636ba73a5c68e`; acceptance and independent review passed, with optional broader test residuals disclosed above.
 - I310/I313 remain independently Active/Claimed under explicit maintainer-authorized parallel execution.
 - SEARCH-001-E/F, Mwmbl/Purili admission and `rust-websearch` removal remain outside I314 authority.
 
 ## Retrospective
 
-- Outcome: pending
-- Documentation: owner/iteration synchronized to Draft PR #842
+- Outcome: Complete / Closed after implementation merge; no premature claim of paid-provider live tests.
+- Documentation: owner, inventories, Board and Issue synchronized post-merge by separate governance closeout.
 - Lessons: explicit parallel authorization keeps non-overlapping work moving without weakening ownership boundaries.

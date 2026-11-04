@@ -1,9 +1,21 @@
+## SEARCH-001-H / I314 post-merge closeout — 2026-11-04
+
+[SEARCH-001-H](active/SEARCH-001-H-explicit-search-overrides.md) / #832 and
+[I314](../iterations/I314-search-explicit-overrides.md) are **Complete / Closed**.
+Completion Commit: `9ba327728bfc87775ed31740d58636ba73a5c68e` (implementation #842).
+CI3800/run `41787775314` passed all 8 exact-head jobs, independent security
+review `6624584293` reported no blockers, and merge CAS passed.
+Only explicit premium/self-hosted overrides close; parent #624 stays open,
+E/F/G stay blocked, SEARCH-001-I remains separately gated, and `rust-websearch`
+remains. Previous T1/I314 Active snapshots below are historical and do not
+override these owner-derived terminal states.
+
 ## T1 active implementation — 2026-11-04
 
 I315 / VALIDATION-003 / #844 is active after claim #845 merged as `261602242`.
 Shared model validation and read-only agile tools are implemented locally; the
 I315 owner records tests, review and platform limits. Integration with merged I314
-search configuration is under verification. Native Windows CI and implementation
+search configuration passed local preflight. Native Windows CI and implementation
 merge remain required. T1 is Partial, T6 unimplemented, and the full handoff Active.
 I310/I314 retain their independent owners; this summary does not close their work.
 

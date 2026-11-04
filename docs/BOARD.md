@@ -1,9 +1,19 @@
+## SEARCH-001-H explicit override completed — 2026-11-04
+
+[SEARCH-001-H](backlog/active/SEARCH-001-H-explicit-search-overrides.md) / #832
+and [I314](iterations/I314-search-explicit-overrides.md) are **Complete / Closed**.
+Completion Commit: `9ba327728bfc87775ed31740d58636ba73a5c68e` (#842 implementation merge).
+CI3800 passed all eight exact-head jobs; the independent security/API review
+reported no blocking findings; merge CAS passed. SEARCH-001 parent #624 stays
+open, D still admitted zero native providers, E/F/G/I remain separately gated;
+I310 and other claim owners are not modified. Earlier snapshots remain historical.
+
 ## T1 active implementation — 2026-11-04
 
 I315 / VALIDATION-003 / #844 is active after claim #845 merged as `261602242`.
 Shared model validation and read-only agile tools are implemented locally; the
 I315 owner records tests, review and platform limits. Integration with merged I314
-search configuration is under verification. Native Windows CI and implementation
+search configuration passed local preflight. Native Windows CI and implementation
 merge remain required. T1 is Partial, T6 unimplemented, and the full handoff Active.
 I310/I314 retain their independent owners; this summary does not close their work.
 
@@ -122,6 +132,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| Explicit search provider overrides / SEARCH-001-H | Complete / Closed | [SEARCH-001-H](backlog/active/SEARCH-001-H-explicit-search-overrides.md) / [I314](iterations/I314-search-explicit-overrides.md) / #832 | Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e` (#842); CI3800 8/8, independent security review no blockers, CAS passed. Parent #624 and E/F/G/I remain separate. |
 | Whole-request compaction / T4 | Complete / Closed | [I312](iterations/I312-whole-request-compaction.md) | #818 merged `65500a869`; eight CI jobs, independent review and CAS passed. |
 | Actor checkpoint/history / T5 | Review / Partial / Claimed | [I313](iterations/I313-model-checkpoint-history.md) | Effective #819 claim; stable stage local preflight passed, implementation unmerged and acceptance incomplete. |
 | Protocol architecture / OpenAI Responses | Complete / Closed | [PROVIDER-008-A](backlog/active/PROVIDER-008-A-openai-responses-protocol.md) / [I306](iterations/I306-provider008a-openai-responses.md) / #748 | Implementation through #803 `dd6c5f8`; all 52 reviewed HTTP pairs active. CI3570 8/8 and technical acceptance review passed. #748 closes after owner closure merge; #724 stays open for unimplemented B/C/D. |
