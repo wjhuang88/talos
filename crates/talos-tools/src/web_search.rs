@@ -691,9 +691,9 @@ impl AgentTool for WebSearchTool {
 
     fn description(&self) -> &str {
         "Search the web for current information, documentation, or answers. \
-         Uses DuckDuckGo by default (no API key needed). \
-         Optionally uses Tavily (TAVILY_API_KEY env) or SearXNG (SEARXNG_URL env) for enhanced results. \
-         Falls back to Wikipedia when other backends fail. Requires network permission."
+         Legacy zero-key DuckDuckGo path, with Wikipedia fallback. \
+         Paid and self-hosted providers require explicit selection through protected web_search. \
+         Requires network permission."
     }
 
     fn parameters(&self) -> Value {
@@ -764,9 +764,35 @@ mod tests {
 
     #[test]
     fn legacy_public_constructor_does_not_activate_optional_providers_from_environment() {
+        // Isolate the ambient variables in a child so other Rust tests never see mutations.
+        const CHILD: &str = "TALOS_SEARCH_LEGACY_ZERO_KEY_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+                .arg("--exact")
+                .arg("web_search::tests::legacy_public_constructor_does_not_activate_optional_providers_from_environment")
+                .env(CHILD, "1")
+                .env("TAVILY_API_KEY", "ambient-fixture-key")
+                .env("SEARXNG_URL", "https://ambient-search.example.invalid")
+                .output()
+                .expect("isolated environment fixture");
+            assert!(
+                output.status.success()
+                    && String::from_utf8_lossy(&output.stdout)
+                        .contains("test result: ok. 1 passed;"),
+                "isolated legacy constructor regression failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+
         let tool = WebSearchTool::new();
+        assert!(std::env::var_os("TAVILY_API_KEY").is_some());
+        assert!(std::env::var_os("SEARXNG_URL").is_some());
         assert!(tool.tavily_api_key.is_none());
         assert!(tool.searxng_url.is_none());
+        let default_tool = WebSearchTool::default();
+        assert!(default_tool.tavily_api_key.is_none());
+        assert!(default_tool.searxng_url.is_none());
     }
 
     #[test]
