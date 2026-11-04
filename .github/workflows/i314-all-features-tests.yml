@@ -1,0 +1,22 @@
+name: I314 all-feature cross-mode search audit (temporary)
+on:
+  push:
+    branches:
+      - tmp/i314-all-features-tests-20261104
+permissions:
+  contents: read
+jobs:
+  all-features:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: All-feature talos-tools library tests
+        run: cargo test -p talos-tools --locked --all-features --lib
+      - name: All-feature talos-tools warning-denied Clippy
+        run: cargo clippy -p talos-tools --locked --all-features --all-targets -- -D warnings
