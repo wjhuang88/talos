@@ -39,6 +39,46 @@ inherit built-in identity from a replaced tool. Cleanup owners from replaced
 instances remain retained for runtime shutdown. The coding preset only fills
 missing tool names and preserves explicit registrations.
 
+### Project validation tools (I315 candidate, next minor)
+
+Shared composition binds project tool discovery to `workspace_root`. A governance
+manifest, or any two canonical Board/iteration-index/backlog files, enables the
+read-only `agile_summary`; project size and Active status are not prerequisites.
+Use it for explicit progress/backlog questions or status needed for accepted work,
+not ordinary chat or repeated refreshes without a task need. Language-project
+markers independently enable `validate_project`; recognizing a language does not
+invent an execution adapter for it. Cargo-only projects expose validation without
+agile summary. Missing prerequisites remain explicit unavailable evidence.
+
+Validation input is exactly `mode: plan|run` and
+`profile: governance|i076|workspace`. Plan has Read facets and no host launch;
+run has concrete Execute facets and normal permission admission. Cargo run may
+execute build scripts, fetch dependencies and write artifacts. Neither tool
+exposes owner/Board/Issue mutations, activation, publication or release operations.
+Descriptions guide model selection; they are not deterministic intent routing.
+Runtime shutdown retains the adapter cleanup owner. Caller replacement tools must
+retain their own equivalent lifecycle guarantees and do not inherit trust.
+
+Run uses `PreparedNormalToolInvocation`: the dispatcher binds input, provenance,
+complete Execute facets and plan identity, then consumes the exact admission
+before creating the executor. Bare `AgentTool::execute` refuses run. Evidence
+states actual admission/consumption without inferring grant scope or approver.
+Custom validation factories must return an operation-local cleanup receipt; a
+missing or panicked receipt refuses execution and reports cleanup unconfirmed.
+The prepared receipt is retained before dispatch; waiting before execution closes
+the unstarted operation, while cancellation after publication waits only for that
+operation. Aggregate shutdown ownership remains required as well.
+
+[ADR-097](../decisions/097-validation-host-execution-api.md) removes conversation's
+public synchronous `run_validation_plan` in the next pre-1.0 minor, not a 0.10
+patch. Internal-only callers migrate to `run_governance_validation`; host checks
+await `run_validation_plan_with_executor` with an admitted, bounded executor and
+retained cleanup ownership. Synchronous embedders own a Tokio runtime at their
+application boundary; conversation creates no hidden runtime or process runner.
+The trait does not enforce third-party executor correctness or grant permissions.
+I315 native Windows, full SDK/preflight and merge gates remain pending; local
+registration tests do not establish full product acceptance.
+
 ### Re-exported Protocol Types (actual `pub use` in `talos-runtime`)
 
 These are selected types `talos-runtime` re-exports. For the complete named export set,

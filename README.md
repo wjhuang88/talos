@@ -612,8 +612,21 @@ talos validate run --profile workspace
 ```
 
 Validation execution accepts only built-in profiles. Each evidence record includes the command,
-exit status, stdout/stderr summaries, and the allowlisted-profile permission decision. It does not
-accept arbitrary commands, edit repository files, push, publish, or tag releases.
+exit status and bounded stdout/stderr summaries. Cargo checks may run build scripts,
+download dependencies and write build artifacts; run mode is not read-only.
+Profile allowlisting is not a permission grant. Arbitrary commands and release
+operations are not exposed by this interface.
+
+The upcoming model tools `agile_summary` and `validate_project` are under I315
+validation. Use the summary for explicit progress/backlog requests or task-relevant
+governance questions, not ordinary chat or repeated unchanged status refreshes.
+A governance manifest or any two canonical Board/iteration-index/backlog files
+enable summary discovery, including small or Planned projects. Validation uses
+recognized project markers independently: a Cargo-only project qualifies without
+governance files. `validate_project` accepts only `mode: plan|run` and
+`profile: governance|i076|workspace`; plan starts no commands, while run requires
+Execute admission. Neither tool edits task records, activates iterations or changes
+Issues. Missing prerequisites are reported, not created to enable discovery.
 
 ### Permission Preflight
 

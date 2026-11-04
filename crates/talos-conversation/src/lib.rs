@@ -30,6 +30,7 @@ mod engine;
 #[cfg(test)]
 mod engine_tests;
 mod governance_summary;
+mod project_tools;
 mod types;
 mod validation;
 
@@ -40,7 +41,10 @@ pub use command_registry::{
 pub use engine::{
     ConversationEngine, build_extension_snapshot, build_extension_snapshot_with_plugins,
 };
-pub use governance_summary::{GovernanceValidationReport, collect_governance_validation};
+pub use governance_summary::{
+    GovernanceValidationReport, collect_governance_validation, format_governance_summary,
+};
+pub use project_tools::{agile_summary_available, project_validation_available};
 pub use types::{
     ChatMessage, ConnectPickerData, ConnectPickerItem, ContentOutput, CopyScope,
     CredentialRequestData, CredentialResponseData, ExtensionSnapshot, HookDeclarationDiagnostic,
@@ -56,9 +60,11 @@ pub use types::{
 pub use validation::{
     EvidenceStatus, FindingSeverity, ProjectType, ProjectTypeDetectorDescriptor, ValidationCheck,
     ValidationEvidence, ValidationEvidenceRecord, ValidationExecutionMode, ValidationFinding,
+    ValidationHostExecutor, ValidationHostFailure, ValidationHostFuture, ValidationHostOutput,
     ValidationPlan, ValidationProfile, collect_validation_plan, detect_project_types,
     project_type_detector_descriptors, render_json_evidence, render_json_plan,
-    render_text_evidence, render_text_plan, run_validation_plan,
+    render_text_evidence, render_text_plan, run_governance_validation,
+    run_validation_plan_with_executor,
 };
 
 /// Format content-free checkpoint facts for transient user-visible status.

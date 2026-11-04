@@ -803,20 +803,30 @@ pub(crate) fn register_builtin_scheduler(
 /// These modes construct a registry before any durable [`talos_session::Session`]
 /// exists, so todo tools are bound to a fresh in-process session id — scoped to
 /// this one run and discarded on exit, not persisted across invocations.
+#[cfg(test)]
 pub(crate) fn build_print_tool_registry(scheduler_tools: Vec<Arc<dyn AgentTool>>) -> ToolRegistry {
+    build_print_tool_registry_for_workspace(scheduler_tools, PathBuf::from("."))
+}
+
+pub(crate) fn build_print_tool_registry_for_workspace(
+    scheduler_tools: Vec<Arc<dyn AgentTool>>,
+    workspace: PathBuf,
+) -> ToolRegistry {
     let ephemeral_session_id = Uuid::new_v4();
-    build_print_tool_registry_with_todo_contributions(
+    build_print_registry_bound_to_workspace(
         scheduler_tools,
         default_todo_tool_contributions(ephemeral_session_id),
+        workspace,
     )
 }
 
-fn build_print_tool_registry_with_todo_contributions(
+fn build_print_registry_bound_to_workspace(
     scheduler_tools: Vec<Arc<dyn AgentTool>>,
     todo_contributions: Vec<ToolContribution>,
+    workspace: PathBuf,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
-    let shared = contribution_groups(SharedToolProfile::Product, PathBuf::from("."));
+    let shared = contribution_groups(SharedToolProfile::Product, workspace);
     let mut contributions = shared.shell;
     contributions.extend(shared.files);
     contributions.push(
@@ -936,8 +946,12 @@ fn build_tui_tool_registry_with_todo_contributions(
 /// Legacy Auto-only constructor retained for rollback and compatibility tests.
 #[allow(dead_code)]
 pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
+    build_mcp_tool_registry_for_workspace(PathBuf::from("."))
+}
+
+fn build_mcp_tool_registry_for_workspace(workspace: PathBuf) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
-    let shared = contribution_groups(SharedToolProfile::Mcp, PathBuf::from("."));
+    let shared = contribution_groups(SharedToolProfile::Mcp, workspace);
     for contribution in shared.shell {
         registry
             .register_builtin_contributions([contribution])
@@ -989,6 +1003,309 @@ pub(crate) fn highlight_snippet(snippet: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    struct ValidationExecutionMarker(PathBuf);
+
+    impl talos_tools::project_management::ValidationHostFactory for ValidationExecutionMarker {
+        fn invocation(&self) -> Box<dyn talos_conversation::ValidationHostExecutor> {
+            std::fs::write(&self.0, "unexpected execution").expect("execution marker");
+            panic!("permission denial must not construct an executor")
+        }
+    }
+
+    #[async_trait]
+    impl talos_core::tool::ToolCleanupReceipt for ValidationExecutionMarker {
+        async fn wait(
+            &self,
+            _: std::time::Duration,
+        ) -> Result<(), talos_core::tool::ToolCleanupError> {
+            Ok(())
+        }
+    }
+
+    impl talos_core::tool::ToolCleanupOwner for ValidationExecutionMarker {
+        fn seal(&self) {}
+    }
+
+    #[tokio::test]
+    async fn validation_run_real_permission_denial_never_reaches_host_factory() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        std::fs::write(workspace.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
+        let marker = workspace.path().join("execution-marker");
+        let contributions = talos_tools::project_management::validation_tool_contributions(
+            workspace.path().to_owned(),
+            Arc::new(ValidationExecutionMarker(marker.clone())),
+        );
+        for decision in [
+            serde_json::json!({"Deny":"validation blocked"}),
+            serde_json::json!("Ask"),
+        ] {
+            let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_owned());
+            engine
+                .load_from_config(
+                    &serde_json::json!({"rules":[{"decision":decision,"nature":"Execute"}]}),
+                )
+                .expect("policy");
+            let wrapped = PermissionAwareTool {
+                inner: contributions[0].tool().clone(),
+                approval: Arc::new(Mutex::new(ApprovalPrompt::new(engine))),
+                print_mode: true,
+            };
+            let run = wrapped
+                .execute(serde_json::json!({"mode":"run","profile":"workspace"}))
+                .await;
+            assert!(run.is_error, "run must be refused: {}", run.content);
+            assert!(!marker.exists());
+            let plan = wrapped
+                .execute(serde_json::json!({"mode":"plan","profile":"workspace"}))
+                .await;
+            assert!(!plan.is_error, "read-only plan: {}", plan.content);
+            assert!(!marker.exists());
+        }
+    }
+
+    #[tokio::test]
+    async fn validation_requests_use_production_permission_pipeline() {
+        use talos_agent::permission_pipeline::{
+            PermissionAuthorizationRequest, PermissionPipeline,
+        };
+        let workspace = tempfile::tempdir().expect("workspace");
+        std::fs::write(workspace.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
+        let registry = build_print_registry_bound_to_workspace(
+            Vec::new(),
+            Vec::new(),
+            workspace.path().to_owned(),
+        );
+        let tool = registry
+            .get("validate_project")
+            .expect("registered validation");
+        let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_owned());
+        engine.load_from_config(&serde_json::json!({"rules":[{"decision":{"Deny":"validation denied"},"nature":"Execute"}]})).expect("policy");
+        let pipeline = PermissionPipeline::new(
+            Arc::new(PermissionSessionState::new(engine)),
+            PermissionContext::new(PermissionMode::Headless, InteractionCapability::Unavailable),
+            None,
+        );
+        for (mode, allowed) in [("plan", true), ("run", false)] {
+            let input = serde_json::json!({"mode":mode,"profile":"workspace"});
+            let profile = tool.permission_profile(&input);
+            let result = pipeline
+                .authorize(PermissionAuthorizationRequest {
+                    tool_name: tool.name(),
+                    provenance: tool.provenance(),
+                    profile: &profile,
+                    input: &input,
+                    presentation_input: tool.project_input(&input),
+                    summary_fields: Vec::new(),
+                    deadline: std::time::Duration::from_secs(1),
+                })
+                .await;
+            assert_eq!(result.is_ok(), allowed, "{mode}");
+        }
+    }
+
+    #[tokio::test]
+    async fn cli_registered_validation_uses_agent_prepared_admission() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        std::fs::create_dir(workspace.path().join(".agent-governance")).expect("directory");
+        std::fs::write(
+            workspace.path().join(".agent-governance/manifest.yaml"),
+            "profile: minimal\nstatus: adopting\n",
+        )
+        .expect("manifest");
+        let registry = build_print_registry_bound_to_workspace(
+            Vec::new(),
+            Vec::new(),
+            workspace.path().to_owned(),
+        );
+        let provider = Arc::new(
+            talos_provider::mock::MockProvider::new()
+                .with_tool_call(
+                    "validate_project",
+                    serde_json::json!({"mode":"run","profile":"governance"}),
+                )
+                .with_response("validation complete"),
+        );
+        let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_owned());
+        engine
+            .load_from_config(
+                &serde_json::json!({"rules":[{"decision":"Allow","nature":"Execute"}]}),
+            )
+            .expect("policy");
+        let agent = talos_agent::Agent::with_security_and_hooks(
+            provider,
+            registry,
+            None,
+            None,
+            workspace.path().to_owned(),
+            Arc::new(talos_plugin::registry::HookRegistry::default()),
+        )
+        .with_permission_pipeline(
+            Arc::new(PermissionSessionState::new(engine)),
+            PermissionContext::new(PermissionMode::Headless, InteractionCapability::Unavailable),
+            None,
+        );
+        let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+        let run = agent.run_streaming("run governance validation".into(), Vec::new(), sender);
+        let capture = async {
+            let mut evidence = None;
+            while let Some(event) = receiver.recv().await {
+                if let talos_core::message::AgentEvent::ToolResult { result, .. } = event {
+                    evidence = Some(result);
+                }
+            }
+            evidence.expect("actual dispatch result")
+        };
+        let (run, result) = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            tokio::join!(run, capture)
+        })
+        .await
+        .expect("bounded dispatch");
+        run.expect("agent run");
+        let evidence: Value = serde_json::from_str(&result.content).expect("validation evidence");
+        assert_eq!(evidence["records"][0]["execution_mode"], "internal");
+        assert_eq!(
+            evidence["records"][0]["permission_decision"],
+            "exact prepared invocation admitted and consumed"
+        );
+        assert!(!workspace.path().join("target").exists());
+    }
+
+    #[tokio::test]
+    async fn validation_later_command_denial_prevents_all_execution() {
+        let workspace = tempfile::tempdir().expect("workspace");
+        std::fs::write(workspace.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
+        let marker = workspace.path().join("execution-marker");
+        let contributions = talos_tools::project_management::validation_tool_contributions(
+            workspace.path().to_owned(),
+            Arc::new(ValidationExecutionMarker(marker.clone())),
+        );
+        let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_owned());
+        engine.load_from_config(&serde_json::json!({"rules":[
+            {"decision":{"Deny":"test execution refused"},"nature":"Execute","resource":"cargo test --locked --workspace"},
+            {"decision":"Allow","nature":"Execute"}
+        ]})).expect("mixed policy");
+        let wrapped = PermissionAwareTool {
+            inner: contributions[0].tool().clone(),
+            approval: Arc::new(Mutex::new(ApprovalPrompt::new(engine))),
+            print_mode: true,
+        };
+        let result = wrapped
+            .execute(serde_json::json!({"mode":"run","profile":"workspace"}))
+            .await;
+        assert!(result.is_error);
+        assert!(
+            result.content.contains("test execution refused"),
+            "{}",
+            result.content
+        );
+        assert!(!marker.exists(), "earlier allowed checks must not start");
+    }
+
+    #[test]
+    fn validation_session_grants_are_revoked_when_host_workspace_changes() {
+        let first = tempfile::tempdir().expect("first workspace");
+        let second = tempfile::tempdir().expect("second workspace");
+        std::fs::write(first.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
+        let tools = talos_tools::project_management::validation_tool_contributions(
+            first.path().to_owned(),
+            Arc::new(ValidationExecutionMarker(first.path().join("marker"))),
+        );
+        let tool = tools[0].tool();
+        let input = serde_json::json!({"mode":"run","profile":"workspace"});
+        let facets = tool.permission_profile(&input);
+        let request = PermissionRequest::new(tool.name(), tool.provenance(), &facets, &input);
+        let context = PermissionContext::new(
+            PermissionMode::Interactive,
+            InteractionCapability::Available,
+        );
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            first.path().to_owned(),
+        ));
+        let proposal = state
+            .propose(&request, &context, GrantScope::Session)
+            .expect("concrete command proposal");
+        state
+            .approve_session(proposal, &request, &context, GrantSource::InteractiveHuman)
+            .expect("approve");
+        assert_eq!(
+            state
+                .evaluate(&request, &context)
+                .expect("evaluation")
+                .decision(),
+            PermissionDecision::Allow
+        );
+        state
+            .replace_policy(PermissionEngine::with_workspace_root(
+                second.path().to_owned(),
+            ))
+            .expect("switch workspace");
+        assert_eq!(state.grant_count().expect("grants"), 0);
+        assert_eq!(
+            state
+                .evaluate(&request, &context)
+                .expect("evaluation")
+                .decision(),
+            PermissionDecision::Ask
+        );
+    }
+
+    #[tokio::test]
+    async fn product_registries_bind_agile_summary_to_selected_workspace() {
+        let selected = tempfile::tempdir().expect("selected workspace");
+        std::fs::create_dir(selected.path().join(".agent-governance")).expect("directory");
+        std::fs::write(
+            selected.path().join(".agent-governance/manifest.yaml"),
+            "profile: selected-workspace-sentinel\n",
+        )
+        .expect("manifest");
+        let empty = tempfile::tempdir().expect("ungoverned workspace");
+        for workspace in [selected.path(), empty.path()] {
+            let (tx, _rx) = mpsc::unbounded_channel();
+            let registries = [
+                build_print_registry_bound_to_workspace(
+                    Vec::new(),
+                    Vec::new(),
+                    workspace.to_owned(),
+                ),
+                build_tui_tool_registry_with_todo_contributions(
+                    Arc::new(TuiApprovalHandler::new(tx, workspace.to_owned())),
+                    workspace.to_owned(),
+                    Vec::new(),
+                    Vec::new(),
+                    None,
+                    None,
+                ),
+                build_mcp_tool_registry_for_workspace(workspace.to_owned()),
+            ];
+            for registry in registries {
+                if workspace == empty.path() {
+                    assert!(registry.get("agile_summary").is_none());
+                    assert!(registry.get("validate_project").is_none());
+                    continue;
+                }
+                assert!(registry.is_builtin_instance("validate_project"));
+                let validation = registry.get("validate_project").expect("validation tool");
+                assert_eq!(
+                    validation.execution_working_directory().as_deref(),
+                    Some(workspace)
+                );
+                assert!(validation.cleanup_receipt().is_some());
+                let plan = validation
+                    .execute(serde_json::json!({"mode":"plan","profile":"governance"}))
+                    .await;
+                assert!(!plan.is_error, "{}", plan.content);
+                assert!(plan.content.contains("internal:governance_validation"));
+                assert!(registry.is_builtin_instance("agile_summary"));
+                let summary = registry
+                    .get("agile_summary")
+                    .expect("selected workspace tool");
+                assert!(summary.is_read_only());
+                let result = summary.execute(serde_json::json!({})).await;
+                assert!(!result.is_error);
+                assert!(result.content.contains("selected-workspace-sentinel"));
+            }
+        }
+    }
     use super::*;
     use talos_core::tool::{ToolNature, ToolProvenance};
     use talos_tools::ReadImageTool;
@@ -1312,20 +1629,21 @@ mod tests {
         let sessions_dir = temp.path().join("sessions");
         let session_id = Uuid::nil();
 
-        let print_registry = build_print_tool_registry_with_todo_contributions(
+        let print_registry = build_print_registry_bound_to_workspace(
             Vec::new(),
             todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id),
+            temp.path().to_owned(),
         );
         let (tx, _rx) = mpsc::unbounded_channel();
         let tui_registry = build_tui_tool_registry_with_todo_contributions(
-            Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
-            PathBuf::from("."),
+            Arc::new(TuiApprovalHandler::new(tx, temp.path().to_owned())),
+            temp.path().to_owned(),
             Vec::new(),
             todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id),
             None,
             None,
         );
-        let mcp_registry = build_mcp_tool_registry();
+        let mcp_registry = build_mcp_tool_registry_for_workspace(temp.path().to_owned());
 
         let mut print_tui_inventory = vec![
             SHELL_TOOL_NAME,
@@ -1438,11 +1756,13 @@ mod tests {
 
     #[test]
     fn workspace_wrapper_policy_preserves_tree_exception() {
-        let mut contributions =
+        let contributions =
             contribution_groups(SharedToolProfile::Product, PathBuf::from(".")).workspace;
         let tree = contributions
-            .pop()
-            .expect("workspace factory must end with tree");
+            .iter()
+            .find(|tool| tool.name() == "tree")
+            .expect("workspace factory must contain tree")
+            .clone();
         let tree = map_workspace_contribution(tree, |tool| {
             Arc::new(DescriptionMarkerTool { inner: tool })
         });
@@ -1451,7 +1771,7 @@ mod tests {
 
         let document = contributions
             .into_iter()
-            .next()
+            .find(|tool| tool.name() == "document_extract")
             .expect("workspace factory must contain document_extract");
         let document = map_workspace_contribution(document, |tool| {
             Arc::new(DescriptionMarkerTool { inner: tool })

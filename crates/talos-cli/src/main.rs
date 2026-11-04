@@ -415,7 +415,7 @@ async fn main() -> Result<()> {
     }
 
     if let Some(TalosCommand::Validate { command }) = &cli.command {
-        return crate::validation::run_validate_command(command.clone());
+        return crate::validation::run_validate_command(command.clone()).await;
     }
 
     if let Some(TalosCommand::Governance { command }) = &cli.command {

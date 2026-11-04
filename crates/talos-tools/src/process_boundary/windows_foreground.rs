@@ -146,6 +146,34 @@ impl ToolCleanupReceipt for CleanupReceipt {
 }
 
 struct CancelOnDrop(Option<oneshot::Sender<()>>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CommandStartState {
+    NotStarted,
+    Started,
+    Unknown,
+}
+
+#[derive(Debug)]
+pub(crate) struct CommandFailure {
+    pub(crate) start_state: CommandStartState,
+    pub(crate) message: String,
+}
+
+impl From<String> for CommandFailure {
+    fn from(message: String) -> Self {
+        Self {
+            start_state: CommandStartState::NotStarted,
+            message,
+        }
+    }
+}
+
+impl From<&str> for CommandFailure {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
 impl Drop for CancelOnDrop {
     fn drop(&mut self) {
         if let Some(sender) = self.0.take() {
@@ -155,21 +183,57 @@ impl Drop for CancelOnDrop {
 }
 
 impl OwnedCommandOperation {
+    /// Keep blocking preparation registered through cancellation and shutdown.
+    /// Dropping the caller requests cancellation but does not abandon ownership
+    /// of a kernel call that has not returned yet. The callback must not launch.
+    #[cfg(feature = "project-management")]
+    pub(crate) async fn run_preparation<T: Send + 'static>(
+        &self,
+        cancellation: tokio_util::sync::CancellationToken,
+        prepare: impl FnOnce(tokio_util::sync::CancellationToken) -> T + Send + 'static,
+    ) -> Result<T, String> {
+        let mut reservation = self.scope.register()?;
+        let guard = cancellation.clone().drop_guard();
+        let task = tokio::task::spawn_blocking(move || {
+            let result = prepare(cancellation);
+            reservation.finish(false);
+            result
+        });
+        let result = task
+            .await
+            .map_err(|_| "Windows preparation worker failed; cleanup unconfirmed".to_owned());
+        drop(guard);
+        result
+    }
+
     pub(crate) fn cleanup_receipt(&self) -> CleanupReceipt {
         CleanupReceipt {
             scope: self.scope.clone(),
         }
     }
 
+    #[cfg(any(feature = "git", test))]
     pub(crate) async fn execute(
         &self,
         command: Command,
         deadline: Duration,
         limit: usize,
     ) -> Result<Output, String> {
+        self.execute_inner(command, deadline, limit, None)
+            .await
+            .map_err(|failure| failure.message)
+    }
+
+    pub(crate) async fn execute_with_start_evidence(
+        &self,
+        command: Command,
+        deadline: Duration,
+        limit: usize,
+    ) -> Result<Output, CommandFailure> {
         self.execute_inner(command, deadline, limit, None).await
     }
 
+    #[cfg(any(feature = "git", test))]
     pub(crate) async fn execute_with_input(
         &self,
         command: Command,
@@ -179,6 +243,7 @@ impl OwnedCommandOperation {
     ) -> Result<Output, String> {
         self.execute_inner(command, deadline, limit, Some(input))
             .await
+            .map_err(|failure| failure.message)
     }
 
     /// Only explicit environment entries are transferred. Git callers construct
@@ -189,7 +254,9 @@ impl OwnedCommandOperation {
         deadline: Duration,
         limit: usize,
         input: Option<Vec<u8>>,
-    ) -> Result<Output, String> {
+    ) -> Result<Output, CommandFailure> {
+        // Encoding and supervisor scheduling consume the caller's budget too.
+        let deadline = tokio::time::Instant::now() + deadline;
         let cwd = command
             .get_current_dir()
             .ok_or("Windows foreground cwd is not bound")?;
@@ -219,14 +286,22 @@ impl OwnedCommandOperation {
         let guard = CancelOnDrop(Some(cancel_tx));
         let (result_tx, result_rx) = oneshot::channel();
         tokio::spawn(async move {
+            // Native launch currently reports errors without distinguishing
+            // pre-creation failure from partial launch. Never infer zero startup
+            // from its diagnostic string; cleanup stays independently checked.
+            let mut start_state = CommandStartState::Unknown;
             let (result, cleanup_failed) =
-                supervise(command, input, deadline, limit, cancel_rx).await;
+                supervise(command, input, deadline, limit, cancel_rx, &mut start_state).await;
             reservation.finish(cleanup_failed);
-            let _ = result_tx.send(result);
+            let _ = result_tx.send(result.map_err(|message| CommandFailure {
+                start_state,
+                message,
+            }));
         });
-        let result = result_rx
-            .await
-            .map_err(|_| "Windows foreground supervisor stopped".to_owned())?;
+        let result = result_rx.await.map_err(|_| CommandFailure {
+            start_state: CommandStartState::Unknown,
+            message: "Windows foreground supervisor stopped".to_owned(),
+        })?;
         drop(guard);
         result
     }
@@ -259,25 +334,35 @@ async fn read(
 async fn supervise(
     command: WindowsLaunchCommand,
     input: Option<Vec<u8>>,
-    timeout: Duration,
+    deadline: tokio::time::Instant,
     limit: usize,
     mut cancel: oneshot::Receiver<()>,
+    start_state: &mut CommandStartState,
 ) -> (Result<Output, String>, bool) {
     use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
     use std::os::windows::process::ExitStatusExt;
     use windows_sys::Win32::Foundation::{WAIT_FAILED, WAIT_OBJECT_0};
     use windows_sys::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject};
 
-    let deadline = tokio::time::Instant::now() + timeout;
     let (control, process, stdout, stderr, stdin) = {
-        let launched = match super::create_windows_job_native(
+        let launched = match super::create_windows_job_native_checked(
             command,
+            || {
+                if tokio::time::Instant::now() >= deadline
+                    || !matches!(cancel.try_recv(), Err(oneshot::error::TryRecvError::Empty))
+                {
+                    Err("Windows foreground launch cancelled or deadline exceeded".into())
+                } else {
+                    Ok(())
+                }
+            },
             #[cfg(test)]
             super::WindowsLaunchTestHooks::default(),
         ) {
             Ok(launched) => launched,
             Err(error) => return (Err(error), true),
         };
+        *start_state = CommandStartState::Started;
         let control = WindowsJobControl { job: launched.job };
         // SAFETY: native launch transfers unique ownership of the process handle.
         let process = unsafe { OwnedHandle::from_raw_handle(launched.process as _) };

@@ -112,6 +112,10 @@ pub fn contribution_groups_with_language_provider_and_search(
 ) -> Result<SharedToolContributions, SearchToolConfigurationError> {
     let image = (profile != SharedToolProfile::Mcp)
         .then(|| read_image_tool_contribution(workspace_root.clone()));
+    let mut workspace = workspace_tool_contributions(workspace_root.clone());
+    workspace.extend(talos_tools::project_management::project_tool_contributions(
+        workspace_root.clone(),
+    ));
     Ok(SharedToolContributions {
         shell: shell_tool_contributions(workspace_root.clone()),
         files: if profile == SharedToolProfile::Mcp {
@@ -122,7 +126,7 @@ pub fn contribution_groups_with_language_provider_and_search(
                 atomic_create,
             )
         },
-        workspace: workspace_tool_contributions(workspace_root.clone()),
+        workspace,
         network: network_tool_contributions_with_search(search)?,
         image,
         symbols: talos_tools::symbol_tool_contributions_with_provider(
@@ -204,6 +208,70 @@ pub fn runtime_tool_contributions_with_search(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn cargo_only_workspace_discovers_validation_across_product_profiles() {
+        let root = tempfile::tempdir().expect("workspace");
+        std::fs::write(root.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
+        for profile in [
+            SharedToolProfile::Product,
+            SharedToolProfile::Runtime,
+            SharedToolProfile::Mcp,
+        ] {
+            let contributions = tool_contributions(profile, root.path().to_owned());
+            assert!(
+                !contributions
+                    .iter()
+                    .any(|item| item.name() == "agile_summary")
+            );
+            let validation = contributions
+                .iter()
+                .find(|item| item.name() == "validate_project")
+                .expect("validation");
+            assert!(validation.tool().cleanup_receipt().is_some());
+            let result = validation
+                .tool()
+                .execute(serde_json::json!({"mode":"plan","profile":"workspace"}))
+                .await;
+            assert!(!result.is_error, "{}", result.content);
+            assert!(result.content.contains("cargo check --locked --workspace"));
+        }
+        let empty = tempfile::tempdir().expect("empty");
+        assert!(
+            !runtime_tool_contributions(empty.path().to_owned())
+                .iter()
+                .any(|item| item.name() == "validate_project")
+        );
+    }
+
+    #[tokio::test]
+    async fn governed_workspace_exposes_shared_read_only_summary_in_each_profile() {
+        let root = tempfile::tempdir().expect("workspace");
+        let directory = root.path().join(".agent-governance");
+        std::fs::create_dir(&directory).expect("directory");
+        std::fs::write(directory.join("manifest.yaml"), "profile: minimal\n").expect("manifest");
+        for profile in [
+            SharedToolProfile::Product,
+            SharedToolProfile::Runtime,
+            SharedToolProfile::Mcp,
+        ] {
+            let contributions = tool_contributions(profile, root.path().to_owned());
+            let summary = contributions
+                .iter()
+                .find(|item| item.name() == "agile_summary")
+                .expect("governance summary contribution");
+            assert!(summary.tool().is_read_only());
+            let result = summary.tool().execute(serde_json::json!({})).await;
+            assert!(!result.is_error);
+            assert!(result.content.contains("minimal"));
+        }
+        let empty = tempfile::tempdir().expect("empty workspace");
+        assert!(
+            !runtime_tool_contributions(empty.path().to_owned())
+                .iter()
+                .any(|item| item.name() == "agile_summary")
+        );
+    }
 
     const DIRECT_ROUTE_CHILD: &str = "TALOS_SEARCH_DIRECT_ROUTE_CHILD";
     const PROXY_ENVIRONMENT: [&str; 6] = [
