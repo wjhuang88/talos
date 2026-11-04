@@ -83,6 +83,10 @@ in the environment must not silently select paid usage or change the default sea
 - `rust-websearch` retirement (SEARCH-001-I).
 - A public provider lifecycle or Plugin model that conflicts with ADR-072/ADR-085.
 
+## Operator Documentation
+
+[Explicit search override configuration, privacy, fallback and rollback](../../reference/SEARCH-001-H-EXPLICIT-OVERRIDES.md) describes the additive persisted `[search]` contract. This document is an implementation artifact; acceptance/merge remains gated by I314 exact-head CI, review and CAS.
+
 ## Rollback
 
 Retain the currently shipped compatibility configuration and provider adapters until an H
