@@ -57,7 +57,7 @@ fn build_router_tool(
         (PRODUCTION_SEARCH_BUDGET, PRODUCTION_SEARCH_MAX_REQUESTS)
     };
     let limits = TransportLimits::new(duration, max_requests, PRODUCTION_SEARCH_MAX_BYTES)
-    .expect("static protected search transport bounds must be valid");
+        .expect("static protected search transport bounds must be valid");
     let policy = SearchRouterPolicy::new(
         Duration::ZERO,
         1,
@@ -139,10 +139,18 @@ pub(crate) fn production_search_router_tool_with_search_configuration(
     );
     let configuration = selected_configuration(&search)?;
     match configuration.with_environment_proxy() {
-        Ok(configuration) => Ok(build_router_tool(configuration, false, explicit_auto_fallback)),
+        Ok(configuration) => Ok(build_router_tool(
+            configuration,
+            false,
+            explicit_auto_fallback,
+        )),
         Err(TransportError::UnsupportedProxy) => {
             let configuration = selected_configuration(&search)?;
-            Ok(build_router_tool(configuration, true, explicit_auto_fallback))
+            Ok(build_router_tool(
+                configuration,
+                true,
+                explicit_auto_fallback,
+            ))
         }
         Err(_) => Err(SearchToolConfigurationError::TransportPolicy),
     }
@@ -236,30 +244,40 @@ mod tests {
 
     #[test]
     fn optional_auto_fallback_only_expands_its_own_frozen_transport_envelope() {
-        assert!(TransportLimits::new(
-            PRODUCTION_SEARCH_BUDGET,
-            PRODUCTION_SEARCH_MAX_REQUESTS,
-            PRODUCTION_SEARCH_MAX_BYTES,
-        ).is_ok());
-        assert!(TransportLimits::new(
-            PRODUCTION_FALLBACK_BUDGET,
-            PRODUCTION_FALLBACK_MAX_REQUESTS,
-            PRODUCTION_SEARCH_MAX_BYTES,
-        ).is_ok());
-        assert!(TransportLimits::new(
-            PRODUCTION_FALLBACK_BUDGET,
-            PRODUCTION_FALLBACK_MAX_REQUESTS + 1,
-            PRODUCTION_SEARCH_MAX_BYTES,
-        ).is_err());
-        let legacy = production_search_router_tool_with_search_configuration(
-            SearchToolConfiguration::Auto,
-        ).expect("auto");
+        assert!(
+            TransportLimits::new(
+                PRODUCTION_SEARCH_BUDGET,
+                PRODUCTION_SEARCH_MAX_REQUESTS,
+                PRODUCTION_SEARCH_MAX_BYTES,
+            )
+            .is_ok()
+        );
+        assert!(
+            TransportLimits::new(
+                PRODUCTION_FALLBACK_BUDGET,
+                PRODUCTION_FALLBACK_MAX_REQUESTS,
+                PRODUCTION_SEARCH_MAX_BYTES,
+            )
+            .is_ok()
+        );
+        assert!(
+            TransportLimits::new(
+                PRODUCTION_FALLBACK_BUDGET,
+                PRODUCTION_FALLBACK_MAX_REQUESTS + 1,
+                PRODUCTION_SEARCH_MAX_BYTES,
+            )
+            .is_err()
+        );
+        let legacy =
+            production_search_router_tool_with_search_configuration(SearchToolConfiguration::Auto)
+                .expect("auto");
         let explicit = production_search_router_tool_with_search_configuration(
             SearchToolConfiguration::Tavily {
                 api_key: "fixture-key".into(),
                 fallback_to_auto: true,
             },
-        ).expect("explicit fallback");
+        )
+        .expect("explicit fallback");
         assert_eq!(legacy.name(), explicit.name());
         assert_eq!(legacy.parameters(), explicit.parameters());
     }

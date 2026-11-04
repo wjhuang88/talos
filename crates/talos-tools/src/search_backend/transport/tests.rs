@@ -31,7 +31,8 @@ fn explicit_fallback_proxy_budget_reserves_optional_request_plus_full_direct_env
             2,
             budget.max_requests,
             TransportError::RequestLimit,
-        ).expect("26 proxy units fit the selected envelope");
+        )
+        .expect("26 proxy units fit the selected envelope");
     }
     assert_eq!(budget.attempts.load(Ordering::Relaxed), 26);
     assert_eq!(
@@ -43,8 +44,8 @@ fn explicit_fallback_proxy_budget_reserves_optional_request_plus_full_direct_env
         ),
         Err(TransportError::RequestLimit)
     );
-    let auto = TransportBudget::new(Duration::from_secs(135), 24, 1024)
-        .expect("unchanged Auto budget");
+    let auto =
+        TransportBudget::new(Duration::from_secs(135), 24, 1024).expect("unchanged Auto budget");
     assert_eq!(auto.max_requests, 24);
     assert!(TransportBudget::new(Duration::from_secs(150), 27, 1024).is_err());
 }
