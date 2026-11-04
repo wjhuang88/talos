@@ -10,7 +10,7 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{Notify, oneshot};
 
-use crate::SandboxError;
+use crate::{CommandStartState, OwnedCommandFailure, SandboxError};
 
 const POLL: Duration = Duration::from_millis(10);
 const CLEANUP_LIMIT: Duration = Duration::from_secs(2);
@@ -149,7 +149,38 @@ struct OwnedChild {
     may_signal: bool,
 }
 
+#[cfg(target_os = "macos")]
+async fn retry_darwin_group_termination(
+    mut terminate: impl FnMut() -> io::Result<()>,
+) -> io::Result<()> {
+    let until = tokio::time::Instant::now() + POLL * 10;
+    loop {
+        match terminate() {
+            Err(error)
+                if error.raw_os_error() == Some(libc::EPERM)
+                    && tokio::time::Instant::now() < until =>
+            {
+                // Darwin excludes zombies from group signalling. Exit
+                // observation and group enumeration can lag that transition.
+                // Retry the SAME ownership/proof checks; never accept EPERM
+                // itself as cleanup and never reap before proof succeeds.
+                tokio::time::sleep(POLL).await;
+            }
+            result => return result,
+        }
+    }
+}
+
 impl OwnedChild {
+    async fn terminate_group_confirmed(&mut self) -> io::Result<()> {
+        #[cfg(target_os = "macos")]
+        {
+            retry_darwin_group_termination(|| self.terminate_group()).await
+        }
+        #[cfg(not(target_os = "macos"))]
+        self.terminate_group()
+    }
+
     fn observe(&mut self) -> io::Result<bool> {
         // SAFETY: zero is a valid initialization for the output-only siginfo_t.
         // waitid receives a valid writable pointer and a positive owned child ID.
@@ -304,15 +335,31 @@ pub(crate) async fn execute_with_limit(
 }
 
 pub(crate) async fn execute_with_input(
-    mut command: Command,
+    command: Command,
     cleanup: Arc<Cleanup>,
     deadline: Duration,
     resources: impl Send + 'static,
     output_limit: usize,
     input: Option<Vec<u8>>,
 ) -> Result<Output, SandboxError> {
+    execute_with_start_evidence(command, cleanup, deadline, resources, output_limit, input)
+        .await
+        .map_err(|failure| failure.source)
+}
+
+pub(crate) async fn execute_with_start_evidence(
+    mut command: Command,
+    cleanup: Arc<Cleanup>,
+    deadline: Duration,
+    resources: impl Send + 'static,
+    output_limit: usize,
+    input: Option<Vec<u8>>,
+) -> Result<Output, OwnedCommandFailure> {
     let started = tokio::time::Instant::now();
-    let mut receipt = cleanup.register()?;
+    let mut receipt = cleanup.register().map_err(|source| OwnedCommandFailure {
+        start_state: CommandStartState::NotStarted,
+        source,
+    })?;
     command
         .stdin(if input.is_some() {
             Stdio::piped()
@@ -337,15 +384,19 @@ pub(crate) async fn execute_with_input(
         Ok(Ok(child)) => child,
         Ok(Err(error)) => {
             receipt.finish(None);
-            return Err(failed(format!(
-                "sandbox spawn/session setup failed: {error}"
-            )));
+            return Err(OwnedCommandFailure {
+                start_state: CommandStartState::NotStarted,
+                source: failed(format!("sandbox spawn/session setup failed: {error}")),
+            });
         }
         Err(_) => {
             receipt.finish(Some(
                 "sandbox process spawn panicked; cleanup unconfirmed".into(),
             ));
-            return Err(failed("sandbox process spawn panicked"));
+            return Err(OwnedCommandFailure {
+                start_state: CommandStartState::Unknown,
+                source: failed("sandbox process spawn panicked"),
+            });
         }
     };
     let pgid = match libc::pid_t::try_from(child.id()) {
@@ -358,7 +409,10 @@ pub(crate) async fn execute_with_input(
             receipt.finish(Some(
                 "sandbox returned invalid process ID; cleanup unconfirmed".into(),
             ));
-            return Err(failed("sandbox returned invalid process ID"));
+            return Err(OwnedCommandFailure {
+                start_state: CommandStartState::Started,
+                source: failed("sandbox returned invalid process ID"),
+            });
         }
     };
     let owner = OwnedChild {
@@ -381,11 +435,15 @@ pub(crate) async fn execute_with_input(
         receipt.finish(result.1);
         result.0
     });
-    let result = task
-        .await
-        .map_err(|error| failed(format!("sandbox supervisor failed: {error}")))?;
+    let result = task.await.map_err(|error| OwnedCommandFailure {
+        start_state: CommandStartState::Started,
+        source: failed(format!("sandbox supervisor failed: {error}")),
+    })?;
     drop(cancel);
-    result
+    result.map_err(|source| OwnedCommandFailure {
+        start_state: CommandStartState::Started,
+        source,
+    })
 }
 
 #[cfg(test)]
@@ -533,7 +591,8 @@ async fn supervise_io_limited(
             _ = tokio::time::sleep(POLL) => {},
         }
     };
-    if let Err(error) = owner.terminate_group() {
+    let cleanup_started = tokio::time::Instant::now();
+    if let Err(error) = owner.terminate_group_confirmed().await {
         let detail = match reason {
             Some(reason) => format!("{reason}; sandbox process-group cleanup failed: {error}"),
             None => format!("sandbox process-group cleanup failed: {error}"),
@@ -541,7 +600,7 @@ async fn supervise_io_limited(
         return (Err(failed(&detail)), Some(detail));
     }
     let cleanup = tokio::time::timeout(
-        CLEANUP_LIMIT,
+        CLEANUP_LIMIT.saturating_sub(cleanup_started.elapsed()),
         finish_cleanup_limited(
             &mut owner,
             &mut stdout,
@@ -636,6 +695,99 @@ async fn finish_cleanup_limited(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[tokio::test]
+    async fn darwin_retry_keeps_persistent_permission_and_ownership_failures_closed() {
+        let mut attempts = 0;
+        let failure = tokio::time::timeout(
+            Duration::from_secs(1),
+            retry_darwin_group_termination(|| {
+                attempts += 1;
+                Err(io::Error::from_raw_os_error(libc::EPERM))
+            }),
+        )
+        .await
+        .expect("bounded retry")
+        .expect_err("persistent denial");
+        assert_eq!(failure.raw_os_error(), Some(libc::EPERM));
+        assert!(attempts > 1);
+
+        let mut attempts = 0;
+        let failure = retry_darwin_group_termination(|| {
+            attempts += 1;
+            Err(io::Error::from_raw_os_error(libc::ECHILD))
+        })
+        .await
+        .expect_err("lost ownership");
+        assert_eq!(failure.raw_os_error(), Some(libc::ECHILD));
+        assert_eq!(attempts, 1);
+
+        let mut attempts = 0;
+        retry_darwin_group_termination(|| {
+            attempts += 1;
+            if attempts == 1 {
+                Err(io::Error::from_raw_os_error(libc::EPERM))
+            } else {
+                Ok(())
+            }
+        })
+        .await
+        .expect("later complete proof succeeds");
+        assert_eq!(attempts, 2);
+    }
+
+    #[tokio::test]
+    async fn startup_evidence_distinguishes_refusal_spawn_failure_and_started_timeout() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let cleanup = Arc::new(Cleanup::default());
+        let missing = Command::new(directory.path().join("missing-executable"));
+        let failure = execute_with_start_evidence(
+            missing,
+            cleanup.clone(),
+            Duration::from_secs(1),
+            (),
+            1024,
+            None,
+        )
+        .await
+        .expect_err("missing executable");
+        assert_eq!(failure.start_state, CommandStartState::NotStarted);
+        cleanup
+            .wait_confirmed(Duration::from_secs(1))
+            .await
+            .expect("no child to clean");
+
+        let mut running = Command::new("/bin/sh");
+        running.args(["-c", "exec sleep 30"]);
+        let failure = execute_with_start_evidence(
+            running,
+            cleanup.clone(),
+            Duration::from_millis(50),
+            (),
+            1024,
+            None,
+        )
+        .await
+        .expect_err("deadline");
+        assert_eq!(failure.start_state, CommandStartState::Started);
+        cleanup
+            .wait_confirmed(Duration::from_secs(3))
+            .await
+            .expect("started child cleaned");
+
+        cleanup.seal();
+        let mut forbidden = Command::new("/bin/sh");
+        forbidden
+            .current_dir(directory.path())
+            .args(["-c", "touch should-not-exist"]);
+        let failure =
+            execute_with_start_evidence(forbidden, cleanup, Duration::from_secs(1), (), 1024, None)
+                .await
+                .expect_err("sealed owner");
+        assert_eq!(failure.start_state, CommandStartState::NotStarted);
+        assert!(!directory.path().join("should-not-exist").exists());
+    }
 
     #[tokio::test]
     async fn finite_input_drains_output_and_closes_the_pipe() {
