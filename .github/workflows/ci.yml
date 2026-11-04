@@ -164,6 +164,7 @@ jobs:
           cargo build --locked -p talos-cli
           python3 scripts/accept_auto_locale.py target/debug/talos
           python3 scripts/accept_auto_locale_tui.py target/debug/talos
+          python3 scripts/accept_search_overrides.py target/debug/talos
 
       - name: Optional language Plugin acceptance
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
