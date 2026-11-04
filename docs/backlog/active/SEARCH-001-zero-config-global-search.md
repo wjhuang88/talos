@@ -134,7 +134,7 @@ real target-network observations; CI cannot stand in for missing geographic evid
 
 - [x] Search domain contract/router and fallback ownership are shipped with compatible tool and permission behavior. SEARCH-001-C completed at #808.
 - [ ] At least two independently admitted Talos-native zero-key providers can satisfy a default search without `rust-websearch`. SEARCH-001-D closed blocked with zero admissions.
-- [ ] Default auto routing and explicit optional premium override are user-documented, permission-safe and recover across network changes. H remains Proposed / Unclaimed.
+- [ ] Global default Auto routing across independently admitted Talos-native providers and recovery across network changes remains pending under E/F/G; the separately governed **explicit premium/self-hosted override** is already Complete / Closed in SEARCH-001-H / I314 (Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e`, #842). This unfinished parent criterion does not reopen H or admit a native provider.
 - [ ] Controlled tests and provenance-backed real-network evidence cover multiple regions including mainland China; limitations are honestly documented.
 - [ ] Fixtures, cancellation, error classification, security/privacy gates and real smoke/soak results are recorded for the terminal chain.
 - [ ] `rust-websearch` is demonstrably no longer a critical default-search dependency; the disposition (optional adapter or removal) has a reviewed decision and rollback.
