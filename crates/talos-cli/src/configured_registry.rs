@@ -8,11 +8,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
-use async_trait::async_trait;
-use serde_json::Value;
-use talos_core::tool::{
-    AgentTool, ToolContribution, ToolContributionSource, ToolFamily, ToolRegistry, ToolResult,
-};
+use talos_core::tool::{AgentTool, ToolContribution, ToolContributionSource, ToolRegistry};
 use talos_runtime::composition::{
     SharedToolContributions, SharedToolProfile,
     contribution_groups_with_language_provider_and_search, contribution_groups_with_search,
@@ -21,7 +17,7 @@ use talos_session::{SessionManager, todo_tool_contributions_for_sessions_dir};
 use talos_tools::SearchToolConfiguration;
 use uuid::Uuid;
 
-use crate::registry::LoadedLanguageContext;
+use crate::registry::{LoadedLanguageContext, StatusTool};
 
 fn default_todo_tool_contributions(session_id: Uuid) -> Vec<ToolContribution> {
     let Ok(sessions_dir) = SessionManager::default_sessions_dir() else {
@@ -99,38 +95,6 @@ pub(crate) fn build_tui_tool_registry_with_search(
         scheduler_tools,
         default_todo_tool_contributions(session_id),
     )
-}
-
-struct StatusTool;
-
-#[async_trait]
-impl AgentTool for StatusTool {
-    fn name(&self) -> &str {
-        "status"
-    }
-
-    fn description(&self) -> &str {
-        "Return Talos MCP server status"
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {}
-        })
-    }
-
-    async fn execute(&self, _input: Value) -> ToolResult {
-        ToolResult::success("talos mcp server alive")
-    }
-
-    fn is_read_only(&self) -> bool {
-        true
-    }
-
-    fn family(&self) -> ToolFamily {
-        ToolFamily::Extension
-    }
 }
 
 pub(crate) fn build_mcp_tool_registry_with_search(

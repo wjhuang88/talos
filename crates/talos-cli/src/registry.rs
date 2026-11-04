@@ -727,8 +727,8 @@ pub(crate) fn register_loaded_tui_plugins(
     Ok((packages, context))
 }
 
-/// A lightweight health/status tool for MCP mode.
-struct StatusTool;
+/// A lightweight health/status tool shared by legacy Auto and configured MCP registries.
+pub(crate) struct StatusTool;
 
 #[async_trait]
 impl AgentTool for StatusTool {
@@ -772,6 +772,8 @@ fn map_workspace_contribution(
     }
 }
 
+/// Retained for the legacy Auto-only MCP composition used by rollback/test callers.
+#[allow(dead_code)]
 fn register_symbol_tool_contributions(
     registry: &mut ToolRegistry,
     contributions: Vec<ToolContribution>,
@@ -931,6 +933,8 @@ fn build_tui_tool_registry_with_todo_contributions(
     registry
 }
 
+/// Legacy Auto-only constructor retained for rollback and compatibility tests.
+#[allow(dead_code)]
 pub(crate) fn build_mcp_tool_registry() -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     let shared = contribution_groups(SharedToolProfile::Mcp, PathBuf::from("."));
