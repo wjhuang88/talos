@@ -34,16 +34,30 @@ fn actor_and_provider_dispatch_share_the_sealed_plan() {
     for required in [
         "let mut initial_plan = Some(initial_plan);",
         "if let Some(plan) = initial_plan.take()",
-        "stream_with_ephemeral_images(",
-        "&plan.messages,",
-        "&plan.tool_definitions,",
-        "plan.tool_protocol,",
     ] {
         assert!(
             agent.contains(required),
             "Agent dispatch must consume the sealed plan without rebuilding: {required}"
         );
     }
+
+    let (before_dispatch, dispatch) = agent
+        .split_once("let provider_request = self.provider.stream_with_replay_context(")
+        .expect("Agent must dispatch with sealed replay context");
+    let (arguments, _) = dispatch
+        .split_once(");")
+        .expect("provider request arguments");
+    assert!(
+        arguments.trim_start().starts_with(
+            "&plan.messages,\n                &plan.tool_definitions,\n                plan.tool_protocol,"
+        ),
+        "Agent must dispatch the sealed messages, tools and protocol directly"
+    );
+    let (_, replay_binding) = before_dispatch
+        .rsplit_once("let replay = match private_replays.for_request(")
+        .expect("Agent must bind replay before dispatch");
+    assert!(replay_binding.trim_start().starts_with("&plan.messages,"));
+    assert!(arguments.trim_end().ends_with("replay,"));
 
     assert!(
         session.contains(".prepare_session_turn(")
