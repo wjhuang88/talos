@@ -7,7 +7,6 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 use std::time::Duration;
-use talos_core::message::Message;
 use talos_core::session::{
     RuntimePolicy, SessionConfig, SessionEvent, SessionOp, TurnCompletionStatus, TurnEventPayload,
 };
@@ -17,6 +16,28 @@ use talos_core::tool::{
 };
 
 const PRIVATE: &str = "browser-private-sentinel";
+
+struct OrdinaryFixture;
+
+#[async_trait::async_trait]
+impl AgentTool for OrdinaryFixture {
+    fn name(&self) -> &str {
+        "ordinary"
+    }
+
+    fn description(&self) -> &str {
+        "ordinary parsed-argument fixture"
+    }
+
+    fn parameters(&self) -> Value {
+        json!({"type":"object","properties":{"text":{"type":"string"}},"required":["text"]})
+    }
+
+    async fn execute(&self, input: Value) -> ToolResult {
+        assert_eq!(input["text"], PRIVATE);
+        ToolResult::success("ordinary completed")
+    }
+}
 
 struct BrowserFixture(Arc<AtomicUsize>);
 #[async_trait::async_trait]
@@ -82,6 +103,7 @@ fn agent(
 ) -> talos_agent::Agent {
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(BrowserFixture(effects)));
+    registry.register(Arc::new(OrdinaryFixture));
     talos_agent::Agent::with_security(Arc::new(provider), registry, None, None, root)
         .with_reasoning_identity(Some("google".into()), Some("model".into()), true)
 }
@@ -123,6 +145,7 @@ async fn browser_signed_replay_survives_two_live_submissions_but_not_durable_reo
     let parts = json!([
         {"text":format!("thought {PRIVATE}"),"thought":true,"thoughtSignature":"private-thought-signature"},
         {"functionCall":{"id":"b","name":"browser","args":{"protocolVersion":2,"operation":"fill","text":PRIVATE}},"thoughtSignature":"private-call-signature"},
+        {"functionCall":{"id":"o","name":"ordinary","args":{"text":PRIVATE}}},
         {"text":format!("opening {PRIVATE}")}
     ]);
     let first = server
@@ -139,7 +162,9 @@ async fn browser_signed_replay_survives_two_live_submissions_but_not_durable_reo
         let body:Value=serde_json::from_slice(r.body().expect("body")).expect("JSON");
         let contents=body["contents"].as_array().expect("contents");
         contents.iter().any(|item|item["role"]=="model" && item["parts"]==expected)
-            && contents.iter().any(|item|item["parts"].as_array().is_some_and(|parts|parts.iter().any(|part|part.get("functionResponse").is_some())))
+            && ["browser completed", "ordinary completed"].iter().all(|result|
+                contents.iter().any(|item|item["parts"].as_array().is_some_and(|parts|
+                    parts.iter().any(|part|part.get("functionResponse").is_some_and(|response|response.to_string().contains(*result))))))
             && !contents.iter().any(|item|item["parts"].as_array().is_some_and(|parts|parts.iter().any(|part|part["text"]=="again")))
     }).with_body(wire(json!([{"text":format!("done {PRIVATE}"),"thoughtSignature":"private-final-signature"}]))).expect(1).create_async().await;
     let expected = parts;
