@@ -695,3 +695,16 @@ Next pre-1.0 minor only, no patch/release claim. This checkpoint is UNVERIFIED a
 merged or made Ready. Finish focused acceptance, Core/Agent/Provider regression/Clippy, both
 governance validators and independent final privacy review locally; then batch one substantive
 PR candidate for fresh native CI. B/parent724 and remaining catalog/UI/fixtures/C/D remain open.
+
+### Private replay checkpoint follow-up — 2026-11-04
+
+Checkpoint 7d2cea27 added the mixed ordinary/browser test. At that exact source, pinned locked
+Core 129, Agent 663 and Provider 283 library tests passed, as did both governance validators and
+format/diff checks. The clean build recovered from registry rate limiting. The first Clippy pass
+found new-source style and argument-count findings. The independent technical review requested
+changes for unknown field-name disclosure, retroactive rewriting of sealed projections, and
+ordinary input normalization before signed binding. This checkpoint is not a merge candidate.
+
+Follow-up covers unknown-key refusal before observation, custody-verified stable projections,
+and binding the original ordinary argument before the existing execution normalization step.
+Tests and review of the follow-up must be recorded separately from the results above.
