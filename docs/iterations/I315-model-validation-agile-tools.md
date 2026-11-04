@@ -436,7 +436,7 @@ reached. Full T1 remains open.
 | Governance Claim PR | #845 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized full ordered handoff delivery; independent API/process-security review, exact-head CI, validators and CAS required |
-| Implementation PR | Not started |
+| Implementation PR | #847 |
 | Last Updated | 2026-11-04 |
 | Handoff / Release Condition | Claim and activation effective only after finalized governance PR merges; no release authority |
 
