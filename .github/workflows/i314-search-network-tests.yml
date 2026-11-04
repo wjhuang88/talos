@@ -1,0 +1,28 @@
+name: I314 search network feature tests (temporary)
+on:
+  push:
+    branches:
+      - tmp/i314-search-network-tests-20261104
+permissions:
+  contents: read
+jobs:
+  search-network:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Network-feature search library regression suite
+        run: |
+          set -euo pipefail
+          cargo test -p talos-tools --locked --features network --lib -- --nocapture \
+            2>&1 | tee i314-network-tests.log
+          grep -F 'explicit_fallback_proxy_budget_reserves_optional_request_plus_full_direct_envelope ... ok' i314-network-tests.log
+          grep -F 'optional_auto_fallback_only_expands_its_own_frozen_transport_envelope ... ok' i314-network-tests.log
+          grep -F 'legacy_public_constructor_does_not_activate_optional_providers_from_environment ... ok' i314-network-tests.log
+      - name: Network-feature Clippy
+        run: cargo clippy -p talos-tools --locked --features network --all-targets -- -D warnings
