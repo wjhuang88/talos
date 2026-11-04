@@ -119,12 +119,13 @@ impl TransportLimits {
         max_bytes: usize,
     ) -> Result<Self, TransportError> {
         let standard = duration <= Duration::from_secs(120) && (1..=16).contains(&max_requests);
-        // One exact enlarged envelope is reserved for production legacy-compatibility parity:
-        // four query-free probes, seven fixed-family query attempts and one Wikipedia fallback,
-        // with CONNECT + application-send accounting under HTTPS proxying.
+        // Two exact production envelopes: Auto's legacy compatibility path (24 units / 135s)
+        // and explicit Tavily/SearXNG followed by Auto (one extra proxied HTTPS send: 26 / 150s).
+        // Other callers retain the existing <=120s / <=16 request bound.
         let compatibility_parity = duration == Duration::from_secs(135) && max_requests == 24;
+        let explicit_auto_fallback = duration == Duration::from_secs(150) && max_requests == 26;
         if duration.is_zero()
-            || (!standard && !compatibility_parity)
+            || (!standard && !compatibility_parity && !explicit_auto_fallback)
             || !(1..=1_048_576).contains(&max_bytes)
         {
             return Err(TransportError::InvalidRequest);

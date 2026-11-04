@@ -132,6 +132,25 @@ I314 is non-overlapping with I310/I313. On 2026-11-02 the maintainer explicitly 
 
 ## Verification Evidence
 
+### 2026-11-04 implementation evidence — pending full acceptance
+
+- Current candidate implementation commit: `8f065c962d0f05ea6e83489b4f3ceb19430886b7` on PR #842 (Draft; not merged). This is **not a Completion Commit**.
+- Latest effective main last verified for this checkpoint: `261602242e49e6f921f5d3e4eac96eebbe92f8b3`. Historical safety archive `archive/i314-pre-main-sync-20261103` remains unmodified.
+- Earlier CI3797 / run `41663411803` exposed three `talos-tools` Clippy findings and twelve missing exhaustive `Config.search` test initializers; all corrected in `464c51dea426f9ebc9b7ff53f0139f5ad8390a10`.
+- CI3798 / run `41745290734` exposed three stale CLI registry symbols under `-D warnings`; current candidate reuses the old MCP status tool and preserves compatibility wrappers.
+- **Independent, source-equivalent binary acceptance:** isolated run `41746957277` on the exact candidate source plus a temporary diagnostic workflow succeeded. Its temporary workflow was removed after use and never entered PR #842.
+- Acceptance command chain:
+  `cargo clippy --workspace --locked -- -D warnings` — **success**;
+  `cargo test -p talos-config --locked --lib` — **268 passed, zero failed**;
+  `cargo build -p talos-cli --locked` — **success**;
+  `python3 scripts/accept_search_overrides.py target/debug/talos` — **success**.
+- Actual `talos --mock --print --no-init --no-context` fixture transcript: `SEARCH_OVERRIDE_E2E auto_with_ambient_optional_values PASS`; `tavily_missing_explicit_credential_fail_closed PASS`; `tavily_explicit_stored_credential PASS`; `searxng_missing_explicit_endpoint_fail_closed PASS`; `searxng_explicit_endpoint PASS`; `rollback_auto_with_persisted_optional_credential PASS`.
+- This confirms real print-mode persisted-config loading and registry construction **without** invoking a search query or consuming paid provider quota. It complements the selected-candidate/transport/permission/router unit fixtures, not an actual external-provider live integration claim.
+- CI3799/run `41746709995` passed **all eight exact-head checks** on `8f065c962d0f05ea6e83489b4f3ceb19430886b7`; this is historical, not acceptance evidence for any later changed head.
+- Independent Copilot review [PR #842 comment 6619286884](https://github.com/wjhuang88/talos/pull/842#issuecomment-6619286884) found two issues: a 24 vs 26 proxied request-unit envelope for explicit + Auto fallback, and ambient optional-provider selection in the legacy public constructor. The subsequent unmerged candidate corrects both and adds regression coverage; renewed exact-head CI/review are required.
+- **Pending gates**: exact-head full CI and independent read-only security/API re-review after these corrections, latest-main/owner/review-thread CAS and merge authorization.
+- Operator contract and rollback: `docs/reference/SEARCH-001-H-EXPLICIT-OVERRIDES.md`. No native Mwmbl/Purili admission or SEARCH-001-E/F authorization, no `rust-websearch` removal.
+
 - Activation: #841 merge `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a`; CI3756/run `41439465737` success; both governance validators zero warnings; exact-head Copilot gate review approved.
 - Implementation: #842 is Draft; exact-head implementation validation remains in progress and no stage is accepted merely by publication.
 
