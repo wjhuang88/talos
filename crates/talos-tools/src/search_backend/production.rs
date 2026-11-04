@@ -33,13 +33,15 @@ use super::transport::{TransportError, TransportLimits};
 //
 // Therefore an invocation can perform at most eight query-bearing logical sends across five fixed
 // query destinations, plus four query-free probe sends. Proxied HTTPS reserves CONNECT + application
-// send for each logical request, so the worst physical-unit envelope is twenty-four. The 135-second
-// enclosing budget covers the ~106.5-second four-source request/retry envelope, up to ~6 seconds of
-// sequential HEAD->GET probe time on the slowest parallel probe, and the 10-second Wikipedia window.
-// Response bytes retain the controlled transport's hard maximum. Auto has exactly one candidate and
-// explicit fallback remains sequential because max_in_flight=1.
+// send for each logical request, so Auto's worst physical-unit envelope is 24. The 135-second
+// Auto budget covers the four-source request/retry envelope, reachability probes and Wikipedia.
+// An explicitly selected Tavily/SearXNG candidate followed by Auto adds at most one logical HTTPS
+// send (two physical units under a proxy), so ONLY opted-in fallback uses 26 and 150 seconds.
+// Both paths retain one shared deadline and max_in_flight=1 ordered router execution.
 const PRODUCTION_SEARCH_BUDGET: Duration = Duration::from_secs(135);
 const PRODUCTION_SEARCH_MAX_REQUESTS: usize = 24;
+const PRODUCTION_FALLBACK_BUDGET: Duration = Duration::from_secs(150);
+const PRODUCTION_FALLBACK_MAX_REQUESTS: usize = 26;
 const PRODUCTION_SEARCH_MAX_BYTES: usize = 1_048_576;
 const PRODUCTION_SEARCH_MAX_EXAMINED_RESULTS: usize = 20;
 const PRODUCTION_SEARCH_MAX_URL_BYTES: usize = 8192;
@@ -47,12 +49,14 @@ const PRODUCTION_SEARCH_MAX_URL_BYTES: usize = 8192;
 fn build_router_tool(
     configuration: SearchCompositionConfiguration,
     preparation_unavailable: bool,
+    explicit_auto_fallback: bool,
 ) -> Arc<dyn AgentTool> {
-    let limits = TransportLimits::new(
-        PRODUCTION_SEARCH_BUDGET,
-        PRODUCTION_SEARCH_MAX_REQUESTS,
-        PRODUCTION_SEARCH_MAX_BYTES,
-    )
+    let (duration, max_requests) = if explicit_auto_fallback {
+        (PRODUCTION_FALLBACK_BUDGET, PRODUCTION_FALLBACK_MAX_REQUESTS)
+    } else {
+        (PRODUCTION_SEARCH_BUDGET, PRODUCTION_SEARCH_MAX_REQUESTS)
+    };
+    let limits = TransportLimits::new(duration, max_requests, PRODUCTION_SEARCH_MAX_BYTES)
     .expect("static protected search transport bounds must be valid");
     let policy = SearchRouterPolicy::new(
         Duration::ZERO,
@@ -123,12 +127,22 @@ fn selected_configuration(
 pub(crate) fn production_search_router_tool_with_search_configuration(
     search: SearchToolConfiguration,
 ) -> Result<Arc<dyn AgentTool>, SearchToolConfigurationError> {
+    let explicit_auto_fallback = matches!(
+        &search,
+        SearchToolConfiguration::Tavily {
+            fallback_to_auto: true,
+            ..
+        } | SearchToolConfiguration::SearXng {
+            fallback_to_auto: true,
+            ..
+        }
+    );
     let configuration = selected_configuration(&search)?;
     match configuration.with_environment_proxy() {
-        Ok(configuration) => Ok(build_router_tool(configuration, false)),
+        Ok(configuration) => Ok(build_router_tool(configuration, false, explicit_auto_fallback)),
         Err(TransportError::UnsupportedProxy) => {
             let configuration = selected_configuration(&search)?;
-            Ok(build_router_tool(configuration, true))
+            Ok(build_router_tool(configuration, true, explicit_auto_fallback))
         }
         Err(_) => Err(SearchToolConfigurationError::TransportPolicy),
     }
@@ -150,6 +164,7 @@ mod tests {
     fn direct_production_tool() -> Arc<dyn AgentTool> {
         build_router_tool(
             SearchCompositionConfiguration::new(None).expect("direct configuration"),
+            false,
             false,
         )
     }
@@ -220,6 +235,36 @@ mod tests {
     }
 
     #[test]
+    fn optional_auto_fallback_only_expands_its_own_frozen_transport_envelope() {
+        assert!(TransportLimits::new(
+            PRODUCTION_SEARCH_BUDGET,
+            PRODUCTION_SEARCH_MAX_REQUESTS,
+            PRODUCTION_SEARCH_MAX_BYTES,
+        ).is_ok());
+        assert!(TransportLimits::new(
+            PRODUCTION_FALLBACK_BUDGET,
+            PRODUCTION_FALLBACK_MAX_REQUESTS,
+            PRODUCTION_SEARCH_MAX_BYTES,
+        ).is_ok());
+        assert!(TransportLimits::new(
+            PRODUCTION_FALLBACK_BUDGET,
+            PRODUCTION_FALLBACK_MAX_REQUESTS + 1,
+            PRODUCTION_SEARCH_MAX_BYTES,
+        ).is_err());
+        let legacy = production_search_router_tool_with_search_configuration(
+            SearchToolConfiguration::Auto,
+        ).expect("auto");
+        let explicit = production_search_router_tool_with_search_configuration(
+            SearchToolConfiguration::Tavily {
+                api_key: "fixture-key".into(),
+                fallback_to_auto: true,
+            },
+        ).expect("explicit fallback");
+        assert_eq!(legacy.name(), explicit.name());
+        assert_eq!(legacy.parameters(), explicit.parameters());
+    }
+
+    #[test]
     fn invalid_explicit_provider_configuration_fails_before_preparation() {
         assert_eq!(
             selected_configuration(&SearchToolConfiguration::Tavily {
@@ -244,6 +289,7 @@ mod tests {
         let protected = build_router_tool(
             SearchCompositionConfiguration::new(None).expect("direct configuration"),
             true,
+            false,
         );
         assert!(protected.requires_network_invocation());
         assert!(matches!(

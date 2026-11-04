@@ -20,6 +20,36 @@ fn form_fields(fields: &[(&str, &str)]) -> Vec<(String, String)> {
 }
 
 #[test]
+fn explicit_fallback_proxy_budget_reserves_optional_request_plus_full_direct_envelope() {
+    let budget = TransportBudget::new(Duration::from_secs(150), 26, 1024)
+        .expect("bounded selected override + Auto budget");
+    // One explicit HTTPS request plus twelve legacy Direct requests, each accounting for
+    // one CONNECT and one application send. All candidates share this single budget.
+    for _ in 0..13 {
+        TransportBudget::reserve(
+            &budget.attempts,
+            2,
+            budget.max_requests,
+            TransportError::RequestLimit,
+        ).expect("26 proxy units fit the selected envelope");
+    }
+    assert_eq!(budget.attempts.load(Ordering::Relaxed), 26);
+    assert_eq!(
+        TransportBudget::reserve(
+            &budget.attempts,
+            2,
+            budget.max_requests,
+            TransportError::RequestLimit,
+        ),
+        Err(TransportError::RequestLimit)
+    );
+    let auto = TransportBudget::new(Duration::from_secs(135), 24, 1024)
+        .expect("unchanged Auto budget");
+    assert_eq!(auto.max_requests, 24);
+    assert!(TransportBudget::new(Duration::from_secs(150), 27, 1024).is_err());
+}
+
+#[test]
 fn form_encoding_preserves_unicode_reserved_bytes_duplicates_empty_fields_and_order() {
     let fields = form_fields(&[("q", "中 +&=~\r\n"), ("q", "*._-"), ("", ""), ("a", "")]);
     assert_eq!(

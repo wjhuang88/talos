@@ -23,8 +23,12 @@ credential/endpoint fails **during configuration/composition**. Fallback does
 not repair invalid explicit configuration. When enabled, fallback is attempted
 only **after** a validly selected provider executes and fails, or produces no
 admissible results. A successful first candidate suppresses later candidates.
-Execution still obeys the existing shared budget, deadline and cancellation
-policy. Fallback is ordered, not a race.
+Execution still obeys one shared budget, deadline and cancellation policy.
+Auto retains the original 135-second/24-physical-request-unit limit. An explicit
+Tavily/SearXNG selection with opted-in Auto fallback uses a bounded 150-second/
+26-unit envelope to admit the optional HTTPS request plus full proxied Auto
+compatibility attempts. Fallback is ordered, not a race; deadline exhaustion
+still terminates the invocation rather than creating an unbounded retry.
 
 ## Examples
 
@@ -95,6 +99,11 @@ Do not embed usernames, passwords or tokens in URLs.
 - All selected candidates share one frozen production proxy-policy snapshot,
   including the actual transport proxy. This preserves existing proxy
   behavior; H introduces no proxy discovery, VPN or region-based routing.
+- The older public `WebSearchTool::new()` constructor is now zero-key even if
+  `TAVILY_API_KEY` or `SEARXNG_URL` are set. Its DuckDuckGo/Wikipedia compatibility
+  implementation remains available for deployment rollback; optional providers
+  require the protected explicit-selection path. This is an intentional security-
+  driven behavior migration for callers previously relying on ambient activation.
 - The model-facing `web_search` tool schema and Network permission remain
   unchanged. The existing router owns fallback, deadline, cancellation and
   typed-error semantics. The shipped `rust-websearch` compatibility
