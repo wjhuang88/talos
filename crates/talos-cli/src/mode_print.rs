@@ -22,12 +22,16 @@ use crate::mode_runtime::{
 };
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
-    build_print_tool_registry, register_explicit_permission_aware_plugins,
-    register_permission_aware_tools,
+    register_explicit_permission_aware_plugins, register_permission_aware_tools,
 };
 use crate::session_setup::{resolve_prompt, resolve_workspace_root};
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
 use crate::{Cli, build_hook_registry};
+
+#[path = "configured_registry.rs"]
+pub(crate) mod configured_registry;
+#[path = "search_configuration.rs"]
+pub(crate) mod search_configuration;
 
 pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let mut config = Config::load().context("failed to load configuration")?;
@@ -54,7 +58,9 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let prompt = resolve_prompt(cli.prompt.clone())?;
 
     let hooks = build_hook_registry(true);
-    let mut registry = build_print_tool_registry(Vec::new());
+    let search = search_configuration::project_search_configuration(&config)?;
+    let mut registry =
+        configured_registry::build_print_tool_registry_with_search(Vec::new(), search)?;
     let sched_pending = crate::registry::register_builtin_scheduler(&mut registry)?;
 
     #[cfg(debug_assertions)]

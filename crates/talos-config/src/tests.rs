@@ -95,6 +95,7 @@ fn test_api_key_from_env_anthropic() {
     unsafe { env::set_var("ANTHROPIC_API_KEY", "env-key-anthropic") };
     let config = Config {
         variant: None,
+        search: Default::default(),
         provider: "anthropic".to_string(),
         model: "claude-test".to_string(),
         providers: HashMap::new(),
@@ -163,6 +164,7 @@ fn test_api_key_from_env_openai() {
     unsafe { env::set_var("OPENAI_API_KEY", "env-key-openai") };
     let config = Config {
         variant: None,
+        search: Default::default(),
         provider: "openai".to_string(),
         model: "gpt-test".to_string(),
         providers: HashMap::new(),
@@ -189,6 +191,7 @@ fn test_api_key_from_env_openai_compat() {
     unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-style-key") };
     let config = Config {
         variant: None,
+        search: Default::default(),
         provider: "openai".to_string(),
         model: "glm-5".to_string(),
         providers: HashMap::new(),
@@ -215,6 +218,7 @@ fn test_api_key_openai_prefers_explicit_env_over_compat_env() {
     unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "bailian-key") };
     let config = Config {
         variant: None,
+        search: Default::default(),
         provider: "openai".to_string(),
         model: "gpt-4.1".to_string(),
         providers: HashMap::new(),
@@ -242,6 +246,7 @@ fn test_api_key_anthropic_does_not_check_openai_compat_env() {
     unsafe { env::set_var("OPENAI_COMPAT_API_KEY", "should-not-be-used") };
     let config = Config {
         variant: None,
+        search: Default::default(),
         provider: "anthropic".to_string(),
         model: "claude-test".to_string(),
         providers: HashMap::new(),
@@ -268,6 +273,7 @@ fn test_api_key_missing_error() {
     unsafe { env::remove_var("ANTHROPIC_API_KEY") };
     let config = Config {
         variant: None,
+        search: Default::default(),
         provider: "anthropic".to_string(),
         model: "claude-test".to_string(),
         providers: HashMap::new(),
@@ -290,6 +296,7 @@ fn test_api_key_missing_error() {
 fn test_base_url_getter() {
     let config = Config {
         variant: None,
+        search: Default::default(),
         provider: "dashscope".to_string(),
         model: "glm-5".to_string(),
         providers: HashMap::from([(
@@ -398,6 +405,7 @@ fn test_custom_provider_api_key_env() {
     unsafe { env::set_var("DASHSCOPE_API_KEY", "dashscope-key") };
     let config = Config {
         variant: None,
+        search: Default::default(),
         provider: "dashscope".to_string(),
         model: "glm-5".to_string(),
         providers: HashMap::from([(
@@ -433,6 +441,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
     // not context_limit() (user-config only).
     let builtin = Config {
         variant: None,
+        search: Default::default(),
         provider: "openai".to_string(),
         model: "gpt-4.1".to_string(),
         providers: HashMap::new(),
@@ -451,6 +460,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
 
     let custom = Config {
         variant: None,
+        search: Default::default(),
         provider: "dashscope".to_string(),
         model: "glm-5".to_string(),
         providers: HashMap::from([(
@@ -612,6 +622,7 @@ fn test_load_then_set_model_recovers_from_empty_model_on_disk() {
 fn test_provider_serialization() {
     let config_anthropic = Config {
         variant: None,
+        search: Default::default(),
         provider: "anthropic".to_string(),
         model: "test".to_string(),
         providers: HashMap::new(),
@@ -626,6 +637,7 @@ fn test_provider_serialization() {
     };
     let config_openai = Config {
         variant: None,
+        search: Default::default(),
         provider: "openai".to_string(),
         model: "test".to_string(),
         providers: HashMap::new(),

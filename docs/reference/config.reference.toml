@@ -68,6 +68,22 @@ model = "claude-sonnet-4-20250514"
 # Set enabled = false to disable the local dashboard. Set loopback_only = false
 # to require a per-process bearer token; the token is not persisted in this file.
 
+# ── Protected web_search selection (SEARCH-001-H) ───────────────────────────────
+# Omitted [search] = zero-key Auto / DuckDuckGo compatibility.
+# Optional provider credentials/endpoints NEVER select a provider by themselves.
+# [search]
+# backend = "auto"                       # "auto" | "duckduckgo" | "tavily" | "searxng"
+# fallback_to_auto = false               # Tavily/SearXNG only; ordered fallback on execution failure
+# url = "https://search.example.org"     # Required for searxng; rejected for others
+#
+# Tavily opt-in: backend = "tavily" requires a key in effective providers.tavily.api_key.
+# Recommended secret storage: ~/.talos/credentials.toml with tavily = "YOUR_KEY".
+# The H projection does not read ambient TAVILY_API_KEY or SEARXNG_URL.
+# Invalid explicit configuration fails before execution; fallback cannot repair it.
+# To roll back, remove [search] (or set backend = "auto" and omit url/fallback).
+# Full privacy, fallback, transport and compatibility contract:
+# docs/reference/SEARCH-001-H-EXPLICIT-OVERRIDES.md
+
 # ── Provider Definitions ──────────────────────────────────────────────────────
 # Each [providers.<name>] section defines a named provider.
 #

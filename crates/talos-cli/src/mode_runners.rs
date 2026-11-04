@@ -47,8 +47,7 @@ use crate::model_lifecycle::{
 };
 use crate::provider_setup::{build_provider, parse_provider};
 use crate::registry::{
-    TuiApprovalHandler, build_mcp_tool_registry, build_print_tool_registry,
-    register_explicit_permission_aware_plugins, register_permission_aware_tools,
+    TuiApprovalHandler, register_explicit_permission_aware_plugins, register_permission_aware_tools,
 };
 use crate::runtime_adapter;
 use crate::session_setup::{
@@ -164,7 +163,12 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     apply_mcp_fixture_config(&mut config, &cli);
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
-    let mut registry = build_print_tool_registry(Vec::new());
+    let search = crate::mode_print::search_configuration::project_search_configuration(&config)?;
+    let mut registry =
+        crate::mode_print::configured_registry::build_print_tool_registry_with_search(
+            Vec::new(),
+            search,
+        )?;
     let sched_pending = crate::registry::register_builtin_scheduler(&mut registry)?;
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
         talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
@@ -872,14 +876,14 @@ pub(crate) fn dashboard_failure_tip(message: &str) -> UiOutput {
 }
 
 pub(crate) async fn run_mcp_server() -> Result<()> {
-    let config_for_logging = Config::load().ok();
-    init_logger(
-        config_for_logging.as_ref().map(|config| &config.log),
-        false,
-        None,
-    );
+    let config_for_logging = Config::load().context("failed to load configuration")?;
+    init_logger(Some(&config_for_logging.log), false, None);
 
-    let tool_registry = Arc::new(build_mcp_tool_registry());
+    let search =
+        crate::mode_print::search_configuration::project_search_configuration(&config_for_logging)?;
+    let tool_registry = Arc::new(
+        crate::mode_print::configured_registry::build_mcp_tool_registry_with_search(search)?,
+    );
     let permission_engine = Arc::new(talos_permission::PermissionEngine::new());
     let hook_registry = build_hook_registry(false);
     let permission_gate = Arc::new(McpPermissionGate::new(permission_engine, hook_registry));

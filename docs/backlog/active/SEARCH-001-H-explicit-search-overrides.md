@@ -9,8 +9,8 @@
 | Story ID | SEARCH-001-H |
 | Source Issue | [#832](https://github.com/wjhuang88/talos/issues/832) |
 | Depends on | Accepted ADR-085/ADR-090; SEARCH-001-C / #643 complete at #808 merge `eb870cdf0a63f45f20d89f1a50eba276f9198643` |
-| Selected Iteration | [I314](../../iterations/I314-search-explicit-overrides.md) — Active / Claimed after this atomic activation reaches `main` |
-| Implementation PR | Not started; implementation must branch from the effective activation merge/current `main` |
+| Selected Iteration | [I314](../../iterations/I314-search-explicit-overrides.md) — Active / Claimed via #841 merge `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a` |
+| Implementation PR | #842 — Draft / in progress |
 | Last Updated | 2026-11-02 |
 
 ## Collaboration Claim
@@ -28,7 +28,7 @@
 | Authorization Evidence | On 2026-11-02 the maintainer explicitly answered `允许并行` after being told that I314 would be activated and implemented in parallel with the currently Active I310 and I313 scopes. |
 | Handoff / Release Condition | Keep I314 ownership until implementation/acceptance closeout or an explicit handoff. Existing I310/I313 ownership remains unchanged; SEARCH-001-E/F stay separately blocked because D admission did not occur. |
 
-This claim/In Progress state is a candidate while #841 is open. It becomes effective only when #841 reaches `main`; no production implementation branch may start before that merge.
+This claim is effective on `main` via #841 merge `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a`. Production implementation is owned by Draft PR #842 and remains subject to exact-head validation, review and merge-time CAS.
 
 ## Goal
 
@@ -49,7 +49,6 @@ in the environment must not silently select paid usage or change the default sea
 
 ## Constraints
 
-- Production implementation starts only after #841 reaches `main`.
 - Parallel execution with I310/I313 is explicitly maintainer-authorized; their scopes and claims remain independent and unchanged.
 - Preserve the model-facing `web_search` schema and Network permission unless separately reviewed.
 - Do not create a second generic retry/backoff/circuit-breaker system; reuse SEARCH-001-C and
@@ -83,6 +82,10 @@ in the environment must not silently select paid usage or change the default sea
 - Generic network retry/circuit-breaker redesign (NET-001/#199).
 - `rust-websearch` retirement (SEARCH-001-I).
 - A public provider lifecycle or Plugin model that conflicts with ADR-072/ADR-085.
+
+## Operator Documentation
+
+[Explicit search override configuration, privacy, fallback and rollback](../../reference/SEARCH-001-H-EXPLICIT-OVERRIDES.md) describes the additive persisted `[search]` contract. This document is an implementation artifact; acceptance/merge remains gated by I314 exact-head CI, review and CAS.
 
 ## Rollback
 

@@ -1,8 +1,8 @@
 //! Web search tool using multiple backends with race + fallback strategy.
 //!
-//! Searches DuckDuckGo by default (no API key required), with optional
-//! Tavily and SearXNG backends for enhanced results. Falls back to
-//! Wikipedia OpenSearch when all other backends fail.
+//! Dormant legacy `WebSearchTool` compatibility surface. Its public constructor is zero-key
+//! and never activates optional providers from ambient credentials or endpoints. Explicit Tavily
+//! and SearXNG selection belongs to the protected production SearchRouter composition.
 
 use std::time::Duration;
 
@@ -277,12 +277,10 @@ fn convert_rust_websearch(
 /// **Default (zero config)**: DuckDuckGo via `rust-websearch` crate.
 /// Falls back to Wikipedia OpenSearch if DuckDuckGo fails.
 ///
-/// **Optional backends** (configured via environment variables):
-/// - **Tavily**: AI-optimized search. Set `TAVILY_API_KEY` env var.
-/// - **SearXNG**: Self-hosted metasearch. Set `SEARXNG_URL` env var.
-///
-/// All available backends are queried in parallel (race). The first
-/// successful response wins.
+/// The historical optional Tavily/SearXNG implementation is retained for source-level
+/// rollback, but **this constructor never activates it from environment variables**.
+/// Explicit optional selection is available through the protected production contribution;
+/// this legacy compatibility path remains DuckDuckGo with Wikipedia fallback.
 pub struct WebSearchTool {
     duckduckgo_config: rust_websearch::SearchConfig,
     tavily_api_key: Option<String>,
@@ -292,17 +290,14 @@ pub struct WebSearchTool {
 impl WebSearchTool {
     /// Create a new [`WebSearchTool`].
     ///
-    /// Reads `TAVILY_API_KEY` and `SEARXNG_URL` from the environment
-    /// at construction time. These are optional — the tool works with
-    /// zero configuration (DuckDuckGo only).
+    /// Always zero-key: ambient optional-provider variables never affect legacy construction.
+    ///
+    /// The protected production search configuration is the sole explicit opt-in path.
     pub fn new() -> Self {
-        let tavily_api_key = std::env::var("TAVILY_API_KEY").ok();
-        let searxng_url = std::env::var("SEARXNG_URL").ok();
-
         Self {
             duckduckgo_config: rust_websearch::SearchConfig::default(),
-            tavily_api_key,
-            searxng_url,
+            tavily_api_key: None,
+            searxng_url: None,
         }
     }
 
@@ -579,6 +574,15 @@ pub(crate) fn format_wikipedia_fallback_results(
     format_admitted_results(query, results, ResultSource::Wikipedia, include_snippets)
 }
 
+/// Fixed-source display conversion for already-admitted Tavily rows, not admission.
+pub(crate) fn format_tavily_results(
+    query: &str,
+    results: Vec<SearchBackendResult>,
+    include_snippets: bool,
+) -> String {
+    format_admitted_results(query, results, ResultSource::Tavily, include_snippets)
+}
+
 /// Fixed-source display conversion for already-admitted SearXNG rows, not admission.
 pub(crate) fn format_searxng_results(
     query: &str,
@@ -687,9 +691,9 @@ impl AgentTool for WebSearchTool {
 
     fn description(&self) -> &str {
         "Search the web for current information, documentation, or answers. \
-         Uses DuckDuckGo by default (no API key needed). \
-         Optionally uses Tavily (TAVILY_API_KEY env) or SearXNG (SEARXNG_URL env) for enhanced results. \
-         Falls back to Wikipedia when other backends fail. Requires network permission."
+         Legacy zero-key DuckDuckGo path, with Wikipedia fallback. \
+         Paid and self-hosted providers require explicit selection through protected web_search. \
+         Requires network permission."
     }
 
     fn parameters(&self) -> Value {
@@ -759,6 +763,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn legacy_public_constructor_does_not_activate_optional_providers_from_environment() {
+        // Isolate the ambient variables in a child so other Rust tests never see mutations.
+        const CHILD: &str = "TALOS_SEARCH_LEGACY_ZERO_KEY_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+                .arg("--exact")
+                .arg("web_search::tests::legacy_public_constructor_does_not_activate_optional_providers_from_environment")
+                .env(CHILD, "1")
+                .env("TAVILY_API_KEY", "ambient-fixture-key")
+                .env("SEARXNG_URL", "https://ambient-search.example.invalid")
+                .output()
+                .expect("isolated environment fixture");
+            assert!(
+                output.status.success()
+                    && String::from_utf8_lossy(&output.stdout)
+                        .contains("test result: ok. 1 passed;"),
+                "isolated legacy constructor regression failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+
+        let tool = WebSearchTool::new();
+        assert!(std::env::var_os("TAVILY_API_KEY").is_some());
+        assert!(std::env::var_os("SEARXNG_URL").is_some());
+        assert!(tool.tavily_api_key.is_none());
+        assert!(tool.searxng_url.is_none());
+        let default_tool = WebSearchTool::default();
+        assert!(default_tool.tavily_api_key.is_none());
+        assert!(default_tool.searxng_url.is_none());
+    }
+
+    #[test]
     fn shared_searxng_formatter_preserves_legacy_bytes_and_utf8_boundary() {
         let snippet = format!("{}中文", "a".repeat(299));
         let legacy = [WebResult {
@@ -779,6 +816,31 @@ mod tests {
                 format_results("q\"中", &legacy, ResultSource::SearXNG, include)
             );
             assert!(output.contains("Source: SearXNG\n"));
+            assert_eq!(output.contains(&format!("{}中…", "a".repeat(299))), include);
+        }
+    }
+
+    #[test]
+    fn shared_tavily_formatter_preserves_legacy_bytes_and_utf8_boundary() {
+        let snippet = format!("{}中文", "a".repeat(299));
+        let legacy = [WebResult {
+            title: "Title".into(),
+            url: "https://example.invalid/".into(),
+            snippet: snippet.clone(),
+        }];
+        for include in [false, true] {
+            let rows = vec![SearchBackendResult {
+                backend: SearchBackendId::Tavily,
+                title: legacy[0].title.clone(),
+                url: legacy[0].url.clone(),
+                snippet: snippet.clone(),
+            }];
+            let output = format_tavily_results("q\"中", rows, include);
+            assert_eq!(
+                output,
+                format_results("q\"中", &legacy, ResultSource::Tavily, include)
+            );
+            assert!(output.contains("Source: Tavily\n"));
             assert_eq!(output.contains(&format!("{}中…", "a".repeat(299))), include);
         }
     }

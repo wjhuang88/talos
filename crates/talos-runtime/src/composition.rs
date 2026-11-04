@@ -9,7 +9,8 @@ use std::path::PathBuf;
 use talos_core::tool::SharedAtomicCreateCapability;
 use talos_core::tool::ToolContribution;
 use talos_tools::{
-    git_mutation_tool_contributions, git_read_tool_contributions, network_tool_contributions,
+    SearchToolConfiguration, SearchToolConfigurationError, git_mutation_tool_contributions,
+    git_read_tool_contributions, network_tool_contributions_with_search,
     ordinary_file_tool_contributions, read_image_tool_contribution, shell_tool_contributions,
     workspace_tool_contributions,
 };
@@ -57,6 +58,21 @@ pub fn contribution_groups(
     contribution_groups_with_capability(profile, workspace_root, None)
 }
 
+/// Selects shared contributions with one explicit protected-search configuration.
+pub fn contribution_groups_with_search(
+    profile: SharedToolProfile,
+    workspace_root: PathBuf,
+    search: SearchToolConfiguration,
+) -> Result<SharedToolContributions, SearchToolConfigurationError> {
+    contribution_groups_with_language_provider_and_search(
+        profile,
+        workspace_root,
+        None,
+        None,
+        search,
+    )
+}
+
 /// Selects shared contributions with an optional directory capability for new-file creation.
 #[cfg(feature = "shared-composition")]
 pub fn contribution_groups_with_capability(
@@ -75,9 +91,28 @@ pub fn contribution_groups_with_language_provider(
     atomic_create: Option<SharedAtomicCreateCapability>,
     language_provider: Option<talos_text::SharedLanguageProvider>,
 ) -> SharedToolContributions {
+    contribution_groups_with_language_provider_and_search(
+        profile,
+        workspace_root,
+        atomic_create,
+        language_provider,
+        SearchToolConfiguration::Auto,
+    )
+    .expect("static Auto search configuration must be valid")
+}
+
+/// Build contributions with one shared language provider and explicit protected-search intent.
+#[cfg(feature = "shared-composition")]
+pub fn contribution_groups_with_language_provider_and_search(
+    profile: SharedToolProfile,
+    workspace_root: PathBuf,
+    atomic_create: Option<SharedAtomicCreateCapability>,
+    language_provider: Option<talos_text::SharedLanguageProvider>,
+    search: SearchToolConfiguration,
+) -> Result<SharedToolContributions, SearchToolConfigurationError> {
     let image = (profile != SharedToolProfile::Mcp)
         .then(|| read_image_tool_contribution(workspace_root.clone()));
-    SharedToolContributions {
+    Ok(SharedToolContributions {
         shell: shell_tool_contributions(workspace_root.clone()),
         files: if profile == SharedToolProfile::Mcp {
             ordinary_file_tool_contributions(workspace_root.clone())
@@ -88,7 +123,7 @@ pub fn contribution_groups_with_language_provider(
             )
         },
         workspace: workspace_tool_contributions(workspace_root.clone()),
-        network: network_tool_contributions(),
+        network: network_tool_contributions_with_search(search)?,
         image,
         symbols: talos_tools::symbol_tool_contributions_with_provider(
             workspace_root.clone(),
@@ -96,7 +131,7 @@ pub fn contribution_groups_with_language_provider(
         ),
         git_read: git_read_tool_contributions(workspace_root.clone()),
         git_mutation: git_mutation_tool_contributions(workspace_root),
-    }
+    })
 }
 
 /// Builds the contribution groups shared by CLI and runtime adapters.
@@ -110,6 +145,23 @@ pub fn tool_contributions(
     workspace_root: PathBuf,
 ) -> Vec<ToolContribution> {
     let groups = contribution_groups(profile, workspace_root);
+    flatten(groups)
+}
+
+/// Builds shared contributions with an explicit protected-search configuration.
+pub fn tool_contributions_with_search(
+    profile: SharedToolProfile,
+    workspace_root: PathBuf,
+    search: SearchToolConfiguration,
+) -> Result<Vec<ToolContribution>, SearchToolConfigurationError> {
+    Ok(flatten(contribution_groups_with_search(
+        profile,
+        workspace_root,
+        search,
+    )?))
+}
+
+fn flatten(groups: SharedToolContributions) -> Vec<ToolContribution> {
     let mut contributions = groups.shell;
     contributions.extend(groups.files);
     contributions.extend(groups.workspace);
@@ -132,23 +184,21 @@ pub fn tool_contributions_with_capability(
     atomic_create: Option<SharedAtomicCreateCapability>,
 ) -> Vec<ToolContribution> {
     let groups = contribution_groups_with_capability(profile, workspace_root, atomic_create);
-    let mut contributions = groups.shell;
-    contributions.extend(groups.files);
-    contributions.extend(groups.workspace);
-    contributions.extend(groups.network);
-    if let Some(image) = groups.image {
-        contributions.push(image);
-    }
-    contributions.extend(groups.symbols);
-    contributions.extend(groups.git_read);
-    contributions.extend(groups.git_mutation);
-    contributions
+    flatten(groups)
 }
 
 /// Builds the explicit full capability inventory for an embedded runtime.
 #[must_use]
 pub fn runtime_tool_contributions(workspace_root: PathBuf) -> Vec<ToolContribution> {
     tool_contributions(SharedToolProfile::Runtime, workspace_root)
+}
+
+/// Builds the explicit full capability inventory for an embedded runtime with search intent.
+pub fn runtime_tool_contributions_with_search(
+    workspace_root: PathBuf,
+    search: SearchToolConfiguration,
+) -> Result<Vec<ToolContribution>, SearchToolConfigurationError> {
+    tool_contributions_with_search(SharedToolProfile::Runtime, workspace_root, search)
 }
 
 #[cfg(test)]
@@ -204,8 +254,6 @@ mod tests {
 
     #[test]
     fn shared_profiles_reject_uninventoried_native_operations() {
-        // Coverage inventory, never an admission allowlist. Equality between two
-        // profiles alone would miss an unreviewed addition shared by both.
         let shared = [
             "exec",
             "read",
@@ -269,6 +317,48 @@ mod tests {
         assert!(mcp.iter().any(|name| name == "read"));
         assert!(mcp.iter().any(|name| name == "write"));
         assert!(mcp.iter().any(|name| name == "document_extract"));
+    }
+
+    #[test]
+    fn explicit_search_configuration_preserves_profile_inventory() {
+        for profile in [
+            SharedToolProfile::Product,
+            SharedToolProfile::Mcp,
+            SharedToolProfile::Runtime,
+        ] {
+            let configured = contribution_groups_with_search(
+                profile,
+                PathBuf::from("workspace"),
+                SearchToolConfiguration::Tavily {
+                    api_key: "fixture-tavily-key".into(),
+                    fallback_to_auto: true,
+                },
+            )
+            .expect("configured groups");
+            let search = configured
+                .network
+                .iter()
+                .find(|contribution| contribution.name() == "web_search")
+                .expect("web_search contribution");
+            let prepared = search
+                .tool()
+                .prepare_network_invocation(&serde_json::json!({
+                    "query": "configured root evidence",
+                    "max_results": 1,
+                    "include_snippets": false
+                }))
+                .expect("protected preparation")
+                .expect("prepared invocation");
+            let hosts: Vec<_> = prepared
+                .manifest()
+                .scope()
+                .endpoints()
+                .iter()
+                .map(|endpoint| endpoint.host())
+                .collect();
+            assert!(hosts.contains(&"api.tavily.com"));
+            assert!(hosts.contains(&"lite.duckduckgo.com"));
+        }
     }
 
     #[test]

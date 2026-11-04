@@ -77,6 +77,8 @@ pub mod read_image_tool;
 pub mod save_url;
 #[cfg(feature = "network")]
 mod search_backend;
+#[cfg(feature = "network")]
+pub mod search_configuration;
 #[cfg(feature = "search")]
 pub mod search_engine;
 #[cfg(feature = "search")]
@@ -101,8 +103,6 @@ pub use browser_page::HttpBrowserPageConnector;
 pub use browser_page::{
     BrowserPageConnector, BrowserPageLink, BrowserPageRecord, MockBrowserPageConnector,
 };
-#[cfg(feature = "network")]
-pub use contributions::network_tool_contributions;
 #[cfg(feature = "image")]
 pub use contributions::read_image_tool_contribution;
 #[cfg(all(feature = "file-read", feature = "search", feature = "git"))]
@@ -118,6 +118,8 @@ pub use contributions::workspace_tool_contributions;
 pub use contributions::{bash_tool_contribution, shell_tool_contributions};
 #[cfg(feature = "git")]
 pub use contributions::{git_mutation_tool_contributions, git_read_tool_contributions};
+#[cfg(feature = "network")]
+pub use contributions::{network_tool_contributions, network_tool_contributions_with_search};
 #[cfg(all(feature = "file-read", feature = "file-write"))]
 pub use contributions::{
     ordinary_file_tool_contributions, snapshot_aware_file_tool_contributions,
@@ -164,6 +166,8 @@ pub use save_url::{SaveUrlError, SaveUrlInput, SaveUrlTool};
 pub use search_backend::integration_test::{
     SearchRouterIntegrationProbe, i293_guarded_search_router_tool_fixture,
 };
+#[cfg(feature = "network")]
+pub use search_configuration::{SearchToolConfiguration, SearchToolConfigurationError};
 #[cfg(feature = "search")]
 pub use search_tools::{GlobInput, GlobTool, GrepInput, GrepTool};
 #[cfg(feature = "file-read")]

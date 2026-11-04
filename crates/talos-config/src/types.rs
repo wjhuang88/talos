@@ -318,6 +318,54 @@ impl Default for AutoConfig {
     }
 }
 
+/// Persisted search backend selection. Optional provider availability never changes this value.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchBackendConfig {
+    /// Zero-key automatic search; currently resolves only to DuckDuckGo compatibility.
+    #[default]
+    Auto,
+    /// Explicit zero-key DuckDuckGo selection.
+    DuckDuckGo,
+    /// Explicit premium Tavily selection; credential is resolved separately.
+    Tavily,
+    /// Explicit caller-configured SearXNG selection.
+    SearXng,
+}
+
+/// Persisted web-search selection and explicit fallback policy.
+#[derive(Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(default)]
+pub struct SearchConfig {
+    /// Explicit backend intent. Defaults to zero-key Auto.
+    pub backend: SearchBackendConfig,
+    /// For Tavily/SearXNG only, attempt zero-key Auto after execution failure/no valid result.
+    pub fallback_to_auto: bool,
+    /// Explicit SearXNG base URL. Ignored nowhere: projection rejects it for other backends.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+impl Default for SearchConfig {
+    fn default() -> Self {
+        Self {
+            backend: SearchBackendConfig::Auto,
+            fallback_to_auto: false,
+            url: None,
+        }
+    }
+}
+
+impl std::fmt::Debug for SearchConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SearchConfig")
+            .field("backend", &self.backend)
+            .field("fallback_to_auto", &self.fallback_to_auto)
+            .field("url", &self.url.as_ref().map(|_| "<redacted>"))
+            .finish()
+    }
+}
+
 /// Talos configuration.
 ///
 /// Contains the model provider, model name, and optional API key.
@@ -339,6 +387,10 @@ pub struct Config {
     /// Named provider definitions.
     #[serde(default)]
     pub providers: HashMap<String, ProviderConfig>,
+
+    /// Explicit web-search backend selection and fallback policy.
+    #[serde(default)]
+    pub search: SearchConfig,
 
     /// Logging configuration.
     #[serde(default)]
@@ -384,6 +436,7 @@ impl Default for Config {
             model: String::new(),
             variant: None,
             providers: HashMap::new(),
+            search: SearchConfig::default(),
             log: LogConfig::default(),
             hooks: HookConfig::default(),
             mcp: McpConfig::default(),

@@ -1,21 +1,27 @@
 //! Production composition for the protected Talos-owned `web_search` route.
 //!
-//! This module selects only the zero-key compatibility family. Optional providers remain outside
-//! Auto selection and no ambient provider credential discovery occurs here. Supported HTTPS proxy
-//! environment state is frozen once into the prepared configuration, including the NO_PROXY route
-//! decision. The manifest exposes the sanitized proxy destination while credentials remain private.
-//! Invalid or unsupported selected proxy configuration fails closed before query preparation.
-//! Rollback is a version/deployment revert under ADR-090; this composition never falls back at
-//! runtime to the legacy opaque `WebSearchTool` execution path.
+//! Auto selects only the zero-key compatibility family. Optional providers enter the composition
+//! only through an explicit caller-supplied [`SearchToolConfiguration`]; no ambient provider
+//! credential or endpoint discovery occurs here. Supported HTTPS proxy environment state is frozen
+//! once against the complete selected endpoint set, including the NO_PROXY route decision. The
+//! manifest exposes the sanitized proxy destination while credentials remain private. Invalid or
+//! unsupported selected proxy configuration fails closed before query preparation. Rollback is a
+//! version/deployment revert under ADR-090; this composition never falls back at runtime to the
+//! legacy opaque `WebSearchTool` execution path.
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use talos_core::tool::AgentTool;
 
+use crate::search_configuration::{SearchToolConfiguration, SearchToolConfigurationError};
+
+use super::SearchBackendId;
 use super::composition::SearchCompositionConfiguration;
 use super::router::SearchRouterPolicy;
 use super::router_tool::GuardedSearchRouterTool;
+use super::selection::SearchBackendSelection;
+use super::transport::compatibility::{searxng::SearXngConfiguration, tavily::TavilyConfiguration};
 use super::transport::{TransportError, TransportLimits};
 
 // Legacy zero-key compatibility first performs parallel query-free DDG/Bing reachability probes:
@@ -27,27 +33,31 @@ use super::transport::{TransportError, TransportLimits};
 //
 // Therefore an invocation can perform at most eight query-bearing logical sends across five fixed
 // query destinations, plus four query-free probe sends. Proxied HTTPS reserves CONNECT + application
-// send for each logical request, so the worst physical-unit envelope is twenty-four. The 135-second
-// enclosing budget covers the ~106.5-second four-source request/retry envelope, up to ~6 seconds of
-// sequential HEAD->GET probe time on the slowest parallel probe, and the 10-second Wikipedia window.
-// Response bytes retain the controlled transport's hard maximum. Auto has exactly one candidate, so
-// hedge timing is unobservable; max_in_flight=1 makes that fact explicit.
+// send for each logical request, so Auto's worst physical-unit envelope is 24. The 135-second
+// Auto budget covers the four-source request/retry envelope, reachability probes and Wikipedia.
+// An explicitly selected Tavily/SearXNG candidate followed by Auto adds at most one logical HTTPS
+// send (two physical units under a proxy), so ONLY opted-in fallback uses 26 and 150 seconds.
+// Both paths retain one shared deadline and max_in_flight=1 ordered router execution.
 const PRODUCTION_SEARCH_BUDGET: Duration = Duration::from_secs(135);
 const PRODUCTION_SEARCH_MAX_REQUESTS: usize = 24;
+const PRODUCTION_FALLBACK_BUDGET: Duration = Duration::from_secs(150);
+const PRODUCTION_FALLBACK_MAX_REQUESTS: usize = 26;
 const PRODUCTION_SEARCH_MAX_BYTES: usize = 1_048_576;
 const PRODUCTION_SEARCH_MAX_EXAMINED_RESULTS: usize = 20;
 const PRODUCTION_SEARCH_MAX_URL_BYTES: usize = 8192;
 
-fn production_search_router_tool_with_configuration(
+fn build_router_tool(
     configuration: SearchCompositionConfiguration,
     preparation_unavailable: bool,
+    explicit_auto_fallback: bool,
 ) -> Arc<dyn AgentTool> {
-    let limits = TransportLimits::new(
-        PRODUCTION_SEARCH_BUDGET,
-        PRODUCTION_SEARCH_MAX_REQUESTS,
-        PRODUCTION_SEARCH_MAX_BYTES,
-    )
-    .expect("static protected search transport bounds must be valid");
+    let (duration, max_requests) = if explicit_auto_fallback {
+        (PRODUCTION_FALLBACK_BUDGET, PRODUCTION_FALLBACK_MAX_REQUESTS)
+    } else {
+        (PRODUCTION_SEARCH_BUDGET, PRODUCTION_SEARCH_MAX_REQUESTS)
+    };
+    let limits = TransportLimits::new(duration, max_requests, PRODUCTION_SEARCH_MAX_BYTES)
+        .expect("static protected search transport bounds must be valid");
     let policy = SearchRouterPolicy::new(
         Duration::ZERO,
         1,
@@ -65,22 +75,91 @@ fn production_search_router_tool_with_configuration(
     Arc::new(tool)
 }
 
-/// Builds the single production `web_search` implementation registered by Talos products.
-///
-/// Static compatibility destinations are repository-owned invariants. Proxy configuration is the
-/// only ambient input and is snapshotted here, before any query exists. A supported snapshot is
-/// carried through the prepared plan and controlled transport. An unsupported selected proxy never
-/// causes a direct fallback: the tool stays registered but preparation closes as `Unavailable`.
-pub(crate) fn production_search_router_tool() -> Arc<dyn AgentTool> {
-    match SearchCompositionConfiguration::new_production() {
-        Ok(configuration) => production_search_router_tool_with_configuration(configuration, false),
-        Err(TransportError::UnsupportedProxy) => {
-            let direct = SearchCompositionConfiguration::new(None)
-                .expect("static protected search compatibility configuration must be valid");
-            production_search_router_tool_with_configuration(direct, true)
+fn selected_configuration(
+    search: &SearchToolConfiguration,
+) -> Result<SearchCompositionConfiguration, SearchToolConfigurationError> {
+    let (selection, tavily, searxng) = match search {
+        SearchToolConfiguration::Auto => (SearchBackendSelection::Auto, None, None),
+        SearchToolConfiguration::DuckDuckGo => (
+            SearchBackendSelection::explicit(SearchBackendId::DuckDuckGo),
+            None,
+            None,
+        ),
+        SearchToolConfiguration::Tavily {
+            api_key,
+            fallback_to_auto,
+        } => {
+            let configuration = TavilyConfiguration::new(api_key)
+                .map_err(|_| SearchToolConfigurationError::InvalidTavily)?;
+            let selection = if *fallback_to_auto {
+                SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::Tavily)
+            } else {
+                SearchBackendSelection::explicit(SearchBackendId::Tavily)
+            };
+            (selection, Some(configuration), None)
         }
-        Err(error) => panic!("invalid static protected search configuration: {error}"),
+        SearchToolConfiguration::SearXng {
+            url,
+            fallback_to_auto,
+        } => {
+            let configuration = SearXngConfiguration::new(url)
+                .map_err(|_| SearchToolConfigurationError::InvalidSearXng)?;
+            let selection = if *fallback_to_auto {
+                SearchBackendSelection::explicit_with_auto_fallback(SearchBackendId::SearXng)
+            } else {
+                SearchBackendSelection::explicit(SearchBackendId::SearXng)
+            };
+            (selection, None, Some(configuration))
+        }
+    };
+
+    SearchCompositionConfiguration::selected(selection, tavily, searxng)
+        .map_err(|_| SearchToolConfigurationError::TransportPolicy)
+}
+
+/// Builds one explicitly configured protected `web_search` implementation.
+///
+/// The configuration itself establishes provider intent. Tavily credentials and SearXNG endpoints
+/// are consumed only after the corresponding explicit variant was selected. Proxy state is the only
+/// ambient input and is snapshotted once against the complete selected endpoint set before any query
+/// exists. Unsupported selected proxy policy keeps the tool registered but makes preparation fail
+/// closed; it never triggers a direct-network bypass.
+pub(crate) fn production_search_router_tool_with_search_configuration(
+    search: SearchToolConfiguration,
+) -> Result<Arc<dyn AgentTool>, SearchToolConfigurationError> {
+    let explicit_auto_fallback = matches!(
+        &search,
+        SearchToolConfiguration::Tavily {
+            fallback_to_auto: true,
+            ..
+        } | SearchToolConfiguration::SearXng {
+            fallback_to_auto: true,
+            ..
+        }
+    );
+    let configuration = selected_configuration(&search)?;
+    match configuration.with_environment_proxy() {
+        Ok(configuration) => Ok(build_router_tool(
+            configuration,
+            false,
+            explicit_auto_fallback,
+        )),
+        Err(TransportError::UnsupportedProxy) => {
+            let configuration = selected_configuration(&search)?;
+            Ok(build_router_tool(
+                configuration,
+                true,
+                explicit_auto_fallback,
+            ))
+        }
+        Err(_) => Err(SearchToolConfigurationError::TransportPolicy),
     }
+}
+
+/// Builds the default zero-key production `web_search` implementation registered by Talos products.
+pub(crate) fn production_search_router_tool() -> Arc<dyn AgentTool> {
+    production_search_router_tool_with_search_configuration(SearchToolConfiguration::Auto)
+        .expect("static protected Auto search configuration must be valid")
 }
 
 #[cfg(test)]
@@ -91,8 +170,9 @@ mod tests {
     use crate::WebSearchTool;
 
     fn direct_production_tool() -> Arc<dyn AgentTool> {
-        production_search_router_tool_with_configuration(
+        build_router_tool(
             SearchCompositionConfiguration::new(None).expect("direct configuration"),
+            false,
             false,
         )
     }
@@ -127,10 +207,107 @@ mod tests {
     }
 
     #[test]
+    fn explicit_provider_configuration_controls_scope_without_ambient_activation() {
+        let auto = selected_configuration(&SearchToolConfiguration::Auto).expect("auto");
+        assert_eq!(auto.scope().endpoints().len(), 9);
+
+        let tavily = selected_configuration(&SearchToolConfiguration::Tavily {
+            api_key: "fixture-tavily-key".into(),
+            fallback_to_auto: false,
+        })
+        .expect("tavily");
+        assert_eq!(tavily.scope().endpoints().len(), 1);
+        assert_eq!(tavily.scope().endpoints()[0].host(), "api.tavily.com");
+
+        let tavily_fallback = selected_configuration(&SearchToolConfiguration::Tavily {
+            api_key: "fixture-tavily-key".into(),
+            fallback_to_auto: true,
+        })
+        .expect("tavily fallback");
+        assert_eq!(tavily_fallback.scope().endpoints().len(), 10);
+
+        let searxng = selected_configuration(&SearchToolConfiguration::SearXng {
+            url: "https://search.example/".into(),
+            fallback_to_auto: false,
+        })
+        .expect("searxng");
+        assert_eq!(searxng.scope().endpoints().len(), 1);
+        assert_eq!(searxng.scope().endpoints()[0].host(), "search.example");
+
+        let searxng_fallback = selected_configuration(&SearchToolConfiguration::SearXng {
+            url: "https://search.example/".into(),
+            fallback_to_auto: true,
+        })
+        .expect("searxng fallback");
+        assert_eq!(searxng_fallback.scope().endpoints().len(), 10);
+    }
+
+    #[test]
+    fn optional_auto_fallback_only_expands_its_own_frozen_transport_envelope() {
+        assert!(
+            TransportLimits::new(
+                PRODUCTION_SEARCH_BUDGET,
+                PRODUCTION_SEARCH_MAX_REQUESTS,
+                PRODUCTION_SEARCH_MAX_BYTES,
+            )
+            .is_ok()
+        );
+        assert!(
+            TransportLimits::new(
+                PRODUCTION_FALLBACK_BUDGET,
+                PRODUCTION_FALLBACK_MAX_REQUESTS,
+                PRODUCTION_SEARCH_MAX_BYTES,
+            )
+            .is_ok()
+        );
+        assert!(
+            TransportLimits::new(
+                PRODUCTION_FALLBACK_BUDGET,
+                PRODUCTION_FALLBACK_MAX_REQUESTS + 1,
+                PRODUCTION_SEARCH_MAX_BYTES,
+            )
+            .is_err()
+        );
+        let legacy =
+            production_search_router_tool_with_search_configuration(SearchToolConfiguration::Auto)
+                .expect("auto");
+        let explicit = production_search_router_tool_with_search_configuration(
+            SearchToolConfiguration::Tavily {
+                api_key: "fixture-key".into(),
+                fallback_to_auto: true,
+            },
+        )
+        .expect("explicit fallback");
+        assert_eq!(legacy.name(), explicit.name());
+        assert_eq!(legacy.parameters(), explicit.parameters());
+    }
+
+    #[test]
+    fn invalid_explicit_provider_configuration_fails_before_preparation() {
+        assert_eq!(
+            selected_configuration(&SearchToolConfiguration::Tavily {
+                api_key: String::new(),
+                fallback_to_auto: true,
+            })
+            .expect_err("missing credential"),
+            SearchToolConfigurationError::InvalidTavily
+        );
+        assert_eq!(
+            selected_configuration(&SearchToolConfiguration::SearXng {
+                url: "not-a-url".into(),
+                fallback_to_auto: true,
+            })
+            .expect_err("invalid endpoint"),
+            SearchToolConfigurationError::InvalidSearXng
+        );
+    }
+
+    #[test]
     fn unsupported_proxy_configuration_stays_fail_closed() {
-        let protected = production_search_router_tool_with_configuration(
+        let protected = build_router_tool(
             SearchCompositionConfiguration::new(None).expect("direct configuration"),
             true,
+            false,
         );
         assert!(protected.requires_network_invocation());
         assert!(matches!(

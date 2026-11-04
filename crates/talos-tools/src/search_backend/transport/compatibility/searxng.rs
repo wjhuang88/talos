@@ -4,11 +4,11 @@ pub(in crate::search_backend) mod invocation;
 use super::{
     CompatibilityError, Method, PreparedTransportRequest, SearchTransport, TransportError,
     TransportResponse, Url, admission, manifest_extends_scope_without_policy_widening,
-    request_endpoint,
+    request_endpoint, scope_with_proxy,
 };
 use crate::search_backend::{
     SearchBackendId, SearchBackendResult,
-    transport::{SystemSearchDns, TransportBudget},
+    transport::{SystemSearchDns, TransportBudget, TransportProxy},
 };
 use std::sync::Arc;
 use talos_core::tool::{
@@ -20,6 +20,7 @@ use thiserror::Error;
 pub(in crate::search_backend) struct SearXngConfiguration {
     url: Url,
     scope: ToolNetworkScope,
+    proxy: Option<Arc<TransportProxy>>,
 }
 impl std::fmt::Debug for SearXngConfiguration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -48,7 +49,20 @@ impl SearXngConfiguration {
         let endpoint = request_endpoint(&url, &Method::GET)?;
         let scope = ToolNetworkScope::new_configuration(vec![endpoint], None, vec![], 0)
             .map_err(|_| TransportError::InvalidRequest)?;
-        Ok(Self { url, scope })
+        Ok(Self {
+            url,
+            scope,
+            proxy: None,
+        })
+    }
+
+    pub(in crate::search_backend) fn with_proxy(
+        mut self,
+        proxy: Option<Arc<TransportProxy>>,
+    ) -> Result<Self, TransportError> {
+        self.scope = scope_with_proxy(&self.scope, proxy.as_ref())?;
+        self.proxy = proxy;
+        Ok(self)
     }
 
     pub(in crate::search_backend) fn scope(&self) -> &ToolNetworkScope {
@@ -104,6 +118,7 @@ impl SearXngConfiguration {
             request,
             facets,
             max_results,
+            proxy: self.proxy.clone(),
         })
     }
 }
@@ -115,6 +130,9 @@ fn facets(manifest: &ToolNetworkManifest) -> Vec<ToolPermissionFacet> {
         .iter()
         .map(|endpoint| endpoint.host())
         .collect();
+    if let Some(proxy) = manifest.scope().proxy() {
+        hosts.push(proxy.host());
+    }
     hosts.sort_unstable();
     hosts.dedup();
     hosts
@@ -130,6 +148,7 @@ pub(in crate::search_backend) struct PreparedSearXng {
     request: PreparedTransportRequest,
     facets: Vec<ToolPermissionFacet>,
     max_results: u32,
+    proxy: Option<Arc<TransportProxy>>,
 }
 impl std::fmt::Debug for PreparedSearXng {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -161,8 +180,13 @@ impl PreparedSearXng {
         authority: Arc<dyn ToolNetworkAuthority>,
         budget: Arc<TransportBudget>,
     ) -> Result<admission::AdmittedCompatibilityResults, SearXngError> {
-        let transport =
-            SearchTransport::new(self.manifest, authority, budget, Arc::new(SystemSearchDns))?;
+        let transport = SearchTransport::new_with_proxy(
+            self.manifest,
+            authority,
+            budget,
+            Arc::new(SystemSearchDns),
+            self.proxy,
+        )?;
         let response = transport.execute_prepared(self.request).await?;
         finish(response, self.max_results, || transport.budget.check_live())
     }

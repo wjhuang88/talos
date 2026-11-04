@@ -119,12 +119,13 @@ impl TransportLimits {
         max_bytes: usize,
     ) -> Result<Self, TransportError> {
         let standard = duration <= Duration::from_secs(120) && (1..=16).contains(&max_requests);
-        // One exact enlarged envelope is reserved for production legacy-compatibility parity:
-        // four query-free probes, seven fixed-family query attempts and one Wikipedia fallback,
-        // with CONNECT + application-send accounting under HTTPS proxying.
+        // Two exact production envelopes: Auto's legacy compatibility path (24 units / 135s)
+        // and explicit Tavily/SearXNG followed by Auto (one extra proxied HTTPS send: 26 / 150s).
+        // Other callers retain the existing <=120s / <=16 request bound.
         let compatibility_parity = duration == Duration::from_secs(135) && max_requests == 24;
+        let explicit_auto_fallback = duration == Duration::from_secs(150) && max_requests == 26;
         if duration.is_zero()
-            || (!standard && !compatibility_parity)
+            || (!standard && !compatibility_parity && !explicit_auto_fallback)
             || !(1..=1_048_576).contains(&max_bytes)
         {
             return Err(TransportError::InvalidRequest);
@@ -399,6 +400,11 @@ impl BodyFormat {
     }
 }
 
+struct ExecutionOptions {
+    authorization: Option<reqwest::header::HeaderValue>,
+    status_only: bool,
+}
+
 fn encode_form(fields: &[(String, String)]) -> Result<Vec<u8>, TransportError> {
     encode_form_with_limit(fields, 16_384)
 }
@@ -457,6 +463,7 @@ pub(super) struct PreparedTransportRequest {
     body: Option<Vec<u8>>,
     format: BodyFormat,
     headers: Option<compatibility::headers::CompatibilityHeaders>,
+    authorization: Option<reqwest::header::HeaderValue>,
     status_only: bool,
 }
 
@@ -548,6 +555,7 @@ impl PreparedTransportRequest {
             body,
             format,
             headers: None,
+            authorization: None,
             status_only: false,
         })
     }
@@ -649,7 +657,17 @@ impl SearchTransport {
         if request.invocation_id != self.manifest.invocation_id() {
             return Err(TransportError::Unauthorized);
         }
+        // Authorization is deliberately limited to non-redirecting scopes. This check occurs
+        // before DNS or request-budget reservation, so a credential can never be replayed to a
+        // redirected endpoint even if a future caller constructs a credentialed request directly.
+        if request.authorization.is_some() && self.manifest.scope().redirect_limit() != 0 {
+            return Err(TransportError::InvalidRequest);
+        }
         self.budget.check_live()?;
+        let options = ExecutionOptions {
+            authorization: request.authorization,
+            status_only: request.status_only,
+        };
         let result = timeout_at(
             self.budget.deadline,
             self.execute_inner(
@@ -658,7 +676,7 @@ impl SearchTransport {
                 request.body,
                 request.format,
                 request.headers,
-                request.status_only,
+                options,
             ),
         )
         .await
@@ -698,7 +716,7 @@ impl SearchTransport {
         body: Option<Vec<u8>>,
         format: BodyFormat,
         headers: Option<compatibility::headers::CompatibilityHeaders>,
-        status_only: bool,
+        options: ExecutionOptions,
     ) -> Result<TransportResponse, TransportError> {
         let mut redirects = 0;
         loop {
@@ -782,8 +800,11 @@ impl SearchTransport {
             let mut request = client
                 .request(method.clone(), url.clone())
                 .header(reqwest::header::ACCEPT_ENCODING, "identity");
-            if let Some(headers) = headers {
+            if let Some(headers) = headers.as_ref() {
                 request = headers.apply(request);
+            }
+            if let Some(authorization) = options.authorization.as_ref() {
+                request = request.header(reqwest::header::AUTHORIZATION, authorization.clone());
             }
             if let Some(body) = body.as_ref() {
                 request = request
@@ -812,7 +833,7 @@ impl SearchTransport {
                 return Err(TransportError::ResponseLimit);
             }
             let status = response.status().as_u16();
-            if status_only {
+            if options.status_only {
                 return Ok(TransportResponse {
                     status,
                     body: Vec::new(),

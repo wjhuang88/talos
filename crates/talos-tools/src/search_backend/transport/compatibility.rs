@@ -14,7 +14,10 @@ pub(in crate::search_backend) mod invocation;
 pub(in crate::search_backend) mod plan;
 pub(in crate::search_backend) mod probe;
 pub(in crate::search_backend) mod searxng;
+pub(in crate::search_backend) mod tavily;
 pub(in crate::search_backend) mod wikipedia;
+
+use std::sync::Arc;
 
 use crate::search_backend::{SearchBackendId, bing_parser, ddg_parser, instant_answer};
 use talos_core::tool::ToolNetworkScope;
@@ -25,7 +28,7 @@ use admission::{AdmissionError, AdmittedCompatibilityResults};
 
 use super::{
     BodyFormat, Method, PreparedTransportRequest, SearchTransport, ToolNetworkEndpoint,
-    ToolNetworkManifest, TransportBudget, TransportError, TransportResponse, Url,
+    ToolNetworkManifest, TransportBudget, TransportError, TransportProxy, TransportResponse, Url,
     encode_form_with_limit, request_endpoint,
 };
 
@@ -33,6 +36,21 @@ use super::{
 /// The budget remains transport-owned; callers cannot replace or extend this clock.
 pub(in crate::search_backend) fn shared_budget_deadline(budget: &TransportBudget) -> Instant {
     budget.deadline
+}
+
+/// Rebuild a candidate scope with the one composition-owned proxy snapshot. All other global
+/// transport policy remains byte-for-byte equivalent to the candidate's original scope.
+pub(super) fn scope_with_proxy(
+    scope: &ToolNetworkScope,
+    proxy: Option<&Arc<TransportProxy>>,
+) -> Result<ToolNetworkScope, TransportError> {
+    ToolNetworkScope::new_configuration(
+        scope.endpoints().to_vec(),
+        proxy.map(|snapshot| snapshot.endpoint().clone()),
+        scope.private_addresses().to_vec(),
+        scope.redirect_limit(),
+    )
+    .map_err(|_| TransportError::InvalidRequest)
 }
 
 /// A shared manifest may add candidate endpoints, but it must not widen global transport policy.

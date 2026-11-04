@@ -19,6 +19,8 @@ mod env;
 mod error;
 mod protocol_resolution;
 mod protocol_signal;
+#[cfg(test)]
+mod search_config_tests;
 mod store;
 #[cfg(test)]
 mod store_finalization_tests;
@@ -47,7 +49,7 @@ pub use types::{
     AutoConfig, Config, ConfigUnsetOutcome, DashboardConfig, HookConfig, HookDeclaration,
     LogConfig, LogFileConfig, LogFormat, LogRotation, McpConfig, McpServerConfig,
     MemoryPromptConfig, ModelConfig, ProviderConfig, ProviderProtocol, ProviderTimeoutConfig,
-    ReasoningEffort, ReasoningOptions, RpcConfig, SkillConfig,
+    ReasoningEffort, ReasoningOptions, RpcConfig, SearchBackendConfig, SearchConfig, SkillConfig,
 };
 
 pub use builtin::builtin_provider_config;

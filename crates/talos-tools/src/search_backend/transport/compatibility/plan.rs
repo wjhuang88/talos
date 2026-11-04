@@ -1,5 +1,5 @@
 //! Dormant compatibility configuration and its owned approval/execution plan.
-//! Production may freeze one environment proxy at construction; no runtime ambient selection.
+//! Production may freeze one environment proxy at composition construction; no runtime ambient selection.
 
 use std::sync::Arc;
 
@@ -17,14 +17,15 @@ use super::{
     chain::{CompatibilityChainError, ORDER, PreparedCompatibilityChain},
     manifest_extends_scope_without_policy_widening,
     probe::PreparedReachabilityProbes,
+    scope_with_proxy,
     wikipedia::PreparedWikipediaSearch,
 };
 use crate::search_backend::transport::{
     SearchTransport, SystemSearchDns, TransportBudget, TransportProxy,
 };
 
-/// Store once per compatibility configuration. Production freezes ambient proxy state here rather
-/// than consulting environment variables while preparing or executing a query.
+/// Store once per compatibility configuration. Any ambient proxy is frozen by the owning
+/// composition and injected here before query preparation or execution.
 pub(in crate::search_backend) struct DirectCompatibilityConfiguration {
     scope: ToolNetworkScope,
     proxy: Option<Arc<TransportProxy>>,
@@ -38,33 +39,24 @@ impl std::fmt::Debug for DirectCompatibilityConfiguration {
 
 impl DirectCompatibilityConfiguration {
     pub(in crate::search_backend) fn new() -> Result<Self, TransportError> {
-        Self::build(false)
-    }
-
-    pub(in crate::search_backend) fn new_with_environment_proxy() -> Result<Self, TransportError> {
-        Self::build(true)
-    }
-
-    fn build(snapshot_environment_proxy: bool) -> Result<Self, TransportError> {
         let mut endpoints = ORDER
             .iter()
             .map(|protocol| protocol.destination())
             .collect::<Result<Vec<_>, _>>()?;
         endpoints.extend(super::probe::destinations()?);
         endpoints.push(super::wikipedia::destination()?);
-        let proxy = if snapshot_environment_proxy {
-            TransportProxy::from_environment(&endpoints)?
-        } else {
-            None
-        };
-        let scope = ToolNetworkScope::new_configuration(
-            endpoints,
-            proxy.as_ref().map(|proxy| proxy.endpoint().clone()),
-            vec![],
-            0,
-        )
-        .map_err(|_| TransportError::InvalidRequest)?;
-        Ok(Self { scope, proxy })
+        let scope = ToolNetworkScope::new_configuration(endpoints, None, vec![], 0)
+            .map_err(|_| TransportError::InvalidRequest)?;
+        Ok(Self { scope, proxy: None })
+    }
+
+    pub(in crate::search_backend) fn with_proxy(
+        mut self,
+        proxy: Option<Arc<TransportProxy>>,
+    ) -> Result<Self, TransportError> {
+        self.scope = scope_with_proxy(&self.scope, proxy.as_ref())?;
+        self.proxy = proxy;
+        Ok(self)
     }
 
     pub(in crate::search_backend) fn scope(&self) -> &ToolNetworkScope {

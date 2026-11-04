@@ -19,11 +19,11 @@
 | Governance Claim PR | #841 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly answered `允许并行` on 2026-11-02 after the activation gate was explained as I314 running concurrently with the currently Active I310 and I313 scopes. |
-| Implementation PR | Not started; branch only after #841 is effective on `main` |
+| Implementation PR | #842 — Draft / in progress |
 | Last Updated | 2026-11-02 |
 | Handoff / Release Condition | Keep the claim until SEARCH-001-H implementation and acceptance closeout or an explicit handoff. Parallel I310/I313 ownership is retained unchanged. |
 
-This Claimed/Active state is a candidate while #841 is open. It becomes effective only on target-branch merge under `docs/sop/AGENT-COLLABORATION.md`; no production implementation branch may start before that gate.
+This Claimed/Active state is effective on `main` via #841 merge `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a`. Production implementation is now owned by Draft PR #842; no completion or acceptance is implied until its full I314 gates pass.
 
 ## Published Baseline
 
@@ -110,14 +110,14 @@ This Claimed/Active state is a candidate while #841 is open. It becomes effectiv
 
 ## Nonterminal Iteration Inventory And Disposition — 2026-11-02 Activation Preflight
 
-Target-branch truth was rechecked immediately before this activation candidate from `main` `069c5da196e492bd8120cc45f50e45438dd19423`:
+Target-branch truth was rechecked immediately before activation from `main` `069c5da196e492bd8120cc45f50e45438dd19423`:
 
-- I313 / T5 remains effective `Active / Claimed`; implementation PR #837 is still Draft/Open, currently based on the I314 planning merge and owned independently.
-- I310 / PROVIDER-008-B Gemini remains effective `Active / Claimed`; implementation PR #838 is still Draft/Open and independently owned.
-- I302 / TEST-003 and I277 / DESKTOP-001-D3 remain Review/Claimed; their deferred evidence/acceptance work is unchanged.
-- I249 remains Planned and I164 remains Paused; neither scope transfers to I314.
-- SEARCH-001-C/I293 and SEARCH-001-D/I294 remain Complete/Closed. D closed with BLOCKED / ZERO-ADMISSION, so E/F remain unauthorized.
-- No other branch or target-branch record claims SEARCH-001-H / I314 implementation ownership.
+- I313 / T5 remained effective `Active / Claimed`; implementation PR #837 was Draft/Open and independently owned.
+- I310 / PROVIDER-008-B Gemini remained effective `Active / Claimed`; implementation PR #838 was Draft/Open and independently owned.
+- I302 / TEST-003 and I277 / DESKTOP-001-D3 remained Review/Claimed; their deferred evidence/acceptance work was unchanged.
+- I249 remained Planned and I164 remained Paused; neither scope transferred to I314.
+- SEARCH-001-C/I293 and SEARCH-001-D/I294 remained Complete/Closed. D closed with BLOCKED / ZERO-ADMISSION, so E/F remain unauthorized.
+- No other branch or target-branch record claimed SEARCH-001-H / I314 implementation ownership.
 
 I314 is non-overlapping with I310/I313. On 2026-11-02 the maintainer explicitly authorized parallel execution after being told that this would activate and implement I314 concurrently with those Active iterations. That authorization satisfies the plan's explicit-parallel activation path; it does not transfer, weaken, or merge the existing I310/I313 claims.
 
@@ -126,12 +126,33 @@ I314 is non-overlapping with I310/I313. On 2026-11-02 the maintainer explicitly 
 | Date | Type | Record |
 |---|---|---|
 | 2026-11-02 | Planning | I314 selected for SEARCH-001-H as Planned / Unclaimed only. Existing Active/Review/Planned inventory retained; no claim or implementation authority established. |
-| 2026-11-02 | Parallel authorization | Maintainer explicitly answered `允许并行` after I314's concurrent activation with I310/I313 was explained. Atomic claim+activation is #841; authority becomes effective only when #841 merges. |
+| 2026-11-02 | Parallel authorization | Maintainer explicitly answered `允许并行` after I314's concurrent activation with I310/I313 was explained. |
+| 2026-11-02 | Activation | #841 passed exact-head CI3756 / run `41439465737`, both governance validators, exact-head Agent review and CAS; merged as `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a`. I314 became effective Active / Claimed. |
+| 2026-11-02 | Implementation | Draft PR #842 opened from the activation merge. Initial bounded stage prepares redacted/sensitive credential-header ownership inside the controlled search transport without activating Tavily or changing Auto selection. |
 
 ## Verification Evidence
 
-- #841 is governance-only; no runtime/configuration code, tests, dependency changes or public API changes are included.
-- Before #841 merge: both governance validators, exact-head CI, review and merge-time CAS are required.
+### 2026-11-04 implementation evidence — pending full acceptance
+
+- Current candidate implementation commit: `8f065c962d0f05ea6e83489b4f3ceb19430886b7` on PR #842 (Draft; not merged). This is **not a Completion Commit**.
+- Latest effective main last verified for this checkpoint: `261602242e49e6f921f5d3e4eac96eebbe92f8b3`. Historical safety archive `archive/i314-pre-main-sync-20261103` remains unmodified.
+- Earlier CI3797 / run `41663411803` exposed three `talos-tools` Clippy findings and twelve missing exhaustive `Config.search` test initializers; all corrected in `464c51dea426f9ebc9b7ff53f0139f5ad8390a10`.
+- CI3798 / run `41745290734` exposed three stale CLI registry symbols under `-D warnings`; current candidate reuses the old MCP status tool and preserves compatibility wrappers.
+- **Independent, source-equivalent binary acceptance:** isolated run `41746957277` on the exact candidate source plus a temporary diagnostic workflow succeeded. Its temporary workflow was removed after use and never entered PR #842.
+- Acceptance command chain:
+  `cargo clippy --workspace --locked -- -D warnings` — **success**;
+  `cargo test -p talos-config --locked --lib` — **268 passed, zero failed**;
+  `cargo build -p talos-cli --locked` — **success**;
+  `python3 scripts/accept_search_overrides.py target/debug/talos` — **success**.
+- Actual `talos --mock --print --no-init --no-context` fixture transcript: `SEARCH_OVERRIDE_E2E auto_with_ambient_optional_values PASS`; `tavily_missing_explicit_credential_fail_closed PASS`; `tavily_explicit_stored_credential PASS`; `searxng_missing_explicit_endpoint_fail_closed PASS`; `searxng_explicit_endpoint PASS`; `rollback_auto_with_persisted_optional_credential PASS`.
+- This confirms real print-mode persisted-config loading and registry construction **without** invoking a search query or consuming paid provider quota. It complements the selected-candidate/transport/permission/router unit fixtures, not an actual external-provider live integration claim.
+- CI3799/run `41746709995` passed **all eight exact-head checks** on `8f065c962d0f05ea6e83489b4f3ceb19430886b7`; this is historical, not acceptance evidence for any later changed head.
+- Independent Copilot review [PR #842 comment 6619286884](https://github.com/wjhuang88/talos/pull/842#issuecomment-6619286884) found two issues: a 24 vs 26 proxied request-unit envelope for explicit + Auto fallback, and ambient optional-provider selection in the legacy public constructor. The subsequent unmerged candidate corrects both and adds regression coverage; renewed exact-head CI/review are required.
+- **Pending gates**: exact-head full CI and independent read-only security/API re-review after these corrections, latest-main/owner/review-thread CAS and merge authorization.
+- Operator contract and rollback: `docs/reference/SEARCH-001-H-EXPLICIT-OVERRIDES.md`. No native Mwmbl/Purili admission or SEARCH-001-E/F authorization, no `rust-websearch` removal.
+
+- Activation: #841 merge `c2d8b441c809c5b2e5cf74d2513d8cc8534a753a`; CI3756/run `41439465737` success; both governance validators zero warnings; exact-head Copilot gate review approved.
+- Implementation: #842 is Draft; exact-head implementation validation remains in progress and no stage is accepted merely by publication.
 
 ## Completion Evidence
 
@@ -140,12 +161,12 @@ I314 is non-overlapping with I310/I313. On 2026-11-02 the maintainer explicitly 
 
 ## Variance And Residuals
 
-- Implementation has not started; the effective claim begins only after #841 reaches `main`.
+- Production implementation is active in Draft PR #842; full I314 acceptance remains pending.
 - I310/I313 remain independently Active/Claimed under explicit maintainer-authorized parallel execution.
-- No runtime/configuration code, tests, dependencies or public API are changed by this activation record.
+- SEARCH-001-E/F, Mwmbl/Purili admission and `rust-websearch` removal remain outside I314 authority.
 
 ## Retrospective
 
 - Outcome: pending
-- Documentation: activation owner only until implementation begins
+- Documentation: owner/iteration synchronized to Draft PR #842
 - Lessons: explicit parallel authorization keeps non-overlapping work moving without weakening ownership boundaries.
