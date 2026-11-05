@@ -20,6 +20,56 @@ fn memory_allocation_probe_child() {
 
 #[cfg(feature = "shell")]
 #[tokio::test]
+async fn background_memory_override_denies_real_allocation() {
+    use talos_core::background_job::{BackgroundJobLauncher, BackgroundProcessEvent};
+    let root = tempfile::tempdir().expect("workspace");
+    let executable = std::env::current_exe().expect("test executable");
+    let launcher = super::super::WindowsBackgroundLauncher::new(
+        executable.to_string_lossy().into_owned(),
+        vec![
+            "--exact".into(),
+            "process_boundary::windows_foreground::tests::memory_allocation_probe_child".into(),
+            "--nocapture".into(),
+        ],
+        root.path().to_path_buf(),
+        std::collections::BTreeMap::from([("TALOS_MEMORY_ALLOCATION_CHILD".into(), "1".into())]),
+    )
+    .with_memory_policy(
+        crate::process_memory::ProcessMemoryPolicy::resolve(Some(128), Default::default())
+            .expect("policy"),
+    );
+    let mut launched = Box::new(launcher).launch().await.expect("background child");
+    let result = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut output = Vec::new();
+        while let Some(event) = launched.events.recv().await {
+            match event {
+                BackgroundProcessEvent::Output(chunk) => {
+                    if output.len() + chunk.bytes.len() > 16384 {
+                        return Err("probe output exceeded bound".to_owned());
+                    }
+                    output.extend_from_slice(&chunk.bytes);
+                }
+                BackgroundProcessEvent::Exited(exit) => return Ok((exit.success, output)),
+                BackgroundProcessEvent::SupervisionFailed(error) => return Err(error),
+            }
+        }
+        Err("missing background exit evidence".to_owned())
+    })
+    .await;
+    launched
+        .control
+        .force_terminate()
+        .await
+        .expect("Job cleanup");
+    let (success, output) = result
+        .expect("bounded background probe")
+        .expect("background evidence");
+    assert!(success, "{}", String::from_utf8_lossy(&output));
+    assert!(String::from_utf8_lossy(&output).contains("windows-bounded-allocation-denied"));
+}
+
+#[cfg(feature = "shell")]
+#[tokio::test]
 async fn job_memory_policy_denies_real_allocation() {
     let root = tempfile::tempdir().expect("workspace");
     let executable = std::env::current_exe().expect("test executable");

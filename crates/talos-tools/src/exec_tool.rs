@@ -1311,6 +1311,62 @@ fn is_sensitive_env_name(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    #[test]
+    fn windows_memory_step_probe() {
+        let Some(expected) = std::env::var_os("TALOS_MEMORY_STEP_ALLOCATION") else {
+            return;
+        };
+        // Pipeline consumers must drain the preceding test harness output.
+        let mut input = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut input).expect("pipeline input");
+        let mut allocation = Vec::<u8>::new();
+        let allowed = allocation.try_reserve_exact(192 * 1024 * 1024).is_ok();
+        assert_eq!(allowed, expected == "allowed");
+        println!(
+            "memory-step-allocation={}",
+            if allowed { "allowed" } else { "denied" }
+        );
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_memory_inheritance_and_override_reach_composed_children() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let executable = std::env::current_exe().expect("test executable");
+        let inherited = serde_json::json!({
+            "command":executable,
+            "args":["--exact","exec_tool::tests::windows_memory_step_probe","--nocapture","--test-threads=1"],
+            "env":{"TALOS_MEMORY_STEP_ALLOCATION":"denied"}
+        });
+        let mut overridden = inherited.clone();
+        overridden["memory_limit_mib"] = serde_json::json!(256);
+        overridden["env"]["TALOS_MEMORY_STEP_ALLOCATION"] = serde_json::json!("allowed");
+        for mode in ["sequential", "parallel"] {
+            for pipes in [false, true] {
+                let mut request = serde_json::json!({"mode":mode,"memory_limit_mib":128});
+                if pipes {
+                    request["pipes"] = serde_json::json!([
+                        {"steps":[inherited.clone(),overridden.clone()]},
+                        {"steps":[overridden.clone(),inherited.clone()]}
+                    ]);
+                } else {
+                    request["steps"] = serde_json::json!([inherited.clone(), overridden.clone()]);
+                }
+                let result = tool.execute(request).await;
+                assert!(!result.is_error, "{mode} pipes={pipes}: {}", result.content);
+                assert!(result.content.contains("memory-step-allocation=allowed"));
+                assert!(result.content.contains("memory-step-allocation=denied"));
+            }
+        }
+        let receipt = tool.cleanup_receipt().expect("aggregate owner");
+        receipt.seal();
+        receipt
+            .wait(Duration::from_secs(5))
+            .await
+            .expect("all composed children cleaned");
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn pipeline_timeout_retains_output_and_confirms_cleanup_before_return() {
