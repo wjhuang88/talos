@@ -12,19 +12,19 @@
 
 | Responsibility | Actual module | Current status |
 |---|---|---|
-| Tool factory, explicit configuration, one router invocation | `src/search_backend/production.rs`, `router_tool.rs`, `selection.rs` | Production-owned; Auto zero-key, premium/self-hosted opt-in |
-| Request validation and invocation-bound network authority | `src/search_backend/{composition,prepared_invocation}.rs`, `transport.rs` | Talos-owned ADR-090 scope |
-| Four internal source request shapes | `src/search_backend/transport/compatibility.rs` | Lite POST, Instant Answer GET, HTML GET, Bing CN GET |
-| Four-source fallback order | `src/search_backend/transport/compatibility/chain.rs` | Lite → Instant Answer → HTML → Bing CN; 15s per-source, bounded network retry + 500ms wait |
-| Query-free reachability and TTL | `src/search_backend/transport/compatibility/probe.rs` | Request-time HEAD then conditional GET; 3s timeout, 30s cache; no startup traffic |
-| Result normalization and URL guards | `src/search_backend/transport/compatibility/admission.rs` | Talos-owned |
-| Search response formats | `src/search_backend/{ddg_parser,instant_answer,bing_parser}.rs` | Talos-owned parser, bounded bytes/fields/results |
-| Final compatibility knowledge fallback | `src/search_backend/transport/compatibility/wikipedia.rs` | Wikipedia OpenSearch; **not** a general web provider |
-| Proxy/permission/deadline protection | `src/search_backend/transport.rs`, `src/search_backend/production.rs` | Shared budget, prepared transport; Auto 135s/24 physical units; opt-in explicit-plus-Auto 150s/26 |
-| Behavior equivalence | `src/search_backend/transport/compatibility/chain/legacy_parity_tests.rs` | Includes actual `WebSearchTool` vs protected path query-recipient sequence tests |
-| Dormant rollback | `src/web_search.rs` | Uses upstream `rust_websearch::search()` and `rust_websearch::SearchConfig`; **not** called by protected production factory |
+| Tool factory, explicit configuration, one router invocation | `crates/talos-tools/src/search_backend/production.rs`, `router_tool.rs`, `selection.rs` | Production-owned; Auto zero-key, premium/self-hosted opt-in |
+| Request validation and invocation-bound network authority | `crates/talos-tools/src/search_backend/{composition,prepared_invocation}.rs`, `transport.rs` | Talos-owned ADR-090 scope |
+| Four internal source request shapes | `crates/talos-tools/src/search_backend/transport/compatibility.rs` | Lite POST, Instant Answer GET, HTML GET, Bing CN GET |
+| Four-source fallback order | `crates/talos-tools/src/search_backend/transport/compatibility/chain.rs` | Lite → Instant Answer → HTML → Bing CN; 15s per-source, bounded network retry + 500ms wait |
+| Query-free reachability and TTL | `crates/talos-tools/src/search_backend/transport/compatibility/probe.rs` | Request-time HEAD then conditional GET; 3s timeout, 30s cache; no startup traffic |
+| Result normalization and URL guards | `crates/talos-tools/src/search_backend/transport/compatibility/admission.rs` | Talos-owned |
+| Search response formats | `crates/talos-tools/src/search_backend/{ddg_parser,instant_answer,bing_parser}.rs` | Talos-owned parser, bounded bytes/fields/results |
+| Final compatibility knowledge fallback | `crates/talos-tools/src/search_backend/transport/compatibility/wikipedia.rs` | Wikipedia OpenSearch; **not** a general web provider |
+| Proxy/permission/deadline protection | `crates/talos-tools/src/search_backend/transport.rs`, `crates/talos-tools/src/search_backend/production.rs` | Shared budget, prepared transport; Auto 135s/24 physical units; opt-in explicit-plus-Auto 150s/26 |
+| Behavior equivalence | `crates/talos-tools/src/search_backend/transport/compatibility/chain/legacy_parity_tests.rs` | Includes actual `WebSearchTool` vs protected path query-recipient sequence tests |
+| Dormant rollback | `crates/talos-tools/src/web_search.rs` | Uses upstream `rust_websearch::search()` and `rust_websearch::SearchConfig`; **not** called by protected production factory |
 
-All relative paths above start in `crates/talos-tools/`.
+Paths above are repository-root-relative; production source files are under `crates/talos-tools/`.
 
 The production protected chain already **ported the method**; a second port of the coordinator
 would create competing routing/caching/budget semantics and is not justified.
@@ -33,13 +33,13 @@ would create competing routing/caching/budget semantics and is not justified.
 
 | Production call site | Upstream symbol | Suggested private target |
 |---|---|---|
-| `src/search_backend/ddg_parser.rs` | `html_utils::clean_html`, `html_utils::resolve_duckduckgo_url` | `search_backend/compatibility_helpers::html` |
-| `src/search_backend/bing_parser.rs` | `html_utils::clean_html` | same |
-| `src/search_backend/instant_answer.rs` | `html_utils::decode_html_entities` | same |
-| `src/search_backend/transport/compatibility.rs` | `anti_detection::random_user_agent` | `search_backend/compatibility_helpers::user_agent` |
-| `src/search_backend/transport/compatibility/chain.rs` | `anti_detection::random_user_agent` | same |
+| `crates/talos-tools/src/search_backend/ddg_parser.rs` | `html_utils::clean_html`, `html_utils::resolve_duckduckgo_url` | `search_backend/compatibility_helpers::html` |
+| `crates/talos-tools/src/search_backend/bing_parser.rs` | `html_utils::clean_html` | same |
+| `crates/talos-tools/src/search_backend/instant_answer.rs` | `html_utils::decode_html_entities` | same |
+| `crates/talos-tools/src/search_backend/transport/compatibility.rs` | `anti_detection::random_user_agent` | `search_backend/compatibility_helpers::user_agent` |
+| `crates/talos-tools/src/search_backend/transport/compatibility/chain.rs` | `anti_detection::random_user_agent` | same |
 
-Historical rollback and parity calls stay under `src/web_search.rs` and test modules.
+Historical rollback and parity calls stay under `crates/talos-tools/src/web_search.rs` and test modules.
 Thus K1 **does not remove the Cargo dependency or prove default-build dependency independence**.
 A full build-graph replacement requires a separately gated later decision under SEARCH-001-I.
 
