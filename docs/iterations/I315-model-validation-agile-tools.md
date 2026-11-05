@@ -1,5 +1,33 @@
 # Iteration I315: Model Validation And Read-Only Agile Tools
 
+## Completion — 2026-11-05
+
+Completion Commit: `add669403734d4e2469eb479939066f57027c74d` (implementation PR #847).
+
+T1 is Complete. Exact-head CI `41849101811` passed all eight jobs on
+`d1b3c8e4fd1cd96de4d3f1b6b3e0285a90903cbd`, including native Windows workspace
+tests and all seven explicitly enumerated validation lifecycle regressions.
+Local standard preflight 5343 passed workspace check, warnings-denied Clippy,
+workspace tests and both independent SDK modes. Independent API/process-security
+review is PR comment `6633437001`; merge CAS is `6646259887`. PR #847 merged
+2026-11-05 at 00:36:41 UTC. Historical checkpoints below do not override this state.
+
+Delivered: host-bound agile summary and fixed-profile validation in shared product
+composition; exact prepared permission consumption; bounded owned Unix/Windows
+execution and operation cleanup; CLI migration; strict applicability/schema;
+README and SDK/API migration documentation. Tests cover real denied admission,
+approved Runtime dispatch with a harmless Cargo executable fixture, cancellation,
+output overflow, startup failure, independent invocation cleanup, and native Windows
+launch/preparation ownership. The fixture is not a live production Cargo build.
+
+Limits remain explicit: descriptions guide model intent rather than implementing
+a deterministic language router; non-Rust language detection does not invent host
+adapters; Unix owned groups do not guarantee hostile tree containment; kernel calls
+cannot be hard-interrupted; Desktop coverage uses shared composition/native CI,
+not manual GUI acceptance. ADR-097 API removal ships only with the next minor,
+not a 0.10 patch; this closure authorizes no release. T6 remains unimplemented and
+the full handoff remains Active.
+
 ## Current validation checkpoint — 2026-11-04
 
 Rebase completed onto `9ba327728` with reviewed CLI/Runtime conflict resolution.
@@ -417,7 +445,7 @@ requested before updating their baseline; no blind hash refresh. The push fixtur
 is rerunning with approved unsandboxed process observation. SDK gates were not
 reached. Full T1 remains open.
 
-> Document status: Active (#845 merged as 261602242e49e6f921f5d3e4eac96eebbe92f8b3)
+> Document status: Complete (#847 merged; implementation evidence above)
 > Published plan date: 2026-11-03
 > Planned objective: complete handoff T1 using shared validation and supported read-only governance services.
 > Baseline rule: preserve all published acceptance; no completion by documentation alone.
@@ -427,7 +455,7 @@ reached. Full T1 remains open.
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 handoff closure session |
 | Work Slice | VALIDATION-003 / handoff T1: shared model validation and read-only agile tools, CLI/Runtime host composition, bounded Unix/Windows execution and acceptance |
@@ -437,7 +465,7 @@ reached. Full T1 remains open.
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized full ordered handoff delivery; independent API/process-security review, exact-head CI, validators and CAS required |
 | Implementation PR | #847 |
-| Last Updated | 2026-11-04 |
+| Last Updated | 2026-11-05 |
 | Handoff / Release Condition | Claim and activation effective only after finalized governance PR merges; no release authority |
 
 ## Published Baseline

@@ -39,7 +39,7 @@ inherit built-in identity from a replaced tool. Cleanup owners from replaced
 instances remain retained for runtime shutdown. The coding preset only fills
 missing tool names and preserves explicit registrations.
 
-### Project validation tools (I315 candidate, next minor)
+### Project validation tools (I315 merged, next minor)
 
 Shared composition binds project tool discovery to `workspace_root`. A governance
 manifest, or any two canonical Board/iteration-index/backlog files, enables the
@@ -76,8 +76,11 @@ await `run_validation_plan_with_executor` with an admitted, bounded executor and
 retained cleanup ownership. Synchronous embedders own a Tokio runtime at their
 application boundary; conversation creates no hidden runtime or process runner.
 The trait does not enforce third-party executor correctness or grant permissions.
-I315 native Windows, full SDK/preflight and merge gates remain pending; local
-registration tests do not establish full product acceptance.
+I315 implementation merged in #847 as `add669403734d4e2469eb479939066f57027c74d`.
+Exact-head CI `41849101811` passed all eight jobs, including native Windows;
+standard preflight passed both SDK modes. Independent API/process-security review
+and merge CAS passed. See the I315 owner for fixture and platform limits; this
+evidence does not authorize a 0.10 patch release of the breaking API migration.
 
 ### Re-exported Protocol Types (actual `pub use` in `talos-runtime`)
 
