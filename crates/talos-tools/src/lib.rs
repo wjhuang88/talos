@@ -75,6 +75,8 @@ pub mod image_validation;
     all(windows, feature = "project-management")
 ))]
 mod process_boundary;
+#[cfg(feature = "shell")]
+mod process_memory;
 #[cfg(feature = "project-management")]
 pub mod project_management;
 #[cfg(feature = "image")]

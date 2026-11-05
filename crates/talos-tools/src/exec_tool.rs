@@ -56,6 +56,10 @@ pub enum ExecError {
 /// Input parameters for [`ExecTool`].
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct ExecInput {
+    /// Per-process memory policy in MiB (64..=65536); omission uses 2048 MiB.
+    #[serde(default, deserialize_with = "crate::process_memory::deserialize_limit")]
+    #[schemars(with = "u64", range(min = 64, max = 65536))]
+    pub memory_limit_mib: Option<u64>,
     /// Program name or path to execute directly in single-command mode.
     #[serde(default)]
     pub command: Option<String>,
@@ -89,6 +93,10 @@ pub struct ExecInput {
 /// One direct argv-style execution step.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct ExecStep {
+    /// Per-process memory policy in MiB; omission inherits the request policy.
+    #[serde(default, deserialize_with = "crate::process_memory::deserialize_limit")]
+    #[schemars(with = "u64", range(min = 64, max = 65536))]
+    pub memory_limit_mib: Option<u64>,
     /// Program name or path to execute directly.
     pub command: String,
     /// Arguments passed as argv elements. No shell parsing is performed.
@@ -241,6 +249,7 @@ impl ExecTool {
         }
 
         let step = ExecStep {
+            memory_limit_mib: input.memory_limit_mib,
             command: input.command.clone().unwrap_or_default(),
             args: input.args.clone(),
             cwd: input.cwd.clone(),
@@ -1091,6 +1100,29 @@ fn is_sensitive_env_name(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn memory_policy_parser_checks_request_step_and_pipeline_fields() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        for value in [
+            serde_json::json!(null),
+            serde_json::json!(63),
+            serde_json::json!(65537),
+            serde_json::json!(64.5),
+        ] {
+            for input in [
+                serde_json::json!({"command":"echo", "memory_limit_mib":value}),
+                serde_json::json!({"steps":[{"command":"echo", "memory_limit_mib":value}]}),
+                serde_json::json!({"pipes":[{"steps":[{"command":"echo"},{"command":"echo", "memory_limit_mib":value}]}]}),
+            ] {
+                assert!(tool.parse_input(input).is_err());
+            }
+        }
+        let input = tool.parse_input(serde_json::json!({"memory_limit_mib":4096, "steps":[{"command":"echo"},{"command":"echo", "memory_limit_mib":64}]})).unwrap();
+        assert_eq!(input.memory_limit_mib, Some(4096));
+        assert_eq!(input.steps[0].memory_limit_mib, None);
+        assert_eq!(input.steps[1].memory_limit_mib, Some(64));
+    }
+
     use super::*;
     use talos_core::tool::ToolResourceKind;
     use tempfile::TempDir;

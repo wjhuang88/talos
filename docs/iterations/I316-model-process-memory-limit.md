@@ -80,3 +80,19 @@ API/native-security design review approved the complete contract on 2026-11-05,
 including explicit inheritance and pre-exec safe evidence requirements. Exact-head
 protected review and CI remain required. No code implementation, tests or Completion
 Commit exists. Full handoff remains Active.
+
+### Local implementation checkpoint — 2026-11-05
+
+Claim #854 merged as `18aa4a58f269b441ff8df7cc030352c718f7e60a` after
+exact-head CI `41947908272` (four applicable jobs successful; native jobs skipped
+for documentation scope), independent protected review comment `6646977525`, and
+merge CAS comment `6647020075`. Implementation starts from this effective merge.
+
+Local, unpublished work adds strict optional memory fields to BashInput, ExecInput
+and ExecStep, plus a typed policy preserving explicit request inheritance. The
+locked shell-feature policy unit tests passed; the two actual tool-parser regressions
+passed with `cargo test -p talos-tools --locked --features shell --lib memory_`.
+These are parsing/policy tests only: final launch owners, native enforcement,
+visible evidence, permission-proof regression, full mode/platform coverage and
+required workspace/review/CI/merge gates remain unimplemented or unverified.
+Do not publish this intermediate API as working memory-limit support.

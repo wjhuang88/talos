@@ -41,6 +41,10 @@ pub enum BashError {
 pub struct BashInput {
     /// The shell command to execute.
     pub command: String,
+    /// Per-process memory policy in MiB (64..=65536); omission uses 2048 MiB.
+    #[serde(default, deserialize_with = "crate::process_memory::deserialize_limit")]
+    #[schemars(with = "u64", range(min = 64, max = 65536))]
+    pub memory_limit_mib: Option<u64>,
     /// Optional timeout in seconds. Clamped to [1, 600]. Defaults to 120 if omitted.
     #[serde(default)]
     #[schemars(range(min = 1, max = 600))]
@@ -573,6 +577,12 @@ fn parse_input(input: Value) -> Result<BashInput, BashError> {
 
     Ok(BashInput {
         command: command.to_owned(),
+        memory_limit_mib: obj
+            .get("memory_limit_mib")
+            .map(|value| crate::process_memory::deserialize_limit(value.clone()))
+            .transpose()
+            .map_err(|error| BashError::InvalidInput(error.to_string()))?
+            .flatten(),
         timeout_secs,
         background: obj
             .get("background")
@@ -950,6 +960,37 @@ fn classify_git(args: &[&str]) -> BashCommandClass {
 #[cfg(test)]
 #[allow(warnings)]
 mod tests {
+    #[test]
+    fn memory_policy_parser_rejects_present_invalid_values() {
+        for value in [
+            serde_json::json!(null),
+            serde_json::json!(63),
+            serde_json::json!(65537),
+            serde_json::json!(64.5),
+        ] {
+            assert!(
+                super::parse_input(
+                    serde_json::json!({"command":"echo marker", "memory_limit_mib":value})
+                )
+                .is_err()
+            );
+        }
+        assert_eq!(
+            super::parse_input(serde_json::json!({"command":"echo marker"}))
+                .unwrap()
+                .memory_limit_mib,
+            None
+        );
+        assert_eq!(
+            super::parse_input(
+                serde_json::json!({"command":"echo marker", "memory_limit_mib":65536})
+            )
+            .unwrap()
+            .memory_limit_mib,
+            Some(65536)
+        );
+    }
+
     #[test]
     fn output_lines_preserve_split_utf8_and_independent_streams() {
         let mut stdout = super::ShellOutputLine::default();
