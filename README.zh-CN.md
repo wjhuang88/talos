@@ -1,5 +1,23 @@
 # Talos
 
+### 进程内存策略（I316 开发中）
+
+Unix 和 Windows 前台 Shell 每条输出流最多保留 1 MiB 原始字节，并显示截断提示；
+超时或取消时由进程监督器清理进程组或 Job，宿主可通过清理凭证确认完成。
+结果先显示 stdout，再显示 stderr，不保留两条流的交错到达顺序。
+
+Shell 和 `exec` 支持可选整数参数 `memory_limit_mib`，范围为 64～65536，
+1 MiB = 1048576 字节；省略时保留 2048 MiB 默认策略。exec 的顺序、并行和
+管道步骤继承请求值，也可逐步骤显式覆盖。限制逐进程应用；后台执行支持单个
+命令，不支持组合任务。
+
+Unix 使用虚拟地址空间限制 `RLIMIT_AS`，不是 RSS；省略参数时为 best-effort，
+显式设置失败则拒绝启动，包括拒绝该设置的 macOS 环境。不会提高继承的硬上限。
+Windows 使用 Job 的逐进程 committed-memory 限制，默认值的实际强制执行是新增
+行为，可能拒绝此前可分配超过 2 GiB 的命令。两者都不是整个进程树的总内存配额。
+工具输出说明所用策略，不将 best-effort 描述为已验证的强制限制。完整请求仍受
+权限控制。本开发变更仅能随下一个 minor 版本及 API 迁移交付，不属于 0.10 补丁承诺。
+
 [![Release](https://github.com/wjhuang88/talos/actions/workflows/release.yml/badge.svg)](https://github.com/wjhuang88/talos/actions/workflows/release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/wjhuang88/talos?include_prereleases)](https://github.com/wjhuang88/talos/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)

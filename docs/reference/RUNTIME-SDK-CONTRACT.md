@@ -7,6 +7,30 @@ pre-1.0 contract: the surface is usable but not yet semver-stable. REL-002 gates
 
 ## Supported Embedding Surface
 
+### I316 process input migration (next minor only)
+
+The direct `talos-tools` public structs `BashInput`, `ExecInput` and `ExecStep`
+gain `memory_limit_mib: Option<u64>`. Existing Rust struct literals must add
+`memory_limit_mib: None` to retain default/request inheritance, or
+`memory_limit_mib: Some(4096)` for an explicit 4096 MiB policy. JSON callers omit
+the field for inheritance; explicit `null` is rejected, as are non-integers and
+values outside 64..=65536. A step inheriting an explicit request remains explicit.
+Do not serialize `None` as JSON null when constructing tool requests.
+
+This is a source-breaking pre-1.0 minor migration under ADR-098, not authorized
+for a 0.10 patch. Windows now enforces the default per-process committed-memory
+policy; Unix omission remains best-effort and explicit setup failure refuses
+payload startup. No API consumer should interpret these limits as RSS or an
+aggregate process-tree quota. Native delivery gates remain tracked by I316.
+
+On Unix, the additive `talos-sandbox::CommandCapture` and
+`OwnedCommandOperation::execute_captured` API retain bounded streams while
+continuing to drain output. Supply a fresh capture instance for each invocation;
+even `Ok(Output)` requires inspecting `timed_out`. Timeout output is returned only
+after confirmed cleanup. Shell and exec expose their aggregate cleanup owner via
+`AgentTool::cleanup_receipt`; cancellation callers must seal/wait that owner during
+host shutdown rather than treating a dropped invocation as cleanup confirmation.
+
 Embedders should depend on **`talos-runtime`**. This contract covers `talos-runtime`'s own public
 API plus the types it explicitly `pub use`-re-exports. I280 source development exposes the
 provider, tool, permission, sandbox and session-event signature types through this facade,

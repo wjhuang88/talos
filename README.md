@@ -1,5 +1,27 @@
 # Talos
 
+### Process memory policy (I316 development)
+
+Foreground shell output on Unix and Windows retains up to 1 MiB of raw bytes per stream,
+reports truncation, and exposes an owner for process-group or Job cleanup confirmation.
+It displays stdout followed by stderr; arrival ordering between streams is not retained.
+
+Shell and `exec` accept optional `memory_limit_mib`, an integer from 64 to 65536
+(1 MiB = 1048576 bytes); omission retains the 2048 MiB default policy. Exec steps
+inherit the request value, with explicit per-step overrides in sequential,
+parallel and pipeline modes. Limits apply to each process separately. Background
+execution supports a single command, not compositions.
+
+Unix uses virtual address-space limits (`RLIMIT_AS`), not RSS. Omitted limits are
+best-effort; explicit setup failure refuses startup, including on macOS hosts
+that reject the requested limit. Inherited hard limits are never raised. Windows
+uses Job per-process committed-memory limits; default enforcement on Windows is
+new and may reject commands previously allowed to allocate more than 2 GiB.
+Neither mechanism is an aggregate process-tree quota. Tool output describes the
+policy; it does not turn best-effort setup into proof of enforcement. Permissions
+still apply to the full request. This development change requires next-minor API
+migration and is not a 0.10 patch-release promise.
+
 [![Release](https://github.com/wjhuang88/talos/actions/workflows/release.yml/badge.svg)](https://github.com/wjhuang88/talos/actions/workflows/release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/wjhuang88/talos?include_prereleases)](https://github.com/wjhuang88/talos/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)

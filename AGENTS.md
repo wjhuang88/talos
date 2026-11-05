@@ -135,6 +135,12 @@ These are immutable facts that every change must respect:
 
 ## Rust-Specific Rules
 
+- **Windows cross-checks:** Before selecting a Windows target on macOS/Linux, read
+  `docs/sop/LOCAL-DEV.md` and use `cargo xwin` with `x86_64-pc-windows-msvc` and
+  `--locked`. Do not substitute GNU/MinGW or report missing MinGW as a project
+  blocker. Cross-check tests with `--tests` when changing Windows tests; native
+  Windows execution remains a separate required gate.
+
 - **Error handling**: Use `thiserror` for library crates, `anyhow` for binary crates only. Never `unwrap()` in library code.
 - **Async**: Talos-authored business async uses `tokio`; do not directly introduce `async-std` or `smol`. ADR-059 permits GPUI-internal scheduling and asynchronous primitives only in the isolated Desktop dependency boundary. Use GPUI scheduling for presentation-local work, and `CancellationToken` for Talos business shutdown; UI task disposal does not imply durable business cancellation.
 - **Traits**: Prefer `impl Trait` for arguments, `dyn Trait` only when dynamic dispatch is required (tool registry, provider abstraction).
