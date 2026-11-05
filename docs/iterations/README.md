@@ -1,3 +1,14 @@
+## I317 / SEARCH-001-K atomic claim proposal — 2026-11-05
+
+[I317](I317-search-compat-fallback-ownership.md) and
+[SEARCH-001-K](../backlog/active/SEARCH-001-K-compat-fallback-ownership.md) / #850
+propose a separately scoped compatibility-helper ownership increment through
+[governance PR #851](https://github.com/wjhuang88/talos/pull/851). Effective only
+after exact-head CI/governance review and target-branch merge. I316 / PROCESS-001
+remains independently Active, I310 remains independently claimed. D/#644 remains
+BLOCKED / ZERO-ADMISSION; D2/#848 remains research, E/F/G/I gated. No K1 code,
+dependent-crate removal, provider admission, or implementation is authorized yet.
+
 ## Session handoff completion — 2026-11-05
 
 The full ordered handoff queue and C0/T7 carryover are Complete in their owners.
