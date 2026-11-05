@@ -8,7 +8,7 @@
 
 | Issue | Summary | Owner | Owner Status | Disposition |
 |---|---|---|---|---|
-| [#853](https://github.com/wjhuang88/talos/issues/853) | Model-selectable process memory limit (handoff T6) | [PROCESS-001](../backlog/active/PROCESS-001-model-process-memory-limit.md) | Ready / proposed activation | I316 and ADR-098 design reviewed; finalized atomic claim and target merge required before implementation. |
+| [#853](https://github.com/wjhuang88/talos/issues/853) | Model-selectable process memory limit (handoff T6) | [PROCESS-001](../backlog/active/PROCESS-001-model-process-memory-limit.md) | In Progress / proposed activation | I316 claim #854 and ADR-098 design reviewed; finalized atomic claim and target merge required before implementation. |
 | [#848](https://github.com/wjhuang88/talos/issues/848) | Hosted keyless MCP admission triage | [SEARCH-001-D2](../tasks/2026-11-05-pending-search-intake-registration.md) | Intake / Unclaimed | Temporary registration pending canonical owner PR #849; no provider admission or implementation authority. |
 | [#850](https://github.com/wjhuang88/talos/issues/850) | Compatibility fallback helper ownership | [SEARCH-001-K](../tasks/2026-11-05-pending-search-intake-registration.md) | Intake / Unclaimed | Temporary registration pending canonical owner PR #851; no implementation or dependency removal authority. |
 | [#757](https://github.com/wjhuang88/talos/issues/757) | Bubblewrap workspace visibility below /tmp | [SANDBOX-001](../backlog/active/SANDBOX-001-bubblewrap-workspace-visibility.md) | In Progress / proposed activation | I307 claim proposed in #758; implementation unauthorized until merge. |

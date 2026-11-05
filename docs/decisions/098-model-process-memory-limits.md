@@ -1,6 +1,6 @@
 # ADR-098: Model-Selectable Per-Process Memory Limits
 
-Status: Proposed; independent API/native-security acceptance required before activation
+Status: Accepted contract, effective only on independently reviewed claim PR #854 merge
 Date: 2026-11-05
 Owner: [I316 / PROCESS-001](../iterations/I316-model-process-memory-limit.md)
 

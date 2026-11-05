@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Story ID | PROCESS-001 |
-| Status | Ready / proposed activation |
+| Status | In Progress / proposed activation in #854 |
 | Source Issue | #853 |
 | Owner | I316 |
 | Depends On | I315/T1 complete (#847 implementation, #852 closeout) |

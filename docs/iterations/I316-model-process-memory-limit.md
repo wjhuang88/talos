@@ -1,6 +1,6 @@
 # Iteration I316: Model-Selectable Process Memory Limit
 
-> Document status: Planned
+> Document status: Active (effective only on claim PR #854 merge)
 > Published plan date: 2026-11-05
 > Planned objective: complete handoff T6 across existing shell/exec execution modes.
 > Baseline rule: preserve full acceptance; platform gaps cannot be closed by wording.
@@ -10,14 +10,14 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / gpt-6-sol |
 | Work Slice | PROCESS-001 / handoff T6: typed process memory policy, shell/exec foreground/background/composition propagation, native enforcement and acceptance |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-05 |
 | Source Issue | #853 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
+| Governance Claim PR | #854 |
+| Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer authorized the complete ordered handoff; finalized independent native/API review and effective target-branch claim still required |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-05 |
@@ -75,6 +75,8 @@ or cleanup safeguards. No release, provider probing or aggregate tree quota.
 
 ## Actual activation and evidence
 
-Preparation only. No effective claim, code implementation, tests or Completion
-Commit exists. Full handoff remains Active. Claim PR number and independent ADR
-review must be finalized before target-branch activation.
+Proposed atomic activation in #854; ineffective until target-branch merge. Independent
+API/native-security design review approved the complete contract on 2026-11-05,
+including explicit inheritance and pre-exec safe evidence requirements. Exact-head
+protected review and CI remain required. No code implementation, tests or Completion
+Commit exists. Full handoff remains Active.
