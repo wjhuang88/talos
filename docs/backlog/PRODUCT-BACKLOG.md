@@ -1,48 +1,11 @@
-## Session handoff completion — 2026-11-05
+# Product Backlog
 
-The full ordered handoff queue and C0/T7 carryover are Complete in their owners.
-Completion Commit: `04022b5ada916f9c01f04b5fa19662d3eb8efe27` (final T6 stage).
-See [all phase implementation evidence and audit limits](../tasks/2026-10-10-session-todo-final-audit.md).
-Earlier snapshots below are historical; this final status publication remains
-subject to its own governance review/CI/merge. No unrelated owner is closed.
+## Completed session handoff
 
-## T6 implementation complete — 2026-11-05
-
-I316 / PROCESS-001 is Complete / Closed. Completion Commit:
-`04022b5ada916f9c01f04b5fa19662d3eb8efe27` (PR #855). All eight exact-head jobs in
-CI `42034824146`, independent security/API review and merge CAS passed.
-Owners retain native platform and next-minor API boundaries. Earlier snapshots
-below are historical. Full queue I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6
-has merged implementation; overall handoff closure still requires this governance
-candidate's review/CI/merge and final evidence audit. No release authorized.
-
-## T6 active implementation checkpoint — 2026-11-05
-
-I316 / PROCESS-001 is Review / Partial. Claim #854 merged at `18aa4a58f`;
-local implementation stages through `b9ea2fceb` are not yet published or merged.
-The owner records complete standard preflight including both SDK modes, all-feature
-check/Clippy/tests with real plugin bundles, xwin/MSVC compilation and independent code review.
-Native Linux/Windows CI and final exact-head review/merge remain open. Earlier snapshots below are
-historical. Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6;
-predecessors closed, T6 incomplete, overall handoff Active.
-
-## T6 atomic activation proposal — 2026-11-05
-
-I316 / PROCESS-001 / #853 proposes in #854 the remaining model-selectable process memory
-limit. Independent API/native-security design review passed; ADR-098 and atomic
-claim still require finalized review and target-branch merge. No implementation
-or effective activation is claimed. Full queue remains I309 → T8/I308 → T2+T3
-MODEL-014 → T4 → T5 → T1 → T6; all predecessors closed, T6 unimplemented.
-
-## T1 completed — 2026-11-05
-
-I315 / VALIDATION-003 / #844 is Complete with Completion Commit:
-`add669403734d4e2469eb479939066f57027c74d` (implementation #847).
-Exact-head CI `41849101811` passed all eight jobs, including native Windows;
-independent API/process-security review and merge CAS passed. I315 preserves
-fixture, platform and API-release limits. Earlier T1 snapshots are historical.
-Full queue: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
-T6 remains unimplemented and unactivated; the full handoff remains Active.
+I309 → I308/T8 → MODEL-014 → T4 → T5 → T1 → T6, including C0/T7 carryover,
+are complete in their owners. See [implementation, validation and audit evidence](../tasks/2026-10-10-session-todo-final-audit.md).
+Final status publication merged in PR #857 (`748557edc`); platform and API limits
+remain in the linked audit and owners.
 
 ## SEARCH-001-H / I314 post-merge closeout — 2026-11-04
 
@@ -56,53 +19,6 @@ E/F/G stay blocked, SEARCH-001-I remains separately gated, and `rust-websearch`
 remains. Previous T1/I314 Active snapshots below are historical and do not
 override these owner-derived terminal states.
 
-## T1 active implementation — 2026-11-04
-
-I315 / VALIDATION-003 / #844 is active after claim #845 merged as `261602242`.
-Shared model validation and read-only agile tools are implemented locally; the
-I315 owner records tests, review and platform limits. Integration with merged I314
-search configuration passed local preflight. Native Windows CI and implementation
-merge remain required. T1 is Partial, T6 unimplemented, and the full handoff Active.
-I310/I314 retain their independent owners; this summary does not close their work.
-
-## MODEL-014 complete; T4 preparation — 2026-10-30
-
-[I311](../iterations/I311-model014-capability-inference.md) and MODEL-014 are Complete/Closed. Completion Commit:
-`0469f8041ed0d24bb2dffb465e9ff7fa3609a034`, `b04421fb964737911551c7e0704d6c81e80aa406`.
-#816 merged as `ca4a79961366eba7bc722b90bd449404cc7b07d5` after all-eight-success
-CI, independent review and CAS. I312 is proposed Active/Claimed in #817, ineffective until merge.
-Full handoff remains Active: T4 → T5 → T1 → T6. Earlier snapshots below are historical.
-
-## MODEL-014 atomic activation proposal — 2026-10-30
-
-[I311](../iterations/I311-model014-capability-inference.md) proposes full handoff T2+T3 after completed I308/#812.
-Proposed Active/Claimed state in #813 is ineffective until merge; ADR-095 defines authority.
-No implementation before finalized claim/activation merges. I310/ADR-094 remain
-reserved by independent Gemini proposal #811. Full handoff stays Active.
-
-## I308/T8 completed — 2026-10-30
-
-I308 and PERM-007-H/G owners are Complete with Completion Commit `5dea4925a143151071ea231779c100a75734e6fe`
-(#809), all-eight-success exact-head CI `41007199388` and independent protected
-closure review. Owner boundaries and historical failures remain recorded.
-MODEL-014 is restored Refinement / Unclaimed; next is its atomic claim/activation.
-Full handoff remains Active: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
-Earlier Active/Partial rows below are historical, superseded by owner evidence.
-
-## MODEL-014 restored intake — 2026-10-30
-
-[MODEL-014](active/MODEL-014-catalog-capability-inference.md) remains Refinement /
-Unclaimed. Its original full custom-model capability/output/variant scope is
-restored; authority/schema proposal review does not activate implementation.
-Handoff order remains I308 → MODEL-014 → T4 → T5 → T1 → T6 after completed I309.
-
-## Proposed T8 selection — 2026-10-26
-
-[I308](../iterations/I308-builtin-auto-review.md) proposes full PERM-007-H/G Auto coverage in #765.
-Claimed/Active values are ineffective until the reviewed, validated governance record merges.
-Implementation must start from that merge or later main. T7 is Complete; later handoff tasks remain incomplete.
-
-# Product Backlog
 
 This file is the compact current-state backlog entrypoint. Story scope, acceptance criteria,
 implementation evidence, and residual ownership live in the linked owner documents.
