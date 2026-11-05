@@ -1,3 +1,13 @@
+## SEARCH-001-K / I317 proposed compatibility helper ownership — 2026-11-05
+
+[SEARCH-001-K](active/SEARCH-001-K-compat-fallback-ownership.md) /
+[I317](../iterations/I317-search-compat-fallback-ownership.md) / #850 proposes
+a limited `rust-websearch` helper internalization under governance #851.
+Existing protected Auto chain, Network authorization and final Wikipedia fallback
+are already Talos-owned; D/#644 ZERO-ADMISSION is unchanged. No dependency
+removal or E/F/I activation. I316/T6 and I310 remain independently owned.
+Claim/Active proposed in #851 remain **ineffective until target-branch merge**.
+
 ## Session handoff completion — 2026-11-05
 
 The full ordered handoff queue and C0/T7 carryover are Complete in their owners.
