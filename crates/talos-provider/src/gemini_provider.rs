@@ -537,7 +537,11 @@ impl LanguageModel for GeminiProvider {
         } else {
             crate::gemini_compat::project(&self.provider, &self.model, &messages, protocol)?
         };
-        let selected_tools = if protocol == ToolProtocol::Native { tools } else { &[] };
+        let selected_tools = if protocol == ToolProtocol::Native {
+            tools
+        } else {
+            &[]
+        };
         let (tx, rx) = mpsc::channel(32);
         self.dispatch_to_sink(
             &messages,

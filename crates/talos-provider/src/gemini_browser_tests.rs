@@ -165,8 +165,18 @@ async fn signed_replay_roundtrip(protocol: talos_core::tool::ToolProtocol) {
     let textual = protocol != talos_core::tool::ToolProtocol::Native;
     let parts = if textual {
         let call = json!({"name":"browser","id":"b","args":{"protocolVersion":2,"operation":"fill","text":format!(" {PRIVATE} ")}});
-        json!([{"text":format!("<tool_call>{call}</tool_call>opening {PRIVATE}"),"thoughtSignature":"private-call-signature"}])
-    } else { parts };
+        let ordinary = if protocol == talos_core::tool::ToolProtocol::Compat {
+            format!(
+                "<tool_call>{}</tool_call>",
+                json!({"name":"ordinary","id":"o","args":{"content":format!(" {PRIVATE} ")}})
+            )
+        } else {
+            String::new()
+        };
+        json!([{"text":format!("<tool_call>{call}</tool_call>{ordinary}opening {PRIVATE}"),"thoughtSignature":"private-call-signature"}])
+    } else {
+        parts
+    };
     let first = server
         .mock("POST", "/")
         .match_request(|r| {
@@ -181,7 +191,7 @@ async fn signed_replay_roundtrip(protocol: talos_core::tool::ToolProtocol) {
         let body:Value=serde_json::from_slice(r.body().expect("body")).expect("JSON");
         let contents=body["contents"].as_array().expect("contents");
         contents.iter().any(|item|item["role"]=="model" && item["parts"]==expected)
-            && (if textual { body.to_string().contains("browser completed") } else {
+            && (if textual { body.to_string().contains("browser completed") && (protocol != talos_core::tool::ToolProtocol::Compat || body.to_string().contains("ordinary completed")) } else {
                 ["browser completed", "ordinary completed"].iter().all(|result|
                     contents.iter().any(|item|item["parts"].as_array().is_some_and(|parts|
                         parts.iter().any(|part|part.get("functionResponse").is_some_and(|response|response.to_string().contains(*result))))))
@@ -218,10 +228,7 @@ async fn signed_replay_roundtrip(protocol: talos_core::tool::ToolProtocol) {
     };
     let mut live_agent = agent(provider(server.url()), root.clone(), effects.clone());
     live_agent.set_tool_protocol(protocol);
-    let (mut handle, mut actor) = talos_agent::session::AppServerSession::new(
-        live_agent,
-        config,
-    );
+    let (mut handle, mut actor) = talos_agent::session::AppServerSession::new(live_agent, config);
     actor.set_persistence(session.clone(), talos_session::SessionMetadata::default());
     let actor = tokio::spawn(async move {
         actor.run().await;
