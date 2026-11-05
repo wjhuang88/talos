@@ -89,12 +89,51 @@ impl ProcessMemoryPolicy {
             .insert_str(position, &format!("{}\n", self.describe()));
         result
     }
+
+    pub(crate) fn annotate_background(
+        self,
+        mut result: talos_core::tool::ToolResult,
+        evidence: Option<String>,
+    ) -> talos_core::tool::ToolResult {
+        // Background receipts are machine-readable JSON consumed by process tools.
+        // Preserve that envelope and every existing field when adding evidence.
+        if let Ok(serde_json::Value::Object(mut receipt)) = serde_json::from_str(&result.content) {
+            receipt.insert(
+                "memory_policy".into(),
+                serde_json::Value::String(self.describe()),
+            );
+            if let Some(evidence) = evidence {
+                receipt.insert(
+                    "memory_child_evidence".into(),
+                    serde_json::Value::String(evidence),
+                );
+            }
+            result.content = serde_json::Value::Object(receipt).to_string();
+            result
+        } else {
+            if let Some(evidence) = evidence {
+                result.content.push_str(&format!("\n{evidence}"));
+            }
+            self.annotate(result)
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn background_failure_keeps_observed_child_evidence_and_error_status() {
+        let result = ProcessMemoryPolicy::default().annotate_background(
+            talos_core::tool::ToolResult::error("launch supervision failed"),
+            Some("memory child evidence: effective_soft_bytes=134217728".to_owned()),
+        );
+        assert!(result.is_error);
+        assert!(result.content.contains("launch supervision failed"));
+        assert!(result.content.contains("effective_soft_bytes=134217728"));
+    }
 
     #[derive(Deserialize)]
     struct Input {

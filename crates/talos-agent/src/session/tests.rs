@@ -855,6 +855,16 @@ async fn session_process_cancels_only_its_own_running_job() {
     let result = tool_result(&events);
     assert!(!result.is_error, "{}", result.content);
     let started: serde_json::Value = serde_json::from_str(&result.content).expect("receipt");
+    assert!(
+        started["memory_policy"]
+            .as_str()
+            .is_some_and(|value| value.contains("2048"))
+    );
+    assert!(
+        started["memory_child_evidence"]
+            .as_str()
+            .is_some_and(|value| value.contains("effective_soft_bytes="))
+    );
     let id = started["job_id"].as_str().expect("job id").to_owned();
     for (session, action) in [(1, "status"), (1, "cancel"), (0, "status"), (0, "cancel")] {
         sessions[session].1.lock().expect("responses").extend([

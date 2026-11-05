@@ -797,10 +797,11 @@ impl AgentTool for ExecTool {
                 Err(error) => return ToolExecutionOutput::error(error),
             };
             ToolExecutionOutput::from_result(
-                memory.annotate(
+                memory.annotate_background(
                     permit
                         .launch(Box::new(launcher.with_memory_policy(memory)))
                         .await,
+                    None,
                 ),
             )
         }
@@ -829,15 +830,12 @@ impl AgentTool for ExecTool {
             let launcher = crate::process_boundary::UnixBackgroundLauncher::new(command)
                 .with_memory_policy(memory);
             let evidence = launcher.memory_evidence();
-            let mut result = permit.launch(Box::new(launcher)).await;
-            if let Some(evidence) = evidence
+            let result = permit.launch(Box::new(launcher)).await;
+            let evidence = evidence
                 .lock()
                 .unwrap_or_else(|error| error.into_inner())
-                .take()
-            {
-                result.content.push_str(&format!("\n{evidence}"));
-            }
-            ToolExecutionOutput::from_result(memory.annotate(result))
+                .take();
+            ToolExecutionOutput::from_result(memory.annotate_background(result, evidence))
         }
     }
 
