@@ -60,6 +60,35 @@ impl ProcessMemoryPolicy {
     pub(crate) fn is_explicit(self) -> bool {
         self.explicit
     }
+
+    pub(crate) fn describe(self) -> String {
+        let mechanism = if cfg!(windows) {
+            "Windows Job per-process committed virtual memory; setup required before resume"
+        } else if self.is_explicit() {
+            "RLIMIT_AS virtual address space; explicit setup required before exec"
+        } else {
+            "RLIMIT_AS virtual address space; default best-effort, enforcement unconfirmed"
+        };
+        format!(
+            "memory_limit_mib: {} ({mechanism}; not RSS or an aggregate process-tree quota)",
+            self.bytes / BYTES_PER_MIB
+        )
+    }
+
+    pub(crate) fn annotate(
+        self,
+        mut result: talos_core::tool::ToolResult,
+    ) -> talos_core::tool::ToolResult {
+        let position = if result.content.starts_with("$ ") {
+            result.content.find('\n').map_or(0, |index| index + 1)
+        } else {
+            0
+        };
+        result
+            .content
+            .insert_str(position, &format!("{}\n", self.describe()));
+        result
+    }
 }
 
 #[cfg(test)]
@@ -75,20 +104,23 @@ mod tests {
 
     #[test]
     fn omission_and_explicit_default_have_distinct_enforcement_intent() {
-        let omitted: Input = serde_json::from_value(json!({})).unwrap();
-        let explicit: Input = serde_json::from_value(json!({"memory_limit_mib": 2048})).unwrap();
+        let omitted: Input = serde_json::from_value(json!({})).expect("omitted input");
+        let explicit: Input =
+            serde_json::from_value(json!({"memory_limit_mib": 2048})).expect("explicit input");
         let default = ProcessMemoryPolicy::default();
-        let omitted = ProcessMemoryPolicy::resolve(omitted.memory_limit_mib, default).unwrap();
-        let explicit = ProcessMemoryPolicy::resolve(explicit.memory_limit_mib, default).unwrap();
+        let omitted = ProcessMemoryPolicy::resolve(omitted.memory_limit_mib, default)
+            .expect("default policy");
+        let explicit = ProcessMemoryPolicy::resolve(explicit.memory_limit_mib, default)
+            .expect("explicit policy");
         assert_eq!(omitted.bytes(), 2 * 1024 * 1024 * 1024);
         assert_eq!(omitted.bytes(), explicit.bytes());
         assert!(!omitted.is_explicit());
         assert!(explicit.is_explicit());
         assert_eq!(
-            ProcessMemoryPolicy::resolve(None, explicit).unwrap(),
+            ProcessMemoryPolicy::resolve(None, explicit).expect("inherited policy"),
             explicit
         );
-        let step = ProcessMemoryPolicy::resolve(Some(64), explicit).unwrap();
+        let step = ProcessMemoryPolicy::resolve(Some(64), explicit).expect("step override");
         assert_eq!(step.bytes(), 64 * BYTES_PER_MIB);
         assert!(step.is_explicit());
     }
@@ -109,7 +141,8 @@ mod tests {
             assert!(serde_json::from_value::<Input>(json!({"memory_limit_mib": value})).is_err());
         }
         for value in [64, 2048, 65536] {
-            let input: Input = serde_json::from_value(json!({"memory_limit_mib": value})).unwrap();
+            let input: Input =
+                serde_json::from_value(json!({"memory_limit_mib": value})).expect("valid boundary");
             assert_eq!(input.memory_limit_mib, Some(value));
         }
         assert!(
