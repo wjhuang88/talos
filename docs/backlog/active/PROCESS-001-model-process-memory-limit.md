@@ -3,10 +3,14 @@
 | Field | Value |
 |---|---|
 | Story ID | PROCESS-001 |
-| Status | Review / Partial / claim #854 effective at 18aa4a58f |
+| Status | Complete / Closed |
 | Source Issue | #853 |
 | Owner | I316 |
 | Depends On | I315/T1 complete (#847 implementation, #852 closeout) |
+
+Completion Commit: `04022b5ada916f9c01f04b5fa19662d3eb8efe27` (PR #855).
+Native CI `42034824146`, independent review and merge CAS passed; full evidence
+and platform/API boundaries are recorded in I316.
 
 ## Deliverable
 
@@ -50,10 +54,8 @@ handoff T6, not conversation memory or an aggregate process-tree quota.
 Pinned Rust and locked checks, warnings-denied Clippy, workspace tests, standard
 preflight including both SDK modes, native Linux/Windows CI, independent API/native
 process-security review, exact-head CAS/merge, and owner-first existing implementation
-Completion Commit are mandatory. Local implementation checkpoints and passing
-focused checks are recorded in I316; no merged implementation or completion
-evidence exists. Standard preflight and full all-feature tests passed; native CI and
-final review/merge remain open.
+Completion Commit are mandatory. All required gates passed; I316 records merged implementation, local standard
+preflight/all-feature tests, native CI, independent review and merge CAS.
 
 ## Required Reads
 

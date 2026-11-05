@@ -1,16 +1,35 @@
 # Iteration I316: Model-Selectable Process Memory Limit
 
-> Document status: Review / Partial (claim #854 effective at 18aa4a58f)
+> Document status: Complete (implementation #855 merged)
 > Published plan date: 2026-11-05
 > Planned objective: complete handoff T6 across existing shell/exec execution modes.
 > Baseline rule: preserve full acceptance; platform gaps cannot be closed by wording.
 > MVP deliverable: model-provided per-process limits with tested inheritance, enforcement/failure evidence and unchanged 2048 MiB default policy.
 
+## Completion evidence — 2026-11-05
+
+Completion Commit: `04022b5ada916f9c01f04b5fa19662d3eb8efe27` (implementation PR #855).
+Exact head `507e68c0c1bb3825f29be20418d4ae75d696bc29` passed all eight jobs in
+CI `42034824146`. Native Windows logs confirm ordinary Auto actual effects,
+checkpoint restart, memory inheritance/allocation and cwd regression success.
+Independent exact-head security/API review: PR comment 6659031854; merge CAS:
+6659596607. Corrected standard preflight passed workspace checks/tests/doctests
+and both SDK modes; both governance validators passed with zero warnings.
+
+All PROCESS-001 acceptance is implemented; platform and API boundaries remain:
+macOS explicit setter failure refuses before payload, not successful enforcement;
+Unix RLIMIT_AS and Windows committed memory are per-process, not RSS/tree quotas.
+Input-struct migration is next minor only; no release authorized. The recovery
+fixture now uses a 20-second integration budget within a 30-second parent bound;
+passing native recovery does not establish the cause of its earlier timeout or
+prove the old ten-second budget. Historical Partial/running entries below are
+chronological evidence, superseded by this completion record.
+
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6-sol |
 | Work Slice | PROCESS-001 / handoff T6: typed process memory policy, shell/exec foreground/background/composition propagation, native enforcement and acceptance |
@@ -18,8 +37,8 @@
 | Source Issue | #853 |
 | Governance Claim PR | #854 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer authorized the ordered handoff; independently reviewed claim #854 merged as 18aa4a58f (review 6646977525, CAS 6647020075); final implementation exact-head review remains required |
-| Implementation PR | Not started |
+| Authorization Evidence | Maintainer authorized the ordered handoff; independently reviewed claim #854 merged as 18aa4a58f (review 6646977525, CAS 6647020075); implementation exact-head review 6659031854 and CAS 6659596607 passed before #855 merge |
+| Implementation PR | #855 |
 | Last Updated | 2026-11-05 |
 | Handoff / Release Condition | No implementation before finalized claim/ADR merge; no release authority |
 
