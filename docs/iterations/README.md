@@ -5,7 +5,7 @@
 propose a separately scoped compatibility-helper ownership increment through
 [governance PR #851](https://github.com/wjhuang88/talos/pull/851). Effective only
 after exact-head CI/governance review and target-branch merge. I316 / PROCESS-001
-remains independently Active, I310 remains independently claimed. D/#644 remains
+is now Complete / Closed, I310 remains independently claimed. D/#644 remains
 BLOCKED / ZERO-ADMISSION; D2/#848 remains research, E/F/G/I gated. No K1 code,
 dependent-crate removal, provider admission, or implementation is authorized yet.
 

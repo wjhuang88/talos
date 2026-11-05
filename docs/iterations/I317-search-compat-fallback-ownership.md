@@ -36,7 +36,7 @@ governance #851 merges to main; the Draft proposal grants no implementation auth
 
 ### Inventory and dependency disposition
 
-- I316 / PROCESS-001 / #853: Active / Claimed after governance #854 merged on 2026-11-05; **retain distinct process-launcher/native memory scope**. This K1 effort is parallel, independently owned, and does not touch launchers, shell/exec, process permission or their iteration documents.
+- I316 / PROCESS-001 / #853: Complete / Closed after implementation #855 and accepted closeout on 2026-11-05; **retain distinct process-launcher/native memory scope**. This K1 effort is parallel, independently owned, and does not touch launchers, shell/exec, process permission or their iteration documents.
 - I310 / PROVIDER-008-B: separately active Gemini protocol/Vertex authentication, retain.
 - I302 / TEST-003: Review with unresolved Windows diagnostics, retain.
 - I277 / DESKTOP-001-D3: Review / deferred human/device acceptance, retain.
