@@ -1,3 +1,13 @@
+## T1 completed — 2026-11-05
+
+I315 / VALIDATION-003 / #844 is Complete with Completion Commit:
+`add669403734d4e2469eb479939066f57027c74d` (implementation #847).
+Exact-head CI `41849101811` passed all eight jobs, including native Windows;
+independent API/process-security review and merge CAS passed. I315 preserves
+fixture, platform and API-release limits. Earlier T1 snapshots are historical.
+Full queue: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
+T6 remains unimplemented and unactivated; the full handoff remains Active.
+
 ## SEARCH-001-H / I314 post-merge closeout — 2026-11-04
 
 [SEARCH-001-H](active/SEARCH-001-H-explicit-search-overrides.md) / #832 and
