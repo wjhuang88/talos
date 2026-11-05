@@ -19,12 +19,40 @@ pub(crate) fn prepare(
     thoughts: &str,
     terminal: Vec<GeminiOutput>,
     sink: &InvocationSender,
+    protocol: talos_core::tool::ToolProtocol,
+    had_private_history: bool,
 ) -> ProviderResult<Vec<ProviderInvocationEvent>> {
     let mut blocks = None;
     let mut end = None;
     let mut raw_calls = Vec::new();
     let mut safe_calls = Vec::new();
     let mut calls = Vec::new();
+    let textual = protocol != talos_core::tool::ToolProtocol::Native;
+    if textual {
+        calls = crate::anthropic_stream::parse_invocation_text_calls(text, protocol, sink)
+            .map_err(|_| invalid())?;
+        let mut ids = std::collections::HashSet::new();
+        for event in &calls {
+            let raw = match event {
+                ProviderInvocationEvent::BrowserToolCall { id, name, arguments } => ToolCall {
+                    id: id.clone(),
+                    name: name.clone(),
+                    input: serde_json::to_value(arguments.fields()).map_err(|_| invalid())?,
+                },
+                ProviderInvocationEvent::Legacy(AgentEvent::ToolCall { call, .. }) => call.clone(),
+                _ => return Err(invalid()),
+            };
+            if !ids.insert(raw.id.clone()) {
+                return Err(invalid());
+            }
+            let mut safe = raw.clone();
+            if sink.is_browser(&raw.name) {
+                safe.input = serde_json::json!({"protocolVersion":2});
+            }
+            raw_calls.push(raw);
+            safe_calls.push(safe);
+        }
+    }
     for event in terminal {
         match event {
             GeminiOutput::Event(AgentEvent::ReasoningComplete { blocks: reasoning })
@@ -39,7 +67,7 @@ pub(crate) fn prepare(
                 id,
                 name,
                 arguments,
-            } if end.is_none() => {
+            } if end.is_none() && !textual => {
                 let raw_input = serde_json::from_str(&arguments).map_err(|_| invalid())?;
                 let raw = ToolCall {
                     id: id.clone(),
@@ -74,8 +102,39 @@ pub(crate) fn prepare(
         }
     }
     let blocks = blocks.ok_or_else(invalid)?;
-    let end = end.ok_or_else(invalid)?;
-    let safe_text = talos_core::message::strip_tool_syntax(text);
+    let mut end = end.ok_or_else(invalid)?;
+    if !calls.is_empty()
+        && !matches!(&end, AgentEvent::TurnEnd {
+            stop_reason: talos_core::message::StopReason::EndTurn
+                | talos_core::message::StopReason::ToolUse, ..
+        })
+    {
+        return Err(invalid());
+    }
+    if !calls.is_empty()
+        && let AgentEvent::TurnEnd { stop_reason, .. } = &mut end
+        && *stop_reason == talos_core::message::StopReason::EndTurn
+    {
+        *stop_reason = talos_core::message::StopReason::ToolUse;
+    }
+    let has_browser = calls.iter().any(|event|
+        matches!(event, ProviderInvocationEvent::BrowserToolCall { .. }));
+    if textual && !had_private_history && !has_browser {
+        let mut output = vec![
+            ProviderInvocationEvent::Legacy(AgentEvent::ReasoningComplete { blocks }),
+            ProviderInvocationEvent::Legacy(AgentEvent::ThinkingDelta { delta: thoughts.into() }),
+            ProviderInvocationEvent::Legacy(AgentEvent::TextDelta { delta: text.into() }),
+        ];
+        output.extend(calls);
+        output.push(ProviderInvocationEvent::Legacy(end));
+        return Ok(output);
+    }
+    let safe_text = if textual {
+        crate::browser_text_arguments::outside_tool_blocks(text)
+            .map_err(|_| invalid())?.trim().to_owned()
+    } else {
+        talos_core::message::strip_tool_syntax(text)
+    };
     let public = Message::Assistant {
         content: safe_text.clone(),
         tool_calls: safe_calls,
