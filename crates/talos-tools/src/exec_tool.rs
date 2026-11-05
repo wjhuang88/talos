@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+#[cfg(not(any(unix, windows)))]
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
@@ -17,11 +18,17 @@ use talos_core::tool::{
     ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use thiserror::Error;
+#[cfg(not(any(unix, windows)))]
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+#[cfg(not(windows))]
 use tokio::process::Command;
 use tokio::task::JoinSet;
 
 use crate::file_tools::{FileToolError, resolve_workspace_path};
+#[cfg(windows)]
+use crate::process_boundary::windows_foreground::{OwnedCommandExecutor, OwnedCommandOperation};
+#[cfg(unix)]
+use talos_sandbox::{OwnedCommandExecutor, OwnedCommandOperation};
 
 const DEFAULT_TIMEOUT_SECS: u64 = 120;
 const MAX_TIMEOUT_SECS: u64 = 600;
@@ -56,6 +63,10 @@ pub enum ExecError {
 /// Input parameters for [`ExecTool`].
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct ExecInput {
+    /// Per-process memory policy in MiB (64..=65536); omission uses 2048 MiB.
+    #[serde(default, deserialize_with = "crate::process_memory::deserialize_limit")]
+    #[schemars(with = "u64", range(min = 64, max = 65536))]
+    pub memory_limit_mib: Option<u64>,
     /// Program name or path to execute directly in single-command mode.
     #[serde(default)]
     pub command: Option<String>,
@@ -89,6 +100,10 @@ pub struct ExecInput {
 /// One direct argv-style execution step.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct ExecStep {
+    /// Per-process memory policy in MiB; omission inherits the request policy.
+    #[serde(default, deserialize_with = "crate::process_memory::deserialize_limit")]
+    #[schemars(with = "u64", range(min = 64, max = 65536))]
+    pub memory_limit_mib: Option<u64>,
     /// Program name or path to execute directly.
     pub command: String,
     /// Arguments passed as argv elements. No shell parsing is performed.
@@ -127,6 +142,8 @@ pub enum ExecMode {
 
 /// A direct subprocess tool that executes one program with argv arguments.
 pub struct ExecTool {
+    #[cfg(any(unix, windows))]
+    executor: OwnedCommandExecutor,
     workspace_root: PathBuf,
     timeout: Duration,
     max_stream_bytes: usize,
@@ -136,6 +153,8 @@ impl ExecTool {
     /// Creates a new `ExecTool` rooted at the given workspace.
     pub fn new(workspace_root: PathBuf) -> Self {
         Self {
+            #[cfg(any(unix, windows))]
+            executor: Default::default(),
             workspace_root,
             timeout: Duration::from_secs(DEFAULT_TIMEOUT_SECS),
             max_stream_bytes: MAX_STREAM_BYTES,
@@ -157,8 +176,18 @@ impl ExecTool {
     }
 
     fn parse_input(&self, input: Value) -> Result<ExecInput, ExecError> {
-        let parsed: ExecInput =
+        let mut parsed: ExecInput =
             serde_json::from_value(input).map_err(|e| ExecError::InvalidInput(e.to_string()))?;
+
+        // Resolve inheritance before splitting into sequential/parallel/pipeline tasks.
+        // An inherited explicit request remains Some, preserving fail-closed semantics.
+        for step in parsed
+            .steps
+            .iter_mut()
+            .chain(parsed.pipes.iter_mut().flat_map(|pipe| &mut pipe.steps))
+        {
+            step.memory_limit_mib = step.memory_limit_mib.or(parsed.memory_limit_mib);
+        }
 
         let has_command = parsed
             .command
@@ -241,6 +270,7 @@ impl ExecTool {
         }
 
         let step = ExecStep {
+            memory_limit_mib: input.memory_limit_mib,
             command: input.command.clone().unwrap_or_default(),
             args: input.args.clone(),
             cwd: input.cwd.clone(),
@@ -317,16 +347,23 @@ impl ExecTool {
             let default_timeout = self.timeout;
             let max_stream_bytes = self.max_stream_bytes;
             let request_timeout_secs = input.timeout_secs;
+            #[cfg(any(unix, windows))]
+            let operation = self.executor.operation();
             set.spawn(async move {
                 let step_started = Instant::now();
                 let result = run_step_inner(
                     workspace_root,
-                    default_timeout,
-                    max_stream_bytes,
+                    StepLimits {
+                        default_timeout,
+                        max_stream_bytes,
+                        timeout_cap: None,
+                    },
                     step,
                     request_timeout_secs,
                     step_started,
                     None,
+                    #[cfg(any(unix, windows))]
+                    operation,
                 )
                 .await;
                 (index, result)
@@ -482,18 +519,25 @@ impl ExecTool {
     ) -> Result<StepExecution, ToolResult> {
         run_step_inner(
             self.workspace_root.clone(),
-            self.timeout,
-            self.max_stream_bytes,
+            StepLimits {
+                default_timeout: self.timeout,
+                max_stream_bytes: self.max_stream_bytes,
+                timeout_cap: None,
+            },
             step.clone(),
             request_timeout_secs,
             started,
             None,
+            #[cfg(any(unix, windows))]
+            self.executor.operation(),
         )
         .await
     }
 
     fn clone_for_task(&self) -> Self {
         Self {
+            #[cfg(any(unix, windows))]
+            executor: self.executor.clone(),
             workspace_root: self.workspace_root.clone(),
             timeout: self.timeout,
             max_stream_bytes: self.max_stream_bytes,
@@ -506,33 +550,13 @@ impl ExecTool {
         request_timeout_secs: Option<u64>,
     ) -> Result<PipeExecution, ToolResult> {
         let started = Instant::now();
-        let timeout = request_timeout_secs
-            .map(|secs| Duration::from_secs(secs.clamp(1, MAX_TIMEOUT_SECS)))
-            .unwrap_or(self.timeout);
         let mut previous_stdout = None;
         let mut step_results = Vec::new();
 
         for step in &pipe.steps {
-            let result = match tokio::time::timeout(
-                timeout,
-                self.run_step_with_stdin(step, request_timeout_secs, previous_stdout.take()),
-            )
-            .await
-            {
-                Ok(Ok(result)) => result,
-                Ok(Err(result)) => return Err(result),
-                Err(_) => StepExecution {
-                    cwd: self
-                        .resolve_cwd(step.cwd.as_deref())
-                        .unwrap_or_else(|_| self.workspace_root.clone()),
-                    duration_ms: started.elapsed().as_millis(),
-                    exit_code: None,
-                    success: false,
-                    marker: Some("timeout"),
-                    stdout: BoundedOutput::empty(),
-                    stderr: BoundedOutput::empty(),
-                },
-            };
+            let result = self
+                .run_step_with_stdin(step, request_timeout_secs, previous_stdout.take())
+                .await?;
             previous_stdout = Some(result.stdout.content.clone());
             let success = result.success;
             step_results.push(result);
@@ -563,12 +587,21 @@ impl ExecTool {
     ) -> Result<StepExecution, ToolResult> {
         run_step_inner(
             self.workspace_root.clone(),
-            self.timeout,
-            self.max_stream_bytes,
+            StepLimits {
+                default_timeout: self.timeout,
+                max_stream_bytes: self.max_stream_bytes,
+                timeout_cap: Some(
+                    request_timeout_secs
+                        .map(|secs| Duration::from_secs(secs.clamp(1, MAX_TIMEOUT_SECS)))
+                        .unwrap_or(self.timeout),
+                ),
+            },
             step.clone(),
             request_timeout_secs,
             Instant::now(),
             stdin_data,
+            #[cfg(any(unix, windows))]
+            self.executor.operation(),
         )
         .await
     }
@@ -576,6 +609,11 @@ impl ExecTool {
 
 #[async_trait]
 impl AgentTool for ExecTool {
+    #[cfg(any(unix, windows))]
+    fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner>> {
+        Some(std::sync::Arc::new(self.executor.clone()))
+    }
+
     fn execution_working_directory(&self) -> Option<PathBuf> {
         Some(self.workspace_root.clone())
     }
@@ -616,7 +654,7 @@ impl AgentTool for ExecTool {
     }
 
     fn description(&self) -> &str {
-        "Execute one program, argv-style steps, or pipe chains with direct process spawning. No shell parsing, redirection, glob expansion, or background jobs are performed."
+        "Execute one program, argv-style steps, or pipe chains without shell parsing, redirection or glob expansion. Single-command supervised background is supported. Optional memory_limit_mib: integer 64..65536, default 2048 MiB per process; steps inherit the request unless overridden. Not RSS or a process-tree quota. Explicit setup failure refuses startup; omitted Unix limits are best-effort."
     }
 
     fn parameters(&self) -> Value {
@@ -669,7 +707,7 @@ impl AgentTool for ExecTool {
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {
-        &["command", "steps", "cwd", "background"]
+        &["command", "steps", "cwd", "background", "memory_limit_mib"]
     }
 
     fn execution_admission(&self, input: &Value) -> Result<ToolExecutionAdmission, String> {
@@ -751,7 +789,21 @@ impl AgentTool for ExecTool {
                 cwd,
                 parsed.env,
             );
-            ToolExecutionOutput::from_result(permit.launch(Box::new(launcher)).await)
+            let memory = match crate::process_memory::ProcessMemoryPolicy::resolve(
+                parsed.memory_limit_mib,
+                Default::default(),
+            ) {
+                Ok(memory) => memory,
+                Err(error) => return ToolExecutionOutput::error(error),
+            };
+            ToolExecutionOutput::from_result(
+                memory.annotate_background(
+                    permit
+                        .launch(Box::new(launcher.with_memory_policy(memory)))
+                        .await,
+                    None,
+                ),
+            )
         }
         #[cfg(unix)]
         {
@@ -768,9 +820,22 @@ impl AgentTool for ExecTool {
             let mut command = Command::new(command_name);
             command.args(&parsed.args).current_dir(cwd);
             scrub_and_apply_env(&mut command, &parsed.env);
-            crate::process_boundary::apply_process_hardening(&mut command);
-            let launcher = crate::process_boundary::UnixBackgroundLauncher::new(command);
-            ToolExecutionOutput::from_result(permit.launch(Box::new(launcher)).await)
+            let memory = match crate::process_memory::ProcessMemoryPolicy::resolve(
+                parsed.memory_limit_mib,
+                Default::default(),
+            ) {
+                Ok(memory) => memory,
+                Err(error) => return ToolExecutionOutput::error(error),
+            };
+            let launcher = crate::process_boundary::UnixBackgroundLauncher::new(command)
+                .with_memory_policy(memory);
+            let evidence = launcher.memory_evidence();
+            let result = permit.launch(Box::new(launcher)).await;
+            let evidence = evidence
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .take();
+            ToolExecutionOutput::from_result(memory.annotate_background(result, evidence))
         }
     }
 
@@ -799,6 +864,7 @@ fn has_detached_exec_shape(command: &str, args: &[String]) -> bool {
 }
 
 struct StepExecution {
+    memory_evidence: Option<String>,
     cwd: PathBuf,
     duration_ms: u128,
     exit_code: Option<i32>,
@@ -822,13 +888,7 @@ struct BoundedOutput {
 }
 
 impl BoundedOutput {
-    fn empty() -> Self {
-        Self {
-            content: Vec::new(),
-            total_bytes: 0,
-        }
-    }
-
+    #[cfg(not(any(unix, windows)))]
     fn from_error(message: String) -> Self {
         Self {
             content: message.into_bytes(),
@@ -845,15 +905,26 @@ impl BoundedOutput {
     }
 }
 
-async fn run_step_inner(
-    workspace_root: PathBuf,
+struct StepLimits {
     default_timeout: Duration,
     max_stream_bytes: usize,
+    timeout_cap: Option<Duration>,
+}
+
+async fn run_step_inner(
+    workspace_root: PathBuf,
+    limits: StepLimits,
     step: ExecStep,
     request_timeout_secs: Option<u64>,
     started: Instant,
     stdin_data: Option<Vec<u8>>,
+    #[cfg(any(unix, windows))] operation: OwnedCommandOperation,
 ) -> Result<StepExecution, ToolResult> {
+    let StepLimits {
+        default_timeout,
+        max_stream_bytes,
+        timeout_cap,
+    } = limits;
     let cwd = match resolve_exec_cwd(&workspace_root, step.cwd.as_deref()) {
         Ok(cwd) => cwd,
         Err(e) => return Err(ToolResult::error(e.to_string())),
@@ -863,82 +934,216 @@ async fn run_step_inner(
         .or(request_timeout_secs)
         .map(|secs| Duration::from_secs(secs.clamp(1, MAX_TIMEOUT_SECS)))
         .unwrap_or(default_timeout);
+    // Pipeline request budgets constrain step overrides inside the owner so
+    // timeout output is returned only after that operation confirms cleanup.
+    let timeout = timeout_cap.map_or(timeout, |cap| timeout.min(cap));
 
-    let mut cmd = Command::new(&step.command);
-    cmd.args(&step.args)
-        .current_dir(&cwd)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    crate::process_boundary::isolate_terminal_input(&mut cmd, stdin_data.is_some());
-    scrub_and_apply_env(&mut cmd, &step.env);
-
-    let mut child = match cmd.spawn() {
-        Ok(child) => child,
-        Err(e) => {
-            return Err(ToolResult::error(format!(
-                "failed to spawn '{}': {e}",
-                step.command
-            )));
-        }
-    };
-
-    let stdout = child.stdout.take().expect("stdout is piped");
-    let stderr = child.stderr.take().expect("stderr is piped");
-    let stdin_task = stdin_data.map(|data| {
-        let mut stdin = child.stdin.take().expect("stdin is piped");
-        tokio::spawn(async move {
-            let _ = stdin.write_all(&data).await;
+    #[cfg(windows)]
+    {
+        let memory = crate::process_memory::ProcessMemoryPolicy::resolve(
+            step.memory_limit_mib,
+            Default::default(),
+        )
+        .map_err(ToolResult::error)?;
+        let output = operation
+            .execute_tool_command(
+                &step.command,
+                &step.args,
+                &cwd,
+                &step.env,
+                stdin_data,
+                timeout,
+                max_stream_bytes,
+                memory,
+            )
+            .await
+            .map_err(|failure| {
+                ToolResult::error(format!(
+                    "process start: {:?}; {}",
+                    failure.start_state, failure.message
+                ))
+            })?;
+        let bounded = |bytes: Vec<u8>, total_bytes| BoundedOutput {
+            content: bytes.into_iter().take(max_stream_bytes).collect(),
+            total_bytes,
+        };
+        Ok(StepExecution {
+            memory_evidence: Some(
+                "memory child evidence: Windows Job configured before resume".to_owned(),
+            ),
+            cwd,
+            duration_ms: started.elapsed().as_millis(),
+            exit_code: if output.timed_out {
+                None
+            } else {
+                output.output.status.code()
+            },
+            success: !output.timed_out && output.output.status.success(),
+            marker: output.timed_out.then_some("timeout"),
+            stdout: bounded(output.output.stdout, output.stdout_total),
+            stderr: bounded(output.output.stderr, output.stderr_total),
         })
-    });
-    let stdout_task = tokio::spawn(read_bounded(stdout, max_stream_bytes));
-    let stderr_task = tokio::spawn(read_bounded(stderr, max_stream_bytes));
-
-    let wait_status = tokio::select! {
-        status = child.wait() => {
-            match status {
-                Ok(status) => Some(status),
-                Err(e) => return Err(ToolResult::error(format!("failed to wait for child: {e}"))),
-            }
-        }
-        _ = tokio::time::sleep(timeout) => {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
-            None
-        }
-    };
-
-    let stdout = stdout_task
-        .await
-        .unwrap_or_else(|e| BoundedOutput::from_error(format!("stdout reader failed: {e}")));
-    let stderr = stderr_task
-        .await
-        .unwrap_or_else(|e| BoundedOutput::from_error(format!("stderr reader failed: {e}")));
-    if let Some(task) = stdin_task {
-        let _ = task.await;
     }
-    let duration_ms = started.elapsed().as_millis();
 
-    let Some(status) = wait_status else {
-        return Ok(StepExecution {
+    #[cfg(unix)]
+    {
+        let memory = crate::process_memory::ProcessMemoryPolicy::resolve(
+            step.memory_limit_mib,
+            Default::default(),
+        )
+        .map_err(ToolResult::error)?;
+        let mut command = Command::new(&step.command);
+        command.args(&step.args).current_dir(&cwd);
+        scrub_and_apply_env(&mut command, &step.env);
+        // The supervisor owns setsid; do not install the terminal hook twice.
+        let evidence =
+            crate::process_boundary::apply_memory_hardening_with_evidence(&mut command, memory)
+                .map_err(|error| {
+                    ToolResult::error(format!("memory channel setup failed: {error}"))
+                })?;
+        let capture = std::sync::Arc::new(talos_sandbox::CommandCapture::default());
+        let output = operation
+            .execute_captured(
+                command.into_std(),
+                timeout,
+                max_stream_bytes,
+                stdin_data,
+                capture.clone(),
+            )
+            .await
+            .map_err(|error| ToolResult::error(error.to_string()))?;
+        let timed_out = capture.timed_out.load(std::sync::atomic::Ordering::SeqCst);
+        Ok(StepExecution {
+            memory_evidence: Some(evidence.describe()),
+            cwd,
+            duration_ms: started.elapsed().as_millis(),
+            exit_code: if timed_out {
+                None
+            } else {
+                output.status.code()
+            },
+            success: !timed_out && output.status.success(),
+            marker: timed_out.then_some("timeout"),
+            stdout: BoundedOutput {
+                content: output.stdout,
+                total_bytes: capture
+                    .stdout_bytes
+                    .load(std::sync::atomic::Ordering::SeqCst),
+            },
+            stderr: BoundedOutput {
+                content: output.stderr,
+                total_bytes: capture
+                    .stderr_bytes
+                    .load(std::sync::atomic::Ordering::SeqCst),
+            },
+        })
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let mut cmd = Command::new(&step.command);
+        cmd.args(&step.args)
+            .current_dir(&cwd)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        crate::process_boundary::isolate_terminal_input(&mut cmd, stdin_data.is_some());
+        scrub_and_apply_env(&mut cmd, &step.env);
+
+        let memory = crate::process_memory::ProcessMemoryPolicy::resolve(
+            step.memory_limit_mib,
+            Default::default(),
+        )
+        .map_err(ToolResult::error)?;
+        #[cfg(unix)]
+        let evidence =
+            crate::process_boundary::apply_memory_hardening_with_evidence(&mut cmd, memory)
+                .map_err(|error| {
+                    ToolResult::error(format!("memory evidence channel setup failed: {error}"))
+                })?;
+
+        let mut child = match cmd.spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                return Err(ToolResult::error(format!(
+                    "failed to spawn '{}': {e}",
+                    step.command
+                )));
+            }
+        };
+        #[cfg(unix)]
+        let memory_evidence = Some(evidence.describe());
+        #[cfg(not(unix))]
+        let memory_evidence = None;
+        drop(cmd);
+
+        let stdout = child.stdout.take().expect("stdout is piped");
+        let stderr = child.stderr.take().expect("stderr is piped");
+        let stdin_task = stdin_data.map(|data| {
+            let mut stdin = child.stdin.take().expect("stdin is piped");
+            tokio::spawn(async move {
+                let _ = stdin.write_all(&data).await;
+            })
+        });
+        let stdout_task = tokio::spawn(read_bounded(stdout, max_stream_bytes));
+        let stderr_task = tokio::spawn(read_bounded(stderr, max_stream_bytes));
+        #[cfg(unix)]
+        let process_group = child
+            .id()
+            .and_then(|pid| i32::try_from(pid).ok())
+            .filter(|pid| *pid > 0)
+            .ok_or_else(|| ToolResult::error("child process group identity unavailable"))?;
+
+        let wait_status = tokio::select! {
+            status = child.wait() => {
+                match status {
+                    Ok(status) => Some(status),
+                    Err(e) => return Err(ToolResult::error(format!("failed to wait for child: {e}"))),
+                }
+            }
+            _ = tokio::time::sleep(timeout) => {
+                #[cfg(unix)]
+                crate::process_boundary::signal_process_group(process_group, libc::SIGKILL)
+                    .map_err(ToolResult::error)?;
+                let _ = child.kill().await;
+                let _ = child.wait().await;
+                None
+            }
+        };
+
+        let stdout = stdout_task
+            .await
+            .unwrap_or_else(|e| BoundedOutput::from_error(format!("stdout reader failed: {e}")));
+        let stderr = stderr_task
+            .await
+            .unwrap_or_else(|e| BoundedOutput::from_error(format!("stderr reader failed: {e}")));
+        if let Some(task) = stdin_task {
+            let _ = task.await;
+        }
+        let duration_ms = started.elapsed().as_millis();
+
+        let Some(status) = wait_status else {
+            return Ok(StepExecution {
+                memory_evidence,
+                cwd,
+                duration_ms,
+                exit_code: None,
+                success: false,
+                marker: Some("timeout"),
+                stdout,
+                stderr,
+            });
+        };
+        let exit_code = status.code().unwrap_or(-1);
+        Ok(StepExecution {
+            memory_evidence,
             cwd,
             duration_ms,
-            exit_code: None,
-            success: false,
-            marker: Some("timeout"),
+            exit_code: Some(exit_code),
+            success: status.success(),
+            marker: None,
             stdout,
             stderr,
-        });
-    };
-    let exit_code = status.code().unwrap_or(-1);
-    Ok(StepExecution {
-        cwd,
-        duration_ms,
-        exit_code: Some(exit_code),
-        success: status.success(),
-        marker: None,
-        stdout,
-        stderr,
-    })
+        })
+    }
 }
 
 fn resolve_exec_cwd(
@@ -956,6 +1161,7 @@ fn resolve_exec_cwd(
     Ok(resolved)
 }
 
+#[cfg(not(windows))]
 fn scrub_and_apply_env(cmd: &mut Command, env: &BTreeMap<String, String>) {
     for name in talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names() {
         cmd.env_remove(name);
@@ -965,6 +1171,7 @@ fn scrub_and_apply_env(cmd: &mut Command, env: &BTreeMap<String, String>) {
     }
 }
 
+#[cfg(not(any(unix, windows)))]
 async fn read_bounded<R>(mut reader: R, limit: usize) -> BoundedOutput
 where
     R: tokio::io::AsyncRead + Unpin,
@@ -1001,6 +1208,17 @@ where
 
 fn format_step_output(step: &ExecStep, result: &StepExecution) -> String {
     let mut output = String::new();
+    if let Some(evidence) = &result.memory_evidence {
+        output.push_str(evidence);
+        output.push('\n');
+    }
+    if let Ok(memory) = crate::process_memory::ProcessMemoryPolicy::resolve(
+        step.memory_limit_mib,
+        Default::default(),
+    ) {
+        output.push_str(&memory.describe());
+        output.push('\n');
+    }
     output.push_str(&format!("command: {}\n", step.command));
     output.push_str(&format!("args: {}\n", step.args.len()));
     output.push_str(&format!("cwd: {}\n", result.cwd.display()));
@@ -1091,6 +1309,267 @@ fn is_sensitive_env_name(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    #[test]
+    fn windows_memory_step_probe() {
+        let Some(expected) = std::env::var_os("TALOS_MEMORY_STEP_ALLOCATION") else {
+            return;
+        };
+        // Pipeline consumers must drain the preceding test harness output.
+        let mut input = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut input).expect("pipeline input");
+        let mut allocation = Vec::<u8>::new();
+        let allowed = allocation.try_reserve_exact(192 * 1024 * 1024).is_ok();
+        assert_eq!(allowed, expected == "allowed");
+        println!(
+            "memory-step-allocation={}",
+            if allowed { "allowed" } else { "denied" }
+        );
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_memory_inheritance_and_override_reach_composed_children() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let executable = std::env::current_exe().expect("test executable");
+        let inherited = serde_json::json!({
+            "command":executable,
+            "args":["--exact","exec_tool::tests::windows_memory_step_probe","--nocapture","--test-threads=1"],
+            "env":{"TALOS_MEMORY_STEP_ALLOCATION":"denied"}
+        });
+        let mut overridden = inherited.clone();
+        overridden["memory_limit_mib"] = serde_json::json!(256);
+        overridden["env"]["TALOS_MEMORY_STEP_ALLOCATION"] = serde_json::json!("allowed");
+        for mode in ["sequential", "parallel"] {
+            for pipes in [false, true] {
+                let mut request = serde_json::json!({"mode":mode,"memory_limit_mib":128});
+                if pipes {
+                    request["pipes"] = serde_json::json!([
+                        {"steps":[inherited.clone(),overridden.clone()]},
+                        {"steps":[overridden.clone(),inherited.clone()]}
+                    ]);
+                } else {
+                    request["steps"] = serde_json::json!([inherited.clone(), overridden.clone()]);
+                }
+                let result = tool.execute(request).await;
+                assert!(!result.is_error, "{mode} pipes={pipes}: {}", result.content);
+                assert!(result.content.contains("memory-step-allocation=allowed"));
+                assert!(result.content.contains("memory-step-allocation=denied"));
+            }
+        }
+        let receipt = tool.cleanup_receipt().expect("aggregate owner");
+        receipt.seal();
+        receipt
+            .wait(Duration::from_secs(5))
+            .await
+            .expect("all composed children cleaned");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn pipeline_timeout_retains_output_and_confirms_cleanup_before_return() {
+        let (tool, temp) = tool_with_temp_workspace();
+        let result = tool.execute(serde_json::json!({"timeout_secs":1,"pipes":[{"steps":[
+            {"command":"sh","args":["-c","printf retained; (sleep 2; touch escaped) & wait"],"timeout_secs":30},
+            {"command":"touch","args":["forbidden"]}
+        ]}]})).await;
+        assert!(result.is_error);
+        assert!(result.content.contains("retained"), "{}", result.content);
+        assert!(result.content.contains("[timeout]"), "{}", result.content);
+        let receipt = tool.cleanup_receipt().expect("aggregate owner");
+        receipt.seal();
+        receipt
+            .wait(Duration::from_millis(100))
+            .await
+            .expect("cleanup already confirmed before result");
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        assert!(!temp.path().join("escaped").exists());
+        assert!(!temp.path().join("forbidden").exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn cancelled_foreground_exec_prevents_late_descendant_effect() {
+        let (tool, temp) = tool_with_temp_workspace();
+        let receipt = tool.cleanup_receipt().expect("aggregate cleanup owner");
+        let task = tokio::spawn(async move {
+            tool.execute(serde_json::json!({"command":"sh", "args":["-c",
+                "printf started > started; (sleep 1; printf escaped > escaped) & wait"]}))
+                .await
+        });
+        let started = tokio::time::timeout(Duration::from_secs(3), async {
+            while !temp.path().join("started").exists() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        task.abort();
+        let _ = task.await;
+        receipt.seal();
+        receipt
+            .wait(Duration::from_secs(3))
+            .await
+            .expect("confirmed group cleanup");
+        assert!(started.is_ok(), "payload must start before cancellation");
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        assert!(
+            !temp.path().join("escaped").exists(),
+            "cancelled operation left a live descendant"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn foreground_timeout_does_not_wait_for_descendant_pipe_eof() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let result = tokio::time::timeout(
+            Duration::from_millis(1800),
+            tool.execute(serde_json::json!({
+                "command":"sh", "args":["-c", "sleep 3 & wait"], "timeout_secs":1
+            })),
+        )
+        .await
+        .expect("one-second timeout must not wait for descendant pipe EOF");
+        assert!(result.is_error);
+        assert!(result.content.contains("[timeout]"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn memory_child_evidence_is_metadata_not_pipeline_input() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let result = tool
+            .execute(serde_json::json!({"pipes":[{"steps":[
+                {"command":"printf", "args":["payload-only"]},
+                {"command":"cat"}
+            ]}]}))
+            .await;
+        assert!(!result.is_error, "{}", result.content);
+        assert_eq!(result.content.matches("memory child evidence:").count(), 2);
+        assert!(
+            result.content.contains("effective_soft_bytes="),
+            "{}",
+            result.content
+        );
+        assert!(
+            result.content.contains("effective_hard_bytes="),
+            "{}",
+            result.content
+        );
+        assert_eq!(result.content.matches("payload-only").count(), 2);
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn cancelled_foreground_memory_command_remains_owned_by_tool_cleanup() {
+        let (tool, temp) = tool_with_temp_workspace();
+        let tool = std::sync::Arc::new(tool);
+        let receipt = tool.cleanup_receipt().expect("aggregate cleanup owner");
+        let running = tool.clone();
+        let task = tokio::spawn(async move {
+            running.execute(serde_json::json!({
+                "command":"powershell.exe",
+                "args":["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+                    "[IO.File]::WriteAllText('started', 'yes'); Start-Sleep -Seconds 30; [IO.File]::WriteAllText('escaped', 'bad')"],
+                "memory_limit_mib":2048
+            })).await
+        });
+        let started = tokio::time::timeout(Duration::from_secs(15), async {
+            while !temp.path().join("started").exists() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        task.abort();
+        let _ = task.await;
+        receipt.seal();
+        receipt
+            .wait(Duration::from_secs(5))
+            .await
+            .expect("Job and IO cleanup must finish after caller cancellation");
+        assert!(
+            started.is_ok(),
+            "child must start before testing cancellation"
+        );
+        assert!(!temp.path().join("escaped").exists());
+        let refused = tool.execute(serde_json::json!({"command":"powershell.exe", "args":["-Command", "'must not launch'"]})).await;
+        assert!(refused.is_error, "sealed host must refuse another command");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn memory_inheritance_reaches_real_sequential_parallel_and_pipeline_children() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        let inherited = serde_json::json!({"command":"sh", "args":["-c", "cat >/dev/null; printf 'observed='; ulimit -v"]});
+        let overridden = serde_json::json!({"command":"sh", "args":["-c", "cat >/dev/null; printf 'observed='; ulimit -v"], "memory_limit_mib":128});
+        for mode in ["sequential", "parallel"] {
+            for pipes in [false, true] {
+                let mut request = serde_json::json!({"mode":mode, "memory_limit_mib":256});
+                if pipes {
+                    request["pipes"] = serde_json::json!([
+                        {"steps":[inherited.clone(), overridden.clone()]},
+                        {"steps":[overridden.clone(), inherited.clone()]},
+                    ]);
+                } else {
+                    request["steps"] = serde_json::json!([inherited.clone(), overridden.clone()]);
+                }
+                let result = tool.execute(request).await;
+                assert!(!result.is_error, "{mode} pipes={pipes}: {}", result.content);
+                assert!(
+                    result.content.contains("observed=262144"),
+                    "{}",
+                    result.content
+                );
+                assert!(
+                    result.content.contains("observed=131072"),
+                    "{}",
+                    result.content
+                );
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn invalid_memory_value_never_launches_an_earlier_valid_step() {
+        let (tool, temp) = tool_with_temp_workspace();
+        let marker = temp.path().join("must-not-exist");
+        let result = tool
+            .execute(serde_json::json!({"steps":[
+                {"command":"sh", "args":["-c", "touch must-not-exist"]},
+                {"command":"sh", "args":["-c", "true"], "memory_limit_mib":null}
+            ]}))
+            .await;
+        assert!(result.is_error);
+        assert!(
+            !marker.exists(),
+            "whole request must validate before any step launch"
+        );
+    }
+
+    #[test]
+    fn memory_policy_parser_checks_request_step_and_pipeline_fields() {
+        let (tool, _temp) = tool_with_temp_workspace();
+        for value in [
+            serde_json::json!(null),
+            serde_json::json!(63),
+            serde_json::json!(65537),
+            serde_json::json!(64.5),
+        ] {
+            for input in [
+                serde_json::json!({"command":"echo", "memory_limit_mib":value}),
+                serde_json::json!({"steps":[{"command":"echo", "memory_limit_mib":value}]}),
+                serde_json::json!({"pipes":[{"steps":[{"command":"echo"},{"command":"echo", "memory_limit_mib":value}]}]}),
+            ] {
+                assert!(tool.parse_input(input).is_err());
+            }
+        }
+        let input = tool.parse_input(serde_json::json!({"memory_limit_mib":4096, "steps":[{"command":"echo"},{"command":"echo", "memory_limit_mib":64}]})).expect("valid request and step policies");
+        assert_eq!(input.memory_limit_mib, Some(4096));
+        assert_eq!(input.steps[0].memory_limit_mib, Some(4096));
+        assert_eq!(input.steps[1].memory_limit_mib, Some(64));
+    }
+
     use super::*;
     use talos_core::tool::ToolResourceKind;
     use tempfile::TempDir;

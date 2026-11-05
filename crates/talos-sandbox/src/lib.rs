@@ -112,8 +112,46 @@ pub struct OwnedCommandOperation {
     cleanup: std::sync::Arc<supervisor::Cleanup>,
 }
 
+/// Retained output metadata for command tools using truncation rather than
+/// treating an output limit as an execution failure.
+/// Use a fresh instance for each execution; never share or modify it while running.
+#[cfg(unix)]
+#[derive(Debug, Default)]
+pub struct CommandCapture {
+    /// Total stdout bytes observed, including bytes discarded after the limit.
+    pub stdout_bytes: std::sync::atomic::AtomicUsize,
+    /// Total stderr bytes observed, including bytes discarded after the limit.
+    pub stderr_bytes: std::sync::atomic::AtomicUsize,
+    /// Whether the command reached its execution deadline.
+    pub timed_out: std::sync::atomic::AtomicBool,
+}
+
 #[cfg(unix)]
 impl OwnedCommandOperation {
+    /// Execute with bounded retained streams and explicit timeout metadata.
+    /// Lifecycle ownership and cleanup are identical to strict-output execution.
+    /// A deadline returns retained output after confirmed cleanup, so callers must
+    /// inspect `capture.timed_out` even when the result is `Ok`.
+    pub async fn execute_captured(
+        &self,
+        command: std::process::Command,
+        deadline: std::time::Duration,
+        output_limit: usize,
+        input: Option<Vec<u8>>,
+        capture: std::sync::Arc<CommandCapture>,
+    ) -> Result<std::process::Output, OwnedCommandFailure> {
+        supervisor::execute_with_capture(
+            command,
+            self.cleanup.clone(),
+            deadline,
+            (),
+            output_limit,
+            input,
+            Some(capture),
+        )
+        .await
+    }
+
     /// Execute with typed startup evidence, preserving the existing cleanup scope.
     /// A failure's startup state is not cleanup evidence; retain and wait for the
     /// operation receipt after completion or after dropping a cancelled future.

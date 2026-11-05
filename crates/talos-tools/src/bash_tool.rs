@@ -1,7 +1,7 @@
 //! Bash tool for shell command execution.
 
 use std::path::PathBuf;
-#[cfg(not(windows))]
+#[cfg(not(any(unix, windows)))]
 use std::process::Stdio;
 use std::time::Duration;
 use std::{
@@ -15,15 +15,13 @@ use serde::Deserialize;
 use serde_json::Value;
 #[cfg(any(unix, windows))]
 use talos_core::background_job::BackgroundJobRequest;
-#[cfg(windows)]
-use talos_core::background_job::{BackgroundJobLauncher, BackgroundProcessEvent};
 use talos_core::background_job::{BackgroundJobPermit, ToolExecutionAdmission};
 use talos_core::tool::{
     AgentTool, ToolExecutionAuthorization, ToolExecutionOutput, ToolFamily, ToolNature,
     ToolPermissionFacet, ToolResourceKind, ToolResult,
 };
 use thiserror::Error;
-#[cfg(not(windows))]
+#[cfg(not(any(unix, windows)))]
 use tokio::io::{AsyncBufReadExt, BufReader};
 #[cfg(not(windows))]
 use tokio::process::Command;
@@ -41,6 +39,10 @@ pub enum BashError {
 pub struct BashInput {
     /// The shell command to execute.
     pub command: String,
+    /// Per-process memory policy in MiB (64..=65536); omission uses 2048 MiB.
+    #[serde(default, deserialize_with = "crate::process_memory::deserialize_limit")]
+    #[schemars(with = "u64", range(min = 64, max = 65536))]
+    pub memory_limit_mib: Option<u64>,
     /// Optional timeout in seconds. Clamped to [1, 600]. Defaults to 120 if omitted.
     #[serde(default)]
     #[schemars(range(min = 1, max = 600))]
@@ -58,17 +60,19 @@ pub struct BashTool {
     working_dir: PathBuf,
     working_dir_identity: Option<String>,
     timeout: Duration,
+    #[cfg(unix)]
+    executor: talos_sandbox::OwnedCommandExecutor,
+    #[cfg(windows)]
+    executor: crate::process_boundary::windows_foreground::OwnedCommandExecutor,
 }
 
 // Each pipe has its own incomplete line so UTF-8 sequences cannot be split by
 // a chunk boundary or by output arriving from the other pipe.
-#[cfg(any(windows, test))]
 #[derive(Default)]
 struct ShellOutputLine {
     pending: Vec<u8>,
 }
 
-#[cfg(any(windows, test))]
 impl ShellOutputLine {
     fn push(&mut self, bytes: &[u8], output: &mut String) {
         for segment in bytes.split_inclusive(|byte| *byte == b'\n') {
@@ -172,6 +176,10 @@ impl BashTool {
             working_dir_identity: directory_identity(&working_dir),
             working_dir,
             timeout: Duration::from_secs(120),
+            #[cfg(unix)]
+            executor: talos_sandbox::OwnedCommandExecutor::default(),
+            #[cfg(windows)]
+            executor: crate::process_boundary::windows_foreground::OwnedCommandExecutor::default(),
         }
     }
 
@@ -196,7 +204,12 @@ impl BashTool {
         bash_permission_resource(command, &self.working_dir)
     }
 
-    async fn run_command(&self, command: &str, timeout_duration: Duration) -> ToolResult {
+    async fn run_command(
+        &self,
+        command: &str,
+        timeout_duration: Duration,
+        memory: crate::process_memory::ProcessMemoryPolicy,
+    ) -> ToolResult {
         if self.working_dir_identity.is_none()
             || directory_identity(&self.working_dir) != self.working_dir_identity
         {
@@ -206,26 +219,106 @@ impl BashTool {
         }
         #[cfg(windows)]
         {
-            self.run_command_windows(command, timeout_duration).await
+            self.run_command_windows(command, timeout_duration, memory)
+                .await
         }
         #[cfg(not(windows))]
-        self.run_command_unix(command, timeout_duration).await
+        self.run_command_unix(command, timeout_duration, memory)
+            .await
     }
 
-    #[cfg(not(windows))]
-    async fn run_command_unix(&self, command: &str, timeout_duration: Duration) -> ToolResult {
+    #[cfg(unix)]
+    async fn run_command_unix(
+        &self,
+        command: &str,
+        timeout_duration: Duration,
+        memory: crate::process_memory::ProcessMemoryPolicy,
+    ) -> ToolResult {
+        // Reuse the supervisor's session, cancellation and aggregate cleanup owner.
+        // Retain at most 1 MiB per stream while continuing to drain both pipes.
+        const STREAM_LIMIT: usize = 1024 * 1024;
+        let mut cmd = platform_shell_command(command);
+        cmd.current_dir(&self.working_dir);
+        let evidence =
+            match crate::process_boundary::apply_memory_hardening_with_evidence(&mut cmd, memory) {
+                Ok(evidence) => evidence,
+                Err(error) => {
+                    return ToolResult::error(format!(
+                        "memory evidence channel setup failed: {error}"
+                    ));
+                }
+            };
+        let capture = std::sync::Arc::new(talos_sandbox::CommandCapture::default());
+        let result = self
+            .executor
+            .operation()
+            .execute_captured(
+                cmd.into_std(),
+                timeout_duration,
+                STREAM_LIMIT,
+                None,
+                capture.clone(),
+            )
+            .await;
+        let result = match result {
+            Ok(result) => result,
+            Err(error) => return ToolResult::error(format!("failed to execute shell: {error}")),
+        };
+        let mut output = format!("$ {command}\n{}\n", evidence.describe());
+        for (name, bytes, total) in [
+            ("stdout", &result.stdout, &capture.stdout_bytes),
+            ("stderr", &result.stderr, &capture.stderr_bytes),
+        ] {
+            let mut lines = ShellOutputLine::default();
+            lines.push(bytes, &mut output);
+            lines.flush(&mut output);
+            if total.load(std::sync::atomic::Ordering::SeqCst) > bytes.len() {
+                output.push_str(&format!("[{name} truncated at {} bytes]\n", bytes.len()));
+            }
+        }
+        if capture.timed_out.load(std::sync::atomic::Ordering::SeqCst) {
+            output.push_str("[timeout]");
+            return ToolResult::error(output);
+        }
+        let exit_code = result.status.code().unwrap_or(-1);
+        output.push_str(&format!("[exit {exit_code}]"));
+        if is_expected_exit_code(command, exit_code) {
+            ToolResult::success(output)
+        } else {
+            ToolResult::error(output)
+        }
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    async fn run_command_unix(
+        &self,
+        command: &str,
+        timeout_duration: Duration,
+        memory: crate::process_memory::ProcessMemoryPolicy,
+    ) -> ToolResult {
         let mut cmd = platform_shell_command(command);
         cmd.current_dir(&self.working_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         crate::process_boundary::isolate_terminal_input(&mut cmd, false);
         #[cfg(unix)]
-        crate::process_boundary::apply_process_hardening(&mut cmd);
+        let evidence =
+            match crate::process_boundary::apply_memory_hardening_with_evidence(&mut cmd, memory) {
+                Ok(evidence) => evidence,
+                Err(error) => {
+                    return ToolResult::error(format!(
+                        "memory evidence channel setup failed: {error}"
+                    ));
+                }
+            };
 
         let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => return ToolResult::error(format!("failed to spawn shell: {e}")),
         };
+        #[cfg(unix)]
+        let memory_evidence = evidence.describe();
+        drop(cmd);
 
         let stdout_pipe = child.stdout.take().expect("stdout is piped");
         let stderr_pipe = child.stderr.take().expect("stderr is piped");
@@ -235,6 +328,8 @@ impl BashTool {
 
         let mut output = String::new();
         output.push_str(&format!("$ {command}\n"));
+        #[cfg(unix)]
+        output.push_str(&format!("{memory_evidence}\n"));
 
         let deadline = tokio::time::sleep(timeout_duration);
         tokio::pin!(deadline);
@@ -324,73 +419,77 @@ impl BashTool {
     /// Runs the Windows foreground shell inside a Job Object so timeout cleanup
     /// terminates descendants that inherited the output pipes as well.
     #[cfg(windows)]
-    async fn run_command_windows(&self, command: &str, timeout_duration: Duration) -> ToolResult {
-        let launcher = crate::process_boundary::WindowsBackgroundLauncher::new(
-            "powershell.exe".to_owned(),
-            vec![
-                "-NoLogo".to_owned(),
-                "-NoProfile".to_owned(),
-                "-NonInteractive".to_owned(),
-                "-Command".to_owned(),
-                command.to_owned(),
-            ],
-            self.working_dir.clone(),
-            std::collections::BTreeMap::new(),
-        );
-        let mut launched = match Box::new(launcher).launch().await {
-            Ok(job) => job,
-            Err(error) => return ToolResult::error(format!("failed to spawn shell: {error}")),
+    async fn run_command_windows(
+        &self,
+        command: &str,
+        timeout_duration: Duration,
+        memory: crate::process_memory::ProcessMemoryPolicy,
+    ) -> ToolResult {
+        const STREAM_LIMIT: usize = 1024 * 1024;
+        let args = vec![
+            "-NoLogo".to_owned(),
+            "-NoProfile".to_owned(),
+            "-NonInteractive".to_owned(),
+            "-Command".to_owned(),
+            command.to_owned(),
+        ];
+        let result = self
+            .executor
+            .operation()
+            .execute_tool_command(
+                "powershell.exe",
+                &args,
+                &self.working_dir,
+                &std::collections::BTreeMap::new(),
+                None,
+                timeout_duration,
+                STREAM_LIMIT,
+                memory,
+            )
+            .await;
+        let result = match result {
+            Ok(result) => result,
+            Err(error) => {
+                return ToolResult::error(format!(
+                    "process start: {:?}; {}",
+                    error.start_state, error.message
+                ));
+            }
         };
         let mut output = format!("$ {command}\n");
-        let mut stdout = ShellOutputLine::default();
-        let mut stderr = ShellOutputLine::default();
-        let deadline = tokio::time::sleep(timeout_duration);
-        tokio::pin!(deadline);
-        loop {
-            tokio::select! {
-                event = launched.events.recv() => match event {
-                    Some(BackgroundProcessEvent::Output(chunk)) => {
-                        match chunk.stream {
-                            talos_core::background_job::BackgroundOutputStream::Stdout => stdout.push(&chunk.bytes, &mut output),
-                            talos_core::background_job::BackgroundOutputStream::Stderr => stderr.push(&chunk.bytes, &mut output),
-                        }
-                    }
-                    Some(BackgroundProcessEvent::Exited(exit)) => {
-                        let code = exit.code.unwrap_or(-1);
-                        stdout.flush(&mut output);
-                        stderr.flush(&mut output);
-                        output.push_str(&format!("[exit {code}]"));
-                        return if is_expected_exit_code(command, code) {
-                            ToolResult::success(output)
-                        } else {
-                            ToolResult::error(output)
-                        };
-                    }
-                    Some(BackgroundProcessEvent::SupervisionFailed(error)) => {
-                        stdout.flush(&mut output);
-                        stderr.flush(&mut output);
-                        return ToolResult::error(format!("{output}[supervision error: {error}]"));
-                    }
-                    None => {
-                        stdout.flush(&mut output);
-                        stderr.flush(&mut output);
-                        return ToolResult::error(format!("{output}[supervision closed]"));
-                    },
-                },
-                _ = &mut deadline => {
-                    let _ = launched.control.force_terminate().await;
-                    stdout.flush(&mut output);
-                    stderr.flush(&mut output);
-                    output.push_str("[timeout]");
-                    return ToolResult::error(output);
-                }
+        output.push_str("memory child evidence: Windows Job configured before resume\n");
+        for (name, bytes, total) in [
+            ("stdout", &result.output.stdout, result.stdout_total),
+            ("stderr", &result.output.stderr, result.stderr_total),
+        ] {
+            let mut lines = ShellOutputLine::default();
+            lines.push(bytes, &mut output);
+            lines.flush(&mut output);
+            if total > bytes.len() {
+                output.push_str(&format!("[{name} truncated at {} bytes]\n", bytes.len()));
             }
+        }
+        if result.timed_out {
+            output.push_str("[timeout]");
+            return ToolResult::error(output);
+        }
+        let code = result.output.status.code().unwrap_or(-1);
+        output.push_str(&format!("[exit {code}]"));
+        if is_expected_exit_code(command, code) {
+            ToolResult::success(output)
+        } else {
+            ToolResult::error(output)
         }
     }
 }
 
 #[async_trait]
 impl AgentTool for BashTool {
+    #[cfg(any(unix, windows))]
+    fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner>> {
+        Some(std::sync::Arc::new(self.executor.clone()))
+    }
+
     fn invocation_review_configuration(&self) -> Option<Value> {
         Some(serde_json::json!({
             "backend": if cfg!(windows) { "powershell.exe" } else { "sh -c" },
@@ -410,7 +509,7 @@ impl AgentTool for BashTool {
     }
 
     fn description(&self) -> &str {
-        "Execute a shell command (fallback: prefer grep/glob/ls/read/write/edit/delete for file ops)"
+        "Execute a shell command (fallback: prefer grep/glob/ls/read/write/edit/delete for file ops). Optional memory_limit_mib: integer 64..65536, default 2048 MiB per process; not RSS or a process-tree quota. Explicit setup failure refuses startup; omitted Unix limits are best-effort."
     }
 
     fn parameters(&self) -> Value {
@@ -462,7 +561,7 @@ impl AgentTool for BashTool {
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {
-        &["command", "background"]
+        &["command", "background", "memory_limit_mib"]
     }
 
     fn execution_admission(&self, input: &Value) -> Result<ToolExecutionAdmission, String> {
@@ -513,6 +612,13 @@ impl AgentTool for BashTool {
                 Ok(_) => return ToolExecutionOutput::error("background intent is missing"),
                 Err(error) => return ToolExecutionOutput::error(error.to_string()),
             };
+            let memory = match crate::process_memory::ProcessMemoryPolicy::resolve(
+                parsed.memory_limit_mib,
+                Default::default(),
+            ) {
+                Ok(memory) => memory,
+                Err(error) => return ToolExecutionOutput::error(error),
+            };
             let launcher = crate::process_boundary::WindowsBackgroundLauncher::new(
                 "powershell.exe".to_owned(),
                 vec![
@@ -525,7 +631,14 @@ impl AgentTool for BashTool {
                 self.working_dir.clone(),
                 std::collections::BTreeMap::new(),
             );
-            ToolExecutionOutput::from_result(permit.launch(Box::new(launcher)).await)
+            ToolExecutionOutput::from_result(
+                memory.annotate_background(
+                    permit
+                        .launch(Box::new(launcher.with_memory_policy(memory)))
+                        .await,
+                    None,
+                ),
+            )
         }
         #[cfg(unix)]
         {
@@ -536,8 +649,22 @@ impl AgentTool for BashTool {
             };
             let mut command = platform_shell_command(&parsed.command);
             command.current_dir(&self.working_dir);
-            let launcher = crate::process_boundary::UnixBackgroundLauncher::new(command);
-            ToolExecutionOutput::from_result(permit.launch(Box::new(launcher)).await)
+            let memory = match crate::process_memory::ProcessMemoryPolicy::resolve(
+                parsed.memory_limit_mib,
+                Default::default(),
+            ) {
+                Ok(memory) => memory,
+                Err(error) => return ToolExecutionOutput::error(error),
+            };
+            let launcher = crate::process_boundary::UnixBackgroundLauncher::new(command)
+                .with_memory_policy(memory);
+            let evidence = launcher.memory_evidence();
+            let result = permit.launch(Box::new(launcher)).await;
+            let evidence = evidence
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .take();
+            ToolExecutionOutput::from_result(memory.annotate_background(result, evidence))
         }
     }
 
@@ -553,8 +680,17 @@ impl AgentTool for BashTool {
             .map(|s| Duration::from_secs(s.clamp(1, MAX_TIMEOUT_SECS)))
             .unwrap_or(self.timeout);
 
-        self.run_command(&bash_input.command, timeout_duration)
-            .await
+        let memory = match crate::process_memory::ProcessMemoryPolicy::resolve(
+            bash_input.memory_limit_mib,
+            Default::default(),
+        ) {
+            Ok(memory) => memory,
+            Err(error) => return ToolResult::error(error),
+        };
+        memory.annotate(
+            self.run_command(&bash_input.command, timeout_duration, memory)
+                .await,
+        )
     }
 }
 
@@ -573,6 +709,12 @@ fn parse_input(input: Value) -> Result<BashInput, BashError> {
 
     Ok(BashInput {
         command: command.to_owned(),
+        memory_limit_mib: obj
+            .get("memory_limit_mib")
+            .map(|value| crate::process_memory::deserialize_limit(value.clone()))
+            .transpose()
+            .map_err(|error| BashError::InvalidInput(error.to_string()))?
+            .flatten(),
         timeout_secs,
         background: obj
             .get("background")
@@ -950,6 +1092,141 @@ fn classify_git(args: &[&str]) -> BashCommandClass {
 #[cfg(test)]
 #[allow(warnings)]
 mod tests {
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn cancelled_windows_shell_is_owned_until_cleanup_confirmation() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let tool = std::sync::Arc::new(BashTool::new(directory.path().to_path_buf()));
+        let receipt = tool.cleanup_receipt().expect("aggregate owner");
+        let running = tool.clone();
+        let task = tokio::spawn(async move {
+            running.execute(serde_json::json!({"command":
+                "[IO.File]::WriteAllText('started','yes'); Start-Sleep -Seconds 3; [IO.File]::WriteAllText('escaped','bad')"})).await
+        });
+        let started = tokio::time::timeout(Duration::from_secs(15), async {
+            while !directory.path().join("started").exists() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        task.abort();
+        let _ = task.await;
+        receipt.seal();
+        receipt
+            .wait(Duration::from_secs(5))
+            .await
+            .expect("Job and IO cleanup");
+        assert!(started.is_ok(), "payload started before cancellation");
+        tokio::time::sleep(Duration::from_millis(3200)).await;
+        assert!(!directory.path().join("escaped").exists());
+        let refused = tool
+            .execute(serde_json::json!({"command":
+            "[IO.File]::WriteAllText('forbidden','bad')"}))
+            .await;
+        assert!(refused.is_error);
+        assert!(!directory.path().join("forbidden").exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn shell_output_is_bounded_and_timeout_cleans_descendants() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let tool = BashTool::new(directory.path().to_path_buf());
+        let result = tool
+            .execute(serde_json::json!({"command":
+            "head -c 1100000 /dev/zero | tr '\\000' x"}))
+            .await;
+        assert!(!result.is_error, "{}", result.content);
+        assert!(
+            result
+                .content
+                .contains("[stdout truncated at 1048576 bytes]")
+        );
+        assert!(result.content.len() < 1048576 + 2048);
+        let timed_out = tool
+            .execute(serde_json::json!({"command":
+            "(sleep 2; printf escaped > escaped) & printf ready; wait", "timeout_secs":1}))
+            .await;
+        assert!(timed_out.is_error);
+        assert!(timed_out.content.contains("ready"));
+        assert!(timed_out.content.contains("[timeout]"));
+        let receipt = tool.cleanup_receipt().expect("aggregate owner");
+        receipt.seal();
+        receipt
+            .wait(Duration::from_secs(3))
+            .await
+            .expect("timeout cleanup");
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        assert!(!directory.path().join("escaped").exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn cancelled_shell_confirms_cleanup_and_prevents_late_descendant_effect() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let tool = std::sync::Arc::new(BashTool::new(directory.path().to_path_buf()));
+        let receipt = tool.cleanup_receipt().expect("aggregate cleanup owner");
+        let running = tool.clone();
+        let task = tokio::spawn(async move {
+            running
+                .execute(serde_json::json!({"command":
+                "printf started > started; (sleep 1; printf escaped > escaped) & wait"}))
+                .await
+        });
+        let started = tokio::time::timeout(Duration::from_secs(3), async {
+            while !directory.path().join("started").exists() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        task.abort();
+        let _ = task.await;
+        receipt.seal();
+        receipt
+            .wait(Duration::from_secs(3))
+            .await
+            .expect("confirmed group cleanup");
+        assert!(started.is_ok(), "payload started before cancellation");
+        tokio::time::sleep(Duration::from_millis(1200)).await;
+        assert!(!directory.path().join("escaped").exists());
+        let refused = tool
+            .execute(serde_json::json!({"command":"touch forbidden"}))
+            .await;
+        assert!(refused.is_error);
+        assert!(!directory.path().join("forbidden").exists());
+    }
+
+    #[test]
+    fn memory_policy_parser_rejects_present_invalid_values() {
+        for value in [
+            serde_json::json!(null),
+            serde_json::json!(63),
+            serde_json::json!(65537),
+            serde_json::json!(64.5),
+        ] {
+            assert!(
+                super::parse_input(
+                    serde_json::json!({"command":"echo marker", "memory_limit_mib":value})
+                )
+                .is_err()
+            );
+        }
+        assert_eq!(
+            super::parse_input(serde_json::json!({"command":"echo marker"}))
+                .unwrap()
+                .memory_limit_mib,
+            None
+        );
+        assert_eq!(
+            super::parse_input(
+                serde_json::json!({"command":"echo marker", "memory_limit_mib":65536})
+            )
+            .unwrap()
+            .memory_limit_mib,
+            Some(65536)
+        );
+    }
+
     #[test]
     fn output_lines_preserve_split_utf8_and_independent_streams() {
         let mut stdout = super::ShellOutputLine::default();

@@ -1,5 +1,164 @@
 use super::*;
 
+#[cfg(feature = "shell")]
+#[test]
+fn memory_allocation_probe_child() {
+    if std::env::var_os("TALOS_MEMORY_ALLOCATION_CHILD").is_none() {
+        return;
+    }
+    let mut small = Vec::<u8>::new();
+    small
+        .try_reserve_exact(1024 * 1024)
+        .expect("small allocation must succeed");
+    let mut large = Vec::<u8>::new();
+    assert!(
+        large.try_reserve_exact(512 * 1024 * 1024).is_err(),
+        "Job must refuse allocation beyond per-process committed memory limit"
+    );
+    println!("windows-bounded-allocation-denied");
+}
+
+#[cfg(feature = "shell")]
+#[tokio::test]
+async fn background_memory_override_denies_real_allocation() {
+    use talos_core::background_job::{BackgroundJobLauncher, BackgroundProcessEvent};
+    let root = tempfile::tempdir().expect("workspace");
+    let executable = std::env::current_exe().expect("test executable");
+    let launcher = super::super::WindowsBackgroundLauncher::new(
+        executable.to_string_lossy().into_owned(),
+        vec![
+            "--exact".into(),
+            "process_boundary::windows_foreground::tests::memory_allocation_probe_child".into(),
+            "--nocapture".into(),
+        ],
+        root.path().to_path_buf(),
+        std::collections::BTreeMap::from([("TALOS_MEMORY_ALLOCATION_CHILD".into(), "1".into())]),
+    )
+    .with_memory_policy(
+        crate::process_memory::ProcessMemoryPolicy::resolve(Some(128), Default::default())
+            .expect("policy"),
+    );
+    let mut launched = Box::new(launcher).launch().await.expect("background child");
+    let result = tokio::time::timeout(Duration::from_secs(20), async {
+        let mut output = Vec::new();
+        while let Some(event) = launched.events.recv().await {
+            match event {
+                BackgroundProcessEvent::Output(chunk) => {
+                    if output.len() + chunk.bytes.len() > 16384 {
+                        return Err("probe output exceeded bound".to_owned());
+                    }
+                    output.extend_from_slice(&chunk.bytes);
+                }
+                BackgroundProcessEvent::Exited(exit) => return Ok((exit.success, output)),
+                BackgroundProcessEvent::SupervisionFailed(error) => return Err(error),
+            }
+        }
+        Err("missing background exit evidence".to_owned())
+    })
+    .await;
+    launched
+        .control
+        .force_terminate()
+        .await
+        .expect("Job cleanup");
+    let (success, output) = result
+        .expect("bounded background probe")
+        .expect("background evidence");
+    assert!(success, "{}", String::from_utf8_lossy(&output));
+    assert!(String::from_utf8_lossy(&output).contains("windows-bounded-allocation-denied"));
+}
+
+#[cfg(feature = "shell")]
+#[tokio::test]
+async fn job_memory_policy_denies_real_allocation() {
+    let root = tempfile::tempdir().expect("workspace");
+    let executable = std::env::current_exe().expect("test executable");
+    let args = [
+        "--exact",
+        "process_boundary::windows_foreground::tests::memory_allocation_probe_child",
+        "--nocapture",
+    ]
+    .map(str::to_owned);
+    let environment = std::collections::BTreeMap::from([(
+        "TALOS_MEMORY_ALLOCATION_CHILD".to_owned(),
+        "1".to_owned(),
+    )]);
+    let owner = OwnedCommandExecutor::default();
+    let result = owner
+        .operation()
+        .execute_tool_command(
+            executable.to_str().expect("executable path"),
+            &args,
+            root.path(),
+            &environment,
+            None,
+            Duration::from_secs(20),
+            4096,
+            crate::process_memory::ProcessMemoryPolicy::resolve(Some(128), Default::default())
+                .expect("policy"),
+        )
+        .await
+        .expect("allocation probe starts");
+    assert!(result.output.status.success(), "{:?}", result.output);
+    assert!(
+        String::from_utf8_lossy(&result.output.stdout)
+            .contains("windows-bounded-allocation-denied")
+    );
+    owner.seal();
+    owner.wait(Duration::from_secs(3)).await.expect("cleanup");
+}
+
+#[cfg(feature = "shell")]
+#[tokio::test]
+async fn tool_memory_adapter_preserves_truncation_and_timeout_output() {
+    let root = tempfile::tempdir().expect("workspace");
+    for timed_out in [false, true] {
+        let owner = OwnedCommandExecutor::default();
+        let operation = owner.operation();
+        let script = if timed_out {
+            "[Console]::Out.Write('started'); [Console]::Out.Flush(); Start-Sleep -Seconds 30"
+        } else {
+            "[Console]::Out.Write(('x' * 4096)); [Console]::Error.Write(('y' * 2048))"
+        };
+        let args = [
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            script,
+        ]
+        .map(str::to_owned);
+        let result = operation
+            .execute_tool_command(
+                "powershell.exe",
+                &args,
+                root.path(),
+                &Default::default(),
+                None,
+                Duration::from_secs(if timed_out { 5 } else { 20 }),
+                32,
+                crate::process_memory::ProcessMemoryPolicy::default(),
+            )
+            .await
+            .expect("owned command result");
+        assert_eq!(result.timed_out, timed_out);
+        if timed_out {
+            assert_eq!(result.output.stdout, b"started");
+            assert_eq!(result.stdout_total, 7);
+        } else {
+            assert!(result.output.status.success());
+            assert_eq!(result.output.stdout, vec![b'x'; 32]);
+            assert_eq!(result.output.stderr, vec![b'y'; 32]);
+            assert_eq!((result.stdout_total, result.stderr_total), (4096, 2048));
+        }
+        owner.seal();
+        owner
+            .wait(Duration::from_secs(3))
+            .await
+            .expect("confirmed cleanup");
+    }
+}
+
 #[cfg(feature = "project-management")]
 #[tokio::test]
 async fn cancelled_preparation_remains_owned_until_blocking_worker_returns() {
@@ -80,7 +239,7 @@ async fn foreground_launch_observes_pre_cancel_closed_sender_and_expired_deadlin
             };
         let mut state = CommandStartState::Unknown;
         let (result, unconfirmed) =
-            supervise(encoded, None, deadline, 128, receiver, &mut state).await;
+            supervise(encoded, None, deadline, 128, receiver, &mut state, None).await;
         assert!(
             matches!(result, Err(ref message) if message.contains("launch cancelled or deadline exceeded"))
         );

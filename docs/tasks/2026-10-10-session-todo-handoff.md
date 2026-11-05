@@ -1,3 +1,23 @@
+## T6 native candidate correction — 2026-11-05
+
+I316 remains Review / Partial. PR #855 head `fd9948418` failed native Windows
+Clippy and two Agent acceptance tests; Linux preflight passed. The owner records
+local Windows cwd compatibility correction, independent security review, xwin
+checks and focused tests. Recovery fixture budget adjustment is not a performance
+root-cause fix. Refreshed candidate preflight/native CI/review/merge and owner
+closeout remain open. Earlier snapshots are historical; the complete ordered
+queue remains retained and the overall handoff is Active.
+
+## T6 active implementation checkpoint — 2026-11-05
+
+I316 / PROCESS-001 is Review / Partial. Claim #854 merged at `18aa4a58f`;
+local implementation stages through `b9ea2fceb` are not yet published or merged.
+The owner records complete standard preflight including both SDK modes, all-feature
+check/Clippy/tests with real plugin bundles, xwin/MSVC compilation and independent code review.
+Native Linux/Windows CI and final exact-head review/merge remain open. Earlier snapshots below are
+historical. Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6;
+predecessors closed, T6 incomplete, overall handoff Active.
+
 ## T6 atomic activation proposal — 2026-11-05
 
 I316 / PROCESS-001 / #853 proposes in #854 the remaining model-selectable process memory

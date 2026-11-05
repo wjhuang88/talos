@@ -1,6 +1,12 @@
 //! Shared non-interactive process boundary for command tools.
 
-#[cfg(all(windows, any(feature = "git", feature = "project-management")))]
+#[cfg(unix)]
+mod memory_evidence;
+
+#[cfg(all(
+    windows,
+    any(feature = "shell", feature = "git", feature = "project-management")
+))]
 pub(crate) mod windows_foreground;
 
 #[cfg(any(windows, test))]
@@ -9,7 +15,10 @@ mod windows_command_line;
 #[cfg(any(windows, test))]
 mod windows_environment;
 
-#[cfg(feature = "shell")]
+#[cfg(windows)]
+mod windows_cwd;
+
+#[cfg(all(feature = "shell", not(windows)))]
 use std::process::Stdio;
 
 #[cfg(all(unix, feature = "shell"))]
@@ -25,7 +34,7 @@ use talos_core::background_job::{
 };
 #[cfg(all(unix, feature = "shell"))]
 use tokio::io::{AsyncRead, AsyncReadExt};
-#[cfg(any(unix, feature = "shell"))]
+#[cfg(any(unix, all(feature = "shell", not(windows))))]
 use tokio::process::Command;
 
 #[cfg(windows)]
@@ -45,7 +54,7 @@ use talos_core::background_job::{
 /// Pipeline callers may explicitly request a piped stdin. Every other child receives EOF. On
 /// Unix, a new session also prevents programs such as `sudo` and `ssh` from bypassing stdin and
 /// opening Talos's controlling terminal through `/dev/tty`.
-#[cfg(feature = "shell")]
+#[cfg(all(feature = "shell", not(windows)))]
 pub(crate) fn isolate_terminal_input(cmd: &mut Command, pipe_stdin: bool) {
     if pipe_stdin {
         cmd.stdin(Stdio::piped());
@@ -70,8 +79,38 @@ pub(crate) fn isolate_terminal_input(cmd: &mut Command, pipe_stdin: bool) {
 }
 
 /// Applies the same resource hardening used by the foreground shell boundary.
-#[cfg(unix)]
+#[cfg(all(unix, feature = "git"))]
 pub(crate) fn apply_process_hardening(cmd: &mut Command) {
+    apply_resource_hardening(cmd, 2_u64 * 1024 * 1024 * 1024, false, None);
+}
+
+#[cfg(all(unix, feature = "shell", test))]
+pub(crate) fn apply_memory_hardening(
+    cmd: &mut Command,
+    policy: crate::process_memory::ProcessMemoryPolicy,
+) {
+    apply_resource_hardening(cmd, policy.bytes(), policy.is_explicit(), None);
+}
+
+#[cfg(all(unix, feature = "shell"))]
+pub(crate) fn apply_memory_hardening_with_evidence(
+    cmd: &mut Command,
+    policy: crate::process_memory::ProcessMemoryPolicy,
+) -> std::io::Result<memory_evidence::MemoryEvidence> {
+    // Caller must retain this reader until synchronous spawn returns, then collect
+    // evidence and drop Command. In particular, macOS send requires a live peer.
+    let (reader, writer) = memory_evidence::MemoryEvidence::prepare()?;
+    apply_resource_hardening(cmd, policy.bytes(), policy.is_explicit(), Some(writer));
+    Ok(reader)
+}
+
+#[cfg(unix)]
+fn apply_resource_hardening(
+    cmd: &mut Command,
+    memory_bytes: u64,
+    explicit: bool,
+    evidence: Option<std::os::unix::net::UnixStream>,
+) {
     let c_names: Vec<std::ffi::CString> =
         talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names()
             .into_iter()
@@ -79,17 +118,14 @@ pub(crate) fn apply_process_hardening(cmd: &mut Command) {
             .collect();
 
     // SAFETY: this closure runs post-fork/pre-exec and performs only the ADR-007-authorized,
-    // async-signal-safe environment and rlimit operations. It allocates nothing and cannot panic.
+    // async-signal-safe environment and rlimit operations. ADR-098 additionally permits
+    // child-only getrlimit with a valid stack pointer. No allocation, locks or formatting.
     unsafe {
         cmd.pre_exec(move || {
             for name in &c_names {
                 libc::unsetenv(name.as_ptr());
             }
-            let limits = [
-                (libc::RLIMIT_CORE, 0_u64),
-                (libc::RLIMIT_CPU, 300_u64),
-                (libc::RLIMIT_AS, 2_u64 * 1024 * 1024 * 1024),
-            ];
+            let limits = [(libc::RLIMIT_CORE, 0_u64), (libc::RLIMIT_CPU, 300_u64)];
             for (resource, limit) in limits {
                 let rlim = libc::rlimit {
                     rlim_cur: limit,
@@ -98,6 +134,54 @@ pub(crate) fn apply_process_hardening(cmd: &mut Command) {
                 // Some Unix targets reject one of these advisory limits (for example
                 // RLIMIT_AS on macOS); preserve the existing best-effort foreground behavior.
                 let _ = libc::setrlimit(resource, &rlim as *const _);
+            }
+            let mut inherited = libc::rlimit {
+                rlim_cur: 0,
+                rlim_max: 0,
+            };
+            if libc::getrlimit(libc::RLIMIT_AS, &mut inherited) != 0 {
+                if explicit {
+                    return Err(std::io::Error::last_os_error());
+                }
+                // Unknown inherited bound: leave it untouched for best-effort omission.
+                return Ok(());
+            }
+            if explicit {
+                // Refuse rather than silently delivering a different explicit bound.
+                // Never attempt to increase an inherited hard limit.
+                if inherited.rlim_max < memory_bytes {
+                    return Err(std::io::Error::from_raw_os_error(libc::EPERM));
+                }
+            }
+            let memory_bytes = memory_bytes.min(inherited.rlim_max);
+            let memory = libc::rlimit {
+                rlim_cur: memory_bytes,
+                rlim_max: memory_bytes,
+            };
+            let applied = libc::setrlimit(libc::RLIMIT_AS, &memory) == 0;
+            if !applied && explicit {
+                return Err(std::io::Error::last_os_error());
+            }
+            if let Some(writer) = &evidence {
+                let mut observed = libc::rlimit {
+                    rlim_cur: 0,
+                    rlim_max: 0,
+                };
+                if libc::getrlimit(libc::RLIMIT_AS, &mut observed) != 0 {
+                    if explicit {
+                        return Err(std::io::Error::last_os_error());
+                    }
+                    return Ok(());
+                }
+                if let Err(error) = memory_evidence::send_record(
+                    writer,
+                    applied,
+                    observed.rlim_cur,
+                    observed.rlim_max,
+                ) && explicit
+                {
+                    return Err(error);
+                }
             }
             Ok(())
         });
@@ -108,12 +192,30 @@ pub(crate) fn apply_process_hardening(cmd: &mut Command) {
 #[cfg(all(unix, feature = "shell"))]
 pub(crate) struct UnixBackgroundLauncher {
     command: Command,
+    memory: crate::process_memory::ProcessMemoryPolicy,
+    evidence: Arc<std::sync::Mutex<Option<String>>>,
 }
 
 #[cfg(all(unix, feature = "shell"))]
 impl UnixBackgroundLauncher {
     pub(crate) fn new(command: Command) -> Self {
-        Self { command }
+        Self {
+            command,
+            memory: Default::default(),
+            evidence: Default::default(),
+        }
+    }
+
+    pub(crate) fn with_memory_policy(
+        mut self,
+        memory: crate::process_memory::ProcessMemoryPolicy,
+    ) -> Self {
+        self.memory = memory;
+        self
+    }
+
+    pub(crate) fn memory_evidence(&self) -> Arc<std::sync::Mutex<Option<String>>> {
+        self.evidence.clone()
     }
 }
 
@@ -135,7 +237,7 @@ impl BackgroundProcessControl for UnixProcessGroupControl {
 }
 
 #[cfg(all(unix, feature = "shell"))]
-fn signal_process_group(pgid: i32, signal: i32) -> Result<(), String> {
+pub(crate) fn signal_process_group(pgid: i32, signal: i32) -> Result<(), String> {
     if pgid <= 0 {
         return Err("refusing to signal a non-positive process group id".to_owned());
     }
@@ -159,11 +261,17 @@ impl BackgroundJobLauncher for UnixBackgroundLauncher {
     async fn launch(mut self: Box<Self>) -> Result<LaunchedBackgroundJob, String> {
         self.command.stdout(Stdio::piped()).stderr(Stdio::piped());
         isolate_terminal_input(&mut self.command, false);
-        apply_process_hardening(&mut self.command);
+        let evidence = apply_memory_hardening_with_evidence(&mut self.command, self.memory)
+            .map_err(|error| format!("memory evidence channel setup failed: {error}"))?;
         let mut child = self
             .command
             .spawn()
             .map_err(|error| format!("failed to spawn background process: {error}"))?;
+        *self
+            .evidence
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(evidence.describe());
+        drop(self.command);
         let pid = child
             .id()
             .ok_or_else(|| "background process has no platform id".to_owned())?;
@@ -253,10 +361,19 @@ mod tests {
     async fn unix_launcher_captures_bounded_ordered_output_and_reaps_leader() {
         let mut command = Command::new("sh");
         command.args(["-c", "printf out; printf err >&2"]);
-        let launched = Box::new(UnixBackgroundLauncher::new(command))
+        let launcher = UnixBackgroundLauncher::new(command);
+        let evidence = launcher.memory_evidence();
+        let launched = Box::new(launcher)
             .launch()
             .await
             .expect("launcher succeeds");
+        let observed = evidence
+            .lock()
+            .expect("evidence lock")
+            .clone()
+            .expect("child evidence");
+        assert!(observed.contains("effective_soft_bytes="), "{observed}");
+        assert!(observed.contains("effective_hard_bytes="), "{observed}");
         let mut events = launched.events;
         let mut output = Vec::new();
         let mut exited = false;
@@ -291,6 +408,169 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         assert!(control.terminate().await.is_ok());
     }
+
+    #[tokio::test]
+    async fn explicit_memory_policy_enforces_or_refuses_before_payload() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let marker = directory.path().join("payload-ran");
+        let mut command = Command::new("sh");
+        command
+            .arg("-c")
+            .arg("printf started > \"$1\"; ulimit -v")
+            .arg("probe")
+            .arg(&marker);
+        let policy =
+            crate::process_memory::ProcessMemoryPolicy::resolve(Some(4096), Default::default())
+                .expect("policy");
+        apply_memory_hardening(&mut command, policy);
+        match command.output().await {
+            Ok(output) => {
+                assert!(output.status.success(), "{:?}", output);
+                assert!(marker.exists());
+                let limit = String::from_utf8(output.stdout).expect("limit text");
+                assert_eq!(limit.trim(), "4194304", "actual child address-space limit");
+                eprintln!(
+                    "memory native evidence: explicit 4096 MiB applied and observed in child"
+                );
+            }
+            Err(error) => {
+                assert!(
+                    !marker.exists(),
+                    "failed setup must not run payload: {error}"
+                );
+                // macOS may reject RLIMIT_AS. Linux must support the actual bound
+                // in this normal CI process; failure there is not accepted coverage.
+                #[cfg(not(target_os = "macos"))]
+                panic!("explicit setup failed: {error}");
+                #[cfg(target_os = "macos")]
+                eprintln!(
+                    "memory native evidence: explicit setup rejected before payload: {error}"
+                );
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn memory_allocation_child() {
+        if std::env::var_os("TALOS_MEMORY_ALLOCATION_CHILD").is_none() {
+            return;
+        }
+        let mut allocation = Vec::<u8>::new();
+        assert!(
+            allocation.try_reserve_exact(512 * 1024 * 1024).is_err(),
+            "allocation above 128 MiB address-space limit must fail"
+        );
+        println!("bounded-allocation-denied");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn inherited_memory_evidence_child() {
+        if std::env::var_os("TALOS_MEMORY_INHERITED_CHILD").is_none() {
+            return;
+        }
+        let mut command = Command::new("sh");
+        command.args(["-c", "ulimit -v"]);
+        let evidence = apply_memory_hardening_with_evidence(&mut command, Default::default())
+            .expect("channel");
+        let output = command.output().await.expect("child starts");
+        let observed = evidence.describe();
+        drop(command);
+        assert!(output.status.success());
+        assert_eq!(
+            String::from_utf8(output.stdout).expect("limit").trim(),
+            "131072"
+        );
+        assert!(
+            observed.contains("effective_soft_bytes=134217728"),
+            "{observed}"
+        );
+        assert!(
+            observed.contains("effective_hard_bytes=134217728"),
+            "{observed}"
+        );
+        println!("inherited-limit-preserved-and-observed");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn omitted_memory_policy_preserves_and_reports_inherited_hard_limit() {
+        let mut command = Command::new(std::env::current_exe().expect("test executable"));
+        command
+            .args([
+                "--exact",
+                "process_boundary::tests::inherited_memory_evidence_child",
+                "--nocapture",
+            ])
+            .env("TALOS_MEMORY_INHERITED_CHILD", "1");
+        apply_memory_hardening(
+            &mut command,
+            crate::process_memory::ProcessMemoryPolicy::resolve(Some(128), Default::default())
+                .expect("policy"),
+        );
+        let output = command.output().await.expect("bounded probe starts");
+        assert!(output.status.success(), "{output:?}");
+        assert!(
+            String::from_utf8_lossy(&output.stdout)
+                .contains("inherited-limit-preserved-and-observed")
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn memory_limit_denies_allocation_without_mutating_parent_limits() {
+        let before = std::fs::read_to_string("/proc/self/limits").expect("parent limits");
+        let mut command = Command::new(std::env::current_exe().expect("test executable"));
+        command
+            .args([
+                "--exact",
+                "process_boundary::tests::memory_allocation_child",
+                "--nocapture",
+            ])
+            .env("TALOS_MEMORY_ALLOCATION_CHILD", "1");
+        apply_memory_hardening(
+            &mut command,
+            crate::process_memory::ProcessMemoryPolicy::resolve(Some(128), Default::default())
+                .expect("policy"),
+        );
+        let output = command.output().await.expect("bounded child starts");
+        assert!(output.status.success(), "{output:?}");
+        assert!(String::from_utf8_lossy(&output.stdout).contains("bounded-allocation-denied"));
+        assert_eq!(
+            std::fs::read_to_string("/proc/self/limits").expect("parent limits"),
+            before
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn background_memory_override_is_not_reset_by_default_hardening() {
+        let mut command = Command::new("sh");
+        command.args(["-c", "ulimit -v"]);
+        let policy =
+            crate::process_memory::ProcessMemoryPolicy::resolve(Some(128), Default::default())
+                .expect("policy");
+        let mut launched =
+            Box::new(UnixBackgroundLauncher::new(command).with_memory_policy(policy))
+                .launch()
+                .await
+                .expect("launch");
+        let mut bytes = Vec::new();
+        let mut success = false;
+        while let Some(event) = launched.events.recv().await {
+            match event {
+                BackgroundProcessEvent::Output(chunk) => bytes.extend_from_slice(&chunk.bytes),
+                BackgroundProcessEvent::Exited(exit) => {
+                    success = exit.success;
+                    break;
+                }
+                BackgroundProcessEvent::SupervisionFailed(error) => panic!("{error}"),
+            }
+        }
+        assert!(success);
+        assert_eq!(String::from_utf8(bytes).expect("output").trim(), "131072");
+    }
 }
 
 /// Windows Job Object launcher implementing ADR-068's assigned-before-resume boundary.
@@ -300,6 +580,7 @@ pub(crate) struct WindowsBackgroundLauncher {
     args: Vec<String>,
     cwd: std::path::PathBuf,
     env: std::collections::BTreeMap<String, String>,
+    memory_bytes: u64,
 }
 
 #[cfg(all(windows, any(feature = "shell", test)))]
@@ -315,7 +596,17 @@ impl WindowsBackgroundLauncher {
             args,
             cwd,
             env,
+            memory_bytes: 2 * 1024 * 1024 * 1024,
         }
+    }
+
+    #[cfg(feature = "shell")]
+    pub(crate) fn with_memory_policy(
+        mut self,
+        policy: crate::process_memory::ProcessMemoryPolicy,
+    ) -> Self {
+        self.memory_bytes = policy.bytes();
+        self
     }
 }
 
@@ -404,7 +695,13 @@ impl Drop for WindowsJobControl {
 #[async_trait]
 impl BackgroundJobLauncher for WindowsBackgroundLauncher {
     async fn launch(self: Box<Self>) -> Result<LaunchedBackgroundJob, String> {
-        let launched = create_windows_job(&self.program, &self.args, &self.cwd, &self.env)?;
+        let launched = create_windows_job_with_memory(
+            &self.program,
+            &self.args,
+            &self.cwd,
+            &self.env,
+            self.memory_bytes,
+        )?;
         // Background calls request no finite input.
         drop(launched.stdin);
         let control = Arc::new(WindowsJobControl { job: launched.job });
@@ -528,7 +825,7 @@ fn last_windows_error(operation: &str) -> String {
     format!("{operation} failed: {}", std::io::Error::last_os_error())
 }
 
-#[cfg(all(windows, any(feature = "shell", test)))]
+#[cfg(all(windows, test))]
 fn create_windows_job(
     program: &str,
     args: &[String],
@@ -546,6 +843,35 @@ fn create_windows_job(
 }
 
 #[cfg(all(windows, any(feature = "shell", test)))]
+fn create_windows_job_with_memory(
+    program: &str,
+    args: &[String],
+    cwd: &std::path::Path,
+    extra_env: &std::collections::BTreeMap<String, String>,
+    memory_bytes: u64,
+) -> Result<WindowsLaunchHandles, String> {
+    let executable = resolve_windows_program(program)?;
+    let args = args
+        .iter()
+        .map(std::ffi::OsString::from)
+        .collect::<Vec<_>>();
+    let mut command = WindowsLaunchCommand::new(
+        &executable,
+        std::ffi::OsStr::new(program),
+        &args,
+        cwd,
+        windows_environment(extra_env)?,
+        false,
+    )?;
+    command.memory_bytes = Some(memory_bytes);
+    create_windows_job_native(
+        command,
+        #[cfg(test)]
+        WindowsLaunchTestHooks::default(),
+    )
+}
+
+#[cfg(all(windows, test))]
 fn create_windows_job_with_hooks(
     program: &str,
     args: &[String],
@@ -582,6 +908,8 @@ struct WindowsLaunchCommand {
     cwd: Vec<u16>,
     environment: Vec<u16>,
     input: WindowsInput,
+    // None preserves non-shell consumers' existing resource contract.
+    memory_bytes: Option<u64>,
 }
 
 #[cfg(windows)]
@@ -596,7 +924,7 @@ impl WindowsLaunchCommand {
     ) -> Result<Self, String> {
         use std::os::windows::ffi::OsStrExt;
         let executable = wide(executable.as_os_str());
-        let cwd = wide(cwd.as_os_str());
+        let cwd = windows_cwd::encode(cwd)?;
         let arg0 = arg0.encode_wide().collect::<Vec<_>>();
         if executable[..executable.len() - 1].contains(&0)
             || cwd[..cwd.len() - 1].contains(&0)
@@ -611,6 +939,7 @@ impl WindowsLaunchCommand {
             return Err("Windows environment block is not terminated".into());
         }
         Ok(Self {
+            memory_bytes: None,
             executable,
             command: windows_command_line::encode(&arguments)?,
             cwd,
@@ -857,6 +1186,12 @@ fn create_windows_job_native_checked(
         }
         let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = zeroed();
         limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if let Some(bytes) = command.memory_bytes {
+            limits.ProcessMemoryLimit = usize::try_from(bytes)
+                .map_err(|_| "process memory limit exceeds platform size".to_owned())?;
+            limits.BasicLimitInformation.LimitFlags |=
+                windows_sys::Win32::System::JobObjects::JOB_OBJECT_LIMIT_PROCESS_MEMORY;
+        }
         if SetInformationJobObject(
             job,
             JobObjectExtendedLimitInformation,

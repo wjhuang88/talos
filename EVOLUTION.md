@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-05 - Follow the existing Windows xwin validation route
+
+- Trigger: Maintainer correction during I316 process-memory implementation.
+- Symptom: GNU test cross-check failed on missing MinGW, incorrectly recorded as a local validation blocker.
+- Root cause: Selected an installed target without reading the existing Windows cross-compilation SOP.
+- Fix: Use installed cargo-xwin with the pinned MSVC target, locked dependencies and all-feature test compilation; authorize existing SDK cache setup through the normal tool gate.
+- Prevention: Read LOCAL-DEV before choosing the Windows command; never infer the supported route from installed targets alone. A cross-check is not native runtime acceptance.
+- Promoted to rule/check: `AGENTS.md` Windows cross-check rule; `docs/sop/LOCAL-DEV.md` already defined the required route.
+
 ## 2026-11-01 - Check decoded strings before privacy-sensitive rendering
 
 - Trigger: Independent I313 review of model-submitted checkpoint preparation.

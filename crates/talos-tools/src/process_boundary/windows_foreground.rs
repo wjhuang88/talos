@@ -134,11 +134,13 @@ pub(crate) struct OwnedCommandOperation {
 }
 
 #[derive(Clone)]
+#[cfg(any(feature = "git", feature = "project-management", test))]
 pub(crate) struct CleanupReceipt {
     scope: Arc<Scope>,
 }
 
 #[async_trait]
+#[cfg(any(feature = "git", feature = "project-management", test))]
 impl ToolCleanupReceipt for CleanupReceipt {
     async fn wait(&self, timeout: Duration) -> Result<(), ToolCleanupError> {
         self.scope.wait(timeout).await
@@ -146,6 +148,25 @@ impl ToolCleanupReceipt for CleanupReceipt {
 }
 
 struct CancelOnDrop(Option<oneshot::Sender<()>>);
+
+#[derive(Default)]
+struct CapturedStream {
+    bytes: Vec<u8>,
+    total: usize,
+}
+#[derive(Default)]
+struct ToolCapture {
+    stdout: Mutex<CapturedStream>,
+    stderr: Mutex<CapturedStream>,
+    timed_out: std::sync::atomic::AtomicBool,
+}
+#[cfg(feature = "shell")]
+pub(crate) struct ToolCommandOutput {
+    pub(crate) output: Output,
+    pub(crate) stdout_total: usize,
+    pub(crate) stderr_total: usize,
+    pub(crate) timed_out: bool,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CommandStartState {
@@ -183,6 +204,65 @@ impl Drop for CancelOnDrop {
 }
 
 impl OwnedCommandOperation {
+    /// Adapt shell-tool argv and inherited environment to the existing owned launcher.
+    #[cfg(feature = "shell")]
+    // Keep each launch bound explicit at this adapter; both callers already resolve them.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn execute_tool_command(
+        &self,
+        program: &str,
+        args: &[String],
+        cwd: &std::path::Path,
+        environment: &std::collections::BTreeMap<String, String>,
+        input: Option<Vec<u8>>,
+        deadline: Duration,
+        limit: usize,
+        memory: crate::process_memory::ProcessMemoryPolicy,
+    ) -> Result<ToolCommandOutput, CommandFailure> {
+        let executable = super::resolve_windows_program(program)?;
+        let mut command = Command::new(executable);
+        command.args(args).current_dir(cwd).env_clear();
+        // Materialize inheritance before entering the owned native boundary.
+        // The shared environment encoder still rejects dangerous names.
+        let dangerous = talos_sandbox::hardening::ProcessHardening::dangerous_env_var_names();
+        for (key, value) in std::env::vars_os() {
+            if !dangerous
+                .iter()
+                .any(|name| key.to_string_lossy().eq_ignore_ascii_case(name))
+            {
+                command.env(key, value);
+            }
+        }
+        command.envs(environment);
+        let capture = Arc::new(ToolCapture::default());
+        let output = self
+            .execute_inner(
+                command,
+                deadline,
+                limit,
+                input,
+                Some(memory.bytes()),
+                Some(capture.clone()),
+            )
+            .await?;
+        let stdout_total = capture
+            .stdout
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .total;
+        let stderr_total = capture
+            .stderr
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .total;
+        Ok(ToolCommandOutput {
+            output,
+            stdout_total,
+            stderr_total,
+            timed_out: capture.timed_out.load(std::sync::atomic::Ordering::SeqCst),
+        })
+    }
+
     /// Keep blocking preparation registered through cancellation and shutdown.
     /// Dropping the caller requests cancellation but does not abandon ownership
     /// of a kernel call that has not returned yet. The callback must not launch.
@@ -206,6 +286,7 @@ impl OwnedCommandOperation {
         result
     }
 
+    #[cfg(any(feature = "git", feature = "project-management", test))]
     pub(crate) fn cleanup_receipt(&self) -> CleanupReceipt {
         CleanupReceipt {
             scope: self.scope.clone(),
@@ -219,18 +300,20 @@ impl OwnedCommandOperation {
         deadline: Duration,
         limit: usize,
     ) -> Result<Output, String> {
-        self.execute_inner(command, deadline, limit, None)
+        self.execute_inner(command, deadline, limit, None, None, None)
             .await
             .map_err(|failure| failure.message)
     }
 
+    #[cfg(any(feature = "git", feature = "project-management", test))]
     pub(crate) async fn execute_with_start_evidence(
         &self,
         command: Command,
         deadline: Duration,
         limit: usize,
     ) -> Result<Output, CommandFailure> {
-        self.execute_inner(command, deadline, limit, None).await
+        self.execute_inner(command, deadline, limit, None, None, None)
+            .await
     }
 
     #[cfg(any(feature = "git", test))]
@@ -241,7 +324,7 @@ impl OwnedCommandOperation {
         limit: usize,
         input: Vec<u8>,
     ) -> Result<Output, String> {
-        self.execute_inner(command, deadline, limit, Some(input))
+        self.execute_inner(command, deadline, limit, Some(input), None, None)
             .await
             .map_err(|failure| failure.message)
     }
@@ -254,6 +337,8 @@ impl OwnedCommandOperation {
         deadline: Duration,
         limit: usize,
         input: Option<Vec<u8>>,
+        memory_bytes: Option<u64>,
+        capture: Option<Arc<ToolCapture>>,
     ) -> Result<Output, CommandFailure> {
         // Encoding and supervisor scheduling consume the caller's budget too.
         let deadline = tokio::time::Instant::now() + deadline;
@@ -269,7 +354,7 @@ impl OwnedCommandOperation {
                 .get_envs()
                 .filter_map(|(key, value)| value.map(|value| (key.to_owned(), value.to_owned()))),
         )?;
-        let command = WindowsLaunchCommand::new(
+        let mut command = WindowsLaunchCommand::new(
             executable,
             command.get_program(),
             &command
@@ -280,6 +365,7 @@ impl OwnedCommandOperation {
             environment,
             input.is_some(),
         )?;
+        command.memory_bytes = memory_bytes;
         // Register before handing any launch authority to the detached supervisor.
         let mut reservation = self.scope.register()?;
         let (cancel_tx, cancel_rx) = oneshot::channel();
@@ -290,8 +376,16 @@ impl OwnedCommandOperation {
             // pre-creation failure from partial launch. Never infer zero startup
             // from its diagnostic string; cleanup stays independently checked.
             let mut start_state = CommandStartState::Unknown;
-            let (result, cleanup_failed) =
-                supervise(command, input, deadline, limit, cancel_rx, &mut start_state).await;
+            let (result, cleanup_failed) = supervise(
+                command,
+                input,
+                deadline,
+                limit,
+                cancel_rx,
+                &mut start_state,
+                capture,
+            )
+            .await;
             reservation.finish(cleanup_failed);
             let _ = result_tx.send(result.map_err(|message| CommandFailure {
                 start_state,
@@ -310,6 +404,7 @@ impl OwnedCommandOperation {
 async fn read(
     mut file: tokio::fs::File,
     remaining: Arc<std::sync::atomic::AtomicUsize>,
+    capture: Option<(Arc<ToolCapture>, bool, usize)>,
 ) -> Result<Vec<u8>, String> {
     use std::sync::atomic::Ordering;
     let mut output = Vec::new();
@@ -321,6 +416,18 @@ async fn read(
             .map_err(|error| format!("Windows output read failed: {error}"))?;
         if count == 0 {
             return Ok(output);
+        }
+        if let Some((capture, is_stdout, limit)) = &capture {
+            let stream = if *is_stdout {
+                &capture.stdout
+            } else {
+                &capture.stderr
+            };
+            let mut stream = stream.lock().unwrap_or_else(|e| e.into_inner());
+            stream.total = stream.total.saturating_add(count);
+            let retained = count.min(limit.saturating_sub(stream.bytes.len()));
+            stream.bytes.extend_from_slice(&buffer[..retained]);
+            continue;
         }
         remaining
             .try_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
@@ -338,6 +445,7 @@ async fn supervise(
     limit: usize,
     mut cancel: oneshot::Receiver<()>,
     start_state: &mut CommandStartState,
+    capture: Option<Arc<ToolCapture>>,
 ) -> (Result<Output, String>, bool) {
     use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
     use std::os::windows::process::ExitStatusExt;
@@ -375,8 +483,16 @@ async fn supervise(
         )
     };
     let remaining = Arc::new(std::sync::atomic::AtomicUsize::new(limit));
-    let mut stdout = tokio::spawn(read(stdout, remaining.clone()));
-    let mut stderr = tokio::spawn(read(stderr, remaining));
+    let mut stdout = tokio::spawn(read(
+        stdout,
+        remaining.clone(),
+        capture.clone().map(|c| (c, true, limit)),
+    ));
+    let mut stderr = tokio::spawn(read(
+        stderr,
+        remaining,
+        capture.clone().map(|c| (c, false, limit)),
+    ));
     let mut writer = tokio::spawn(async move {
         match (stdin, input) {
             (Some(mut writer), Some(input)) => {
@@ -429,9 +545,15 @@ async fn supervise(
             stderr,
         })
     };
-    let result: Result<Output, String> = tokio::select! {
+    let mut result: Result<Output, String> = tokio::select! {
         _ = &mut cancel => Err("Windows foreground execution cancelled".into()),
-        result = tokio::time::timeout_at(deadline, collect) => result.unwrap_or_else(|_| Err("Windows foreground deadline exceeded".into())),
+        result = tokio::time::timeout_at(deadline, collect) => match result {
+            Ok(result) => result,
+            Err(_) => if let Some(capture) = &capture {
+                capture.timed_out.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(Output { status: std::process::ExitStatus::from_raw(1), stdout: Vec::new(), stderr: Vec::new() })
+            } else { Err("Windows foreground deadline exceeded".into()) },
+        },
     };
     // Join all workers after Job termination; dropping File futures alone does
     // not cancel the blocking IO owned by Tokio's filesystem adapter.
@@ -440,6 +562,22 @@ async fn supervise(
     let stdout_closed = finish_io(&mut stdout, stdout_joined, cleanup_deadline).await;
     let stderr_closed = finish_io(&mut stderr, stderr_joined, cleanup_deadline).await;
     let writer_closed = finish_io(&mut writer, writer_joined, cleanup_deadline).await;
+    if let (Some(capture), Ok(output)) = (&capture, &mut result) {
+        output.stdout = std::mem::take(
+            &mut capture
+                .stdout
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .bytes,
+        );
+        output.stderr = std::mem::take(
+            &mut capture
+                .stderr
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .bytes,
+        );
+    }
     if cleanup_error.is_some() || !stdout_closed || !stderr_closed || !writer_closed {
         // Preserve the failed boundary and execution outcome: an unconfirmed
         // pipe worker and an unconfirmed Job need different investigations.
