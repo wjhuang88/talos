@@ -1,3 +1,12 @@
+## SEARCH-001-K / I317 proposed atomic activation — 2026-11-05
+
+[SEARCH-001-K](backlog/active/SEARCH-001-K-compat-fallback-ownership.md) /
+[I317](iterations/I317-search-compat-fallback-ownership.md) / #850 proposes
+production compatibility-helper ownership only in draft governance #851,
+ineffective until finalized head CI/review/merge. I316 and I310 remain
+independent; D/#644 remains ZERO-ADMISSION; E/F/G/I stay gated; Exa/Parallel
+D2/#848 has separate intake. No K1 implementation or change to Auto routing.
+
 ## Session handoff completion — 2026-11-05
 
 The full ordered handoff queue and C0/T7 carryover are Complete in their owners.
