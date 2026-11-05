@@ -1,5 +1,177 @@
 use super::*;
 
+#[cfg(feature = "project-management")]
+#[tokio::test]
+async fn cancelled_preparation_remains_owned_until_blocking_worker_returns() {
+    let owner = OwnedCommandExecutor::default();
+    let operation = owner.operation();
+    let token = tokio_util::sync::CancellationToken::new();
+    let worker_token = token.clone();
+    let (entered_tx, entered_rx) = oneshot::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let pending = tokio::spawn(async move {
+        operation
+            .run_preparation(worker_token, move |cancel| {
+                entered_tx.send(()).expect("entered");
+                release_rx.recv().expect("released");
+                assert!(
+                    cancel.is_cancelled(),
+                    "dropped call must close preparation authority"
+                );
+            })
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(3), entered_rx)
+        .await
+        .expect("worker starts")
+        .expect("entry signal");
+    pending.abort();
+    assert!(pending.await.expect_err("cancelled caller").is_cancelled());
+    assert!(token.is_cancelled());
+    owner.seal();
+    let waiting = owner.wait(Duration::from_millis(20)).await;
+    // Release before asserting, so a failed assertion cannot strand the fixture.
+    release_tx.send(()).expect("release worker");
+    assert_eq!(waiting, Err(ToolCleanupError::Timeout));
+    owner
+        .wait(Duration::from_secs(3))
+        .await
+        .expect("worker completion releases ownership");
+}
+
+#[tokio::test]
+async fn foreground_launch_observes_pre_cancel_closed_sender_and_expired_deadline() {
+    for mode in 0..3 {
+        let root = tempfile::tempdir().expect("workspace");
+        let command = powershell("Set-Content -LiteralPath escaped -Value ran");
+        let encoded =
+            super::super::WindowsLaunchCommand::new(
+                std::path::Path::new(command.get_program()),
+                command.get_program(),
+                &command
+                    .get_args()
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<_>>(),
+                root.path(),
+                super::super::windows_environment::snapshot(command.get_envs().filter_map(
+                    |(key, value)| value.map(|value| (key.to_owned(), value.to_owned())),
+                ))
+                .expect("environment"),
+                false,
+            )
+            .expect("encoded command");
+        let (sender, receiver) = oneshot::channel();
+        let retained_sender = match mode {
+            0 => {
+                sender.send(()).expect("cancel");
+                None
+            }
+            1 => {
+                drop(sender);
+                None
+            }
+            _ => Some(sender),
+        };
+        let deadline = tokio::time::Instant::now()
+            + if mode == 2 {
+                Duration::ZERO
+            } else {
+                Duration::from_secs(30)
+            };
+        let mut state = CommandStartState::Unknown;
+        let (result, unconfirmed) =
+            supervise(encoded, None, deadline, 128, receiver, &mut state).await;
+        assert!(
+            matches!(result, Err(ref message) if message.contains("launch cancelled or deadline exceeded"))
+        );
+        assert_eq!(state, CommandStartState::Unknown);
+        assert!(
+            unconfirmed,
+            "native error path must not invent cleanup evidence"
+        );
+        assert!(!root.path().join("escaped").exists());
+        drop(retained_sender);
+    }
+}
+
+#[tokio::test]
+async fn launch_checkpoints_refuse_before_payload_can_run() {
+    for refusal_stage in 1..=4 {
+        let root = tempfile::tempdir().expect("workspace");
+        let command = powershell("Set-Content -LiteralPath escaped -Value ran");
+        let executable = std::path::Path::new(command.get_program());
+        let encoded =
+            super::super::WindowsLaunchCommand::new(
+                executable,
+                command.get_program(),
+                &command
+                    .get_args()
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<_>>(),
+                root.path(),
+                super::super::windows_environment::snapshot(command.get_envs().filter_map(
+                    |(key, value)| value.map(|value| (key.to_owned(), value.to_owned())),
+                ))
+                .expect("environment"),
+                false,
+            )
+            .expect("encoded command");
+        let mut stage = 0;
+        let result = super::super::create_windows_job_native_checked(
+            encoded,
+            || {
+                stage += 1;
+                if stage == refusal_stage {
+                    Err("injected launch cancellation".into())
+                } else {
+                    Ok(())
+                }
+            },
+            super::super::WindowsLaunchTestHooks::default(),
+        );
+        assert!(matches!(result, Err(ref message) if message == "injected launch cancellation"));
+        assert_eq!(stage, refusal_stage);
+        assert!(
+            !root.path().join("escaped").exists(),
+            "payload must never resume"
+        );
+    }
+}
+
+#[tokio::test]
+async fn typed_start_evidence_preserves_preflight_refusal_and_started_timeout() {
+    let owner = OwnedCommandExecutor::default();
+    let operation = owner.operation();
+    let refusal = operation
+        .execute_with_start_evidence(
+            Command::new("unbound-relative-command"),
+            Duration::from_secs(1),
+            128,
+        )
+        .await
+        .expect_err("unbound command refused");
+    assert_eq!(refusal.start_state, CommandStartState::NotStarted);
+    operation
+        .cleanup_receipt()
+        .wait(Duration::from_secs(1))
+        .await
+        .expect("nothing launched");
+    let timeout = operation
+        .execute_with_start_evidence(
+            powershell("Start-Sleep -Seconds 30"),
+            Duration::from_millis(100),
+            128,
+        )
+        .await
+        .expect_err("started deadline");
+    assert_eq!(timeout.start_state, CommandStartState::Started);
+    operation
+        .cleanup_receipt()
+        .wait(Duration::from_secs(3))
+        .await
+        .expect("Job cleaned");
+}
+
 #[tokio::test]
 async fn panicked_io_worker_never_confirms_cleanup() {
     let mut task = tokio::spawn(async {

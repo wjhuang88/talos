@@ -69,8 +69,14 @@ pub mod git;
 pub mod http_request;
 #[cfg(feature = "image")]
 pub mod image_validation;
-#[cfg(any(feature = "shell", feature = "git"))]
+#[cfg(any(
+    feature = "shell",
+    feature = "git",
+    all(windows, feature = "project-management")
+))]
 mod process_boundary;
+#[cfg(feature = "project-management")]
+pub mod project_management;
 #[cfg(feature = "image")]
 pub mod read_image_tool;
 #[cfg(all(feature = "network", feature = "file-write"))]

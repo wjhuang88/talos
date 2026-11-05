@@ -10,13 +10,14 @@ E/F/G stay blocked, SEARCH-001-I remains separately gated, and `rust-websearch`
 remains. Previous T1/I314 Active snapshots below are historical and do not
 override these owner-derived terminal states.
 
-## T1 atomic claim proposal — 2026-11-03
+## T1 active implementation — 2026-11-04
 
-I315 / VALIDATION-003 / #844 proposes model-callable validation and read-only agile
-summary after merged I313/T5. Claim/activation are ineffective until finalized
-claim PR #845 merge. Supported CLI/Runtime and Unix/Windows execution, applicability,
-permissions, cancellation and output bounds are binding acceptance. T6 remains
-later and unimplemented; full handoff Active. I310/I314 retain independent owners.
+I315 / VALIDATION-003 / #844 is active after claim #845 merged as `261602242`.
+Shared model validation and read-only agile tools are implemented locally; the
+I315 owner records tests, review and platform limits. Integration with merged I314
+search configuration passed local preflight. Native Windows CI and implementation
+merge remain required. T1 is Partial, T6 unimplemented, and the full handoff Active.
+I310/I314 retain their independent owners; this summary does not close their work.
 
 ## MODEL-014 complete; T4 preparation — 2026-10-30
 

@@ -1,3 +1,14 @@
+## T1 active implementation — 2026-11-04
+
+Claim #845 is merged as `261602242e49e6f921f5d3e4eac96eebbe92f8b3`.
+I315 holds the current implementation and validation evidence. Local sandbox stage
+`9bf942651` is committed; the remaining candidate is not yet published. Workspace
+check/Clippy/tests and both external SDK modes passed in complete preflight 66373.
+Fresh main I314 merge requires composition integration and revalidation.
+Native Windows validation, exact-head review/CI and
+merge remain required. T1 is Partial, T6 unimplemented, and the full ordered queue
+I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6 remains Active.
+
 ## T1 atomic claim proposal — 2026-11-03
 
 I315 / VALIDATION-003 / #844 proposes model-callable validation and read-only agile

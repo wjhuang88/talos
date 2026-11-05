@@ -393,8 +393,8 @@ impl ConversationEngine {
     }
 
     fn handle_validate_command(&self, arg: &str) -> Vec<UiOutput> {
-        let profile = match arg.trim() {
-            "" | "governance" => crate::ValidationProfile::Governance,
+        match arg.trim() {
+            "" | "governance" => {}
             other => {
                 let text = format!(
                     "[Error] Unsupported internal validation profile: {other}. Usage: /validate [governance]\n"
@@ -409,8 +409,7 @@ impl ConversationEngine {
             )];
         };
 
-        let plan = crate::collect_validation_plan(ws, profile);
-        let evidence = crate::run_validation_plan(ws, plan);
+        let evidence = crate::run_governance_validation(ws);
         let text = crate::render_text_evidence(&evidence);
         vec![content_block(MessageSource::System, text)]
     }

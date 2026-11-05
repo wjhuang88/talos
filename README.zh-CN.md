@@ -349,8 +349,18 @@ talos validate run --profile governance --json
 talos validate run --profile workspace
 ```
 
-验证执行只接受内置 profile。每条证据记录包含命令、退出状态、stdout/stderr 摘要，以及
-allowlisted profile 权限决策；它不接受任意命令，不会编辑仓库文件、push、publish 或打 tag。
+验证执行只接受内置 profile，证据包含命令、退出状态和有界 stdout/stderr 摘要。
+Cargo 检查可能运行构建脚本、下载依赖及写入构建产物，因此 run 不是只读操作；
+profile 白名单也不等于权限授权。该接口不提供任意命令或发布操作。
+
+模型工具 `agile_summary` 与 `validate_project` 正在 I315 验证，尚未完成交付。
+明确的进度、待办或任务相关治理问题适用 summary；普通聊天、孤立代码解释和重复刷新
+未变化状态不适用。治理 manifest 或 Board、迭代索引、backlog 三个标准文件中的任意两个
+可启用 summary，小项目及 Planned 项目也适用，不要求 Active 迭代。
+验证工具独立依据项目标记发现，仅有 Cargo.toml 的项目也可使用。输入仅支持
+`mode: plan|run` 和 `profile: governance|i076|workspace`；plan 不启动命令，run 需要
+Execute 准入。两者都不修改任务记录、激活迭代或操作 Issue；缺失前置条件会如实报告，
+不会为启用工具而创建占位治理文件。
 
 ### 治理变更预览
 

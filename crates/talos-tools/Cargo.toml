@@ -9,6 +9,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [features]
+project-management = ["dep:talos-conversation", "dep:talos-permission", "dep:talos-sandbox", "dep:tokio-util", "dep:windows-sys", "tokio/rt", "tokio/macros", "tokio/time", "tokio/fs", "tokio/io-util", "tokio/process"]
 plugin-acceptance = ["code-intelligence"]
 search-integration-test = ["network"]
 default = ["file-read", "search"]
@@ -52,6 +53,7 @@ network = [
 image = ["file-read", "dep:image"]
 code-intelligence = ["talos-text/code-intelligence"]
 coding = [
+    "project-management",
     "file-read",
     "file-write",
     "search",
@@ -64,6 +66,8 @@ coding = [
 ]
 
 [dependencies]
+talos-conversation = { version = "0.10.1", path = "../talos-conversation", optional = true }
+tokio-util = { version = "0.7.19", features = ["rt"], optional = true }
 talos-core = { version = "0.10.1", path = "../talos-core" }
 talos-permission = { version = "0.10.1", path = "../talos-permission", optional = true }
 talos-text = { version = "0.10.1", path = "../talos-text" }

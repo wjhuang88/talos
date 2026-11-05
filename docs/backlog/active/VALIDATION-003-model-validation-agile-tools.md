@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Story ID | VALIDATION-003 |
-| Status | In Progress (proposed in #845; ineffective until merge) |
+| Status | In Progress (#845 merged; I315 implementation and validation ongoing) |
 | Priority | P1 |
 | Source Issue | #844 |
 | Owner | I315 |
@@ -117,7 +117,9 @@ Unavailable does not satisfy Windows acceptance; Unix evidence is not portable p
 Run meaningful real permission/runtime regressions above, pinned locked checks,
 Clippy, standard preflight with SDK modes, native platform CI, independent protected
 review and merge CAS. Update README en/zh and tool/SDK docs; owner-first evidence
-before derived views. No Completion Commit or implementation evidence exists yet.
+before derived views. No Completion Commit exists yet. The local sandbox stage is
+`9bf942651`; remaining implementation, verification boundaries and merge gates are
+tracked in I315.
 
 ## Required Reads
 

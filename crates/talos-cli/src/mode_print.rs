@@ -59,8 +59,11 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
 
     let hooks = build_hook_registry(true);
     let search = search_configuration::project_search_configuration(&config)?;
-    let mut registry =
-        configured_registry::build_print_tool_registry_with_search(Vec::new(), search)?;
+    let mut registry = configured_registry::build_print_tool_registry_with_search(
+        Vec::new(),
+        workspace_root.clone(),
+        search,
+    )?;
     let sched_pending = crate::registry::register_builtin_scheduler(&mut registry)?;
 
     #[cfg(debug_assertions)]

@@ -1,6 +1,6 @@
 //! Shared non-interactive process boundary for command tools.
 
-#[cfg(all(windows, feature = "git"))]
+#[cfg(all(windows, any(feature = "git", feature = "project-management")))]
 pub(crate) mod windows_foreground;
 
 #[cfg(any(windows, test))]
@@ -30,13 +30,14 @@ use tokio::process::Command;
 
 #[cfg(windows)]
 use async_trait::async_trait;
-#[cfg(windows)]
+#[cfg(all(windows, any(feature = "shell", test)))]
 use std::sync::Arc;
 #[cfg(windows)]
+use talos_core::background_job::BackgroundProcessControl;
+#[cfg(all(windows, any(feature = "shell", test)))]
 use talos_core::background_job::{
     BACKGROUND_PROCESS_EVENT_CAPACITY, BackgroundJobLauncher, BackgroundOutputChunk,
-    BackgroundOutputStream, BackgroundProcessControl, BackgroundProcessEvent,
-    BackgroundProcessExit, LaunchedBackgroundJob,
+    BackgroundOutputStream, BackgroundProcessEvent, BackgroundProcessExit, LaunchedBackgroundJob,
 };
 
 /// Prevents a foreground tool child from competing with Talos for terminal input.
@@ -293,7 +294,7 @@ mod tests {
 }
 
 /// Windows Job Object launcher implementing ADR-068's assigned-before-resume boundary.
-#[cfg(windows)]
+#[cfg(all(windows, any(feature = "shell", test)))]
 pub(crate) struct WindowsBackgroundLauncher {
     program: String,
     args: Vec<String>,
@@ -301,7 +302,7 @@ pub(crate) struct WindowsBackgroundLauncher {
     env: std::collections::BTreeMap<String, String>,
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, any(feature = "shell", test)))]
 impl WindowsBackgroundLauncher {
     pub(crate) fn new(
         program: String,
@@ -399,7 +400,7 @@ impl Drop for WindowsJobControl {
     }
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, any(feature = "shell", test)))]
 #[async_trait]
 impl BackgroundJobLauncher for WindowsBackgroundLauncher {
     async fn launch(self: Box<Self>) -> Result<LaunchedBackgroundJob, String> {
@@ -459,7 +460,7 @@ impl BackgroundJobLauncher for WindowsBackgroundLauncher {
     }
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, any(feature = "shell", test)))]
 async fn pump_windows_output(
     mut reader: tokio::fs::File,
     stream: BackgroundOutputStream,
@@ -527,7 +528,7 @@ fn last_windows_error(operation: &str) -> String {
     format!("{operation} failed: {}", std::io::Error::last_os_error())
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, any(feature = "shell", test)))]
 fn create_windows_job(
     program: &str,
     args: &[String],
@@ -544,7 +545,7 @@ fn create_windows_job(
     )
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, any(feature = "shell", test)))]
 fn create_windows_job_with_hooks(
     program: &str,
     args: &[String],
@@ -710,8 +711,23 @@ impl WindowsInputPipe {
 }
 
 #[cfg(windows)]
+#[cfg(any(feature = "shell", test))]
 fn create_windows_job_native(
+    command: WindowsLaunchCommand,
+    #[cfg(test)] hooks: WindowsLaunchTestHooks<'_>,
+) -> Result<WindowsLaunchHandles, String> {
+    create_windows_job_native_checked(
+        command,
+        || Ok(()),
+        #[cfg(test)]
+        hooks,
+    )
+}
+
+#[cfg(windows)]
+fn create_windows_job_native_checked(
     mut command: WindowsLaunchCommand,
+    mut checkpoint: impl FnMut() -> Result<(), String>,
     #[cfg(test)] mut hooks: WindowsLaunchTestHooks<'_>,
 ) -> Result<WindowsLaunchHandles, String> {
     use std::mem::{size_of, zeroed};
@@ -733,6 +749,7 @@ fn create_windows_job_native(
         ResumeThread, STARTUPINFOEXW, UpdateProcThreadAttribute,
     };
 
+    checkpoint()?;
     #[cfg(test)]
     if hooks.fault == Some(WindowsLaunchFault::UnsupportedHost) {
         return Err(
@@ -893,6 +910,7 @@ fn create_windows_job_native(
         let mut info: PROCESS_INFORMATION = zeroed();
         #[cfg(test)]
         observe!("before_process");
+        checkpoint()?;
         if CreateProcessW(
             command.executable.as_mut_ptr(),
             command.command.as_mut_ptr(),
@@ -916,6 +934,7 @@ fn create_windows_job_native(
             acquired!(Thread, thread);
             observe!("process_created");
         }
+        checkpoint()?;
         #[cfg(test)]
         let assignment_failed = hooks.fault == Some(WindowsLaunchFault::Assignment)
             || AssignProcessToJobObject(job, process) == 0;
@@ -931,6 +950,7 @@ fn create_windows_job_native(
                 last_windows_error("AssignProcessToJobObject")
             ));
         }
+        checkpoint()?;
         #[cfg(test)]
         let resume_failed =
             hooks.fault == Some(WindowsLaunchFault::Resume) || ResumeThread(thread) == u32::MAX;
@@ -1069,7 +1089,7 @@ fn create_windows_job_native(
     result
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, any(feature = "shell", test)))]
 fn windows_environment(
     extra: &std::collections::BTreeMap<String, String>,
 ) -> Result<Vec<u16>, String> {
@@ -1088,7 +1108,7 @@ fn windows_environment(
     }))
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, any(feature = "shell", test)))]
 fn resolve_windows_program(program: &str) -> Result<std::path::PathBuf, String> {
     let candidate = std::path::PathBuf::from(program);
     if candidate.is_absolute() || candidate.components().count() > 1 {

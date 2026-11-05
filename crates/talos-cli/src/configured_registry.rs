@@ -64,10 +64,11 @@ fn build_product_registry(
 
 pub(crate) fn build_print_tool_registry_with_search(
     scheduler_tools: Vec<Arc<dyn AgentTool>>,
+    workspace_root: PathBuf,
     search: SearchToolConfiguration,
 ) -> Result<ToolRegistry> {
     let shared =
-        contribution_groups_with_search(SharedToolProfile::Product, PathBuf::from("."), search)?;
+        contribution_groups_with_search(SharedToolProfile::Product, workspace_root, search)?;
     build_product_registry(
         shared,
         scheduler_tools,
@@ -126,13 +127,50 @@ mod tests {
 
     #[test]
     fn configured_product_and_mcp_keep_web_search_builtin_identity() {
-        let product =
-            build_print_tool_registry_with_search(Vec::new(), SearchToolConfiguration::DuckDuckGo)
-                .expect("configured product registry");
+        let product = build_print_tool_registry_with_search(
+            Vec::new(),
+            PathBuf::from("."),
+            SearchToolConfiguration::DuckDuckGo,
+        )
+        .expect("configured product registry");
         let mcp = build_mcp_tool_registry_with_search(SearchToolConfiguration::DuckDuckGo)
             .expect("configured mcp registry");
         assert!(product.is_builtin_instance("web_search"));
         assert!(mcp.is_builtin_instance("web_search"));
         assert!(mcp.is_builtin_instance("status"));
+    }
+
+    #[tokio::test]
+    async fn configured_search_keeps_validation_bound_to_selected_workspace() {
+        let root = tempfile::tempdir().expect("workspace");
+        std::fs::write(root.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
+        let registry = build_print_tool_registry_with_search(
+            Vec::new(),
+            root.path().to_owned(),
+            SearchToolConfiguration::DuckDuckGo,
+        )
+        .expect("configured registry");
+        assert!(registry.is_builtin_instance("web_search"));
+        assert!(registry.get("agile_summary").is_none());
+        let validation = registry.get("validate_project").expect("validation");
+        assert_eq!(
+            validation.execution_working_directory(),
+            Some(root.path().to_owned())
+        );
+        let plan = validation
+            .execute(serde_json::json!({"mode":"plan","profile":"workspace"}))
+            .await;
+        assert!(!plan.is_error, "{}", plan.content);
+        assert!(plan.content.contains("cargo check --locked --workspace"));
+        let empty = tempfile::tempdir().expect("empty workspace");
+        let registry = build_print_tool_registry_with_search(
+            Vec::new(),
+            empty.path().to_owned(),
+            SearchToolConfiguration::DuckDuckGo,
+        )
+        .expect("empty registry");
+        assert!(registry.get("validate_project").is_none());
+        assert!(registry.get("agile_summary").is_none());
+        assert!(registry.is_builtin_instance("web_search"));
     }
 }

@@ -1,6 +1,7 @@
 use std::path::Path;
 
-pub(crate) fn format_governance_summary(workspace: &Path) -> String {
+/// Render the supported read-only governance summary for the bound workspace.
+pub fn format_governance_summary(workspace: &Path) -> String {
     let mut out = String::new();
     out.push_str("[System] Talos Governance Status\n");
     out.push_str("[System] ========================\n\n");

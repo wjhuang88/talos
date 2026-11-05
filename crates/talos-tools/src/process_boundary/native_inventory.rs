@@ -9,11 +9,11 @@ const SOURCES: [&str; 5] = [
     include_str!("windows_foreground.rs"),
 ];
 const EXPECTED: [u64; 5] = [
-    0xc080cbefcd2d8c27,
+    0xcf8bc3346fd8d6cd,
     0xaaf4ee820de4ea11,
     0x77b368f79911fbee,
     0xa95c60b55dcdf0fc,
-    0x34615160b23c4ee3,
+    0x772df988fa37f98f,
 ];
 fn fingerprint(source: &str) -> u64 {
     source
