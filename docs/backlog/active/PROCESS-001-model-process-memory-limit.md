@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Story ID | PROCESS-001 |
-| Status | In Progress / claim #854 effective at 18aa4a58f |
+| Status | Review / Partial / claim #854 effective at 18aa4a58f |
 | Source Issue | #853 |
 | Owner | I316 |
 | Depends On | I315/T1 complete (#847 implementation, #852 closeout) |
@@ -52,7 +52,7 @@ preflight including both SDK modes, native Linux/Windows CI, independent API/nat
 process-security review, exact-head CAS/merge, and owner-first existing implementation
 Completion Commit are mandatory. Local implementation checkpoints and passing
 focused checks are recorded in I316; no merged implementation or completion
-evidence exists. Standard preflight passed; all-feature test retry, native CI and
+evidence exists. Standard preflight and full all-feature tests passed; native CI and
 final review/merge remain open.
 
 ## Required Reads

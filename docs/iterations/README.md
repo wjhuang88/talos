@@ -1,10 +1,10 @@
 ## T6 active implementation checkpoint — 2026-11-05
 
-I316 / PROCESS-001 is Active / Partial. Claim #854 merged at `18aa4a58f`;
+I316 / PROCESS-001 is Review / Partial. Claim #854 merged at `18aa4a58f`;
 local implementation stages through `b9ea2fceb` are not yet published or merged.
 The owner records complete standard preflight including both SDK modes, all-feature
-check/Clippy, xwin/MSVC compilation and independent code review. All-feature test
-retry, native Linux/Windows CI and final exact-head review/merge remain open. Earlier snapshots below are
+check/Clippy/tests with real plugin bundles, xwin/MSVC compilation and independent code review.
+Native Linux/Windows CI and final exact-head review/merge remain open. Earlier snapshots below are
 historical. Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6;
 predecessors closed, T6 incomplete, overall handoff Active.
 

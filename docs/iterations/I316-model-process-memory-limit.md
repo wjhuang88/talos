@@ -1,6 +1,6 @@
 # Iteration I316: Model-Selectable Process Memory Limit
 
-> Document status: Active / Partial (claim #854 effective at 18aa4a58f)
+> Document status: Review / Partial (claim #854 effective at 18aa4a58f)
 > Published plan date: 2026-11-05
 > Planned objective: complete handoff T6 across existing shell/exec execution modes.
 > Baseline rule: preserve full acceptance; platform gaps cannot be closed by wording.
@@ -361,3 +361,11 @@ Rust artifact SHA256: `2d67f75e9cdf7531ae43d1fc65a2d65db249b1220658d1597996fc561
 Python: `040bd1ab7c8fa07b0743b5bcf16293797b220570212a0691a95a65e0d204a1b6`.
 Full all-feature retry now supplies that verified bundle root, retaining two test
 threads and all tests; log `/private/tmp/i316-all-features-real-bundles.log`.
+
+Full all-feature workspace tests and doctests completed exit 0 with the verified
+bundles and two test threads. Both governance validators passed with zero warnings
+at candidate `c9b63dba5`; independent candidate review approved that exact head and
+confirmed its crates are identical to reviewed implementation `b9ea2fceb`.
+Local convergence is complete; delivery moves to Review / Partial for native
+Linux/Windows exact-head CI, final authorization/CAS and merge. No Completion
+Commit is declared until implementation reaches the target branch.
