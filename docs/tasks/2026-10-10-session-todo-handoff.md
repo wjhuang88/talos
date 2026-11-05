@@ -1,3 +1,11 @@
+## T6 claim preparation — 2026-11-05
+
+I316 / PROCESS-001 / #853 proposes the remaining model-selectable process memory
+limit. Independent API/native-security design review passed; ADR-098 and atomic
+claim still require finalized review and target-branch merge. No implementation
+or effective activation is claimed. Full queue remains I309 → T8/I308 → T2+T3
+MODEL-014 → T4 → T5 → T1 → T6; all predecessors closed, T6 unimplemented.
+
 ## T1 completed — 2026-11-05
 
 I315 / VALIDATION-003 / #844 is Complete with Completion Commit:
