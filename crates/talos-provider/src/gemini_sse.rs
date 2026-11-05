@@ -439,6 +439,60 @@ mod tests {
     }
 
     #[test]
+    fn sourced_go_sdk_trailing_empty_stop_preserves_signed_call() {
+        let wire = include_bytes!("../tests/fixtures/gemini/go_genai_trailing_empty.sse");
+        for size in [1, 7, wire.len()] {
+            let mut decoder = GeminiSse::new();
+            for chunk in wire.chunks(size) {
+                let early = decoder.push(chunk).expect("sourced SSE");
+                assert!(
+                    early
+                        .iter()
+                        .all(|event| !matches!(event, GeminiOutput::FunctionCall { .. }))
+                );
+            }
+            let output = decoder
+                .finish_with_identity("google", "model")
+                .expect("complete");
+            let blocks = output
+                .iter()
+                .find_map(|event| match event {
+                    GeminiOutput::Event(AgentEvent::ReasoningComplete { blocks }) => Some(blocks),
+                    _ => None,
+                })
+                .expect("signed replay");
+            let replay =
+                crate::gemini_replay::decode("google", "model", &blocks[0]).expect("decode");
+            assert_eq!(replay.parts[0]["functionCall"]["name"], "get_weather");
+            assert_eq!(replay.parts[0]["functionCall"]["args"]["city"], "Paris");
+            assert_eq!(replay.parts[0]["thoughtSignature"], "c2lnLTE=");
+            assert_eq!(replay.bindings.len(), 1);
+            let call_id = output
+                .iter()
+                .find_map(|event| match event {
+                    GeminiOutput::FunctionCall { id, .. } => Some(id),
+                    _ => None,
+                })
+                .expect("call identity");
+            assert_eq!(replay.bindings[0], (call_id.clone(), 0));
+            assert_eq!(
+                output
+                    .iter()
+                    .filter(|event| matches!(event, GeminiOutput::FunctionCall { .. }))
+                    .count(),
+                1
+            );
+            assert!(matches!(
+                output.last(),
+                Some(GeminiOutput::Event(AgentEvent::TurnEnd {
+                    stop_reason: talos_core::message::StopReason::ToolUse,
+                    ..
+                }))
+            ));
+        }
+    }
+
+    #[test]
     fn completed_signed_stream_roundtrips_into_identity_checked_request_history() {
         use serde_json::json;
         use talos_core::message::{AssistantReasoning, Message, MessageToolResult, ToolCall};
