@@ -1,3 +1,13 @@
+## T6 native candidate correction — 2026-11-05
+
+I316 remains Review / Partial. PR #855 head `fd9948418` failed native Windows
+Clippy and two Agent acceptance tests; Linux preflight passed. The owner records
+local Windows cwd compatibility correction, independent security review, xwin
+checks and focused tests. Recovery fixture budget adjustment is not a performance
+root-cause fix. Refreshed candidate preflight/native CI/review/merge and owner
+closeout remain open. Earlier snapshots are historical; the complete ordered
+queue remains retained and the overall handoff is Active.
+
 ## T6 active implementation checkpoint — 2026-11-05
 
 I316 / PROCESS-001 is Review / Partial. Claim #854 merged at `18aa4a58f`;

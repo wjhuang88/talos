@@ -15,6 +15,9 @@ mod windows_command_line;
 #[cfg(any(windows, test))]
 mod windows_environment;
 
+#[cfg(windows)]
+mod windows_cwd;
+
 #[cfg(all(feature = "shell", not(windows)))]
 use std::process::Stdio;
 
@@ -921,7 +924,7 @@ impl WindowsLaunchCommand {
     ) -> Result<Self, String> {
         use std::os::windows::ffi::OsStrExt;
         let executable = wide(executable.as_os_str());
-        let cwd = wide(cwd.as_os_str());
+        let cwd = windows_cwd::encode(cwd)?;
         let arg0 = arg0.encode_wide().collect::<Vec<_>>();
         if executable[..executable.len() - 1].contains(&0)
             || cwd[..cwd.len() - 1].contains(&0)

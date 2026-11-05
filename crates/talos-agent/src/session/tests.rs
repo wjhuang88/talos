@@ -5987,15 +5987,18 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             })
             .await
             .expect("restart submit");
+        // The child repeats multiple bounded reads over 8300+ records and
+        // persists a final turn. Its integration budget is distinct from each
+        // product operation deadline and remains inside the parent's 30 seconds.
+        // Native CI reached final provider step 12 but exceeded the old 10-second
+        // fixture budget; record elapsed time rather than claiming a latency fix.
+        let recovery_started = std::time::Instant::now();
         let events = tokio::time::timeout(
-            Duration::from_secs(10),
-            // Recovery may bind multiple disk pages without emitting an event.
-            // Keep the outer ten-second total bound rather than imposing the
-            // ordinary helper's shorter two-second idle bound on native CI.
+            Duration::from_secs(20),
             collect_until_completions_with_idle_timeout(
                 &mut restarted_handle.eq_rx,
                 1,
-                Duration::from_secs(10),
+                Duration::from_secs(20),
             ),
         )
         .await
@@ -6007,6 +6010,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                 restarted_task.is_finished(),
             )
         });
+        eprintln!(
+            "checkpoint_restart identity={identity} elapsed_ms={}",
+            recovery_started.elapsed().as_millis()
+        );
         assert!(events.iter().any(|event| matches!(
             completed_status(event),
             Some(TurnCompletionStatus::Success { .. })

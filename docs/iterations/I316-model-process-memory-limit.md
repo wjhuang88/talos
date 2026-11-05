@@ -369,3 +369,61 @@ confirmed its crates are identical to reviewed implementation `b9ea2fceb`.
 Local convergence is complete; delivery moves to Review / Partial for native
 Linux/Windows exact-head CI, final authorization/CAS and merge. No Completion
 Commit is declared until implementation reaches the target branch.
+
+## First native candidate findings — 2026-11-05
+
+PR #855 publishes head `fd994841894508a461467d1dc88543fba5a76c63` against
+`18aa4a58f269b441ff8df7cc030352c718f7e60a`. Independent exact-head approval is
+comment 6656605078. CI `42017547326` completed unsuccessfully: Linux standard
+preflight and Desktop passed; Windows Desktop/workspace Clippy rejected the new
+nine-argument adapter. Native workspace tests also failed
+`ordinary_auto::real_shell_and_exec_auto_control_effects` (allowed operation did
+not create its expected effect) and
+`registered_model_checkpoint_discovers_admits_and_applies_through_actor`
+(restart deadline at provider step 12, zero verification calls). Neither root
+cause is established; neither failure is waived or classified as flaky.
+
+Local correction adds a narrowly scoped adapter lint allowance with rationale,
+independently reviewed SHA256
+`9ae592731a97c83513990ee581622c6161bdccf0facd7635cee3366d5d143a26`,
+updates its reviewed inventory, and adds a first-command result assertion to
+expose Auto execution errors before effect assertions. These edits are not yet
+published. Full xwin test-target Clippy additionally found existing test-only
+useless-format and unwrap_err lints in Git config/search tests; library-only
+xwin Clippy is being checked separately, not represented as full test lint success.
+Logs: `/private/tmp/i316-windows-desktop-ci.log`,
+`/private/tmp/i316-windows-workspace-ci.log`,
+`/private/tmp/i316-windows-clippy-correction.log`.
+Native defects, refreshed candidate validation/review/CI, CAS/merge and owner
+closure remain required; T6 and the full handoff remain incomplete.
+
+### Native correction investigation
+
+Windows library-only xwin Clippy passed. Upstream pinned Rust 1.99.0
+`library/std/src/sys/process/windows.rs::make_dirp` removes verbatim cwd prefixes
+only when Win32 normalization preserves spelling. The new raw launcher had not
+carried this compatibility behavior. A safe `windows_cwd` adapter now uses
+`std::path::absolute` and exact OsStr equality, refuses nested-verbatim conversion,
+and preserves normalization-sensitive spelling. Independent review approved the
+native delta and seven-file inventory; final xwin shell/test compilation passed
+(`/private/tmp/i316-windows-cwd-final-check.log`). Native Auto failure attribution
+remains a hypothesis until actual Windows execution passes; checkpoint recovery
+timeout is still unresolved. No refreshed candidate has been published.
+
+First native run did pass Windows real allocation-denial, background memory,
+composition inheritance/override and output/timeout memory adapter tests. Those
+passing cases do not supersede the two failing Agent acceptance tests.
+
+### Recovery fixture budget and focused correction validation
+
+Native recovery had reached the final provider request (step counter 12) when
+its ten-second integration timeout fired. The correction gives the multi-operation
+8300+ record restart fixture 20 seconds inside the unchanged 30-second parent
+process bound and records elapsed time. Product operation deadlines, recovery
+contents/privacy/reuse assertions and no-replay checks are unchanged. Independent
+review accepted this test-budget change; it is not a performance root-cause fix
+or proof of the former ten-second bound. Focused recovery passed 1/1 locally
+(`/private/tmp/i316-recovery-correction.log`), and ordinary Auto passed 1/1 across
+its scenarios (`/private/tmp/i316-auto-correction.log`). Current Windows library
+xwin warnings-denied Clippy passed (`/private/tmp/i316-cwd-final-clippy.log`).
+Corrected standard preflight is running; native candidate validation remains open.

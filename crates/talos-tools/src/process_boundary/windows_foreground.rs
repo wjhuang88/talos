@@ -206,6 +206,8 @@ impl Drop for CancelOnDrop {
 impl OwnedCommandOperation {
     /// Adapt shell-tool argv and inherited environment to the existing owned launcher.
     #[cfg(feature = "shell")]
+    // Keep each launch bound explicit at this adapter; both callers already resolve them.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn execute_tool_command(
         &self,
         program: &str,

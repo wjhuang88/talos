@@ -243,6 +243,26 @@ async fn real_shell_and_exec_auto_control_effects() {
                 expected_calls,
                 "scenario not reached: {tool_name}/{scenario}"
             );
+            if matches!(
+                scenario,
+                "allow" | "replay" | "changed_input" | "changed_memory"
+            ) {
+                let messages = captured.lock().await;
+                let result = messages
+                    .last()
+                    .expect("continuation")
+                    .iter()
+                    .find_map(|message| match message {
+                        Message::Tool { result } if result.tool_use_id == "command" => Some(result),
+                        _ => None,
+                    })
+                    .expect("command result");
+                assert!(
+                    !result.is_error,
+                    "{tool_name}/{scenario}: {}",
+                    result.content
+                );
+            }
             assert_eq!(
                 root.path().join("nested/effect").exists(),
                 matches!(
