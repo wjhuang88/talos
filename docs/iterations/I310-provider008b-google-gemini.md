@@ -339,3 +339,18 @@ Desktop check with --features desktop-ui started separately and has no final res
 This covers negative ADC admission, not a successful factory Vertex cloud endpoint exchange.
 Remaining positive lazy-path/host, capability/decision/ephemeral/browser and full integration gates
 continue to block completion. No merge/release/parent acceptance claim.
+
+### Isolated decision/permission-review support — 2026-11-02
+
+Implementation e86d63462390b97a4bcbcd344bcf5ef1dcacef34 supports bounded stream_decision
+and inherited stream_auto_review delegation. Shared validation permits only System/User text and
+positive token caps; cloned output/retry limits do not mutate conversation settings. No native
+tools are declared. Private thinking/replay events are suppressed, and unexpected returned tools
+produce failure without ToolCall/TurnEnd. Tests cover actual thought/signature filtering, output
+cap and unchanged normal conversation budget, zero retry on 429 and assistant-history refusal.
+Independent current-source review found no new blocker. First build failed E0460/E0463 due stale
+shared talos_core-linked workspace artifacts; cleaned workspace crate build artifacts and reran.
+Final Rust1.99.0 cargo test -p talos-provider --lib --locked: 257 passed, zero failed/ignored/
+filtered (5.06s). Source and tests formatted; no claim of a new Desktop UI result (prior log lost
+with workspace maintenance). Remaining ephemeral/browser compatibility, host/UI/catalog, vendor
+fixtures, full preflight and precise CI/review continue to block Gemini/parent completion.
