@@ -179,3 +179,17 @@ Pinned locked Provider lib tests: 229 passed, zero failed/ignored/filtered (5.44
 independent images with exact byte/order assertions and same-name parallel tools/results reversed
 in completion order. Prior transport status-classification correction also passes in this run.
 Request mapping is not yet factory/SSE/Agent connected; full Gemini acceptance remains pending.
+
+### Stream semantic decoder checkpoint — 2026-11-01
+
+Added GeminiStream for decoded GenerateContentResponse JSON: distinct text/thought summaries,
+native ordered parts/signatures retained privately without Debug, supplied tool IDs preserved,
+unique local IDs when absent, duplicate/malformed calls rejected, safety/unsupported finish outcomes
+explicit, missing terminal EOF rejected, trailing usage included before one TurnEnd. Truncated tool
+responses fail rather than execute. Content/usage counters are bounded. Native replay integration
+is still pending; this decoder does not yet emit durable reasoning metadata.
+Rust 1.99.0 locked Provider library tests: 233 passed, zero failed/ignored/filtered (6.04s), including
+semantic fixtures and Unicode text-sequence proptest. Fixtures are authored synthetic cases, not
+recorded vendor evidence. SSE byte framing/chunk-boundary proptest, sourced vendor fixtures,
+timeouts, factory and Agent wiring remain required. Independent read-only decoder review requested.
+No complete Gemini/parent acceptance or merge authorization is claimed.
