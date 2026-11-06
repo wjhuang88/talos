@@ -769,6 +769,23 @@ mod tests {
     }
 
     #[test]
+    fn gemini_picker_preserves_transport_and_model_override_provenance() {
+        let model = talos_config::model::builtin_models().into_iter().find(|model| model.provider == "google").expect("Google catalog model");
+        for profile in [talos_config::GeminiTransportConfig::AiStudio, talos_config::GeminiTransportConfig::Vertex { project: "fixture-project".into(), location: "global".into(), allow_metadata: false }] {
+            let mut config = Config::default();
+            let api_key = matches!(&profile, talos_config::GeminiTransportConfig::AiStudio).then(|| "fixture-key".to_owned());
+            config.providers.insert("google".into(), talos_config::ProviderConfig { protocol: talos_config::ProviderProtocol::GoogleGemini, gemini: Some(profile), api_key, ..Default::default() });
+            let data = build_model_picker_data(&config);
+            let row = data.ready_models.iter().find(|row| row.provider == "google" && row.model_id == model.id).expect("authenticated Gemini picker row");
+            assert!(row.label.contains("google-gemini (Configured)"), "{}", row.label);
+            config.providers.get_mut("google").expect("provider").models.insert(model.id.clone(), talos_config::ModelConfig { protocol: Some(talos_config::ProviderProtocol::OpenAIChat), ..Default::default() });
+            let data = build_model_picker_data(&config);
+            let row = data.ready_models.iter().find(|row| row.provider == "google" && row.model_id == model.id).expect("overridden row");
+            assert!(row.label.contains("openai-chat (Configured)"), "{}", row.label);
+        }
+    }
+
+    #[test]
     fn model014_custom_reasoning_walkthrough_picker_provenance() {
         let catalog = talos_config::model::builtin_models();
         let model = catalog
