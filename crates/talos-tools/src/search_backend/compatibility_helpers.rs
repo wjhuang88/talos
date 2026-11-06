@@ -138,42 +138,62 @@ mod tests {
     #[test]
     fn html_helpers_preserve_upstream_bytes() {
         for input in [
-            "", "plain text", "&amp;&lt;&gt;&quot;&#x27;&#39;&nbsp;",
+            "",
+            "plain text",
+            "&amp;&lt;&gt;&quot;&#x27;&#39;&nbsp;",
             "&amp;lt;&unknown;&#x27;&#39;&#39;",
             "<p> Hello </p>  <em>world</em>",
-            "malformed <tag unclosed and > more", "<<nested>>",
-            "a\r\n  b\u{00a0}c", "中文 café 😀 <strong>é</strong>",
+            "malformed <tag unclosed and > more",
+            "<<nested>>",
+            "a\r\n  b\u{00a0}c",
+            "中文 café 😀 <strong>é</strong>",
             "&#x1F600; &apos; &#039; &NbSp;",
             " <a href='a&b'>X &amp; Y</a> ",
         ] {
-            assert_eq!(decode_html_entities(input),
-                rust_websearch::html_utils::decode_html_entities(input));
-            assert_eq!(strip_html_tags(input),
-                rust_websearch::html_utils::strip_html_tags(input));
-            assert_eq!(clean_html(input),
-                rust_websearch::html_utils::clean_html(input));
+            assert_eq!(
+                decode_html_entities(input),
+                rust_websearch::html_utils::decode_html_entities(input)
+            );
+            assert_eq!(
+                strip_html_tags(input),
+                rust_websearch::html_utils::strip_html_tags(input)
+            );
+            assert_eq!(
+                clean_html(input),
+                rust_websearch::html_utils::clean_html(input)
+            );
         }
     }
 
     #[test]
     fn ddg_redirect_percent_utf8_and_error_parity() {
         for input in [
-            "", "https://example.org/path?a=1&amp;b=2",
+            "",
+            "https://example.org/path?a=1&amp;b=2",
             "//example.org/path?q=é",
             "/l/?uddg=https%3A%2F%2Fexample.org%2Fa%3Fb%3D1%26c%3D2",
             "/l/?uddg=https%3A%2F%2Fexample.org%2Fa+b",
-            "/l/?uddg=%E4%B8%AD%E6%96%87", "/l/?uddg=%FF",
-            "/l/?uddg=%GG", "/l/?uddg=%2",
+            "/l/?uddg=%E4%B8%AD%E6%96%87",
+            "/l/?uddg=%FF",
+            "/l/?uddg=%GG",
+            "/l/?uddg=%2",
             "/l/?uddg=abc%20def&amp;unused=1",
-            "/l/?uddg=非ASCII", "/l/?uddg=abc%00def",
-            "/l/?uddg=", "/l/?other=foo&uddg=https%3A%2F%2Fexample.org",
+            "/l/?uddg=非ASCII",
+            "/l/?uddg=abc%00def",
+            "/l/?uddg=",
+            "/l/?other=foo&uddg=https%3A%2F%2Fexample.org",
         ] {
-            assert_eq!(resolve_duckduckgo_url(input),
-                rust_websearch::html_utils::resolve_duckduckgo_url(input));
+            assert_eq!(
+                resolve_duckduckgo_url(input),
+                rust_websearch::html_utils::resolve_duckduckgo_url(input)
+            );
         }
         assert_eq!(resolve_duckduckgo_url("/l/?uddg=%FF"), "/l/?uddg=%FF");
         assert_eq!(resolve_duckduckgo_url("/l/?uddg=%GG"), "/l/?uddg=%GG");
-        assert_eq!(resolve_duckduckgo_url("//example.org/a"), "https://example.org/a");
+        assert_eq!(
+            resolve_duckduckgo_url("//example.org/a"),
+            "https://example.org/a"
+        );
         assert_eq!(resolve_duckduckgo_url("/l/?uddg=%E4%B8%AD"), "中");
     }
 
