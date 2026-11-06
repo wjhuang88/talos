@@ -147,3 +147,37 @@ Use a Copilot-compatible credential authorized for the selected model. The packa
 or enterprise endpoint discovery. Account scopes, subscriptions, integration quotas and model
 allowlists remain server-side decisions. No real credentials or live vendor probe are used in tests.
 See [ADR-093 section 9](../decisions/093-openai-responses-protocol-boundary.md) for the pinned contract.
+
+### Explicit Gemini reasoning controls (implementation candidate)
+
+The Gemini adapter in PROVIDER-008-B uses an explicit AI Studio or Vertex transport profile;
+its Draft #838 is not yet fully accepted. Reasoning options never activate Gemini by themselves.
+For an explicitly selected Gemini provider, configure model-local options as follows:
+
+```toml
+[providers.google]
+protocol = "google-gemini"
+api_key_env = "GEMINI_API_KEY"
+
+[providers.google.gemini]
+transport = "ai-studio"
+
+[providers.google.models."gemini-2.5-flash".reasoning]
+budget_tokens = 1024
+```
+
+Confirmed budget models are `gemini-2.5-pro` (128–32768), `gemini-2.5-flash` (0–24576)
+and `gemini-2.5-flash-lite` (0 or 512–24576). Omit the budget for the vendor default;
+zero disables thinking only on the admitted Flash/Lite models. `gemini-3.8-flash` and
+`gemini-4-argon` accept `effort = "low"`, `"medium"`, or `"high"` instead of a budget.
+An empty Argon options block uses its documented medium level. Enabled options request thought
+summaries; the existing output limit still caps total generated tokens including thinking.
+
+Unsupported model/setting combinations, both fields together and `replay = false` fail before
+generation dispatch. Gemini native tool calls may require positional signatures, so the adapter
+refuses a request to disable their replay instead of silently corrupting tool history. Isolated
+permission decisions use independent minimal budget/level controls and suppress summaries and
+reasoning events; they do not inherit conversation settings. Explicit reasoning_supported=false
+continues to suppress conversation controls, but cannot silently ignore replay=false.
+These exact model mappings do not infer preview, gateway or future model support, and do not
+activate catalog entries. See ADR-094 for the primary source and current acceptance boundary.

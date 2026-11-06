@@ -52,6 +52,10 @@ fn build_with_connection(
     let provider_config = config.active_provider_config();
     let model_config = provider_config.models.get(&config.model).cloned();
     let reasoning_disabled = config.resolve_model_fields().reasoning_supported.value == Some(false);
+    let replay_disabled = model_config
+        .as_ref()
+        .and_then(|model| model.reasoning.as_ref())
+        .is_some_and(|options| !options.replay);
     let reasoning = model_config
         .and_then(|model| model.reasoning)
         .filter(|_| !reasoning_disabled);
@@ -138,9 +142,9 @@ fn build_with_connection(
         }
         ProviderProtocol::GoogleGemini => {
             use talos_config::GeminiTransportConfig;
-            if reasoning.is_some() {
+            if replay_disabled {
                 return Err(ProviderError::InvalidResponse(
-                    "Gemini reasoning settings are not yet supported".into(),
+                    "Gemini requires native signature replay; replay=false is unsupported".into(),
                 ));
             }
             let profile = provider_config.gemini.as_ref().ok_or_else(|| {
@@ -200,7 +204,11 @@ fn build_with_connection(
                     )?
                 }
             };
-            Ok(Arc::new(provider))
+            Ok(Arc::new(
+                provider
+                    .with_reasoning(reasoning.as_ref())?
+                    .with_reasoning_disabled(reasoning_disabled),
+            ))
         }
         ProviderProtocol::OpenAIResponses => {
             let mut provider = OpenAIResponsesProvider::new(api_key, &config.model)
@@ -300,6 +308,86 @@ mod tests {
         assert!(message.contains("invalid or unsupported Vertex credentials"));
         assert!(!message.contains("private-fixture-account"));
         assert!(!message.contains("invalid explicit ADC fixture"));
+    }
+
+    #[test]
+    fn gemini_reasoning_factory_validates_before_lazy_vertex_credentials() {
+        use talos_config::{
+            GeminiTransportConfig, ModelConfig, ProviderConfig, ReasoningEffort, ReasoningOptions,
+        };
+        let mut config = Config {
+            provider: "fixture-google".into(),
+            model: "gemini-2.5-flash".into(),
+            providers: std::collections::HashMap::from([(
+                "fixture-google".into(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::GoogleGemini,
+                    gemini: Some(GeminiTransportConfig::Vertex {
+                        project: "fixture-project".into(),
+                        location: "global".into(),
+                        allow_metadata: false,
+                    }),
+                    models: std::collections::HashMap::from([(
+                        "gemini-2.5-flash".into(),
+                        ModelConfig {
+                            reasoning_supported: Some(true),
+                            reasoning: Some(ReasoningOptions {
+                                budget_tokens: Some(1024),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        // A valid reasoning configuration does not require opening an ADC file in the factory.
+        assert!(build_configured_provider(&config, "").is_ok());
+        let model = config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider")
+            .models
+            .get_mut("gemini-2.5-flash")
+            .expect("model");
+        model.reasoning = Some(ReasoningOptions {
+            effort: Some(ReasoningEffort::Low),
+            ..Default::default()
+        });
+        let error = match build_configured_provider(&config, "") {
+            Ok(_) => panic!("unsupported effort admitted"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("requires a thinking budget"));
+        config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider")
+            .models
+            .get_mut("gemini-2.5-flash")
+            .expect("model")
+            .reasoning_supported = Some(false);
+        assert!(
+            build_configured_provider(&config, "").is_ok(),
+            "explicit unsupported capability suppresses controls"
+        );
+        config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider")
+            .models
+            .get_mut("gemini-2.5-flash")
+            .expect("model")
+            .reasoning
+            .as_mut()
+            .expect("options")
+            .replay = false;
+        assert!(
+            build_configured_provider(&config, "").is_err(),
+            "capability suppression must not silently ignore replay=false"
+        );
     }
 
     #[test]

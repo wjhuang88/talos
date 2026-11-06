@@ -115,9 +115,9 @@ pub struct ModelConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 #[serde(default)]
 pub struct ReasoningOptions {
-    /// Reasoning effort for OpenAI-style providers.
+    /// Reasoning effort for OpenAI and confirmed Gemini level-based models.
     pub effort: Option<ReasoningEffort>,
-    /// Token budget for Anthropic thinking blocks.
+    /// Token budget for Anthropic thinking and confirmed Gemini budget-based models.
     pub budget_tokens: Option<u32>,
     /// Replay captured reasoning in request history (ADR-034 replay policy).
     pub replay: bool,

@@ -468,3 +468,30 @@ claimed for the new metadata checkpoint yet. Draft #838 remains unaccepted; CI37
 in progress at source head 090ec083 and must not be treated as the final-head CI result after
 claim metadata changes. The previously paused automation stays paused until reliable execution
 is established; no background continuation is claimed.
+
+### Confirmed-model reasoning controls — 2026-11-02 (not accepted)
+
+Added exact-ID native thinking policy for Gemini 2.5 Pro/Flash/Flash-Lite budgets and
+3.8 Flash / 4 Argon low/medium/high levels, sourced in ADR-094. Unsupported aliases,
+unknown explicit settings, mixed budget/effort and replay=false fail before generation.
+Factory catches replay=false before capability suppression; explicit reasoning_supported=false
+suppresses thinkingConfig on both ordinary and isolated requests. No new dependency/schema
+field or catalog activation. Existing output caps remain separate and include thinking tokens.
+
+Isolated decisions use their own minimal controls (Flash/Lite 0, Pro 128, level models low,
+includeThoughts=false), preserve the caller's bounded output/retry limits and filter private
+reasoning events. HTTP regressions cover all three budget models and both level models, then
+ordinary requests verify conversation controls are unchanged. Added invalid budget/combined
+control/alias matrices, capability suppression HTTP and factory admission checks. Configuration
+field documentation and protocol reference were updated; remaining B acceptance stays open.
+
+Recovered prior preflight log ends during dependency compilation and its execution handle no
+longer exists; there is no completed preflight result. First current focused Provider run failed
+before tests with E0786 corrupt Cranelift metadata from the interrupted cache. Cleaned only
+cranelift-codegen and wasmtime-internal-unwinder task artifacts and started a pinned --locked
+Provider rerun with CI debug=0, incremental=0 and two build jobs. Result pending; do not reuse
+prior 263 as proof of these new controls. Initial independent read-only review found no source
+blocker and requested the HTTP matrices added above; final diff review remains in progress.
+
+Draft #838 remains unaccepted. Remote CI3733 was pending at unchanged head 26a91246 before
+this new checkpoint; it is not validation of subsequent reasoning changes. No merge/release/tag.
