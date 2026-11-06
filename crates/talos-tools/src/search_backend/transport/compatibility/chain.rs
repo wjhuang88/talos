@@ -69,7 +69,7 @@ impl PreparedCompatibilityChain {
             manifest,
             query,
             max_results,
-            rust_websearch::anti_detection::random_user_agent,
+            crate::search_backend::compat_helpers::random_user_agent,
         )
     }
 
