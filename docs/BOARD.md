@@ -1,5 +1,9 @@
 # Talos Board
 
+## Issue #768 fixture repair proposal
+
+[Independent task](tasks/2026-11-06-issue768-search-refusal-fixtures.md) proposes native search refusal fixture diagnosis and parallel validation. Claim/activation are ineffective until merge; I308 remains closed and #768 remains open.
+
 ## Completed session handoff
 
 I309 → I308/T8 → MODEL-014 → T4 → T5 → T1 → T6, including C0/T7 carryover,
