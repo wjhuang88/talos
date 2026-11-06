@@ -291,7 +291,8 @@ impl Agent {
                 &active_tool_definitions,
                 &mut continuation_parts,
                 request_context_limit,
-                &PrivateTokens::default(),
+                &private_replays.seed_tokens()?,
+                Some(&private_replays),
                 history_source.as_ref(),
                 checkpoint_observer.as_ref(),
             )
@@ -327,8 +328,10 @@ impl Agent {
         tool_definitions: &[ToolDefinition],
         continuation_parts: &mut Vec<ContentPart>,
         private_tokens: &PrivateTokens,
+        private_replays: Option<&crate::private_replay::PrivateReplayStore>,
     ) -> AgentResult<ProviderRequestPlan> {
-        let hook_messages = self.persistence_projection_with_tokens(messages, private_tokens);
+        let hook_messages =
+            self.persistence_projection_with_tokens(messages, private_tokens, private_replays);
         let observed_provider_messages = match self
             .run_hook(
                 hook_ctx,
@@ -421,6 +424,7 @@ impl Agent {
         continuation_parts: &mut Vec<ContentPart>,
         request_context_limit: Option<u32>,
         private_tokens: &PrivateTokens,
+        private_replays: Option<&crate::private_replay::PrivateReplayStore>,
         history_source: Option<&crate::compaction::HistorySource>,
         checkpoint_observer: Option<&crate::checkpoint_progress::CheckpointObserver>,
     ) -> AgentResult<ProviderRequestPlan> {
@@ -431,6 +435,7 @@ impl Agent {
                 tool_definitions,
                 continuation_parts,
                 private_tokens,
+                private_replays,
             )
             .await?;
         self.seal_observed_request_plan(

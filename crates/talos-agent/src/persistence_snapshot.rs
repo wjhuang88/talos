@@ -20,8 +20,9 @@ impl Agent {
         &self,
         raw: &[Message],
         private: &PrivateTokens,
+        private_replays: Option<&crate::private_replay::PrivateReplayStore>,
     ) -> PersistenceSnapshot {
-        let messages = self.persistence_projection_with_tokens(raw, private);
+        let messages = self.persistence_projection_with_tokens(raw, private, private_replays);
         let mut pending = HashMap::new();
         let mut seen = HashSet::new();
         let mut recovery = Vec::new();
@@ -179,7 +180,7 @@ mod tests {
                     },
                 ];
                 agent.record_checkpoint_result("read", &result);
-                let snapshot = agent.persistence_snapshot(&messages, &private);
+                let snapshot = agent.persistence_snapshot(&messages, &private, None);
                 assert_eq!(snapshot.recovery.len(), 1);
                 assert_eq!(snapshot.recovery[0].content, expected);
                 assert!(!expected.contains("snapshot:"));
@@ -271,12 +272,12 @@ mod tests {
                 let private = PrivateTokens::default();
                 assert!(
                     agent
-                        .persistence_snapshot(&messages, &private)
+                        .persistence_snapshot(&messages, &private, None)
                         .recovery
                         .is_empty()
                 );
                 agent.record_checkpoint_result("read", &result);
-                let snapshot = agent.persistence_snapshot(&messages, &private);
+                let snapshot = agent.persistence_snapshot(&messages, &private, None);
                 assert_eq!(snapshot.recovery.len(), usize::from(!different || opt_in));
                 if !different || opt_in {
                     assert_eq!(snapshot.recovery[0].message_index, 1);
@@ -353,7 +354,7 @@ mod tests {
                 RECOVERY_EXECUTION.sync_scope(uuid::Uuid::new_v4(), || {
                     assert!(
                         agent
-                            .persistence_snapshot(&messages, &private)
+                            .persistence_snapshot(&messages, &private, None)
                             .recovery
                             .is_empty(),
                         "old execution cannot authorize another turn"
@@ -361,7 +362,7 @@ mod tests {
                     agent.record_checkpoint_result("read", &result);
                     assert_eq!(
                         agent
-                            .persistence_snapshot(&messages, &private)
+                            .persistence_snapshot(&messages, &private, None)
                             .recovery
                             .len(),
                         usize::from(!different || opt_in)
@@ -370,7 +371,7 @@ mod tests {
                 agent.tools.register(Arc::new(Tool { different, opt_in }));
                 assert!(
                     agent
-                        .persistence_snapshot(&messages, &private)
+                        .persistence_snapshot(&messages, &private, None)
                         .recovery
                         .is_empty()
                 );
