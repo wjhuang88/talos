@@ -162,6 +162,31 @@ impl GeminiProvider {
         decision_only: bool,
         images: Vec<talos_core::provider::EphemeralImage>,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        let (tx, rx) = mpsc::channel(32);
+        self.dispatch_to_sink(
+            messages,
+            tools,
+            progress,
+            decision_only,
+            images,
+            InvocationSender::Legacy(tx),
+            None,
+        )
+        .await?;
+        Ok(rx)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn dispatch_to_sink(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        progress: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+        decision_only: bool,
+        images: Vec<talos_core::provider::EphemeralImage>,
+        sink: InvocationSender,
+        private_response: Option<bool>,
+    ) -> ProviderResult<()> {
         let started = Instant::now();
         let deadline = started
             .checked_add(Duration::from_secs(self.timeout.dispatch_timeout_secs))
@@ -302,16 +327,22 @@ impl GeminiProvider {
         let idle = Duration::from_secs(self.timeout.stream_idle_timeout_secs);
         let provider = self.provider.clone();
         let model = self.model.clone();
-        let (tx, rx) = mpsc::channel(32);
         tokio::spawn(async move {
-            let sink = InvocationSender::Legacy(tx.clone());
-            if tx.send(AgentEvent::TurnStart).await.is_err() {
+            if sink.send(AgentEvent::TurnStart).await.is_err() {
                 return;
             }
             let (raw_tx, mut raw_rx) = mpsc::channel(32);
+            let reader_provider = provider.clone();
+            let reader_model = model.clone();
             let reader = async move {
                 let result = crate::gemini_sse::read_response(
-                    response, &provider, &model, &raw_tx, deadline, first, idle,
+                    response,
+                    &reader_provider,
+                    &reader_model,
+                    &raw_tx,
+                    deadline,
+                    first,
+                    idle,
                 )
                 .await;
                 drop(raw_tx);
@@ -320,19 +351,25 @@ impl GeminiProvider {
             tokio::pin!(reader);
             let mut finished = false;
             let mut terminal = Vec::new();
+            let mut private_text = String::new();
+            let mut private_thoughts = String::new();
             loop {
                 tokio::select! {
-                    _ = tx.closed() => return,
+                    _ = sink.closed() => return,
                     result = &mut reader, if !finished => {
                         finished = true;
                         if let Err(error) = result {
-                            let _ = tx.try_send(AgentEvent::Error {message:error.to_string()});
+                            let _ = sink.try_send(AgentEvent::Error {message:error.to_string()});
                             return;
                         }
                     }
                     event = raw_rx.recv() => match event {
                         Some(GeminiOutput::Event(event @ (AgentEvent::TextDelta{..} | AgentEvent::ThinkingDelta{..}))) => {
                             if decision_only && matches!(event, AgentEvent::ThinkingDelta{..}) { continue; }
+                            if private_response.is_some() {
+                                match event { AgentEvent::TextDelta{delta} => private_text.push_str(&delta), AgentEvent::ThinkingDelta{delta} => private_thoughts.push_str(&delta), _=>{} }
+                                continue;
+                            }
                             if Instant::now() >= deadline { return; }
                             if !matches!(tokio::time::timeout_at(deadline.into(), sink.send(event)).await, Ok(Ok(()))) { return; }
                         }
@@ -340,12 +377,29 @@ impl GeminiProvider {
                         None => {
                             // The reader drops its sender only after return. Poll its result first.
                             if !finished && let Err(error) = (&mut reader).await {
-                                let _ = tx.try_send(AgentEvent::Error{message:error.to_string()});
+                                let _ = sink.try_send(AgentEvent::Error{message:error.to_string()});
                                 return;
                             }
                             if decision_only && terminal.iter().any(|event| matches!(event,GeminiOutput::FunctionCall{..})) {
-                                let _ = tx.try_send(AgentEvent::Error{message:"Gemini isolated decision returned a tool call".into()});
+                                let _ = sink.try_send(AgentEvent::Error{message:"Gemini isolated decision returned a tool call".into()});
                                 return;
+                            }
+                            if let Some(had_private_history) = private_response {
+                                let has_browser_call = terminal.iter().any(|event| matches!(event, GeminiOutput::FunctionCall{name,..} if sink.is_browser(name)));
+                                if had_private_history || has_browser_call {
+                                match crate::gemini_private_replay::prepare(&provider, &model, &private_text, &private_thoughts, terminal, &sink) {
+                                    Ok(events) => for event in events {
+                                        if !matches!(tokio::time::timeout_at(deadline.into(), sink.send_invocation(event)).await, Ok(Ok(()))) {return;}
+                                    },
+                                    Err(error) => { let _=sink.try_send(AgentEvent::Error {message:error.to_string()}); }
+                                }
+                                return;
+                                }
+                                // Merely presenting browser tools does not make an ordinary
+                                // response non-recoverable or consume private-history quota.
+                                for event in [AgentEvent::TextDelta{delta:private_text}, AgentEvent::ThinkingDelta{delta:private_thoughts}] {
+                                    if !matches!(tokio::time::timeout_at(deadline.into(), sink.send(event)).await, Ok(Ok(()))) {return;}
+                                }
                             }
                             for event in terminal {
                                 if decision_only && matches!(event,GeminiOutput::Event(AgentEvent::ReasoningComplete{..})) { continue; }
@@ -362,7 +416,7 @@ impl GeminiProvider {
                 }
             }
         });
-        Ok(rx)
+        Ok(())
     }
 }
 
@@ -436,6 +490,63 @@ impl LanguageModel for GeminiProvider {
             Err(_) => preview["error"] = serde_json::json!("Gemini history cannot be previewed"),
         }
         Some(preview)
+    }
+
+    async fn stream_with_replay_context(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: ToolProtocol,
+        progress: mpsc::UnboundedSender<ProviderProgress>,
+        browser_tools: &[String],
+        images: Vec<talos_core::provider::EphemeralImage>,
+        replay: Vec<std::sync::Arc<talos_core::provider::TransientReplay>>,
+    ) -> ProviderResult<talos_core::provider::ProviderInvocationStream> {
+        if browser_tools.is_empty() && replay.is_empty() {
+            // Detect persisted markers even when the caller lost its private custody.
+            talos_core::provider::TransientReplay::restore_history(
+                messages,
+                &self.provider,
+                &self.model,
+                &[],
+            )?;
+            return self
+                .stream_with_ephemeral_images(
+                    messages,
+                    tools,
+                    protocol,
+                    progress,
+                    browser_tools,
+                    images,
+                )
+                .await;
+        }
+        if protocol != ToolProtocol::Native {
+            return Err(ProviderError::InvalidResponse(
+                "Gemini private browser replay requires native tool mode".into(),
+            ));
+        }
+        let messages = talos_core::provider::TransientReplay::restore_history(
+            messages,
+            &self.provider,
+            &self.model,
+            &replay,
+        )?;
+        let (tx, rx) = mpsc::channel(32);
+        self.dispatch_to_sink(
+            &messages,
+            tools,
+            Some(&progress),
+            false,
+            images,
+            InvocationSender::Original {
+                tx,
+                browser_tools: browser_tools.to_vec(),
+            },
+            Some(!replay.is_empty()),
+        )
+        .await?;
+        Ok(talos_core::provider::ProviderInvocationStream::original(rx))
     }
 
     async fn stream_with_protocol(

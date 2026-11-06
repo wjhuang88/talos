@@ -6,6 +6,9 @@ use tokio::sync::mpsc;
 
 use crate::message::{AgentEvent, Message};
 
+mod transient_replay;
+pub use transient_replay::{MAX_TRANSIENT_REPLAY_BYTES, TransientReplay};
+
 mod invocation;
 pub use invocation::{ProviderInvocationEvent, ProviderInvocationStream};
 mod ephemeral;
@@ -116,6 +119,37 @@ impl ToolDefinition {
 
 #[async_trait::async_trait]
 pub trait LanguageModel: Send + Sync {
+    /// Dispatches with session-private replay custody; unsupported adapters refuse it.
+    async fn stream_with_replay_context(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: crate::tool::ToolProtocol,
+        progress_tx: mpsc::UnboundedSender<ProviderProgress>,
+        browser_tools: &[String],
+        images: Vec<EphemeralImage>,
+        replay: Vec<std::sync::Arc<TransientReplay>>,
+    ) -> ProviderResult<ProviderInvocationStream> {
+        if !replay.is_empty()
+            || messages
+                .iter()
+                .any(|message| !matches!(TransientReplay::marker(message), Ok(None)))
+        {
+            return Err(ProviderError::InvalidResponse(
+                "provider does not support private replay context".into(),
+            ));
+        }
+        self.stream_with_ephemeral_images(
+            messages,
+            tools,
+            protocol,
+            progress_tx,
+            browser_tools,
+            images,
+        )
+        .await
+    }
+
     /// Dispatches one request with nonpersistent image attachments.
     /// Unsupported adapters refuse attachments before any transport dispatch.
     async fn stream_with_ephemeral_images(

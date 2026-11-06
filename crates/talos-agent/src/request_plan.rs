@@ -26,6 +26,7 @@ pub(super) struct ProviderRequestPlan {
 
 /// Canonical turn state plus the already sealed initial Provider request.
 pub(crate) struct PreparedSessionTurn {
+    pub(super) private_replays: std::sync::Arc<crate::private_replay::PrivateReplayStore>,
     pub(super) hook_ctx: HookContext,
     pub(super) messages: Vec<Message>,
     pub(super) persist_start: usize,
@@ -187,6 +188,7 @@ impl Agent {
             request_context_limit,
             source,
             None,
+            Default::default(),
         )
         .await
     }
@@ -201,6 +203,7 @@ impl Agent {
         revision: u64,
         recovered: Option<&crate::compaction::HistorySource>,
         checkpoint_observer: Option<crate::checkpoint_progress::CheckpointObserver>,
+        private_replays: std::sync::Arc<crate::private_replay::PrivateReplayStore>,
     ) -> AgentResult<PreparedSessionTurn> {
         let source = crate::compaction::HistorySource::bind_recovered_until(
             generation,
@@ -218,10 +221,12 @@ impl Agent {
             Some(request_context_limit),
             source,
             checkpoint_observer,
+            private_replays,
         )
         .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn prepare_turn_start_with_source(
         &self,
         memory_query: String,
@@ -230,7 +235,14 @@ impl Agent {
         request_context_limit: Option<u32>,
         history_source: Option<crate::compaction::HistorySource>,
         checkpoint_observer: Option<crate::checkpoint_progress::CheckpointObserver>,
+        private_replays: std::sync::Arc<crate::private_replay::PrivateReplayStore>,
     ) -> AgentResult<PreparedSessionTurn> {
+        private_replays.prune(&history)?;
+        private_replays.for_request(
+            &history,
+            self.provider_key.as_deref(),
+            self.model_id.as_deref(),
+        )?;
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
@@ -293,6 +305,7 @@ impl Agent {
         };
 
         Ok(PreparedSessionTurn {
+            private_replays,
             hook_ctx,
             messages,
             persist_start,
@@ -335,6 +348,22 @@ impl Agent {
             observed_provider_messages
         };
 
+        talos_core::provider::TransientReplay::validate_hook_projection(
+            messages,
+            provider_messages,
+        )?;
+        if !self.replay_reasoning
+            && messages.iter().any(|message| {
+                !matches!(
+                    talos_core::provider::TransientReplay::marker(message),
+                    Ok(None)
+                )
+            })
+        {
+            return Err(AgentError::ToolError(
+                "private replay cannot be disabled for signed history".into(),
+            ));
+        }
         let mut owned_messages = if self.replay_reasoning {
             provider_messages.to_vec()
         } else {

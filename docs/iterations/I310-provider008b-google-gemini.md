@@ -657,3 +657,41 @@ known successful checks or discard CI3788. Submit this source-reviewed, focused-
 stage for fresh native CI; do not merge until the complete B acceptance and native gates pass.
 Record later validation in PR metadata while its head is unchanged, and batch owner evidence
 with the next substantive stage rather than interrupting native CI with documentation-only pushes.
+
+### Native browser private-history implementation — 2026-11-04 (unverified checkpoint)
+
+Resumed from validated PR head9d1771ce; CI3793 finished with successful aggregate and all seven
+applicable jobs successful. Preserve advisory #844/#390 matrix failure and all historical local
+failures; this is not an eight-job-success claim. Current main26160224 adds I315 governance only;
+AGENTS/collaboration SOP unchanged. The effective I310 claim remains the same Work Slice.
+
+The working stage adds a nonserializable provider replay carrier, safe marker/byte reserve,
+Actor-owned live custody, exact post-hook and final-request binding, native Gemini original
+argument ingress and private signed restoration only at HTTP encoding. Live Actor user turns
+retain custody; reopened/forked/generation or persistence identity replacements do not inherit it.
+Request-only compaction does not reclaim the hard32-block/16MiB canonical cap. Ordinary text
+without an actual browser call/private context remains ordinary durable history. Browser textual
+modes remain explicitly refused; this is native Gemini integration, no new browser capability.
+
+Independent design/source review requested corrections, not approval: turn-local custody was
+replaced by Actor custody; retained private filters now cover later text/tool-free replies and
+mixed ordinary inputs; existing non-rescanning privacy filtering replaces recursive replacements;
+private marker prefixes and unknown operations have explicit checks. Private data in routing
+IDs/names/object keys is refused before observations, and original argument evidence must match
+the same signed private call. These last corrections await final review/tests. Native tool
+permission gates remain on the existing prepared-invocation path.
+
+Core initially128 and Provider282 passed at earlier intermediate source before these final
+privacy corrections; do not use them as final-stage proof. Current Core/Agent privacy tests and
+new HTTP→two live Actor submissions→prepared browser→exact signed continuation→real TLOG and
+JSON/Markdown export→reopen refusal test are being compiled. The old /tmp logs and root toolchain
+were removed during the session transition; restored task-owned pinned Rust1.99.0 and new logs
+under the sibling talos-build directory. Cargo.lock adds only the existing local talos-session
+dev-dependency edge for the persistence acceptance test; no package version/source change.
+
+Public API amendment/migration is in ADR-094: invocation enum becomes non_exhaustive with one
+private carrier variant, and a default provider context entrypoint refuses unsupported custody.
+Next pre-1.0 minor only, no patch/release claim. This checkpoint is UNVERIFIED and must not be
+merged or made Ready. Finish focused acceptance, Core/Agent/Provider regression/Clippy, both
+governance validators and independent final privacy review locally; then batch one substantive
+PR candidate for fresh native CI. B/parent724 and remaining catalog/UI/fixtures/C/D remain open.

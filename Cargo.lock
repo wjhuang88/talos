@@ -10018,6 +10018,7 @@ dependencies = [
  "talos-config",
  "talos-core",
  "talos-permission",
+ "talos-session",
  "talos-tools",
  "tempfile",
  "thiserror 2.0.20",
