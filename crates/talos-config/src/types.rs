@@ -671,6 +671,41 @@ impl Default for RpcConfig {
 mod gemini_profile_tests {
     use super::*;
     #[test]
+    fn adc_key_exemption_requires_effective_gemini_vertex_profile() {
+        let mut config = Config {
+            provider: "fixture-adc".into(),
+            model: "unknown-model".into(),
+            providers: HashMap::from([(
+                "fixture-adc".into(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::GoogleGemini,
+                    gemini: Some(GeminiTransportConfig::Vertex {
+                        project: "project".into(),
+                        location: "global".into(),
+                        allow_metadata: false,
+                    }),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+        assert_eq!(config.api_key().expect("ADC"), "");
+        config
+            .providers
+            .get_mut("fixture-adc")
+            .expect("provider")
+            .protocol = ProviderProtocol::OpenAIChat;
+        assert!(config.validate().is_err());
+        assert!(config.api_key().is_err());
+        let provider = config.providers.get_mut("fixture-adc").expect("provider");
+        provider.protocol = ProviderProtocol::GoogleGemini;
+        provider.gemini = Some(GeminiTransportConfig::AiStudio);
+        assert!(config.validate().is_err());
+        assert!(config.api_key().is_err());
+    }
+
+    #[test]
     fn profiles_roundtrip_without_changing_old_provider_defaults() {
         let old: ProviderConfig = toml::from_str("protocol = 'openai-chat'").expect("old config");
         assert!(old.gemini.is_none());

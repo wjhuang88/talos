@@ -124,6 +124,7 @@ impl GeminiSse {
         Ok(Vec::new())
     }
 
+    #[cfg(test)]
     pub(crate) fn finish(&mut self) -> ProviderResult<Vec<GeminiOutput>> {
         self.finish_inner(None)
     }

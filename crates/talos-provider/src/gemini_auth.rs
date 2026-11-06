@@ -298,6 +298,7 @@ fn adc_paths(
 }
 
 impl VertexTokenSource {
+    #[cfg(test)]
     pub(crate) fn from_bytes(bytes: &[u8]) -> ProviderResult<Self> {
         Self::from_validated_credentials(parse_credentials(bytes)?)
     }
