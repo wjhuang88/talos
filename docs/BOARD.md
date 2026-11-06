@@ -2,9 +2,10 @@
 
 ## Delivery quality repairs / QUALITY-001
 
-[Repair owner](tasks/2026-11-06-quality001-delivery-repair.md) is Review / Claimed
-through #864 (`2e7614bb`). Local preflight and xwin test checks passed;
-completion requires implementation evidence, independent review and exact-head CI.
+[Repair owner](tasks/2026-11-06-quality001-delivery-repair.md) is Complete / Closed.
+Completion Commit `95546b1f91e06ba969554fd602faf0d01c60f25a` (#865); local preflight,
+cargo-xwin MSVC tests, independent Agent review and CI42227450980 passed,
+including native Windows/macOS and Desktop gates.
 
 ## SEARCH-001-K / I317 proposed atomic activation — 2026-11-05
 
