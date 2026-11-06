@@ -1,5 +1,11 @@
 # Talos Board
 
+## Delivery quality repairs / QUALITY-001
+
+[Repair owner](tasks/2026-11-06-quality001-delivery-repair.md) proposes a bounded
+checkout/history/validation and T5 status repair in #864. Claim and activation
+remain ineffective until exact-head governance review, CI and target merge.
+
 ## SEARCH-001-K / I317 proposed atomic activation — 2026-11-05
 
 [SEARCH-001-K](backlog/active/SEARCH-001-K-compat-fallback-ownership.md) /

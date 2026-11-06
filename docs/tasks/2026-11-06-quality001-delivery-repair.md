@@ -1,6 +1,6 @@
 # QUALITY-001: Recent Delivery Quality Repairs
 
-> Document status: Planned
+> Document status: Active (proposed; effective only after claim PR #864 merges)
 > Published plan date: 2026-11-06
 > Deliverable: reproducible checkout regression corrected, large saved messages restored, usable bounded workspace validation, and accurate T5 Board status.
 
@@ -8,13 +8,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | Repair the four findings from the 2026-11-06 delivery quality assessment: checkout conditional-config regression, host message restoration across large records, fixed validation workload budgets, and T5 derived Board synchronization |
 | Claimed At | 2026-11-06 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #864 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Session instruction requests fixing the assessed issues; independent governance review and exact-head CI required before activation |
 | Implementation PR | Not started |
