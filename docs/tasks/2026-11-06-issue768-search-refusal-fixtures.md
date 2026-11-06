@@ -1,6 +1,6 @@
 # ISSUE-768: Reliable Search Refusal Fixtures
 
-> Document status: Active (atomic proposal; ineffective until claim merge)
+> Document status: Review (local implementation and standard preflight passed; remote gates pending)
 > Published plan date: 2026-11-06
 > Deliverable: native refusal classification and chain policy regressions reliable under parallel macOS validation, with honest causal evidence.
 
@@ -16,7 +16,7 @@
 | Source Issue | #768 |
 | Governance Claim PR | #859 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Maintainer explicitly requested completing #768; required independent governance and fixture-boundary review before delivery |
+| Authorization Evidence | Maintainer explicitly requested completing #768; exact-head independent governance approval recorded in #859, CI42176421804 passed; claim merged as 3f94a2684c4305e44f524a9a390c87d697167fc2 |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-06 |
 | Handoff / Release Condition | Claim and activation effective only on target-branch merge; no release or other search ownership |
@@ -115,3 +115,55 @@ Requested outcome: complete #768. Artifacts: fixture code/regressions, this owne
 I308 pointer, issue matrix, Board and remote Issue. Preserve prior failures and
 current production contracts. Remaining diagnosis, implementation, parallel/native
 validation, independent review and merge evidence remain here until actually done.
+
+## Implementation checkpoint — 2026-11-06
+
+Claim #859 merged as `3f94a2684c4305e44f524a9a390c87d697167fc2`. Two test files
+now separate resolver-injected refusal policy from native HTTP/HTTPS classification.
+The next-source winner still performs real HTTP; occupied source0 asserts zero
+connections/disclosure. Exact retry/host/budget/wire assertions remain. A low-port
+cooperative lease isolates native tests from normal ephemeral allocation, but cannot
+exclude arbitrary external binders. Native classification remains strict: no reset,
+timeout or retry-until-green accepted as refusal. The old release/rebind mechanism
+has a deterministic successful-connect counterexample; historical cause remains unknown.
+
+Initial candidate transport186/186 passed with16threads; independent review found
+the new counterexample also needed the low-port lease. That correction is applied;
+final parallel workspace validation is running outside the sandbox. Baseline full
+workspace failed at two unrelated Git tests: object_layout drift and process
+observation EPERM. It is not a successful workspace result. Logs remain under
+`/private/tmp/issue768-{fixed-transport,workspace-parallel-baseline,fixed-workspace-parallel}.log`.
+No source permission, retry policy or endpoint change is part of this repair.
+
+Final fixture adds8simultaneous admitted chains (4runtime workers,15second bound),
+each with an occupied source0 and real source1 winner. Final all-feature transport
+suite passed186/186 with16test threads. MSVC cross-check passed using
+`cargo xwin check --locked -p talos-tools --features network --tests --target x86_64-pc-windows-msvc`;
+this is compilation only, not Windows execution. Independent fixture/security-boundary
+static review approved the final diff after the counterexample lease correction.
+Reviewer did not execute tests. Exact-head review remains required after commit.
+
+Outside-sandbox parallel `cargo test --locked --workspace --lib` passed exit0,
+including Tools1116/1116, before the8-chain strengthening. Final standard preflight
+is running with that strengthening and no RUST_TEST_THREADS override; it must pass
+before claiming final full-workspace evidence. The default-feature0test attempt,
+sandbox failure and prototype counterexamples remain historical, not successes.
+
+## Stable candidate validation — 2026-11-06
+
+Final `CARGO_TARGET_DIR=/private/tmp/talos-i313-target CARGO_INCREMENTAL=0
+CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_BUILD_JOBS=1
+./scripts/release_preflight.sh` completed exit0, ending `release preflight: passed`.
+No RUST_TEST_THREADS override: final workspace tests ran with normal parallelism,
+Tools1116/1116 passed and both default/coding external SDK executions passed.
+The log explicitly includes the8-chain occupied-source test, actual HTTP/HTTPS
+refusal and release/rebind counterexample. Check/Clippy and both governance
+validators passed. `/private/tmp/issue768-preflight.log` is local evidence;
+remote exact-head/native CI and merge remain pending. The two earlier unrelated
+Git failures did not recur; this does not establish their original cause.
+
+The user authorized rebuilding unused cache. Removed examples/old Windows cache
+and completed task-specific xwin outputs; source/worktree preserved. One initial
+cargo-clean attempt encountered an already-removed examples directory (exit101),
+not a test failure. Cross-check logs retained. No fixture test was ignored or
+serialized globally, and no source change followed this final successful preflight.

@@ -1,24 +1,36 @@
 use super::*;
 
-fn reserve(mut ports: std::ops::Range<u16>) -> std::net::TcpListener {
-    // Keep refused destinations separate from each other and from the default
-    // ephemeral ports used by parallel loopback servers and outgoing connects.
-    // The listener is released immediately before the real connection attempt.
-    ports
-        .find_map(|port| std::net::TcpListener::bind(("127.0.0.1", port)).ok())
-        .expect("reserve unused non-ephemeral refused port")
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn injected_refusal_retries_before_real_next_source_despite_occupied_destination() {
+    // Each contender owns a real listener at source zero; execute independent
+    // admitted chains concurrently rather than repeatedly hoping for a free port.
+    let mut contenders = tokio::task::JoinSet::new();
+    for _ in 0..8 {
+        contenders.spawn(assert_refusal_policy_with_occupied_destination());
+    }
+    tokio::time::timeout(Duration::from_secs(15), async {
+        while let Some(result) = contenders.join_next().await {
+            result.expect("concurrent refusal policy assertion");
+        }
+    })
+    .await
+    .expect("bounded concurrent fixture execution");
 }
 
-#[tokio::test]
-async fn refused_connection_retries_same_source_before_next_admitted_source() {
+async fn assert_refusal_policy_with_occupied_destination() {
     let server = Server::new(vec![valid(ORDER[1])]);
     let server_port = server
         .url("/")
         .port_or_known_default()
         .expect("server port");
-    let reserved = reserve(16_384..16_896);
-    let port = reserved.local_addr().expect("address").port();
-    let (chain, transport, resolver, budget) = setup_with_ports(
+    // Deliberately occupy the formerly refused destination. Removing the injected
+    // error would send the query to this wrong source and violate the assertions.
+    let occupied = Server::new(vec![valid(ORDER[0])]);
+    let port = occupied
+        .url("/")
+        .port_or_known_default()
+        .expect("occupied port");
+    let (chain, mut transport, resolver, budget) = setup_with_ports(
         &server,
         vec![],
         4,
@@ -30,7 +42,7 @@ async fn refused_connection_retries_same_source_before_next_admitted_source() {
         .headers
         .expect("frozen headers")
         .user_agent();
-    drop(reserved);
+    transport.dns = Arc::new(SelectiveRefusingDns(resolver.clone()));
     let rows = chain
         .execute(&transport)
         .await
@@ -50,6 +62,8 @@ async fn refused_connection_retries_same_source_before_next_admitted_source() {
     );
     assert_eq!(budget.attempts.load(Ordering::Relaxed), 3);
     assert_eq!(server.count(), 1);
+    assert_eq!(occupied.count(), 0);
+    assert_eq!(occupied.accepted.load(Ordering::Relaxed), 0);
     let wire = server.request(0);
     assert!(wire.starts_with("GET /?q="));
     assert!(wire.contains("%E4%B8%AD+%2B%26%7E+"));
@@ -59,8 +73,25 @@ async fn refused_connection_retries_same_source_before_next_admitted_source() {
     );
 }
 
+// Preserve resolver observations, but make only source zero unavailable. Later
+// sources still execute real HTTP through the ordinary transport and authority.
+struct SelectiveRefusingDns(Arc<Resolver>);
+
+#[async_trait]
+impl SearchDns for SelectiveRefusingDns {
+    async fn resolve(&self, host: &str, port: u16) -> Result<Vec<SocketAddr>, TransportError> {
+        let addresses = self.0.resolve(host, port).await?;
+        if host == "source-0.invalid" {
+            Err(TransportError::ConnectionRefused)
+        } else {
+            Ok(addresses)
+        }
+    }
+}
+
 // Policy-only injection at the existing resolver error seam. Real send-boundary
-// classification and next-source execution remain separate socket tests.
+// classification remains in transport::tests::connect; next-source execution
+// above still uses real HTTP.
 struct RefusingDns(Arc<Resolver>);
 
 #[async_trait]
@@ -104,22 +135,25 @@ async fn injected_refusal_errors_exhaust_legacy_seven_attempts_without_reset() {
 }
 
 #[tokio::test]
-async fn refused_connection_consumes_budget_before_retry_can_resolve() {
+async fn injected_refusal_consumes_budget_before_retry_despite_occupied_destination() {
     let server = Server::new(vec![valid(ORDER[1])]);
     let server_port = server
         .url("/")
         .port_or_known_default()
         .expect("server port");
-    let reserved = reserve(16_896..17_408);
-    let port = reserved.local_addr().expect("address").port();
-    let (chain, transport, resolver, budget) = setup_with_ports(
+    let occupied = Server::new(vec![valid(ORDER[0])]);
+    let port = occupied
+        .url("/")
+        .port_or_known_default()
+        .expect("occupied port");
+    let (chain, mut transport, resolver, budget) = setup_with_ports(
         &server,
         vec![],
         1,
         AfterFailure::Continue,
         Some([port, server_port, server_port, server_port]),
     );
-    drop(reserved);
+    transport.dns = Arc::new(SelectiveRefusingDns(resolver.clone()));
     assert_eq!(
         chain.execute(&transport).await.expect_err("spent budget"),
         CompatibilityChainError::Terminal {
@@ -130,6 +164,8 @@ async fn refused_connection_consumes_budget_before_retry_can_resolve() {
     assert_eq!(hosts(&resolver), ["source-0.invalid"]);
     assert_eq!(budget.attempts.load(Ordering::Relaxed), 1);
     assert_eq!(server.count(), 0);
+    assert_eq!(occupied.count(), 0);
+    assert_eq!(occupied.accepted.load(Ordering::Relaxed), 0);
 }
 
 struct NetworkOnceDns {

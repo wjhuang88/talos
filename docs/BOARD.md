@@ -9,9 +9,9 @@ ineffective until finalized head CI/review/merge. I316 and I310 remain
 independent; D/#644 remains ZERO-ADMISSION; E/F/G/I stay gated; Exa/Parallel
 D2/#848 has separate intake. No K1 implementation or change to Auto routing.
 
-## Issue #768 fixture repair proposal
+## Issue #768 fixture repair
 
-[Independent task](tasks/2026-11-06-issue768-search-refusal-fixtures.md) proposes native search refusal fixture diagnosis and parallel validation. Claim/activation are ineffective until merge; I308 remains closed and #768 remains open.
+[Independent task](tasks/2026-11-06-issue768-search-refusal-fixtures.md) is Review after claim #859 merged as `3f94a2684`. Test-only policy/native fixture separation is implemented locally; local parallel preflight and xwin passed; remote native CI and delivery remain pending. I308 stays closed; #768 stays open.
 
 ## Completed session handoff
 
