@@ -76,10 +76,56 @@ pub(crate) async fn read_credentials(
     }).await.map_err(|_| auth_error("Vertex credential file read timed out"))?
 }
 
+/// Load local ADC only after explicit Vertex dispatch. The caller resolves platform paths.
+/// Only absence of the well-known file permits a subsequent metadata decision; an explicitly
+/// selected file, permission failure, or invalid file must never switch accounts silently.
+pub(crate) async fn read_local_adc(
+    explicit: Option<&std::path::Path>,
+    well_known: &std::path::Path,
+    deadline: std::time::Instant,
+) -> ProviderResult<Option<Value>> {
+    if deadline <= std::time::Instant::now() {
+        return Err(auth_error("Vertex credential file read timed out"));
+    }
+    if let Some(path) = explicit {
+        return read_credentials(path, deadline).await.map(Some);
+    }
+    use tokio::io::AsyncReadExt;
+    tokio::time::timeout_at(deadline.into(), async {
+        let file = match tokio::fs::File::open(well_known).await {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => return Err(auth_error("cannot open Vertex credential file")),
+        };
+        let mut bytes = Vec::new();
+        file.take((MAX_CREDENTIAL_BYTES + 1) as u64).read_to_end(&mut bytes).await
+            .map_err(|_| auth_error("cannot read Vertex credential file"))?;
+        parse_credentials(&bytes).map(Some)
+    }).await.map_err(|_| auth_error("Vertex credential file read timed out"))?
+}
+
 #[cfg(test)]
 mod file_tests {
     use super::*;
     use std::time::{Duration, Instant};
+
+    #[tokio::test]
+    async fn local_adc_only_falls_through_for_absent_well_known_file() {
+        let dir = tempfile::tempdir().expect("directory");
+        let path = dir.path().join("adc.json");
+        let deadline = || Instant::now() + Duration::from_secs(2);
+        assert!(read_local_adc(None, &path, deadline()).await.expect("absent").is_none());
+        assert!(read_local_adc(Some(&path), &path, deadline()).await.is_err());
+        std::fs::write(&path, b"invalid JSON").expect("write");
+        assert!(read_local_adc(None, &path, deadline()).await.is_err());
+        let valid = br#"{"type":"authorized_user","client_id":"fixture-client","client_secret":"fixture-secret","refresh_token":"fixture-refresh"}"#;
+        std::fs::write(&path, valid).expect("write");
+        assert_eq!(read_local_adc(None, &path, deadline()).await.expect("valid"),
+            Some(parse_credentials(valid).expect("credentials")));
+        let missing = dir.path().join("explicit-missing.json");
+        assert!(read_local_adc(Some(&missing), &path, deadline()).await.is_err());
+        assert!(read_local_adc(None, &path, Instant::now() - Duration::from_secs(1)).await.is_err());
+    }
 
     #[tokio::test]
     async fn explicit_invalid_file_fails_without_account_fallback_or_path_disclosure() {
