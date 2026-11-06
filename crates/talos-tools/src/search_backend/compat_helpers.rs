@@ -160,7 +160,10 @@ mod tests {
             "😀 <a href='?x=1&amp;y=2'>你好</a> &amp; fin",
         ];
         for input in fixtures {
-            assert_eq!(clean_html(input), rust_websearch::html_utils::clean_html(input));
+            assert_eq!(
+                clean_html(input),
+                rust_websearch::html_utils::clean_html(input)
+            );
             assert_eq!(
                 strip_html_tags(input),
                 rust_websearch::html_utils::strip_html_tags(input)
@@ -212,6 +215,19 @@ mod tests {
             // Actual upstream random output must belong to the same pinned static set.
             assert!(USER_AGENTS.contains(&rust_websearch::anti_detection::random_user_agent()));
         }
+    }
+
+    #[test]
+    fn pinned_upstream_user_agent_pool_exact_bytes_and_order() {
+        // FNV-1a64 of the twelve original UA strings joined with a single LF.
+        // Expected value independently computed from upstream user_agent.rs at
+        // b30180a03609580e8b28dfb682284cb2ba249fba.
+        let mut fingerprint = 0xcbf29ce484222325_u64;
+        for byte in USER_AGENTS.join("\n").bytes() {
+            fingerprint ^= u64::from(byte);
+            fingerprint = fingerprint.wrapping_mul(0x100000001b3);
+        }
+        assert_eq!(fingerprint, 0xe8d044e22b377885);
     }
 
     #[test]
