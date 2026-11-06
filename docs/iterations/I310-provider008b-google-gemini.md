@@ -19,9 +19,9 @@
 | Governance Claim PR | #811 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized completing parent #724; distinct human reviewer unavailable in this session. Exact-head checks, independent protocol/auth review and merge CAS required. |
-| Implementation PR | Not started |
-| Last Updated | 2026-10-30 |
-| Handoff / Release Condition | Claim and activation are ineffective until finalized governance PR merges; no implementation before then. |
+| Implementation PR | #838 (Draft; not accepted) |
+| Last Updated | 2026-11-02 |
+| Handoff / Release Condition | Claim effective via #811; retain Claimed until full child acceptance, exact-head CI/review and merge CAS. |
 
 ## Scope and deliverable
 
@@ -440,3 +440,31 @@ but remain distinct canonical paths. The unchanged failing test binary passed wh
 with the internal Git directory (1 passed, 586 filtered; 13.53s). No Git authority checks or
 permission source was modified. A Cargo focused rerun is also in progress; rerun full preflight
 with this explicit host PATH. Retain the failed baseline; do not claim workspace tests passed.
+
+### Draft implementation PR and updated focused evidence — 2026-11-02
+
+Opened Draft #838; backfilled both owner claim records and the Board. This is an unfinished
+implementation candidate, not Ready/Complete. Latest catalog foundation 090ec083 has the same
+Git tree as locally reviewed f3f093dc. Full locked Config/Core rerun: 268 passed (1.92s) and
+123 passed (0.06s). The unchanged Git fixture also passed its pinned/locked Cargo rerun with
+internal Git PATH (1 passed, 586 filtered; 15.30s). Full standard preflight using that explicit
+PATH is running; do not equate the focused recovery with a workspace pass. Draft PR lists all
+remaining acceptance blockers. No merge/release/tag or live-provider success claim.
+
+### Local disk recovery — 2026-11-02
+
+The next standard preflight reached workspace test compilation but failed with OS error 28
+(No space left on device), before a final test result. Target cache had 37 GiB deps, 13 GiB
+incremental and 1.8 GiB build artifacts after focused/workspace/Desktop feature variants.
+Removed only this task's target directory; source, Git history, Cargo.lock and other worktrees
+were retained. Free space returned to 53 GiB. Rerun with the same debug=0/incremental=0 profile
+settings already used by repository CI (ci.yml), plus bounded build jobs and internal Git PATH.
+This is an artifact-resource change, not a test skip or assertion/policy change.
+
+Owner/Board backfill validation initially failed because cargo was absent from that shell PATH;
+a retry during disk exhaustion produced no usable log/result. Fresh standard preflight must
+revalidate both governance scripts with the pinned Cargo PATH. No governance/preflight pass is
+claimed for the new metadata checkpoint yet. Draft #838 remains unaccepted; CI3732 was observed
+in progress at source head 090ec083 and must not be treated as the final-head CI result after
+claim metadata changes. The previously paused automation stays paused until reliable execution
+is established; no background continuation is claimed.
