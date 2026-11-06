@@ -1,6 +1,6 @@
 # SEARCH-001-K: Talos-Owned Zero-Key Compatibility Fallback
 
-**Status**: Active / Claimed (proposed #851; effective only after target-branch merge)
+**Status**: Active / Claimed (#851 merged 2026-11-06; K1 implementation Draft #861)
 
 | Field | Value |
 |---|---|
@@ -9,7 +9,7 @@
 | Parent Epic | [SEARCH-001 / #624](SEARCH-001-zero-config-global-search.md) |
 | Source Issue | [#850](https://github.com/wjhuang88/talos/issues/850) |
 | Baseline | `main` `eed60f5a8587afc1a2cbc2483ee26ac2eb39ea08` (2026-11-04) |
-| Selected Iteration | [I317](../../iterations/I317-search-compat-fallback-ownership.md) (proposed activation in #851) |
+| Selected Iteration | [I317](../../iterations/I317-search-compat-fallback-ownership.md) (activation effective through #851) |
 | Related | A/B/C (completed), H/#832 (completed), D/#644 (blocked-zero-admission), D2/#848 (research), I (gated) |
 | Evidence | [2026-11-04 code-truth inventory](../../reference/SEARCH-001-K-COMPATIBILITY-OWNERSHIP-2026-11-04.md) |
 
@@ -26,9 +26,9 @@
 | Governance Claim PR | #851 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer explicitly requested continuation of SEARCH-001-K on 2026-11-05 while I316 and I310 remain separate; concurrent scope is disjoint. Exact-head governance validators, CI, and no-blocker review required before the claim can merge; effective only on target branch. |
-| Implementation PR | None |
-| Last Updated | 2026-11-05 |
-| Handoff / Release Condition | No implementation until claim/activation #851 merges; independent API/network review, locked Rust tests, exact-head CI and merge CAS required before K1 implementation closure. |
+| Implementation PR | [#861](https://github.com/wjhuang88/talos/pull/861) — Draft, validation pending |
+| Last Updated | 2026-11-06 |
+| Handoff / Release Condition | #851 effective on main as `7b482a4243b37a4f79ef3fe460b69b0740400682`; K1 #861 requires independent API/network review, locked Rust tests, exact-head CI and merge CAS before implementation closure. |
 
 ## Why this work is narrower than a new native provider
 
@@ -77,4 +77,4 @@ SEARCH-001-D2 Exa/Parallel remains independently researched and unadmitted.
 4. Independent network/permission/security compatibility review and merge CAS are recorded.
 5. Parent #624 and historical #644 blocked disposition remain unchanged.
 
-This proposed atomic claim is **ineffective until PR #851 merges into main**; K1 has no completion evidence and must not be marked Complete until separately implemented and verified.
+The atomic claim became effective when #851 merged into main as `7b482a4243b37a4f79ef3fe460b69b0740400682` after exact-head docs-only CI3840. K1 code is staged in Draft #861 at `d8b5046a7c3e3aaa130044d1087968f2bd6eff5b`; CI3843 and independent review are pending. No K1 completion is claimed, and #850 remains Open.

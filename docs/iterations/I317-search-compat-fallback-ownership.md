@@ -1,6 +1,6 @@
 # Iteration I317: Own Zero-Key Search Compatibility Helpers
 
-> Document status: Active (proposed atomic claim+activation in #851; ineffective before merge)
+> Document status: Active / Claimed (claim #851 merged; Draft implementation #861 pending review/CI)
 > Published plan date: 2026-11-05
 > Planned objective: make the protected production Auto search path independent of `rust_websearch` utility/helper calls while preserving the existing zero-key compatibility fallback.
 > Baseline rule: preserve current search semantics and authority; no E/F provider admission or `rust-websearch` retirement.
@@ -19,12 +19,13 @@
 | Governance Claim PR | #851 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer directed continued K1 implementation on 2026-11-05 with existing I316/T6 and I310 independently claimed; non-overlapping search-private module scope. Exact-head CI, governance validators, no-blocker review and merge CAS remain required. |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-05 |
-| Handoff / Release Condition | No production coding/implementation PR before #851 finalized merge. Completion requires separately merged accepted code, exact-head tests/security compatibility review and existing implementation SHA. |
+| Implementation PR | [#861](https://github.com/wjhuang88/talos/pull/861) — Draft, validation pending |
+| Last Updated | 2026-11-06 |
+| Handoff / Release Condition | #851 merged into main as `7b482a4243b37a4f79ef3fe460b69b0740400682`; completion requires separately merged accepted #861 code, exact-head tests, independent security compatibility review and actual implementation merge SHA. |
 
-The proposed claim and Active state become effective **only** when the complete, reviewed
-governance #851 merges to main; the Draft proposal grants no implementation authority.
+The proposed claim and Active state **became effective** when governance #851 merged on
+2026-11-06 as `7b482a4243b37a4f79ef3fe460b69b0740400682`. The implementation
+is independently gated and remains Draft / incomplete.
 
 ## Published Baseline
 
@@ -93,10 +94,12 @@ unprotected direct legacy fallback. Do not modify E/F or I state.
 | Date | Type | Record |
 |---|---|---|
 | 2026-11-05 | Atomic claim+activation proposal | #851 proposes this I317/SEARCH-001-K claim and Active; **ineffective before target-branch merge**. I316/I310 retained as separate non-overlapping owners. |
+| 2026-11-06 | Claim effective | #851 merged as `7b482a4243b37a4f79ef3fe460b69b0740400682` after CI3840 exact-head docs validation success (4 applicable jobs passed; 4 platform jobs skipped) and single-maintainer governance-only audit. #768 and I310 retain separate ownership. |
+| 2026-11-06 | K1 code staged | Draft implementation #861 at `d8b5046a7c3e3aaa130044d1087968f2bd6eff5b` internalizes production HTML/UA helpers and adds offline upstream parity tests. CI3843 pending at this checkpoint, no pass or merge claimed. |
 
 ## Verification Evidence
 
-Pending claim CI, governance review/merge; no code tests or implementation evidence claimed.
+Effective claim CI3840/run 42177971137 passed for governance-only exact head `7db808c484a1dca68dcfab389daf60751b7ef139`, followed by merge CAS #851. Implementation #861 CI3843/run 42179146894 was in progress at this checkpoint; no passing code validation or independent implementation review is claimed.
 
 ## Completion Evidence
 

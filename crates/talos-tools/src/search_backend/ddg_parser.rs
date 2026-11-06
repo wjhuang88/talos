@@ -11,7 +11,7 @@
 
 use std::{fmt, panic::catch_unwind};
 
-use rust_websearch::html_utils::{clean_html, resolve_duckduckgo_url};
+use super::compatibility_helpers::{clean_html, resolve_duckduckgo_url};
 use scraper::{ElementRef, Html, Selector};
 use thiserror::Error;
 

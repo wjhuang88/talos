@@ -30,6 +30,8 @@ pub(crate) use production::production_search_router_tool_with_search_configurati
 // Explicit opt-in bridge for cross-crate caller-boundary tests; never built by default.
 #[cfg(feature = "search-integration-test")]
 pub(crate) mod integration_test;
+// Talos-owned MIT-attributed compatibility utility behavior.
+mod compatibility_helpers;
 // Controlled response parsing prerequisites.
 mod bing_parser;
 mod ddg_parser;

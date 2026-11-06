@@ -200,7 +200,7 @@ impl CompatibilityProtocol {
             manifest,
             query,
             max_results,
-            rust_websearch::anti_detection::random_user_agent,
+            crate::search_backend::compatibility_helpers::random_user_agent,
         )
     }
 
@@ -261,7 +261,7 @@ impl CompatibilityProtocol {
         self.prepare_with(
             manifest,
             query,
-            rust_websearch::anti_detection::random_user_agent,
+            crate::search_backend::compatibility_helpers::random_user_agent,
         )
     }
 
