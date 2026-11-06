@@ -1,6 +1,6 @@
 # Session handoff final evidence audit — 2026-11-05
 
-Current main2ec24d83d. I316 implementation04022b5ad/#855 and owner closure#856 merged;
+Audit baseline: main `2ec24d83d` (2026-11-05). I316 implementation04022b5ad/#855 and owner closure#856 merged;
 Issue853closed. CI42034824146 all8success, doc CI42039487065success.
 
 C0 six rows and T7 six rows + ADR089 matrix: independent reviewer completed
@@ -88,9 +88,10 @@ and owner closure2ec24d83d are verified. Corrected local preflight included both
 SDK modes; all-feature real-plugin tests and xwin checks retain their exact scope.
 
 All grouped scope rows now accounted for with explicit historical evidence reliance.
-Delivery gate: this final evidence/status candidate requires independent governance
-review, exact-head document CI and merge. The active goal remains open until that
-merge is verified. No release or unrelated owner completion is authorized.
+Delivery gate completed: this evidence/status record merged in PR #857 at
+`748557edc4dc7eb95c71dbb3836179880f6a2a85` after independent governance review
+and exact-head document CI `42046345169`. No release or unrelated owner
+completion is authorized.
 
 
 ## Scope, immutable implementation evidence and limits
