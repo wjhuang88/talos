@@ -144,3 +144,13 @@ https://docs.cloud.google.com/compute/docs/access/authenticate-workloads .
 This constructor is not yet wired into runtime ADC selection. Platform discovery, endpoint
 validation/configuration, native generateContent/SSE and Agent acceptance remain incomplete.
 Independent metadata implementation review requested; no merge approval is claimed.
+
+### Official endpoint admission checkpoint — 2026-11-01
+
+Added dedicated official AI Studio and Vertex regional/global endpoint constructors. Resource
+components reject path/query/fragment/authority injection before credential acquisition. This
+module is not yet connected to factory/config dispatch. Custom-gateway credential profiles
+remain separate and unimplemented. Formatted recovered gemini_auth.rs with pinned rustfmt.
+Pinned rustc --edition 2024 --test gemini_endpoint.rs: 2 passed, zero failed; this standalone
+check validates endpoint logic only. Full locked Provider tests are compiling dependencies;
+no fresh Provider/workspace pass or Gemini acceptance is claimed.
