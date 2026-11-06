@@ -131,3 +131,16 @@ ignored or filtered (6.43s). Includes mock service-account exchange/cache and in
 No full workspace, exact-head CI, implementation security approval or Gemini runtime acceptance
 is claimed. Metadata ADC, platform path discovery, config/factory and native Gemini request/SSE,
 signature isolation and Agent acceptance remain pending. Keep Active; no merge/release.
+
+### Metadata transport checkpoint — 2026-10-31
+
+Implementation cf38416c79e51f0d6a88881691c30aa8f1f16ec4 adds explicit metadata token
+source: fixed link-local IP, no proxy, no redirects, required Google Metadata-Flavor response,
+bounded response/expiry validation and shared request-owned deadline/cache semantics.
+Rust 1.99.0 cargo test -p talos-provider --lib --locked: 219 passed, zero failed,
+ignored or filtered (5.40s). New mocks cover flavor rejection, valid cache reuse and no redirect
+forwarding. No real metadata service was contacted. Source reference checked 2026-10-31:
+https://docs.cloud.google.com/compute/docs/access/authenticate-workloads .
+This constructor is not yet wired into runtime ADC selection. Platform discovery, endpoint
+validation/configuration, native generateContent/SSE and Agent acceptance remain incomplete.
+Independent metadata implementation review requested; no merge approval is claimed.
