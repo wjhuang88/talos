@@ -197,6 +197,29 @@ async fn service_account_assertion(credentials: &Value) -> ProviderResult<String
     Ok(format!("{input}.{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(signature)))
 }
 
+/// Resolve documented ADC locations without logging account-specific filesystem paths.
+fn adc_paths(
+    lookup: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> ProviderResult<(Option<std::path::PathBuf>, std::path::PathBuf)> {
+    use std::path::PathBuf;
+    if let Some(path) = lookup("GOOGLE_APPLICATION_CREDENTIALS") {
+        if path.is_empty() {
+            return Err(auth_error("Vertex credential path is empty"));
+        }
+        let path = PathBuf::from(path);
+        // The explicit source never falls through, so no home-directory lookup is needed.
+        return Ok((Some(path.clone()), path));
+    }
+    let root_name = if cfg!(windows) { "APPDATA" } else { "HOME" };
+    let root = lookup(root_name).filter(|value| !value.is_empty())
+        .ok_or_else(|| auth_error("Vertex ADC directory is unavailable"))?;
+    let mut path = PathBuf::from(root);
+    if !cfg!(windows) { path.push(".config"); }
+    path.push("gcloud");
+    path.push("application_default_credentials.json");
+    Ok((None, path))
+}
+
 impl VertexTokenSource {
     pub(crate) fn from_bytes(bytes: &[u8]) -> ProviderResult<Self> {
         Self::from_validated_credentials(parse_credentials(bytes)?)
@@ -212,6 +235,16 @@ impl VertexTokenSource {
             endpoint: "https://oauth2.googleapis.com/token".into(),
             metadata: false,
         })
+    }
+
+    /// Discover ADC locations only after standard Vertex transport admission.
+    /// Environment reads do not start network requests; token acquisition remains request-owned.
+    pub(crate) async fn from_environment(
+        allow_metadata: bool,
+        deadline: std::time::Instant,
+    ) -> ProviderResult<Self> {
+        let (explicit, well_known) = adc_paths(|name| std::env::var_os(name))?;
+        Self::from_adc(explicit.as_deref(), &well_known, allow_metadata, deadline).await
     }
 
     /// Resolve local credentials before explicitly allowed metadata credentials.
@@ -335,6 +368,25 @@ mod refresh_tests {
         VertexTokenSource::from_bytes(br#"{"type":"authorized_user","client_id":"fixture-client","client_secret":"fixture-secret","refresh_token":"fixture-refresh"}"#).expect("credentials")
     }
     fn deadline() -> Instant { Instant::now() + Duration::from_secs(5) }
+
+    #[test]
+    fn adc_environment_paths_preserve_priority_and_reject_missing_roots() {
+        let (explicit, path) = adc_paths(|name| {
+            assert_eq!(name, "GOOGLE_APPLICATION_CREDENTIALS");
+            Some("fixture-explicit.json".into())
+        }).expect("explicit needs no home");
+        assert_eq!(explicit.as_deref(), Some(path.as_path()));
+        assert!(adc_paths(|_| Some("".into())).is_err());
+        assert!(adc_paths(|_| None).is_err());
+        let (explicit, path) = adc_paths(|name| {
+            if name == "GOOGLE_APPLICATION_CREDENTIALS" { None } else { Some("fixture-root".into()) }
+        }).expect("default location");
+        assert!(explicit.is_none());
+        let mut expected = std::path::PathBuf::from("fixture-root");
+        if !cfg!(windows) { expected.push(".config"); }
+        expected.push("gcloud/application_default_credentials.json");
+        assert_eq!(path, expected);
+    }
 
     #[tokio::test]
     async fn adc_selection_requires_opt_in_and_never_masks_invalid_files() {
