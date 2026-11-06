@@ -285,3 +285,17 @@ Added config round-trip/unknown-field/old-default and factory profile/relocation
 Pinned rustfmt/diff checks pass. Locked config/provider check is compiling; tests await build lock.
 No new passing result, public host/CLI credential flow or full Gemini acceptance is claimed.
 Next: resolve compilation/tests, host credential and capability integration, actual Agent acceptance.
+
+### Profile/factory integration corrections and validation — 2026-11-01
+
+Implementation 4ec9f7bb9eb0de520023ac7b15f014c14a480c96 corrects two findings: effective
+provider configuration now merges the explicit Gemini profile; API-key resolution/validation exempts
+only effective google-gemini + Vertex profile so existing CLI/Desktop key entrypoints can reach
+request-owned ADC. Old protocol/AiStudio without key remain rejected. Explicit Vertex endpoint
+replacement is rejected while irrelevant inherited default roots are not used for its transport.
+Recorded failure: first Provider run 250 passed/1 failed because profile merging was missing.
+Final pinned locked library tests: config267 passed (0.91s), provider251 passed (4.78s), zero
+failed/ignored/filtered. Locked config/provider check passes; test-only helpers restricted to cfg(test)
+remove four production dead-code warnings. No full host/workspace/real Agent/Vertex round-trip
+acceptance or catalog activation is claimed. Next: host builds, model/capability displays, real
+permission-gated Agent image/tool rounds for both profiles and remaining acceptance checks.
