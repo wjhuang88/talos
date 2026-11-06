@@ -193,3 +193,16 @@ semantic fixtures and Unicode text-sequence proptest. Fixtures are authored synt
 recorded vendor evidence. SSE byte framing/chunk-boundary proptest, sourced vendor fixtures,
 timeouts, factory and Agent wiring remain required. Independent read-only decoder review requested.
 No complete Gemini/parent acceptance or merge authorization is claimed.
+
+### Bounded SSE framing/reader checkpoint — 2026-11-01
+
+Added GeminiSse byte framing with LF/CRLF/CR, arbitrary UTF-8 splits, 1 MiB record/line and
+8 MiB total byte limits. Invalid UTF-8/JSON, incomplete record EOF or missing semantic terminal
+fails closed. Function calls are retained until successful semantic EOF; late errors discard them.
+Added request-owned HTTP response reader with fixed first-event, idle-read and shared total
+deadlines plus bounded channel delivery; no detached read task. Heartbeat/comment packets do
+not reset the first-event deadline. Runtime factory, signed replay and Agent acceptance pending.
+Pinned locked Provider lib: 239 passed, zero failed/ignored/filtered (5.68s). Includes every UTF-8/
+CRLF split, arbitrary chunk-size proptest, truncation/size errors, delayed tool release and loopback
+heartbeat-first-event timeout. Other HTTP reader failure/cancellation/idle cases remain to extend.
+Synthetic fixtures do not replace required sourced vendor samples. Independent reader review requested.
