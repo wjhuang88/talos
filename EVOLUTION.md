@@ -115,6 +115,8 @@ repeating known mistakes.
 
 ## Lesson Index
 
+- [Test persisted workloads across the actual consumer boundary](#2026-11-06---test-persisted-workloads-across-the-actual-consumer-boundary) — QUALITY-001.
+
 - [Parse URL authority and propagate connection errors](#2026-10-28---parse-url-authority-and-propagate-connection-errors) — I306.
 
 - [Research stalled designs and report implementation honestly](#2026-10-23---research-stalled-designs-and-report-implementation-honestly) — I300.
@@ -1657,3 +1659,12 @@ visible; distinguish passed assertions from independently emitted evidence.
   commit under one fence; acquire the inner permission lock nonblockingly under the
   runtime lock, forbid callback reentry, and test both reset-before and reset-after
   commit orderings. Narrow helper success does not prove the model-visible path.
+
+## 2026-11-06 - Test persisted workloads across the actual consumer boundary
+
+- Trigger: QUALITY-001 delivery assessment and failed standard preflight.
+- Symptom: a valid large stored record could not be restored; normal workspace checks exceeded fixed execution budgets; a checkout fixture retained a superseded refusal expectation.
+- Root cause: writer/reader limits and real Cargo workloads were not tested together; the hook fixture selected a different branch from the attempted creation.
+- Fix: incremental host-record restoration with separate model limits; quiet Cargo tests with finite workload-sized budgets; matching conditional-hook refusal plus safe-creation assertions.
+- Prevention: use writer-produced large records and real Cargo execution, and verify the actual selected branch/configuration before changing security behavior.
+- Promoted to rule/check: message_scan large-record regressions, CLI validation_workspace integration fixture, and conditional checkout regression.

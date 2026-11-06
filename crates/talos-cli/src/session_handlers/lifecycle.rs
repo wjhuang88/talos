@@ -1017,7 +1017,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn resume_oversized_history_keeps_original_session_and_command_route() {
+    async fn resume_corrupt_history_keeps_original_session_and_command_route() {
         let root = tempfile::tempdir().expect("root");
         let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
         let workspace = canonical_workspace_root(root.path());
@@ -1029,9 +1029,19 @@ mod tests {
             .expect("target");
         target
             .append(&Message::User {
-                content: "x".repeat(2 * 1024 * 1024 + 1),
+                content: "valid inventory entry".into(),
             })
-            .expect("oversized record");
+            .expect("nonempty target");
+        let bytes = std::fs::read(&target.file_path).expect("history");
+        let end = bytes
+            .iter()
+            .position(|byte| *byte == b'\n')
+            .expect("header");
+        // Legacy inventory skips TALOS headers; strict restoration validates the
+        // version before retiring the active runtime.
+        let mut corrupt = b"TALOS\t99\t1000\n".to_vec();
+        corrupt.extend_from_slice(&bytes[end + 1..]);
+        std::fs::write(&target.file_path, corrupt).expect("invalid header version");
         let (raw_tx, mut raw_rx) = mpsc::channel(4);
         let owner = SessionTransition::new(raw_tx.clone(), original.clone()).expect("owner");
         let route = owner.bind_active_sender();
@@ -1053,18 +1063,22 @@ mod tests {
             false,
             true,
         );
-        let result = handle_session_resume(
-            &transition,
-            &ui_tx,
-            &Config::default(),
-            &builder,
-            &manager,
-            &session_tx,
-            &route_tx,
-            &bridge_tx,
-            Some(target.id.to_string()),
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            handle_session_resume(
+                &transition,
+                &ui_tx,
+                &Config::default(),
+                &builder,
+                &manager,
+                &session_tx,
+                &route_tx,
+                &bridge_tx,
+                Some(target.id.to_string()),
+            ),
         )
-        .await;
+        .await
+        .expect("history refusal must not retire the original runtime");
         assert!(result.is_none());
         assert_eq!(transition.lock().await.active_session().id, original.id);
         assert_eq!(transition.lock().await.active_generation(), generation);

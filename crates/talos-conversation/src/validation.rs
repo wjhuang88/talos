@@ -431,40 +431,61 @@ fn checks_for_profile(profile: ValidationProfile) -> Vec<ValidationCheck> {
             },
             ValidationCheck {
                 id: "provider-usage",
-                command: "cargo test --locked -p talos-provider",
+                command: "cargo test --quiet --locked -p talos-provider",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["test", "--locked", "-p", "talos-provider"],
+                args: &["test", "--quiet", "--locked", "-p", "talos-provider"],
                 required: true,
                 source: "T101",
                 ecosystem: Some("rust"),
             },
             ValidationCheck {
                 id: "tui-status",
-                command: "cargo test --locked -p talos-tui status_bar",
+                command: "cargo test --quiet --locked -p talos-tui status_bar",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["test", "--locked", "-p", "talos-tui", "status_bar"],
+                args: &[
+                    "test",
+                    "--quiet",
+                    "--locked",
+                    "-p",
+                    "talos-tui",
+                    "status_bar",
+                ],
                 required: true,
                 source: "T102/T103",
                 ecosystem: Some("rust"),
             },
             ValidationCheck {
                 id: "tool-results",
-                command: "cargo test --locked -p talos-tools file_tool_tests",
+                command: "cargo test --quiet --locked -p talos-tools file_tool_tests",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["test", "--locked", "-p", "talos-tools", "file_tool_tests"],
+                args: &[
+                    "test",
+                    "--quiet",
+                    "--locked",
+                    "-p",
+                    "talos-tools",
+                    "file_tool_tests",
+                ],
                 required: true,
                 source: "T104",
                 ecosystem: Some("rust"),
             },
             ValidationCheck {
                 id: "model-switch",
-                command: "cargo test --locked -p talos-cli model_switch_marker",
+                command: "cargo test --quiet --locked -p talos-cli model_switch_marker",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["test", "--locked", "-p", "talos-cli", "model_switch_marker"],
+                args: &[
+                    "test",
+                    "--quiet",
+                    "--locked",
+                    "-p",
+                    "talos-cli",
+                    "model_switch_marker",
+                ],
                 required: true,
                 source: "T106",
                 ecosystem: Some("rust"),
@@ -504,10 +525,10 @@ fn checks_for_profile(profile: ValidationProfile) -> Vec<ValidationCheck> {
             },
             ValidationCheck {
                 id: "test",
-                command: "cargo test --locked --workspace",
+                command: "cargo test --quiet --locked --workspace",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["test", "--locked", "--workspace"],
+                args: &["test", "--quiet", "--locked", "--workspace"],
                 required: true,
                 source: "workspace validation",
                 ecosystem: Some("rust"),
@@ -561,8 +582,11 @@ pub fn run_governance_validation(workspace: &Path) -> ValidationEvidence {
     }
 }
 
-const HOST_CHECK_TIMEOUT: Duration = Duration::from_secs(30);
-const HOST_OUTPUT_LIMIT: usize = 16 * 1024;
+// A fixed host policy, not model-controlled input. Cold builds and full workspace
+// tests need minutes; quiet test progress avoids spending the output budget on
+// one line per passing test. Overflow still fails under ADR-097.
+const HOST_CHECK_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+const HOST_OUTPUT_LIMIT: usize = 2 * 1024 * 1024;
 
 fn run_internal_validation_check(
     workspace: &Path,

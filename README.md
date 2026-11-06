@@ -637,10 +637,12 @@ Validation execution accepts only built-in profiles. Each evidence record includ
 exit status and bounded stdout/stderr summaries. Cargo checks may run build scripts,
 download dependencies and write build artifacts; run mode is not read-only.
 Profile allowlisting is not a permission grant. Arbitrary commands and release
-operations are not exposed by this interface.
+operations are not exposed by this interface. Each host check has a fixed 15-minute
+deadline and a 2 MiB limit per output stream. Cargo tests use quiet progress output;
+output overflow, timeout and unconfirmed cleanup remain failures, even if partial
+output is available. Evidence summaries are bounded separately.
 
-The upcoming model tools `agile_summary` and `validate_project` are under I315
-validation. Use the summary for explicit progress/backlog requests or task-relevant
+The model tools `agile_summary` and `validate_project` were delivered in I315. Use the summary for explicit progress/backlog requests or task-relevant
 governance questions, not ordinary chat or repeated unchanged status refreshes.
 A governance manifest or any two canonical Board/iteration-index/backlog files
 enable summary discovery, including small or Planned projects. Validation uses

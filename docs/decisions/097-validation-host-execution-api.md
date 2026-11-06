@@ -59,3 +59,16 @@ modes through standard preflight. Record current exact-head CI/review in I315.
 Existing 0.10 releases are unchanged; release notes must identify the removal and
 replacement before publishing the next minor. Full T1 acceptance remains owned by
 VALIDATION-003, including unresolved preparation bounds and native Windows evidence.
+
+## QUALITY-001 workload budget correction — 2026-11-06
+
+The fixed host policy allows 15 minutes per check and at most 2 MiB per output
+stream; Cargo test commands use `--quiet`. These are Soft host policy choices:
+30 seconds/16 KiB rejected routine cold builds and passing workspace progress.
+The model still cannot select arbitrary commands, deadlines, environment or paths.
+Overflow remains a failure, cancellation and cleanup remain owned, and evidence
+summaries retain their smaller presentation bound. The real CLI Cargo fixture
+includes a 31-second build script, a 24 KiB diagnostic and 400 tests, then verifies
+an actual test failure is not converted into success. Review/validation is owned
+by [QUALITY-001](../tasks/2026-11-06-quality001-delivery-repair.md); this amendment
+does not itself claim implementation completion or release.

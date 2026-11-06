@@ -1181,7 +1181,7 @@ mod tests {
         );
         let mut engine = PermissionEngine::with_workspace_root(workspace.path().to_owned());
         engine.load_from_config(&serde_json::json!({"rules":[
-            {"decision":{"Deny":"test execution refused"},"nature":"Execute","resource":"cargo test --locked --workspace"},
+            {"decision":{"Deny":"test execution refused"},"nature":"Execute","resource":"cargo test --quiet --locked --workspace"},
             {"decision":"Allow","nature":"Execute"}
         ]})).expect("mixed policy");
         let wrapped = PermissionAwareTool {

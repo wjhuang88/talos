@@ -233,8 +233,8 @@ mod tests {
             output_limit: usize,
         ) -> ValidationHostFuture<'a> {
             Box::pin(async move {
-                assert_eq!(timeout, Duration::from_secs(30));
-                assert_eq!(output_limit, 16 * 1024);
+                assert_eq!(timeout, Duration::from_secs(15 * 60));
+                assert_eq!(output_limit, 2 * 1024 * 1024);
                 self.calls.fetch_add(1, Ordering::SeqCst);
                 self.cancelled.store(true, Ordering::SeqCst);
                 Err(ValidationHostFailure::Failed(

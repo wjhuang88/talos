@@ -99,7 +99,7 @@ fn approved_validation_runs_owned_checks_and_returns_provider_evidence() {
         );
         assert_eq!(
             std::fs::read_to_string(root.path().join("calls")).expect("real command marker"),
-            "fmt --all -- --check\ncheck --locked --workspace\ntest --locked --workspace\n"
+            "fmt --all -- --check\ncheck --locked --workspace\ntest --quiet --locked --workspace\n"
         );
     }
 }

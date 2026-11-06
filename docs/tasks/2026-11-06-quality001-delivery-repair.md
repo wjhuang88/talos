@@ -1,6 +1,6 @@
 # QUALITY-001: Recent Delivery Quality Repairs
 
-> Document status: Active (proposed; effective only after claim PR #864 merges)
+> Document status: Review / Claimed
 > Published plan date: 2026-11-06
 > Deliverable: reproducible checkout regression corrected, large saved messages restored, usable bounded workspace validation, and accurate T5 Board status.
 
@@ -16,7 +16,7 @@
 | Source Issue | None |
 | Governance Claim PR | #864 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Session instruction requests fixing the assessed issues; independent governance review and exact-head CI required before activation |
+| Authorization Evidence | Session repair instruction; #864 merged as 2e7614bb after independent Agent APPROVE for 4e08f6ba against 35d7264b and CI42200671396 passed; review receipt in PR body |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-06 |
 | Handoff / Release Condition | Local regression and standard preflight pass, independent review and exact-head CI, then implementation evidence and owner closure |
@@ -79,3 +79,83 @@ and native CI; no Linux result represents native Windows execution.
 Residual destination: this owner. Keep delivery Review until actual implementation
 commit evidence and required review/CI exist. Roll back only this repair candidate
 if acceptance fails; do not suppress tests or widen permission policy.
+
+## Implementation checkpoint — 2026-11-06
+
+Claim #864 is effective at `2e7614bb`. The checkout failure is a stale fixture:
+its hook was conditional on `target`, but it expected unrelated `created` to
+refuse despite existing admitted target-discovery support. Corrected fixture
+verifies successful safe creation and refusal for `blocked` with an actual
+matching hook condition, preserving HEAD/index/no-hook/no-new-ref checks. No
+production Git behavior or permission change. Focused workspace-built test passed.
+
+Host message restoration accumulates unfinished records across bounded reads;
+strict model indexing retains its old bounds. Sixteen focused message-scan tests
+passed, including both writer formats, >page records, cancellation and changed
+source refusal. No persisted format or writer change. Fixed validation now uses
+quiet Cargo tests, 15-minute checks and 2 MiB streams; ADR-097 overflow failures
+and smaller evidence summaries remain. These budget choices are Soft policy,
+not a promise every project fits. Real Cargo and full preflight remain pending.
+
+T5 Board row now mirrors existing #837 owner evidence. README tool-delivery
+wording and execution budgets, SDK restoration semantics and ADR-097 are updated.
+All unfinished checks, independent implementation review and remote/native CI
+remain owned here; no Complete claim is made.
+
+### Preflight prerequisite fixture correction
+
+First repaired preflight failed an existing Agent pressure fixture: it compared
+System instructions from separately prepared turns, including independently
+generated unix_seconds timestamps (boundary crossed during the run). This is
+fixture-only maintenance within the repair's validation checkpoint: compare the
+provider request to its exact prepared request; retain pressure persistence, tool,
+budget and call-count assertions. No production Agent behavior or admission change.
+Original log: `/tmp/talos-quality-fixed-preflight.log`. The later result does not
+erase that failed run. Large-buffer mid-read cancellation/retry regression added
+after independent preliminary review; focused message-scan tests now pass 17/17.
+
+The next preflight exposed two old fixture assumptions directly affected by the
+repair: the validation deny rule matched the pre-quiet command, and a resume
+refusal fixture used a now-supported large record. Updated exact deny matching;
+use genuinely malformed history for refusal and add a deadline to avoid hanging
+on unintended retirement. The real Actor startup fixture now includes a single
+>2 MiB message and verifies exact provider delivery. Interrupted the obsolete
+hanging run; `/tmp/talos-quality-final-preflight.log` is not a passing result.
+
+### Local validation checkpoint
+
+- `cargo test --locked -p talos-session --lib message_scan`: 17 passed, including
+  cancellation during an already accumulated record and strict model refusal.
+- Workspace-feature checkout regression: 1 passed, safe creation and actual
+  conditional-hook refusal. Production Git unchanged.
+- Conversation validation suite: 25 passed. Real CLI Cargo fixture: 1 passed
+  (31.99 seconds), including a deliberately failing second run.
+- Real Actor large-message startup and corrupt-resume route-preservation tests:
+  1 passed each. The initial malformed-header fixture was excluded by inventory;
+  corrected it to a legacy-inventory-visible invalid version, not weaker assertions.
+- `cargo clippy --locked -p talos-cli --tests -- -D warnings`: passed.
+- `cargo xwin check --locked -p talos-session -p talos-cli --tests --target
+  x86_64-pc-windows-msvc`: passed. Tools coding-feature tests also cross-compiled
+  with `cargo xwin check --locked -p talos-tools --features coding --tests --target
+  x86_64-pc-windows-msvc`. These are compile checks, not native Windows execution.
+- MSVC std was missing initially; installed pinned Rust1.99.0 target after official
+  archive SHA256 verification. cargo-xwin and SDK/CRT cache were already available.
+- A subsequent preflight reached Runtime and found the remaining exact command
+  fixture expected pre-quiet argv; synchronized it. Failed/interrupted runs remain
+  `/tmp/talos-quality-{fixed,final,converged}-preflight.log`. Final preflight is
+  `/tmp/talos-quality-verified-preflight.log`, still running at this checkpoint.
+
+Independent preliminary security/API review found no blockers; its suggestion for
+mid-record cancellation coverage is implemented. Final exact-head review, full
+preflight and native CI are still required before closure.
+
+## Converged local candidate — 2026-11-06
+
+`./scripts/release_preflight.sh` exited 0, ending `release preflight: passed` in
+`/tmp/talos-quality-verified-preflight.log`. Includes both governance validators,
+format, locked workspace check/Clippy/tests/doc-tests and both independent SDK
+modes. Agent655/655, CLI410/410, Session305/305, Tools1123/1123 passed; no ignored
+tests or global serialization added. Final Runtime exact-argv fixture includes
+quiet mode. Both xwin test checks and CLI test-target Clippy passed as above.
+Native Windows/macOS execution and exact-head CI/review remain remote gates.
+This is Review, not Complete; no implementation SHA exists yet for closure.

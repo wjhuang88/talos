@@ -266,19 +266,33 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
         ),
     )
     .expect("target config");
+    // The late hook is relevant only to the branch whose conditional config
+    // selects it. Target discovery now supports creation; an unrelated branch
+    // must not inherit target's hook or be refused merely for having includeIf.
     let create = AddPlan::prepare_checkout(
         root.path(),
         &serde_json::json!({"branch":"created", "create":true}),
         ToolProvenance::Native,
     )
     .expect("create plan");
+    let created = execute_approved(create).await;
+    assert!(!created.result.is_error, "{}", created.result.content);
+    assert_eq!(git(&["branch", "--show-current"]), "created");
+    assert!(!root.path().join("hook-ran").exists());
+    assert_eq!(std::fs::read(root.path().join(".git/index")).expect("index"), index);
+    git(&["checkout", "source"]);
+    git(&["config", "includeIf.onbranch:blocked.path", root.path().join("target.config").to_str().expect("path")]);
+    let create = AddPlan::prepare_checkout(
+        root.path(),
+        &serde_json::json!({"branch":"blocked", "create":true}),
+        ToolProvenance::Native,
+    ).expect("hook-bearing create plan");
     let refused = execute_approved(create).await;
-    assert!(
-        refused.result.is_error && refused.result.content.contains("target-branch discovery"),
-        "{}",
-        refused.result.content
-    );
+    assert!(refused.result.is_error && refused.result.content.contains("target-branch discovery"), "{}", refused.result.content);
     assert_eq!(git(&["branch", "--show-current"]), "source");
+    assert!(git(&["branch", "--list", "blocked"]).is_empty());
+    assert!(!root.path().join("hook-ran").exists());
+    assert_eq!(std::fs::read(root.path().join(".git/index")).expect("index"), index);
     let plan = AddPlan::prepare_checkout(
         root.path(),
         &serde_json::json!({"branch":"target"}),

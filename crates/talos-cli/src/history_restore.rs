@@ -392,10 +392,14 @@ mod tests {
             "test".into(),
             root.path().join("history.jsonl"),
         );
+        let expected_content = |i| {
+            let length = if i == 4000 { 2 * 1024 * 1024 + 1 } else { 260 };
+            format!("original-{i}: {}", "x".repeat(length))
+        };
         let mut lines = String::new();
         for i in 0..8300 {
             let message = Message::User {
-                content: format!("original-{i}: {}", "x".repeat(260)),
+                content: expected_content(i),
             };
             lines.push_str(&serde_json::json!({"type":"message", "data":message}).to_string());
             lines.push('\n');
@@ -442,7 +446,7 @@ mod tests {
             .collect();
         assert_eq!(users.len(), 8301);
         for (i, content) in users[..8300].iter().enumerate() {
-            assert_eq!(*content, format!("original-{i}: {}", "x".repeat(260)));
+            assert_eq!(*content, expected_content(i));
         }
         assert_eq!(users[8300], "continue restored work");
         tokio::time::timeout(Duration::from_secs(10), async {
