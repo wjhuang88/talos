@@ -639,3 +639,21 @@ then push one stable code/docs stage and obtain its fresh native CI. Next accept
 browser nonserializable run-local replay and durable privacy/planner binding, final host/UI,
 separately frozen catalog activation, sourced fixtures and full protocol/auth review/CI/CAS.
 B stays Active/Claimed, Completion Commit Pending; C/D and parent #724 remain incomplete.
+
+Validation disposition for the compatibility candidate: final focused Provider **282/0**
+(6.07s) and all-target Clippy **passed** (7.19s); source is checkpoint
+5c2cde9c19e4d9b6183d0f31b800e49d479eb271, exact tree0ccac363. Standard preflight passed
+workspace check/Clippy, then stopped after **1,974 passed / 2 failed** in unchanged MCP
+checkout::case_04_approved/denied: AF_UNIX socket fixture creation returns EPERM. Both fixture
+files match main58d8bf92 exactly. A standalone Python AF_UNIX socket creation also returns
+EPERM before any Talos code. The remaining-package run exposed the same host restriction in
+runtime_evidence_rejects_directory_symlinks_and_socket_entries (88 runtime tests passed,
+1 failed). Do not weaken these assertions or claim a standard-preflight/workspace pass.
+
+Remaining packages are being collected with --no-fail-fast to identify every host-blocked row;
+remaining MCP integration targets and the standard external SDK fixture are also running.
+These unfinished runs are not pass evidence. This host restriction is not a reason to repeat
+known successful checks or discard CI3788. Submit this source-reviewed, focused-tested Draft
+stage for fresh native CI; do not merge until the complete B acceptance and native gates pass.
+Record later validation in PR metadata while its head is unchanged, and batch owner evidence
+with the next substantive stage rather than interrupting native CI with documentation-only pushes.

@@ -117,3 +117,10 @@ stage evidence, retained cold-build failure and resume steps are in I310. Worksp
 Clippy passed; full test compilation and the final duplicate-ID focused rerun remain pending.
 No final workspace/preflight or new-head native CI pass is claimed. Delivery remains
 Active / Claimed; Completion Commit: Pending. #724/#810 stay open; no release or merge.
+
+Final compatibility source checkpoint5c2cde9c has focused Provider282/0 and all-target Clippy
+passing. Standard preflight is **failed**, not passed: unchanged MCP socket fixtures return
+EPERM; standalone AF_UNIX creation is denied too. A later Runtime socket fixture has the same
+host failure. Remaining --no-fail-fast package, MCP and external SDK runs are still collecting
+results; native CI and all full B acceptance gates remain required. See I310 for exact tests,
+counts, preserved successes and resume instructions. This is a Draft stage, not B completion.
