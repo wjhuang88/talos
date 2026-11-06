@@ -794,3 +794,6 @@ mod ephemeral_deadline_tests;
 
 #[cfg(test)]
 mod gemini_agent_tests;
+
+#[cfg(test)]
+mod gemini_factory_tests;
