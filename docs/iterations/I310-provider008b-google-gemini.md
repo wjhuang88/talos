@@ -232,3 +232,16 @@ all other message/tool strings are private. Rust 1.99.0 cargo test -p talos-core
 123 passed, zero failed/ignored/filtered (0.02s). Provider replay tests restarted after earlier
 CONNECT proxy failure; no fresh Provider pass is claimed. SSE/request signed replay wiring remains
 pending. No Complete, release or parent acceptance claim.
+
+### Response-to-request replay composition checkpoint — 2026-11-01
+
+Response semantics now retain internal-call-ID to original-part-index bindings. Only successful
+semantic EOF permits replay encoding; SSE completion can stamp actual supplied transport identity
+and emits private ReasoningComplete before the held tool calls and TurnEnd. HTTP reader requires
+provider/model identity rather than deriving authority from payload contents. Added signed stream
+through serialized/restored history into the next native request, including native and generated
+IDs, reversed same-name tool completions and exact original-part comparison. Latest request-side
+checkpoint 489ddcc also batches results in original call order to preserve idless associations.
+Pinned rustfmt and diff checks pass. Locked Provider tests restarted and are compiling dependencies
+after workspace maintenance; no fresh test pass claimed. Factory/LanguageModel/real Agent and
+recorded vendor fixture acceptance remain outstanding; no completion or merge claim.
