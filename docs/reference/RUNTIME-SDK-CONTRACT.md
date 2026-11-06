@@ -742,11 +742,15 @@ Host message restoration also accepts historical headerless TLOG records beginni
 with `E\t`; strict history authority readers still require the creation header.
 Empty persisted sessions restore as empty, and their first append writes the header.
 
-A page reads at most 2 MiB / 8192 entries with cooperative cancellation and a CLI
-two-second page deadline. Total restored history still occupies linear memory;
-blocked OS I/O may retain resources after caller cancellation. Malformed TLOG
-headers/records, invalid UTF-8, oversized records and unsupported source volumes
-fail explicitly. Incomplete final TLOG records and invalid JSONL lines are omitted
+Each host restoration step reads at most 2 MiB and decodes at most 8192 entries,
+with cooperative cancellation and a CLI two-second step deadline. A single large
+message or metadata record accumulates across reads; allocation follows actual
+captured file bytes, never a declared length alone. Total restored history and the
+pending record occupy linear memory; decoding one complete record is synchronous.
+Blocked OS I/O may retain resources after caller cancellation. Malformed TLOG
+headers/records, invalid UTF-8 and unsupported source volumes fail explicitly.
+Model history indexing/disclosure retains its separate 2 MiB record/page limits;
+host restoration does not create model recovery authority. Incomplete final TLOG records and invalid JSONL lines are omitted
 as before. SessionStore implementers default to no paged encoding; opt into a
 built-in encoding only when it matches the actual store. There is no whole-file
 fallback. `/resume` and model switching use the same paged message/tail snapshot.

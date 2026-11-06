@@ -2,9 +2,9 @@
 
 ## Delivery quality repairs / QUALITY-001
 
-[Repair owner](tasks/2026-11-06-quality001-delivery-repair.md) proposes a bounded
-checkout/history/validation and T5 status repair in #864. Claim and activation
-remain ineffective until exact-head governance review, CI and target merge.
+[Repair owner](tasks/2026-11-06-quality001-delivery-repair.md) is Review / Claimed
+through #864 (`2e7614bb`). Local preflight and xwin test checks passed;
+completion requires implementation evidence, independent review and exact-head CI.
 
 ## SEARCH-001-K / I317 proposed atomic activation — 2026-11-05
 
@@ -71,7 +71,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 |---|---|---|---|
 | Explicit search provider overrides / SEARCH-001-H | Complete / Closed | [SEARCH-001-H](backlog/active/SEARCH-001-H-explicit-search-overrides.md) / [I314](iterations/I314-search-explicit-overrides.md) / #832 | Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e` (#842); CI3800 8/8, independent security review no blockers, CAS passed. Parent #624 and E/F/G/I remain separate. |
 | Whole-request compaction / T4 | Complete / Closed | [I312](iterations/I312-whole-request-compaction.md) | #818 merged `65500a869`; eight CI jobs, independent review and CAS passed. |
-| Actor checkpoint/history / T5 | Review / Partial / Claimed | [I313](iterations/I313-model-checkpoint-history.md) | Effective #819 claim; stable stage local preflight passed, implementation unmerged and acceptance incomplete. |
+| Actor checkpoint/history / T5 | Complete / Closed | [I313](iterations/I313-model-checkpoint-history.md) | Completion Commit `322574bc9707492ea6e9d5232794f73e687071d9` (#837); CI41608342151 and independent API/privacy/storage/security review passed. Later quality repairs are separately owned by QUALITY-001. |
 | Protocol architecture / OpenAI Responses | Complete / Closed | [PROVIDER-008-A](backlog/active/PROVIDER-008-A-openai-responses-protocol.md) / [I306](iterations/I306-provider008a-openai-responses.md) / #748 | Implementation through #803 `dd6c5f8`; all 52 reviewed HTTP pairs active. CI3570 8/8 and technical acceptance review passed. #748 closes after owner closure merge; #724 stays open for unimplemented B/C/D. |
 | Windows known-resource acceptance | Complete / Closed | [TEST-004](backlog/active/TEST-004-windows-known-resource-acceptance.md) / [I305](iterations/I305-windows-known-resource-acceptance.md) / #729 | #716 merged `b5b8241e`; I305/TEST004 cite existing Completion Commit. CI3221 all6jobs and protected review/CAS passed; only known-resource criterion closed, #717 residual open. |
 | Absent-journal pause without initialization | Complete / Closed | [RUNTIME-011](backlog/active/RUNTIME-011-absent-journal-pause.md) / [I304](iterations/I304-absent-journal-pause.md) | #726 implementation `aa1c477f` merged `c869a9af`; CI3203/review/CAS and CI3206 post-repair2220/2220 passed. I304 retains local failures; #705 retains broader timeout residuals. |

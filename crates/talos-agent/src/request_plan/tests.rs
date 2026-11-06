@@ -747,6 +747,15 @@ async fn actual_provider_receives_pressure_without_persisting_it() {
     // context capacity shrinks and grows; advisory pressure is not sticky.
     let reserve_capacity = baseline.initial_plan.estimated_tokens * 2;
     let pressure_reserve = reserve_capacity * 9 / 10 - baseline.initial_plan.estimated_tokens + 1;
+    let instructions = |messages: &[Message]| {
+        messages
+            .iter()
+            .filter_map(|message| match message {
+                Message::System { content, .. } => Some(content.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
     for (capacity, output_reserve, expected_notices) in [
         (1_000_000, 1, 0),
         (limit, 1, 1),
@@ -760,6 +769,10 @@ async fn actual_provider_receives_pressure_without_persisting_it() {
             .prepare_session_turn(&items, vec![], capacity)
             .await
             .expect("request fits current capacity");
+        // Runtime datetime is intentionally refreshed by each preparation.
+        // Compare the provider wire request with this exact prepared request,
+        // not an earlier baseline that may have crossed a wall-clock second.
+        let prepared_instructions = instructions(&prepared.initial_plan.messages);
         let (result, persisted) = agent
             .run_prepared_session_turn(prepared, mpsc::unbounded_channel().0, None, None, None)
             .await;
@@ -772,19 +785,7 @@ async fn actual_provider_receives_pressure_without_persisting_it() {
             format!("{:?}", request.tools),
             format!("{:?}", baseline.initial_plan.tool_definitions)
         );
-        let instructions = |messages: &[Message]| {
-            messages
-                .iter()
-                .filter_map(|message| match message {
-                    Message::System { content, .. } => Some(content.clone()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(
-            instructions(&request.messages),
-            instructions(&baseline.initial_plan.messages)
-        );
+        assert_eq!(instructions(&request.messages), prepared_instructions);
         assert!(
             agent.estimate_provider_request_tokens(&request.messages, &request.tools) <= capacity
         );

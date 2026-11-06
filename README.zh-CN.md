@@ -371,7 +371,10 @@ talos validate run --profile workspace
 Cargo 检查可能运行构建脚本、下载依赖及写入构建产物，因此 run 不是只读操作；
 profile 白名单也不等于权限授权。该接口不提供任意命令或发布操作。
 
-模型工具 `agile_summary` 与 `validate_project` 正在 I315 验证，尚未完成交付。
+每项宿主检查的固定时限为 15 分钟，每路输出上限为 2 MiB；Cargo 测试使用精简进度输出。
+输出溢出、超时和清理未确认仍判为失败，返回证据摘要另行限制长度。
+
+模型工具 `agile_summary` 与 `validate_project` 已在 I315 交付。
 明确的进度、待办或任务相关治理问题适用 summary；普通聊天、孤立代码解释和重复刷新
 未变化状态不适用。治理 manifest 或 Board、迭代索引、backlog 三个标准文件中的任意两个
 可启用 summary，小项目及 Planned 项目也适用，不要求 Active 迭代。
