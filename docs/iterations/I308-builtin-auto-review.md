@@ -989,6 +989,10 @@ remaining H/G coverage remain unimplemented.
   complete tool/profile/host dispositions and full I308 acceptance. No later
   handoff item is completed or waived by this submission.
 
+## Independent fixture residual ownership — 2026-11-06
+
+Issue #768 is now owned by the [independent fixture task](../tasks/2026-11-06-issue768-search-refusal-fixtures.md), claim #859 merged as `3f94a2684`. I308 completion and historical failure evidence remain unchanged. This ownership transfer does not claim a repaired fixture or close #768.
+
 ### 2026-10-26 Current-head validation failures and fixture isolation
 
 At `99c828313`, two authorized parallel standard preflights each failed one
