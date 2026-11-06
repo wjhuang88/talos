@@ -369,6 +369,14 @@ mod tests {
         let output = decoder
             .finish_with_identity("google", "model")
             .expect("complete");
+        assert!(matches!(
+            output.first(),
+            Some(GeminiOutput::Event(AgentEvent::ReasoningComplete { .. }))
+        ));
+        assert!(matches!(
+            output.last(),
+            Some(GeminiOutput::Event(AgentEvent::TurnEnd { .. }))
+        ));
         let mut blocks = Vec::new();
         let mut calls = Vec::new();
         for event in output {
@@ -439,6 +447,32 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn replay_encoding_failure_never_releases_tools() {
+        for invalid_part in [false, true] {
+            let mut parts = vec![serde_json::json!({"functionCall":{"name":"ping"}})];
+            if invalid_part {
+                parts.push(
+                    serde_json::json!({"thoughtSignature":"fixture","unsupportedField":true}),
+                );
+            }
+            let wire = format!(
+                "data: {}\n\n",
+                serde_json::json!({"candidates":[{"content":{"parts":parts},"finishReason":"STOP"}]})
+            );
+            let mut decoder = GeminiSse::new();
+            assert!(
+                decoder
+                    .push(wire.as_bytes())
+                    .expect("deferred tool")
+                    .is_empty()
+            );
+            let provider = if invalid_part { "google" } else { "" };
+            assert!(decoder.finish_with_identity(provider, "model").is_err());
+            assert!(decoder.finish_with_identity("google", "model").is_err());
+        }
     }
 
     #[test]
