@@ -14,7 +14,7 @@
 | Work Slice | #768 search transport test-fixture diagnosis, deterministic refusal/policy regressions, native parallel validation and evidence synchronization; no production transport policy change |
 | Claimed At | 2026-11-06 |
 | Source Issue | #768 |
-| Governance Claim PR | Not started |
+| Governance Claim PR | #859 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer explicitly requested completing #768; required independent governance and fixture-boundary review before delivery |
 | Implementation PR | Not started |
@@ -102,7 +102,12 @@ workspace rebuild, preserving unrelated worktrees and source.
   timeout (EAGAIN35), not refusal, on this macOS host. Apple XNU tcp_input.c drops
   packets in TCPS_CLOSED; no retained-bound-socket fix is assumed portable.
   Primary source: https://github.com/apple-oss-distributions/xnu/blob/main/bsd/netinet/tcp_input.c
-- No production or fixture changes yet; no completed fix or root-cause claim.
+- Rejected stronger reservation claim: an established loopback client source port
+  produced native refusal in128parallel Python cases, but a Rust counterexample
+  showed std TcpListener (SO_REUSEADDR) can bind that occupied source port on macOS.
+  The Python default-bind result does not prove exclusive ownership. Do not ship
+  this mechanism as an exclusive-port fixture without resolving that counterexample.
+- No production or fixture changes yet; no completed fix or historical root-cause claim.
 
 ## Closure ledger
 
