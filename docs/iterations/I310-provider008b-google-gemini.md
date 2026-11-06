@@ -717,3 +717,11 @@ A subsequent all-target Clippy run flagged three test-only findings (deprecated 
 constructor, unnecessary clone, nested condition). The fixture-only fixes passed all-target
 Clippy for Core, Agent and Provider with warnings denied. Standard release preflight was
 started on the follow-up. Do not infer a workspace/preflight or final Gemini acceptance pass.
+
+Standard preflight at 5349cd3c passed the workspace check and Clippy. Workspace test compilation
+completed, but the I169 dispatch source guard still expected the old image-only provider method.
+The guard is updated to require the sealed messages, tools and protocol at the new dispatch entry,
+and to verify that replay is bound against those same messages before dispatch. Both guard tests
+pass locally. A standalone AF_UNIX probe still reports EPERM on this host. This does not account
+for the I169 failure, which was a source regression in this change. The workspace no-fail-fast
+rerun and native CI are tracked separately.
