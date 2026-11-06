@@ -20,7 +20,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized completing parent #724; distinct human reviewer unavailable in this session. Exact-head checks, independent protocol/auth review and merge CAS required. |
 | Implementation PR | #838 (Draft; not accepted) |
-| Last Updated | 2026-11-02 |
+| Last Updated | 2026-11-03 |
 | Handoff / Release Condition | Claim effective via #811; retain Claimed until full child acceptance, exact-head CI/review and merge CAS. |
 
 ## Scope and deliverable
@@ -596,3 +596,46 @@ durable and must not hold browser raw arguments. Hook edits, transcript pruning,
 and missing continuation on resume must be handled without reconstructing signed arguments.
 Compatibility, host/UI, separate catalog activation, sourced fixtures/final docs and whole-candidate
 review/CI/CAS remain open. Active/Claimed, Completion Commit Pending; parent #724 stays open.
+
+### Successor-session recovery and ordinary textual tools — 2026-11-03
+
+Recovered remote #838 head1eabe26f23b328a9b0e02c66e20c3b2b7b9a0f0f and main
+58d8bf926beefe24df4e04c3d9c98f5ca62636cd into a new worktree. CI3788/run41624864516
+has a successful workflow aggregate and seven successful native/classifier/installer/Desktop
+jobs. The separate global Issue-owner reconciliation job failed on missing #844 and stale #390;
+retain that advisory residual under ADR-071 rather than discarding successful implementation
+validation or rerunning it solely for unrelated matrix drift. No merge or completion follows.
+
+Added Compat/TalosStrict ordinary tool dispatch over the same Gemini wire, no native tool
+declarations and no cross-wire fallback. Signed model text/parts are unchanged on continuation;
+parsed call names/arguments/order and explicit wire IDs must match retained tool metadata.
+ID-less legacy frames use retained local IDs, and duplicate/orphan/missing results fail before
+credentials/HTTP. Signed native-tool history cannot be rewritten into textual mode. Browser
+registry names remain refused in all modes; this does not implement private browser replay.
+The additional bridge obeys the original absolute deadline even for a stalled receiver, cancels
+upstream on receiver drop and rejects unterminated/malformed/native-call textual responses.
+Request-local images retain order and one-request lifetime across all three explicit modes.
+
+Pinned Rust1.99.0/locked Provider library tests passed twice: **282 passed, zero failed**
+(5.64s, then 5.91s for final source including three-mode image coverage). Real Agent + actual
+PermissionEngine/ReadTool fixtures cover both textual modes and signed tool continuation.
+New regressions cover edited wire IDs/arguments, orphan/duplicate/missing outcomes, ID-less
+legacy frames, malformed/strict batches, blocked-consumer deadlines and browser/Auto admission.
+Both governance validators passed with zero warnings; rustfmt/diff whitespace passed.
+The initial cold build failed archiving cranelift-codegen because one object file had length zero;
+cleaning only that package's task artifacts and retrying passed. Keep the failure in this record.
+Independent Agent source review approved bounded blobsff5b1346 (compat), b51f56b8 (provider),
+81693f3f (Agent fixtures), 0a13e349 (module wiring). Shared repository identity; no human or
+whole-candidate review claim. The first all-target Clippy run found two cloned-reference test-slice lints; replaced them with
+std::slice::from_ref without changing assertions. Independent review approved the final compat
+blob0a7ef648 after this equivalent test cleanup. Provider all-target Clippy then passed
+(1m59s including lock wait). Staged self-review additionally added duplicate explicit ID batch
+rejection before releasing any tool; independent review approved final compat blobff5b1346.
+The final focused rerun is queued behind standard workspace preflight. Workspace check and
+Clippy passed; full workspace test compilation is still running, so no preflight pass is claimed.
+
+Resume from the feature branch/PR, preserving old-head CI evidence. Finish current validation,
+then push one stable code/docs stage and obtain its fresh native CI. Next acceptance work remains
+browser nonserializable run-local replay and durable privacy/planner binding, final host/UI,
+separately frozen catalog activation, sourced fixtures and full protocol/auth review/CI/CAS.
+B stays Active/Claimed, Completion Commit Pending; C/D and parent #724 remain incomplete.
