@@ -1,14 +1,12 @@
 # Product Backlog
 
-## SEARCH-001-K / I317 proposed compatibility helper ownership — 2026-11-05
+## SEARCH-001-K / I317 active compatibility ownership — 2026-11-06
 
 [SEARCH-001-K](active/SEARCH-001-K-compat-fallback-ownership.md) /
-[I317](../iterations/I317-search-compat-fallback-ownership.md) / #850 proposes
-a limited `rust-websearch` helper internalization under governance #851.
-Existing protected Auto chain, Network authorization and final Wikipedia fallback
-are already Talos-owned; D/#644 ZERO-ADMISSION is unchanged. No dependency
-removal or E/F/I activation. I316/T6 and I310 remain independently owned.
-Claim/Active proposed in #851 remain **ineffective until target-branch merge**.
+[I317](../iterations/I317-search-compat-fallback-ownership.md) / #850 is now
+Active/Claimed on main after #851 (`7b482a4243b37a4f79ef3fe460b69b0740400682`). Production helper candidate
+#860 remains Draft and unaccepted; no new provider, permission change, Cargo
+retirement or SEARCH-001-E/F/G/I activation. I310 and #768 remain independent.
 
 ## Completed session handoff
 

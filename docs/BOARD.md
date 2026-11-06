@@ -1,13 +1,13 @@
 # Talos Board
 
-## SEARCH-001-K / I317 proposed atomic activation — 2026-11-05
+## SEARCH-001-K / I317 effective claim — 2026-11-06
 
 [SEARCH-001-K](backlog/active/SEARCH-001-K-compat-fallback-ownership.md) /
-[I317](iterations/I317-search-compat-fallback-ownership.md) / #850 proposes
-production compatibility-helper ownership only in draft governance #851,
-ineffective until finalized head CI/review/merge. I316 and I310 remain
-independent; D/#644 remains ZERO-ADMISSION; E/F/G/I stay gated; Exa/Parallel
-D2/#848 has separate intake. No K1 implementation or change to Auto routing.
+[I317](iterations/I317-search-compat-fallback-ownership.md) / #850 is Active/Claimed
+by merged governance #851 (`7b482a4243b37a4f79ef3fe460b69b0740400682`). K1 protected compatibility-helper
+implementation is Draft PR #860; no accepted code or completion yet. I310 and #768
+remain independently owned; D/#644 is BLOCKED/ZERO-ADMISSION, D2/#848 unadmitted,
+E/F/G/I gated. Neither Auto routing nor `rust-websearch` retirement is authorized.
 
 ## Issue #768 fixture repair proposal
 

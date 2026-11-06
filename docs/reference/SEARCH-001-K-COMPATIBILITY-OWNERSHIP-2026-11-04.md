@@ -93,3 +93,11 @@ replacement after I's prerequisite evidence. Do not quietly expand K1 to depende
 Status now: **K1 is proposed, not implemented**. Formal scope selection/claim and applicable
 review are required before code implementation. E/F admission, G region acceptance, D2 vendor
 research and I retirement are separate.
+
+## 2. Implementation candidate (2026-11-06; not yet accepted)
+
+- Effective owner: governance #851 merged as `7b482a4243b37a4f79ef3fe460b69b0740400682`; Draft K1 implementation #860 starts from this exact commit.
+- Private `crates/talos-tools/src/search_backend/compat_helpers.rs` now owns pinned upstream HTML entities/tag cleanup, DDG redirect decode and the exact 12-UA pool; the protected parser/compatibility preparation imports are rewritten to use it.
+- Parity tests compare actual `rust_websearch::html_utils` outputs for deterministic input, invalid encoding and redirect edge cases; random UA tests check membership of both the pinned upstream and new local supplier. The new supplier uses existing network-enabled `uuid/v4` entropy, with unbiased rejection sampling. Exact random *sequence* is not claimed identical to upstream rand.
+- No `Cargo.toml`, lockfile, legacy `WebSearchTool`, endpoint, permission, shared transport budget or fallback scheduler changed. Remaining upstream crate references in the dormant legacy and test-only upstream comparison are intentionally preserved; removing the dependency belongs to separately gated SEARCH-001-I.
+- These are candidate/source facts, **not** a successful compiler, CI, native platform, security review or live-provider acceptance claim. #860 remains Draft pending those gates.
