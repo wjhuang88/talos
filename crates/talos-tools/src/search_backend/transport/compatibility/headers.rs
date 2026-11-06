@@ -1,6 +1,6 @@
 //! Dormant fixed compatibility headers and prepared credential headers.
 //!
-//! Reuses rust-websearch 0.1.2's public anti_detection::random_user_agent helper.
+//! Uses Talos-owned compatibility_helpers::random_user_agent with pinned upstream UA bytes.
 //! Fixed Bing language derives from VCS b30180a0, crates/websearch/src/bing.rs;
 //! client/UA provenance: src/anti_detection/{mod,user_agent}.rs in that package.
 //! MIT notice: crates/talos-tools/LICENSES/rust-websearch-MIT.txt.
