@@ -548,3 +548,16 @@ checks pass. Locked Provider tests are still cold-compiling with CI debug=0/incr
 no passing test result is claimed for this checkpoint. Browser ingress remains refused: transient
 signed replay versus durable TLOG projection, compatibility modes and complete B acceptance still
 require implementation and tests. #838 stays Draft; Completion Commit remains Pending.
+
+Validation completed for original-arguments source checkpoint
+`4c27bb2ce3ce7250e9e76daa88e94f3b441b43f5`: Provider locked library tests **270 passed,
+0 failed** (4.93s); Provider locked all-targets Clippy with `-D warnings` passed (1m10s).
+Source blobs independently reviewed: gemini_stream `93e90d4a`, gemini_sse `7cd8b64d`,
+gemini_provider `242da570`; no remaining blocking finding in this bounded stage.
+Project governance initially failed because the shell PATH omitted Cargo. After exporting the
+pinned toolchain and Git internal executable paths, governance passed with zero warnings;
+collaboration claim validation also passed with zero warnings. No permission check was weakened.
+New exact-head CI3743/run41411287919 is pending, not passed. Earlier CI3741 still has seven
+successful jobs and a running macOS job; do not infer its final outcome from the preflight step.
+Next implementation gate remains transient browser signed replay and durable privacy projection,
+then compatibility, positive lazy factory/ADC, catalog/host/UI/fixtures/docs and full acceptance.
