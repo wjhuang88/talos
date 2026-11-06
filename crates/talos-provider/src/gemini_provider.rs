@@ -334,8 +334,63 @@ impl GeminiProvider {
     }
 }
 
+fn redact_preview(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(fields) => {
+            if fields.get("thought").and_then(serde_json::Value::as_bool) == Some(true)
+                && fields.contains_key("text") {
+                fields.insert("text".into(), serde_json::json!("***"));
+            }
+            for (key, value) in fields {
+                if key == "thoughtSignature" || key == "inlineData" {
+                    *value = serde_json::json!("***");
+                } else { redact_preview(value); }
+            }
+        }
+        serde_json::Value::Array(values) => values.iter_mut().for_each(redact_preview),
+        _ => {}
+    }
+}
+
 #[async_trait::async_trait]
 impl LanguageModel for GeminiProvider {
+    fn request_preview(&self, messages: &[Message]) -> Option<serde_json::Value> {
+        // Preview never opens ADC/image files or acquires credentials.
+        let messages: Vec<_> = messages.iter().map(|message| match message {
+            Message::Multimodal { parts } => Message::Multimodal {
+                parts: parts.iter().map(|part| match part {
+                    talos_core::message::ContentPart::Text { .. } => part.clone(),
+                    talos_core::message::ContentPart::Image { .. } => talos_core::message::ContentPart::Text {
+                        text: "[image omitted in preview]".into(),
+                    },
+                }).collect(),
+            },
+            _ => message.clone(),
+        }).collect();
+        let mut preview = if let Some(transport) = &self.transport {
+            transport.preview_connection()
+        } else {
+            let vertex = self.vertex.as_ref()?;
+            serde_json::json!({"method":"POST","url":crate::gemini_endpoint::vertex(
+                &vertex.project, &vertex.location, &self.model, true).ok()?,
+                "headers":{"Authorization":"Bearer ***"}})
+        };
+        preview["headers"]["Content-Type"] = serde_json::json!("application/json");
+        match crate::gemini_request::build_request_for_identity(
+            &self.provider, &self.model, &messages, &[], self.output_limit,
+        ) {
+            Ok(mut body) => {
+                if let Some(thinking) = &self.thinking {
+                    body["generationConfig"]["thinkingConfig"] = thinking.clone();
+                }
+                redact_preview(&mut body);
+                preview["body"] = body;
+            }
+            Err(_) => preview["error"] = serde_json::json!("Gemini history cannot be previewed"),
+        }
+        Some(preview)
+    }
+
     async fn stream_with_ephemeral_images(
         &self,
         messages: &[Message],
@@ -402,6 +457,26 @@ impl LanguageModel for GeminiProvider {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn preview_keeps_adc_lazy_and_hides_signed_thoughts() {
+        use talos_core::message::AssistantReasoning;
+        let provider = GeminiProvider::vertex("project".into(), "global".into(), false,
+            "vertex".into(), "model".into(), Some(512), Default::default()).expect("provider");
+        let blocks = vec![crate::gemini_replay::encode("vertex", "model", &[
+            json!({"text":"private-thought","thought":true,"thoughtSignature":"private-signature"}),
+            json!({"text":"answer"}),
+        ], &[]).expect("replay")];
+        let preview = provider.request_preview(&[Message::Assistant { content:"answer".into(),
+            tool_calls:vec![], reasoning:Some(AssistantReasoning {provider:"vertex".into(),model:"model".into(),blocks}) }]).expect("preview");
+        assert!(preview.get("error").is_none());
+        assert_eq!(preview["headers"]["Authorization"], "Bearer ***");
+        assert_eq!(preview["body"]["generationConfig"]["maxOutputTokens"],512);
+        assert!(!preview.to_string().contains("private-thought"));
+        assert!(!preview.to_string().contains("private-signature"));
+        assert!(preview.to_string().contains("answer"));
+        assert!(provider.vertex.as_ref().expect("profile").transport.get().is_none());
+    }
 
     fn ephemeral_fixture(bytes: &[u8], lifetime: Duration) -> talos_core::provider::EphemeralImage {
         talos_core::provider::EphemeralImage::png(bytes.to_vec(), Instant::now() + lifetime)

@@ -55,6 +55,14 @@ impl GeminiTransport {
         self
     }
 
+    pub(crate) fn preview_connection(&self) -> Value {
+        let headers = match &self.authentication {
+            Authentication::AiStudio(_) => serde_json::json!({"x-goog-api-key":"***"}),
+            Authentication::Vertex(_) => serde_json::json!({"Authorization":"Bearer ***"}),
+        };
+        serde_json::json!({"method":"POST","url":self.endpoint,"headers":headers})
+    }
+
     fn client() -> ProviderResult<Client> {
         Client::builder()
             .redirect(reqwest::redirect::Policy::none())
