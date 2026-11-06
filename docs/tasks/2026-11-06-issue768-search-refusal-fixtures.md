@@ -1,4 +1,4 @@
-# Issue #768: Reliable Search Refusal Fixtures
+# ISSUE-768: Reliable Search Refusal Fixtures
 
 > Document status: Active (atomic proposal; ineffective until claim merge)
 > Published plan date: 2026-11-06
