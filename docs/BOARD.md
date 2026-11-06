@@ -11,7 +11,7 @@ D2/#848 has separate intake. No K1 implementation or change to Auto routing.
 
 ## Issue #768 fixture repair
 
-[Independent task](tasks/2026-11-06-issue768-search-refusal-fixtures.md) is Review after claim #859 merged as `3f94a2684`. Test-only policy/native fixture separation is implemented locally; local parallel preflight and xwin passed; remote native CI and delivery remain pending. I308 stays closed; #768 stays open.
+[Independent task](tasks/2026-11-06-issue768-search-refusal-fixtures.md) is Complete / Closed. Implementation #862 merged as `317934290` after exact-head native CI and independent review. Historical cause and external-binder limits remain in the owner; production policy unchanged.
 
 ## Completed session handoff
 

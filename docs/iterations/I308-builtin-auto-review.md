@@ -991,7 +991,7 @@ remaining H/G coverage remain unimplemented.
 
 ## Independent fixture residual ownership — 2026-11-06
 
-Issue #768 is now owned by the [independent fixture task](../tasks/2026-11-06-issue768-search-refusal-fixtures.md), claim #859 merged as `3f94a2684`. I308 completion and historical failure evidence remain unchanged. This ownership transfer does not claim a repaired fixture or close #768.
+Issue #768 is now owned by the [independent fixture task](../tasks/2026-11-06-issue768-search-refusal-fixtures.md), claim #859 merged as `3f94a2684`. I308 completion and historical failure evidence remain unchanged. The independent fixture repair subsequently merged in #862 as `317934290`; its owner records completion and validation limits. Original I308 failures below remain historical evidence.
 
 ### 2026-10-26 Current-head validation failures and fixture isolation
 
