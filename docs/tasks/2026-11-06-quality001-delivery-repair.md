@@ -1,6 +1,7 @@
 # QUALITY-001: Recent Delivery Quality Repairs
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
+> Completion Commit: 95546b1f91e06ba969554fd602faf0d01c60f25a
 > Published plan date: 2026-11-06
 > Deliverable: reproducible checkout regression corrected, large saved messages restored, usable bounded workspace validation, and accurate T5 Board status.
 
@@ -8,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | Repair the four findings from the 2026-11-06 delivery quality assessment: checkout conditional-config regression, host message restoration across large records, fixed validation workload budgets, and T5 derived Board synchronization |
@@ -17,9 +18,9 @@
 | Governance Claim PR | #864 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Session repair instruction; #864 merged as 2e7614bb after independent Agent APPROVE for 4e08f6ba against 35d7264b and CI42200671396 passed; review receipt in PR body |
-| Implementation PR | Not started |
+| Implementation PR | #865 |
 | Last Updated | 2026-11-06 |
-| Handoff / Release Condition | Local regression and standard preflight pass, independent review and exact-head CI, then implementation evidence and owner closure |
+| Handoff / Release Condition | None; accepted repair merged with exact-head review and CI |
 
 ## Baseline and inventory
 
@@ -188,3 +189,17 @@ fixtures (`/tmp/talos-quality-symlink-checkout.log`). CI42222681087's Windows na
 workspace, Windows/Linux Desktop and installer jobs all passed on the first
 candidate; its macOS failure remains recorded, not replaced by that evidence.
 Independent supplemental Agent review found no blockers in either fixture repair.
+
+## Completion — 2026-11-06
+
+Implementation #865 merged as `95546b1f91e06ba969554fd602faf0d01c60f25a`.
+All four acceptance findings are repaired. Final candidate `61d73ce6` received
+independent Agent technical/security APPROVE against `2e7614bb` (receipt in PR
+body; no separate human GitHub identity claimed). CI42227450980 passed all jobs,
+including native Windows workspace tests/CLI smoke, macOS standard preflight and
+CLI/TUI/plugin acceptance, and Linux/Windows/macOS Desktop validation. Local
+standard preflight, both governance validators and cargo-xwin MSVC test checks
+also passed. Merge-time CAS confirmed unchanged target owner/base, no new
+overlapping PR, exact-head checks and mergeability. No acceptance residual remains.
+Large-record restoration retains linear per-record memory/decode cost; fixed
+validation budgets remain finite policy, as documented. No release tag created.
