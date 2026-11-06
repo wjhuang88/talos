@@ -167,3 +167,24 @@ The privacy filter covers the original string and its deterministic trimmed/path
 Substring collisions with routing fields still fail closed, including collisions with public
 schema names. Browser result content is outside this raw-invocation filter unless the tool
 explicitly supplies private tokens.
+
+
+## Textual browser continuation amendment — 2026-11-05
+
+The next candidate extends the same custody boundary to Compat and TalosStrict through
+`stream_with_replay_context`. Buffer the complete response, validate the shared textual batch
+against original argument syntax, then publish custody before any text/thought/tool event.
+Restore exact signed text before compatibility history projection; omit native declarations.
+Auto remains refused. Tool calls in truncated responses are rejected before execution.
+
+With a browser registered, signed ordinary tool frames also require custody: Agent text cleanup
+may otherwise remove fenced calls or surrounding whitespace. Pure no-call responses without
+private history do not acquire custody. Thus an ordinary tool response in this protected route
+can consume the same 32-block/16-MiB limit and makes a durable reopen require missing-context
+refusal. This is an explicit availability tradeoff for exact signed replay, not durable secrets.
+
+The shared textual JSON envelope now rejects duplicate name/args/id fields before routing,
+including escaped duplicate keys. Non-string, non-null IDs are rejected instead of generating
+an ID. Unknown envelope fields, ordinary nested arguments and legacy name-plus-JSON framing
+retain their previous handling. Original browser arguments still undergo the stricter protected
+extractor. No browser permission, credential destination or public API change is added here.

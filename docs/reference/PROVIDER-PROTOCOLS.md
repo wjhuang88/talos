@@ -259,3 +259,20 @@ pre-1.0 minor migration, together with ADR-094. Provider integrations that match
 replay uses `LanguageModel::stream_with_replay_context` and must keep the carrier out of
 logs, serialized events, and durable history. The default implementation refuses private
 attachments and delegates ordinary requests to the existing dispatch method.
+
+
+### Gemini browser tools and live continuation (Draft candidate)
+
+Native, Compat and TalosStrict browser invocations use the existing prepared browser permission
+path. The provider holds a complete response until validation, keeps signed original arguments
+only in live Actor custody, and persists projected calls plus an opaque replay marker.
+Subsequent submissions in that same Actor can continue. Reopening or forking durable history
+cannot recover this private custody and refuses before contacting the model; start a new
+conversation instead. Auto must be resolved before dispatch.
+
+Custody is limited to 32 blocks / 16 MiB. With browser tools registered, signed ordinary textual
+tool responses also use custody to preserve their exact framing; plain no-tool replies without
+private history do not. This limitation applies even if that particular response did not call
+the browser. Browser tool results are only redacted when the tool declares private tokens.
+This remains an unreleased Draft implementation; full Gemini acceptance and catalog activation
+are pending, and mock/SSE fixture success is not a live Google service validation.

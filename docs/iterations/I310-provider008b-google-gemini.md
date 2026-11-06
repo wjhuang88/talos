@@ -733,3 +733,45 @@ several source lines with hard-coded LF and failed with CRLF. The Windows aggreg
 same failure. The advisory remote issue reconciliation still reports missing #844 and stale #390.
 The follow-up compares trimmed source lines through Rust's newline-aware iterator and retains the
 sealed dispatch and replay checks. No runtime behavior changes.
+
+### Textual browser replay candidate — 2026-11-05
+
+CI3802/run41839654389 at abae7183 completed with a successful aggregate and seven applicable
+jobs passing. Preserve the first Windows checkout-discovery foreground timeout and its successful
+single-job retry; the retry does not establish root cause. Advisory #844/#390 reconciliation
+remains failed. CI3801 and prior local failures above remain historical failed evidence.
+
+Recovery checkpoints 7b44a43e, 8d7af8c9 and 90326ed8 preserve the textual browser work. A local
+runtime restoration lost the earlier process/log/toolchain; no result is claimed for that lost
+run. Restored pinned Rust1.99.0 and locked dependencies, then completed Gemini82/0 and full
+Provider291/0 at 90326ed8. That checkpoint includes terminal-only original browser extraction,
+exact signed history restoration before textual projection, live two-submission Actor tests in
+Compat/TalosStrict, mixed ordinary/browser Compat, TLOG/export privacy and reopen refusal.
+
+Independent source review found ordinary signed fenced/whitespace tool content could still be
+cleaned before replay. Corrected it by retaining custody for all tool frames on the protected
+route, while plain no-call/no-private-history answers remain ordinary. A further duplicate-name
+routing regression was fixed in the shared textual parser before Value normalization. Duplicate
+name/args/id and non-string/non-null ID now fail before tool dispatch; ordinary nested arguments
+and unknown envelope fields retain their handling. Bounded independent Agent source review
+approved these corrections, not the entire B acceptance or a human review.
+
+The next candidate adds an Apache-2.0 public Google Go SDK SSE regression sample, fixed to
+upstream087281541b864840a1ff51a14d16eea23f0d8d83, with source Git blob, fixture SHA-256 and license.
+It is a public synthetic SDK sample, not a live vendor capture. Provider292/0 passed with the
+sample; a subsequent stronger binding-index/ID assertion passed in its focused rerun. All-target
+Provider Clippy passed before that assertion refinement; final rerun and standard preflight are
+recorded separately below. The README and ADR document the ordinary-tool custody availability
+tradeoff explicitly. No credential destination or browser permission policy changes.
+
+Full B remains Active/Claimed, Completion Commit Pending. Remaining: final host/UI/provenance
+acceptance, separately frozen/reviewed catalog activation, complete architecture/SDK/unreleased
+migration sync, whole protocol/auth review and fresh exact-head native CI/CAS. C/D and parent724
+remain incomplete. No merge, release or live-vendor success claim.
+
+Final Provider all-target Clippy passed (11.07s), format/diff checks passed, and the strengthened
+sourced-fixture regression passed. The first standalone governance invocation failed because its
+shell omitted Cargo from PATH (SQLite consumer validation could not launch cargo). The correctly
+configured standard preflight subsequently passed SQLite17 cases and governance with zero
+warnings. Claims validation passed with zero warnings. Workspace preflight is still in progress;
+these focused results do not establish a workspace or final B acceptance pass.
