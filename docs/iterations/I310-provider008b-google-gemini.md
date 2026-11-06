@@ -95,3 +95,8 @@ It is not wired into runtime yet, is not a merge candidate, and has no passing t
 Remaining: request-owned OAuth refresh/signing, reviewed dependency graph and ADR amendment,
 config/factory, Gemini wire/SSE, full acceptance and native CI. Keep Active; completion pending.
 Historical auth audit and recovery rationale are durably recorded in issue #810.
+
+Recovered authorized-user token refresh, bounded response validation, shared on-demand cache,
+request deadline and redirect rejection, with regression tests. No new dependency introduced.
+This checkpoint remains unwired and unverified; service-account signer, explicit ADC discovery,
+metadata isolation, in-flight cancellation tests and Gemini adapter remain outstanding.
