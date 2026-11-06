@@ -708,3 +708,12 @@ ordinary input normalization before signed binding. This checkpoint is not a mer
 Follow-up covers unknown-key refusal before observation, custody-verified stable projections,
 and binding the original ordinary argument before the existing execution normalization step.
 Tests and review of the follow-up must be recorded separately from the results above.
+
+At ed1c5c8c the clean pinned locked library run passed Core 129, Agent 664 and Provider 284
+tests. This includes both HTTP browser regressions and the custody-verified snapshot test.
+Independent source review confirmed the three corrections at tree
+5ae21de4297ea5e2e70a94be261f6b737706c64b. Its approval was bounded to those corrections.
+A subsequent all-target Clippy run flagged three test-only findings (deprecated fixture
+constructor, unnecessary clone, nested condition). The fixture-only fixes passed all-target
+Clippy for Core, Agent and Provider with warnings denied. Standard release preflight was
+started on the follow-up. Do not infer a workspace/preflight or final Gemini acceptance pass.
