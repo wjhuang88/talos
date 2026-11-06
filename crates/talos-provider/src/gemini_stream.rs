@@ -162,11 +162,11 @@ impl GeminiStream {
                         .filter(|s| !s.is_empty())
                         .ok_or_else(|| invalid("invalid Gemini function name"))?
                         .to_owned();
-                    let arguments = call
-                        .get("args")
-                        .filter(|v| v.is_object())
-                        .cloned()
-                        .ok_or_else(|| invalid("invalid Gemini function arguments"))?;
+                    let arguments = match call.get("args") {
+                        None => serde_json::json!({}),
+                        Some(value) if value.is_object() => value.clone(),
+                        Some(_) => return Err(invalid("invalid Gemini function arguments")),
+                    };
                     let id = match call.get("id") {
                         Some(id) => id
                             .as_str()
@@ -266,6 +266,17 @@ mod tests {
             matches!(stream.finish_eof().expect("end"), AgentEvent::TurnEnd{stop_reason:StopReason::EndTurn,usage} if usage.output_tokens == 5 && usage.reasoning_tokens == 2)
         );
         assert!(stream.finish_eof().is_err());
+    }
+
+    #[test]
+    fn no_argument_function_call_defaults_to_empty_object() {
+        let output = GeminiStream::new()
+            .apply(&json!({"candidates":[{"content":{"parts":[
+            {"functionCall":{"name":"ping"}}]},"finishReason":"STOP"}]}))
+            .expect("zero arguments");
+        assert!(
+            matches!(&output[0], GeminiOutput::FunctionCall{arguments,..} if arguments == &json!({}))
+        );
     }
 
     #[test]
