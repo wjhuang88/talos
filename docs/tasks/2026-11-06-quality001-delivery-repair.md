@@ -159,3 +159,32 @@ tests or global serialization added. Final Runtime exact-argv fixture includes
 quiet mode. Both xwin test checks and CLI test-target Clippy passed as above.
 Native Windows/macOS execution and exact-head CI/review remain remote gates.
 This is Review, not Complete; no implementation SHA exists yet for closure.
+
+### Native CI fixture correction
+
+Candidate `8b34406e` / PR #865 received exact-head independent Agent APPROVE
+against `2e7614bb`; CI42222681087 then exposed the checkout fixture's noncanonical
+macOS temporary paths. Target discovery correctly rejects symlink ancestors.
+Reproduced the exact line279 failure on Linux by running the workspace-built test
+with TMPDIR pointing through a symlink. Canonicalized this Unix fixture's root
+before writing conditional include paths; production Git admission stays unchanged.
+The original macOS failed log is `/tmp/talos-quality-macos-failure.log`.
+Fresh local preflight, exact-head review and CI are required for this correction.
+
+The correction preflight passed the checkout regression but exposed an unrelated
+search retry fixture's 100ms real-I/O deadline under concurrent suite load
+(`Transport(RequestLimit)`, 1122 tools tests passed). The first DNS call explicitly
+stalls 10s; give the source 1s and total budget 5s so the first call still times out
+while a real loopback retry has scheduling margin. Keep exact two DNS calls,
+one server request and successful result assertions. Test-only validation
+prerequisite; no search policy change. Open #860/#861 modify chain.rs but not this
+fixture file; no implementation scope overlap. Preserve failed log
+`/tmp/talos-quality-canonical-preflight.log`; new run is recorded separately.
+
+Correction checkpoint: standard preflight exited 0 in
+`/tmp/talos-quality-final2-preflight.log`, including all workspace tests and both
+external SDK modes. Canonical checkout passed in both ordinary and symlink-TMPDIR
+fixtures (`/tmp/talos-quality-symlink-checkout.log`). CI42222681087's Windows native
+workspace, Windows/Linux Desktop and installer jobs all passed on the first
+candidate; its macOS failure remains recorded, not replaced by that evidence.
+Independent supplemental Agent review found no blockers in either fixture repair.

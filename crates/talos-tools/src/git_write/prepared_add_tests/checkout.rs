@@ -110,11 +110,14 @@ async fn checkout_linked_worktree_admits_actual_metadata_and_preserves_main_head
 #[cfg(unix)]
 async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
     use std::os::unix::fs::PermissionsExt;
-    let root = fixture();
+    let temporary = fixture();
+    // Target discovery rejects symlink ancestors. macOS temp paths can use
+    // /var -> /private/var; write conditional includes with the actual path.
+    let root = temporary.path().canonicalize().expect("canonical fixture");
     let git = |args: &[&str]| {
         let output = std::process::Command::new("git")
             .args(args)
-            .current_dir(root.path())
+            .current_dir(root.as_path())
             .output()
             .expect("git");
         assert!(output.status.success(), "{output:?}");
@@ -131,7 +134,7 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
     git(&["branch", "-m", "source"]);
     git(&["branch", "target"]);
     for branch in ["source", "target"] {
-        let path = root.path().join(format!("{branch}.config"));
+        let path = root.as_path().join(format!("{branch}.config"));
         std::fs::write(&path, format!("[fixture]\n marker = {branch}\n"))
             .expect("conditional config");
         git(&[
@@ -140,10 +143,10 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
             path.to_str().expect("path"),
         ]);
     }
-    let index = std::fs::read(root.path().join(".git/index")).expect("index");
+    let index = std::fs::read(root.as_path().join(".git/index")).expect("index");
     for branch in ["target", "source"] {
         let plan = AddPlan::prepare_checkout(
-            root.path(),
+            root.as_path(),
             &serde_json::json!({"branch":branch}),
             ToolProvenance::Native,
         )
@@ -160,7 +163,7 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
         ("-", "source"),
     ] {
         let plan = AddPlan::prepare_checkout(
-            root.path(),
+            root.as_path(),
             &serde_json::json!({"branch":input}),
             ToolProvenance::Native,
         )
@@ -172,7 +175,7 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
     }
     for input in ["HEAD", "@"] {
         let head_plan = AddPlan::prepare_checkout(
-            root.path(),
+            root.as_path(),
             &serde_json::json!({"branch":input}),
             ToolProvenance::Native,
         )
@@ -187,7 +190,7 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
         assert_eq!(git(&["config", "fixture.marker"]), "source");
     }
     let plan = AddPlan::prepare_checkout(
-        root.path(),
+        root.as_path(),
         &serde_json::json!({"branch":"target"}),
         ToolProvenance::Native,
     )
@@ -197,7 +200,7 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
         .expect("discovery");
     let admission = proof(&discovered);
     std::fs::write(
-        root.path().join("source.config"),
+        root.as_path().join("source.config"),
         "[fixture]\n marker = changed\n",
     )
     .expect("change active conditional config");
@@ -213,24 +216,24 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
     );
     assert_eq!(git(&["branch", "--show-current"]), "source");
     assert_eq!(
-        std::fs::read(root.path().join(".git/index")).expect("index"),
+        std::fs::read(root.as_path().join(".git/index")).expect("index"),
         index
     );
     std::fs::write(
-        root.path().join("source.config"),
+        root.as_path().join("source.config"),
         "[fixture]\n marker = source\n",
     )
     .expect("restore active conditional config");
     for event in ["post-checkout", "reference-transaction"] {
         std::fs::write(
-            root.path().join("source.config"),
+            root.as_path().join("source.config"),
             format!(
                 "[hook \"conditional\"]\n event = {event}\n command = touch command-hook-ran\n"
             ),
         )
         .expect("active command hook");
         let plan = AddPlan::prepare_checkout(
-            root.path(),
+            root.as_path(),
             &serde_json::json!({"branch":"target"}),
             ToolProvenance::Native,
         )
@@ -242,24 +245,24 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
             refused.result.content
         );
         assert_eq!(git(&["branch", "--show-current"]), "source");
-        assert!(!root.path().join("command-hook-ran").exists());
+        assert!(!root.as_path().join("command-hook-ran").exists());
         assert_eq!(
-            std::fs::read(root.path().join(".git/index")).expect("index"),
+            std::fs::read(root.as_path().join(".git/index")).expect("index"),
             index
         );
     }
     std::fs::write(
-        root.path().join("source.config"),
+        root.as_path().join("source.config"),
         "[fixture]\n marker = source\n",
     )
     .expect("restore conditional config after command hooks");
-    let hooks = root.path().join("target-hooks");
+    let hooks = root.as_path().join("target-hooks");
     std::fs::create_dir(&hooks).expect("hooks");
     let hook = hooks.join("post-checkout");
     std::fs::write(&hook, "#!/bin/sh\ntouch hook-ran\n").expect("hook");
     std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).expect("mode");
     std::fs::write(
-        root.path().join("target.config"),
+        root.as_path().join("target.config"),
         format!(
             "[core]\n hooksPath = {}\n[fixture]\n marker = target\n",
             hooks.display()
@@ -270,7 +273,7 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
     // selects it. Target discovery now supports creation; an unrelated branch
     // must not inherit target's hook or be refused merely for having includeIf.
     let create = AddPlan::prepare_checkout(
-        root.path(),
+        root.as_path(),
         &serde_json::json!({"branch":"created", "create":true}),
         ToolProvenance::Native,
     )
@@ -278,12 +281,12 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
     let created = execute_approved(create).await;
     assert!(!created.result.is_error, "{}", created.result.content);
     assert_eq!(git(&["branch", "--show-current"]), "created");
-    assert!(!root.path().join("hook-ran").exists());
-    assert_eq!(std::fs::read(root.path().join(".git/index")).expect("index"), index);
+    assert!(!root.as_path().join("hook-ran").exists());
+    assert_eq!(std::fs::read(root.as_path().join(".git/index")).expect("index"), index);
     git(&["checkout", "source"]);
-    git(&["config", "includeIf.onbranch:blocked.path", root.path().join("target.config").to_str().expect("path")]);
+    git(&["config", "includeIf.onbranch:blocked.path", root.as_path().join("target.config").to_str().expect("path")]);
     let create = AddPlan::prepare_checkout(
-        root.path(),
+        root.as_path(),
         &serde_json::json!({"branch":"blocked", "create":true}),
         ToolProvenance::Native,
     ).expect("hook-bearing create plan");
@@ -291,20 +294,20 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
     assert!(refused.result.is_error && refused.result.content.contains("target-branch discovery"), "{}", refused.result.content);
     assert_eq!(git(&["branch", "--show-current"]), "source");
     assert!(git(&["branch", "--list", "blocked"]).is_empty());
-    assert!(!root.path().join("hook-ran").exists());
-    assert_eq!(std::fs::read(root.path().join(".git/index")).expect("index"), index);
+    assert!(!root.as_path().join("hook-ran").exists());
+    assert_eq!(std::fs::read(root.as_path().join(".git/index")).expect("index"), index);
     let plan = AddPlan::prepare_checkout(
-        root.path(),
+        root.as_path(),
         &serde_json::json!({"branch":"target"}),
         ToolProvenance::Native,
     )
     .expect("plan");
     let output = execute_approved(plan).await;
     assert!(!output.result.is_error, "{}", output.result.content);
-    assert!(!root.path().join("hook-ran").exists());
+    assert!(!root.as_path().join("hook-ran").exists());
     assert_eq!(git(&["branch", "--show-current"]), "target");
     let plan = AddPlan::prepare_checkout(
-        root.path(),
+        root.as_path(),
         &serde_json::json!({"branch":"source"}),
         ToolProvenance::Native,
     )
@@ -316,9 +319,9 @@ async fn checkout_existing_local_branch_preserves_onbranch_configuration() {
         refused.result.content
     );
     assert_eq!(git(&["branch", "--show-current"]), "target");
-    assert!(!root.path().join("hook-ran").exists());
+    assert!(!root.as_path().join("hook-ran").exists());
     assert_eq!(
-        std::fs::read(root.path().join(".git/index")).expect("index"),
+        std::fs::read(root.as_path().join(".git/index")).expect("index"),
         index
     );
 }
