@@ -52,6 +52,10 @@ fn build_with_connection(
     let provider_config = config.active_provider_config();
     let model_config = provider_config.models.get(&config.model).cloned();
     let reasoning_disabled = config.resolve_model_fields().reasoning_supported.value == Some(false);
+    let replay_disabled = model_config
+        .as_ref()
+        .and_then(|model| model.reasoning.as_ref())
+        .is_some_and(|options| !options.replay);
     let reasoning = model_config
         .and_then(|model| model.reasoning)
         .filter(|_| !reasoning_disabled);
@@ -136,6 +140,76 @@ fn build_with_connection(
                 .with_timeout_config(timeout);
             Ok(Arc::new(provider))
         }
+        ProviderProtocol::GoogleGemini => {
+            use talos_config::GeminiTransportConfig;
+            if replay_disabled {
+                return Err(ProviderError::InvalidResponse(
+                    "Gemini requires native signature replay; replay=false is unsupported".into(),
+                ));
+            }
+            let profile = provider_config.gemini.as_ref().ok_or_else(|| {
+                ProviderError::InvalidResponse(
+                    "google-gemini requires an explicit gemini transport profile".into(),
+                )
+            })?;
+            let provider = match profile {
+                GeminiTransportConfig::AiStudio => {
+                    if base_url.as_deref().is_some_and(|base| {
+                        !matches!(
+                            base.trim_end_matches('/'),
+                            "https://generativelanguage.googleapis.com"
+                                | "https://generativelanguage.googleapis.com/v1beta"
+                        )
+                    }) {
+                        return Err(ProviderError::InvalidResponse(
+                            "custom Gemini destinations require a separate credential profile"
+                                .into(),
+                        ));
+                    }
+                    let transport = crate::gemini_transport::GeminiTransport::ai_studio(
+                        &config.model,
+                        api_key,
+                        true,
+                    )?;
+                    crate::gemini_provider::GeminiProvider::new(
+                        transport,
+                        config.provider.clone(),
+                        config
+                            .model
+                            .strip_prefix("models/")
+                            .unwrap_or(&config.model)
+                            .to_owned(),
+                        output_limit,
+                        timeout,
+                    )?
+                }
+                GeminiTransportConfig::Vertex {
+                    project,
+                    location,
+                    allow_metadata,
+                } => {
+                    if original_endpoint.is_some() {
+                        return Err(ProviderError::InvalidResponse(
+                            "Vertex ADC refuses replacement endpoints".into(),
+                        ));
+                    }
+                    crate::gemini_provider::GeminiProvider::vertex(
+                        project.clone(),
+                        location.clone(),
+                        *allow_metadata,
+                        config.provider.clone(),
+                        config.model.clone(),
+                        output_limit,
+                        timeout,
+                    )?
+                }
+            };
+            Ok(Arc::new(
+                provider
+                    .with_reasoning(reasoning.as_ref())?
+                    .with_reasoning_disabled(reasoning_disabled),
+            ))
+        }
         ProviderProtocol::OpenAIResponses => {
             let mut provider = OpenAIResponsesProvider::new(api_key, &config.model)
                 .with_provider_key(&config.provider);
@@ -163,6 +237,287 @@ fn build_with_connection(
 mod tests {
     use super::*;
     use talos_core::tool::{CapabilityProbe, ProtocolCapabilities};
+
+    #[test]
+    fn gemini_factory_preview_preserves_configured_wire_and_masks_credentials() {
+        use talos_config::{GeminiTransportConfig, ModelConfig, ProviderConfig, ReasoningOptions};
+        for profile in [
+            GeminiTransportConfig::AiStudio,
+            GeminiTransportConfig::Vertex {
+                project: "fixture-project".into(),
+                location: "global".into(),
+                allow_metadata: false,
+            },
+        ] {
+            let vertex = matches!(&profile, GeminiTransportConfig::Vertex { .. });
+            let config = Config {
+                provider: "fixture-google".into(),
+                model: "gemini-2.5-flash".into(),
+                providers: std::collections::HashMap::from([(
+                    "fixture-google".into(),
+                    ProviderConfig {
+                        protocol: ProviderProtocol::GoogleGemini,
+                        gemini: Some(profile),
+                        api_key: (!vertex).then(|| "private-fixture-key".into()),
+                        models: std::collections::HashMap::from([(
+                            "gemini-2.5-flash".into(),
+                            ModelConfig {
+                                output_limit: Some(2048),
+                                reasoning_supported: Some(true),
+                                reasoning: Some(ReasoningOptions {
+                                    budget_tokens: Some(1024),
+                                    ..Default::default()
+                                }),
+                                ..Default::default()
+                            },
+                        )]),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            };
+            config.validate().expect("explicit profile");
+            let key = config.api_key().expect("host credential admission");
+            let provider = build_configured_provider(&config, &key).expect("host factory");
+            let preview = provider
+                .request_preview(&[talos_core::message::Message::User {
+                    content: "visible prompt".into(),
+                }])
+                .expect("host diagnostic preview");
+            assert!(preview.get("error").is_none(), "{preview}");
+            assert_eq!(preview["body"]["generationConfig"]["maxOutputTokens"], 2048);
+            assert_eq!(
+                preview["body"]["generationConfig"]["thinkingConfig"]["thinkingBudget"],
+                1024
+            );
+            assert_eq!(
+                preview["body"]["contents"][0]["parts"][0]["text"],
+                "visible prompt"
+            );
+            let url = preview["url"].as_str().expect("wire URL");
+            if vertex {
+                assert!(url.starts_with("https://aiplatform.googleapis.com/v1/projects/fixture-project/locations/global/"));
+                assert_eq!(preview["headers"]["Authorization"], "Bearer ***");
+                assert!(preview["headers"].get("x-goog-api-key").is_none());
+            } else {
+                assert!(
+                    url.starts_with("https://generativelanguage.googleapis.com/v1beta/models/")
+                );
+                assert_eq!(preview["headers"]["x-goog-api-key"], "***");
+                assert!(preview["headers"].get("Authorization").is_none());
+            }
+            assert!(url.ends_with(":streamGenerateContent?alt=sse"));
+            assert!(!preview.to_string().contains("private-fixture-key"));
+        }
+    }
+
+    #[test]
+    fn vertex_factory_defers_isolated_adc_and_never_masks_invalid_explicit_file() {
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let path = directory.path().join("private-fixture-account.json");
+        std::fs::write(&path, b"invalid explicit ADC fixture").expect("fixture");
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .arg("--exact")
+            .arg("openai_responses::factory::tests::vertex_factory_subprocess_probe")
+            .arg("--nocapture")
+            .env("TALOS_GEMINI_ADC_CHILD", "1")
+            .env("GOOGLE_APPLICATION_CREDENTIALS", &path)
+            .env_remove("HOME")
+            .env_remove("APPDATA")
+            .env("GCE_METADATA_HOST", "127.0.0.1:9")
+            .output()
+            .expect("isolated subprocess");
+        assert!(
+            output.status.success(),
+            "Vertex factory subprocess failed: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+    }
+
+    #[tokio::test]
+    async fn vertex_factory_subprocess_probe() {
+        if std::env::var_os("TALOS_GEMINI_ADC_CHILD").is_none() {
+            return;
+        }
+        let config = Config {
+            provider: "fixture-vertex".into(),
+            model: "fixture-model".into(),
+            providers: std::collections::HashMap::from([(
+                "fixture-vertex".into(),
+                talos_config::ProviderConfig {
+                    protocol: ProviderProtocol::GoogleGemini,
+                    gemini: Some(talos_config::GeminiTransportConfig::Vertex {
+                        project: "fixture-project".into(),
+                        location: "global".into(),
+                        allow_metadata: true,
+                    }),
+                    timeout: talos_config::ProviderTimeoutConfig {
+                        dispatch_timeout_secs: 1,
+                        max_attempts: 0,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        config
+            .validate()
+            .expect("valid ADC config without key or home");
+        let key = config.api_key().expect("ADC host admission");
+        assert!(key.is_empty());
+        // Factory construction must not inspect even an invalid selected credential file.
+        let provider = build_configured_provider(&config, &key).expect("lazy factory");
+        let result = provider
+            .stream(&[talos_core::message::Message::User {
+                content: "hello".into(),
+            }])
+            .await;
+        let message = match result {
+            Ok(_) => panic!("invalid explicit ADC unexpectedly admitted"),
+            Err(error) => error.to_string(),
+        };
+        assert!(message.contains("invalid or unsupported Vertex credentials"));
+        assert!(!message.contains("private-fixture-account"));
+        assert!(!message.contains("invalid explicit ADC fixture"));
+    }
+
+    #[test]
+    fn gemini_reasoning_factory_validates_before_lazy_vertex_credentials() {
+        use talos_config::{
+            GeminiTransportConfig, ModelConfig, ProviderConfig, ReasoningEffort, ReasoningOptions,
+        };
+        let mut config = Config {
+            provider: "fixture-google".into(),
+            model: "gemini-2.5-flash".into(),
+            providers: std::collections::HashMap::from([(
+                "fixture-google".into(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::GoogleGemini,
+                    gemini: Some(GeminiTransportConfig::Vertex {
+                        project: "fixture-project".into(),
+                        location: "global".into(),
+                        allow_metadata: false,
+                    }),
+                    models: std::collections::HashMap::from([(
+                        "gemini-2.5-flash".into(),
+                        ModelConfig {
+                            reasoning_supported: Some(true),
+                            reasoning: Some(ReasoningOptions {
+                                budget_tokens: Some(1024),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        // A valid reasoning configuration does not require opening an ADC file in the factory.
+        assert!(build_configured_provider(&config, "").is_ok());
+        let model = config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider")
+            .models
+            .get_mut("gemini-2.5-flash")
+            .expect("model");
+        model.reasoning = Some(ReasoningOptions {
+            effort: Some(ReasoningEffort::Low),
+            ..Default::default()
+        });
+        let error = match build_configured_provider(&config, "") {
+            Ok(_) => panic!("unsupported effort admitted"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("requires a thinking budget"));
+        config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider")
+            .models
+            .get_mut("gemini-2.5-flash")
+            .expect("model")
+            .reasoning_supported = Some(false);
+        assert!(
+            build_configured_provider(&config, "").is_ok(),
+            "explicit unsupported capability suppresses controls"
+        );
+        config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider")
+            .models
+            .get_mut("gemini-2.5-flash")
+            .expect("model")
+            .reasoning
+            .as_mut()
+            .expect("options")
+            .replay = false;
+        assert!(
+            build_configured_provider(&config, "").is_err(),
+            "capability suppression must not silently ignore replay=false"
+        );
+    }
+
+    #[test]
+    fn explicit_gemini_profiles_build_without_ambient_adc_and_refuse_relocation() {
+        use talos_config::{GeminiTransportConfig, ProviderConfig};
+        let mut config = Config {
+            provider: "fixture-google".into(),
+            model: "gemini-2.5-flash".into(),
+            providers: std::collections::HashMap::from([(
+                "fixture-google".into(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::GoogleGemini,
+                    gemini: Some(GeminiTransportConfig::AiStudio),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        assert!(build_configured_provider(&config, "fixture-key").is_ok());
+        config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider")
+            .base_url = Some("https://custom.invalid/v1beta".into());
+        assert!(build_configured_provider(&config, "fixture-key").is_err());
+        let entry = config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider");
+        entry.base_url = None;
+        entry.gemini = Some(GeminiTransportConfig::Vertex {
+            project: "fixture-project".into(),
+            location: "global".into(),
+            allow_metadata: false,
+        });
+        // No files/env/metadata are consulted until dispatch.
+        assert!(matches!(
+            config.active_provider_config().gemini,
+            Some(GeminiTransportConfig::Vertex { .. })
+        ));
+        assert!(config.validate().is_ok());
+        assert_eq!(config.api_key().expect("ADC needs no API key"), "");
+        assert!(build_configured_provider(&config, "").is_ok());
+        config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider")
+            .base_url = Some("https://custom.invalid".into());
+        assert!(build_configured_provider(&config, "").is_err());
+        let entry = config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider");
+        entry.base_url = None;
+        entry.gemini = None;
+        assert!(build_configured_provider(&config, "fixture-key").is_err());
+    }
 
     #[test]
     fn model014_direct_factory_suppresses_disabled_reasoning_parameters() {

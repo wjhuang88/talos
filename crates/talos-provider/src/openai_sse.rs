@@ -19,6 +19,15 @@ pub(crate) enum InvocationSender {
 }
 
 impl InvocationSender {
+    pub(crate) fn try_send(&self, event: AgentEvent) -> Result<(), ()> {
+        match self {
+            Self::Legacy(tx) => tx.try_send(event).map_err(|_| ()),
+            Self::Original { tx, .. } => tx
+                .try_send(talos_core::provider::ProviderInvocationEvent::Legacy(event))
+                .map_err(|_| ()),
+        }
+    }
+
     pub(crate) fn buffers_compat_text(&self, protocol: talos_core::tool::ToolProtocol) -> bool {
         protocol != talos_core::tool::ToolProtocol::Native
             && matches!(self, Self::Original { browser_tools, .. } if !browser_tools.is_empty())

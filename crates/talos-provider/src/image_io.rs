@@ -63,11 +63,20 @@ pub(crate) fn append_responses_ephemeral_images(
     append_images(body, images, ImageWire::Responses)
 }
 
+/// Consume Gemini request-local PNGs with the shared count, byte and expiry limits.
+pub(crate) fn append_gemini_ephemeral_images(
+    body: &mut serde_json::Value,
+    images: Vec<talos_core::provider::EphemeralImage>,
+) -> talos_core::provider::ProviderResult<Option<std::time::Instant>> {
+    append_images(body, images, ImageWire::Gemini)
+}
+
 #[derive(Clone, Copy)]
 enum ImageWire {
     Chat,
     Anthropic,
     Responses,
+    Gemini,
 }
 
 fn append_images(
@@ -102,7 +111,9 @@ fn append_images(
         deadline =
             Some(deadline.map_or(expires, |current: std::time::Instant| current.min(expires)));
         let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
-        blocks.push(if anthropic {
+        blocks.push(if matches!(wire, ImageWire::Gemini) {
+            serde_json::json!({"inlineData":{"mimeType":"image/png","data":encoded}})
+        } else if anthropic {
             serde_json::json!({"type":"image","source":{"type":"base64","media_type":"image/png","data":encoded}})
         } else if matches!(wire, ImageWire::Responses) {
             serde_json::json!({"type":"input_image","image_url":format!("data:image/png;base64,{encoded}")})
@@ -111,7 +122,9 @@ fn append_images(
         });
     }
     let messages = body
-        .get_mut(if matches!(wire, ImageWire::Responses) {
+        .get_mut(if matches!(wire, ImageWire::Gemini) {
+            "contents"
+        } else if matches!(wire, ImageWire::Responses) {
             "input"
         } else {
             "messages"
@@ -145,7 +158,11 @@ fn append_images(
             }
         }
     } else {
-        let mut message = serde_json::json!({"role":"user","content":blocks});
+        let mut message = if matches!(wire, ImageWire::Gemini) {
+            serde_json::json!({"role":"user","parts":blocks})
+        } else {
+            serde_json::json!({"role":"user","content":blocks})
+        };
         if matches!(wire, ImageWire::Responses) {
             message["type"] = serde_json::json!("message");
         }
@@ -313,6 +330,41 @@ mod tests {
                     .contains(&encoded)
             );
         }
+    }
+
+    #[test]
+    fn gemini_ephemeral_limits_refuse_without_mutating_history() {
+        let mut body =
+            serde_json::json!({"contents":[{"role":"model","parts":[{"text":"history"}]}]});
+        let original = body.clone();
+        assert!(
+            append_gemini_ephemeral_images(
+                &mut body,
+                (0..33).map(|_| ephemeral_fixture()).collect()
+            )
+            .is_err()
+        );
+        assert_eq!(body, original);
+        let bytes = {
+            let mut bytes = vec![0; 2 * 1024 * 1024];
+            bytes[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+            bytes
+        };
+        let images = (0..9)
+            .map(|_| {
+                talos_core::provider::EphemeralImage::png(
+                    bytes.clone(),
+                    std::time::Instant::now() + std::time::Duration::from_secs(30),
+                )
+                .expect("carrier")
+            })
+            .collect();
+        assert!(append_gemini_ephemeral_images(&mut body, images).is_err());
+        assert_eq!(body, original);
+        assert!(
+            append_gemini_ephemeral_images(&mut serde_json::json!({}), vec![ephemeral_fixture()])
+                .is_err()
+        );
     }
 
     #[test]

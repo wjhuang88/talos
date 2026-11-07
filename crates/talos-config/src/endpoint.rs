@@ -88,9 +88,10 @@ pub fn validate_provider_protocol(protocol: &str) -> Result<ProviderProtocol, St
     match protocol {
         "openai-chat" => Ok(ProviderProtocol::OpenAIChat),
         "openai-responses" => Ok(ProviderProtocol::OpenAIResponses),
+        "google-gemini" => Ok(ProviderProtocol::GoogleGemini),
         "anthropic-messages" => Ok(ProviderProtocol::AnthropicMessages),
         other => Err(format!(
-            "Unknown protocol '{other}'. Allowed: openai-chat, openai-responses, anthropic-messages."
+            "Unknown protocol '{other}'. Allowed: openai-chat, openai-responses, anthropic-messages, google-gemini."
         )),
     }
 }

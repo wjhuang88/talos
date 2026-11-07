@@ -113,6 +113,7 @@ impl TokenEstimator {
     /// ```
     pub fn estimate(&self, messages: &[Message]) -> u32 {
         messages.iter().fold(0_u32, |total, msg| {
+            let private_reserve = talos_core::provider::TransientReplay::reserved_tokens(msg);
             let message_tokens = match msg {
                 Message::User { content } => Self::estimate_text(content),
                 Message::System { content, .. } => Self::estimate_text(content),
@@ -128,19 +129,21 @@ impl TokenEstimator {
                             .saturating_add(Self::estimate_text(&call.name))
                             .saturating_add(Self::estimate_text(&call.input.to_string()))
                     })
-                    .saturating_add(reasoning.as_ref().map_or(0, |reasoning| {
-                        reasoning.blocks.iter().fold(0_u32, |total, block| {
-                            use talos_core::message::ReasoningBlock;
-                            let tokens = match block {
-                                ReasoningBlock::Plain { text } => Self::estimate_text(text),
-                                ReasoningBlock::Thinking { text, signature } => {
-                                    Self::estimate_text(text).saturating_add(
-                                        signature.as_deref().map_or(0, Self::estimate_text),
-                                    )
-                                }
-                                ReasoningBlock::Redacted { data } => Self::estimate_text(data),
-                            };
-                            total.saturating_add(tokens)
+                    .saturating_add(private_reserve.unwrap_or_else(|| {
+                        reasoning.as_ref().map_or(0, |reasoning| {
+                            reasoning.blocks.iter().fold(0_u32, |total, block| {
+                                use talos_core::message::ReasoningBlock;
+                                let tokens = match block {
+                                    ReasoningBlock::Plain { text } => Self::estimate_text(text),
+                                    ReasoningBlock::Thinking { text, signature } => {
+                                        Self::estimate_text(text).saturating_add(
+                                            signature.as_deref().map_or(0, Self::estimate_text),
+                                        )
+                                    }
+                                    ReasoningBlock::Redacted { data } => Self::estimate_text(data),
+                                };
+                                total.saturating_add(tokens)
+                            })
                         })
                     })),
                 Message::Tool { result } => Self::estimate_text(&result.content)

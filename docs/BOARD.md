@@ -233,7 +233,8 @@ It is ineffective until target-branch merge. I300 remains Active; PERM-007-H's
 remaining full built-in coverage stays unclaimed and subsequent. See the I300
 owner for scope, acceptance and complete active/review/planned inventory.
 
-## Gemini atomic activation proposal
+## Gemini implementation checkpoint — 2026-11-02
 
-PROVIDER-008-B / #810 / I310 is proposed Active / Claimed in #811; ineffective until merge.
-Owner: [Gemini](backlog/active/PROVIDER-008-B-google-gemini.md). No implementation yet.
+PROVIDER-008-B / #810 / I310 is Active / Claimed, effective via #811.
+Owner: [Gemini](backlog/active/PROVIDER-008-B-google-gemini.md); implementation Draft #838.
+Branch code and focused regressions exist; full acceptance and merge gates remain pending.

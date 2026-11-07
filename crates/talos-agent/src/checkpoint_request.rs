@@ -1312,6 +1312,7 @@ mod tests {
                 &mut vec![],
                 Some(limit),
                 &PrivateTokens::default(),
+                None,
                 crate::compaction::HistorySource::bind(
                     0,
                     0,
@@ -1801,6 +1802,7 @@ mod tests {
                 &mut vec![],
                 Some(limit),
                 &PrivateTokens::default(),
+                None,
                 Some(&source),
                 None,
             )
@@ -1822,6 +1824,7 @@ mod tests {
                 &mut vec![],
                 Some(limit),
                 &PrivateTokens::default(),
+                None,
                 Some(&source),
                 None,
             )
@@ -1906,6 +1909,7 @@ mod tests {
                 &mut vec![],
                 Some(limit),
                 &PrivateTokens::default(),
+                None,
                 Some(&pressured_source),
                 None,
             )
@@ -2136,6 +2140,7 @@ mod tests {
                 &mut vec![],
                 Some(limit),
                 &PrivateTokens::default(),
+                None,
                 Some(&source),
                 None,
             )
@@ -2478,6 +2483,7 @@ mod tests {
                 &mut vec![],
                 Some(limit),
                 &PrivateTokens::default(),
+                None,
                 Some(&source),
                 None,
             )
@@ -2520,6 +2526,7 @@ mod tests {
                 &[],
                 &mut vec![],
                 &PrivateTokens::default(),
+                None,
             )
             .await
             .expect("observe");

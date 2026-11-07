@@ -6,6 +6,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "anthropic" => Some(ProviderConfig {
             protocol: ProviderProtocol::AnthropicMessages,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: None,
             api_key: None,
             api_key_env: Some("ANTHROPIC_API_KEY".to_string()),
@@ -15,6 +16,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "openai" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: None,
             api_key: None,
             api_key_env: Some("OPENAI_API_KEY".to_string()),
@@ -24,6 +26,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "google" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://generativelanguage.googleapis.com/v1beta".to_string()),
             api_key: None,
             api_key_env: Some("GOOGLE_API_KEY".to_string()),
@@ -33,6 +36,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "deepseek" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://api.deepseek.com".to_string()),
             api_key: None,
             api_key_env: Some("DEEPSEEK_API_KEY".to_string()),
@@ -42,6 +46,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "qwen" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://dashscope.aliyuncs.com/compatible-mode/v1".to_string()),
             api_key: None,
             api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
@@ -51,6 +56,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "zhipuai" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://open.bigmodel.cn/api/paas/v4".to_string()),
             api_key: None,
             api_key_env: Some("ZHIPUAI_API_KEY".to_string()),
@@ -60,6 +66,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "zhipuai-coding-plan" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://open.bigmodel.cn/api/coding/paas/v4".to_string()),
             api_key: None,
             api_key_env: Some("ZHIPUAI_CODING_PLAN_API_KEY".to_string()),
@@ -69,6 +76,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "zai" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://api.z.ai/api/paas/v4".to_string()),
             api_key: None,
             api_key_env: Some("ZAI_API_KEY".to_string()),
@@ -78,6 +86,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "zai-coding-plan" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://api.z.ai/api/coding/paas/v4".to_string()),
             api_key: None,
             api_key_env: Some("ZAI_CODING_PLAN_API_KEY".to_string()),
@@ -87,6 +96,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "minimax" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://api.minimaxi.com/v1".to_string()),
             api_key: None,
             api_key_env: Some("MINIMAX_API_KEY".to_string()),
@@ -96,6 +106,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "moonshot" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://api.moonshot.cn/v1".to_string()),
             api_key: None,
             api_key_env: Some("MOONSHOT_API_KEY".to_string()),
@@ -105,6 +116,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "openrouter" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://openrouter.ai/api/v1".to_string()),
             api_key: None,
             api_key_env: Some("OPENROUTER_API_KEY".to_string()),
@@ -114,6 +126,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
         "groq" => Some(ProviderConfig {
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
+            gemini: None,
             base_url: Some("https://api.groq.com/openai/v1".to_string()),
             api_key: None,
             api_key_env: Some("GROQ_API_KEY".to_string()),

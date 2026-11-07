@@ -147,3 +147,132 @@ Use a Copilot-compatible credential authorized for the selected model. The packa
 or enterprise endpoint discovery. Account scopes, subscriptions, integration quotas and model
 allowlists remain server-side decisions. No real credentials or live vendor probe are used in tests.
 See [ADR-093 section 9](../decisions/093-openai-responses-protocol-boundary.md) for the pinned contract.
+
+### Explicit Gemini reasoning controls (implementation candidate)
+
+The Gemini adapter in PROVIDER-008-B uses an explicit AI Studio or Vertex transport profile;
+its Draft #838 is not yet fully accepted. Reasoning options never activate Gemini by themselves.
+For an explicitly selected Gemini provider, configure model-local options as follows:
+
+```toml
+[providers.google]
+protocol = "google-gemini"
+api_key_env = "GEMINI_API_KEY"
+
+[providers.google.gemini]
+transport = "ai-studio"
+
+[providers.google.models."gemini-2.5-flash".reasoning]
+budget_tokens = 1024
+```
+
+Confirmed budget models are `gemini-2.5-pro` (128–32768), `gemini-2.5-flash` (0–24576)
+and `gemini-2.5-flash-lite` (0 or 512–24576). Omit the budget for the vendor default;
+zero disables thinking only on the admitted Flash/Lite models. `gemini-3.8-flash` and
+`gemini-4-argon` accept `effort = "low"`, `"medium"`, or `"high"` instead of a budget.
+An empty Argon options block uses its documented medium level. Enabled options request thought
+summaries; the existing output limit still caps total generated tokens including thinking.
+
+Unsupported model/setting combinations, both fields together and `replay = false` fail before
+generation dispatch. Gemini native tool calls may require positional signatures, so the adapter
+refuses a request to disable their replay instead of silently corrupting tool history. Isolated
+permission decisions use independent minimal budget/level controls and suppress summaries and
+reasoning events; they do not inherit conversation settings. Explicit reasoning_supported=false
+continues to suppress conversation controls, but cannot silently ignore replay=false.
+These exact model mappings do not infer preview, gateway or future model support, and do not
+activate catalog entries. See ADR-094 for the primary source and current acceptance boundary.
+
+
+## Explicit Gemini transports (unreleased implementation candidate)
+
+Draft #838 / I310 adds `google-gemini` to the adapters listed above. Full B acceptance and
+catalog activation are pending. Selecting a model named Gemini does not enable this candidate;
+configure both the wire and its authentication profile explicitly in `~/.talos/config.toml`.
+
+AI Studio uses the configured API-key source and the official generateContent destination:
+
+```toml
+provider = "google"
+model = "gemini-2.5-flash"
+
+[providers.google]
+protocol = "google-gemini"
+api_key_env = "GEMINI_API_KEY"
+
+[providers.google.gemini]
+transport = "ai-studio"
+```
+
+Set `GEMINI_API_KEY` in your environment before starting Talos. Standard Vertex uses OAuth
+ADC instead of an API key; it requires an explicit project and location:
+
+```toml
+provider = "vertex"
+model = "gemini-2.5-flash"
+
+[providers.vertex]
+protocol = "google-gemini"
+
+[providers.vertex.gemini]
+transport = "vertex"
+project = "your-project-id"
+location = "global"
+allow_metadata = false
+```
+
+For Vertex, set `GOOGLE_APPLICATION_CREDENTIALS` to a local `service_account` or `authorized_user`
+JSON file. Without that variable, discovery uses `$HOME/.config/gcloud/application_default_credentials.json`
+on Unix or `%APPDATA%/gcloud/application_default_credentials.json` on Windows. An invalid explicit
+file fails; it does not fall through to another account. File discovery is delayed until the first
+request. Token acquisition/refresh and cache locking share the request deadline; cancelling the
+request cancels its token exchange. The local synchronous service-account signer cannot be
+preempted; its input bounds and integration limits are recorded in ADR-094.
+
+Metadata authentication is disabled by default. `allow_metadata = true` permits the fixed metadata
+service only when no local ADC file exists. Environment metadata-host overrides, external-account
+executables, impersonation and arbitrary token destinations are not supported. Talos does not run
+`gcloud` or perform an interactive login. ADC is never used for AI Studio or a replacement gateway.
+Do not set a custom provider/model `base_url` for Vertex; it is rejected before credential discovery.
+
+The candidate supports ordered images, native tool results and positional signature replay.
+Ordinary tools also support explicit `compat` and `talos-strict` modes over the same Gemini wire.
+These modes omit native function declarations, validate textual calls before releasing any tool,
+and retain signed model text unchanged on continuation. A signed native-tool turn cannot be
+rewritten as textual-tool history; start a new conversation to change that mode. Request-local
+images remain request-local in both textual modes. `auto` must be resolved before dispatch.
+Native mode supports the existing permission-gated browser tool. Gemini's signed call and its
+original arguments stay in the running session's memory and are restored when encoding a
+continuation for the same provider and model. The transcript and exports receive a filtered
+projection. A reopened or forked session has no access to the original call. Start a new
+conversation if Talos reports that the private replay context is unavailable. Browser tools
+remain unavailable in textual tool modes.
+
+Reasoning controls and their model boundaries are described above. Failures never trigger an
+automatic retry over a different wire.
+There is no live-vendor success claim or packaged Gemini catalog activation in this candidate.
+
+`ProviderConfig` gains optional `gemini: Option<GeminiTransportConfig>`; downstream exhaustive
+struct literals must supply `gemini: None` or use `..Default::default()`. The protocol and catalog
+enums gain `GoogleGemini`; keep catch-all match arms. These public changes require the next
+pre-1.0 minor migration, together with ADR-094. Provider integrations that match
+`ProviderInvocationEvent` also need a catch-all arm. An integration that opts into private
+replay uses `LanguageModel::stream_with_replay_context` and must keep the carrier out of
+logs, serialized events, and durable history. The default implementation refuses private
+attachments and delegates ordinary requests to the existing dispatch method.
+
+
+### Gemini browser tools and live continuation (Draft candidate)
+
+Native, Compat and TalosStrict browser invocations use the existing prepared browser permission
+path. The provider holds a complete response until validation, keeps signed original arguments
+only in live Actor custody, and persists projected calls plus an opaque replay marker.
+Subsequent submissions in that same Actor can continue. Reopening or forking durable history
+cannot recover this private custody and refuses before contacting the model; start a new
+conversation instead. Auto must be resolved before dispatch.
+
+Custody is limited to 32 blocks / 16 MiB. With browser tools registered, signed ordinary textual
+tool responses also use custody to preserve their exact framing; plain no-tool replies without
+private history do not. This limitation applies even if that particular response did not call
+the browser. Browser tool results are only redacted when the tool declares private tokens.
+This remains an unreleased Draft implementation; full Gemini acceptance and catalog activation
+are pending, and mock/SSE fixture success is not a live Google service validation.

@@ -321,7 +321,7 @@ fn build_browser_rows(config: &Config) -> Vec<CatalogBrowserRow> {
                     .unwrap_or_else(|| provider.clone()),
                 model_id: model.id.clone(),
                 qualified: format!("{provider}/{}", model.id),
-                authenticated: config.provider_authenticated(&provider),
+                authenticated: config.model_authentication_configured(&provider, &model.id),
                 current: config.provider == provider && config.model == model.id,
                 context: ctx,
                 pricing,
@@ -641,6 +641,61 @@ mod tests {
                 protocol: Some(ProviderProtocol::OpenAIChat),
             },
         ]
+    }
+
+    #[test]
+    fn gemini_browser_preserves_transport_and_model_override_provenance() {
+        let model = talos_config::model::builtin_models()
+            .into_iter()
+            .find(|model| model.provider == "google")
+            .expect("Google catalog model");
+        for profile in [
+            talos_config::GeminiTransportConfig::AiStudio,
+            talos_config::GeminiTransportConfig::Vertex {
+                project: "fixture-project".into(),
+                location: "global".into(),
+                allow_metadata: false,
+            },
+        ] {
+            let mut config = Config::default();
+            let api_key = matches!(&profile, talos_config::GeminiTransportConfig::AiStudio)
+                .then(|| "fixture-key".to_owned());
+            config.providers.insert(
+                "google".into(),
+                talos_config::ProviderConfig {
+                    protocol: talos_config::ProviderProtocol::GoogleGemini,
+                    gemini: Some(profile),
+                    api_key,
+                    ..Default::default()
+                },
+            );
+            let rows = build_browser_rows(&config);
+            let row = rows
+                .iter()
+                .find(|row| row.provider == "google" && row.model_id == model.id)
+                .expect("Gemini browser row");
+            assert!(row.authenticated);
+            assert_eq!(row.effective_protocol, "google-gemini (Configured)");
+            config
+                .providers
+                .get_mut("google")
+                .expect("provider")
+                .models
+                .insert(
+                    model.id.clone(),
+                    talos_config::ModelConfig {
+                        protocol: Some(talos_config::ProviderProtocol::OpenAIChat),
+                        ..Default::default()
+                    },
+                );
+            let rows = build_browser_rows(&config);
+            let row = rows
+                .iter()
+                .find(|row| row.provider == "google" && row.model_id == model.id)
+                .expect("overridden row");
+            assert_eq!(row.effective_protocol, "openai-chat (Configured)");
+            assert_eq!(row.authenticated, config.provider_authenticated("google"));
+        }
     }
 
     #[test]
