@@ -1,5 +1,11 @@
 # Product Backlog
 
+## TUI-ELLIPSIS-001 — proposed activation
+
+[Owner / Required Reads](../tasks/2026-11-08-tui-result-ellipsis.md): tool-result
+line clipping and muted Nord background. Active / Claimed proposed in #876;
+ineffective until target merge. TUI-034 completion remains historical.
+
 ## SEARCH-001-K / I317 post-merge closeout — 2026-11-07
 
 [SEARCH-001-K](active/SEARCH-001-K-compat-fallback-ownership.md) /

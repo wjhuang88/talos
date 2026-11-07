@@ -1,19 +1,19 @@
 # TUI-ELLIPSIS-001: Tool Result Clipping And Muted Background
 
-> Document status: Planned / Unclaimed
+> Document status: Active / Claimed (proposed; ineffective until PR #876 merges)
 > Deliverable: tool-result logical lines fit terminal width with ellipsis and muted default input/user-message background.
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Talos / gpt-6-astra |
 | Work Slice | Tool-result width clipping and Nord input/user-message background, focused tests and README; excludes poll grouping, spinner lifecycle and queued input |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-08 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #876 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User authorized governance PR publication; independent review and exact-head CI remain required |
 | Implementation PR | Not started |
@@ -44,10 +44,11 @@ Documentation: README.md. Residual destination: this owner.
 ## Selection and dependencies
 
 Preparation target: ad71a208905b4354d1485e73edaa8b884ccf6fd7.
-Target TOOL-ROUTE-001 inventory retains I310 Active, I318/I302/I277 Review,
-I249 Planned/deferred and I164 Paused; no Blocked header reported there.
-TUI-POLL-001 owns polling projection; TOOL-ROUTE-001 owns tool-routing guidance.
-Neither scope transfers here. Recheck owner inventory before activation.
+Owner-header inventory verified on the preparation target: I310 Active retained;
+I318/I302/I277 Review retained; I249 Planned/deferred retained. No Blocked owner
+header found. I164 Paused retained; I162 Complete with historical Review outcome
+is not reopened. TUI-POLL-001 owns polling projection; TOOL-ROUTE-001 owns routing.
+Neither scope transfers here. Recheck owners and target drift before merge.
 Open PRs checked: #861 search helpers, #849 hosted MCP research, #838 Gemini;
 none claims this clipping/background behavior. This task is an independent slice,
 not a replacement objective for an existing iteration.
