@@ -69,7 +69,7 @@ impl AgentTool for ProcessTool {
     }
 
     fn description(&self) -> &str {
-        "Inspect or cancel a Talos-supervised background command owned by this session. Use process(read) with the returned byte cursor, bounded wait_ms, and do not busy-poll; cancel jobs when no longer needed."
+        "Read/status/cancel session-owned background jobs by returned ID; read with next_cursor and bounded wait_ms. Avoid busy polling/restarts; confirm terminal state. Background is only for concurrent work or service/client coordination; otherwise use foreground."
     }
 
     fn summary_fields(&self) -> &'static [&'static str] {

@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-08 - Prompt wording participates in runtime budgets and review evidence
+
+- Trigger: TOOL-ROUTE-001 standard preflight after shared routing guidance and tool-description edits.
+- Symptom: The existing 20k history-compaction fixture exceeded capacity; process cancellation fell back to denied approval.
+- Root cause: Shared instructions contribute to the sealed request budget. Tool descriptions also enter Auto evidence, where the standalone word `authorization` triggers the existing secret-like text filter.
+- Fix: Compress guidance while preserving scope; shorten tool descriptions and remove the false-positive wording. Keep safety checks, context limits and existing test assertions intact.
+- Prevention: Validate prompt assembly and real dispatch/compaction paths after prose changes; do not assume descriptions are display-only or weaken security checks to accommodate wording.
+- Promoted to rule/check: Existing `actor_compacts_long_recovered_text_without_replacing_raw_history` and `process_auto_cancellation_uses_owned_instance_and_exact_job` regression tests; prompt assembly coverage in `crates/talos-agent/src/prompt/tests.rs`.
+
 ## 2026-11-05 - Follow the existing Windows xwin validation route
 
 - Trigger: Maintainer correction during I316 process-memory implementation.

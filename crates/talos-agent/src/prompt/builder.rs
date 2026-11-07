@@ -5,7 +5,7 @@ use talos_core::message::{SystemCacheMarker, SystemCacheType};
 use talos_plugin::{HookContext, HookEvent, HookOutcome, HookRegistry};
 use talos_skill::SkillIndex;
 
-use super::assets::{DEFAULT_IDENTITY, TOOL_CALLING_STRICT};
+use super::assets::{DEFAULT_IDENTITY, TOOL_CALLING_STRICT, TOOL_SELECTION};
 use super::sections::{HarnessReport, PromptSection, PromptSectionKind, run_precedence_harness};
 use super::types::{ActivatedSkillContext, CacheMarker, CacheType, ContextFile, ToolDescription};
 
@@ -268,7 +268,7 @@ impl SystemPromptBuilder {
 
         if self.tools.is_empty() {
             sections.push(PromptSection {
-                text: String::from("# Tools\nNo tools available.\n"),
+                text: format!("# Tools\n{TOOL_SELECTION}\nNo tools available.\n"),
                 kind: PromptSectionKind::Cacheable,
             });
         } else {
@@ -278,7 +278,9 @@ impl SystemPromptBuilder {
             }
 
             sections.push(PromptSection {
-                text: String::from("# Tools\nTool definitions are grouped by stable family.\n"),
+                text: format!(
+                    "# Tools\n{TOOL_SELECTION}\nTool definitions are grouped by stable family.\n"
+                ),
                 kind: PromptSectionKind::Cacheable,
             });
 
