@@ -1,6 +1,6 @@
 # TOOL-ROUTE-001: Direct Tool Selection And Foreground Defaults
 
-> Document status: Active / Unclaimed (proposed; ineffective until target merge)
+> Document status: Active / Claimed (proposed; ineffective until target merge)
 > Published plan date: 2026-11-08
 > Deliverable: shared model-visible guidance routes covered operations to dedicated tools, avoids redundant executor/interpreter wrappers, and defaults to foreground execution.
 
@@ -8,13 +8,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | Shared system-prompt tool-routing and foreground/background guidance plus exec, shell and process descriptions; prompt assembly tests and documentation; no runtime execution or permission-policy change |
 | Claimed At | 2026-11-08 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #874 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requests general analysis and optimization beyond exec-to-bash wrappers; explicitly requires foreground unless concrete parallel work or service/foreground coordination exists |
 | Implementation PR | Not started |
