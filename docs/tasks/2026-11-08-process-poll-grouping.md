@@ -1,6 +1,6 @@
 # TUI-POLL-001: Group Background Process Polling
 
-> Document status: Active / Claimed (proposed claim; ineffective until target merge)
+> Document status: Review / Claimed
 > Published plan date: 2026-11-08
 > Deliverable: consecutive native process read/status calls for the same job occupy one live TUI summary, with errors and completion prominent.
 
@@ -67,3 +67,32 @@ error and terminal state remain prominent, replay matches live, narrow/wide resi
 and selection stay valid. Run pinned locked TUI tests, cargo-xwin MSVC with --tests,
 and standard release_preflight.sh. Independent Agent review plus exact-head CI
 and merge-time CAS before merge. Complete only with existing implementation SHA.
+
+## Local implementation checkpoint
+
+Claim #873 merged as `1a2c184d` after exact-head independent Agent APPROVE and
+CI42391413797 passed. Implemented projection-only grouping with immutable raw
+transcript entries; click expansion reuses existing history interaction. Terminal
+observations remain separate and show actual state/exit code. Error/malformed
+results and ambiguous parallel-call batches remain ordinary rows. Text-byte counts
+include repeated reads; truncation/gaps/partial reads stay visible.
+Initial TUI suite passed 626 tests; final added parallel-pairing/frame regressions,
+preflight, xwin and independent implementation review remain pending. Original
+worktree ellipsis/theme edits were not touched.
+
+Independent preliminary review found malformed optional metadata was silently
+defaulted during grouping. Corrected parsing to reject invalid types and retain
+ordinary display; added read/status metadata regressions. First preflight stopped
+at claim-reference formatting (PR field must be exactly #873); corrected the
+field without changing claim provenance. Failed log: /tmp/talos-poll-preflight.log.
+
+## Converged local candidate
+
+Standard `./scripts/release_preflight.sh` passed in
+`/tmp/talos-poll-preflight2.log`: governance, format, locked workspace check/Clippy,
+workspace tests/doc-tests and both external SDK modes. TUI 628/628 passed including
+real frame/click/drag, same-job collapse, malformed metadata, parallel-call
+isolation, terminal/error boundaries, replay parity and resize/selection anchors.
+`cargo xwin check --locked -p talos-tui --tests --target x86_64-pc-windows-msvc`
+passed; this is compile evidence, not native execution. Supplemental independent
+Agent review found no remaining blockers. Exact-head review/CI and merge remain.

@@ -58,7 +58,7 @@ impl Tui {
         }
     }
 
-    fn toggle_reasoning_at_screen(&mut self, column: u16, row: u16) -> bool {
+    fn toggle_expansion_at_screen(&mut self, column: u16, row: u16) -> bool {
         let Some(area) = self.last_history_area else {
             return false;
         };
@@ -73,11 +73,11 @@ impl Tui {
         };
         let Some(id) = self
             .last_history_projection
-            .reasoning_header_at(history_row)
+            .expandable_header_at(history_row)
         else {
             return false;
         };
-        self.transcript.toggle_reasoning(id)
+        self.transcript.toggle_expansion(id)
     }
 
     pub(super) fn history_selection_point_at_screen(
@@ -588,7 +588,7 @@ impl Tui {
                         if selection.anchor == selection.focus {
                             self.selection = None;
                             if !selection.moved {
-                                self.toggle_reasoning_at_screen(mouse.column, mouse.row);
+                                self.toggle_expansion_at_screen(mouse.column, mouse.row);
                             }
                             return false;
                         }

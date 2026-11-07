@@ -2,8 +2,8 @@
 
 ## Background process polling / TUI-POLL-001
 
-[Owner](tasks/2026-11-08-process-poll-grouping.md) proposes same-job TUI polling
-grouping; claim/activation becomes effective only after its governance PR merges.
+[Owner](tasks/2026-11-08-process-poll-grouping.md) is Review / Claimed through #873 (`1a2c184d`).
+Same-job TUI polling grouping is implemented locally; final validation and review pending.
 
 ## I318 / TUI-054 native key repeat — Review
 

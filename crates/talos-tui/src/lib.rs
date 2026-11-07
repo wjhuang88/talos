@@ -10,6 +10,7 @@ mod highlight;
 mod history_projection;
 mod inline_terminal;
 mod panel_state;
+mod process_poll;
 mod scrollback;
 mod scrollback_input;
 mod scrollback_markdown;
