@@ -4,7 +4,7 @@
 
 [I318](iterations/I318-native-key-repeat.md) / #269 proposes editing/navigation repeat routing with
 one-shot approval/submission and focus isolation. Effective only after claim merge; real-terminal
-hold/IME acceptance remains required. #38 closure runs independently.
+hold/IME acceptance remains required. #38 is closed independently by supersession.
 
 ## Issue #38 persistent-task proposal — 2026-11-07
 

@@ -84,3 +84,10 @@ Implementation choice: reuse the already-locked Rust `unicode-segmentation` 1.13
 used by Desktop) for complete grapheme boundaries instead of custom Unicode approximations; an
 explicit direct TUI dependency and lockfile edge will be reviewed. No version upgrade or native code.
 Repeat ownership will use content-free panel identity, never credential/provider input snapshots.
+
+## Pre-merge baseline refresh
+
+Rebased onto `b194ef7058a6b3500f0cf4256918348187c7763a`: #38 is now closed by supersession,
+and its terminal-owner validator correction is present. I317 has completed through #860 and its
+closeout; its prior Active disposition above is the selection-time snapshot. I310 remains separately
+active. Board/index conflicts were resolved by preserving both scopes; no TUI implementation yet.
