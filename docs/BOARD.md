@@ -1,5 +1,10 @@
 # Talos Board
 
+## Background process polling / TUI-POLL-001
+
+[Owner](tasks/2026-11-08-process-poll-grouping.md) proposes same-job TUI polling
+grouping; claim/activation becomes effective only after its governance PR merges.
+
 ## I318 / TUI-054 native key repeat — Review
 
 [I318](iterations/I318-native-key-repeat.md) / #269 has implementation PR #872 for editing/navigation repeat routing with
