@@ -1,5 +1,10 @@
 # Talos Board
 
+## Tool routing / TOOL-ROUTE-001
+
+[Owner](tasks/2026-11-08-tool-routing-guidance.md) proposes shared direct-tool
+selection and foreground defaults; activation awaits governance claim merge.
+
 ## Background process polling / TUI-POLL-001
 
 [Owner](tasks/2026-11-08-process-poll-grouping.md) proposes same-job TUI polling
