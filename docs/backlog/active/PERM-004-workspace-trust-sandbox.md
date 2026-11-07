@@ -27,7 +27,7 @@ baseline. Their future-tense/open-Issue statements are historical, superseded by
 | Trust management and reduced prompts | `talos permissions trust` status/revoke, CLI `--trust`, persistent trust store; I117 / ADR-040 | Delivered CLI workflow replaces the proposed `/trust` spelling; no claim that a `/trust` slash command shipped. |
 | Bash/exec, Git and network workflow | [I308](../../iterations/I308-builtin-auto-review.md), PR #809 implementation `5dea4925a143151071ea231779c100a75734e6fe`; PERM-007-G/H shared Auto review and real operation fixtures | Reviewed one-use admission is delivered; it is not repo-wide permanent command trust. Strict denial, uncertainty, freshness, cancellation and higher-risk gates are intended behavior, not automatically unfinished features. |
 | Approval/grant/execution composition | PERM-006-A/B/C, including agent-owned pipeline implementation `49d1546c3748930177655dbedc7f3665780d92ab` | Delivered slices; [PERM-006-D](PERM-006-D-typed-effects-and-resources.md) / #56 and [PERM-006-E](PERM-006-E-cross-surface-conformance.md) / #57 retain their own unchanged unfinished scope. |
-| Actual arbitrary-command OS confinement | ADR-038/040 and [PERM-005](PERM-005-logical-tool-sandbox-enforcement.md) distinguish diagnostic evidence from enforcement | Not delivered as a universal guarantee. Deferred design, not required to claim this superseded umbrella complete. See retained design options below. |
+| Actual arbitrary-command OS confinement | ADR-038/040 and [PERM-005](PERM-005-logical-tool-sandbox-enforcement.md) distinguish diagnostic evidence from enforcement | Not delivered as a universal guarantee. Deferred design; this umbrella is retired rather than declared fully implemented. See retained design options below. |
 
 ## Retained design options (not implemented, not activated)
 
@@ -66,13 +66,13 @@ No new product requirement, implementation branch or relaxed policy is authorize
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | Governance-only reconciliation and supersession of PERM-004 / #22; no runtime or policy changes |
 | Claimed At | 2026-11-07 |
 | Source Issue | #22 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #867 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer requested closure reconciliation; exact-head independent review and CI required before merge |
 | Implementation PR | None |
