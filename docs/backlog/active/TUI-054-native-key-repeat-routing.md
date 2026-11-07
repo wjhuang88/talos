@@ -13,13 +13,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | I318 / TUI-054 native editing/navigation repeat routing and one-shot/focus isolation |
 | Claimed At | 2026-11-07 |
 | Source Issue | #269 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #869 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer explicitly requested implementation while #38 CI runs; independent input/approval-boundary review and exact-head CI required |
 | Implementation PR | Not started |
