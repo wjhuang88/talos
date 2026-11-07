@@ -1,6 +1,6 @@
 # SEARCH-001-K: Talos-Owned Zero-Key Compatibility Fallback
 
-**Status**: Active / Claimed (#851 merged `7b482a4243b37a4f79ef3fe460b69b0740400682`; implementation #860 Draft)
+**Status**: Complete / Closed — Implementation Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (PR #860), I317 post-merge governance closeout in progress
 
 | Field | Value |
 |---|---|
@@ -17,7 +17,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | SEARCH-001-K K1: replace production-side rust-websearch HTML/URL and User-Agent helpers only, add deterministic exact-upstream regression fixtures; preserve dormant legacy rollback and cargo dependency |
@@ -26,9 +26,9 @@
 | Governance Claim PR | #851 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | #851 was merged as `7b482a4243b37a4f79ef3fe460b69b0740400682` after exact-head CI3840 (success), both governance validators (0 warnings), and documented single-maintainer CAS because independent reviewer was unavailable. Security-sensitive code still requires independent review. |
-| Implementation PR | #860 (Draft, acceptance pending) |
-| Last Updated | 2026-11-06 |
-| Handoff / Release Condition | Claim effective on main; #860 Draft production implementation requires exact-head locked/native CI, independent API/network/security review and merge CAS before completion. No release. |
+| Implementation PR | #860 — merged `e32ea0a6220889e8346676d368110310171e2cce` |
+| Last Updated | 2026-11-07 |
+| Handoff / Release Condition | Implementation #860 merged `e32ea0a6220889e8346676d368110310171e2cce` with exact-head CI3862 8/8, independent API/network/security review and merge CAS; synchronize governance/Issue #850 on this docs-only closeout merge. No release or parent closure. |
 
 ## Why this work is narrower than a new native provider
 
@@ -37,8 +37,8 @@ chain, parser, authorization, transport budget, query-free reachability and Wiki
 with actual-legacy fixture comparisons. It does **not** invoke the opaque
 `rust_websearch::search()` routing coordinator.
 
-Remaining production-side crate calls are small helpers (HTML entity/text cleanup, DDG redirect
-URL decoding, random UA choice). The dormant public `WebSearchTool`, old behavior and
+At the original K1 intake baseline, remaining production-side crate calls were small helpers (HTML entity/text cleanup, DDG redirect
+URL decoding, random UA choice); these have now been internalized in the reviewed K1 code. The dormant public `WebSearchTool`, old behavior and
 old-versus-protected parity tests still depend on `rust-websearch` for rollback.
 
 The requested deliverable is **make the already-shipped compatible fallback self-contained at the
@@ -77,7 +77,7 @@ SEARCH-001-D2 Exa/Parallel remains independently researched and unadmitted.
 4. Independent network/permission/security compatibility review and merge CAS are recorded.
 5. Parent #624 and historical #644 blocked disposition remain unchanged.
 
-The atomic claim **became effective** when #851 merged into main as `7b482a4243b37a4f79ef3fe460b69b0740400682`. Draft implementation #860 must not be marked Complete until its independent security review, exact-head code CI and implementation merge succeed.
+The claim became effective in #851 (`7b482a4243b37a4f79ef3fe460b69b0740400682`); all K1 implementation acceptance gates later passed and #860 merged as existing Completion Commit `e32ea0a6220889e8346676d368110310171e2cce`. This owner is complete upon the docs-only governance closeout merge; #850 is synchronized/closed afterward.
 
 ## Code validation checkpoint — 2026-11-06
 
@@ -86,3 +86,15 @@ CI3847/run [42179784778](https://github.com/wjhuang88/talos/actions/runs/4217978
 ## Code and independent review checkpoint — 2026-11-07
 
 CI3855/run [42203333658](https://github.com/wjhuang88/talos/actions/runs/42203333658) passed **8/8** on historical pre-sync code SHA `7dbe82c65c034a2c0c827dd699975c4442c64930`; independent Copilot [read-only review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6682872016) reported **no blocking API/network/security/upstream-parity findings** for exactly that SHA. The single non-blocking stale `headers.rs` comment was corrected in this replay. Latest main `4685c2979453ef8a89675477032053ec0e15acec` includes independent #865/#866 QUALITY-001 closure and search timeout fixtures. **Fresh-head CI, exact-head re-review and merge remain required**; do not promote Draft until accepted.
+
+## Authoritative post-merge completion — 2026-11-07
+
+- **Delivery: Complete / Closed (upon this governance record's merge).** Existing production implementation Completion Commit: `e32ea0a6220889e8346676d368110310171e2cce`, [PR #860](https://github.com/wjhuang88/talos/pull/860) squash-merged after exact-head CAS of `d79d3d0ecbe51b19246d81a8dcc0acdd7ae6b13e`. This governance commit is not a substitute implementation SHA.
+- **Exact-head CI**: [CI3862/run 42340480867](https://github.com/wjhuang88/talos/actions/runs/42340480867) **8/8 successful**, including Windows Rust/workspace, macOS Release Preflight, Linux/Windows Desktop, installer, classifier and owner reconciliation. Actual preflight logs show all six new pinned-upstream parity helper tests passed and `release preflight: passed`.
+- **Independent API/network/security/upstream parity review**: [Copilot #6702564750](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750) **no blocking findings** for the merged exact head; previous [review #6682872016](https://github.com/wjhuang88/talos/pull/860#issuecomment-6682872016) flagged only stale UA provenance comments, corrected before final acceptance.
+- **Merge-time latest-main CAS**: current base #867 was docs-only PERM-004/#22, with clean GitHub merge and no K1 code overlap. GitHub confirmed main equals the implementation merge SHA and preserves the unrelated governance changes.
+- **Delivered**: private Talos-owned parity helpers for seven-entry HTML entity replacement, text/tag cleaning, DDG `uddg` redirect decoding, and pinned ordered 12-UA pool with uniform rejection sampling. Existing four-source zero-key compatibility fallback plus Wikipedia final knowledge fallback, permission/source/budget/proxy/redirect/deadline behavior and model-facing schema are unchanged.
+- **Retained**: dormant `WebSearchTool`, `rust-websearch` Cargo dependency and MIT provenance for rollback/upstream differential tests; no live DDG/Bing regional availability, scraping permissions or native-provider admission proven. D/#644 remains BLOCKED / ZERO-ADMISSION; D2/#848 stays separate; E/F/G/I remain gated; parent SEARCH-001/#624 remains Open.
+- **Issue synchronization**: #850 was auto-closed by implementation merge, then intentionally reopened until owner-first docs are accepted. Close #850 only after this governance PR merges; do not close #624.
+
+Earlier Draft/pending entries are historical checkpoints and do not override this terminal-state record.

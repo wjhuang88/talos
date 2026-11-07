@@ -14,17 +14,16 @@ Completion Commit `95546b1f91e06ba969554fd602faf0d01c60f25a` (#865); local prefl
 cargo-xwin MSVC tests, independent Agent review and CI42227450980 passed,
 including native Windows/macOS and Desktop gates.
 
-## SEARCH-001-K / I317 active implementation — 2026-11-07
+## SEARCH-001-K / I317 complete — 2026-11-07
 
 [SEARCH-001-K](backlog/active/SEARCH-001-K-compat-fallback-ownership.md) /
-[I317](iterations/I317-search-compat-fallback-ownership.md) / #850 is Active / Claimed
-since governance #851 merged (`7b482a4243b37a4f79ef3fe460b69b0740400682`).
-K1 candidate #860 remains Draft. Pre-sync CI3855 passed 8/8 and Copilot
-independent security/API parity review reported no blockers; one stale provenance
-comment was corrected. Fresh latest-main CI/re-review and implementation merge
-are pending. QUALITY-001, #768 remain separately Complete / Closed;
-I310 separately claimed, D/#644 remains BLOCKED / ZERO-ADMISSION, D2/#848
-unadmitted, and E/F/G/I gated. No Auto/source/permission/dependency change.
+[I317](iterations/I317-search-compat-fallback-ownership.md) / #850 is
+**Complete / Closed** on governance closeout merge. Existing K1 implementation
+Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (#860),
+[CI3862](https://github.com/wjhuang88/talos/actions/runs/42340480867) 8/8, [independent security/API review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750)
+no blockers, latest-main CAS. Original legacy rollback/Cargo dependency remains.
+QUALITY-001, #768 and PERM-004/#22 remain separately governed;
+D/#644 ZERO-ADMISSION, D2/#848 research only, E/F/G/I gated, #624 Open.
 
 ## Issue #768 fixture repair
 
@@ -80,6 +79,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| Protected zero-key compatibility helpers / SEARCH-001-K | Complete / Closed | [SEARCH-001-K](backlog/active/SEARCH-001-K-compat-fallback-ownership.md) / [I317](iterations/I317-search-compat-fallback-ownership.md) / #850 | Existing Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (#860); CI3862 8/8, independent security review no blockers and CAS passed; #624 remains Open, legacy dependency retained. |
 | Explicit search provider overrides / SEARCH-001-H | Complete / Closed | [SEARCH-001-H](backlog/active/SEARCH-001-H-explicit-search-overrides.md) / [I314](iterations/I314-search-explicit-overrides.md) / #832 | Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e` (#842); CI3800 8/8, independent security review no blockers, CAS passed. Parent #624 and E/F/G/I remain separate. |
 | Whole-request compaction / T4 | Complete / Closed | [I312](iterations/I312-whole-request-compaction.md) | #818 merged `65500a869`; eight CI jobs, independent review and CAS passed. |
 | Actor checkpoint/history / T5 | Complete / Closed | [I313](iterations/I313-model-checkpoint-history.md) | Completion Commit `322574bc9707492ea6e9d5232794f73e687071d9` (#837); CI41608342151 and independent API/privacy/storage/security review passed. Later quality repairs are separately owned by QUALITY-001. |
