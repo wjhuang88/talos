@@ -90,6 +90,24 @@ regressions. Goal: no direct upstream **helper calls** in protected production p
 **K2 (outside current claim and still gated)**: evaluate full build dependency/legacy API
 replacement after I's prerequisite evidence. Do not quietly expand K1 to dependency deletion.
 
-Status now: **K1 is proposed, not implemented**. Formal scope selection/claim and applicable
+Historical intake status on 2026-11-04: **K1 was proposed, not implemented**. Formal scope selection/claim and applicable
 review are required before code implementation. E/F admission, G region acceptance, D2 vendor
 research and I retirement are separate.
+
+## 2. Implementation candidate (2026-11-06; not yet accepted)
+
+- Effective owner: governance #851 merged as `7b482a4243b37a4f79ef3fe460b69b0740400682`; Draft K1 implementation #860 starts from this exact commit.
+- Private `crates/talos-tools/src/search_backend/compat_helpers.rs` now owns pinned upstream HTML entities/tag cleanup, DDG redirect decode and the exact 12-UA pool; the protected parser/compatibility preparation imports are rewritten to use it.
+- Parity tests compare actual `rust_websearch::html_utils` outputs for deterministic input, invalid encoding and redirect edge cases; random UA tests check membership of both the pinned upstream and new local supplier. The new supplier uses existing network-enabled `uuid/v4` entropy, with unbiased rejection sampling. Exact random *sequence* is not claimed identical to upstream rand.
+- No `Cargo.toml`, lockfile, legacy `WebSearchTool`, endpoint, permission, shared transport budget or fallback scheduler changed. Remaining upstream crate references in the dormant legacy and test-only upstream comparison are intentionally preserved; removing the dependency belongs to separately gated SEARCH-001-I.
+- These are candidate/source facts, **not** a successful compiler, CI, native platform, security review or live-provider acceptance claim. #860 remains Draft pending those gates.
+
+## 3. Validation evidence after 2026-11-06 branch replay
+
+Previous code SHA `f2c978ea71bb0c6e9d603908f46c444a991a4650` passed all eight jobs in CI3847/run 42179784778. The branch was replayed onto current main to preserve independent #768/#862 and QUALITY-001 changes. This historical success does not establish a new exact-head CI result; no independent API/security review or live backend verification is claimed. Source-only helper parity remains the boundary.
+
+## 4. CI3855 and independent parity-review checkpoint (2026-11-07)
+
+CI3855/run [42203333658](https://github.com/wjhuang88/talos/actions/runs/42203333658) passed **8/8** on historical pre-sync code SHA `7dbe82c65c034a2c0c827dd699975c4442c64930`; independent Copilot [read-only review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6682872016) reported **no blocking API/network/security/upstream-parity findings** for exactly that SHA. The single non-blocking stale `headers.rs` comment was corrected in this replay. Latest main `4685c2979453ef8a89675477032053ec0e15acec` includes independent #865/#866 QUALITY-001 closure and search timeout fixtures. **Fresh-head CI, exact-head re-review and merge remain required**; do not promote Draft until accepted.
+
+Upstream rust-websearch remains a dormant rollback and direct test oracle. The original pinned-source semantics and all six parity fixtures are unmodified by main replay; only `compatibility/headers.rs` module/documentation commentary was corrected. No live provider acceptance is claimed.

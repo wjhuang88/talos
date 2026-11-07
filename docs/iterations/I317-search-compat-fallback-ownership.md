@@ -1,6 +1,6 @@
 # Iteration I317: Own Zero-Key Search Compatibility Helpers
 
-> Document status: Active (proposed atomic claim+activation in #851; ineffective before merge)
+> Document status: Active (governance #851 merged `7b482a4243b37a4f79ef3fe460b69b0740400682`; implementation #860 Draft)
 > Published plan date: 2026-11-05
 > Planned objective: make the protected production Auto search path independent of `rust_websearch` utility/helper calls while preserving the existing zero-key compatibility fallback.
 > Baseline rule: preserve current search semantics and authority; no E/F provider admission or `rust-websearch` retirement.
@@ -18,13 +18,13 @@
 | Source Issue | #850 |
 | Governance Claim PR | #851 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer directed continued K1 implementation on 2026-11-05 with existing I316/T6 and I310 independently claimed; non-overlapping search-private module scope. Exact-head CI, governance validators, no-blocker review and merge CAS remain required. |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-05 |
-| Handoff / Release Condition | No production coding/implementation PR before #851 finalized merge. Completion requires separately merged accepted code, exact-head tests/security compatibility review and existing implementation SHA. |
+| Authorization Evidence | Single-maintainer docs claim #851 merged `7b482a4243b37a4f79ef3fe460b69b0740400682` after exact-head CI3840 and both governance validators passed 0 warnings; independent reviewer unavailable (GitHub rejected Copilot assignment). K1 code requires independent network/security review. |
+| Implementation PR | #860 (Draft, code acceptance pending) |
+| Last Updated | 2026-11-07 |
+| Handoff / Release Condition | Effective claim on main. Draft implementation #860 unaccepted; must pass exact-head locked tests, native CI, independent security review and merge CAS before closure. |
 
-The proposed claim and Active state become effective **only** when the complete, reviewed
-governance #851 merges to main; the Draft proposal grants no implementation authority.
+The claim and Active state **became effective** on main at `7b482a4243b37a4f79ef3fe460b69b0740400682` (#851).
+The separately scoped K1 code now lives in Draft PR #860 and has no delivery/closure authority before validation and merge.
 
 ## Published Baseline
 
@@ -92,11 +92,19 @@ unprotected direct legacy fallback. Do not modify E/F or I state.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-11-05 | Atomic claim+activation proposal | #851 proposes this I317/SEARCH-001-K claim and Active; **ineffective before target-branch merge**. I316/I310 retained as separate non-overlapping owners. |
+| 2026-11-05 | Atomic claim+activation proposal | #851 proposed I317/SEARCH-001-K, ineffective prior to its target-branch merge; separate I316/I310 owners retained. |
+| 2026-11-06 | Claim effective | #851 merged into main as `7b482a4243b37a4f79ef3fe460b69b0740400682` after CI3840 and both governance validators. |
+| 2026-11-06 | Draft implementation | #860 K1 private helper replacement and parity fixtures submitted; code CI/review pending. |
 
 ## Verification Evidence
 
-Pending claim CI, governance review/merge; no code tests or implementation evidence claimed.
+- Governance claim #851 merged at `7b482a4243b37a4f79ef3fe460b69b0740400682`. Its exact-head CI3840/run 42177971137 completed success; both governance validators passed with zero warnings. Single-maintainer exception recorded; no independent reviewer approval is claimed.
+- Draft implementation PR #860 begins from the effective claim merge. Initial commit `f38fd1bdaacad77edb9c369931eb843ac0ee5f90` adds a private upstream-parity helper and tests. CI and independent implementation security review are **pending**, not passing evidence.
+
+### 2026-11-06 Historical CI acceptance boundary
+
+- **CI3847/run [42179784778](https://github.com/wjhuang88/talos/actions/runs/42179784778)** passed all **8/8** jobs on historical head `f2c978ea71bb0c6e9d603908f46c444a991a4650`: macOS release preflight, native Windows Rust/workspace, Linux/Windows Desktop, installer/classifier and remote owner checks. CI3842 had failed on rustfmt before the formatting fix; CI3844 was canceled. These are historical outcomes, not a claim that the rebased head passed.
+- Current-main replay preserves separately accepted #768 fixture repair and QUALITY-001. Fresh exact-head code/native validation and an independent API/network/security review are **still required**. Implementation #860 remains Draft; no merged K1 code or Completion Commit.
 
 ## Completion Evidence
 
@@ -110,3 +118,9 @@ fallback ownership. The old crate remains in Cargo until the separately gated I 
 ## Retrospective
 
 Pending actual implementation and closeout.
+
+## Independent review and CI after historical main synchronization — 2026-11-07
+
+CI3855/run [42203333658](https://github.com/wjhuang88/talos/actions/runs/42203333658) passed **8/8** on historical pre-sync code SHA `7dbe82c65c034a2c0c827dd699975c4442c64930`; independent Copilot [read-only review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6682872016) reported **no blocking API/network/security/upstream-parity findings** for exactly that SHA. The single non-blocking stale `headers.rs` comment was corrected in this replay. Latest main `4685c2979453ef8a89675477032053ec0e15acec` includes independent #865/#866 QUALITY-001 closure and search timeout fixtures. **Fresh-head CI, exact-head re-review and merge remain required**; do not promote Draft until accepted.
+
+Evidence is *not* code completion: final merged implementation SHA and separately accepted governance closeout remain blank. Issue #850 remains open until both occur.
