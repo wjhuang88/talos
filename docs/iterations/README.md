@@ -1,8 +1,8 @@
 # Iterations
 
-## I318 native key repeat — Active
+## I318 native key repeat — Review
 
-[I318](I318-native-key-repeat.md) / TUI-054 / #269 has native repeat-safe input routing under validation.
+[I318](I318-native-key-repeat.md) / TUI-054 / #269 has locally validated native repeat-safe routing in PR #872.
 Claim #869 is effective; physical terminal/IME acceptance is deferred, not waived.
 
 ## I317 / SEARCH-001-K post-merge closeout — 2026-11-07

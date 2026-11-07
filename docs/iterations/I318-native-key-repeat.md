@@ -1,6 +1,6 @@
 # Iteration I318: Native TUI Key Repeat
 
-> Document status: Active — implementation under validation
+> Document status: Review — implementation PR #872; physical acceptance deferred
 > Published plan date: 2026-11-07
 > Planned objective: deliver Issue #269 native repeat-safe editing/navigation with one-shot and focus isolation.
 > MVP deliverable: the real Talos TUI consumes backend Repeat for safe actions without a timer; submission/approval remain single-shot.
@@ -18,7 +18,7 @@
 | Governance Claim PR | #869 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer explicitly requested implementation while #38 CI runs; independent input/approval-boundary review and exact-head CI required |
-| Implementation PR | Not started |
+| Implementation PR | #872 |
 | Last Updated | 2026-11-07 |
 | Handoff / Release Condition | Effective only after atomic claim merge; complete implementation and validation, retain Review for unmet real-terminal acceptance |
 
@@ -98,8 +98,16 @@ Claim #869 became effective at `8a3bd94076b02d16769d3dc3a82f188de6ef1944`. Local
 now routes native editing/navigation Repeat through content-free focus ownership, rejects one-shot
 action repeats, and uses Unicode grapheme-safe deletion/movement. Terminal focus reporting has
 setup/rollback/restore coverage. Final TUI library regression run: 619 passed, 0 failed
-(`/private/tmp/i318-tui-reviewed.log`). Full final-source preflight and implementation review remain
-pending; this is not merged delivery evidence.
+(`/private/tmp/i318-tui-reviewed.log`). Final-source standard preflight passed (workspace check, warnings-denied Clippy, all workspace
+tests and both external Runtime SDK modes; `/private/tmp/i318-preflight-final.log`). Windows MSVC
+`cargo xwin check --locked -p talos-tui --tests --target x86_64-pc-windows-msvc`, TUI all-targets
+Clippy, and the rebuilt CLI PTY fixture passed. Both governance validators passed. Initial sandbox
+preflight failed with config-read EPERM; the successful run was outside that sandbox.
+
+Implementation commit: `0972ef6ddf2d7f2709d7be5b98427798e4604aba`, PR #872. Independent Agent
+static review approved that head against `8a3bd94076b02d16769d3dc3a82f188de6ef1944`; reviewer
+ran no tests and shares the external identity. Exact-head remote CI/review and merge remain pending;
+this is not merged delivery or physical acceptance evidence.
 
 Maintainer explicitly deferred physical acceptance. **Ghostty without tmux**, second-terminal
 hold/release, and Chinese IME observations remain unverified. Keep this scope open; PTY protocol
