@@ -14,14 +14,17 @@ Completion Commit `95546b1f91e06ba969554fd602faf0d01c60f25a` (#865); local prefl
 cargo-xwin MSVC tests, independent Agent review and CI42227450980 passed,
 including native Windows/macOS and Desktop gates.
 
-## SEARCH-001-K / I317 proposed atomic activation — 2026-11-05
+## SEARCH-001-K / I317 active implementation — 2026-11-07
 
 [SEARCH-001-K](backlog/active/SEARCH-001-K-compat-fallback-ownership.md) /
-[I317](iterations/I317-search-compat-fallback-ownership.md) / #850 proposes
-production compatibility-helper ownership only in draft governance #851,
-ineffective until finalized head CI/review/merge. I316 and I310 remain
-independent; D/#644 remains ZERO-ADMISSION; E/F/G/I stay gated; Exa/Parallel
-D2/#848 has separate intake. No K1 implementation or change to Auto routing.
+[I317](iterations/I317-search-compat-fallback-ownership.md) / #850 is Active / Claimed
+since governance #851 merged (`7b482a4243b37a4f79ef3fe460b69b0740400682`).
+K1 candidate #860 remains Draft. Pre-sync CI3855 passed 8/8 and Copilot
+independent security/API parity review reported no blockers; one stale provenance
+comment was corrected. Fresh latest-main CI/re-review and implementation merge
+are pending. QUALITY-001, #768 remain separately Complete / Closed;
+I310 separately claimed, D/#644 remains BLOCKED / ZERO-ADMISSION, D2/#848
+unadmitted, and E/F/G/I gated. No Auto/source/permission/dependency change.
 
 ## Issue #768 fixture repair
 

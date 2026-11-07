@@ -1,15 +1,14 @@
 # Iterations
 
-## I317 / SEARCH-001-K atomic claim proposal — 2026-11-05
+## I317 / SEARCH-001-K active implementation — 2026-11-07
 
-[I317](I317-search-compat-fallback-ownership.md) and
+[I317](I317-search-compat-fallback-ownership.md) /
 [SEARCH-001-K](../backlog/active/SEARCH-001-K-compat-fallback-ownership.md) / #850
-propose a separately scoped compatibility-helper ownership increment through
-[governance PR #851](https://github.com/wjhuang88/talos/pull/851). Effective only
-after exact-head CI/governance review and target-branch merge. I316 / PROCESS-001
-is now Complete / Closed, I310 remains independently claimed. D/#644 remains
-BLOCKED / ZERO-ADMISSION; D2/#848 remains research, E/F/G/I gated. No K1 code,
-dependent-crate removal, provider admission, or implementation is authorized yet.
+is Active / Claimed after #851 merged. Candidate #860 remains Draft.
+CI3855 8/8 and independent Copilot parity/API/security read-only review passed
+on historical `7dbe82c`; the comment correction/latest-main replay requires
+fresh exact-head checks and review before merge. I310 and #768 remain separate,
+D/#644 ZERO-ADMISSION, E/F/G/I gated.
 
 ## Completed session handoff
 
