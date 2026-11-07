@@ -173,7 +173,10 @@ fn reasoning_click_toggles_but_drag_back_to_origin_does_not() {
     ));
     tui.last_history_projection =
         project_history(&tui.transcript, 40, 10, &HistoryScrollState::follow_tail());
-    assert_eq!(tui.last_history_projection.reasoning_header_at(0), Some(id));
+    assert_eq!(
+        tui.last_history_projection.expandable_header_at(0),
+        Some(id)
+    );
     tui.handle_input_event(&mouse(MouseEventKind::Down(MouseButton::Left), 3, 0));
     tui.handle_input_event(&mouse(MouseEventKind::Drag(MouseButton::Left), 7, 0));
     tui.handle_input_event(&mouse(MouseEventKind::Drag(MouseButton::Left), 3, 0));
@@ -4406,4 +4409,129 @@ fn native_repeat_deletion_that_joins_flag_keeps_cursor_on_boundary() {
     assert_eq!(tui.state.input_buffer, "🇦🇧");
     tui.handle_input_event(&repeat_event(KeyCode::Delete, Press));
     assert!(tui.state.input_buffer.is_empty());
+}
+
+#[test]
+fn process_poll_history_click_expands_details_without_mutating_records() {
+    use crossterm::event::MouseButton;
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    let first =
+        crate::process_poll::tests::append_poll(&mut tui.transcript, "job_a", "read", "running");
+    for _ in 0..23 {
+        crate::process_poll::tests::append_poll(&mut tui.transcript, "job_a", "status", "running");
+    }
+    let raw = format!("{:?}", tui.transcript.entries());
+    tui.draw_frame().expect("grouped frame");
+    assert!(tui.terminal.test_rendered_text().contains("24 polls"));
+    assert!(!tui.terminal.test_rendered_text().contains("next_cursor"));
+    tui.last_history_projection =
+        project_history(&tui.transcript, 120, 60, &HistoryScrollState::follow_tail());
+    assert_eq!(tui.last_history_projection.total_rows, 1);
+    assert!(
+        tui.last_history_projection.rows[0]
+            .line
+            .text
+            .contains("24 polls")
+    );
+    tui.last_history_area = Some(ratatui::layout::Rect::new(0, 0, 120, 60));
+    tui.last_history_prefix_row_count = 0;
+    tui.last_frame_history_start = 0;
+    for kind in [
+        MouseEventKind::Down(MouseButton::Left),
+        MouseEventKind::Up(MouseButton::Left),
+    ] {
+        tui.handle_input_event(&mouse(kind, 2, 0));
+    }
+    assert!(tui.transcript.poll_expanded(first));
+    let expanded = project_history(
+        &tui.transcript,
+        120,
+        200,
+        &HistoryScrollState::follow_tail(),
+    );
+    assert!(expanded.total_rows >= 49);
+    assert!(
+        expanded
+            .rows
+            .iter()
+            .any(|row| row.line.text.contains("next_cursor"))
+    );
+    assert_eq!(format!("{:?}", tui.transcript.entries()), raw);
+    // Clicking a folded header must remain distinct from drag-to-copy.
+    tui.transcript.toggle_expansion(first);
+    for kind in [
+        MouseEventKind::Down(MouseButton::Left),
+        MouseEventKind::Drag(MouseButton::Left),
+        MouseEventKind::Up(MouseButton::Left),
+    ] {
+        tui.handle_input_event(&mouse(kind, 2, 0));
+    }
+    assert!(!tui.transcript.poll_expanded(first));
+}
+
+#[test]
+fn process_poll_live_and_replayed_history_have_identical_grouping() {
+    use talos_conversation::UiOutput;
+    use talos_core::message::{MessageToolResult, ToolCall};
+    let mut fixture = crate::transcript::TranscriptStore::default();
+    for state in ["running", "running", "completed"] {
+        crate::process_poll::tests::append_poll(&mut fixture, "job_a", "read", state);
+    }
+    let mut live = crate::app::Tui::for_test(TuiState::new(), None);
+    let mut history = Vec::new();
+    for (index, pair) in fixture.entries().chunks(2).enumerate() {
+        let TranscriptBlock::ToolCall(call) = &pair[0].block else {
+            panic!("call")
+        };
+        let TranscriptBlock::ToolResult(result) = &pair[1].block else {
+            panic!("result")
+        };
+        live.handle_ui_output(UiOutput::ToolCall(call.clone()));
+        live.commit_pending_transcript().expect("call frame");
+        live.handle_ui_output(UiOutput::ToolResult(result.clone()));
+        live.commit_pending_transcript().expect("result frame");
+        history.push(Message::Assistant {
+            content: String::new(),
+            reasoning: None,
+            tool_calls: vec![ToolCall {
+                id: format!("poll-{index}"),
+                name: call.tool_name.clone(),
+                input: call.arguments.clone(),
+            }],
+        });
+        history.push(Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: format!("poll-{index}"),
+                content: result.content.clone(),
+                is_error: result.is_error,
+            },
+        });
+    }
+    let original = format!("{history:?}");
+    let mut replay = crate::app::Tui::for_test(TuiState::new(), None);
+    replay.hydrate_history(&history);
+    replay.commit_pending_transcript().expect("replay frame");
+    for width in [20, 80, 160] {
+        let a = project_history(
+            &live.transcript,
+            width,
+            100,
+            &HistoryScrollState::follow_tail(),
+        );
+        let b = project_history(
+            &replay.transcript,
+            width,
+            100,
+            &HistoryScrollState::follow_tail(),
+        );
+        let texts = |p: &crate::history_projection::HistoryProjection| {
+            p.rows
+                .iter()
+                .map(|r| r.line.text.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(texts(&a), texts(&b));
+        assert_eq!(a.total_rows, 2);
+    }
+    assert_eq!(format!("{history:?}"), original);
 }

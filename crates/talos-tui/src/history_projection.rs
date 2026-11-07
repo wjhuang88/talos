@@ -63,7 +63,7 @@ impl HistoryScrollState {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RenderedHistoryRow {
-    pub(crate) reasoning_header: bool,
+    pub(crate) expandable_header: bool,
     pub(crate) synthetic_prefix: usize,
     pub(crate) start_anchor: LogicalContentAnchor,
     pub(crate) end_anchor: LogicalContentAnchor,
@@ -131,10 +131,10 @@ impl HistoryProjectionCache {
 }
 
 impl HistoryProjection {
-    pub(crate) fn reasoning_header_at(&self, row: usize) -> Option<TranscriptEntryId> {
+    pub(crate) fn expandable_header_at(&self, row: usize) -> Option<TranscriptEntryId> {
         self.all_rows
             .get(row)
-            .filter(|row| row.reasoning_header)
+            .filter(|row| row.expandable_header)
             .map(|row| row.start_anchor.entry_id)
     }
     pub(crate) fn selection_point(
@@ -405,48 +405,101 @@ fn project_all_history(
 ) {
     let mut all = Vec::new();
     let mut projected_logical_lines = Vec::new();
-    for entry in transcript.entries() {
-        for (logical_line, line) in logical_lines(&entry.block).into_iter().enumerate() {
-            projected_logical_lines.push((
+    let mut projected = Vec::new();
+    let entries = transcript.entries();
+    let mut index = 0;
+    let mut pending_calls = 0usize;
+    while index < entries.len() {
+        let entry = &entries[index];
+        // Display events have no call IDs: never infer pairing inside a parallel batch.
+        if pending_calls == 0
+            && let Some(group) = crate::process_poll::group_at(&entries[index..])
+        {
+            let expanded = transcript.poll_expanded(entry.id);
+            let color = if group.terminal && group.state != "completed" {
+                crate::theme::to_crossterm_color(crate::theme::semantic::TEXT_ERROR)
+            } else if group.terminal {
+                crate::theme::to_crossterm_color(crate::theme::semantic::TEXT_SUCCESS)
+            } else {
+                crate::tool_display::secondary_result_color()
+            };
+            projected.push((
                 entry.id,
-                logical_line,
-                line.segments
-                    .iter()
-                    .map(|segment| segment.text.as_str())
-                    .collect(),
+                0,
+                true,
+                ScrollbackLine::plain(group.summary(expanded), color),
             ));
-            let reasoning_header =
-                matches!(entry.block, TranscriptBlock::Reasoning { .. }) && logical_line == 0;
-            let mut chunks = project_line_chunks(&line, width);
-            // A collapsed entry remains one hit target even in a narrow viewport.
-            // Keep the full semantic title above so resizing can restore it.
-            if reasoning_header {
-                chunks.truncate(1);
+            if expanded {
+                for (offset, detail) in entries[index..index + group.entries].iter().enumerate() {
+                    let block = match &detail.block {
+                        TranscriptBlock::ToolResult(result) => {
+                            TranscriptBlock::ToolResult(crate::process_poll::detail_result(result))
+                        }
+                        block => block.clone(),
+                    };
+                    for (line_index, line) in logical_lines(&block).into_iter().enumerate() {
+                        projected.push((
+                            detail.id,
+                            line_index + usize::from(offset == 0),
+                            false,
+                            line,
+                        ));
+                    }
+                }
             }
-            let last = chunks.len().saturating_sub(1);
-            all.extend(
-                chunks
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, chunk)| RenderedHistoryRow {
-                        reasoning_header,
-                        synthetic_prefix: chunk.synthetic_prefix,
-                        start_anchor: LogicalContentAnchor {
-                            entry_id: entry.id,
-                            logical_line,
-                            scalar_offset: chunk.logical_start,
-                        },
-                        end_anchor: LogicalContentAnchor {
-                            entry_id: entry.id,
-                            logical_line,
-                            scalar_offset: chunk.logical_end,
-                        },
-                        is_last_row_of_logical_line: index == last,
-                        is_empty_logical_line: line.text.is_empty(),
-                        line: chunk.line,
-                    }),
-            );
+            index += group.entries;
+        } else {
+            match &entry.block {
+                TranscriptBlock::ToolCall(_) => pending_calls = pending_calls.saturating_add(1),
+                TranscriptBlock::ToolResult(_) => pending_calls = pending_calls.saturating_sub(1),
+                _ => {}
+            }
+            for (line_index, line) in logical_lines(&entry.block).into_iter().enumerate() {
+                let header =
+                    matches!(entry.block, TranscriptBlock::Reasoning { .. }) && line_index == 0;
+                projected.push((entry.id, line_index, header, line));
+            }
+            index += 1;
         }
+    }
+    for (entry_id, logical_line, expandable_header, line) in projected {
+        projected_logical_lines.push((
+            entry_id,
+            logical_line,
+            line.segments
+                .iter()
+                .map(|segment| segment.text.as_str())
+                .collect(),
+        ));
+        let mut chunks = project_line_chunks(&line, width);
+        // A collapsed entry remains one hit target even in a narrow viewport.
+        // Keep the full semantic title above so resizing can restore it.
+        if expandable_header {
+            chunks.truncate(1);
+        }
+        let last = chunks.len().saturating_sub(1);
+        all.extend(
+            chunks
+                .into_iter()
+                .enumerate()
+                .map(|(index, chunk)| RenderedHistoryRow {
+                    expandable_header,
+                    synthetic_prefix: chunk.synthetic_prefix,
+                    start_anchor: LogicalContentAnchor {
+                        entry_id,
+                        logical_line,
+                        scalar_offset: chunk.logical_start,
+                    },
+                    end_anchor: LogicalContentAnchor {
+                        entry_id,
+                        logical_line,
+                        scalar_offset: chunk.logical_end,
+                    },
+                    is_last_row_of_logical_line: index == last,
+                    is_empty_logical_line: line.text.is_empty(),
+                    line: chunk.line,
+                }),
+        );
     }
     (all, projected_logical_lines)
 }
@@ -739,6 +792,68 @@ mod tests {
     use crate::inline_terminal::HistoryAttrs;
 
     #[test]
+    fn parallel_calls_are_not_guessed_into_poll_pairs() {
+        let mut fixture = TranscriptStore::default();
+        crate::process_poll::tests::append_poll(&mut fixture, "job_a", "read", "running");
+        let call = fixture.entries()[0].block.clone();
+        let result = fixture.entries()[1].block.clone();
+        let mut transcript = TranscriptStore::default();
+        for block in [call.clone(), call, result.clone(), result] {
+            transcript.append(block);
+        }
+        let projected = project_history(&transcript, 120, 100, &HistoryScrollState::follow_tail());
+        assert!(!projected.all_rows.iter().any(|row| row.expandable_header));
+    }
+
+    #[test]
+    fn process_poll_expansion_resize_selection_and_later_anchor() {
+        let mut transcript = TranscriptStore::default();
+        let id =
+            crate::process_poll::tests::append_poll(&mut transcript, "job_a", "read", "running");
+        crate::process_poll::tests::append_poll(&mut transcript, "job_a", "status", "running");
+        let later = transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "later anchor",
+            None,
+        )));
+        let mut cache = HistoryProjectionCache::default();
+        for width in [18, 120, 30, 120] {
+            let collapsed =
+                cache.project(&transcript, width, 100, &HistoryScrollState::follow_tail());
+            assert_eq!(collapsed.total_rows, 2);
+            assert_eq!(collapsed.expandable_header_at(0), Some(id));
+            let start = collapsed.selection_point(0, 0).expect("start");
+            let end = collapsed.selection_point(0, 5).expect("end");
+            assert!(collapsed.selected_text(start, end).starts_with("▸ proc"));
+            assert!(transcript.toggle_expansion(id));
+            let expanded =
+                cache.project(&transcript, width, 100, &HistoryScrollState::follow_tail());
+            assert!(expanded.total_rows > 5);
+            assert!(
+                expanded
+                    .all_rows
+                    .iter()
+                    .any(|row| row.start_anchor.entry_id == later)
+            );
+            let mut scroll = HistoryScrollState::follow_tail();
+            let anchor = LogicalContentAnchor {
+                entry_id: later,
+                logical_line: 0,
+                scalar_offset: 0,
+            };
+            scroll.anchor(anchor, 0);
+            assert_eq!(
+                cache.project(&transcript, width, 1, &scroll).rows[0].start_anchor,
+                anchor
+            );
+            assert!(transcript.toggle_expansion(id));
+            assert_eq!(
+                cache.project(&transcript, width, 1, &scroll).rows[0].start_anchor,
+                anchor
+            );
+        }
+    }
+
+    #[test]
     fn edit_background_fills_every_projected_row() {
         use talos_conversation::ToolResultDisplay;
         for count in [2, 40] {
@@ -989,7 +1104,7 @@ mod tests {
     }
 
     #[test]
-    fn reasoning_header_stays_one_row_across_narrow_resize() {
+    fn expandable_header_stays_one_row_across_narrow_resize() {
         let mut transcript = TranscriptStore::default();
         let id = transcript.append(TranscriptBlock::Reasoning {
             text: "中文思考内容".into(),
@@ -999,7 +1114,7 @@ mod tests {
         for width in [40, 8, 3, 1, 8, 40] {
             let projection = project_history(&transcript, width, 20, &scroll);
             assert_eq!(projection.total_rows, 1, "width={width}");
-            assert_eq!(projection.reasoning_header_at(0), Some(id));
+            assert_eq!(projection.expandable_header_at(0), Some(id));
             assert!(projection.rows[0].line.text.width() <= usize::from(width));
             if width == 40 {
                 assert_eq!(projection.rows[0].line.text, " ◇ Thinking ▸");
@@ -1068,15 +1183,15 @@ mod tests {
         let scroll = HistoryScrollState::follow_tail();
         let collapsed = project_history(&transcript, 40, 20, &scroll);
         assert_eq!(collapsed.total_rows, 2);
-        assert_eq!(collapsed.reasoning_header_at(0), Some(first));
-        assert_eq!(collapsed.reasoning_header_at(1), Some(second));
+        assert_eq!(collapsed.expandable_header_at(0), Some(first));
+        assert_eq!(collapsed.expandable_header_at(1), Some(second));
         let revision = transcript.revision();
         assert!(transcript.toggle_reasoning(first));
         assert!(transcript.revision() > revision);
         let expanded = project_history(&transcript, 40, 20, &scroll);
         assert_eq!(expanded.total_rows, 3);
         assert_eq!(expanded.rows[1].line.text, "   first reasoning body");
-        assert_eq!(expanded.reasoning_header_at(1), None);
+        assert_eq!(expanded.expandable_header_at(1), None);
         assert!(
             !expanded
                 .rows

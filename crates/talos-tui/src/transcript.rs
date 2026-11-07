@@ -31,6 +31,7 @@ pub(crate) struct TranscriptStore {
     entries: Vec<TranscriptEntry>,
     next_id: u64,
     revision: u64,
+    expanded_polls: std::collections::BTreeSet<TranscriptEntryId>,
 }
 
 impl TranscriptStore {
@@ -48,6 +49,27 @@ impl TranscriptStore {
 
     pub(crate) const fn revision(&self) -> u64 {
         self.revision
+    }
+
+    pub(crate) fn poll_expanded(&self, id: TranscriptEntryId) -> bool {
+        self.expanded_polls.contains(&id)
+    }
+
+    pub(crate) fn toggle_expansion(&mut self, id: TranscriptEntryId) -> bool {
+        if self.toggle_reasoning(id) {
+            return true;
+        }
+        let Some(index) = self.entries.iter().position(|entry| entry.id == id) else {
+            return false;
+        };
+        if crate::process_poll::group_at(&self.entries[index..]).is_none() {
+            return false;
+        }
+        if !self.expanded_polls.remove(&id) {
+            self.expanded_polls.insert(id);
+        }
+        self.revision = self.revision.saturating_add(1);
+        true
     }
 
     pub(crate) fn toggle_reasoning(&mut self, id: TranscriptEntryId) -> bool {
