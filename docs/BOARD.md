@@ -4,7 +4,8 @@
 
 [Owner](tasks/2026-11-08-tui-result-ellipsis.md) proposes Active / Claimed in
 PR #876 for result-line ellipsis and muted Nord backgrounds. Ineffective until
-target merge; independent review and exact-head CI pending. No implementation delivered.
+target merge; single-maintainer authorization recorded in the owner; resulting
+exact-head CI and merge-time checks pending. No implementation delivered.
 
 ## Tool routing / TOOL-ROUTE-001
 

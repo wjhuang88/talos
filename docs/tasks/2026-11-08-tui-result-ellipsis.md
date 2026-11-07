@@ -14,8 +14,8 @@
 | Claimed At | 2026-11-08 |
 | Source Issue | None |
 | Governance Claim PR | #876 |
-| Authorization Mode | Independent review |
-| Authorization Evidence | User authorized governance PR publication; independent review and exact-head CI remain required |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer confirms single-person maintenance and no available independent maintainer; authorizes #876 only. [Authorization record](https://github.com/wjhuang88/talos/pull/876#issuecomment-6710615716). Agent technical review is supporting evidence, not independent human approval. Both governance validators, resulting exact-head CI and merge-time CAS remain mandatory |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-08 |
 | Handoff / Release Condition | Effective target claim, implementation tests, standard preflight, native visual acceptance, exact-head CI and review |
