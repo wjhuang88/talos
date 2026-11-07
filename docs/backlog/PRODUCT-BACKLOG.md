@@ -237,7 +237,7 @@ Required reads:
 | TOOL-026 / I191 | Closed / Delivered | Owner evidence `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213` and independent review `5274917099`. TOOL-024-A/I188 later completed independently at `245eddeb`; production children remain separately blocked. [Story](active/TOOL-026-noninteractive-terminal-containment.md) / [Iteration](../iterations/I191-noninteractive-terminal-containment.md) |
 | SESSION-010 / I192 | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213` and independent review `5274917099`. Its SESSION-008-B residual was completed later by I193; RUNTIME-005 remains independently governed. [Story](active/SESSION-010-runtime-resume-empty-artifact-closure.md) / [Iteration](../iterations/I192-session-runtime-recovery-closure.md) |
 | TOOL-023 | Partial | A/C Complete; decide TOOL-023-B independently. |
-| PERM-004 | Partial | Issue #22 stays open for broader sandbox/security residuals. |
+| PERM-004 | Cancelled / Superseded | Original #22 umbrella retired after delivered-slice reconciliation; retained unimplemented design options stay in [owner](active/PERM-004-workspace-trust-sandbox.md). PERM-006-D/E remain independent. |
 | PROVIDER-001 | Review | Complete accurate OpenAI-compatible streaming usage evidence. |
 | TUI-017 / TUI-018 / TOOL-015 / TUI-019 | Review | Reconcile with their owner docs and dependent provider/tool evidence before closure. |
 

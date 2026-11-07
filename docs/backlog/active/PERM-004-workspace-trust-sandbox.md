@@ -4,9 +4,80 @@
 |---|---|
 | Story ID | PERM-004 |
 | Priority | P1 |
-| Status | Partial — bounded repo-contained file-write trust delivered; command/network/destructive-operation sandbox scope remains open |
+| Status | Cancelled / Superseded — original umbrella replaced by the delivered slices and explicit dispositions below; not a full sandbox completion claim |
 | Source | [GitHub Issue #22](https://github.com/wjhuang88/talos/issues/22) |
 | Depends On | `PERM-002`, `PERM-003`, `TOOL-017`, `VALIDATION-001` |
+
+
+**Status**: Cancelled / Superseded (2026-11-07)
+
+## Current disposition — 2026-11-07
+
+The maintainer requested reconciliation and closure of Issue #22 after the old Partial summary
+was found to omit subsequent delivery. This governance-only closure retires the original umbrella;
+it does not declare every original proposal implemented or relax any permission/security boundary.
+The original problem, acceptance and historical implementation report remain below as the published
+baseline. Their future-tense/open-Issue statements are historical, superseded by this section.
+
+| Original requirement / question | Current implementation or decision | Disposition |
+|---|---|---|
+| Workspace boundary, persistence, Deny precedence, non-Git behavior | ADR-038; `WorkspaceTrustStore`, `is_git_workspace`, `is_within_repo`; repo-contained Write trust in the permission engine; I112/T121 implementation `050c132ddf1c32c66826f22df82b15e203a44100` | Bounded logical file-write trust delivered; no blanket command or network trust. |
+| Relative traversal / symlink handling | Permission engine resolves relative paths and canonicalizes existing paths; file authorization canonicalizes nearest existing ancestors and revalidates paths under ADR-047 | The original claim that all relative paths are directly allowed is obsolete. This is not a proof of universal TOCTOU exclusion. |
+| External paths must never reuse approval | ADR-047 / [SEC-001](SEC-001-external-path-authorization.md), implementation `fc424edbe752bbe46b77668cd1e39fd1fae157aa`; `exact_session_grant_is_reused_for_external_path` regression | Superseded by explicit exact-path, operation/lifetime-bound approval, with Deny precedence; not arbitrary external or cross-session permission. |
+| Trust management and reduced prompts | `talos permissions trust` status/revoke, CLI `--trust`, persistent trust store; I117 / ADR-040 | Delivered CLI workflow replaces the proposed `/trust` spelling; no claim that a `/trust` slash command shipped. |
+| Bash/exec, Git and network workflow | [I308](../../iterations/I308-builtin-auto-review.md), PR #809 implementation `5dea4925a143151071ea231779c100a75734e6fe`; PERM-007-G/H shared Auto review and real operation fixtures | Reviewed one-use admission is delivered; it is not repo-wide permanent command trust. Strict denial, uncertainty, freshness, cancellation and higher-risk gates are intended behavior, not automatically unfinished features. |
+| Approval/grant/execution composition | PERM-006-A/B/C, including agent-owned pipeline implementation `49d1546c3748930177655dbedc7f3665780d92ab` | Delivered slices; [PERM-006-D](PERM-006-D-typed-effects-and-resources.md) / #56 and [PERM-006-E](PERM-006-E-cross-surface-conformance.md) / #57 retain their own unchanged unfinished scope. |
+| Actual arbitrary-command OS confinement | ADR-038/040 and [PERM-005](PERM-005-logical-tool-sandbox-enforcement.md) distinguish diagnostic evidence from enforcement | Not delivered as a universal guarantee. Deferred design, not required to claim this superseded umbrella complete. See retained design options below. |
+
+## Retained design options (not implemented, not activated)
+
+This owner remains the durable destination for the following original ideas. They are explicitly
+deferred, not silently transferred into completed PERM-005 or into PERM-006-D/E:
+
+- Repository discovery from subdirectories/submodules: the trust helper still checks `.git` at the
+  supplied root; it does not implement ADR-038's proposed `gix::Repository::discover()` selection.
+  A future change must reconcile that ADR and positively establish the trust root before broadening it.
+- A dedicated directory/file-extension policy DSL and generic one-click command sandbox trust:
+  existing rule/grant mechanisms are not evidence that these proposed UX/DSL forms shipped.
+- Uniform OS enforcement of arbitrary commands and children, including platform availability and
+  fallback guarantees: diagnostic unknown-access evidence and Auto assessment do not provide this.
+- The original proposal's system-path defaults and all-operation audit guarantee are not certified
+  by this reconciliation; any stricter new defaults or universal audit contract need explicit
+  requirements, independent security review and their own runnable acceptance.
+
+Reactivation trigger: a maintainer selects one of these concrete behaviors. Create a separately
+claimed executable Story/iteration linked here, with ADR/security review and platform tests.
+No new product requirement, implementation branch or relaxed policy is authorized by this closure.
+
+## Closure ledger and validation
+
+- Outcome: close obsolete #22 by supersession, not by asserting complete original implementation.
+- Artifacts: this owner, Product Backlog, Board and current Issue reconciliation matrix; historical
+  snapshots and original ADR text are preserved.
+- Evidence: source/test inspection against `main@4685c2979`; implementation SHAs above are already
+  merged. I308 owner records exact-head CI `41007199388` and independent review of PR #809.
+- Validation: both repository governance validators, skill governance validator, diff check and
+  independent exact-head governance/security-boundary review are required before merge. No Rust
+  code changes or new runtime test results are claimed by this documentation-only reconciliation.
+- Remaining delivery: merge this governance record, then close #22 as superseded and synchronize
+  its remote disposition. Existing #56/#57 scope and unactivated design options remain separate.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / GPT-6 |
+| Work Slice | Governance-only reconciliation and supersession of PERM-004 / #22; no runtime or policy changes |
+| Claimed At | 2026-11-07 |
+| Source Issue | #22 |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Maintainer requested closure reconciliation; exact-head independent review and CI required before merge |
+| Implementation PR | None |
+| Last Updated | 2026-11-07 |
+| Handoff / Release Condition | Governance-only terminal record effective on target-branch merge; close #22 after merge; retained options require fresh selection |
 
 ## Problem
 
