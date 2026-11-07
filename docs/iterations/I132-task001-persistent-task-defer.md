@@ -42,7 +42,9 @@
   implemented.
 - TASK-001 capability gap (task lifecycle, phase checkpoints, incomplete-task recovery,
   durable scheduling) remains Open via [Issue #38](https://github.com/wjhuang88/talos/issues/38)
-  and the ADR-043 reversal trigger.
+  and the ADR-043 reversal trigger. This was the historical disposition; on 2026-11-07 #38 was
+  selected for supersession closure. The [TASK-001 owner](../backlog/active/TASK-001-persistent-task-runtime-spike.md)
+  now retains the unimplemented differences and reactivation criteria; I132 remains a decision-only delivery.
 - SESSION-006 (P120 audit finding) remains a separate Open owner.
 
 ## Retrospective
