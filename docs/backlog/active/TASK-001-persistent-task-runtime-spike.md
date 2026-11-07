@@ -60,8 +60,14 @@ These are evidence for bounded foundations only, not Completion Commits for TASK
 Closure ledger: synchronize this owner, ADR-043 addendum, I132 residual pointer, Backlog, Board and
 Issue matrix; preserve published baseline/history. Run both repository governance validators,
 current skill validator and diff check; obtain independent exact-head governance/security-boundary
-review and CI before merge, then close #38 as superseded. No code or fresh runtime test result is
+review and CI before merge, then close #38 as superseded. No runtime code change or fresh runtime test result is
 claimed. Remaining capability differences stay in this owner's section above.
+
+The first exact-head CI exposed a governance defect: the remote Issue validator recognized only
+Complete owners, so already-closed #22 (Cancelled / Superseded) failed reconciliation. The bounded
+validator correction recognizes an explicit Cancelled status declaration and preserves existing
+completion handling. Offline regressions reject active/historical cancellation prose; the standard
+governance validator runs them. This does not change product or permission policy.
 
 ## Collaboration Claim
 
@@ -70,7 +76,7 @@ claimed. Remaining capability differences stay in this owner's section above.
 | Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
-| Work Slice | Governance-only #38 supersession and retained recovery-difference mapping; no runtime or policy change |
+| Work Slice | Governance-only #38 supersession and terminal-owner validator correction; no runtime or policy change |
 | Claimed At | 2026-11-07 |
 | Source Issue | #38 |
 | Governance Claim PR | #868 |

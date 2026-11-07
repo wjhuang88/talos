@@ -64,6 +64,17 @@ def parse_matrix(path: Path) -> dict[int, tuple[str, Path, str]]:
     return entries
 
 
+def owner_is_terminal(owner_text: str) -> bool:
+    """Accept delivered owners and explicitly cancelled owner status declarations."""
+    if "Complete / Closed" in owner_text or "**Status**: Complete" in owner_text:
+        return True
+    # Cancelled is a terminal state in AGENT-COLLABORATION, but mentioning
+    # cancellation in a plan or quoted historical note must not close an owner.
+    return re.search(
+        r"^\*\*Status\*\*:[ \t]*Cancelled(?:[ \t]|$)", owner_text, re.MULTILINE
+    ) is not None
+
+
 def github_request(url: str, token: str) -> tuple[Any, Any]:
     request = urllib.request.Request(
         url,
@@ -144,7 +155,7 @@ def main() -> int:
     for issue in sorted(matrix_numbers - open_issue_numbers):
         _owner, owner_path, status = matrix[issue]
         owner_text = owner_path.read_text(encoding="utf-8")
-        if "Complete / Closed" in owner_text or "**Status**: Complete" in owner_text:
+        if owner_is_terminal(owner_text):
             continue
         stale.append(issue)
     if missing or stale:

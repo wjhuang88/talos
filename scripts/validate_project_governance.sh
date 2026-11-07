@@ -404,6 +404,13 @@ elif ! python3 "$delivery_workflow_validator"; then
   error "delivery workflow scenario validation failed"
 fi
 
+remote_owner_tests="$root/scripts/test_remote_issue_owners.py"
+if [ ! -f "$remote_owner_tests" ]; then
+  error "missing remote Issue owner regressions: scripts/test_remote_issue_owners.py"
+elif ! python3 "$remote_owner_tests"; then
+  error "remote Issue owner regressions failed"
+fi
+
 if [ "$errors" -gt 0 ]; then
   printf 'Governance validation failed: %d error(s), %d warning(s).\n' "$errors" "$warnings"
   exit 1
