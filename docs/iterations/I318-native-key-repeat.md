@@ -71,3 +71,16 @@ fails one-shot safety; do not weaken approval tests to enable repeat.
 Claim-stage only: no implementation, tests or device acceptance claimed. Atomic claim and activation
 become effective together on target merge. Real-terminal evidence unavailable here must remain a
 tracked unmet row in this owner, not a complete claim or a silent scope reduction.
+
+## Terminal and implementation preparation — 2026-11-07
+
+Maintainer primary terminal: **Ghostty, no tmux** (explicit session answer). Physical hold/release
+and non-English IME observations remain pending; a second materially different terminal/platform
+is still required. Crossterm 0.29 source `event.rs` defines Press/Repeat/Release and documents
+REPORT_EVENT_TYPES; Talos already requests that flag in `inline_terminal.rs`. Source inspection
+is protocol evidence, not native keyboard acceptance.
+
+Implementation choice: reuse the already-locked Rust `unicode-segmentation` 1.13.3 package (currently
+used by Desktop) for complete grapheme boundaries instead of custom Unicode approximations; an
+explicit direct TUI dependency and lockfile edge will be reviewed. No version upgrade or native code.
+Repeat ownership will use content-free panel identity, never credential/provider input snapshots.
