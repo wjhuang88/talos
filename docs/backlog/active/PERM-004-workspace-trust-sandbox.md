@@ -11,6 +11,8 @@
 
 **Status**: Cancelled / Superseded (2026-11-07)
 
+**Administrative reconciliation: Complete / Closed** at merged governance PR #867 (`5b7d2c0a23b71237839e7a038f91a12d8590ad54`); this marks the *governance disposition* as completed for the remote Issue owner validator, **not** the original feature as fully implemented. Original PERM-004 work remains **Cancelled / Superseded**, and all deferred security/sandbox options remain unadmitted and separately gated.
+
 ## Current disposition — 2026-11-07
 
 The maintainer requested reconciliation and closure of Issue #22 after the old Partial summary
