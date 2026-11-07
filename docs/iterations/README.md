@@ -1,14 +1,15 @@
 # Iterations
 
-## I317 / SEARCH-001-K active implementation — 2026-11-07
+## I317 / SEARCH-001-K post-merge closeout — 2026-11-07
 
 [I317](I317-search-compat-fallback-ownership.md) /
 [SEARCH-001-K](../backlog/active/SEARCH-001-K-compat-fallback-ownership.md) / #850
-is Active / Claimed after #851 merged. Candidate #860 remains Draft.
-CI3855 8/8 and independent Copilot parity/API/security read-only review passed
-on historical `7dbe82c`; the comment correction/latest-main replay requires
-fresh exact-head checks and review before merge. I310 and #768 remain separate,
-D/#644 ZERO-ADMISSION, E/F/G/I gated.
+is **Complete / Closed** on this governance closeout's merge.
+Existing Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (#860),
+[CI3862](https://github.com/wjhuang88/talos/actions/runs/42340480867) 8/8 and independent API/security/parity
+[review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750) no blockers. Remaining `rust-websearch` dependency, E/F/G/I
+and D/#644 zero native-provider admission are deliberately unchanged;
+parent SEARCH-001/#624 stays Open.
 
 ## Completed session handoff
 

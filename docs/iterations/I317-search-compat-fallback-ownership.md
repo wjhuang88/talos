@@ -1,6 +1,6 @@
 # Iteration I317: Own Zero-Key Search Compatibility Helpers
 
-> Document status: Active (governance #851 merged `7b482a4243b37a4f79ef3fe460b69b0740400682`; implementation #860 Draft)
+> Document status: Complete / Closed (implementation #860 merged `e32ea0a6220889e8346676d368110310171e2cce`; governance closeout published on merge)
 > Published plan date: 2026-11-05
 > Planned objective: make the protected production Auto search path independent of `rust_websearch` utility/helper calls while preserving the existing zero-key compatibility fallback.
 > Baseline rule: preserve current search semantics and authority; no E/F provider admission or `rust-websearch` retirement.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | SEARCH-001-K K1: production-side HTML, DDG URL/entity, and UA helper ownership plus parity fixtures; no source/transport/permission/dependency/rollback changes |
@@ -19,12 +19,12 @@
 | Governance Claim PR | #851 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Single-maintainer docs claim #851 merged `7b482a4243b37a4f79ef3fe460b69b0740400682` after exact-head CI3840 and both governance validators passed 0 warnings; independent reviewer unavailable (GitHub rejected Copilot assignment). K1 code requires independent network/security review. |
-| Implementation PR | #860 (Draft, code acceptance pending) |
+| Implementation PR | #860 — merged `e32ea0a6220889e8346676d368110310171e2cce` |
 | Last Updated | 2026-11-07 |
-| Handoff / Release Condition | Effective claim on main. Draft implementation #860 unaccepted; must pass exact-head locked tests, native CI, independent security review and merge CAS before closure. |
+| Handoff / Release Condition | All K1 code acceptance gates completed by #860 merge; close Issue #850 after this owner-first governance closeout merges. SEARCH-001/#624, D/#644 and E/F/G/I remain separate. |
 
 The claim and Active state **became effective** on main at `7b482a4243b37a4f79ef3fe460b69b0740400682` (#851).
-The separately scoped K1 code now lives in Draft PR #860 and has no delivery/closure authority before validation and merge.
+K1 code was implemented and merged in PR #860 at `e32ea0a6220889e8346676d368110310171e2cce`; the I317 terminal governance record is published in this docs-only closeout.
 
 ## Published Baseline
 
@@ -94,12 +94,13 @@ unprotected direct legacy fallback. Do not modify E/F or I state.
 |---|---|---|
 | 2026-11-05 | Atomic claim+activation proposal | #851 proposed I317/SEARCH-001-K, ineffective prior to its target-branch merge; separate I316/I310 owners retained. |
 | 2026-11-06 | Claim effective | #851 merged into main as `7b482a4243b37a4f79ef3fe460b69b0740400682` after CI3840 and both governance validators. |
-| 2026-11-06 | Draft implementation | #860 K1 private helper replacement and parity fixtures submitted; code CI/review pending. |
+| 2026-11-06 | Draft implementation | #860 K1 private helper replacement and parity fixtures submitted; initial CI3842 rustfmt failure was fixed before successful later heads. |
+| 2026-11-07 | Accepted implementation merge | #860 exact head `d79d3d0` passed CI3862 8/8 and independent security/API review, then merged into main as `e32ea0a6220889e8346676d368110310171e2cce` by expected-head CAS. |
 
 ## Verification Evidence
 
 - Governance claim #851 merged at `7b482a4243b37a4f79ef3fe460b69b0740400682`. Its exact-head CI3840/run 42177971137 completed success; both governance validators passed with zero warnings. Single-maintainer exception recorded; no independent reviewer approval is claimed.
-- Draft implementation PR #860 begins from the effective claim merge. Initial commit `f38fd1bdaacad77edb9c369931eb843ac0ee5f90` adds a private upstream-parity helper and tests. CI and independent implementation security review are **pending**, not passing evidence.
+- Implementation PR #860 began after effective claim; the original `f38fd1b` failed rustfmt in CI3842, fixed by `f2c978e`. Final code head `d79d3d0` passed CI3862 8/8 and independent exact-head security/API review, then merged `e32ea0a6220889e8346676d368110310171e2cce`.
 
 ### 2026-11-06 Historical CI acceptance boundary
 
@@ -108,7 +109,11 @@ unprotected direct legacy fallback. Do not modify E/F or I state.
 
 ## Completion Evidence
 
-Pending a separately accepted implementation commit. A governance-only commit must not cite itself.
+**Complete / Closed** on publication of this governance closeout.
+
+Actual implementation Completion Commit: `e32ea0a6220889e8346676d368110310171e2cce`
+
+[CI3862](https://github.com/wjhuang88/talos/actions/runs/42340480867) passed 8/8, [independent final-head API/security review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750) found no blockers, and GitHub clean target-branch CAS and expected-head merge succeeded. This docs-only closeout is not the Completion Commit.
 
 ## Variance And Residuals
 
@@ -117,10 +122,19 @@ fallback ownership. The old crate remains in Cargo until the separately gated I 
 
 ## Retrospective
 
-Pending actual implementation and closeout.
+K1 kept scope private and narrow, preserving protected zero-key behavior and upstream rollback. The historical rustfmt discrepancy and nonblocking stale-UA provenance comment were repaired and independently rechecked. Cross-platform CI verified source-parity fixtures; it did not prove live search reachability.
 
 ## Independent review and CI after historical main synchronization — 2026-11-07
 
 CI3855/run [42203333658](https://github.com/wjhuang88/talos/actions/runs/42203333658) passed **8/8** on historical pre-sync code SHA `7dbe82c65c034a2c0c827dd699975c4442c64930`; independent Copilot [read-only review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6682872016) reported **no blocking API/network/security/upstream-parity findings** for exactly that SHA. The single non-blocking stale `headers.rs` comment was corrected in this replay. Latest main `4685c2979453ef8a89675477032053ec0e15acec` includes independent #865/#866 QUALITY-001 closure and search timeout fixtures. **Fresh-head CI, exact-head re-review and merge remain required**; do not promote Draft until accepted.
 
-Evidence is *not* code completion: final merged implementation SHA and separately accepted governance closeout remain blank. Issue #850 remains open until both occur.
+That was the historical pre-merge checkpoint. The actual merged implementation now exists as `e32ea0a6220889e8346676d368110310171e2cce`; governance and #850 closeout remain conditional on this documentation PR merging.
+
+## Final authoritative I317 closure — 2026-11-07
+
+- K1 code Completion Commit: `e32ea0a6220889e8346676d368110310171e2cce`
+- Accepted implementation head `d79d3d0ecbe51b19246d81a8dcc0acdd7ae6b13e` passed CI3862 8/8, [independent Copilot security/API/parity review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750), clean merge-time CAS.
+- Six offline exact-upstream helper tests passed, including malformed encodings and 12-UA-byte fingerprint, with no source/permission/budget/proxy/redirect/retry/transport/API change.
+- Dormant `rust-websearch` package, legacy `WebSearchTool`, MIT notice and direct upstream test oracle intentionally retained. Dependency retirement is separately gated SEARCH-001-I; D/#644 zero native-provider admission and regional reachability limitations persist.
+- Parent SEARCH-001/#624 stays **Open**; E/F/G/I not activated. #850 had been automatically closed by #860 merge and reopened until this closeout merges; update/close only after published governance CAS.
+- Older Active/Draft statements are historical and superseded by this terminal-state section.
