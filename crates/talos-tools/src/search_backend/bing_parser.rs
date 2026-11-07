@@ -10,7 +10,7 @@
 
 use std::{fmt, panic::catch_unwind};
 
-use rust_websearch::html_utils::clean_html;
+use super::compat_helpers::clean_html;
 use scraper::{ElementRef, Html, Selector};
 use thiserror::Error;
 
