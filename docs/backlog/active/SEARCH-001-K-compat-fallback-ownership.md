@@ -1,6 +1,6 @@
 # SEARCH-001-K: Talos-Owned Zero-Key Compatibility Fallback
 
-**Status**: Complete / Closed — Implementation Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (PR #860), I317 post-merge governance closeout in progress
+**Status**: Complete / Closed — Implementation Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (PR #860), I317 governance closeout merged in PR #870 (`45a1733ec88b7925e9f1931082562bf3b240e513`)
 
 | Field | Value |
 |---|---|
