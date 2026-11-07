@@ -5,6 +5,21 @@
 > Iteration: I132 / P130
 > Revised: 2026-07-16 (review v1 — corrected capability assessment)
 
+
+## 2026-11-07 supersession addendum
+
+The original evidence table below is the **2026-07-16 assessment**, not a current inventory of
+Work/Goal/Mission identities. WORK-001 subsequently delivered the shared domain and evaluation
+foundation; Desktop D6 delivered bounded durable-session navigation. They do not establish phase
+checkpoint recovery or a durable scheduler. The earlier correction rejecting "substantially
+delivered" remains valid for the persistent multi-phase runtime.
+
+At the maintainer's request, [TASK-001](../backlog/active/TASK-001-persistent-task-runtime-spike.md)
+and #38 now retire the separate-engine umbrella as Cancelled / Superseded. The owner preserves the
+unimplemented lifecycle/checkpoint/recovery/scheduling/concurrency differences and reactivation
+criteria. Future selected work must reuse the shared domain, Session storage and permission pipeline.
+This does not authorize a new engine, change permissions, or revoke the defer/reversal safety gates.
+
 ## Context
 
 TASK-001 asked for an ADR-ready recommendation on persistent resumable task capability before any
