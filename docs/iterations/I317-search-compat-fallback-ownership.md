@@ -109,7 +109,11 @@ unprotected direct legacy fallback. Do not modify E/F or I state.
 
 ## Completion Evidence
 
-**Complete / Closed** on publication of this governance closeout. **Actual implementation Completion Commit:** `e32ea0a6220889e8346676d368110310171e2cce` (#860). [CI3862](https://github.com/wjhuang88/talos/actions/runs/42340480867) 8/8, [independent final-head API/security review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750) no blockers, GitHub clean target-branch CAS and expected-head merge. This docs-only closeout is not the Completion Commit.
+**Complete / Closed** on publication of this governance closeout.
+
+Actual implementation Completion Commit: `e32ea0a6220889e8346676d368110310171e2cce`
+
+[CI3862](https://github.com/wjhuang88/talos/actions/runs/42340480867) passed 8/8, [independent final-head API/security review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750) found no blockers, and GitHub clean target-branch CAS and expected-head merge succeeded. This docs-only closeout is not the Completion Commit.
 
 ## Variance And Residuals
 
@@ -128,7 +132,8 @@ That was the historical pre-merge checkpoint. The actual merged implementation n
 
 ## Final authoritative I317 closure — 2026-11-07
 
-- K1 code Completion Commit: `e32ea0a6220889e8346676d368110310171e2cce` (#860); exact-head `d79d3d0ecbe51b19246d81a8dcc0acdd7ae6b13e` accepted with CI3862 8/8, [independent Copilot security/API/parity review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750), clean merge-time CAS.
+- K1 code Completion Commit: `e32ea0a6220889e8346676d368110310171e2cce`
+- Accepted implementation head `d79d3d0ecbe51b19246d81a8dcc0acdd7ae6b13e` passed CI3862 8/8, [independent Copilot security/API/parity review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750), clean merge-time CAS.
 - Six offline exact-upstream helper tests passed, including malformed encodings and 12-UA-byte fingerprint, with no source/permission/budget/proxy/redirect/retry/transport/API change.
 - Dormant `rust-websearch` package, legacy `WebSearchTool`, MIT notice and direct upstream test oracle intentionally retained. Dependency retirement is separately gated SEARCH-001-I; D/#644 zero native-provider admission and regional reachability limitations persist.
 - Parent SEARCH-001/#624 stays **Open**; E/F/G/I not activated. #850 had been automatically closed by #860 merge and reopened until this closeout merges; update/close only after published governance CAS.
