@@ -1,5 +1,10 @@
 # Iterations
 
+## I318 native key repeat — proposed activation
+
+[I318](I318-native-key-repeat.md) / TUI-054 / #269 proposes native repeat-safe input routing.
+Claim and activation are ineffective until governance merge; non-overlap inventory is in the owner.
+
 ## I317 / SEARCH-001-K post-merge closeout — 2026-11-07
 
 [I317](I317-search-compat-fallback-ownership.md) /
