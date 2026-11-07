@@ -4,6 +4,7 @@
 //! This module owns only input handling, approval overlay, and display state.
 
 use std::time::{Duration, Instant};
+use unicode_segmentation::UnicodeSegmentation;
 
 use talos_conversation::{
     CommandExecutionMode, CredentialResponseData, ModelPickerData, SessionPickerItem,
@@ -108,29 +109,74 @@ impl TuiState {
         }
     }
 
+    fn cursor_byte(&self) -> usize {
+        self.input_buffer
+            .char_indices()
+            .nth(self.cursor_pos)
+            .map_or(self.input_buffer.len(), |(offset, _)| offset)
+    }
+    fn set_cursor_byte(&mut self, byte: usize) {
+        // Deleting a separator may join two regional indicators or combining
+        // sequences. Keep the cursor on a boundary in the resulting text too.
+        let boundary = if byte == self.input_buffer.len() {
+            byte
+        } else {
+            self.input_buffer
+                .grapheme_indices(true)
+                .map(|(start, _)| start)
+                .take_while(|start| *start <= byte)
+                .last()
+                .unwrap_or(0)
+        };
+        self.cursor_pos = self.input_buffer[..boundary].chars().count();
+    }
     pub(crate) fn input_backspace(&mut self) {
-        if self.cursor_pos > 0 {
-            self.cursor_pos -= 1;
-            let byte_pos = self
-                .input_buffer
-                .char_indices()
-                .nth(self.cursor_pos)
-                .map(|(i, _)| i)
-                .unwrap_or(self.input_buffer.len());
-            self.input_buffer.remove(byte_pos);
+        let cursor = self.cursor_byte();
+        if cursor == 0 {
+            return;
+        }
+        if let Some((start, cluster)) = self
+            .input_buffer
+            .grapheme_indices(true)
+            .find(|(start, cluster)| *start < cursor && start + cluster.len() >= cursor)
+        {
+            let end = start + cluster.len();
+            self.input_buffer.replace_range(start..end, "");
+            self.set_cursor_byte(start);
         }
     }
-
+    pub(crate) fn input_delete(&mut self) {
+        let cursor = self.cursor_byte();
+        if let Some((start, cluster)) = self
+            .input_buffer
+            .grapheme_indices(true)
+            .find(|(start, cluster)| start + cluster.len() > cursor)
+        {
+            let end = start + cluster.len();
+            self.input_buffer.replace_range(start..end, "");
+            self.set_cursor_byte(start);
+        }
+    }
     pub(crate) fn input_cursor_left(&mut self) {
-        if self.cursor_pos > 0 {
-            self.cursor_pos -= 1;
-        }
+        let cursor = self.cursor_byte();
+        let previous = self
+            .input_buffer
+            .grapheme_indices(true)
+            .map(|(start, _)| start)
+            .take_while(|start| *start < cursor)
+            .last()
+            .unwrap_or(0);
+        self.set_cursor_byte(previous);
     }
-
     pub(crate) fn input_cursor_right(&mut self) {
-        if self.cursor_pos < self.input_buffer.chars().count() {
-            self.cursor_pos += 1;
-        }
+        let cursor = self.cursor_byte();
+        let next = self
+            .input_buffer
+            .grapheme_indices(true)
+            .map(|(start, cluster)| start + cluster.len())
+            .find(|end| *end > cursor)
+            .unwrap_or(self.input_buffer.len());
+        self.set_cursor_byte(next);
     }
 
     pub(crate) fn input_cursor_to_line_start(&mut self) {
@@ -217,10 +263,10 @@ impl TuiState {
         if self.slash_menu.is_credential_input() {
             match self.slash_menu.credential_field {
                 CredentialField::ApiKey => {
-                    self.slash_menu.credential_buffer.pop();
+                    pop_grapheme(&mut self.slash_menu.credential_buffer);
                 }
                 CredentialField::BaseUrl => {
-                    self.slash_menu.base_url_buffer.pop();
+                    pop_grapheme(&mut self.slash_menu.base_url_buffer);
                 }
             }
         }
@@ -334,10 +380,10 @@ impl TuiState {
             return;
         };
         match *step {
-            WizardStep::Name => name.pop(),
-            WizardStep::BaseUrl => base_url.pop(),
-            WizardStep::ApiKey => api_key.pop(),
-            _ => None,
+            WizardStep::Name => pop_grapheme(name),
+            WizardStep::BaseUrl => pop_grapheme(base_url),
+            WizardStep::ApiKey => pop_grapheme(api_key),
+            _ => {}
         };
     }
 
@@ -446,7 +492,11 @@ impl TuiState {
     /// reach the bridge so it can show its corrective picker message. Once a
     /// separator follows either command, leave the command menu and preserve
     /// the composer text verbatim for normal submission.
-    fn refresh_slash_menu_after_input(&mut self) {
+    pub(crate) fn refresh_slash_menu_after_input(&mut self) {
+        if self.slash_menu.is_slash() && !self.input_buffer.starts_with('/') {
+            self.slash_menu.close();
+            return;
+        }
         if self.slash_menu.is_slash()
             && matches!(
                 self.input_buffer
@@ -680,3 +730,9 @@ impl TuiState {
 #[cfg(test)]
 #[path = "state_tests.rs"]
 mod tests;
+
+fn pop_grapheme(text: &mut String) {
+    if let Some((start, _)) = text.grapheme_indices(true).next_back() {
+        text.truncate(start);
+    }
+}
