@@ -67,13 +67,13 @@ claimed. Remaining capability differences stay in this owner's section above.
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | Governance-only #38 supersession and retained recovery-difference mapping; no runtime or policy change |
 | Claimed At | 2026-11-07 |
 | Source Issue | #38 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #868 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer requested #38 closure; exact-head independent review and CI required before merge |
 | Implementation PR | None |
