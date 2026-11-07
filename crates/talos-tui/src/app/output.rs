@@ -765,6 +765,7 @@ impl Tui {
             }
             UiOutput::SessionIdentity { id } => {
                 if self.session_id.as_ref() != Some(&id) {
+                    self.repeat_key = None;
                     self.tool_activities.clear();
                 }
                 self.session_id = Some(id);

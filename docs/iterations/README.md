@@ -1,9 +1,9 @@
 # Iterations
 
-## I318 native key repeat — proposed activation
+## I318 native key repeat — Review
 
-[I318](I318-native-key-repeat.md) / TUI-054 / #269 proposes native repeat-safe input routing.
-Claim and activation are ineffective until governance merge; non-overlap inventory is in the owner.
+[I318](I318-native-key-repeat.md) / TUI-054 / #269 has locally validated native repeat-safe routing in PR #872.
+Claim #869 is effective; physical terminal/IME acceptance is deferred, not waived.
 
 ## I317 / SEARCH-001-K post-merge closeout — 2026-11-07
 

@@ -1,6 +1,63 @@
 use super::*;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct RepeatFocus {
+    panel: u64,
+    open: bool,
+    approval: bool,
+    wizard: Option<crate::state::WizardStep>,
+    credential: crate::state::CredentialField,
+}
 impl Tui {
+    fn repeat_focus(&self) -> RepeatFocus {
+        RepeatFocus {
+            panel: self.state.slash_menu.input_id,
+            open: self.state.slash_menu.is_open,
+            approval: !matches!(self.state.approval_state, ApprovalState::Hidden),
+            wizard: match &self.state.slash_menu.kind {
+                Some(crate::state::PanelKind::ProviderWizard { step, .. }) => Some(*step),
+                _ => None,
+            },
+            credential: self.state.slash_menu.credential_field,
+        }
+    }
+    fn admit_key_event(&mut self, key: &event::KeyEvent) -> bool {
+        let focus = self.repeat_focus();
+        let safe = matches!(
+            key.code,
+            KeyCode::Backspace
+                | KeyCode::Delete
+                | KeyCode::Left
+                | KeyCode::Right
+                | KeyCode::Up
+                | KeyCode::Down
+                | KeyCode::PageUp
+                | KeyCode::PageDown
+                | KeyCode::Home
+                | KeyCode::End
+        );
+        let identity = (key.code, key.modifiers, focus);
+        match key.kind {
+            KeyEventKind::Press => {
+                self.repeat_key = safe.then_some(identity);
+                true
+            }
+            KeyEventKind::Repeat => {
+                let accepted = safe && self.repeat_key == Some(identity);
+                if !accepted {
+                    self.repeat_key = None;
+                }
+                accepted
+            }
+            KeyEventKind::Release => {
+                if self.repeat_key.is_some_and(|(code, _, _)| code == key.code) {
+                    self.repeat_key = None;
+                }
+                false
+            }
+        }
+    }
+
     fn toggle_reasoning_at_screen(&mut self, column: u16, row: u16) -> bool {
         let Some(area) = self.last_history_area else {
             return false;
@@ -189,9 +246,12 @@ impl Tui {
     }
 
     pub(super) fn handle_input_event(&mut self, event: &Event) -> bool {
+        if !matches!(event, Event::Key(_)) {
+            self.repeat_key = None;
+        }
         match event {
             Event::Key(key) => {
-                if key.kind != KeyEventKind::Press {
+                if !self.admit_key_event(key) {
                     return false;
                 }
                 match key.code {
@@ -425,6 +485,13 @@ impl Tui {
                             self.state.backspace_slash_query();
                         } else {
                             self.state.input_backspace();
+                        }
+                    }
+                    KeyCode::Delete => {
+                        self.state.ctrl_c_state = CtrlCState::Idle;
+                        self.state.input_delete();
+                        if self.state.slash_menu.is_open {
+                            self.state.refresh_slash_menu_after_input();
                         }
                     }
                     KeyCode::Left => {

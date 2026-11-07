@@ -4,6 +4,11 @@ use talos_conversation::{
     CommandExecutionMode, ModelPickerData, ModelPickerItem, SessionPickerItem,
 };
 
+// Content-free identity for each opening; never snapshot panel secrets.
+static NEXT_PANEL_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+fn next_panel_id() -> u64 {
+    NEXT_PANEL_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
 pub(crate) const SLASH_MENU_MAX_VISIBLE: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -138,6 +143,7 @@ pub(crate) enum CredentialField {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub(crate) struct BottomPanelState {
+    pub(crate) input_id: u64,
     pub(crate) is_open: bool,
     pub(crate) kind: Option<PanelKind>,
     pub(crate) items: Vec<PanelItem>,
@@ -167,6 +173,7 @@ impl BottomPanelState {
             })
             .collect();
         Self {
+            input_id: next_panel_id(),
             is_open: true,
             kind: Some(PanelKind::SlashCommand),
             items,
@@ -203,6 +210,7 @@ impl BottomPanelState {
             })
             .collect();
         Self {
+            input_id: next_panel_id(),
             is_open: true,
             kind: Some(PanelKind::SessionPicker),
             items,
@@ -297,6 +305,7 @@ impl BottomPanelState {
             .position(|i| i.action != PanelItemAction::Header)
             .unwrap_or(0);
         Self {
+            input_id: next_panel_id(),
             is_open: true,
             kind: Some(PanelKind::ModelPicker),
             items: panel_items,
@@ -354,6 +363,7 @@ impl BottomPanelState {
             .unwrap_or(0);
 
         Self {
+            input_id: next_panel_id(),
             is_open: true,
             kind: Some(PanelKind::ModelList {
                 provider: provider.to_string(),
@@ -435,6 +445,7 @@ impl BottomPanelState {
             .unwrap_or(0);
 
         Self {
+            input_id: next_panel_id(),
             is_open: true,
             kind: Some(PanelKind::ConnectPicker),
             items: panel_items,
@@ -453,6 +464,7 @@ impl BottomPanelState {
         default_base_url: Option<String>,
     ) -> Self {
         Self {
+            input_id: next_panel_id(),
             is_open: true,
             kind: Some(PanelKind::CredentialInput {
                 provider: provider.to_string(),
@@ -489,6 +501,7 @@ impl BottomPanelState {
             })
             .collect();
         Self {
+            input_id: next_panel_id(),
             is_open: true,
             kind: Some(PanelKind::VariantPicker {
                 provider,
@@ -507,6 +520,7 @@ impl BottomPanelState {
     #[allow(dead_code)]
     pub(crate) fn open_provider_wizard() -> Self {
         Self {
+            input_id: next_panel_id(),
             is_open: true,
             kind: Some(PanelKind::ProviderWizard {
                 step: WizardStep::Name,
@@ -571,6 +585,7 @@ impl BottomPanelState {
         preview: Option<String>,
     ) -> Self {
         Self {
+            input_id: next_panel_id(),
             is_open: true,
             kind: Some(PanelKind::Approval {
                 tool_name: tool_name.to_string(),
@@ -707,6 +722,7 @@ impl BottomPanelState {
     }
 
     pub(crate) fn close(&mut self) {
+        self.input_id = next_panel_id();
         self.is_open = false;
         self.kind = None;
         self.items.clear();
