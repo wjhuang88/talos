@@ -1,5 +1,12 @@
 # Talos Board
 
+## Issue #22 workspace-trust reconciliation — 2026-11-07
+
+[PERM-004](backlog/active/PERM-004-workspace-trust-sandbox.md) is Cancelled / Superseded.
+Bounded trust, exact external-path grants and I308 Auto admission replace the old umbrella.
+Unimplemented discovery/DSL/universal confinement options remain explicitly deferred in the owner;
+PERM-006-D/E retain their separate scope. No runtime or permission-policy change.
+
 ## Delivery quality repairs / QUALITY-001
 
 [Repair owner](tasks/2026-11-06-quality001-delivery-repair.md) is Complete / Closed.
