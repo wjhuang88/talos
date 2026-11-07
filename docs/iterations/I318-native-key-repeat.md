@@ -1,6 +1,6 @@
 # Iteration I318: Native TUI Key Repeat
 
-> Document status: Active — proposed atomic activation, ineffective until target merge
+> Document status: Active — implementation under validation
 > Published plan date: 2026-11-07
 > Planned objective: deliver Issue #269 native repeat-safe editing/navigation with one-shot and focus isolation.
 > MVP deliverable: the real Talos TUI consumes backend Repeat for safe actions without a timer; submission/approval remain single-shot.
@@ -91,3 +91,16 @@ Rebased onto `b194ef7058a6b3500f0cf4256918348187c7763a`: #38 is now closed by su
 and its terminal-owner validator correction is present. I317 has completed through #860 and its
 closeout; its prior Active disposition above is the selection-time snapshot. I310 remains separately
 active. Board/index conflicts were resolved by preserving both scopes; no TUI implementation yet.
+
+## Implementation progress — 2026-11-07
+
+Claim #869 became effective at `8a3bd94076b02d16769d3dc3a82f188de6ef1944`. Local implementation
+now routes native editing/navigation Repeat through content-free focus ownership, rejects one-shot
+action repeats, and uses Unicode grapheme-safe deletion/movement. Terminal focus reporting has
+setup/rollback/restore coverage. Final TUI library regression run: 619 passed, 0 failed
+(`/private/tmp/i318-tui-reviewed.log`). Full final-source preflight and implementation review remain
+pending; this is not merged delivery evidence.
+
+Maintainer explicitly deferred physical acceptance. **Ghostty without tmux**, second-terminal
+hold/release, and Chinese IME observations remain unverified. Keep this scope open; PTY protocol
+execution and synthetic event tests cannot replace these observations.

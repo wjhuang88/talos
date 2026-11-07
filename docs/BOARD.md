@@ -1,10 +1,10 @@
 # Talos Board
 
-## I318 / TUI-054 native key repeat — proposed activation
+## I318 / TUI-054 native key repeat — Active
 
-[I318](iterations/I318-native-key-repeat.md) / #269 proposes editing/navigation repeat routing with
-one-shot approval/submission and focus isolation. Effective only after claim merge; real-terminal
-hold/IME acceptance remains required. #38 is closed independently by supersession.
+[I318](iterations/I318-native-key-repeat.md) / #269 has local editing/navigation repeat routing with
+one-shot approval/submission and focus isolation under validation. Claim #869 is merged; physical
+Ghostty/second-terminal hold and IME acceptance is explicitly deferred and remains required. #38 is closed independently by supersession.
 
 ## Issue #38 persistent-task proposal — 2026-11-07
 

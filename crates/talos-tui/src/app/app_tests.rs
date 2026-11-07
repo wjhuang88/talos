@@ -4122,3 +4122,288 @@ fn escape_cancels_manual_compaction_without_a_fake_processing_turn() {
     tui.handle_input_event(&key_press(KeyCode::Esc));
     assert!(rx.try_recv().is_err());
 }
+
+fn repeat_event(code: KeyCode, kind: crossterm::event::KeyEventKind) -> crossterm::event::Event {
+    crossterm::event::Event::Key(crossterm::event::KeyEvent::new_with_kind(
+        code,
+        crossterm::event::KeyModifiers::NONE,
+        kind,
+    ))
+}
+
+#[test]
+fn native_repeat_edits_whole_graphemes_and_stops_at_release() {
+    use crossterm::event::KeyEventKind::{Press, Release, Repeat};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.state.input_append_str("a中e\u{301}👩‍💻🇨🇳");
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Press));
+    assert_eq!(tui.state.input_buffer, "a中e\u{301}👩‍💻");
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Repeat));
+    assert_eq!(tui.state.input_buffer, "a中e\u{301}");
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Release));
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Repeat));
+    assert_eq!(tui.state.input_buffer, "a中e\u{301}");
+    tui.handle_input_event(&repeat_event(KeyCode::Left, Press));
+    assert_eq!(tui.state.cursor_pos, 2);
+    tui.handle_input_event(&repeat_event(KeyCode::Left, Repeat));
+    assert_eq!(tui.state.cursor_pos, 1);
+    tui.handle_input_event(&repeat_event(KeyCode::Delete, Press));
+    tui.handle_input_event(&repeat_event(KeyCode::Delete, Repeat));
+    assert_eq!(tui.state.input_buffer, "a");
+    for _ in 0..4 {
+        tui.handle_input_event(&repeat_event(KeyCode::Delete, Repeat));
+    }
+    assert_eq!(tui.state.input_buffer, "a");
+}
+
+#[test]
+fn native_repeat_cannot_cross_panel_replacement_or_submit_approval() {
+    use crossterm::event::KeyEventKind::{Press, Repeat};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.show_approval("first", "{}");
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Press));
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Repeat));
+    assert_eq!(tui.state.slash_menu.selected_index, 2);
+    tui.hide_approval();
+    tui.show_approval("second", "{}");
+    let selected = tui.state.slash_menu.selected_index;
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Repeat));
+    assert_eq!(tui.state.slash_menu.selected_index, selected);
+    let (tx, mut rx) = tokio::sync::oneshot::channel();
+    tui.state.pending_approval_response = Some(tx);
+    for code in [
+        KeyCode::Enter,
+        KeyCode::Char('1'),
+        KeyCode::Char('2'),
+        KeyCode::Char('3'),
+        KeyCode::Esc,
+    ] {
+        tui.handle_input_event(&repeat_event(code, Repeat));
+    }
+    assert!(matches!(
+        rx.try_recv(),
+        Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+    ));
+}
+
+#[test]
+fn native_repeat_menu_wrap_and_focus_invalidation() {
+    use crossterm::event::{
+        Event,
+        KeyEventKind::{Press, Repeat},
+    };
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.state
+        .open_slash_menu(talos_conversation::command_registry());
+    let start = tui.state.slash_menu.selected_index;
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Press));
+    let once = tui.state.slash_menu.selected_index;
+    assert_ne!(once, start);
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Repeat));
+    assert_ne!(tui.state.slash_menu.selected_index, once);
+    for event in [
+        Event::FocusLost,
+        Event::FocusGained,
+        Event::Resize(100, 40),
+        Event::Paste(String::new()),
+    ] {
+        tui.handle_input_event(&repeat_event(KeyCode::Down, Press));
+        tui.handle_input_event(&event);
+        let selected = tui.state.slash_menu.selected_index;
+        tui.handle_input_event(&repeat_event(KeyCode::Down, Repeat));
+        assert_eq!(tui.state.slash_menu.selected_index, selected);
+    }
+}
+
+#[test]
+fn native_repeat_submit_is_one_shot_and_orphan_repeat_is_ignored() {
+    use crossterm::event::KeyEventKind::{Press, Release, Repeat};
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(tx));
+    tui.state.input_append_str("first");
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Repeat));
+    assert_eq!(tui.state.input_buffer, "first");
+    tui.handle_input_event(&repeat_event(KeyCode::Enter, Press));
+    assert!(matches!(rx.try_recv(), Ok(UserInput::Message(_))));
+    tui.state.input_append_str("second");
+    for kind in [Repeat, Release, Repeat] {
+        tui.handle_input_event(&repeat_event(KeyCode::Enter, kind));
+    }
+    assert!(rx.try_recv().is_err());
+    assert_eq!(tui.state.input_buffer, "second");
+}
+
+#[test]
+fn native_repeat_cannot_delete_composer_after_slash_closes() {
+    use crossterm::event::KeyEventKind::{Press, Repeat};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.state
+        .open_slash_menu(talos_conversation::command_registry());
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Press));
+    assert!(!tui.state.slash_menu.is_open);
+    tui.state.input_append_str("new draft");
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Repeat));
+    assert_eq!(tui.state.input_buffer, "new draft");
+}
+
+#[test]
+fn native_repeat_right_stops_at_grapheme_end_and_empty_edits_are_noops() {
+    use crossterm::event::KeyEventKind::{Press, Repeat};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.state.input_append_str("e\u{301}👩‍💻中");
+    tui.state.cursor_pos = 0;
+    for (kind, expected) in [(Press, 2), (Repeat, 5), (Repeat, 6), (Repeat, 6)] {
+        tui.handle_input_event(&repeat_event(KeyCode::Right, kind));
+        assert_eq!(tui.state.cursor_pos, expected);
+    }
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Press));
+    for _ in 0..5 {
+        tui.handle_input_event(&repeat_event(KeyCode::Backspace, Repeat));
+    }
+    assert!(tui.state.input_buffer.is_empty());
+    assert_eq!(tui.state.cursor_pos, 0);
+}
+
+#[test]
+fn native_repeat_credential_backspace_preserves_composed_text_and_isolates_field() {
+    use crossterm::event::KeyEventKind::{Press, Repeat};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.state.open_credential_input("fixture", None, true, None);
+    tui.state.credential_append_str("a中e\u{301}");
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Press));
+    assert_eq!(tui.state.slash_menu.credential_buffer, "a中");
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Repeat));
+    assert_eq!(tui.state.slash_menu.credential_buffer, "a");
+    tui.state.slash_menu.credential_field = crate::state::CredentialField::BaseUrl;
+    tui.state.slash_menu.base_url_buffer = "https://fixture.invalid".into();
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Repeat));
+    assert_eq!(
+        tui.state.slash_menu.base_url_buffer,
+        "https://fixture.invalid"
+    );
+}
+
+#[test]
+fn native_repeat_forward_delete_closes_slash_without_crossing_focus() {
+    use crossterm::event::KeyEventKind::{Press, Repeat};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.state
+        .open_slash_menu(talos_conversation::command_registry());
+    tui.state.input_append_str("model");
+    tui.state.cursor_pos = 0;
+    tui.handle_input_event(&repeat_event(KeyCode::Delete, Press));
+    assert!(!tui.state.slash_menu.is_open);
+    assert_eq!(tui.state.input_buffer, "model");
+    tui.handle_input_event(&repeat_event(KeyCode::Delete, Repeat));
+    assert_eq!(tui.state.input_buffer, "model");
+}
+
+#[test]
+fn native_repeat_release_with_changed_modifiers_clears_ownership() {
+    use crossterm::event::{
+        Event, KeyEvent,
+        KeyEventKind::{Press, Release, Repeat},
+        KeyModifiers,
+    };
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.state.input_append_str("abcd");
+    tui.handle_input_event(&Event::Key(KeyEvent::new_with_kind(
+        KeyCode::Left,
+        KeyModifiers::SHIFT,
+        Press,
+    )));
+    tui.handle_input_event(&Event::Key(KeyEvent::new_with_kind(
+        KeyCode::Left,
+        KeyModifiers::NONE,
+        Release,
+    )));
+    tui.handle_input_event(&Event::Key(KeyEvent::new_with_kind(
+        KeyCode::Left,
+        KeyModifiers::SHIFT,
+        Repeat,
+    )));
+    assert_eq!(tui.state.cursor_pos, 3);
+}
+
+#[test]
+fn native_repeat_model_picker_wraps_and_wizard_step_rejects_stale_repeat() {
+    use crossterm::event::KeyEventKind::{Press, Repeat};
+    use talos_conversation::{ModelPickerData, ModelPickerItem};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    let data = ModelPickerData {
+        recent: vec![],
+        setup_providers: vec![],
+        ready_models: ["one", "two"]
+            .into_iter()
+            .map(|provider| ModelPickerItem {
+                command: "/model".into(),
+                model_id: "model".into(),
+                provider: provider.into(),
+                label: provider.into(),
+                context_limit: None,
+                pricing: None,
+                authenticated: true,
+                is_current: false,
+                variants: vec![],
+                variant: None,
+            })
+            .collect(),
+    };
+    tui.state.open_model_picker(&data);
+    let first = tui.state.slash_menu.selected_index;
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Press));
+    assert_ne!(tui.state.slash_menu.selected_index, first);
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Repeat));
+    assert_eq!(tui.state.slash_menu.selected_index, first);
+    tui.state.slash_menu = crate::panel_state::BottomPanelState::open_provider_wizard();
+    if let Some(crate::state::PanelKind::ProviderWizard { step, .. }) =
+        &mut tui.state.slash_menu.kind
+    {
+        *step = crate::state::WizardStep::Protocol;
+    }
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Repeat));
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Press));
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Repeat));
+    if let Some(crate::state::PanelKind::ProviderWizard { step, protocol, .. }) =
+        &mut tui.state.slash_menu.kind
+    {
+        assert_eq!(protocol, "anthropic-messages");
+        *step = crate::state::WizardStep::Name;
+    }
+    tui.handle_input_event(&repeat_event(KeyCode::Down, Repeat));
+    assert!(tui.repeat_key.is_none());
+}
+
+#[test]
+fn native_repeat_viewport_uses_current_projection_and_release_stops() {
+    use crossterm::event::KeyEventKind::{Press, Release, Repeat};
+    let mut tui = tui_with_projected_history(4, 10);
+    tui.handle_input_event(&repeat_event(KeyCode::PageUp, Press));
+    tui.last_history_projection = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
+    let once = tui.last_history_projection.visible_start;
+    tui.handle_input_event(&repeat_event(KeyCode::PageUp, Repeat));
+    let twice = project_history(&tui.transcript, 80, 10, &tui.history_scroll).visible_start;
+    assert!(twice < once);
+    tui.handle_input_event(&repeat_event(KeyCode::PageUp, Release));
+    tui.last_history_projection = project_history(&tui.transcript, 80, 10, &tui.history_scroll);
+    tui.handle_input_event(&repeat_event(KeyCode::PageUp, Repeat));
+    assert_eq!(
+        project_history(&tui.transcript, 80, 10, &tui.history_scroll).visible_start,
+        twice
+    );
+}
+
+#[test]
+fn native_repeat_deletion_that_joins_flag_keeps_cursor_on_boundary() {
+    use crossterm::event::KeyEventKind::{Press, Repeat};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.state.input_append_str("🇦x🇧");
+    tui.state.cursor_pos = 2;
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Press));
+    assert_eq!(tui.state.input_buffer, "🇦🇧");
+    assert_eq!(tui.state.cursor_pos, 0);
+    tui.handle_input_event(&repeat_event(KeyCode::Backspace, Repeat));
+    assert_eq!(tui.state.input_buffer, "🇦🇧");
+    tui.handle_input_event(&repeat_event(KeyCode::Delete, Press));
+    assert!(tui.state.input_buffer.is_empty());
+}

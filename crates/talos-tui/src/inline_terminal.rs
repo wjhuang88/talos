@@ -3,8 +3,9 @@ use std::io::{self, Stdout};
 use crossterm::{
     cursor::{Hide, MoveTo, SetCursorStyle, Show},
     event::{
-        DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-        KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+        DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
+        EnableFocusChange, EnableMouseCapture, KeyboardEnhancementFlags,
+        PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
     },
     execute, queue,
     style::Color as CColor,
@@ -164,6 +165,7 @@ struct TerminalLifecycleState {
     cursor_hidden: bool,
     bracketed_paste: bool,
     mouse_capture: bool,
+    focus_reporting: bool,
     keyboard_enhancement: bool,
 }
 
@@ -175,8 +177,10 @@ enum TerminalAction {
     HideCursor,
     EnableBracketedPaste,
     EnableMouseCapture,
+    EnableFocusReporting,
     ClearFrame,
     DisableMouseCapture,
+    DisableFocusReporting,
     DisableBracketedPaste,
     ShowCursor,
     LeaveAlternateScreen,
@@ -521,6 +525,7 @@ fn initialize_lifecycle(
         TerminalAction::HideCursor,
         TerminalAction::EnableBracketedPaste,
         TerminalAction::EnableMouseCapture,
+        TerminalAction::EnableFocusReporting,
     ] {
         if let Err(error) = run(action) {
             return Err(setup_error(error, &mut lifecycle, &mut run));
@@ -529,6 +534,7 @@ fn initialize_lifecycle(
             TerminalAction::HideCursor => lifecycle.cursor_hidden = true,
             TerminalAction::EnableBracketedPaste => lifecycle.bracketed_paste = true,
             TerminalAction::EnableMouseCapture => lifecycle.mouse_capture = true,
+            TerminalAction::EnableFocusReporting => lifecycle.focus_reporting = true,
             _ => unreachable!("only setup actions are listed above"),
         }
     }
@@ -564,6 +570,12 @@ fn restore_lifecycle(
     mut run: impl FnMut(TerminalAction) -> io::Result<()>,
 ) -> io::Result<()> {
     let mut first_error = None;
+    attempt_restore(
+        &mut lifecycle.focus_reporting,
+        TerminalAction::DisableFocusReporting,
+        &mut run,
+        &mut first_error,
+    );
     attempt_restore(
         &mut lifecycle.mouse_capture,
         TerminalAction::DisableMouseCapture,
@@ -635,6 +647,7 @@ fn execute_backend_action(
         TerminalAction::HideCursor => execute!(backend, Hide),
         TerminalAction::EnableBracketedPaste => execute!(backend, EnableBracketedPaste),
         TerminalAction::EnableMouseCapture => execute!(backend, EnableMouseCapture),
+        TerminalAction::EnableFocusReporting => execute!(backend, EnableFocusChange),
         TerminalAction::ClearFrame => execute!(backend, Clear(ClearType::All), MoveTo(0, 0)),
         action => execute_stdout_action(action),
     }
@@ -644,6 +657,7 @@ fn execute_stdout_action(action: TerminalAction) -> io::Result<()> {
     let mut stdout = io::stdout();
     match action {
         TerminalAction::DisableMouseCapture => execute!(stdout, DisableMouseCapture),
+        TerminalAction::DisableFocusReporting => execute!(stdout, DisableFocusChange),
         TerminalAction::DisableBracketedPaste => execute!(stdout, DisableBracketedPaste),
         TerminalAction::ShowCursor => execute!(stdout, SetCursorStyle::DefaultUserShape, Show),
         TerminalAction::LeaveAlternateScreen => execute!(
@@ -855,9 +869,20 @@ mod tests {
                 TerminalAction::HideCursor,
                 TerminalAction::EnableBracketedPaste,
                 TerminalAction::EnableMouseCapture,
+                TerminalAction::EnableFocusReporting,
                 TerminalAction::ClearFrame,
             ]
         );
+    }
+
+    #[test]
+    fn focus_reporting_failure_rolls_back_mouse_and_prior_states() {
+        let (result, actions) = initialize_with_failure(TerminalAction::EnableFocusReporting);
+        assert!(result.is_err());
+        assert!(actions.contains(&TerminalAction::DisableMouseCapture));
+        assert!(actions.contains(&TerminalAction::DisableBracketedPaste));
+        assert!(actions.contains(&TerminalAction::LeaveAlternateScreen));
+        assert!(!actions.contains(&TerminalAction::DisableFocusReporting));
     }
 
     #[test]
@@ -989,6 +1014,7 @@ mod tests {
             bracketed_paste: true,
             mouse_capture: true,
             keyboard_enhancement: true,
+            focus_reporting: true,
         };
         let mut first = Vec::new();
         assert!(
@@ -1000,7 +1026,7 @@ mod tests {
             })
             .is_err()
         );
-        assert_eq!(first.len(), 6);
+        assert_eq!(first.len(), 7);
         assert!(lifecycle.bracketed_paste);
         assert!(
             !lifecycle.mouse_capture && !lifecycle.cursor_hidden && !lifecycle.alternate_screen
