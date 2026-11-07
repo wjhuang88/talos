@@ -1,6 +1,6 @@
 # TUI-POLL-001: Group Background Process Polling
 
-> Document status: Active / Unclaimed (proposed claim; ineffective until target merge)
+> Document status: Active / Claimed (proposed claim; ineffective until target merge)
 > Published plan date: 2026-11-08
 > Deliverable: consecutive native process read/status calls for the same job occupy one live TUI summary, with errors and completion prominent.
 
@@ -8,13 +8,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | TUI-only consecutive same-job process read/status grouping, expandable raw call/result presentation, and failure/terminal visibility |
 | Claimed At | 2026-11-08 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #873 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User screenshot and explicit confirmation to implement same-job read/status summary with state, poll count and output amount; independent Agent review and exact-head CI required |
 | Implementation PR | Not started |
