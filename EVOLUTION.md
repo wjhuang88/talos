@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-08 - Protection stops must cross the live and durable boundaries
+
+- Trigger: User reported a silent stop after editing and rejected a manual continue workaround (AGENT-PAUSE-001).
+- Symptom: Runtime returned an explanatory success string, but no TextDelta or assistant history entry existed; the UI became idle without a reason.
+- Root cause: Guard exits bypassed ordinary finalized message publication. Repeat signatures also ignored real file changes between validation commands. The historical live guard subtype was not retained; deterministic regressions confirmed both code defects.
+- Fix: Publish and persist synthetic guard explanations once before completion. Refresh only built-in command signatures after invocation-scoped, successful built-in file changes; preserve the total budget and other signatures.
+- Prevention: Test real edit/validation sequences, no-op/failure/unknown tools, prepared mutations, Session durable reopen and Conversation rendering. Returning final text alone is not proof of user-visible delivery; asking the user to continue does not repair a silent stop.
+- Promoted to rule/check: `crates/talos-agent/src/tests/protection_stop.rs`, Session protection-stop regression, Conversation protection-stop projection and file mutation observation tests.
+
 ## 2026-11-08 - Prompt wording participates in runtime budgets and review evidence
 
 - Trigger: TOOL-ROUTE-001 standard preflight after shared routing guidance and tool-description edits.

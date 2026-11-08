@@ -163,6 +163,7 @@ impl DeleteTool {
             .to_string_lossy()
             .to_string();
 
+        talos_core::tool::record_file_mutation();
         Ok(match receipt {
             Some(id) => format!(
                 "deleted {display}; recovery_id: {id}; restore with this delete instance using path and recovery_id within 15 minutes. Backup is memory-only; restores bytes and basic permissions, not ownership, ACLs or timestamps."

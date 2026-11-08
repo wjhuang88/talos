@@ -71,6 +71,7 @@ mod helpers;
 pub mod permission_pipeline;
 mod persistence_snapshot;
 pub mod prompt;
+mod protection_progress;
 mod request_plan;
 mod scheduler;
 pub mod session;
@@ -923,6 +924,7 @@ impl Agent {
                 boundary_ack_tx,
             ),
         );
+        let run = protection_progress::FILE_CHANGED.scope(std::cell::Cell::new(false), run);
         if let Some(execution) = checkpoint_execution {
             checkpoint_tools::EXECUTION.scope(execution, run).await
         } else {
@@ -1601,6 +1603,13 @@ impl Agent {
                 );
             }
 
+            // Only completed mutations from a preceding batch count. A proposed
+            // same-batch edit is not evidence that validation has new input.
+            if protection_progress::take() {
+                doom_tracker.retain(|(name, _), _| {
+                    !protection_progress::is_command(name) || !self.tools.is_builtin_instance(name)
+                });
+            }
             for call in &effective_tool_calls {
                 let key = (call.name.clone(), call.input.to_string());
                 let count = doom_tracker.entry(key).or_insert(0);
@@ -2115,6 +2124,23 @@ impl Agent {
             }
         };
 
+        if matches!(
+            final_status,
+            TurnStatus::BudgetExceeded | TurnStatus::DoomLoopDetected
+        ) && let Ok(reason) = &result
+        {
+            let content = private_tokens.project(reason);
+            if let Some(tx) = &event_tx {
+                let _ = tx.send(AgentEvent::TextDelta {
+                    delta: content.clone(),
+                });
+            }
+            messages.push(Message::Assistant {
+                content,
+                tool_calls: vec![],
+                reasoning: None,
+            });
+        }
         self.emit_turn_complete(&hook_ctx, final_status).await;
 
         // Always extract the normalized partial messages from persist_start.
