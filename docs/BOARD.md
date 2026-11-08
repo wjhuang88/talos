@@ -290,3 +290,10 @@ owner for scope, acceptance and complete active/review/planned inventory.
 
 PROVIDER-008-B / #810 / I310 is proposed Active / Claimed in #811; ineffective until merge.
 Owner: [Gemini](backlog/active/PROVIDER-008-B-google-gemini.md). No implementation yet.
+
+## Session-owned worktrees / WORKTREE-001
+
+[Owner](tasks/2026-11-08-session-owned-worktrees.md) proposes Active / Claimed.
+Repair manual approval/execution for external paths and automatically admit verified
+Session-created worktrees, with resume and revocation. Claim is ineffective until
+its governance PR merges; production implementation is not yet delivered.
