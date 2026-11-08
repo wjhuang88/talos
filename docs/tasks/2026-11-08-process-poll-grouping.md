@@ -1,6 +1,6 @@
 # TUI-POLL-001: Group Background Process Polling
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-11-08
 > Deliverable: consecutive native process read/status calls for the same job occupy one live TUI summary, with errors and completion prominent.
 
@@ -8,7 +8,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | TUI-only consecutive same-job process read/status grouping, expandable raw call/result presentation, and failure/terminal visibility |
@@ -17,9 +17,9 @@
 | Governance Claim PR | #873 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User screenshot and explicit confirmation to implement same-job read/status summary with state, poll count and output amount; independent Agent review and exact-head CI required |
-| Implementation PR | Not started |
+| Implementation PR | #875 |
 | Last Updated | 2026-11-08 |
-| Handoff / Release Condition | Focused rendering/interaction regressions, standard preflight, MSVC xwin tests, independent review and exact-head CI before closure |
+| Handoff / Release Condition | None; accepted projection scope delivered |
 
 ## Goal and acceptance
 
@@ -96,3 +96,25 @@ isolation, terminal/error boundaries, replay parity and resize/selection anchors
 `cargo xwin check --locked -p talos-tui --tests --target x86_64-pc-windows-msvc`
 passed; this is compile evidence, not native execution. Supplemental independent
 Agent review found no remaining blockers. Exact-head review/CI and merge remain.
+
+## Completion evidence
+
+Completion Commit: ae66e309204e25cc67e4f289775989efcb79a553
+
+Implementation #875 merged after independent Agent APPROVE on head
+3964c246af63aa261d6e4426d2d3746102330f26 against base
+1a2c184d3dd972e27695b0b07acdd9e484e414e5. Reviewer:
+/root/quality_claim_review; receipt in PR body, no blockers. This was independent
+Agent technical review, not separate human GitHub approval.
+CI42393582470 passed all checks on that head: macOS workspace/preflight and runtime
+acceptance, native Windows workspace/runtime checks, Linux/Windows Desktop,
+installer, classification and owner reconciliation. Merge CAS confirmed unchanged
+claim owner and no overlapping work; TUI-ELLIPSIS-001 explicitly excludes grouping.
+Final governance validators passed with zero warnings. README.zh-CN documents the
+summary, expansion and byte-count semantics.
+
+All accepted scope is delivered. Physical-terminal visual inspection was not run;
+rendered-frame/click/drag tests provide the recorded interaction evidence. No claim
+of Desktop grouping, complete process-output byte totals or grouping ambiguous
+parallel batches. No remaining implementation item in this scope; unrelated local
+ellipsis/theme changes remain preserved.

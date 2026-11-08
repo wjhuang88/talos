@@ -7,8 +7,8 @@ selection and foreground defaults; activation awaits governance claim merge.
 
 ## Background process polling / TUI-POLL-001
 
-[Owner](tasks/2026-11-08-process-poll-grouping.md) is Review / Claimed through #873 (`1a2c184d`).
-Same-job TUI polling grouping is implemented locally; final validation and review pending.
+[Owner](tasks/2026-11-08-process-poll-grouping.md) is Complete / Closed.
+Same-job summaries and expansion shipped in #875 (`ae66e309`); preflight/xwin, independent review and native CI passed.
 
 ## I318 / TUI-054 native key repeat — Review
 
