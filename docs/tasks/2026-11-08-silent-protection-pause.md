@@ -1,6 +1,7 @@
 # AGENT-PAUSE-001: Visible Protection Stops And Post-Edit Validation
 
-> Document status: Review / Claimed (effective claim merge 1f537340)
+> Document status: Complete / Closed
+> Completion Commit: 7a4391726556815e7c3ff488a8cec0c8a185bffe
 > Published plan date: 2026-11-08
 > Deliverable: repeated-call and tool-budget stops visibly explain why execution ended, persist the explanation, and permit legitimate validation after successful file changes.
 
@@ -8,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | Agent protection-stop publication/persistence and scoped post-file-change repeat tracking; Session/Conversation/TUI regression coverage and user docs; no permission/sandbox policy change |
@@ -117,3 +118,11 @@ exited 0, including workspace check, Clippy, tests and external SDK fixture
 by `/root/quality_claim_review` found no blockers and confirmed no permission or
 sandbox relaxation. Final exact-head review, native CI and merge remain required.
 Owner stays Review until already-existing merged implementation evidence exists.
+
+Closure: #881 merged as 7a4391726556815e7c3ff488a8cec0c8a185bffe.
+Independent Agent review approved head 4fec0555 against base 1f537340; native
+CI run 42441593775 passed all checks, including Windows workspace and both
+Desktop feature checks. Merge-time head/base, claim, non-overlap and mergeability
+were rechecked. No residual within this protection-stop scope. The later
+power-loss Running-custody defect is separately owned by SESSION-CRASH-001;
+this completion does not claim that interrupted-session recovery is repaired.
