@@ -1119,6 +1119,11 @@ mod tests {
                 .await
                 .is_error
         );
+        // Windows revokes through metadata replacement, so the old output
+        // remains in this directory. Fresh create authorization still requires
+        // a missing target on every platform.
+        #[cfg(windows)]
+        std::fs::remove_file(&target).expect("remove old worktree output");
         for scope in [
             talos_permission::GrantScope::Once,
             talos_permission::GrantScope::Session,
