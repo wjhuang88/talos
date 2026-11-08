@@ -13,7 +13,7 @@
 | Work Slice | Verified Session-owned worktree creation receipts, additional workspace capabilities, resume revalidation, tool/permission integration and adversarial tests |
 | Claimed At | 2026-11-08 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #889 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requests automatic workspace admission for worktrees created by the Session; independent security design review identifies receipt and capability prerequisites |
 | Implementation PR | Not started |
@@ -82,8 +82,11 @@ shell success alone does not prove creation ownership. The reviewed recommendati
 is trusted creation receipts plus per-root capabilities and resume revalidation.
 This is design advice, not approval of implementation or a completed repair.
 
-Before activation, settle the bounded shell syntax, atomic creation/identity custody
-on Unix and Windows, persistence schema and public API compatibility in an ADR.
+The effective claim includes a design checkpoint before permission expansion.
+Settle bounded shell syntax, atomic creation/identity custody on Unix and Windows,
+persistence schema and public API compatibility in ADR-099 and obtain independent
+security review of that checkpoint before implementing automatic membership.
+Approval/execution regression repair remains the first implementation checkpoint.
 Prefer an existing audited host process boundary; document any host-git dependency,
 unavailable-host behavior and replacement trigger. Do not implement broad directory
 allowlisting as an interim fix. This owner is the residual destination.
@@ -116,3 +119,22 @@ validation, exact-head security review and merged evidence. Owner remains Active
 until all accepted behavior is implemented; partial milestones do not close it.
 
 Decision: [ADR-099](../decisions/099-session-owned-worktree-admission.md).
+
+## User-confirmed policy correction
+
+The user explicitly clarified the rule: ordinary workspace files are allowed;
+non-workspace files require human authorization. Session-created worktrees become
+workspace roots. Do not keep the old default Ask for ordinary local file operations
+or use automatic-model review as a barrier to the external-path human prompt.
+Explicit Deny and sensitive-path restrictions remain authoritative. Limit the new
+default to native ordinary file operations, not Execute/Network/Git administration
+or plugin identity inferred from a tool name. Add a policy matrix regression for
+local ordinary files, external files (approve/deny), registered worktrees and secrets.
+
+The user's next clarification explicitly requires compatibility with automatic review.
+External paths require authorization, not necessarily unconditional human approval:
+retain existing deterministic automatic-review eligibility and exact one-shot grants.
+When automatic review cannot approve, is ineligible or fails, fall back to human
+approval. Do not broaden automatic eligibility merely because a path is external.
+Both approval routes feed the same exact execution authorization. This clarification
+supersedes any wording above that implies skipping automatic review for external paths.

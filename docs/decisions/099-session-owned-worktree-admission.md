@@ -1,6 +1,6 @@
 # ADR-099: Session-owned worktree admission
 
-Status: Proposed
+Status: Accepted (effective with governance merge #889)
 Owner: [WORKTREE-001](../tasks/2026-11-08-session-owned-worktrees.md)
 
 ## Context
@@ -12,6 +12,14 @@ single managed root is extended only for verified session-owned additional roots
 ADR-089's exact Git effect and denial boundaries remain applicable.
 
 ## Decision
+
+User-confirmed default: ordinary native workspace file operations are allowed.
+External file operations require authorization through the existing pipeline: retain
+applicable automatic review and fall back to human approval when it cannot allow.
+Do not expand automatic eligibility for external paths. This supersedes
+the default ordinary local-write Ask/trust requirement only for this file scope.
+Explicit restrictions, protected paths, Execute/Network and Git administrative
+effects are unchanged. Tool provenance must not be inferred from a name.
 
 Workspace-boundary Ask is recoverable through the existing human approval surface.
 Only explicit Deny remains terminal. Exact path approval must not be discarded by
@@ -57,3 +65,34 @@ cross-session isolation, deletion/replacement and resume. Full pinned locked pre
 cargo-xwin MSVC test compilation and native Windows identity tests are required.
 Independent security review must verify creation custody and execution-time fencing.
 This ADR defines requirements; it does not claim implemented capabilities.
+
+## Policy precedence and ordinary-file boundary
+
+Explicit Deny and protected-path restrictions win. Explicit user Ask remains an
+intentional human checkpoint; replacing the default local-file Ask must not override
+it. After explicit policy, the new workspace default applies only to registry-proven
+built-in ordinary read/write/edit operations on regular file paths. Read-only listing
+and search retain their existing rules. Recursive deletion, Git administration,
+credential/secret stores, sensitive configuration and symlink escapes do not acquire
+new default authority. Plugin/MCP tools cannot gain this privilege by copying names.
+
+External requests retain existing auto-eligibility rules, so a workspace-only
+auto policy remains ineligible outside it and reaches the human fallback. This is
+not a new blanket permission for model-approved external writes.
+
+## Implementation design checkpoint
+
+This claim activates investigation and implementation of approval/execution repair.
+Before automatic membership expansion, independently review the concrete custody
+and persistence implementation plan. Destination custody must use exclusive directory
+creation and a held directory identity before native Git execution, with verified
+Git backlinks and unchanged identities on completion. Failure never registers a root.
+A native trusted producer must record completion before mutable display/hooks; generic
+post-command scans cannot mint receipts. Native Windows must use real directory
+identity, not timestamp-only identity. Persisted evidence must survive process restart
+without allowing recreation at the old path to inherit authority.
+
+The absolute-path write repair must resolve paths into an appropriate directory
+capability, preserving create-new semantics and parent identity checks. Do not merely
+skip the atomic capability for absolute inputs. Regression tests must install the
+same capability configuration as the CLI and exercise actual approval delivery.

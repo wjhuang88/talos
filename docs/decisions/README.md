@@ -28,6 +28,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
+| [099: Session-owned worktree admission](099-session-owned-worktree-admission.md) | Accepted on #889 merge | Ordinary workspace files allowed; external paths require authorization with human fallback; verified Session worktrees join the same workspace boundary. |
 | [098: Model-Selectable Per-Process Memory Limits](098-model-process-memory-limits.md) | Proposed / independent design review passed | I316 / PROCESS-001; per-process memory policy, explicit inheritance, native enforcement/failure evidence; activation and implementation pending. |
 | [097: Validation Host Execution API](097-validation-host-execution-api.md) | Accepted / I315 Complete | Unsafe sync host runner removed; injected owned async execution merged in #847 (`add669403`), native/SDK/review gates passed and #852 closed owners; next minor only, no 0.10 patch release. |
 | [095: Custom-Model Capability Authority](095-model014-catalog-capability-authority.md) | Proposed / I311 #813 | Unique canonical identity, explicit-negative overrides and per-field provenance; no implementation authority before atomic claim merge. |
