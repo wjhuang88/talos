@@ -6,7 +6,7 @@
 
 ## Validation result presentation / VALIDATION-DISPLAY-001
 
-- Active proposal: [owner](tasks/2026-11-08-validation-result-display.md); claim is ineffective until merge. Readable plan/run results while preserving raw evidence; excludes clipping/theme and execution behavior.
+- Review: [owner](tasks/2026-11-08-validation-result-display.md), effective claim #882. Readable plan/run formatting implemented locally; validation and review pending; excludes clipping/theme and execution behavior.
 
 ## Protection stops / AGENT-PAUSE-001
 

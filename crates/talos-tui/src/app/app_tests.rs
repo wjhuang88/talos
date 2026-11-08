@@ -4535,3 +4535,85 @@ fn process_poll_live_and_replayed_history_have_identical_grouping() {
     }
     assert_eq!(format!("{history:?}"), original);
 }
+
+#[test]
+fn validation_results_live_and_hydrated_history_match_and_keep_raw_evidence() {
+    use talos_conversation::{ToolCallDisplay, UiOutput};
+    use talos_core::message::{MessageToolResult, ToolCall};
+    let raw = serde_json::json!({
+        "profile":"workspace", "authority":"read-only plan; commands are not executed",
+        "findings":[], "checks":[{"id":"fmt", "command":"cargo fmt --all -- --check", "required":true}]
+    }).to_string();
+    let arguments = serde_json::json!({"mode":"plan", "profile":"workspace"});
+    let history = vec![
+        Message::Assistant {
+            content: String::new(),
+            reasoning: None,
+            tool_calls: vec![ToolCall {
+                id: "validation-1".into(),
+                name: "validate_project".into(),
+                input: arguments.clone(),
+            }],
+        },
+        Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "validation-1".into(),
+                content: raw.clone(),
+                is_error: false,
+            },
+        },
+    ];
+    let original = format!("{history:?}");
+    let mut live = crate::app::Tui::for_test(TuiState::new(), None);
+    live.handle_ui_output(UiOutput::ToolCall(ToolCallDisplay {
+        tool_name: "validate_project".into(),
+        arguments,
+        provenance: talos_core::tool::ToolProvenance::Native,
+        summary_fields: vec![],
+    }));
+    live.commit_pending_transcript().expect("call");
+    live.handle_ui_output(UiOutput::ToolResult(ToolResultDisplay {
+        tool_name: Some("validate_project".into()),
+        content: raw.clone(),
+        is_error: false,
+        todo_presentation: None,
+    }));
+    live.commit_pending_transcript().expect("result");
+    let mut replay = crate::app::Tui::for_test(TuiState::new(), None);
+    replay.hydrate_history(&history);
+    replay.commit_pending_transcript().expect("replay");
+    for width in [20, 80, 160] {
+        let a = project_history(
+            &live.transcript,
+            width,
+            100,
+            &HistoryScrollState::follow_tail(),
+        );
+        let b = project_history(
+            &replay.transcript,
+            width,
+            100,
+            &HistoryScrollState::follow_tail(),
+        );
+        let texts = |p: &crate::history_projection::HistoryProjection| {
+            p.rows
+                .iter()
+                .map(|r| r.line.text.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(texts(&a), texts(&b));
+        if width == 160 {
+            assert!(texts(&a).iter().any(|text| text.contains("NOT EXECUTED")));
+        }
+    }
+    for tui in [&live, &replay] {
+        assert!(
+            tui.transcript
+                .entries()
+                .iter()
+                .any(|entry| matches!(&entry.block,
+            TranscriptBlock::ToolResult(result) if result.content == raw))
+        );
+    }
+    assert_eq!(format!("{history:?}"), original);
+}

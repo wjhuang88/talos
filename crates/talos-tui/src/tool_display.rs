@@ -382,7 +382,9 @@ pub(crate) fn build_tool_result_scrollback_lines(
         )];
     }
 
-    let all_lines: Vec<&str> = display.content.lines().collect();
+    let validation_text = crate::validation_display::project(display);
+    let visible_content = validation_text.as_deref().unwrap_or(&display.content);
+    let all_lines: Vec<&str> = visible_content.lines().collect();
 
     // TUI-015: tools that are not summarized still collapse once they cross the
     // shared threshold, keeping the first and last lines visible with an omitted

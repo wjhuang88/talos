@@ -23,6 +23,7 @@ mod stream_markdown;
 mod theme;
 mod tool_display;
 mod transcript;
+mod validation_display;
 mod widgets;
 
 pub use app::Tui;
