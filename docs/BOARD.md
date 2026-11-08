@@ -1,5 +1,10 @@
 # Talos Board
 
+## Protection stops / AGENT-PAUSE-001
+
+[Owner](tasks/2026-11-08-silent-protection-pause.md) proposes visible protection reasons
+and post-edit validation progress; activation awaits claim merge.
+
 ## Tool result clipping / TUI-ELLIPSIS-001
 
 [Owner](tasks/2026-11-08-tui-result-ellipsis.md) proposes Active / Claimed in
