@@ -129,7 +129,8 @@ pub const NORD_THEME: &Theme = &Theme {
     text_error: nord::NORD11,
     text_warning: nord::NORD13,
     text_special: nord::NORD15,
-    input_bg: nord::NORD1,
+    // Halfway between NORD0 and NORD1 for a subtler composer/user-message surface.
+    input_bg: Color::Rgb(53, 59, 73),
     preview_fg: nord::NORD5,
     dim_text: nord::NORD3,
     status_value: nord::NORD9,

@@ -70,6 +70,15 @@ paged restoration; failed resume retains the active session. CLI fork stages
 bounded raw-byte pages from the same captured history, with cleanup on cancellation;
 it requires filesystem hard-link support. See the [startup compatibility limits](docs/reference/RUNTIME-SDK-CONTRACT.md#cli-startup-history-restoration-i313-candidate).
 
+### TUI tool-result display (unreleased)
+
+Tool-result lines that exceed the available terminal width end with `…` instead of
+wrapping. Explicit newlines remain separate rows; summaries and head/tail previews
+follow the same width limit. This affects display only: original tool results and
+`/export` content remain unchanged. Tool-call arguments and chat messages retain
+their existing wrapping behavior. The default Nord composer and user-message
+background is slightly closer to the base color for a less prominent surface.
+
 ### TUI thinking and activity
 
 Completed displayable thinking appears as a collapsed `Thinking` title in history.

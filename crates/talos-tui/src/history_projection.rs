@@ -64,6 +64,7 @@ impl HistoryScrollState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RenderedHistoryRow {
     pub(crate) expandable_header: bool,
+    clipped_logical_length: Option<usize>,
     pub(crate) synthetic_prefix: usize,
     pub(crate) start_anchor: LogicalContentAnchor,
     pub(crate) end_anchor: LogicalContentAnchor,
@@ -427,6 +428,7 @@ fn project_all_history(
                 entry.id,
                 0,
                 true,
+                false,
                 ScrollbackLine::plain(group.summary(expanded), color),
             ));
             if expanded {
@@ -442,6 +444,7 @@ fn project_all_history(
                             detail.id,
                             line_index + usize::from(offset == 0),
                             false,
+                            matches!(block, TranscriptBlock::ToolResult(_)),
                             line,
                         ));
                     }
@@ -457,12 +460,18 @@ fn project_all_history(
             for (line_index, line) in logical_lines(&entry.block).into_iter().enumerate() {
                 let header =
                     matches!(entry.block, TranscriptBlock::Reasoning { .. }) && line_index == 0;
-                projected.push((entry.id, line_index, header, line));
+                projected.push((
+                    entry.id,
+                    line_index,
+                    header,
+                    matches!(entry.block, TranscriptBlock::ToolResult(_)),
+                    line,
+                ));
             }
             index += 1;
         }
     }
-    for (entry_id, logical_line, expandable_header, line) in projected {
+    for (entry_id, logical_line, expandable_header, clip, line) in projected {
         projected_logical_lines.push((
             entry_id,
             logical_line,
@@ -471,7 +480,11 @@ fn project_all_history(
                 .map(|segment| segment.text.as_str())
                 .collect(),
         ));
-        let mut chunks = project_line_chunks(&line, width);
+        let mut chunks = if clip {
+            project_result_line(&line, width)
+        } else {
+            project_line_chunks(&line, width)
+        };
         // A collapsed entry remains one hit target even in a narrow viewport.
         // Keep the full semantic title above so resizing can restore it.
         if expandable_header {
@@ -484,6 +497,7 @@ fn project_all_history(
                 .enumerate()
                 .map(|(index, chunk)| RenderedHistoryRow {
                     expandable_header,
+                    clipped_logical_length: clip.then(|| line.text.chars().count()),
                     synthetic_prefix: chunk.synthetic_prefix,
                     start_anchor: LogicalContentAnchor {
                         entry_id,
@@ -543,6 +557,9 @@ fn row_contains_anchor(row: &RenderedHistoryRow, anchor: LogicalContentAnchor) -
     {
         return false;
     }
+    if let Some(length) = row.clipped_logical_length {
+        return anchor.scalar_offset <= length;
+    }
     let start = row.start_anchor.scalar_offset;
     let end = row.end_anchor.scalar_offset;
     if start == end {
@@ -554,7 +571,7 @@ fn row_contains_anchor(row: &RenderedHistoryRow, anchor: LogicalContentAnchor) -
 }
 
 /// Stable semantic lines. Tool display is formatted once at an effectively
-/// unbounded width; only `project_line` performs current-viewport wrapping.
+/// unbounded width; viewport projection wraps chat/calls and clips tool results.
 fn logical_lines(block: &TranscriptBlock) -> Vec<ScrollbackLine> {
     match block {
         TranscriptBlock::Reasoning { text, expanded } => {
@@ -614,7 +631,7 @@ fn logical_lines(block: &TranscriptBlock) -> Vec<ScrollbackLine> {
             } else {
                 crate::theme::to_crossterm_color(crate::theme::semantic::TEXT_SUCCESS)
             };
-            crate::tool_display::build_tool_result_scrollback_lines(display, icon, color, u16::MAX)
+            crate::tool_display::build_tool_result_display_lines(display, icon, color)
         }
     }
 }
@@ -624,6 +641,55 @@ struct ProjectedLineChunk {
     line: ScrollbackLine,
     logical_start: usize,
     logical_end: usize,
+}
+
+// Result logical lines remain intact above; only this viewport projection clips.
+// The synthetic ellipsis is outside the selectable semantic range.
+fn project_result_line(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineChunk> {
+    let text = if width == 0 {
+        String::new()
+    } else {
+        crate::scrollback::truncate_to_display_width(&line.text, usize::from(width))
+    };
+    let clipped = text != line.text;
+    let visible = text
+        .chars()
+        .count()
+        .saturating_sub(usize::from(clipped && width > 0));
+    let mut remaining = visible;
+    let mut segments = Vec::new();
+    for segment in &line.segments {
+        let take = remaining.min(segment.text.chars().count());
+        if take > 0 {
+            let mut part = segment.clone();
+            part.text = segment.text.chars().take(take).collect();
+            segments.push(part);
+            remaining -= take;
+        }
+    }
+    if clipped && width > 0 {
+        let mut ellipsis = segments
+            .last()
+            .or_else(|| line.segments.first())
+            .cloned()
+            .unwrap_or_else(|| HistorySegment::styled("", None, Default::default()));
+        ellipsis.text = "…".into();
+        segments.push(ellipsis);
+    }
+    let mut rendered = ScrollbackLine::styled(segments, line.bg);
+    if let Some(fill) = &line.fill {
+        let used = UnicodeWidthStr::width(rendered.text.as_str());
+        if let Some(fill) = project_fill_segment(fill, usize::from(width).saturating_sub(used)) {
+            rendered.text.push_str(&fill.text);
+            rendered.segments.push(fill);
+        }
+    }
+    vec![ProjectedLineChunk {
+        synthetic_prefix: 0,
+        line: rendered,
+        logical_start: 0,
+        logical_end: visible,
+    }]
 }
 
 fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineChunk> {
@@ -851,6 +917,77 @@ mod tests {
                 anchor
             );
         }
+    }
+
+    #[test]
+    fn result_history_clips_at_viewport_and_restores_content_after_resize() {
+        let content = format!("+ {}TAIL\n- second", "中文e\u{301}".repeat(30));
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::ToolResult(
+            talos_conversation::ToolResultDisplay {
+                tool_name: Some("edit".into()),
+                content: content.clone(),
+                is_error: false,
+                todo_presentation: None,
+            },
+        ));
+        let raw = format!("{:?}", transcript.entries());
+        let mut cache = HistoryProjectionCache::default();
+        let scroll = HistoryScrollState::follow_tail();
+        let narrow = cache.project(&transcript, 12, 100, &scroll);
+        assert_eq!(narrow.total_rows, 2);
+        assert!(narrow.rows[0].line.text.trim_end().ends_with('…'));
+        assert!(
+            narrow.selection_point(0, 11).is_none(),
+            "ellipsis is synthetic"
+        );
+        let start = narrow.selection_point(0, 3).expect("start");
+        let end = narrow.selection_point(0, 6).expect("end");
+        let selected = narrow.selected_text(start, end);
+        for width in [300, 12, 1] {
+            let projection = cache.project(&transcript, width, 100, &scroll);
+            assert_eq!(projection.total_rows, 2);
+            assert!(
+                projection
+                    .rows
+                    .iter()
+                    .all(|row| row.line.text.width() <= usize::from(width))
+            );
+            assert_eq!(projection.selected_text(start, end), selected);
+            assert!(projection.rows.iter().all(|row| row.line.bg.is_some()));
+            if width == 300 {
+                assert!(projection.rows[0].line.text.contains("TAIL"));
+            }
+        }
+        assert_eq!(format!("{:?}", transcript.entries()), raw);
+    }
+
+    #[test]
+    fn validation_history_clips_results_but_keeps_chat_wrapping() {
+        let mut transcript = TranscriptStore::default();
+        transcript.append(TranscriptBlock::ToolResult(talos_conversation::ToolResultDisplay {
+            tool_name: Some("validate_project".into()),
+            content: serde_json::json!({"profile":"workspace", "authority":"read only",
+                "findings":[], "checks":[{"id":"test", "command":"cargo test --locked --workspace", "required":true}]}).to_string(),
+            is_error: false, todo_presentation: None,
+        }));
+        let scroll = HistoryScrollState::follow_tail();
+        let narrow = project_history(&transcript, 12, 100, &scroll);
+        assert_eq!(narrow.total_rows, 3);
+        assert!(narrow.rows[0].line.text.ends_with('…'));
+        let wide = project_history(&transcript, 200, 100, &scroll);
+        assert!(wide.rows[0].line.text.contains("NOT EXECUTED"));
+        assert!(
+            wide.rows[2]
+                .line
+                .text
+                .contains("cargo test --locked --workspace")
+        );
+        transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+            "a".repeat(40),
+            None,
+        )));
+        assert!(project_history(&transcript, 12, 100, &scroll).total_rows > 4);
     }
 
     #[test]
@@ -1497,12 +1634,12 @@ mod tests {
             },
         ));
         let initial = project_history(&transcript, 8, 100, &HistoryScrollState::follow_tail());
-        let anchor = initial
-            .rows
-            .iter()
-            .find(|row| row.start_anchor.logical_line >= 1 && row.start_anchor.scalar_offset > 0)
-            .expect("wrapped result row")
-            .start_anchor;
+        assert_eq!(
+            initial.total_rows, 5,
+            "explicit newlines remain logical rows"
+        );
+        let mut anchor = initial.rows[1].start_anchor;
+        anchor.scalar_offset = 20; // Hidden at narrow widths, restored at wide widths.
         let mut scroll = HistoryScrollState::follow_tail();
         scroll.anchor(anchor, 0);
         for width in [160, 40, 3, 2, 1, 80, 160] {

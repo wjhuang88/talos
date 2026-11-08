@@ -4617,3 +4617,32 @@ fn validation_results_live_and_hydrated_history_match_and_keep_raw_evidence() {
     }
     assert_eq!(format!("{history:?}"), original);
 }
+
+#[test]
+fn tool_result_frame_clips_and_reveals_full_line_on_resize() {
+    use talos_conversation::UiOutput;
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    let content = format!("RESULT_START {} RESULT_END\nSECOND_ROW", "中文".repeat(20));
+    tui.handle_ui_output(UiOutput::ToolResult(ToolResultDisplay {
+        tool_name: Some("custom_tool".into()),
+        content: content.clone(),
+        is_error: false,
+        todo_presentation: None,
+    }));
+    tui.commit_pending_transcript().expect("result");
+    for width in [40, 160, 40] {
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(width, 30));
+        tui.draw_frame().expect("frame");
+        let text = tui.terminal.test_rendered_text();
+        assert!(text.contains("RESULT_START"), "{text}");
+        assert!(text.contains("SECOND_ROW"), "{text}");
+        assert_eq!(text.contains("RESULT_END"), width == 160, "{text}");
+        if width == 40 {
+            assert!(text.contains('…'), "{text}");
+        }
+    }
+    assert!(tui.transcript.entries().iter().any(|entry| matches!(
+        &entry.block, TranscriptBlock::ToolResult(result) if result.content == content)));
+}
