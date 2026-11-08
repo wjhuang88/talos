@@ -1,6 +1,6 @@
 # VALIDATION-DISPLAY-001: Readable Validation Tool Results
 
-> Document status: Active / Claimed (proposed; ineffective until claim #882 merges)
+> Document status: Review / Claimed (effective claim #882 / 0adc3451)
 > Deliverable: readable validate_project plan and run results in live and replayed TUI history, with raw evidence preserved.
 
 ## Collaboration Claim
@@ -58,3 +58,23 @@ Run pinned locked release_preflight.sh and cargo xwin check with MSVC --tests fo
 affected crates; native CI remains required. Run both governance validators.
 Review staged diff and exact head; recheck claim/CAS before merge. Completion
 requires existing merged implementation SHA. Residual destination: this owner.
+
+## Implementation ledger
+
+Effective claim #882 merged at 0adc3451; branch fix/validation-result-display.
+A private TUI formatter recognizes validate_project plan/evidence fields and
+projects logical text rows immediately before existing width/head-tail handling.
+No execution or result model/storage/export field changes. Plan always says
+NOT EXECUTED; run shows passed count, non-passing attention row, actual statuses,
+permission decisions, exits and multiline diagnostics. Invalid/unrelated content
+uses the existing raw fallback. No clipping/theme changes and no edits to the
+other agent's original worktree.
+
+Local validation passed with pinned Rust 1.99.0: four focused tests, including
+actual hydrate_history replay versus live events at widths 20/80/160, raw history
+preservation, plan/results, denied/skipped/error and fallback cases; the complete
+locked release_preflight.sh; and cargo xwin check --locked -p talos-tui
+--all-features --tests --target x86_64-pc-windows-msvc. Logs:
+/tmp/talos-display-tests2.log, /tmp/talos-display-preflight.log and
+/tmp/talos-display-xwin.log. Independent exact-head review and native CI remain
+required before merge; this is not a completion claim.
