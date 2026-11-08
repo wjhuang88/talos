@@ -2450,7 +2450,7 @@ struct BoundaryBlockingTool {
 }
 
 #[tokio::test]
-async fn boundary_injection_ambiguous_running_recovery_fences_new_execution() {
+async fn boundary_injection_interruption_recovers_both_identities_without_replay() {
     let temp = tempfile::tempdir().expect("temporary directory");
     let manager = talos_session::SessionManager::with_dir(temp.path().to_path_buf());
     let session = manager
@@ -2485,54 +2485,27 @@ async fn boundary_injection_ambiguous_running_recovery_fences_new_execution() {
             .mark_running(id, "interrupted-before-transcript")
             .expect("running");
     }
-    handle
-        .sq_tx
-        .send(SessionOp::SubmitStructured {
-            submission: structured_submission(
-                "new",
-                "new-item",
-                1,
-                "must not start",
-                SubmissionSource::User,
-            ),
-        })
-        .await
-        .expect("queued before recovery");
     let task = tokio::spawn(async move { actor.run().await });
-    let (receipt_tx, mut receipt_rx) = tokio::sync::mpsc::unbounded_channel();
-    handle
-        .sq_tx
-        .send(SessionOp::SubmitStructuredTracked {
-            submission: structured_submission(
-                "tracked-new",
-                "tracked-new-item",
-                1,
-                "must reject",
-                SubmissionSource::User,
-            ),
-            receipt_tx: Some(receipt_tx),
-        })
-        .await
-        .expect("tracked submit");
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !store.recover_running().expect("running").is_empty() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("recovery");
+    for id in ["original", "injected"] {
+        assert_eq!(
+            store.get(id).expect("lookup").expect("identity").state,
+            talos_core::session::PendingSubmissionState::TerminalError
+        );
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
     handle
         .sq_tx
         .send(SessionOp::Shutdown)
         .await
         .expect("shutdown");
-    tokio::time::timeout(Duration::from_secs(5), task)
-        .await
-        .expect("recovery terminates")
-        .expect("actor joins");
-    let receipt = receipt_rx.try_recv().expect("explicit tracked rejection");
-    assert!(matches!(
-        receipt.disposition,
-        SubmissionReceiptDisposition::Rejected {
-            reason: SubmissionRejectionReason::SessionClosed
-        }
-    ));
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
-    assert!(store.get("new").expect("lookup").is_none());
-    assert_eq!(store.recover_running().expect("frozen identities").len(), 2);
+    task.await.expect("join");
 }
 
 #[tokio::test]

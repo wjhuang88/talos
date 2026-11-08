@@ -184,6 +184,30 @@ fn remove_paths(paths: &[PathBuf]) -> Result<SessionArtifactCleanupReport, Sessi
     Ok(report)
 }
 
+fn cleanup_lease(
+    transcript: &Path,
+    paths: &[PathBuf],
+) -> Result<crate::SessionRuntimeLease, SessionError> {
+    crate::SessionRuntimeLease::acquire(transcript).map_err(|error| SessionError::ArtifactCleanup {
+        path: transcript.to_path_buf(),
+        source: std::io::Error::other(error.to_string()),
+        removed: Vec::new(),
+        remaining: existing_paths(paths),
+    })
+}
+
+pub(crate) fn cleanup_session_with_index(
+    transcript: &Path,
+    remove_index: impl FnOnce() -> Result<(), SessionError>,
+) -> Result<SessionArtifactCleanupReport, SessionError> {
+    let set = SessionArtifactSet::for_transcript(transcript)?;
+    let _lease = cleanup_lease(transcript, &set.sidecars())?;
+    let mut report = remove_paths(&set.sidecars())?;
+    remove_index()?;
+    report.merge(remove_paths(&[set.transcript])?);
+    Ok(report)
+}
+
 /// Removes WAL, SHM and pending SQLite in that order while retaining the transcript.
 ///
 /// A failure leaves the transcript discoverable so `/delete` or retention can retry.
@@ -191,6 +215,7 @@ pub fn remove_session_sidecars_for_transcript(
     transcript_path: &Path,
 ) -> Result<SessionArtifactCleanupReport, SessionError> {
     let set = SessionArtifactSet::for_transcript(transcript_path)?;
+    let _lease = cleanup_lease(transcript_path, &set.sidecars())?;
     remove_paths(&set.sidecars())
 }
 
@@ -199,6 +224,7 @@ pub fn remove_session_transcript(
     transcript_path: &Path,
 ) -> Result<SessionArtifactCleanupReport, SessionError> {
     let set = SessionArtifactSet::for_transcript(transcript_path)?;
+    let _lease = cleanup_lease(transcript_path, std::slice::from_ref(&set.transcript))?;
     remove_paths(&[set.transcript])
 }
 
@@ -206,8 +232,10 @@ pub fn remove_session_transcript(
 pub fn remove_session_artifacts_for_transcript(
     transcript_path: &Path,
 ) -> Result<SessionArtifactCleanupReport, SessionError> {
-    let mut report = remove_session_sidecars_for_transcript(transcript_path)?;
-    report.merge(remove_session_transcript(transcript_path)?);
+    let set = SessionArtifactSet::for_transcript(transcript_path)?;
+    let _lease = cleanup_lease(transcript_path, &set.sidecars())?;
+    let mut report = remove_paths(&set.sidecars())?;
+    report.merge(remove_paths(&[set.transcript])?);
     Ok(report)
 }
 
@@ -403,6 +431,10 @@ pub(crate) fn reconcile_orphan_sidecars_in_root(
             report.skipped_sets = report.skipped_sets.saturating_add(1);
             continue;
         }
+        let Ok(_lease) = crate::SessionRuntimeLease::acquire(&set.transcript) else {
+            report.skipped_sets = report.skipped_sets.saturating_add(1);
+            continue;
+        };
         let tlog = workspace.join(format!("{id}.tlog"));
         let jsonl = workspace.join(format!("{id}.jsonl"));
         if fs::symlink_metadata(&tlog).is_ok() || fs::symlink_metadata(&jsonl).is_ok() {

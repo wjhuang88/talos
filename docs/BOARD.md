@@ -2,7 +2,7 @@
 
 ## Interrupted session recovery / SESSION-CRASH-001
 
-- Active proposal: [owner](tasks/2026-11-08-crash-resume.md); #882 claim pending merge. Recover abandoned execution without replaying tools and permit new user work.
+- Review: [owner](tasks/2026-11-08-crash-resume.md), effective claim #882. Recovery, full locked preflight and MSVC test compilation passed; user confirmed original cargo-run session continues. Exact-head review and native CI pending.
 
 ## Validation result presentation / VALIDATION-DISPLAY-001
 

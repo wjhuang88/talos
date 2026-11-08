@@ -80,6 +80,88 @@ pub fn read_history_page(
     read_page_impl(path, encoding, offset, source_end, deadline, stopped, None)
 }
 
+// Host crash reconciliation must accept writer-produced records larger than a
+// model-facing page. Unlike compatibility restoration, every byte must decode.
+pub(crate) fn validate_host_transcript(path: &Path) -> Result<(), HistoryPageError> {
+    let mut file = open_source(path)?;
+    let jsonl = path.extension().is_some_and(|ext| ext == "jsonl");
+    let deadline = Instant::now() + std::time::Duration::from_secs(5);
+    let mut bytes = Vec::new();
+    let mut first = !jsonl;
+    let mut counter = 0;
+    let mut eof = false;
+    loop {
+        if Instant::now() >= deadline {
+            return Err(HistoryPageError::Stopped);
+        }
+        let mut consumed = 0;
+        while consumed < bytes.len() {
+            if Instant::now() >= deadline {
+                return Err(HistoryPageError::Stopped);
+            }
+            let remaining = &bytes[consumed..];
+            if first {
+                if remaining.starts_with(b"E\t") {
+                    first = false;
+                } else {
+                    let Some(end) = remaining.iter().position(|b| *b == b'\n') else {
+                        break;
+                    };
+                    let header = std::str::from_utf8(&remaining[..end])
+                        .map_err(|_| HistoryPageError::InvalidRecord)?;
+                    let fields: Vec<_> = header.split('\t').collect();
+                    if fields.len() != 3
+                        || fields[0] != "TALOS"
+                        || fields[1] != "1"
+                        || fields[2].parse::<i64>().is_err()
+                    {
+                        return Err(HistoryPageError::InvalidRecord);
+                    }
+                    first = false;
+                    consumed += end + 1;
+                    continue;
+                }
+            }
+            if matches!(remaining[0], b'\n' | b'\r') {
+                consumed += 1;
+                continue;
+            }
+            if jsonl {
+                let end = match remaining.iter().position(|b| *b == b'\n') {
+                    Some(end) => end,
+                    None if eof => remaining.len(),
+                    None => break,
+                };
+                let line = std::str::from_utf8(&remaining[..end])
+                    .map_err(|_| HistoryPageError::InvalidRecord)?;
+                crate::store::decode_jsonl_history_line(line, &mut counter)
+                    .ok_or(HistoryPageError::InvalidRecord)?;
+                consumed += end + usize::from(end < remaining.len());
+            } else {
+                let Some((_, length)) = decode_tlog_record(remaining, usize::MAX)? else {
+                    break;
+                };
+                consumed += length;
+            }
+        }
+        bytes.drain(..consumed);
+        if eof {
+            return if bytes.is_empty() {
+                Ok(())
+            } else {
+                Err(HistoryPageError::InvalidRecord)
+            };
+        }
+        let mut chunk = [0; 8192];
+        let count = file.read(&mut chunk)?;
+        eof = count == 0;
+        bytes.try_reserve(count).map_err(|_| {
+            HistoryPageError::Io(std::io::Error::other("recovery record allocation failed"))
+        })?;
+        bytes.extend_from_slice(&chunk[..count]);
+    }
+}
+
 // Host restoration buffers only the unfinished record plus one I/O page. It does
 // not grant model-disclosure authority or relax read_history_page's limits.
 pub(crate) struct MessagePageBuffer {

@@ -1,6 +1,6 @@
 # SESSION-CRASH-001: Resume After Interrupted Execution
 
-> Document status: Active / Claimed (proposed; ineffective until claim #882 merges)
+> Document status: Review / Claimed (effective claim #882 / 0adc3451)
 > Deliverable: a session interrupted by process/power loss can accept new user work after safe recovery, without replaying ambiguous tools.
 
 ## Collaboration Claim
@@ -22,7 +22,8 @@
 
 ## Evidence and acceptance
 
-Screenshot: session 4404450a-443c-479d-8153-f530d10faa21, turn turn24078371_1,
+Screenshot: session 4404450a-443c-479d-8153-f530d10faa21; read-only journal
+inspection confirms turn `turn_2407837_1_1` (screenshot spacing was ambiguous),
 Running submission steering:64b3c82b-a89b-4917-b410-da0bb8986ca1:batch:1 has
 no terminal transcript proof; startup rejects all new input with SessionClosed.
 Code explicitly preserves this state indefinitely. Previous AGENT-PAUSE-001
@@ -59,3 +60,66 @@ Use independent safety review, standard locked preflight and cargo-xwin MSVC
 --tests; native CI required. Run both governance validators, staged review and
 merge-time CAS. No Source Issue. Residual destination: this owner. Complete only
 after existing merged implementation SHA and all required evidence are recorded.
+
+## Implementation and validation ledger
+
+Implementation branch `fix/session-crash-resume` starts at claim merge 0adc3451.
+SessionRuntimeLease uses the pinned Rust standard-library file lock; permanent
+anchors and canonical parent identity prevent cooperating cleanup/alias paths
+from splitting ownership. Actor, Agent, event-forwarder, preview and manual
+compaction tasks retain ownership. Entire deletion/index cleanup holds one lease.
+Existing older binaries and external filesystem mutation remain outside this
+cooperative protocol; documentation requires exiting old clients before upgrade.
+
+Strict host validation streams chunks with a deadline and keeps only unfinished
+record data; it accepts supported legacy and large native records, refusing
+corrupt/truncated bytes without rewriting them. Recovery pauses unstarted work,
+durably records an interrupted Error with one assistant explanation, syncs even
+on already-visible terminal retries, and only then finalizes Running custody.
+The current model history receives the same deduplicated note. Original turn and
+submission identities remain; exact retries never re-execute old tools.
+
+Read-only user journal inspection returned SQLite integrity `ok` and one Running
+row. User data was not edited. Original repo dirty files are preserved. Power loss
+also left two zero-byte Git files; they were isolated in
+`/tmp/talos-git-powerloss-backup` and the remote tracking ref restored by fetch.
+
+Initial full Agent regression passed 662 unit tests on the host. Repeated sandbox
+runs reused PID-derived `/tmp` fixture identities and caused unrelated timeouts;
+the host run passed those tests. A new model-history assertion caught a System
+note filtered from provider history; the note is now Assistant and all six initial
+terminal recovery tests pass (`/tmp/talos-crash-terminal-final.log`). Session suite
+passed (`/tmp/talos-crash-session-final.log`). Later added second-crash, generation,
+sync-failure and cleanup-race tests require final validation below. Preliminary
+MSVC all-feature test compilation passed (`/tmp/talos-crash-xwin.log`), with the
+existing unrelated checkpoint-history test-only dead-code warning. Full locked
+preflight, final xwin, independent review and exact-head native CI remain pending.
+
+Final focused validation: 8 terminal-outcome integration tests and 9 runtime-lease
+tests passed; final cargo xwin check --locked -p talos-session -p talos-agent
+-p talos-cli --all-features --tests --target x86_64-pc-windows-msvc passed.
+A consistent copy of the affected user transcript/journal recovered its one
+Running row as TerminalError with original identities, original transcript bytes
+retained as a prefix, and no model/tool call. The private fixture probe was removed
+after execution and is not shipped. Original user data was not manually edited.
+
+Actual user acceptance on 2026-11-08: after synchronizing the recovery source into
+the user's main working directory and building there, the user reran cargo run
+-- -c and explicitly confirmed "可以继续了" (new input can continue the original
+session). An earlier shared-target binary-only delivery was insufficient because
+cargo run rebuilt the old main source. This is recorded in EVOLUTION.md.
+Shared-target preflights reached passing ordinary workspace tests but failed
+rustdoc against stale dependency artifacts; standalone Agent doctests passed
+12/12. Copying that cache to an isolated target retained the stale Session library
+and reproduced the failure. After targeted cargo clean of Session/Agent in the
+isolated target, all workspace doctests passed. Final preflight uses this cleaned,
+isolated target so the user's main cargo run and independent worktrees cannot
+overwrite validation artifacts. This cache diagnosis does not substitute for the
+required complete preflight below.
+
+Final local checkpoint passed: pinned 1.99.0 locked release_preflight.sh, including
+workspace check, Clippy, all unit/integration/doc tests and both external SDK
+feature modes (/tmp/talos-crash-preflight-clean.log). Both repository governance
+validators, current skill validator and scale assessment passed; profile remains
+high-risk/release-managed with worktrees required. Final exact-head independent
+review, native CI and merge/closure remain pending.

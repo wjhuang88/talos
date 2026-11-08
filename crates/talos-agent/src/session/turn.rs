@@ -47,6 +47,7 @@ pub(super) enum TurnRecordStatus {
 }
 
 pub(super) struct TurnForwarding {
+    pub(super) runtime_lease: Option<Arc<talos_session::SessionRuntimeLease>>,
     pub(super) agent: Arc<Agent>,
     pub(super) prepared: PreparedSessionTurn,
     pub(super) event_tx: mpsc::UnboundedSender<AgentEvent>,
@@ -67,6 +68,7 @@ pub(super) struct TurnForwarding {
 
 pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let TurnForwarding {
+        runtime_lease,
         agent,
         prepared,
         event_tx,
@@ -101,7 +103,9 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let (agent_ack_tx, mut agent_ack_rx) =
         mpsc::unbounded_channel::<SteeringBoundaryAcknowledgement>();
 
+    let forwarder_lease = runtime_lease.clone();
     let forwarder = tokio::spawn(async move {
+        let _runtime_lease = forwarder_lease;
         let mut response_ordinal = 0_u32;
         loop {
             tokio::select! {
@@ -188,7 +192,9 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         .and_then(|sandbox| sandbox.cleanup_receipt());
     let history_owner = durable_persistence.clone();
     let history_cancel = cancel_token.clone();
+    let agent_lease = runtime_lease.clone();
     let mut agent_task = tokio::spawn(async move {
+        let _runtime_lease = agent_lease;
         let recovery = if agent.tools.is_builtin_instance("history_search") {
             if let Some(owner) = &history_owner {
                 crate::checkpoint_history::History::prepare_cached(

@@ -149,6 +149,7 @@ pub struct AppServerSession {
     turn_prefix: String,
     model_context_limit: u32,
     runtime_admission: Option<RuntimeAdmissionControl>,
+    runtime_lease: Option<Arc<talos_session::SessionRuntimeLease>>,
     #[cfg(test)]
     start_commit_gate: Option<(Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>)>,
     #[cfg(test)]
@@ -202,6 +203,7 @@ impl AppServerSession {
             turn_prefix: format!("turn_{}_{}", std::process::id(), instance_id),
             model_context_limit: config.model_context_limit,
             runtime_admission: None,
+            runtime_lease: None,
             #[cfg(test)]
             start_commit_gate: None,
             #[cfg(test)]
@@ -368,24 +370,48 @@ impl AppServerSession {
 
     /// Runs the session actor until shutdown or SQ disconnect.
     pub async fn run(&mut self) {
-        self.reconcile_running_submissions();
-        let recovery_fenced = match self.pending_store.recover_running() {
-            Ok(records) if records.is_empty() => false,
-            Ok(_) => {
-                self.emit_custody_error(
-                    "session stopped because Running custody has no terminal transcript proof",
-                    &"reconcile the original Turn before resuming",
-                );
-                true
+        let transcript = self
+            .persistence
+            .as_ref()
+            .map(|p| p.session.file_path.as_path())
+            .or_else(|| {
+                self.durable_persistence
+                    .as_ref()
+                    .map(|p| p.session.file_path())
+            });
+        if let Some(transcript) = transcript {
+            match talos_session::SessionRuntimeLease::acquire(transcript) {
+                Ok(lease) => self.runtime_lease = Some(Arc::new(lease)),
+                Err(error) => {
+                    self.emit_custody_error("cannot start Session execution or recovery", &error);
+                    return;
+                }
             }
-            Err(error) => {
-                self.emit_custody_error(
-                    "session stopped because Running custody could not be inspected",
-                    &error,
-                );
-                true
-            }
-        };
+        }
+        self.run_owned().await;
+        self.runtime_lease = None;
+    }
+
+    async fn run_owned(&mut self) {
+        let reconciliation_ok = self.reconcile_running_submissions();
+        let recovery_fenced = !reconciliation_ok
+            || match self.pending_store.recover_running() {
+                Ok(records) if records.is_empty() => false,
+                Ok(_) => {
+                    self.emit_custody_error(
+                        "session stopped because Running custody has no terminal transcript proof",
+                        &"reconcile the original Turn before resuming",
+                    );
+                    true
+                }
+                Err(error) => {
+                    self.emit_custody_error(
+                        "session stopped because Running custody could not be inspected",
+                        &error,
+                    );
+                    true
+                }
+            };
         if recovery_fenced {
             // Preserve observational reconciliation while refusing execution
             // whose quota cannot be accounted for from orphan Running rows.
@@ -1432,6 +1458,7 @@ impl AppServerSession {
         };
 
         if submission.common_kind() == Some(SubmissionKind::PreviewRequest) {
+            let runtime_lease = self.runtime_lease.clone();
             let agent = self.agent.clone();
             let eq_tx = self.eq_tx.clone();
             let history = self.history.clone();
@@ -1439,6 +1466,7 @@ impl AppServerSession {
             let message = submission.items[0].text.clone();
             let preview_token = token.clone();
             let handle = tokio::spawn(async move {
+                let _runtime_lease = runtime_lease;
                 let result = tokio::select! {
                     () = preview_token.cancelled() => {
                         let completion = TurnCompletionStatus::Cancelled;
@@ -1571,6 +1599,7 @@ impl AppServerSession {
         let source_namespace = durable_persistence
             .as_ref()
             .map(|p| p.session.id().to_string());
+        let runtime_lease = self.runtime_lease.clone();
         let handle = tokio::spawn(async move {
             let (event_tx, event_rx) = mpsc::unbounded_channel::<AgentEvent>();
             let (result_tx, result_rx) = tokio::sync::oneshot::channel::<TurnRecord>();
@@ -1587,6 +1616,7 @@ impl AppServerSession {
                 sequence,
                 persistence,
                 durable_persistence,
+                runtime_lease,
                 result_tx,
                 boundary_tx,
                 boundary_ack_tx,

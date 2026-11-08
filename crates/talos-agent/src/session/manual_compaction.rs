@@ -210,7 +210,9 @@ impl ManualCompaction {
         let task_token = token.clone();
         self.measurement = Arc::new(std::sync::Mutex::new(None));
         let measurement = self.measurement.clone();
+        let runtime_lease = actor.runtime_lease.clone();
         let task = tokio::spawn(async move {
+            let _runtime_lease = runtime_lease;
             tokio::select! { biased;
                 () = task_token.cancelled() => ManualCheckpointResult::Outcome(CompactOutcome::Cancelled),
                 outcome = agent.compact_session_history_measured(history, generation, limit, recovered.as_ref(), Some(&measurement)) => outcome,

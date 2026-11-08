@@ -600,6 +600,15 @@ impl PendingSubmissionStore {
         }
 
         let outcome = self.transcript_outcome_for_turn(turn_id)?;
+        if outcome.is_some() {
+            // A previous append may have succeeded while its sync failed. Never
+            // release custody merely because those bytes are currently readable.
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(self.session_file.as_ref())?
+                .sync_all()?;
+        }
         match outcome {
             Some(TurnTranscriptOutcome::Success) => self.transition(
                 submission_id,
@@ -737,6 +746,7 @@ impl PendingSubmissionStore {
             .ok_or(PendingSubmissionError::MissingRecord)?;
         if !expected.contains(&decode_state(&current)?)
             || (turn_id.is_none() && current_turn_id.is_some())
+            || (current_turn_id.is_some() && current_turn_id.as_deref() != turn_id)
         {
             return Err(PendingSubmissionError::InvalidTransition);
         }

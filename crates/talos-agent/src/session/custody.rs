@@ -33,14 +33,21 @@ impl AppServerSession {
         true
     }
 
-    pub(super) fn reconcile_running_submissions(&self) {
+    pub(super) fn reconcile_running_submissions(&mut self) -> bool {
         let records = match self.pending_store.recover_running() {
             Ok(records) => records,
             Err(error) => {
                 self.emit_custody_error("failed to inspect running submissions", &error);
-                return;
+                return false;
             }
         };
+        if !records.is_empty()
+            && let Some(lease) = &self.runtime_lease
+            && let Err(error) = lease.validate_transcript()
+        {
+            self.emit_custody_error("interrupted Session transcript requires repair", &error);
+            return false;
+        }
         for record in records {
             let Some(turn_id) = record.turn_id.as_deref() else {
                 self.emit_custody_error(
@@ -53,8 +60,20 @@ impl AppServerSession {
                 .pending_store
                 .mark_committed(&record.submission.id, turn_id)
             {
-                Ok(()) => {}
+                Ok(()) => {
+                    if let Err(error) = self.restore_interruption_message(turn_id) {
+                        self.emit_custody_error("cannot restore interruption context", &error);
+                        return false;
+                    }
+                }
                 Err(PendingSubmissionError::InvalidTransition) => {
+                    if self.recover_interrupted_submission(&record, turn_id) {
+                        if let Err(error) = self.restore_interruption_message(turn_id) {
+                            self.emit_custody_error("cannot restore interruption context", &error);
+                            return false;
+                        }
+                        continue;
+                    }
                     let _ = self.eq_tx.send(SessionEvent::Error {
                         message: format!(
                             "submission {} remains frozen in Running state because transcript outcome for Turn {turn_id} is ambiguous",
@@ -66,6 +85,88 @@ impl AppServerSession {
                     "failed to reconcile Running submission with transcript outcome",
                     &error,
                 ),
+            }
+        }
+        true
+    }
+
+    fn restore_interruption_message(
+        &mut self,
+        turn_id: &str,
+    ) -> Result<(), talos_session::SessionError> {
+        let content = talos_session::SessionRuntimeLease::interruption_message(turn_id);
+        if self.history.iter().any(|message| {
+            matches!(message,
+            talos_core::message::Message::Assistant { content: existing, .. } if existing == &content)
+        }) {
+            return Ok(());
+        }
+        let session = self.persistence.as_ref().map(|p| &p.session).or_else(|| {
+            self.durable_persistence
+                .as_ref()
+                .map(|p| p.session.session())
+        });
+        let Some(session) = session else {
+            return Ok(());
+        };
+        if session
+            .read_entries()?
+            .iter()
+            .any(|entry| entry.role == "assistant" && entry.content == content)
+        {
+            self.history.push(talos_core::message::Message::Assistant {
+                content,
+                tool_calls: Vec::new(),
+                reasoning: None,
+            });
+            self.recovered_source = None;
+        }
+        Ok(())
+    }
+
+    fn recover_interrupted_submission(
+        &self,
+        record: &talos_session::PendingSubmissionRecord,
+        turn_id: &str,
+    ) -> bool {
+        let Some(lease) = &self.runtime_lease else {
+            return false;
+        };
+        let session = self.persistence.as_ref().map(|p| &p.session).or_else(|| {
+            self.durable_persistence
+                .as_ref()
+                .map(|p| p.session.session())
+        });
+        let Some(session) = session else {
+            return false;
+        };
+        let result = (|| -> Result<(), PendingSubmissionError> {
+            let generation = self.pending_store.runtime_generation()?;
+            if generation != self.session_generation
+                || record.submission.sender_generation != generation
+            {
+                return Err(PendingSubmissionError::GenerationConflict {
+                    expected: self.session_generation,
+                    actual: record.submission.sender_generation,
+                });
+            }
+            // Pause dependent work before publishing recovery, including if we
+            // crash after the marker but before the journal is finalized.
+            self.pending_store.pause_unstarted()?;
+            lease.interrupt_turn(session, turn_id)?;
+            self.pending_store
+                .mark_committed(&record.submission.id, turn_id)
+        })();
+        match result {
+            Ok(()) => {
+                let _ = self.eq_tx.send(SessionEvent::Error {
+                    message: format!("Recovered interrupted Turn {turn_id}. Tool side effects are unknown; the old request was not replayed. The Session can accept new input."),
+                });
+                true
+            }
+            Err(error) => {
+                self.emit_custody_error("failed to recover interrupted Session", &error);
+                false
             }
         }
     }
