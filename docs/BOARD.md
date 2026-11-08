@@ -15,10 +15,9 @@
 
 ## Tool result clipping / TUI-ELLIPSIS-001
 
-[Owner](tasks/2026-11-08-tui-result-ellipsis.md) is Review / Claimed. Implementation
-merged in #886 (`b7706d64`); local preflight, cargo-xwin, independent exact-head
-review and Linux/Windows CI passed. User deferred real-terminal ellipsis, newline,
-resize and background acceptance until after merge and cleanup.
+[Owner](tasks/2026-11-08-tui-result-ellipsis.md) is Complete / Closed through #886
+(`b7706d64`). Local preflight, cargo-xwin, independent review and Linux/Windows CI
+passed; user confirmed the deferred real-terminal visual acceptance on 2026-11-08.
 
 ## Tool routing / TOOL-ROUTE-001
 

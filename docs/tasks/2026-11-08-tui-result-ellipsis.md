@@ -1,13 +1,14 @@
 # TUI-ELLIPSIS-001: Tool Result Clipping And Muted Background
 
-> Document status: Review / Claimed (effective claim #876 / e4eb3ba6)
+> Document status: Complete / Closed (effective claim #876 / e4eb3ba6)
+> Completion Commit: b7706d64943bf8572d304dcf615749d5cb157e55
 > Deliverable: tool-result logical lines fit terminal width with ellipsis and muted default input/user-message background.
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6; consolidating Talos / gpt-6-astra implementation at user request |
 | Work Slice | Tool-result width clipping and Nord input/user-message background, focused tests and README; excludes poll grouping, spinner lifecycle and queued input |
@@ -18,7 +19,7 @@
 | Authorization Evidence | Original claim #876 used single-maintainer authorization limited to that PR. User now requests consolidation of this session's remaining work onto main and branch/worktree cleanup; implementation requires independent Agent technical review and exact-head CI |
 | Implementation PR | #886 |
 | Last Updated | 2026-11-08 |
-| Handoff / Release Condition | User-deferred native terminal visual acceptance: long-output ellipsis, explicit newlines, resize and Nord background |
+| Handoff / Release Condition | None; user confirmed native terminal acceptance passed |
 
 ## Acceptance
 
@@ -198,3 +199,14 @@ validation runs. Width-sensitive tests must verify the new clipping contract whi
 retaining checks for styling, raw-content preservation and narrow-window behavior.
 The superseded untracked experiment proposal can now be removed: its evidence and
 implementation lesson are preserved in this owner.
+
+## Final native acceptance
+
+On 2026-11-08, after main synchronization and cleanup, the user confirmed
+"验证通过了" in response to the outstanding real-terminal acceptance. This closes
+the deferred long-output ellipsis, explicit-newline, resize and Nord-background
+walkthrough. Evidence is the user's report, not an additional automated test run.
+Together with the implementation, preflight, cargo-xwin, independent review and
+native CI evidence above, all acceptance is satisfied. Delivery is Complete and
+the claim is Closed; no residual remains in this Work Slice. Earlier pending or
+deferred acceptance statements are historical and superseded by this record.
