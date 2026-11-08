@@ -1,5 +1,9 @@
 # Talos Board
 
+## Interrupted session recovery / SESSION-CRASH-001
+
+- Active proposal: [owner](tasks/2026-11-08-crash-resume.md); #882 claim pending merge. Recover abandoned execution without replaying tools and permit new user work.
+
 ## Validation result presentation / VALIDATION-DISPLAY-001
 
 - Active proposal: [owner](tasks/2026-11-08-validation-result-display.md); claim is ineffective until merge. Readable plan/run results while preserving raw evidence; excludes clipping/theme and execution behavior.

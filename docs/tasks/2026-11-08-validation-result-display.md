@@ -1,19 +1,19 @@
 # VALIDATION-DISPLAY-001: Readable Validation Tool Results
 
-> Document status: Active / Unclaimed (proposed; ineffective until claim merge)
+> Document status: Active / Claimed (proposed; ineffective until claim #882 merges)
 > Deliverable: readable validate_project plan and run results in live and replayed TUI history, with raw evidence preserved.
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | validate_project result presentation and regression coverage; new formatter plus minimal TUI wiring; excludes width clipping, theme, execution, permissions and polling |
 | Claimed At | 2026-11-08 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #882 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requests fixing unreadable validation tool output; independent Agent technical review and exact-head CI required |
 | Implementation PR | Not started |
