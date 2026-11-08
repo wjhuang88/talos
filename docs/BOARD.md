@@ -1,5 +1,9 @@
 # Talos Board
 
+## Validation result presentation / VALIDATION-DISPLAY-001
+
+- Active proposal: [owner](tasks/2026-11-08-validation-result-display.md); claim is ineffective until merge. Readable plan/run results while preserving raw evidence; excludes clipping/theme and execution behavior.
+
 ## Protection stops / AGENT-PAUSE-001
 
 [Owner](tasks/2026-11-08-silent-protection-pause.md) proposes visible protection reasons
