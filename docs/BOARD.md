@@ -15,10 +15,10 @@
 
 ## Tool result clipping / TUI-ELLIPSIS-001
 
-[Owner](tasks/2026-11-08-tui-result-ellipsis.md) proposes Active / Claimed in
-PR #876 for result-line ellipsis and muted Nord backgrounds. Ineffective until
-target merge; single-maintainer authorization recorded in the owner; resulting
-exact-head CI and merge-time checks pending. No implementation delivered.
+[Owner](tasks/2026-11-08-tui-result-ellipsis.md) is Review / Claimed under effective
+#876. Consolidated clipping/background and actual history projection passed local
+preflight/MSVC checks; exact-head review/CI pending. User deferred native terminal
+acceptance until after merge and branch cleanup; owner remains Review.
 
 ## Tool routing / TOOL-ROUTE-001
 

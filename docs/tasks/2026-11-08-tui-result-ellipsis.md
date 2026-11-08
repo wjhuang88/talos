@@ -1,6 +1,6 @@
 # TUI-ELLIPSIS-001: Tool Result Clipping And Muted Background
 
-> Document status: Active / Claimed (proposed; ineffective until PR #876 merges)
+> Document status: Review / Claimed (effective claim #876 / e4eb3ba6)
 > Deliverable: tool-result logical lines fit terminal width with ellipsis and muted default input/user-message background.
 
 ## Collaboration Claim
@@ -9,13 +9,13 @@
 |---|---|
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
-| Executing Agent | Talos / gpt-6-astra |
+| Executing Agent | Codex / gpt-6; consolidating Talos / gpt-6-astra implementation at user request |
 | Work Slice | Tool-result width clipping and Nord input/user-message background, focused tests and README; excludes poll grouping, spinner lifecycle and queued input |
 | Claimed At | 2026-11-08 |
 | Source Issue | None |
 | Governance Claim PR | #876 |
-| Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer confirms single-person maintenance and no available independent maintainer; authorizes #876 only. [Authorization record](https://github.com/wjhuang88/talos/pull/876#issuecomment-6710615716). Agent technical review is supporting evidence, not independent human approval. Both governance validators, resulting exact-head CI and merge-time CAS remain mandatory |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Original claim #876 used single-maintainer authorization limited to that PR. User now requests consolidation of this session's remaining work onto main and branch/worktree cleanup; implementation requires independent Agent technical review and exact-head CI |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-08 |
 | Handoff / Release Condition | Effective target claim, implementation tests, standard preflight, native visual acceptance, exact-head CI and review |
@@ -53,6 +53,40 @@ Open PRs checked: #861 search helpers, #849 hosted MCP research, #838 Gemini;
 none claims this clipping/background behavior. This task is an independent slice,
 not a replacement objective for an existing iteration.
 
+## Implementation checkpoint
+
+Implementation branch: `feat/tui-result-ellipsis`, based on effective claim merge
+`e4eb3ba6e39c7303861fa2197e2fa5ea2dabaaad`. Local changes are not committed.
+Migrated result clipping, Nord background and README; added combining-character
+coverage alongside ASCII/CJK and narrow widths. Updated obsolete continuation-row
+assertions; omitted-row styling is identified by position, not clipped text.
+Foreground locked TUI library tests: 627 passed, 0 failed. Initial migration runs
+failed on obsolete wrapping/full-text assertions; those were corrected without
+removing width, styling or raw-content checks.
+Foreground standard preflight hit the 600-second command timeout. A buffered
+last-lines pipeline produced no output before termination, so the reached stage
+is unavailable. This run is not a pass; full preflight remains pending. Next run
+must expose progress or retain a complete log rather than buffer until EOF.
+Environment: C locale, two test threads, one build job, 32768 MiB process address
+limit; shared target directory used for the foreground tests/preflight.
+Native visual acceptance and implementation PR remain pending.
+
+## Follow-up validation and rebase
+
+Before rebase, the direct foreground standard `./scripts/release_preflight.sh`
+completed in 392.263 seconds with exit code 0 using the environment above and
+warmed compilation cache. This includes locked workspace tests and the final SDK
+fixture check; earlier timeout attempts are not passes. Writing this evidence
+previously failed due to approval deadline expiry and is now retried successfully.
+
+At the user's request, fetched `origin` and rebased `feat/tui-result-ellipsis` onto
+`origin/main` using `--autostash`. Git reported successful rebase and successful
+restoration of the uncommitted changes, without a conflict. After rebase, the
+foreground standard `./scripts/release_preflight.sh` completed in 587.925 seconds
+with exit code 0 using the same environment. All standard checks, locked workspace
+tests and final SDK fixture passed on the rebased working tree.
+Native visual acceptance, implementation commit and PR remain pending.
+
 ## Validation and delivery boundary
 
 Run focused locked TUI tests for ordinary, summary, head/tail, narrow widths,
@@ -68,3 +102,70 @@ interactive acceptance is pending. No implementation belongs in this claim PR.
 Backfill the actual PR number and propose Claimed / Active atomically before
 review; ownership becomes effective only after target merge. Completion requires
 existing implementation commit evidence, not this document or validation alone.
+
+## Consolidation ledger
+
+User requested consolidation on main and cleanup of local/remote session branches
+and worktrees, explicitly retaining unrelated open PRs #838/#849/#861. Responsible
+Actor and scope remain unchanged. Both local copies are preserved in temporary
+patches; implementation combines the worktree combining-character coverage and
+the main-worktree raw-result preservation assertion. Current base 1e835e7d.
+The original untracked proposal is superseded by this effective owner; its failure
+and validation history is retained below. No scope expansion. I310 Active,
+I318/I302/I277 Review, I249 Planned/deferred, I164 Paused, I162 Complete remain
+unchanged; no Blocked owner selected. Final preflight, xwin, independent review,
+native acceptance and exact-head CI are tracked here before closure.
+
+### Preserved experiment evidence
+
+Consolidation review found that history projection passed u16::MAX to the tool
+renderer and then wrapped results at viewport width, bypassing the original
+direct-renderer clipping tests. The actual history path now retains complete
+logical lines and clips only ToolResult viewport rows (including expanded process
+details). Chat/tool-call wrapping stays unchanged; visible scalar ranges exclude
+synthetic ellipses while hidden logical anchors remain stable after resizing.
+Added real project_history and draw_frame narrow/wide/narrow tests, validation
+format integration, raw preservation and selection coverage. The first frame
+fixture used read, whose existing summary intentionally hides content; corrected
+the fixture to a generic visible result. 633 TUI library tests and the additional
+frame test passed. Earlier in-progress preflight was deliberately stopped after
+review found the defect; it is not counted as a pass. Final preflight/xwin pending.
+User reported display issues, possibly from an old version; corrected source has
+been synchronized to their cargo-run directory. Native acceptance is not yet a pass.
+The user explicitly chose "先合并清理，终端验收稍后进行": merge and clean up now,
+defer native-terminal acceptance. This owner remains Review / Claimed after merge;
+the residual is long-output ellipsis, explicit newlines, resize and Nord surface
+appearance in the user's real terminal. Automated render tests do not close this
+manual row. No implementation or branch retention is required for that later check.
+
+Final local checkpoint: pinned Rust 1.99.0 full locked release_preflight.sh passed
+on the consolidated source, including 634 TUI tests, workspace/doc tests and both
+external SDK modes (/tmp/talos-ellipsis-preflight-final.log). MSVC all-feature test
+compilation passed with cargo xwin check --locked -p talos-tui --all-features
+--tests --target x86_64-pc-windows-msvc (/tmp/talos-ellipsis-xwin.log). Governance
+skill validation and scale assessment passed; profile remains high-risk with
+required worktrees. Independent exact-head review/native CI remain before merge;
+native terminal acceptance is explicitly deferred by the user as recorded above.
+
+
+- `cargo test --locked -p talos-tui --lib -j 1 -- --quiet`: 605 passed, 0 failed.
+  Used an 8192 MiB per-process virtual-address limit after the initial default-limit
+  build failed compiling cranelift with LLVM out-of-memory.
+- Standard `scripts/release_preflight.sh` started with `CARGO_BUILD_JOBS=1` and
+  the same memory limit. Governance, collaboration, format, workspace check and
+  Clippy passed. Workspace tests stopped at 3 talos-plugin WASM failures; one
+  explicitly reported mmap reservation failure under the 8192 MiB address limit.
+  `cargo test --locked -p talos-plugin --features wasm --lib -j 1 -- --test-threads=1`
+  then passed all 73 tests. A first standalone run without `--features wasm` ran
+  only 32 tests and was not evidence for the failing WASM cases. Standard preflight
+  with `RUST_TEST_THREADS=1` timed out at the 600-second command limit.
+- Final foreground standard preflight passed (exit 0), using `CARGO_BUILD_JOBS=1`,
+  `RUST_TEST_THREADS=2`, `LANG=C`, `LC_ALL=C`, and a 32768 MiB per-process address
+  limit. This includes workspace tests, doctests and external runtime SDK fixtures.
+  The output pipeline used `pipefail` and retained the last 100 lines.
+- Earlier foreground attempts failed: the full tools binary reproduced an English
+  Git stderr assertion failure under the ambient locale (1128 passed, 1 failed);
+  the exact failing test passed with C locale. A later preflight failed at TUI,
+  but its detailed stdout was truncated; the same TUI binary immediately passed
+  all 605 tests. That earlier failure remains unexplained, not silently dismissed.
+- Native interactive visual acceptance has not been performed.
