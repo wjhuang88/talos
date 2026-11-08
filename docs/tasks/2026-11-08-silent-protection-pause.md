@@ -14,7 +14,7 @@
 | Work Slice | Agent protection-stop publication/persistence and scoped post-file-change repeat tracking; Session/Conversation/TUI regression coverage and user docs; no permission/sandbox policy change |
 | Claimed At | 2026-11-08 |
 | Source Issue | None |
-| Governance Claim PR | None |
+| Governance Claim PR | #880 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requires fixing silent stop rather than asking users to continue around it; independent Agent review and exact-head CI before merge |
 | Implementation PR | Not started |
