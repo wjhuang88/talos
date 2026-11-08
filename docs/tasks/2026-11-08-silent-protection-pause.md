@@ -17,7 +17,7 @@
 | Governance Claim PR | #880 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requires fixing silent stop rather than asking users to continue around it; independent Agent review and exact-head CI before merge |
-| Implementation PR | Not started |
+| Implementation PR | #881 |
 | Last Updated | 2026-11-08 |
 | Handoff / Release Condition | Reproductions, locked preflight, MSVC xwin tests, independent review, exact-head CI and merged implementation evidence |
 
