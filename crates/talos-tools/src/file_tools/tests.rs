@@ -2,6 +2,7 @@ use super::*;
 use talos_core::tool::AgentTool;
 
 mod delete;
+mod mutation_progress;
 
 mod file_tool_tests {
     use super::*;

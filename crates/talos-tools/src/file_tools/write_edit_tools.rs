@@ -107,6 +107,7 @@ impl WriteTool {
                 if let Some(registry) = &self.snapshots {
                     registry.invalidate_path(&path)?;
                 }
+                talos_core::tool::record_file_mutation();
                 return Ok(format!(
                     "wrote {} bytes to {}\npreview:\n{}",
                     write_input.content.len(),
@@ -157,6 +158,7 @@ impl WriteTool {
             })?;
         }
 
+        talos_core::tool::record_file_mutation();
         Ok(format!(
             "wrote {} bytes to {}\npreview:\n{}",
             write_input.content.len(),
@@ -395,6 +397,9 @@ impl EditTool {
             })?;
         }
 
+        if content != new_content {
+            talos_core::tool::record_file_mutation();
+        }
         Ok(format!(
             "edited {}{recovery}\ndiff:\n{}",
             edit_input.path,
@@ -463,6 +468,9 @@ impl EditTool {
                 "file edited{recovery}; snapshot invalidation failed: {error}"
             ))
         })?;
+        if current != updated {
+            talos_core::tool::record_file_mutation();
+        }
         Ok(format!("edited {}{recovery}\ndiff:\n{diff}", anchored.path))
     }
 }

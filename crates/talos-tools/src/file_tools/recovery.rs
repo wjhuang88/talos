@@ -88,6 +88,9 @@ impl FileRecoveryStore {
             path_lock.unwrap_or(&self.write_lock),
         )
         .map_err(|error| FileToolError::AtomicWriteFailed(format!("{error}; recovery_id: {id}")))?;
+        if original != updated {
+            talos_core::tool::record_file_mutation();
+        }
         Ok(id)
     }
 
@@ -143,6 +146,7 @@ impl FileRecoveryStore {
         fs::remove_file(path).map_err(|error| {
             FileToolError::AtomicWriteFailed(format!("deletion failed; recovery_id: {id}; {error}"))
         })?;
+        talos_core::tool::record_file_mutation();
         Ok(id)
     }
 
@@ -183,6 +187,12 @@ impl FileRecoveryStore {
             )),
             other => other,
         })?;
+        if match &backup.expected {
+            ExpectedState::Contents(expected) => digest(&backup.original) != *expected,
+            ExpectedState::Deleted(_) => true,
+        } {
+            talos_core::tool::record_file_mutation();
+        }
         records.remove(id);
         Ok(())
     }

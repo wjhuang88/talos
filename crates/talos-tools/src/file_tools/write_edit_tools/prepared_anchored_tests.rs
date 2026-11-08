@@ -94,9 +94,15 @@ async fn retained_anchored_plan_reviews_exact_result_and_checks_freshness() {
                 .expect("invalidate");
         }
         let proof = admit(root.path(), prepared.as_ref(), &input);
-        let PreparedNormalStage::Complete(output) = prepared.execute_stage(proof).await else {
+        let (stage, changed) =
+            talos_core::tool::observe_file_mutation(prepared.execute_stage(proof)).await;
+        let PreparedNormalStage::Complete(output) = stage else {
             panic!("execution")
         };
+        assert_eq!(
+            changed, !output.result.is_error,
+            "actual prepared mutation evidence"
+        );
         if scenario != "allow" {
             assert!(output.result.is_error, "{scenario}");
             assert_eq!(

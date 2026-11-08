@@ -13,6 +13,84 @@ use tokio::sync::mpsc;
 
 type Receiver<T> = mpsc::Receiver<T>;
 
+#[tokio::test]
+async fn protection_stop_reaches_session_and_durable_replay() {
+    for budget in [false, true] {
+        let root = tempfile::tempdir().expect("root");
+        let durable =
+            talos_session::DurableSession::open_or_create(root.path(), "guard").expect("session");
+        let responses = (0..if budget { 51 } else { 3 }).map(|i| vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall { call: talos_core::message::ToolCall {
+                id: format!("guard_{i}"), name: "echo".into(),
+                input: serde_json::json!({"message":if budget { i.to_string() } else { "same".into() }}),
+            }, provenance: Default::default(), summary_fields: vec![] },
+            AgentEvent::TurnEnd { stop_reason: StopReason::ToolUse, usage: Default::default() },
+        ]).collect();
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(EchoTool));
+        #[allow(deprecated)]
+        let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_durable_persistence(durable.clone(), Default::default());
+        let task = tokio::spawn(async move { actor.run().await });
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "run".into(),
+            })
+            .await
+            .expect("submit");
+        let events = collect_until_completions(&mut handle.eq_rx, 1).await;
+        let reason = events
+            .iter()
+            .find_map(|event| match completed_status(event) {
+                Some(TurnCompletionStatus::Success { final_text, .. }) => Some(final_text.clone()),
+                _ => None,
+            })
+            .expect("bounded stop");
+        assert!(reason.contains(if budget { "limit" } else { "repeated" }));
+        let deltas = events
+            .iter()
+            .filter_map(|event| match progress_event(event) {
+                Some(AgentEvent::TextDelta { delta }) => Some(delta),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(deltas, vec![&reason]);
+        let live_index = events
+            .iter()
+            .position(|e| matches!(progress_event(e), Some(AgentEvent::TextDelta { .. })))
+            .expect("live reason");
+        let completed_index = events
+            .iter()
+            .position(|e| completed_status(e).is_some())
+            .expect("completion");
+        assert!(live_index < completed_index);
+        let messages = durable.read_messages().expect("durable replay");
+        assert_eq!(messages.iter().filter(|m| matches!(m, Message::Assistant { content, tool_calls, .. } if content == &reason && tool_calls.is_empty())).count(), 1);
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        task.await.expect("actor");
+        drop(durable);
+        let reopened = talos_session::DurableSession::open_existing(root.path(), "guard")
+            .expect("reopen")
+            .expect("existing");
+        assert_eq!(reopened.read_messages().expect("replay"), messages);
+    }
+}
+
 fn is_turn_started(event: &SessionEvent) -> bool {
     matches!(
         event,

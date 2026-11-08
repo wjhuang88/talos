@@ -4,6 +4,7 @@ mod network_invocation;
 mod ordinary_auto;
 mod ordinary_http_auto;
 mod process_auto;
+mod protection_stop;
 mod read_auto;
 mod sandbox_command_binding;
 mod save_url_auto;

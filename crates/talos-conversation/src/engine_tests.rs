@@ -17,6 +17,37 @@ fn new_engine() -> ConversationEngine {
 }
 
 #[test]
+fn protection_stop_after_tool_use_is_visible_once_without_false_completion_text() {
+    let reason = "Detected a repeated call pattern. Paused for review.";
+    let mut engine = new_engine();
+    engine.handle_turn_started();
+    engine.handle_agent_event(&AgentEvent::TurnStart);
+    engine.handle_agent_event(&AgentEvent::ToolCallStarted {
+        name: "exec".into(),
+    });
+    engine.handle_agent_event(&AgentEvent::TurnEnd {
+        stop_reason: StopReason::ToolUse,
+        usage: Default::default(),
+    });
+    let mut outputs = engine.handle_agent_event(&AgentEvent::TextDelta {
+        delta: reason.into(),
+    });
+    outputs.extend(engine.handle_turn_completed(
+        &talos_core::session::TurnCompletionStatus::Success {
+            final_text: reason.into(),
+            new_messages: vec![talos_core::message::Message::Assistant {
+                content: reason.into(),
+                tool_calls: vec![],
+                reasoning: None,
+            }],
+        },
+    ));
+    assert_eq!(outputs.iter().filter(|output| matches!(output, UiOutput::Content(ContentOutput::Delta { text }) if text == reason)).count(), 1);
+    assert_eq!(engine.transcript_markdown().matches(reason).count(), 1);
+    assert!(!engine.status_snapshot().is_processing);
+}
+
+#[test]
 fn admission_budget_is_independent_of_billing_and_resets_with_session() {
     let mut engine = new_engine();
     assert_eq!(engine.status_snapshot().context_budget, None);
