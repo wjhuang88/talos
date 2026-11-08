@@ -80,11 +80,18 @@ impl ReadTool {
             return Err(FileToolError::FileNotFound(read_input.path));
         }
 
-        if is_binary_file(&path)? {
-            return Err(FileToolError::BinaryFile(read_input.path));
-        }
-
-        let content = tokio::fs::read_to_string(&path).await?;
+        let content = if let Some(bytes) = super::workspace_read(&path, authorizations, u64::MAX)? {
+            if bytes.iter().take(8192).any(|byte| *byte == 0) {
+                return Err(FileToolError::BinaryFile(read_input.path));
+            }
+            String::from_utf8(bytes)
+                .map_err(|_| FileToolError::BinaryFile(read_input.path.clone()))?
+        } else {
+            if is_binary_file(&path)? {
+                return Err(FileToolError::BinaryFile(read_input.path));
+            }
+            tokio::fs::read_to_string(&path).await?
+        };
         let lines: Vec<&str> = content.lines().collect();
         let total_lines = lines.len();
 

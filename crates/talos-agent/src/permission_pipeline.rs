@@ -796,6 +796,11 @@ impl PermissionPipeline {
             .state_snapshot()
             .map_err(|error| PermissionPipelineError::State(error.to_string()))?;
         let mut request = PermissionRequest::new(tool_name, provenance.clone(), profile, input);
+        if (builtin_description.is_some() || file_mutation.is_some())
+            && matches!(tool_name, "read" | "write" | "edit" | "grep" | "glob")
+        {
+            request = request.with_ordinary_workspace_file();
+        }
         if (builtin_description.is_some() || unregistered_prepared)
             && matches!(
                 tool_name,

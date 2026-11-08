@@ -1764,3 +1764,57 @@ fn rule_ids_survive_unrelated_insertions() {
         .expect("prepend unrelated configured rule");
     assert_eq!(evaluate_id(&engine), before);
 }
+
+#[test]
+fn ordinary_workspace_default_preserves_explicit_policy_and_external_boundary() {
+    use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolResourceKind};
+    let root = tempfile::tempdir().expect("root");
+    let outside = tempfile::tempdir().expect("outside");
+    for (resource, expected) in [
+        (root.path().join("file.txt"), PermissionDecision::Allow),
+        (outside.path().join("file.txt"), PermissionDecision::Ask),
+        (root.path().join(".env"), PermissionDecision::Ask),
+        (root.path().join(".git/config"), PermissionDecision::Ask),
+    ] {
+        let mut engine = PermissionEngine::with_workspace_root(root.path().to_owned());
+        engine.set_ordinary_workspace_files(true);
+        let input = serde_json::json!({"path":resource});
+        let facets = [ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            resource.to_string_lossy(),
+            ToolResourceKind::Path,
+        )];
+        let request = crate::PermissionRequest::native("write", &facets, &input)
+            .with_ordinary_workspace_file();
+        assert_eq!(
+            engine
+                .evaluate_request(&request, &crate::PermissionContext::compatibility())
+                .decision(),
+            expected
+        );
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Ask,
+        ));
+        assert_eq!(
+            engine
+                .evaluate_request(&request, &crate::PermissionContext::compatibility())
+                .decision(),
+            PermissionDecision::Ask
+        );
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Deny("explicit".into()),
+        ));
+        assert!(matches!(
+            engine
+                .evaluate_request(&request, &crate::PermissionContext::compatibility())
+                .decision(),
+            PermissionDecision::Deny(_)
+        ));
+    }
+}

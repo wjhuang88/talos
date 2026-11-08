@@ -4670,6 +4670,7 @@ name = "talos-tools"
 version = "0.10.1"
 dependencies = [
  "async-trait",
+ "cap-fs-ext",
  "cap-std",
  "gix",
  "glob",
@@ -4682,6 +4683,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.5",
  "rust-websearch",
+ "rustix",
  "same-file",
  "schemars",
  "scraper 0.27.0",

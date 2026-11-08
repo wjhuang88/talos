@@ -1,6 +1,6 @@
 # WORKTREE-001: Session-owned worktree workspace admission
 
-> Document status: Active / Claimed (proposed; effective only after claim merge)
+> Document status: Active / Claimed (effective governance merge #889)
 > Deliverable: a worktree verifiably created by the current Session becomes an additional workspace root for that Session without a second workspace-admission prompt.
 
 ## Collaboration Claim
@@ -138,3 +138,41 @@ When automatic review cannot approve, is ineligible or fails, fall back to human
 approval. Do not broaden automatic eligibility merely because a path is external.
 Both approval routes feed the same exact execution authorization. This clarification
 supersedes any wording above that implies skipping automatic review for external paths.
+
+
+## Implementation checkpoint — 2026-11-08
+
+Approval execution repair, product ordinary-file defaults, retained root IO, durable
+receipt validation and approval-generation revocation are implemented locally; no
+implementation commit or delivery approval exists yet. Focused tests have verified
+external approval through the real Agent auto-fallback chain and worktree creation,
+resume, identity replacement and fresh external reapproval. Expanded read/edit/search
+and UI tests are still converging. One full workspace test run passed, but its final
+external SDK fixture failed because its independent lockfile needed the new capability
+dependency; both fixture lockfiles are now synchronized and require revalidation.
+
+Independent review found and corrected stale Once/Session grant reuse, missing
+metadata identities, command semantic changes and optional-capability gaps. Atomic
+creation custody now uses protected staging plus no-replace publication (ADR-099).
+The Windows OS ABI extension has design-checkpoint approval only; native Windows
+results and exact-head implementation approval are outstanding.
+
+Remaining gates: stable-source full preflight, cargo-xwin MSVC tests, actual CLI/TUI
+approval regression, native Windows contention/reparse tests, independent security
+review and target-branch merge/source sync. Sandboxed execution does not register
+host roots; SDK/print defaults and unsupported command forms are documented, not
+represented as delivered automatic admission. Keep the owner Active; no Complete claim.
+
+
+## Accepted scope adjustment — 2026-11-08
+
+User explicitly selected: “先交付 CLI/TUI 修复，独立 OS 沙箱登记另立任务”.
+WORKTREE-001 delivers the interactive CLI/TUI host execution path, inline Session
+restoration, exact external approval execution, and their existing automatic-review
+compatibility. Independent OS-sandbox root propagation and sandbox-owned creation
+receipts are excluded from this delivery and owned by
+[WORKTREE-SANDBOX-001](2026-11-08-sandbox-owned-worktrees.md). This overrides the
+original combined sandbox-construction acceptance above without deleting its baseline.
+SDK embedders opt in; ephemeral print mode has no persistent Session membership.
+Other tools that have not adopted held worktree capabilities retain external approval;
+original workspace trust is never inherited as blanket additional-root write authority.

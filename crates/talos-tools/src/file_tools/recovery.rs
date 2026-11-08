@@ -50,6 +50,17 @@ impl FileRecoveryStore {
         updated: &[u8],
         path_lock: Option<&Mutex<()>>,
     ) -> Result<String, FileToolError> {
+        self.replace_guarded(path, original, updated, path_lock, None)
+    }
+
+    pub(crate) fn replace_guarded(
+        &self,
+        path: &Path,
+        original: &[u8],
+        updated: &[u8],
+        path_lock: Option<&Mutex<()>>,
+        workspace: Option<&std::sync::Arc<dyn talos_core::tool::WorkspaceRootCapability>>,
+    ) -> Result<String, FileToolError> {
         if original.len() > MAX_FILE_BYTES || updated.len() > MAX_FILE_BYTES {
             return Err(FileToolError::SnapshotLimit(
                 "recoverable edit before/after content exceeds 2 MiB limit".into(),
@@ -81,13 +92,27 @@ impl FileRecoveryStore {
         }
         // Keep the backup on errors too: a parent-directory sync error can occur
         // after rename. Recovery still requires the exact expected edited content.
-        atomic_replace(
-            path,
-            updated,
-            digest(original),
-            path_lock.unwrap_or(&self.write_lock),
-        )
-        .map_err(|error| FileToolError::AtomicWriteFailed(format!("{error}; recovery_id: {id}")))?;
+        let result = if let Some(root) = workspace {
+            let _lock = path_lock
+                .unwrap_or(&self.write_lock)
+                .lock()
+                .map_err(|_| FileToolError::SnapshotRegistryUnavailable)?;
+            let relative = path
+                .strip_prefix(root.root())
+                .map_err(|_| FileToolError::PathIdentityChanged)?;
+            root.replace_file(relative, original, updated)
+                .map_err(FileToolError::Io)
+        } else {
+            atomic_replace(
+                path,
+                updated,
+                digest(original),
+                path_lock.unwrap_or(&self.write_lock),
+            )
+        };
+        result.map_err(|error| {
+            FileToolError::AtomicWriteFailed(format!("{error}; recovery_id: {id}"))
+        })?;
         if original != updated {
             talos_core::tool::record_file_mutation();
         }
@@ -156,6 +181,16 @@ impl FileRecoveryStore {
         id: &str,
         path_lock: Option<&Mutex<()>>,
     ) -> Result<(), FileToolError> {
+        self.restore_guarded(path, id, path_lock, None)
+    }
+
+    pub(crate) fn restore_guarded(
+        &self,
+        path: &Path,
+        id: &str,
+        path_lock: Option<&Mutex<()>>,
+        workspace: Option<&std::sync::Arc<dyn talos_core::tool::WorkspaceRootCapability>>,
+    ) -> Result<(), FileToolError> {
         // Serializing restores with backup lookup prevents concurrent consumption.
         let mut records = self.records()?;
         let backup = records.get(id).ok_or_else(|| {
@@ -167,6 +202,25 @@ impl FileRecoveryStore {
             return Err(FileToolError::SnapshotPathMismatch);
         }
         let result = match &backup.expected {
+            ExpectedState::Contents(expected) if workspace.is_some() => {
+                let root = workspace.ok_or(FileToolError::PathIdentityChanged)?;
+                let _lock = path_lock
+                    .unwrap_or(&self.write_lock)
+                    .lock()
+                    .map_err(|_| FileToolError::SnapshotRegistryUnavailable)?;
+                let relative = path
+                    .strip_prefix(root.root())
+                    .map_err(|_| FileToolError::PathIdentityChanged)?;
+                let mut current = Vec::new();
+                root.open_read(relative)?
+                    .take(MAX_FILE_BYTES as u64 + 1)
+                    .read_to_end(&mut current)?;
+                if current.len() > MAX_FILE_BYTES || digest(&current) != *expected {
+                    return Err(FileToolError::FileRevisionMismatch);
+                }
+                root.replace_file(relative, &current, &backup.original)
+                    .map_err(FileToolError::Io)
+            }
             ExpectedState::Contents(expected) => atomic_replace(
                 path,
                 &backup.original,
