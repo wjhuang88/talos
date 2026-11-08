@@ -15,10 +15,10 @@
 
 ## Tool result clipping / TUI-ELLIPSIS-001
 
-[Owner](tasks/2026-11-08-tui-result-ellipsis.md) is Review / Claimed under effective
-#876. Consolidated clipping/background and actual history projection passed local
-preflight/MSVC checks; exact-head review/CI pending. User deferred native terminal
-acceptance until after merge and branch cleanup; owner remains Review.
+[Owner](tasks/2026-11-08-tui-result-ellipsis.md) is Review / Claimed. Implementation
+merged in #886 (`b7706d64`); local preflight, cargo-xwin, independent exact-head
+review and Linux/Windows CI passed. User deferred real-terminal ellipsis, newline,
+resize and background acceptance until after merge and cleanup.
 
 ## Tool routing / TOOL-ROUTE-001
 

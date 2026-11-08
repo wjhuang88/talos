@@ -16,9 +16,9 @@
 | Governance Claim PR | #876 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Original claim #876 used single-maintainer authorization limited to that PR. User now requests consolidation of this session's remaining work onto main and branch/worktree cleanup; implementation requires independent Agent technical review and exact-head CI |
-| Implementation PR | Not started |
+| Implementation PR | #886 |
 | Last Updated | 2026-11-08 |
-| Handoff / Release Condition | Effective target claim, implementation tests, standard preflight, native visual acceptance, exact-head CI and review |
+| Handoff / Release Condition | User-deferred native terminal visual acceptance: long-output ellipsis, explicit newlines, resize and Nord background |
 
 ## Acceptance
 
@@ -169,3 +169,32 @@ native terminal acceptance is explicitly deferred by the user as recorded above.
   but its detailed stdout was truncated; the same TUI binary immediately passed
   all 605 tests. That earlier failure remains unexplained, not silently dismissed.
 - Native interactive visual acceptance has not been performed.
+
+## Merged implementation and deferred acceptance
+
+Implementation evidence: `b7706d64943bf8572d304dcf615749d5cb157e55` (#886),
+merged into main after CI run `42454166960` passed every check, including native
+Windows workspace tests. Independent Agent review approved exact head
+`ed3cc3da39ef6bfffbd979808582be7758550dde` against base
+`1e835e7d4b21300440b937f5814b84d883e4d6ee`, with no blocking findings; reviewer
+and author share a GitHub identity, so this is not a separate human approval.
+The final local preflight and cargo-xwin evidence above applies to this code.
+
+User explicitly requested merge and branch/worktree cleanup before real-terminal
+acceptance. Source is synchronized to the main directory used by `cargo run`.
+Delivery remains Review and claim remains Claimed; the only outstanding acceptance
+is the native walkthrough listed in the release condition. Resume from main using
+`cargo run -- -c`; record actual results here before any Complete / Closed change.
+No implementation branch or extra worktree is needed for this deferred check.
+The earlier checkpoint sections are historical; their pending implementation and
+CI statements are superseded by this merge record.
+
+### Preserved implementation lesson
+
+Repeated identical replacements targeted three separate result paths, but temporary
+single-element wrapping loops and editing during compilation obscured review.
+Read all related paths first, apply one coherent change, and freeze source while
+validation runs. Width-sensitive tests must verify the new clipping contract while
+retaining checks for styling, raw-content preservation and narrow-window behavior.
+The superseded untracked experiment proposal can now be removed: its evidence and
+implementation lesson are preserved in this owner.
