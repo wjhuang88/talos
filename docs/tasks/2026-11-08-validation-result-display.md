@@ -1,13 +1,15 @@
 # VALIDATION-DISPLAY-001: Readable Validation Tool Results
 
-> Document status: Review / Claimed (effective claim #882 / 0adc3451)
+> Document status: Complete / Closed
 > Deliverable: readable validate_project plan and run results in live and replayed TUI history, with raw evidence preserved.
+
+Completion Commit: bbea3dcf6e9e204fe2365a8f9e8cfec829f1ce2e
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | validate_project result presentation and regression coverage; new formatter plus minimal TUI wiring; excludes width clipping, theme, execution, permissions and polling |
@@ -15,10 +17,10 @@
 | Source Issue | None |
 | Governance Claim PR | #882 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | User requests fixing unreadable validation tool output; independent Agent technical review and exact-head CI required |
-| Implementation PR | Not started |
+| Authorization Evidence | Independent Agent APPROVE at 933277652595884dd0253add4e6630f74a309932 against 0adc34519490b85769cc46863420b888bf014e2a; CI42448963047 all successful; merged #883 |
+| Implementation PR | #883 |
 | Last Updated | 2026-11-08 |
-| Handoff / Release Condition | Focused display/replay/raw-preservation tests, standard locked preflight, MSVC xwin tests, exact-head review/CI and merged evidence |
+| Handoff / Release Condition | None; scoped acceptance passed and implementation merged |
 
 ## Acceptance and boundaries
 
@@ -78,3 +80,14 @@ locked release_preflight.sh; and cargo xwin check --locked -p talos-tui
 /tmp/talos-display-tests2.log, /tmp/talos-display-preflight.log and
 /tmp/talos-display-xwin.log. Independent exact-head review and native CI remain
 required before merge; this is not a completion claim.
+
+## Closure
+
+PR #883 merged as the Completion Commit above after independent exact-head Agent
+technical APPROVE (no blocking or nonblocking findings), both governance validators,
+and CI42448963047 all successful, including native Windows workspace tests and
+Windows/Linux Desktop gates. The independent Agent shares the GitHub identity;
+this is not a claim of separate human approval. Merge-time CAS confirmed the
+effective #882 owner unchanged, no overlapping PR, and the exact reviewed head
+mergeable. No residual work within this presentation scope; TUI-ELLIPSIS-001
+continues to own clipping/theme changes separately.
