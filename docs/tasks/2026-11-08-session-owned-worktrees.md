@@ -209,3 +209,10 @@ identity-only staging handle repair and post-publication capability transition.
 macOS additionally reported two pre-existing long-history recovery test failures
 (committed-source deadline and checkpoint outer timeout); these remain pending
 validation rather than waived. All exact-head checks must pass on the next candidate.
+
+Second native candidate 7ad6f4cf passed macOS full preflight (including the two
+previous history failures) and Windows ordinary workspace policy tests. Windows
+creation progressed past publication but Git rejected the canonical `\\?\` destination
+spelling. The final follow-up gives Git a conventional argument only after unchanged
+Win32 normalization and directory identity comparison, rejecting reserved/verbatim-only
+names. Permission and receipt paths remain canonical. Native success is still required.

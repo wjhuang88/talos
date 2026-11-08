@@ -538,7 +538,7 @@ impl SessionWorktrees {
             .map_err(|e| e.to_string())?;
         let (held, identity) = publish_empty_directory(&staging, target)?;
         let index = args.len() - 2;
-        args[index] = target.to_string_lossy().into_owned();
+        args[index] = git_directory_argument(target)?;
         let mut command = serde_json::json!({"command":git,"args":args,"timeout_secs":input.get("timeout_secs").and_then(|v|v.as_u64()).unwrap_or(120)});
         if let Some(memory) = input.get("memory_limit_mib") {
             command["memory_limit_mib"] = memory.clone();
@@ -565,6 +565,58 @@ impl SessionWorktrees {
         )))
     }
 }
+fn git_directory_argument(path: &Path) -> Result<String> {
+    let original = path.to_str().ok_or("Git worktree path is not Unicode")?;
+    #[cfg(not(windows))]
+    return Ok(original.to_owned());
+    #[cfg(windows)]
+    {
+        // Git for Windows rewrites backslashes but does not preserve Rust's
+        // verbatim namespace. Convert only an unchanged Win32 spelling that
+        // resolves to the held directory, never merely strip the prefix.
+        let spelling = if let Some(unc) = original.strip_prefix(r"\\?\UNC\") {
+            format!(r"\\{unc}")
+        } else if let Some(disk) = original.strip_prefix(r"\\?\") {
+            disk.to_owned()
+        } else {
+            original.to_owned()
+        };
+        let candidate = Path::new(&spelling);
+        let absolute = std::path::absolute(candidate).map_err(|e| e.to_string())?;
+        if !candidate.is_absolute() || absolute.as_os_str() != candidate.as_os_str() {
+            return Err("Git worktree path changes under Win32 normalization".into());
+        }
+        for part in candidate.components() {
+            if let std::path::Component::Normal(name) = part {
+                let name = name.to_str().ok_or("invalid Git path component")?;
+                let stem = name
+                    .split('.')
+                    .next()
+                    .unwrap_or_default()
+                    .to_ascii_uppercase();
+                let reserved = matches!(
+                    stem.as_str(),
+                    "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+                ) || ["COM", "LPT"].iter().any(|prefix| {
+                    stem.strip_prefix(prefix).is_some_and(|suffix| {
+                        matches!(
+                            suffix,
+                            "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+                        )
+                    })
+                });
+                if reserved || name.ends_with(['.', ' ']) || name.contains(':') {
+                    return Err("Git worktree path requires verbatim semantics".into());
+                }
+            }
+        }
+        if directory(candidate)?.1 != directory(path)?.1 {
+            return Err("Git worktree path identity changed".into());
+        }
+        Ok(spelling)
+    }
+}
+
 fn publish_empty_directory(staging: &Path, target: &Path) -> Result<(Dir, Identity)> {
     std::panic::catch_unwind(|| {
         let builder = std::fs::DirBuilder::new();
@@ -1097,6 +1149,21 @@ mod tests {
             let result = write.execute_authorized(value.clone(), &fresh).await;
             assert!(!result.is_error, "{}", result.content);
             std::fs::remove_file(&target).expect("reset target");
+        }
+    }
+    #[cfg(windows)]
+    #[test]
+    fn git_directory_spelling_preserves_identity_and_rejects_verbatim_only_names() {
+        let temp = tempfile::tempdir().expect("temp");
+        let canonical = temp.path().canonicalize().expect("canonical");
+        let spelling = git_directory_argument(&canonical).expect("Git path");
+        assert!(!spelling.starts_with(r"\\?\"));
+        assert_eq!(
+            directory(Path::new(&spelling)).expect("spelling").1,
+            directory(&canonical).expect("canonical").1
+        );
+        for name in ["trailing.", "trailing ", "NUL", "COM1"] {
+            assert!(git_directory_argument(&canonical.join(name)).is_err());
         }
     }
     #[test]
