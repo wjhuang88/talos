@@ -2,11 +2,11 @@
 
 ## Interrupted session recovery / SESSION-CRASH-001
 
-- Review: [owner](tasks/2026-11-08-crash-resume.md), effective claim #882. Recovery, full locked preflight and MSVC test compilation passed; user confirmed original cargo-run session continues. Exact-head review and native CI pending.
+- Complete / Closed: [owner](tasks/2026-11-08-crash-resume.md), #884 (`c7a4b28e`). User confirmed original cargo-run session continues; full preflight, MSVC tests, independent safety/API review and native CI passed.
 
 ## Validation result presentation / VALIDATION-DISPLAY-001
 
-- Review: [owner](tasks/2026-11-08-validation-result-display.md), effective claim #882. Readable plan/run formatting implemented locally; validation and review pending; excludes clipping/theme and execution behavior.
+- Complete / Closed: [owner](tasks/2026-11-08-validation-result-display.md), #883 (`bbea3dcf`). Readable plan/run and real history replay passed full preflight, MSVC checks, independent review and native CI; excludes clipping/theme and execution behavior.
 
 ## Protection stops / AGENT-PAUSE-001
 

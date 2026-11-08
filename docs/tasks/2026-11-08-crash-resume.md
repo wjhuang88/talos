@@ -1,13 +1,15 @@
 # SESSION-CRASH-001: Resume After Interrupted Execution
 
-> Document status: Review / Claimed (effective claim #882 / 0adc3451)
+> Document status: Complete / Closed
 > Deliverable: a session interrupted by process/power loss can accept new user work after safe recovery, without replaying ambiguous tools.
+
+Completion Commit: c7a4b28eac0c0d985c6e24406165638e60aa87e5
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | Interrupted Running-custody recovery, runtime ownership exclusion, durable terminal recovery evidence and resume regression tests; excludes tool display, clipping, theme and permission policy |
@@ -15,10 +17,10 @@
 | Source Issue | None |
 | Governance Claim PR | #882 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | User reports power loss followed by unusable -c recovery and requests a fix; independent safety review and exact-head CI required |
-| Implementation PR | Not started |
+| Authorization Evidence | Independent Agent safety/API APPROVE at 2b386161c64643f8b2918b70983c1c29314f14bd against 0adc34519490b85769cc46863420b888bf014e2a; CI42450412604 all successful; merged #884 |
+| Implementation PR | #884 |
 | Last Updated | 2026-11-08 |
-| Handoff / Release Condition | Crash/reopen/new-submission and no-replay tests, concurrent-owner exclusion, locked preflight, MSVC xwin tests and native CI, exact-head review and merged evidence |
+| Handoff / Release Condition | None; scoped acceptance passed and implementation merged |
 
 ## Evidence and acceptance
 
@@ -123,3 +125,21 @@ feature modes (/tmp/talos-crash-preflight-clean.log). Both repository governance
 validators, current skill validator and scale assessment passed; profile remains
 high-risk/release-managed with worktrees required. Final exact-head independent
 review, native CI and merge/closure remain pending.
+
+## Closure
+
+PR #884 merged as the Completion Commit above after independent exact-head Agent
+safety/API/technical APPROVE with no blockers, both governance validators and
+CI42450412604 all successful, including native Windows workspace/process tests
+and Windows/Linux Desktop checks. Agent review shares the GitHub identity and
+does not represent a separate human approval. Merge-time CAS confirmed the owner
+unchanged, no overlapping claim/implementation, and the reviewed head mergeable
+on the latest target (the intervening #883 presentation change was independent).
+
+The user confirmed original-session continuation via cargo run -- -c. Follow-up
+read-only verification found the original interrupted turn terminal_error and
+SQLite integrity ok. Recovery was performed by the application, not a manual
+journal edit. Temporary private-session fixture and probe were removed. Git
+connectivity check passed after the earlier power-loss artifact recovery.
+Documented cooperative-lock and existing whole-file-reader limits remain design
+boundaries, not omitted acceptance. No residual implementation within this scope.
