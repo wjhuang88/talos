@@ -10,8 +10,8 @@
 
 ## Protection stops / AGENT-PAUSE-001
 
-[Owner](tasks/2026-11-08-silent-protection-pause.md) proposes visible protection reasons
-and post-edit validation progress; activation awaits claim merge.
+[Owner](tasks/2026-11-08-silent-protection-pause.md) is Review / Claimed through #880;
+implementation #881 has passed local preflight and MSVC tests; exact-head review, native CI and merge pending.
 
 ## Tool result clipping / TUI-ELLIPSIS-001
 

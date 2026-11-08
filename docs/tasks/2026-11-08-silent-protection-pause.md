@@ -1,6 +1,6 @@
 # AGENT-PAUSE-001: Visible Protection Stops And Post-Edit Validation
 
-> Document status: Active / Claimed (proposed; effective only after claim merge)
+> Document status: Review / Claimed (effective claim merge 1f537340)
 > Published plan date: 2026-11-08
 > Deliverable: repeated-call and tool-budget stops visibly explain why execution ended, persist the explanation, and permit legitimate validation after successful file changes.
 
@@ -17,7 +17,7 @@
 | Governance Claim PR | #880 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requires fixing silent stop rather than asking users to continue around it; independent Agent review and exact-head CI before merge |
-| Implementation PR | Not started |
+| Implementation PR | #881 |
 | Last Updated | 2026-11-08 |
 | Handoff / Release Condition | Reproductions, locked preflight, MSVC xwin tests, independent review, exact-head CI and merged implementation evidence |
 
@@ -73,3 +73,47 @@ failed/no-op edits and true repetition, budget stop, streamed output plus persis
 history and replay. Run pinned locked standard release_preflight.sh and cargo-xwin
 MSVC --tests for affected crates; native CI remains required. Review exact head
 and merge CAS. Complete only with existing implementation SHA and honest residuals.
+
+## Implementation decisions and local evidence
+
+The claim became effective through #880 / 1f537340. Implementation branch:
+`fix/agent-silent-protection-stop`. No permission policy or sandbox behavior changes.
+A scoped task-local observer records actual native file changes; the caller also
+requires the original successful result and the registry-owned write/edit/delete
+instance before recording turn-local progress. Hooks are outside the observation
+scope. Existing Tokio gains an explicit `rt` feature in core for the additive
+observer utility API; no dependency or serialized protocol is added. The utility
+is advisory evidence, not authorization or a complete filesystem version.
+
+Markers run on the invocation task after filesystem calls complete, including
+legacy/anchored, staged backup edits/deletes and restoration. Child tasks do not
+inherit the observer. An error after a partial side effect conservatively grants
+no progress. No-op restorations compare the retained original/expected digest.
+Only a preceding completed batch can refresh command signatures; a proposed
+same-batch edit does not count. Total budget and non-command repeat counters stay.
+
+Pre-fix reproductions failed as expected: `/tmp/talos-pause-red.log` showed no
+live explanation; `/tmp/talos-pause-edit-red.log` stopped the third identical real
+command after intervening edits. Initial focused corrected tests passed. At that checkpoint, full local and
+remote validation remained pending; subsequent evidence is recorded below.
+
+Focused validation: 7 Agent/Session tests and one Conversation test passed in
+`/tmp/talos-pause-session3.log`; real ExecTool invokes `rustc --version` and asserts
+successful results between real EditTool writes. The scope-isolation regression
+passed in `/tmp/talos-pause-mutation.log`; 97 file-tool tests passed with explicit
+`--features file-write` (`/tmp/talos-pause-files2.log`). The default tools feature
+set does not compile mutation tests and is not acceptance evidence.
+`cargo xwin check --locked -p talos-core -p talos-agent -p talos-tools
+-p talos-conversation --all-features --tests --target x86_64-pc-windows-msvc`
+passed (`/tmp/talos-pause-xwin.log`); existing checkpoint-history test-only unused
+function warning remains. Locked CLI build passed and `talos --version` starts
+successfully (`/tmp/talos-pause-cli-build.log`). The already-running old process
+must be restarted to load this repaired binary; no live restart or session input
+was forced. Original worktree dirty-file checksums still match the retained baseline.
+
+Local convergence passed: repository-pinned locked `./scripts/release_preflight.sh`
+exited 0, including workspace check, Clippy, tests and external SDK fixture
+(`/tmp/talos-pause-preflight.log`). Independent implementation preliminary review
+by `/root/quality_claim_review` found no blockers and confirmed no permission or
+sandbox relaxation. Final exact-head review, native CI and merge remain required.
+Owner stays Review until already-existing merged implementation evidence exists.
