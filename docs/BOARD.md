@@ -9,8 +9,8 @@ exact-head CI and merge-time checks pending. No implementation delivered.
 
 ## Tool routing / TOOL-ROUTE-001
 
-[Owner](tasks/2026-11-08-tool-routing-guidance.md) proposes shared direct-tool
-selection and foreground defaults; activation awaits governance claim merge.
+[Owner](tasks/2026-11-08-tool-routing-guidance.md) is Review / Claimed through #874 (`ad71a208`).
+Shared direct-tool selection and foreground defaults passed local preflight/xwin; remote review/CI pending.
 
 ## Background process polling / TUI-POLL-001
 

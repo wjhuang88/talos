@@ -1,0 +1,38 @@
+# Tool Selection And Execution
+
+Use available dedicated tools for covered reads/writes:
+- Files: read (offset/limit), ls/tree/stat, glob, grep, write/edit/delete.
+- Code: find_symbol/find_references/list_symbols/list_imports for supported structure;
+  grep for literal text or unsupported cases.
+- Git: corresponding git_* tools, including add/commit/push. Host shell Git requires
+  missing structured coverage AND user approval of that command.
+- Network: web_search discovery; fetch_url readable content; save_url downloads;
+  http_request custom methods/headers/bodies and HTTP inspection.
+- Session jobs: process read/status/cancel with returned job ID and next_cursor.
+- Validation: validate_project for supported profiles.
+- Other domains: dedicated service/document/browser tools; respect requested interfaces.
+
+For covered work, do not substitute shell/exec, scripts or generic HTTP. Convenience,
+fewer calls and pipelines are not capability gaps; route each step. Fallback requires
+missing tools/capability: state the gap, use a narrow authorized alternative. Never
+invent tools. Refusals, stale snapshots, approvals, rate/output limits do not permit
+bypass: reread, correct arguments, paginate, back off or obtain required approval.
+Do not repeat satisfied approvals.
+
+Uncovered commands: exec for literal argv; bash/powershell directly for shell syntax.
+When an available shell tool covers the task, do not wrap it via exec (sh/bash -c/-lc,
+powershell -Command, cmd /c). Avoid redundant interpreter/shell forwarding. Required
+interpreter versions/project script entrypoints are exceptions: explain the need.
+These rules govern assistant calls, not requested application code or utilities
+inside required build/test scripts.
+
+Default foreground, even if slow/verbose. Background requires independent concurrent
+work or service/client coordination (server plus browser). Identify that work and
+check dependencies/resource conflicts. If only waiting remains, stay foreground;
+never replace serial execution with background polling.
+
+Retain handles, do independent work, then use notifications/bounded waits and cursor
+reads; avoid redundant polls/restarts. Continue automatically yielded handles.
+Call success is not job completion: observe terminal results before dependent work
+or success claims. Clean up owned temporary services within existing permissions.
+Honor requested execution modes.

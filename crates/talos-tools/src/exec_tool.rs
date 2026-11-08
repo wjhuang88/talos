@@ -654,7 +654,7 @@ impl AgentTool for ExecTool {
     }
 
     fn description(&self) -> &str {
-        "Execute one program, argv-style steps, or pipe chains without shell parsing, redirection or glob expansion. Single-command supervised background is supported. Optional memory_limit_mib: integer 64..65536, default 2048 MiB per process; steps inherit the request unless overridden. Not RSS or a process-tree quota. Explicit setup failure refuses startup; omitted Unix limits are best-effort."
+        "Literal argv, steps or pipes; no shell parsing/redirection/globbing. Prefer dedicated tools; call available shell tools directly for shell syntax. Foreground by default; single-command background only for independent concurrency or service/client coordination. Optional memory_limit_mib: integer 64..65536, default 2048 MiB per process; steps inherit the request unless overridden. Not RSS or a process-tree quota. Explicit setup failure refuses startup; omitted Unix limits are best-effort."
     }
 
     fn parameters(&self) -> Value {

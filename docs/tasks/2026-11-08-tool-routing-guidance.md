@@ -1,6 +1,6 @@
 # TOOL-ROUTE-001: Direct Tool Selection And Foreground Defaults
 
-> Document status: Active / Claimed (proposed; ineffective until target merge)
+> Document status: Review / Claimed
 > Published plan date: 2026-11-08
 > Deliverable: shared model-visible guidance routes covered operations to dedicated tools, avoids redundant executor/interpreter wrappers, and defaults to foreground execution.
 
@@ -70,3 +70,53 @@ with foreground browser. Run locked Agent prompt and Tools/Process tests, standa
 release_preflight.sh and cargo-xwin MSVC tests for affected platform descriptions.
 Independent review, exact-head CI and CAS before merge; Complete requires existing
 implementation SHA. Do not claim prompts mechanically prevent every model mistake.
+
+## Implementation and analysis checkpoint
+
+Claim #874 merged as ad71a208 after independent Agent APPROVE for 649ba6f8
+against 1a2c184d and CI42392887768 passed. Existing identity rules covered only
+files/read-only Git and treated multi-step pipelines as a blanket shell exception.
+Exec described no shell parsing without prohibiting redundant shell wrappers.
+Fetch URL already described its HTTP-request boundary. These facts informed the
+new shared tool_selection asset, injected into the existing cacheable Tools section
+so default/custom identity and native/textual protocols share one copy without
+adding cache markers. Removed superseded identity routing/AST duplicates.
+Updated exec/shell/process descriptions; no execution branch or permission changed.
+
+Manual scenario review: read/edit use file tools; semantic references use supported
+symbol tools; Git add/commit/push use corresponding structured tools; URL content,
+download and POST use fetch_url/save_url/http_request; uncovered literal argv uses
+exec; shell syntax uses platform shell directly. Missing capability permits narrow
+authorized fallback, while refusal/stale snapshot requires supported recovery.
+Serial slow tests stay foreground; independent checks may run concurrently after
+resource/dependency review; a server plus browser is valid background/foreground
+coordination with cleanup. Existing project entrypoints and requested application
+code remain valid. This is a wording review, not measured model-routing accuracy.
+
+Assembly tests cover catalog presence/absence, default/custom identity, native/text
+protocols, exactly-once stable-prefix inclusion and cache-range coverage.
+
+Local preflight caught two prompt-boundary regressions before submission: added
+instructions pushed the unchanged 20k compaction fixture over its sealed request
+budget, and `authorization` in process description triggered the existing sensitive
+text filter in Auto action evidence. Compressed the shared rules and changed that
+description to concise equivalent wording; did not relax budgets, test assertions or
+safety filters. The real process cancellation allow/deny/stale/foreign/replacement
+fixture then passed. Recorded the reusable lesson in EVOLUTION.md. Independent
+review also caught a lost shell-unavailable fallback qualification during shortening;
+restored the condition that a matching shell tool must cover the task.
+
+The full workspace run also detected the CLI model-switch fixture entering 80%
+pressure after expanded descriptions. Measured 26,016 estimated tokens at 32k
+capacity with an 8,192 output reserve; shortened duplicate local descriptions and
+shared prose without changing the fixture or pressure thresholds. Final Agent
+655/655 and CLI 410/410 tests passed, including all three budget/approval regressions.
+Final cargo-xwin MSVC --tests check for agent/tools (coding feature) passed; existing
+checkpoint_history test-only dead-code warning remains unrelated.
+
+Final standard release_preflight.sh passed (locked workspace check/Clippy/tests,
+doc-tests, both external SDK fixture modes and governance checks). The retained
+shell-description compatibility test passed after keeping `shell command` wording.
+No test budget/assertion or runtime permission/execution behavior changed.
+Logs: /tmp/talos-route-preflight4.log and /tmp/talos-route-final-xwin2.log.
+Exact-head independent review and remote CI remain required before merge.

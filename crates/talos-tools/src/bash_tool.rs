@@ -509,7 +509,7 @@ impl AgentTool for BashTool {
     }
 
     fn description(&self) -> &str {
-        "Execute a shell command (fallback: prefer grep/glob/ls/read/write/edit/delete for file ops). Optional memory_limit_mib: integer 64..65536, default 2048 MiB per process; not RSS or a process-tree quota. Explicit setup failure refuses startup; omitted Unix limits are best-effort."
+        "Run shell commands (fallback); prefer dedicated tools. Call directly, not via exec/nested shell. Foreground by default; background only for independent concurrency or service/client coordination. Optional memory_limit_mib: integer 64..65536, default 2048 MiB per process; not RSS or a process-tree quota. Explicit setup failure refuses startup; omitted Unix limits are best-effort."
     }
 
     fn parameters(&self) -> Value {
