@@ -1,6 +1,6 @@
 # WORKTREE-001: Session-owned worktree workspace admission
 
-> Document status: Active / Claimed (effective governance merge #889)
+> Document status: Review / Claimed (effective governance merge #889)
 > Deliverable: a worktree verifiably created by the current Session becomes an additional workspace root for that Session without a second workspace-admission prompt.
 
 ## Collaboration Claim
@@ -176,3 +176,24 @@ original combined sandbox-construction acceptance above without deleting its bas
 SDK embedders opt in; ephemeral print mode has no persistent Session membership.
 Other tools that have not adopted held worktree capabilities retain external approval;
 original workspace trust is never inherited as blanket additional-root write authority.
+
+
+## Stable candidate validation — implementation b8b7f760
+
+Implementation Commit: b8b7f760304a29de9e17cfa5f16d99507c882e81
+
+- Pinned Rust 1.99.0 `./scripts/release_preflight.sh`: passed, including both
+  governance validators, workspace check/Clippy/tests and both external SDK modes.
+- `cargo xwin check --locked -p talos-tools -p talos-agent -p talos-cli --all-features
+  --tests --target x86_64-pc-windows-msvc`: passed. Existing test-only dead-code
+  warning in checkpoint_history remains unrelated; no new cross-check warning.
+- Real Agent authorized worktree creation → next native write: passed with exactly
+  one creation approval. TUI external Once/Always/Deny execution: passed.
+- Root read/write/edit/grep/glob, no-primary-capability write, resume, policy reload,
+  protected receipts, invalid-root old Once/Session rejection and fresh external
+  reapproval: passed. No-clobber/competing target/Unix symlink tests: passed.
+- Independent Agent static security review APPROVE for implementation head above,
+  base d29fbebe40f7077b5c0a254bc6748746918e0f99. Reviewer is separate from the
+  implementation agent but shares the maintainer's GitHub identity; not a separate
+  human approval. Native Windows identity/reparse results and exact candidate CI
+  remain merge gates. No Complete status or completion evidence is claimed yet.

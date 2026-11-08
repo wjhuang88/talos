@@ -293,9 +293,9 @@ Owner: [Gemini](backlog/active/PROVIDER-008-B-google-gemini.md). No implementati
 
 ## Session-owned worktrees / WORKTREE-001
 
-[Owner](tasks/2026-11-08-session-owned-worktrees.md) is Active / Claimed (effective #889).
+[Owner](tasks/2026-11-08-session-owned-worktrees.md) is Review / Claimed (effective #889).
 Repair manual approval/execution for external paths and automatically admit verified
-Session-created worktrees, with resume and revocation. Local implementation is under
-validation; production delivery is not yet complete. Independent OS-sandbox registration
+Session-created worktrees, with resume and revocation. Implementation b8b7f760 passed local preflight and MSVC cross-check; exact-head CI
+and native Windows acceptance remain before merge. Independent OS-sandbox registration
 is explicitly deferred to [WORKTREE-SANDBOX-001](tasks/2026-11-08-sandbox-owned-worktrees.md)
 (Planned / Unclaimed).
