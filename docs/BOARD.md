@@ -9,8 +9,9 @@ exact-head CI and merge-time checks pending. No implementation delivered.
 
 ## Tool routing / TOOL-ROUTE-001
 
-[Owner](tasks/2026-11-08-tool-routing-guidance.md) is Review / Claimed through #874 (`ad71a208`).
-Shared direct-tool selection and foreground defaults passed local preflight/xwin; remote review/CI pending.
+[Owner](tasks/2026-11-08-tool-routing-guidance.md) is Complete / Closed through #877 (`25c7769b`).
+Dedicated-tool routing and foreground defaults passed preflight/xwin, independent review and exact-head CI.
+Owner retains the unrelated first-attempt macOS storage-test diagnostic observation.
 
 ## Background process polling / TUI-POLL-001
 

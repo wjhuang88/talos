@@ -1,6 +1,6 @@
 # TOOL-ROUTE-001: Direct Tool Selection And Foreground Defaults
 
-> Document status: Review / Claimed
+> Document status: Complete / Closed
 > Published plan date: 2026-11-08
 > Deliverable: shared model-visible guidance routes covered operations to dedicated tools, avoids redundant executor/interpreter wrappers, and defaults to foreground execution.
 
@@ -8,7 +8,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | Shared system-prompt tool-routing and foreground/background guidance plus exec, shell and process descriptions; prompt assembly tests and documentation; no runtime execution or permission-policy change |
@@ -17,9 +17,9 @@
 | Governance Claim PR | #874 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requests general analysis and optimization beyond exec-to-bash wrappers; explicitly requires foreground unless concrete parallel work or service/foreground coordination exists |
-| Implementation PR | Not started |
+| Implementation PR | #877 |
 | Last Updated | 2026-11-08 |
-| Handoff / Release Condition | Shared prompt assembly, description parity, focused tests and standard validation; independent review and exact-head CI before closure |
+| Handoff / Release Condition | None; routing scope delivered, unrelated CI diagnostic observation retained below |
 
 ## Goal, scope and acceptance
 
@@ -120,3 +120,43 @@ shell-description compatibility test passed after keeping `shell command` wordin
 No test budget/assertion or runtime permission/execution behavior changed.
 Logs: /tmp/talos-route-preflight4.log and /tmp/talos-route-final-xwin2.log.
 Exact-head independent review and remote CI remain required before merge.
+
+## Remote verification and residual
+
+Implementation PR #877 reviewed by /root/quality_claim_review: APPROVE for head
+abd07c11cc224b0158aa80b49b0f07ba7ade97f8 against base
+ae66e309204e25cc67e4f289775989efcb79a553. No blockers. Review receipt is in the
+PR body; independent Agent technical review, not separate human GitHub approval.
+Both final governance validators passed with zero warnings; integrated TUI tests
+passed 628/628 after preserving both README sections during integration.
+
+CI42396273664 attempt 1 passed native Windows and Linux/Windows Desktop but failed
+an unchanged talos-session macOS fixture:
+`fork_recovery_skips_active_lock_and_retires_only_unpublished_intent`, durable.rs:2363,
+retired count 0 versus expected 1. Session sources/dependencies were unchanged and
+have no dependency on the modified Agent/Tools crates. Full Linux preflight and the
+isolated fixture passed. A single failed-job rerun on the same head was approved
+by independent Agent assessment; no assertions/timeouts/safety paths were changed.
+First-attempt cause remains unknown: the test asserted only retired count, while
+recovery can skip held locks or count I/O/SQLite failures. Do not label it fixed or
+proven infrastructure instability.
+
+Residual diagnostic observation (owner: this document): preserve attempt 1 logs in
+CI42396273664 and /tmp/talos-route-ci-failure.log. If reproduced, capture the full
+(scanned, retired, failed, cursor) result and underlying recovery error before
+choosing a separate storage/test repair; do not mechanically retry or weaken the
+lock/retirement assertion. This observation is not a missing routing deliverable.
+
+## Completion evidence
+
+Completion Commit: 25c7769bbc68fbc47aec5f5e9c385077bb35f90c
+
+CI42396273664 attempt 2 passed the failed macOS job on the unchanged implementation
+head, including standard preflight, real CLI/TUI acceptance, language plugins and
+offline dependency audit. All applicable checks were green before #877 merged.
+Merge CAS verified exact head, mergeability, unchanged owner/claim and no overlap;
+subsequent #878 closure and #876 ellipsis claim did not change this scope.
+README.zh-CN documents the delivered rules. No implementation remains in scope.
+Prompt guidance does not enforce model routing and no live-provider accuracy
+measurement is claimed. The unrelated first-attempt storage diagnostic remains
+explicitly unresolved above; no storage bug-fix claim is made.
