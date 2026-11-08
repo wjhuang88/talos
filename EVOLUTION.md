@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-08 - Crash fencing needs a safe recovery path
+
+- Trigger: power loss followed by `talos -c` permanently refused input because Running custody lacked terminal proof (SESSION-CRASH-001).
+- Root cause: no-replay fencing had no abandoned-turn terminalization path; partial transcript text cannot establish success.
+- Fix: acquire cooperative cross-process ownership, strictly validate history, preserve existing outcomes or durably record interruption before releasing custody; retain identities and never replay old tool work.
+- Prevention: test process death, competing live owners, Actor abort with surviving workers, interrupted recovery retries and genuinely new input. Sync failures must not become success merely because appended bytes are readable; cleanup must verify candidates while holding ownership.
+- Checks: `runtime_lease` tests and `i169_terminal_outcome_recovery`; native platform execution remains required.
+- Delivery lesson: rebuilding a shared target binary from an isolated worktree does not update the user's `cargo run` source. Verify the actual launch directory and synchronize source before claiming the fix is available. Give independent worktrees separate target directories: concurrent builds can replace dependencies between Cargo compilation and rustdoc execution.
+
 ## 2026-11-08 - Protection stops must cross the live and durable boundaries
 
 - Trigger: User reported a silent stop after editing and rejected a manual continue workaround (AGENT-PAUSE-001).

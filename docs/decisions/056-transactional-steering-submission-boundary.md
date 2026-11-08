@@ -194,6 +194,45 @@ Successful finalization order is:
 Restart scans Running custody. Transcript proof finalizes it without Provider re-execution; ambiguous
 execution state fails closed rather than replaying.
 
+#### 2026-11-08 amendment: abandoned execution recovery (SESSION-CRASH-001)
+
+The no-replay rule remains mandatory. Once a persisted Actor holds exclusive
+Session runtime ownership, it may terminate an abandoned current-generation
+Running turn as Error with an explicit interruption explanation; it must never
+infer Success or resubmit that turn. New explicit input can then proceed.
+The same lease covers normal Actor execution, nested Agent/forwarder work and
+recovery. An unavailable lease refuses startup without modifying custody or
+interrupting the owner. OS handle lifetime releases the lease on process death;
+Actor cancellation alone does not release ownership while turn workers survive.
+
+Use Rust standard-library nonblocking file locks (pinned Rust 1.99), with
+permanent `.runtime-locks/<session-id>` anchors beside session artifacts. Parent
+aliases are canonicalized, symlink anchors refused, and normal artifact cleanup
+never removes anchors. A failed lock is not proof of process death. This is
+cooperative exclusion among participating runtime Actors, not a sandbox against
+external filesystem replacement or older binaries. Stop older Talos processes
+before using an upgraded binary to recover the same Session. Lock anchors persist
+after Session deletion intentionally, preventing reuse from splitting ownership.
+
+Validate native transcript records before interpreting absence of terminal proof.
+Corrupt/truncated records fail closed without rewriting the transcript. Strict
+host scanning preserves supported legacy envelopes/headerless logs and accepts
+large writer-produced records independently of model-facing pagination limits.
+The strict verifier checks a five-second deadline between chunks/records and
+buffers the unfinished record. Existing outcome/history APIs subsequently
+materialize the transcript and may repeat per Running record; this change does
+not claim a bounded-memory or hard-deadline guarantee for the whole recovery chain.
+Preserve existing terminal outcomes. Pause unstarted
+work before publishing an interruption marker; sync transcript evidence before
+finalizing journal custody, including retry paths. Record identity and generation
+remain unchanged, so duplicate submissions cannot replay. Recovery does not claim
+that external effects were rolled back or surviving child processes were killed.
+
+Validation includes real process death, live competing ownership, Actor abort with
+a surviving worker, crash/reopen/new input, preserved outcomes and idempotent
+recovery. This amendment is subject to independent implementation review and
+native CI under the task owner; it is not evidence of delivery by itself.
+
 ### 12. Exact request-plan boundary
 
 Every initial and continuation Provider call constructs one sealed exact request plan containing all

@@ -191,7 +191,7 @@ async fn orphan_running_submission_is_never_auto_replayed() {
     assert_eq!(
         disposition,
         SubmissionReceiptDisposition::AlreadyAccepted {
-            state: PendingSubmissionState::Running,
+            state: PendingSubmissionState::TerminalError,
             turn_id: Some("orphan_turn".into()),
         }
     );
@@ -204,7 +204,7 @@ async fn orphan_running_submission_is_never_auto_replayed() {
             .expect("operation should succeed")
             .expect("operation should succeed")
             .state,
-        PendingSubmissionState::Running
+        PendingSubmissionState::TerminalError
     );
 
     sq_tx
