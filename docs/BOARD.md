@@ -1,9 +1,17 @@
 # Talos Board
 
+## Interrupted session recovery / SESSION-CRASH-001
+
+- Active proposal: [owner](tasks/2026-11-08-crash-resume.md); #882 claim pending merge. Recover abandoned execution without replaying tools and permit new user work.
+
+## Validation result presentation / VALIDATION-DISPLAY-001
+
+- Active proposal: [owner](tasks/2026-11-08-validation-result-display.md); claim is ineffective until merge. Readable plan/run results while preserving raw evidence; excludes clipping/theme and execution behavior.
+
 ## Protection stops / AGENT-PAUSE-001
 
-[Owner](tasks/2026-11-08-silent-protection-pause.md) is Review / Claimed through #880;
-implementation #881 has passed local preflight and MSVC tests; exact-head review, native CI and merge pending.
+[Owner](tasks/2026-11-08-silent-protection-pause.md) is Complete / Closed through
+#881 (`7a439172`); local preflight, MSVC tests, independent review and native CI passed.
 
 ## Tool result clipping / TUI-ELLIPSIS-001
 
