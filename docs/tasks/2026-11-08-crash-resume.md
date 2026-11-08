@@ -45,10 +45,11 @@ Docs: README.zh-CN.md, recovery decision, EVOLUTION.md, this owner; Board mirror
 
 ## Inventory and closure ledger
 
-Base 1f537340; implementation starts from claim merge or later. I310 Active;
+Initial investigation base 1f537340; current claim candidate base 7a439172;
+implementation starts from claim merge or later. I310 Active;
 I318/I302/I277 Review; I249 Planned deferred; I164 Paused superseded; I162 Complete;
-no Blocked iteration. Preserve these dispositions. AGENT-PAUSE-001 merged #881
-and awaits closure. VALIDATION-DISPLAY-001 remains separately claimed in this
+no Blocked iteration. Preserve these dispositions. AGENT-PAUSE-001 closes
+Complete / Closed in this candidate using merged #881. VALIDATION-DISPLAY-001 remains separately claimed in this
 governance PR. TUI-ELLIPSIS-001 and original dirty files remain untouched.
 Other open #838/#849/#861 do not own this scope. Existing profile unchanged.
 

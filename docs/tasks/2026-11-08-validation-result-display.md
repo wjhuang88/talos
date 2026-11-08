@@ -39,9 +39,11 @@ TUI result/replay/export paths, collaboration/testing/local-development SOPs.
 
 ## Inventory and isolation
 
-Base 1f537340. I310 Active retained; I318/I302/I277 Review retained; I249 Planned
+Initial investigation base 1f537340; current claim candidate base 7a439172.
+I310 Active retained; I318/I302/I277 Review retained; I249 Planned
 deferred; I164 Paused superseded; I162 Complete retained. No Blocked iteration.
-AGENT-PAUSE-001 is independently in Review (#881). TUI-ELLIPSIS-001 owns width
+AGENT-PAUSE-001 closes Complete / Closed in this candidate using merged #881.
+TUI-ELLIPSIS-001 owns width
 clipping and theme; this task only adds content formatting before existing width
 handling, with tests in its own module. Preserve original dirty files and do not
 edit its width/style behavior. Other open PRs #838/#849/#861 do not overlap.
