@@ -894,37 +894,34 @@ fn rule_has_concrete_path_scope(rule: &PermissionRule) -> bool {
 /// Checks whether `path` is within (or relative to) the workspace `root`.
 ///
 /// Relative paths are resolved against the workspace root. Existing paths are
-/// canonicalized so symlink escapes are rejected; missing write targets use a
-/// lexical normalization that still rejects `..` escapes.
+/// canonicalized through their nearest existing ancestor so missing targets
+/// respect workspace aliases while symlink escapes remain outside the boundary.
 fn is_path_in_workspace(path_str: &str, root: &Path) -> bool {
+    let Ok(root) = std::fs::canonicalize(root) else {
+        return false;
+    };
     let path = Path::new(path_str);
-    let root = match std::fs::canonicalize(root) {
-        Ok(root) => root,
-        Err(_) => return false,
-    };
-    let candidate = if path.is_relative() {
-        root.join(path)
+    let candidate = if path.is_absolute() {
+        path.to_owned()
     } else {
-        path.to_path_buf()
+        root.join(path)
     };
-
-    if let Ok(canonical) = std::fs::canonicalize(&candidate) {
-        return canonical.starts_with(&root);
-    }
-
-    let mut normalized = PathBuf::new();
-    for component in candidate.components() {
-        match component {
-            std::path::Component::CurDir => {}
-            std::path::Component::ParentDir => {
-                if !normalized.pop() {
-                    return false;
-                }
-            }
-            other => normalized.push(other.as_os_str()),
+    let mut ancestor = candidate.as_path();
+    loop {
+        if let Ok(resolved) = ancestor.canonicalize() {
+            return resolved.starts_with(&root);
         }
+        // Existing but unresolvable entries (including dangling links) are not
+        // missing suffixes. Do not collapse `..` across a symlink or missing
+        // component: preserve OS path traversal semantics.
+        if ancestor.symlink_metadata().is_ok() || ancestor.file_name().is_none() {
+            return false;
+        }
+        let Some(parent) = ancestor.parent() else {
+            return false;
+        };
+        ancestor = parent;
     }
-    normalized.starts_with(root)
 }
 
 impl Default for PermissionEngine {

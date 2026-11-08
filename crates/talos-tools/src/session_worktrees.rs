@@ -578,8 +578,33 @@ fn publish_empty_directory(staging: &Path, target: &Path) -> Result<(Dir, Identi
         builder.create(staging).map_err(|e| e.to_string())?;
         let (parent, _) = directory(staging)?;
         parent.create_dir("root").map_err(|e| e.to_string())?;
+        #[cfg(not(windows))]
         let held = parent.open_dir("root").map_err(|e| e.to_string())?;
+        #[cfg(not(windows))]
         let metadata = held.dir_metadata().map_err(|e| e.to_string())?;
+        #[cfg(windows)]
+        let custody = {
+            use std::os::windows::fs::OpenOptionsExt;
+            use windows_sys::Win32::Storage::FileSystem::{
+                FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_DELETE,
+                FILE_SHARE_READ, FILE_SHARE_WRITE,
+            };
+            // cap-std directory handles intentionally prohibit rename. This
+            // identity-only handle permits atomic publication; capability IO
+            // starts only after opening the published directory below.
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+                .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+                .open(staging.join("root"))
+                .map_err(|e| e.to_string())?;
+            cap_std::fs::File::from_std(file)
+        };
+        #[cfg(windows)]
+        let metadata = custody.metadata().map_err(|e| e.to_string())?;
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return Err("staged worktree is not an ordinary directory".into());
+        }
         let identity = Identity {
             device: metadata.dev(),
             inode: metadata.ino(),
@@ -587,13 +612,20 @@ fn publish_empty_directory(staging: &Path, target: &Path) -> Result<(Dir, Identi
         let result = publish_no_replace(staging, target);
         if let Err(error) = result {
             let _ = parent.remove_dir("root");
+            drop(parent);
             let _ = std::fs::remove_dir(staging);
             return Err(error.to_string());
         }
+        drop(parent);
         let _ = std::fs::remove_dir(staging);
-        if directory(target)?.1 != identity {
+        let (published, published_identity) = directory(target)?;
+        if published_identity != identity {
             return Err("published worktree identity changed".into());
         }
+        #[cfg(windows)]
+        let held = published;
+        #[cfg(not(windows))]
+        drop(published);
         Ok((held, identity))
     })
     .map_err(|_| "worktree publication unavailable".to_owned())?
@@ -994,8 +1026,25 @@ mod tests {
             )
             .expect("session approval");
         assert_eq!(state.grant_count().expect("count"), 1);
-        std::fs::rename(temp.path().join("linked"), temp.path().join("old-linked")).expect("move");
-        std::fs::create_dir(temp.path().join("linked")).expect("replacement");
+        #[cfg(not(windows))]
+        {
+            std::fs::rename(temp.path().join("linked"), temp.path().join("old-linked"))
+                .expect("move");
+            std::fs::create_dir(temp.path().join("linked")).expect("replacement");
+        }
+        #[cfg(windows)]
+        {
+            // Retained cap-std directory handles prevent root replacement on
+            // Windows. Verify that defense, then revoke via metadata identity.
+            assert!(
+                std::fs::rename(temp.path().join("linked"), temp.path().join("old-linked"))
+                    .is_err()
+            );
+            let metadata = temp.path().join("linked/.git");
+            let contents = std::fs::read(&metadata).expect("metadata");
+            std::fs::rename(&metadata, temp.path().join("old-dotgit")).expect("move metadata");
+            std::fs::write(metadata, contents).expect("replacement metadata");
+        }
         assert_eq!(
             state
                 .evaluate(&request, &context)

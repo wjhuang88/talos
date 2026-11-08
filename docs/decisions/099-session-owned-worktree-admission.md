@@ -121,3 +121,17 @@ and local cap-std 4.0.3/rustix 1.1.4 source. `std::fs::rename` is unsuitable: it
 replacement and Windows additionally has a FileRenameInfoEx fallback. Host-authorized
 unrestricted same-user code is outside this receipt-store isolation boundary; normal
 native path tools cannot write the protected storage or staging paths.
+
+## Native Windows validation follow-up
+
+The first native CI candidate exposed `ERROR_SHARING_VIOLATION` during publication.
+cap-primitives 4.0.3 `windows/fs/dir_utils.rs` and `windows/fs/oflags.rs` deliberately
+remove `FILE_SHARE_DELETE` from directory capabilities to keep Windows capability
+lookups stable. Publication therefore holds a separate identity-only standard-library
+file handle with `FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT` and
+read/write/delete sharing. It performs no capability IO through that handle. After
+no-replace publication, open the ordinary cap-std directory and compare identities
+while the original handle remains alive. Subsequent capability IO retains cap-std's
+rename prevention. Windows adversarial tests assert that prevention and separately
+replace Git metadata identity to exercise revocation and stale approval rejection.
+No additional unsafe boundary is introduced.

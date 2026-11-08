@@ -197,3 +197,15 @@ Implementation Commit: b8b7f760304a29de9e17cfa5f16d99507c882e81
   implementation agent but shares the maintainer's GitHub identity; not a separate
   human approval. Native Windows identity/reparse results and exact candidate CI
   remain merge gates. No Complete status or completion evidence is claimed yet.
+
+## First remote candidate findings — PR #890
+
+Exact candidate cc3a63ac failed native CI; it is not merge evidence. Missing-target
+workspace comparison mishandled macOS path aliases and Windows canonical prefixes.
+The repair resolves existing ancestors with OS semantics and explicitly rejects
+symlink/parent traversal escapes and dangling links. Native Windows also exposed
+cap-std's deliberate directory rename lock during publication; ADR-099 records the
+identity-only staging handle repair and post-publication capability transition.
+macOS additionally reported two pre-existing long-history recovery test failures
+(committed-source deadline and checkpoint outer timeout); these remain pending
+validation rather than waived. All exact-head checks must pass on the next candidate.

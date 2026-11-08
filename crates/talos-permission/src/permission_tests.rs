@@ -1818,3 +1818,45 @@ fn ordinary_workspace_default_preserves_explicit_policy_and_external_boundary() 
         ));
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn missing_workspace_targets_resolve_aliases_and_reject_symlink_escape() {
+    let temp = tempfile::tempdir().expect("temp");
+    let root = temp.path().join("workspace");
+    let outside = temp.path().join("outside");
+    let alias = temp.path().join("alias");
+    std::fs::create_dir(&root).expect("root");
+    std::fs::create_dir(&outside).expect("outside");
+    std::os::unix::fs::symlink(&root, &alias).expect("alias");
+    std::os::unix::fs::symlink(&outside, root.join("escape")).expect("escape");
+    assert!(super::is_path_in_workspace(
+        alias.join("nested/new.txt").to_str().expect("path"),
+        &root,
+    ));
+    assert!(!super::is_path_in_workspace(
+        root.join("escape/nested/new.txt").to_str().expect("path"),
+        &root,
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn workspace_boundary_preserves_symlink_parent_traversal() {
+    let temp = tempfile::tempdir().expect("temp");
+    let root = temp.path().join("workspace");
+    let outside = temp.path().join("outside");
+    std::fs::create_dir(&root).expect("root");
+    std::fs::create_dir_all(outside.join("child")).expect("outside");
+    std::fs::write(outside.join("secret"), "external").expect("secret");
+    std::os::unix::fs::symlink(outside.join("child"), root.join("link")).expect("link");
+    std::os::unix::fs::symlink(outside.join("absent"), root.join("dangling")).expect("dangling");
+    for resource in [
+        "dangling/new.txt",
+        "link/../secret",
+        "link/../missing/new.txt",
+        "absent/../new.txt",
+    ] {
+        assert!(!super::is_path_in_workspace(resource, &root), "{resource}");
+    }
+}
