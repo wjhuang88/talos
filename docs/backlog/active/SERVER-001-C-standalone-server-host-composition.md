@@ -47,6 +47,7 @@ Refinement must define a bounded server-host composition that:
 ## Dependencies / Relationships
 
 - Parent: [SERVER-001](SERVER-001-serve-connect-protocol-adapters.md) / Issue #142.
+- **Mandatory before ServerHost implementation:** [ARCH-035](ARCH-035-behavior-preserving-host-composition.md) / Issue #897: equivalent host/domain composition extraction using existing local adapters; STORE-002 / #670 owns the capability contracts. ADR/refinement may proceed while blocked; no production server implementation before this gate.
 - Remote relational state: [SERVER-002](SERVER-002-remote-relational-persistence-profile.md) / Issue #360.
 - Optional object workspace: [TOOL-027](TOOL-027-s3-object-workspace-backend.md) / Issue #362.
 - Session/client architecture: SESSION-009 / Issue #46.
