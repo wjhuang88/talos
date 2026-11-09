@@ -4646,3 +4646,70 @@ fn tool_result_frame_clips_and_reveals_full_line_on_resize() {
     assert!(tui.transcript.entries().iter().any(|entry| matches!(
         &entry.block, TranscriptBlock::ToolResult(result) if result.content == content)));
 }
+
+#[test]
+fn clipboard_shortcut_preserves_draft_and_suppresses_repeats_and_duplicates() {
+    use crossterm::event::{Event, KeyEvent, KeyEventKind, KeyModifiers};
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(tx));
+    tui.state.input_paste("draft text");
+    let key = KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL);
+    tui.handle_input_event(&Event::Key(key));
+    assert!(matches!(rx.try_recv(), Ok(UserInput::Message(command)) if command == "/paste-image"));
+    assert_eq!(tui.state.input_buffer, "draft text");
+    tui.handle_input_event(&Event::Key(key));
+    tui.handle_input_event(&Event::Key(KeyEvent::new_with_kind(
+        KeyCode::Char('v'),
+        KeyModifiers::CONTROL,
+        KeyEventKind::Repeat,
+    )));
+    assert!(rx.try_recv().is_err());
+}
+
+#[test]
+fn clipboard_shortcut_is_not_read_in_approval_or_panel() {
+    use crossterm::event::{Event, KeyEvent, KeyModifiers};
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(tx));
+    tui.show_approval("test", "fixture");
+    tui.handle_input_event(&Event::Key(KeyEvent::new(
+        KeyCode::Char('v'),
+        KeyModifiers::CONTROL,
+    )));
+    assert!(rx.try_recv().is_err());
+    tui.state.approval_state = ApprovalState::Hidden;
+    tui.state
+        .open_slash_menu(talos_conversation::command_registry());
+    tui.handle_input_event(&Event::Key(KeyEvent::new(
+        KeyCode::Char('V'),
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+    )));
+    assert!(rx.try_recv().is_err());
+}
+
+#[test]
+fn clipboard_loading_keeps_draft_and_allows_cancel_without_deferred_send() {
+    use crossterm::event::{Event, KeyEvent, KeyModifiers};
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(tx));
+    tui.state.input_paste("keep this draft");
+    tui.handle_input_event(&Event::Key(KeyEvent::new(
+        KeyCode::Char('v'),
+        KeyModifiers::CONTROL,
+    )));
+    assert!(matches!(rx.try_recv(), Ok(UserInput::Message(_))));
+    tui.handle_input_event(&Event::Key(KeyEvent::new(
+        KeyCode::Enter,
+        KeyModifiers::NONE,
+    )));
+    assert!(rx.try_recv().is_err());
+    assert_eq!(tui.state.input_buffer, "keep this draft");
+    tui.handle_input_event(&Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)));
+    assert!(matches!(rx.try_recv(), Ok(UserInput::Cancel)));
+    tui.handle_ui_output(talos_conversation::UiOutput::ClipboardPastePending(false));
+    assert!(
+        rx.try_recv().is_err(),
+        "completion never auto-sends the draft"
+    );
+    assert_eq!(tui.state.input_buffer, "keep this draft");
+}

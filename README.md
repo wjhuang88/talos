@@ -1387,3 +1387,24 @@ For current engineering status, use the project governance docs instead of this 
 ## License
 
 Talos is licensed under the [Apache License 2.0](LICENSE).
+
+### Clipboard images in the CLI TUI
+
+With an image-capable model selected, press **Ctrl+V** or **Alt+V**, or run
+`/paste-image`, to add a clipboard image to the pending attachments. Wait for the
+attachment confirmation before sending. `/attachments` lists images and `/detach`
+removes them. Existing image count, byte and pixel limits apply. Clipboard file
+paths use the same authorization as `/attach`.
+
+On Wayland, Talos reads the native clipboard with arboard's data-control support;
+`wl-paste` is not required. Ghostty's default **Ctrl+Shift+V** invokes terminal text
+paste and does not forward image data to terminal programs. Use Ctrl+V/Alt+V for
+images. Ctrl+Shift+V also works if your terminal forwards that key. Ordinary
+terminal text paste is unchanged. SSH/headless sessions need access to a graphical
+clipboard on the host running Talos; otherwise use `/attach <path>`.
+
+Clipboard PNGs are staged privately under `~/.talos/clipboard`. Unsubmitted staged
+files are removed when detached or when the composer closes. Files retained for
+submitted messages must remain available for session recovery; they are not
+currently removed by session deletion. Delete them manually only when their
+messages no longer need image recovery.

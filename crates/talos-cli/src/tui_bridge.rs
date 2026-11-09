@@ -206,6 +206,65 @@ pub(crate) struct ConversationLoopIo {
     pub permission_engine: Option<Arc<talos_permission::PermissionSessionState>>,
 }
 
+fn admit_clipboard_part(
+    part: talos_core::message::ContentPart,
+    count: usize,
+    total: u64,
+) -> anyhow::Result<talos_core::message::ContentPart> {
+    anyhow::ensure!(
+        count < crate::image_validation::max_image_count(),
+        "image attachment count limit reached"
+    );
+    let talos_core::message::ContentPart::Image { byte_count, .. } = &part else {
+        anyhow::bail!("expected clipboard image")
+    };
+    anyhow::ensure!(
+        total
+            .checked_add(*byte_count)
+            .is_some_and(|sum| sum <= crate::image_validation::max_total_image_bytes()),
+        "image attachment total byte limit reached"
+    );
+    Ok(part)
+}
+
+async fn acquire_clipboard_attachment(
+    cancel: tokio_util::sync::CancellationToken,
+    ui_tx: tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    permission_engine: Option<Arc<talos_permission::PermissionSessionState>>,
+    count: usize,
+    total: u64,
+) -> anyhow::Result<crate::clipboard_image::Capture> {
+    let capture = crate::clipboard_image::acquire(cancel.clone()).await?;
+    authorize_clipboard_capture(capture, cancel, &ui_tx, &permission_engine, count, total).await
+}
+
+async fn authorize_clipboard_capture(
+    capture: crate::clipboard_image::Capture,
+    cancel: tokio_util::sync::CancellationToken,
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    permission_engine: &Option<Arc<talos_permission::PermissionSessionState>>,
+    count: usize,
+    total: u64,
+) -> anyhow::Result<crate::clipboard_image::Capture> {
+    let crate::clipboard_image::Capture::Files(files) = capture else {
+        return Ok(capture);
+    };
+    let path = files
+        .first()
+        .and_then(|p| p.to_str())
+        .ok_or_else(|| anyhow::anyhow!("clipboard file path unsupported"))?;
+    let authorized = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return Err(anyhow::anyhow!("clipboard paste cancelled")),
+        path = authorize_attach_image(ui_tx, permission_engine, path) => path,
+    }
+    .ok_or_else(|| anyhow::anyhow!("clipboard file not authorized"))?;
+    anyhow::ensure!(!cancel.is_cancelled(), "clipboard paste cancelled");
+    let part = crate::image_validation::create_image_content_part(&authorized, count, total)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    Ok(crate::clipboard_image::Capture::Authorized(part))
+}
+
 pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: ConversationLoopIo) {
     let ConversationLoopIo {
         mut agent_rx,
@@ -228,11 +287,51 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
     let mut sender_generation = authoritative_generation_for_sender(&known_sender).unwrap_or(0);
     let mut pending_attachment_generation =
         (!engine.pending_image_attachments.is_empty()).then_some(sender_generation);
+    let mut clipboard_job = None;
+    let mut clipboard_generation = 0;
+    let mut clipboard_cancel = tokio_util::sync::CancellationToken::new();
+    let mut clipboard_staging = crate::clipboard_image::Staging::default();
     let mut receipt_tick = tokio::time::interval(RECEIPT_RECONCILE_TICK);
     receipt_tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
     loop {
+        clipboard_staging.retain_pending(&engine.pending_image_attachments);
         tokio::select! {
+            result = async { clipboard_job.as_mut().expect("guarded clipboard future").await }, if clipboard_job.is_some() => {
+                clipboard_job = None;
+                let _ = ui_tx.send(UiOutput::ClipboardPastePending(false));
+                if clipboard_cancel.is_cancelled() || Some(clipboard_generation) != authoritative_generation_for_sender(&sq_tx_watch.borrow()) || turn_state.blocks_session_mutation() || engine.has_steering() {
+                    emit_bridge_error(&ui_tx, "clipboard result discarded: conversation changed; paste again");
+                    continue;
+                }
+                if !model_info_watch.borrow().image_input_capability.allows_attachment() {
+                    emit_bridge_error(&ui_tx, "active model no longer supports images");
+                    continue;
+                }
+                let count = engine.pending_image_attachments.len();
+                let total = engine.pending_image_attachments.iter().map(|p| match p {
+                    talos_core::message::ContentPart::Image { byte_count, .. } => *byte_count,
+                    _ => 0,
+                }).sum::<u64>();
+                let part = match result {
+                    Ok(crate::clipboard_image::Capture::Png(bytes)) => clipboard_staging.stage(&bytes, count, total),
+                    Ok(crate::clipboard_image::Capture::Authorized(part)) => admit_clipboard_part(part, count, total),
+                    Ok(crate::clipboard_image::Capture::Files(_)) => Err(anyhow::anyhow!("unauthorized clipboard file response")),
+                    Err(error) => Err(error),
+                };
+                match part {
+                    Ok(part) => {
+                        engine.pending_image_attachments.push(part);
+                        pending_attachment_generation = Some(sender_generation);
+                        let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                            source: MessageSource::System,
+                            text: "[System] Clipboard image attached. Enter sends it with your message.\n".into(),
+                        }));
+                        let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+                    }
+                    Err(error) => emit_bridge_error(&ui_tx, &format!("clipboard image: {error}")),
+                }
+            }
             changed = sq_tx_watch.changed() => {
                 if changed.is_ok() {
                     let current_sender = sq_tx_watch.borrow().clone();
@@ -242,6 +341,8 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         {
                             pending_compact = None;
                             let _ = ui_tx.send(UiOutput::CompactionPending(false));
+                            clipboard_cancel.cancel();
+                            let _ = ui_tx.send(UiOutput::ClipboardPastePending(false));
                             sender_generation = current_generation;
                             known_sender = current_sender;
                             // A new/resumed/forked session publishes a fresh command sender.
@@ -305,6 +406,31 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
             Some(input) = user_rx.recv() => {
                 match input {
                     UserInput::Message(msg) => {
+                        if msg.trim() == "/paste-image" {
+                            let _ = ui_tx.send(UiOutput::ClipboardPastePending(clipboard_job.is_some()));
+                            if clipboard_job.is_some() {
+                                emit_bridge_error(&ui_tx, "clipboard busy; try again");
+                            } else if turn_state.blocks_session_mutation() || engine.has_steering() {
+                                emit_bridge_error(&ui_tx, "finish or cancel queued work before changing attachments");
+                            } else if !engine.image_input_capability.allows_attachment() {
+                                emit_bridge_error(&ui_tx, "active model does not support images; clipboard was not read");
+                            } else if engine.pending_image_attachments.len() >= crate::image_validation::max_image_count() {
+                                emit_bridge_error(&ui_tx, "image attachment count limit reached; clipboard was not read");
+                            } else {
+                                let _ = ui_tx.send(UiOutput::ClipboardPastePending(true));
+                                clipboard_generation = sender_generation;
+                                clipboard_cancel = tokio_util::sync::CancellationToken::new();
+                                clipboard_job = Some(Box::pin(acquire_clipboard_attachment(
+                                    clipboard_cancel.clone(), ui_tx.clone(), permission_engine.clone(),
+                                    engine.pending_image_attachments.len(),
+                                    engine.pending_image_attachments.iter().map(|p| match p {
+                                        talos_core::message::ContentPart::Image { byte_count, .. } => *byte_count,
+                                        _ => 0,
+                                    }).sum(),
+                                )));
+                            }
+                            continue;
+                        }
                         if msg.starts_with('/')
                             && !ConversationEngine::is_model_passthrough_slash_command(&msg)
                         {
@@ -502,7 +628,9 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                                 kind,
                                 attachments.clone(),
                             );
-                            if !accepted {
+                            if accepted {
+                                clipboard_staging.commit(&attachments);
+                            } else {
                                 engine.pending_image_attachments = attachments;
                                 pending_attachment_generation = attachment_generation;
                             }
@@ -592,6 +720,8 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         }
                     }
                     UserInput::Cancel => {
+                        clipboard_cancel.cancel();
+                        let _ = ui_tx.send(UiOutput::ClipboardPastePending(false));
                         if let Some((session_generation, operation_id)) = pending_compact {
                             let sender = sq_tx_watch.borrow().clone();
                             if authoritative_generation_for_sender(&sender) == Some(session_generation)
@@ -602,6 +732,8 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                         request_cancel(&mut turn_state, &sq_tx_watch, &ui_tx);
                     }
                     UserInput::Exit => {
+                        clipboard_cancel.cancel();
+                        if let Some(job) = clipboard_job.take() { let _ = job.await; }
                         let _ = ui_tx.send(UiOutput::Exit);
                         break;
                     }
@@ -3063,5 +3195,63 @@ mod attachment_authorization_tests {
         };
         assert!(text.contains("authorization became stale"));
         assert!(text.contains("No file was read"));
+    }
+    #[tokio::test]
+    async fn clipboard_file_authorization_is_cancellable_without_reading_or_approval() {
+        let workspace = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        let path = external.path().join("image.png");
+        std::fs::write(&path, b"not an image; must not be read").unwrap();
+        let permission_engine = Some(Arc::new(talos_permission::PermissionSessionState::new(
+            talos_permission::PermissionEngine::with_workspace_root(workspace.path().to_path_buf()),
+        )));
+        let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let mut job = Box::pin(authorize_clipboard_capture(
+            crate::clipboard_image::Capture::Files(vec![path]),
+            cancel.clone(),
+            &ui_tx,
+            &permission_engine,
+            0,
+            0,
+        ));
+        let approval = tokio::select! {
+            output = ui_rx.recv() => output.unwrap(),
+            _ = &mut job => panic!("must wait for approval"),
+        };
+        let UiOutput::ToolApprovalRequest { response, .. } = approval else {
+            panic!("approval")
+        };
+        cancel.cancel();
+        let error = job.await.unwrap_err();
+        assert!(error.to_string().contains("cancelled"));
+        assert!(response.is_closed());
+        assert!(
+            ui_rx.try_recv().is_err(),
+            "no validation/read error after cancellation"
+        );
+    }
+    #[test]
+    fn clipboard_final_admission_uses_current_attachment_limits() {
+        let part = talos_core::message::ContentPart::Image {
+            path: std::path::PathBuf::from("unused-no-read.png"),
+            mime: "image/png".into(),
+            byte_count: 1024,
+            content_digest: crate::image_validation::compute_content_digest(b"fixture"),
+        };
+        assert!(
+            admit_clipboard_part(part.clone(), crate::image_validation::max_image_count(), 0)
+                .is_err()
+        );
+        assert!(
+            admit_clipboard_part(
+                part.clone(),
+                0,
+                crate::image_validation::max_total_image_bytes()
+            )
+            .is_err()
+        );
+        assert!(admit_clipboard_part(part.clone(), 0, u64::MAX).is_err());
+        assert!(admit_clipboard_part(part, 0, 0).is_ok());
     }
 }
