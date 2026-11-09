@@ -1,6 +1,6 @@
 # WORKTREE-001: Session-owned worktree workspace admission
 
-> Document status: Active / Claimed (proposed; effective only after claim merge)
+> Document status: Review / Claimed (effective governance merge #889)
 > Deliverable: a worktree verifiably created by the current Session becomes an additional workspace root for that Session without a second workspace-admission prompt.
 
 ## Collaboration Claim
@@ -138,3 +138,81 @@ When automatic review cannot approve, is ineligible or fails, fall back to human
 approval. Do not broaden automatic eligibility merely because a path is external.
 Both approval routes feed the same exact execution authorization. This clarification
 supersedes any wording above that implies skipping automatic review for external paths.
+
+
+## Implementation checkpoint — 2026-11-08
+
+Approval execution repair, product ordinary-file defaults, retained root IO, durable
+receipt validation and approval-generation revocation are implemented locally; no
+implementation commit or delivery approval exists yet. Focused tests have verified
+external approval through the real Agent auto-fallback chain and worktree creation,
+resume, identity replacement and fresh external reapproval. Expanded read/edit/search
+and UI tests are still converging. One full workspace test run passed, but its final
+external SDK fixture failed because its independent lockfile needed the new capability
+dependency; both fixture lockfiles are now synchronized and require revalidation.
+
+Independent review found and corrected stale Once/Session grant reuse, missing
+metadata identities, command semantic changes and optional-capability gaps. Atomic
+creation custody now uses protected staging plus no-replace publication (ADR-099).
+The Windows OS ABI extension has design-checkpoint approval only; native Windows
+results and exact-head implementation approval are outstanding.
+
+Remaining gates: stable-source full preflight, cargo-xwin MSVC tests, actual CLI/TUI
+approval regression, native Windows contention/reparse tests, independent security
+review and target-branch merge/source sync. Sandboxed execution does not register
+host roots; SDK/print defaults and unsupported command forms are documented, not
+represented as delivered automatic admission. Keep the owner Active; no Complete claim.
+
+
+## Accepted scope adjustment — 2026-11-08
+
+User explicitly selected: “先交付 CLI/TUI 修复，独立 OS 沙箱登记另立任务”.
+WORKTREE-001 delivers the interactive CLI/TUI host execution path, inline Session
+restoration, exact external approval execution, and their existing automatic-review
+compatibility. Independent OS-sandbox root propagation and sandbox-owned creation
+receipts are excluded from this delivery and owned by
+[WORKTREE-SANDBOX-001](2026-11-08-sandbox-owned-worktrees.md). This overrides the
+original combined sandbox-construction acceptance above without deleting its baseline.
+SDK embedders opt in; ephemeral print mode has no persistent Session membership.
+Other tools that have not adopted held worktree capabilities retain external approval;
+original workspace trust is never inherited as blanket additional-root write authority.
+
+
+## Stable candidate validation — implementation b8b7f760
+
+Implementation Commit: b8b7f760304a29de9e17cfa5f16d99507c882e81
+
+- Pinned Rust 1.99.0 `./scripts/release_preflight.sh`: passed, including both
+  governance validators, workspace check/Clippy/tests and both external SDK modes.
+- `cargo xwin check --locked -p talos-tools -p talos-agent -p talos-cli --all-features
+  --tests --target x86_64-pc-windows-msvc`: passed. Existing test-only dead-code
+  warning in checkpoint_history remains unrelated; no new cross-check warning.
+- Real Agent authorized worktree creation → next native write: passed with exactly
+  one creation approval. TUI external Once/Always/Deny execution: passed.
+- Root read/write/edit/grep/glob, no-primary-capability write, resume, policy reload,
+  protected receipts, invalid-root old Once/Session rejection and fresh external
+  reapproval: passed. No-clobber/competing target/Unix symlink tests: passed.
+- Independent Agent static security review APPROVE for implementation head above,
+  base d29fbebe40f7077b5c0a254bc6748746918e0f99. Reviewer is separate from the
+  implementation agent but shares the maintainer's GitHub identity; not a separate
+  human approval. Native Windows identity/reparse results and exact candidate CI
+  remain merge gates. No Complete status or completion evidence is claimed yet.
+
+## First remote candidate findings — PR #890
+
+Exact candidate cc3a63ac failed native CI; it is not merge evidence. Missing-target
+workspace comparison mishandled macOS path aliases and Windows canonical prefixes.
+The repair resolves existing ancestors with OS semantics and explicitly rejects
+symlink/parent traversal escapes and dangling links. Native Windows also exposed
+cap-std's deliberate directory rename lock during publication; ADR-099 records the
+identity-only staging handle repair and post-publication capability transition.
+macOS additionally reported two pre-existing long-history recovery test failures
+(committed-source deadline and checkpoint outer timeout); these remain pending
+validation rather than waived. All exact-head checks must pass on the next candidate.
+
+Second native candidate 7ad6f4cf passed macOS full preflight (including the two
+previous history failures) and Windows ordinary workspace policy tests. Windows
+creation progressed past publication but Git rejected the canonical `\\?\` destination
+spelling. The final follow-up gives Git a conventional argument only after unchanged
+Win32 normalization and directory identity comparison, rejecting reserved/verbatim-only
+names. Permission and receipt paths remain canonical. Native success is still required.

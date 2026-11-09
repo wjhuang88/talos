@@ -191,3 +191,6 @@ pub(crate) fn workspace_relative_display(path: &std::path::Path, root: &std::pat
         .to_string_lossy()
         .replace('\\', "/")
 }
+
+#[cfg(all(feature = "git", feature = "shell"))]
+pub mod session_worktrees;

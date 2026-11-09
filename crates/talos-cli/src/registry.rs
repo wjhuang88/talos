@@ -40,6 +40,45 @@ use uuid::Uuid;
 use crate::approval::ApprovalPrompt;
 use crate::colors;
 
+/// Product file defaults; explicit policy and the external approval pipeline remain authoritative.
+pub(crate) fn product_permission_engine(root: PathBuf) -> PermissionEngine {
+    let mut engine = PermissionEngine::with_workspace_root(root);
+    engine.set_ordinary_workspace_files(true);
+    engine
+}
+
+/// Installs Session-owned worktree creation into the product's trusted shell instance.
+pub(crate) fn bind_session_worktrees(
+    registry: &mut ToolRegistry,
+    root: &Path,
+    session: uuid::Uuid,
+    sessions_dir: &Path,
+    state: Arc<PermissionSessionState>,
+) -> Result<(), String> {
+    // Non-Git workspaces retain ordinary file and shell behavior.
+    if !root.join(".git").exists() {
+        return Ok(());
+    }
+    let store = sessions_dir.join("workspace-receipts");
+    let host = match talos_tools::session_worktrees::SessionWorktrees::open(
+        root,
+        &session.to_string(),
+        &store,
+        state,
+    ) {
+        Ok(host) => host,
+        Err(error) => {
+            tracing::warn!(%error, "worktree membership unavailable; normal path authorization remains active");
+            return Ok(());
+        }
+    };
+    registry
+        .replace_builtin(Arc::new(
+            talos_tools::BashTool::new(root.to_owned()).with_session_worktrees(host),
+        ))
+        .map_err(|e| e.to_string())
+}
+
 /// Non-blocking approval handler for TUI mode.
 ///
 /// Sends approval requests to the TUI via a channel and awaits responses
@@ -69,7 +108,7 @@ impl TuiApprovalHandler {
         workspace_root: PathBuf,
         talos_root: &Path,
     ) -> Self {
-        let mut engine = PermissionEngine::with_workspace_root(workspace_root.clone());
+        let mut engine = product_permission_engine(workspace_root.clone());
 
         let trust_store = talos_permission::WorkspaceTrustStore::new(talos_root);
         let is_git = talos_permission::is_git_workspace(&workspace_root);
@@ -2370,6 +2409,55 @@ mod tests {
             "Ask in print mode should auto-deny: {}",
             result.content
         );
+    }
+
+    #[tokio::test]
+    async fn external_write_tui_approval_reaches_capability_execution() {
+        for choice in [
+            ApprovalChoice::ApproveOnce,
+            ApprovalChoice::AlwaysApprove,
+            ApprovalChoice::Deny,
+        ] {
+            let workspace = tempfile::tempdir().expect("workspace");
+            let external = tempfile::tempdir().expect("external");
+            let target = external.path().join("nested/new.txt");
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let handler = Arc::new(TuiApprovalHandler::new(tx, workspace.path().to_owned()));
+            let write = talos_tools::WriteTool::new(workspace.path().to_owned())
+                .with_atomic_create_capability(Arc::new(
+                    talos_tools::file_tools::CapStdAtomicCreateCapability::open(workspace.path())
+                        .expect("capability"),
+                ));
+            let wrapped = TuiPermissionAwareTool {
+                inner: Arc::new(write),
+                approval: handler,
+            };
+            let expected = !matches!(choice, ApprovalChoice::Deny);
+            let response = tokio::spawn(async move {
+                loop {
+                    match rx.recv().await {
+                        Some(talos_conversation::UiOutput::ToolApprovalRequest {
+                            response,
+                            ..
+                        }) => {
+                            response.send(choice).expect("live approval receiver");
+                            break;
+                        }
+                        Some(_) => continue,
+                        None => panic!("no human approval request"),
+                    }
+                }
+            });
+            let output = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                wrapped.execute(serde_json::json!({"path":target,"content":"approved"})),
+            )
+            .await
+            .expect("approval must finish");
+            response.await.expect("response task");
+            assert_eq!(!output.is_error, expected, "{}", output.content);
+            assert_eq!(target.exists(), expected);
+        }
     }
 
     #[tokio::test]

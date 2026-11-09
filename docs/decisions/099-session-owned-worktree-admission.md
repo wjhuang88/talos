@@ -96,3 +96,42 @@ The absolute-path write repair must resolve paths into an appropriate directory
 capability, preserving create-new semantics and parent identity checks. Do not merely
 skip the atomic capability for absolute inputs. Regression tests must install the
 same capability configuration as the CLI and exercise actual approval delivery.
+
+## Atomic custody publication (implementation checkpoint)
+
+The 2026-11-08 independent security design checkpoint accepts private staging followed
+by same-filesystem no-replace publication. Protect the exact random staging path before
+creating it (Unix mode 0700); create and hold the child directory there, then publish
+that same object before running Git. Compare its identity again at the final path.
+Safe Rust `rustix 1.1.4::fs::renameat_with(NOREPLACE)` supplies Linux/Apple publication.
+This is an additional direct Rust dependency already present transitively, not a new
+native runtime. Unsupported filesystems/platforms fail without copy/rename fallback.
+
+This ADR authorizes one narrow Windows OS-ABI unsafe boundary, using the existing
+windows-sys dependency: `MoveFileExW(old, new, 0)` for directory publication. Buffers
+must reject embedded NUL, retain terminating UTF-16 storage throughout the synchronous
+call, and capture last-error immediately on failure. No replacement/cross-volume flags
+or fallback are allowed. Catch dependency panics at the outer boundary. This does not
+authorize other unsafe filesystem code. Native Windows contention/reparse/no-clobber
+validation and independent implementation review remain required.
+
+Primary sources inspected: [Microsoft MoveFileExW contract](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw),
+[Rust 1.99.0 Windows filesystem source](https://github.com/rust-lang/rust/blob/1.99.0/library/std/src/sys/fs/windows.rs),
+and local cap-std 4.0.3/rustix 1.1.4 source. `std::fs::rename` is unsuitable: it enables
+replacement and Windows additionally has a FileRenameInfoEx fallback. Host-authorized
+unrestricted same-user code is outside this receipt-store isolation boundary; normal
+native path tools cannot write the protected storage or staging paths.
+
+## Native Windows validation follow-up
+
+The first native CI candidate exposed `ERROR_SHARING_VIOLATION` during publication.
+cap-primitives 4.0.3 `windows/fs/dir_utils.rs` and `windows/fs/oflags.rs` deliberately
+remove `FILE_SHARE_DELETE` from directory capabilities to keep Windows capability
+lookups stable. Publication therefore holds a separate identity-only standard-library
+file handle with `FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT` and
+read/write/delete sharing. It performs no capability IO through that handle. After
+no-replace publication, open the ordinary cap-std directory and compare identities
+while the original handle remains alive. Subsequent capability IO retains cap-std's
+rename prevention. Windows adversarial tests assert that prevention and separately
+replace Git metadata identity to exercise revocation and stale approval rejection.
+No additional unsafe boundary is introduced.

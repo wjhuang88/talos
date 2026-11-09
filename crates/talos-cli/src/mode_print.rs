@@ -81,7 +81,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     let mcp_runtime = McpSessionRuntime::start(&config.mcp, hooks.clone()).await?;
     mcp_runtime.report_startup_failures();
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
+        crate::registry::product_permission_engine(workspace_root.to_path_buf()),
     )));
     register_permission_aware_tools(
         &mut registry,
@@ -109,7 +109,7 @@ pub(crate) async fn run_print_mode(cli: Cli) -> Result<()> {
     };
 
     let permission_engine =
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf());
+        crate::registry::product_permission_engine(workspace_root.to_path_buf());
     let mut agent = Agent::with_security_and_hooks(
         provider,
         registry,
@@ -324,7 +324,7 @@ fn build_print_submit_op(
     // fails closed. Canonicalize BEFORE authorization so the approval
     // identity matches the attachment identity (P1-A: no path-alias drift).
     let auth_state = talos_permission::PermissionSessionState::new(
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
+        crate::registry::product_permission_engine(workspace_root.to_path_buf()),
     );
     let auth_context = talos_permission::PermissionContext::new(
         talos_permission::PermissionMode::Headless,

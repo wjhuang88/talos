@@ -1695,3 +1695,12 @@ visible; distinguish passed assertions from independently emitted evidence.
 - Fix: incremental host-record restoration with separate model limits; quiet Cargo tests with finite workload-sized budgets; matching conditional-hook refusal plus safe-creation assertions.
 - Prevention: use writer-produced large records and real Cargo execution, and verify the actual selected branch/configuration before changing security behavior.
 - Promoted to rule/check: message_scan large-record regressions, CLI validation_workspace integration fixture, and conditional checkout regression.
+
+## 2026-11-08 - Approval must reach the production file capability
+
+- Trigger: an approved external worktree write still failed with `path escapes workspace root`.
+- Symptom: permission approval succeeded but the CLI-installed atomic creator rejected absolute paths.
+- Root cause: bare-tool authorization tests omitted the production capability; workspace membership and execution authority were treated as interchangeable.
+- Fix: preserve exact external authorization through capability-relative creation; separately bind Session-owned worktree receipts and invalidate old approvals when root identities change.
+- Prevention: test real approval delivery with CLI-equivalent capabilities, approved/denied external paths, and stale Once/Session grants after worktree replacement.
+- Promoted to rule/check: `external_write_tui_approval_reaches_capability_execution`, `workspace_defaults_and_external_auto_fallback_reach_real_write`, and Session worktree custody/revocation tests. Implementation remains under review; this entry is not delivery evidence.

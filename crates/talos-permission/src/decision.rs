@@ -94,6 +94,7 @@ pub struct PermissionRequest<'a> {
     input: &'a Value,
     network_manifest: Option<&'a ToolNetworkManifest>,
     transitive_effects: bool,
+    ordinary_workspace_file: bool,
 }
 
 impl<'a> PermissionRequest<'a> {
@@ -112,6 +113,7 @@ impl<'a> PermissionRequest<'a> {
             input,
             network_manifest: None,
             transitive_effects: false,
+            ordinary_workspace_file: false,
         }
     }
 
@@ -137,6 +139,18 @@ impl<'a> PermissionRequest<'a> {
     pub fn with_transitive_effects(mut self) -> Self {
         self.transitive_effects = true;
         self
+    }
+
+    /// Marks an ordinary file operation from a host-verified built-in instance.
+    /// Callers must verify registry identity; a tool name or native label is insufficient.
+    #[must_use]
+    pub fn with_ordinary_workspace_file(mut self) -> Self {
+        self.ordinary_workspace_file = true;
+        self
+    }
+
+    pub(crate) const fn ordinary_workspace_file(&self) -> bool {
+        self.ordinary_workspace_file
     }
 
     pub(crate) const fn transitive_effects(&self) -> bool {

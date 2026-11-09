@@ -79,7 +79,7 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     };
 
     let approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.clone()),
+        crate::registry::product_permission_engine(workspace_root.clone()),
     )));
 
     let mut registry = ToolRegistry::new();
@@ -107,6 +107,14 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
         .lock()
         .map_err(|_| anyhow!("approval lock poisoned"))?
         .session_state();
+    crate::registry::bind_session_worktrees(
+        &mut registry,
+        &workspace_root,
+        session.id,
+        session_manager.sessions_dir(),
+        permission_state.clone(),
+    )
+    .map_err(anyhow::Error::msg)?;
     let (terminal_approval, terminal_approval_rx) = terminal_approval_channel();
     let provider = build_provider(&config, &api_key, cli.mock)?;
     let fallback = terminal_approval.clone();

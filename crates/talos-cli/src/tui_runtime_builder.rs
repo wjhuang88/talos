@@ -195,6 +195,14 @@ impl TuiRuntimeBuilder {
                 language_provider_context,
                 search,
             )?;
+        crate::registry::bind_session_worktrees(
+            &mut registry,
+            &self.workspace_root,
+            session.id,
+            self.session_manager.sessions_dir(),
+            self.approval_handler.shared_engine(),
+        )
+        .map_err(anyhow::Error::msg)?;
         let pending_scheduler = crate::registry::register_builtin_scheduler(&mut registry)?;
         register_tui_permission_aware_tools(
             &mut registry,
