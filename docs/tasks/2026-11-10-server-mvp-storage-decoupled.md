@@ -2,7 +2,7 @@
 
 > Planning baseline (2026-11-10). **Status: Planning / Unclaimed.** This file is a proposed long-task coordinator, not an effective Collaboration Claim, implementation authorization, or evidence of a shipped server.
 >
-> Parent: [SERVER-001 / #142](https://github.com/wjhuang88/talos/issues/142). Host: [SERVER-001-C / #361](https://github.com/wjhuang88/talos/issues/361). Storage abstraction: [STORE-002 / #670](https://github.com/wjhuang88/talos/issues/670). Session: [SESSION-009 / #46](https://github.com/wjhuang88/talos/issues/46). Future remote persistence: [SERVER-002 / #360](https://github.com/wjhuang88/talos/issues/360).
+> Parent: [SERVER-001 / #142](https://github.com/wjhuang88/talos/issues/142). Host: [SERVER-001-C / #361](https://github.com/wjhuang88/talos/issues/361). Storage abstraction: [STORE-002 / #670](https://github.com/wjhuang88/talos/issues/670). **Hard architecture prerequisite:** [ARCH-035 / #897](https://github.com/wjhuang88/talos/issues/897) (host-composition equivalence and contract consumption). Session: [SESSION-009 / #46](https://github.com/wjhuang88/talos/issues/46). Future remote persistence: [SERVER-002 / #360](https://github.com/wjhuang88/talos/issues/360).
 >
 > **Work mode: Standard**. No deferred-human-validation tracker; required manual/security acceptance cannot be assumed passed.
 
@@ -63,6 +63,7 @@ Ports must cover: stable Session/Turn/Submission identities; ordered commit and 
 
 ## Dependencies and prerequisite decisions
 
+- **Independent pre-implementation prerequisite: ARCH-035 / #897.** Its E0–E4 behavior-equivalent cross-host composition gates must pass using STORE-002 / #670-owned storage contracts before ServerHost integration or AG-UI protocol implementation may activate. Architectural refinement may proceed beforehand, but no Server feature implementation can bypass this dependency. ARCH-035 is an independent unclaimed owner; this long-task planning record does not authorize or claim its code.
 - T0 requires current main/PR/iteration inventory and an accepted ADR defining local MVP authority, persistent facts, port boundaries, AG-UI version/HTTP semantics, identity/control rules and failure semantics.
 - T1 consumes #670's approved first-phase capability direction; preserve full scope and zero-change criteria, not just those needed by Server. If STORE-002 implementation is independently selected, its effective claim/iteration belongs to #670, not this coordinator.
 - T2 consumes #46 session-owner contract and #614 tracked submission where needed; do not duplicate SDK ownership or treat #46 as completed by the MVP subset.
@@ -129,7 +130,7 @@ Risks, deviations and residual owner:
 Next item / exact prerequisite / recovery command:
 ```
 
-**Initial checkpoint (2026-11-10):** Plan prepared from current repository Issues #142/#361/#360/#670/#46 and collaboration/long-task SOP; no implementation claim, no validation evidence, no database adapter implementation, and no production server is asserted. AG-UI child/version requires T0 refinement. #38 is already Closed / Superseded; it is not a dependency for this MVP.
+**Initial checkpoint (2026-11-10):** Plan prepared from current repository Issues #142/#361/#360/#670/#46 and prerequisite #897 and collaboration/long-task SOP; no implementation claim, no validation evidence, no database adapter implementation, and no production server is asserted. AG-UI child/version requires T0 refinement. #38 is already Closed / Superseded; it is not a dependency for this MVP.
 
 ## Architecture refinement — domain-first ports, host-selected adapters (2026-11-10)
 
@@ -182,7 +183,7 @@ Do not turn each capability taxonomy entry into a dynamic trait without a consum
 
 ### Implications for task order
 
-- **T0:** include a crate dependency/call-site matrix; record existing local factory and UI vs host ownership, pin semantics to protect, and decide exact trait home(s). Reconcile this with SERVER-001, STORE-002, SERVER-002 and SESSION-009 without reopening their independent claimed scopes.
+- **T0:** register ARCH-035 / #897 as the Server prerequisite, and include a crate dependency/call-site matrix; record existing local factory and UI vs host ownership, pin semantics to protect, and decide exact trait home(s). Reconcile this with SERVER-001, STORE-002, SERVER-002 and SESSION-009 without reopening their independent claimed scopes.
 - **T1:** classify all #670 capabilities and extract the minimum domain seams *across existing consumers* with exact behavioral characterization. Preserve current `RuntimeBuilder::durable_session` and all current CLI/TUI/Desktop paths. Do not move storage construction into `talos-tui`.
 - **T2/T3:** shared SessionHost and Runtime receive capability bundles through one accepted composition contract; CLI continues to choose current local default, Server chooses the same local default for MVP. Avoid separate Server `SessionManager` and separate Agent loop.
 - **T4:** protocol adapter only authenticates/translates/projections; it cannot directly construct SQLite or issue persistence writes.
