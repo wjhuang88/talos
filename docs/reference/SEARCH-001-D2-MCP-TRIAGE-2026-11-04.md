@@ -103,9 +103,15 @@ does not grant an independent architectural Provider or prove upstream independe
 1. Finish applicable-use/default-client permission decision with authoritative source or
    vendor clarification. If unresolved, **stop** default-route research; optional user MCP
    connection can be evaluated as separate feature, not E/F substitution.
-2. On approved interfaces, use already merged I294/#827 bounded harness from genuine test
-   network(s) to collect one or more non-sensitive valid searches, metadata-only DNS/TLS/HTTP
-   observations, MCP handshake/tool names/version, safe response fixtures and provenance.
+2. Before collecting MCP evidence, **separately claim, implement, review, and validate an
+   MCP-capable extension** to the I294/#827 observation harness. The existing
+   `scripts/search_provider_observation.py` supports fixed Mwmbl/Purili HTTPS GET
+   observations only; it does not implement MCP initialize/tools/list/tools/call,
+   and its metadata-only output omits response bodies and replayable fixtures.
+   Reuse its bounded DNS/TLS/HTTP, timeout, privacy, regional provenance and no-
+   secret-retention safeguards; add separately authorized search-only MCP protocol
+   acquisition and sanitized deterministic fixtures only within that future scope.
+   No such extension, live MCP query, or fixture capture is delivered by this intake.
 3. Compare controlled-region performance and success from genuine mainland-China and other
    locations; record operator-supplied coarse region/proxy provenance. A VPN, arbitrary public IP,
    offshore CI/VM or guessed location is not mainland-China proof.

@@ -44,8 +44,13 @@ that a product may preconfigure that endpoint for all users.
    distributed local clients; block admission on unresolved material policy conflicts.
 3. Record hosting, upstream index provenance and correlated-failure risks; two different DNS names
    alone do not satisfy ADR-085 independence.
-4. Define bounded live/fixture and genuine mainland-China evidence requirements before any behavioral
-   child. Use existing #827 harness; do not fabricate regional observations.
+4. Define bounded MCP live/fixture and genuine mainland-China evidence requirements before
+   any behavioral child. The existing I294/#827 `scripts/search_provider_observation.py`
+   observes fixed Mwmbl/Purili HTTPS GET metadata only: it cannot negotiate MCP or
+   retain replayable search fixtures. A **separately claimed and reviewed MCP-capable
+   harness extension** is a hard prerequisite to approved MCP acquisition, reusing
+   #827's bounds, source provenance, privacy, and regional-truth safeguards.
+   This intake authorizes no harness implementation or live MCP calls.
 5. Publish a binary evidence-gate outcome (per route: admissible only with complete evidence;
    otherwise explicitly blocked) and any separately owned next acquisition slice.
 
