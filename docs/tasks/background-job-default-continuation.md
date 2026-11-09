@@ -30,7 +30,7 @@ unsafe, new dependency, process restart recovery, spinner or steering UI work.
 
 ## Required Reads
 
-- docs/decisions/100-background-completion-continuation.md (Proposed; not effective)
+- docs/decisions/101-background-completion-continuation.md (Proposed; not effective)
 
 - docs/proposals/background-continuation-actor-design.md
 - docs/decisions/060-supervised-background-command-jobs.md
@@ -100,6 +100,18 @@ The reviewer attributed remote reconciliation failure to global matrix omission
 #891, not this PR's runtime behavior. This is reviewer-provided evidence; retain
 that separate residual without editing unrelated owners here. Both findings still
 require independent re-review of the corrected head. No runtime tests were run.
+
+## ADR numbering resolution
+
+The preceding checkpoints describe the historical ADR-100 candidate. This revision
+renumbers this proposal to ADR-101, including its filename and required-read link.
+Read-only main directory inspection found a highest numbered ADR of 099; all five
+open PRs were inspected for decision paths: #895 proposes 100, #838 changes 094,
+#861/#849 have none, and #893 held this proposal. No competing 101 was found.
+This avoids the observed conflict without modifying another owner's PR. It is not
+a permanent reservation: repeat target/open-PR CAS before merge. Earlier review
+references to ADR-100 refer to the same proposal before this filename-only change.
+ADR-101 remains Proposed and this owner remains inactive.
 
 ## Source integration checkpoint (candidate tree)
 
