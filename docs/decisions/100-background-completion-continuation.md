@@ -89,6 +89,38 @@ Consumed/suppressed entries release their slots; terminal transitions are monoto
 and delayed notifications cannot reconstruct removed entries. Existing job-output
 retention remains separate, so process reads may explicitly report expired output.
 
+### Slot retirement and terminal outcomes
+
+Slot lifecycle is Reserved -> Pending -> Running -> Retired. Retirement releases
+capacity exactly once and is independent of retained process output. Reserved
+slots retire on reservation rollback, synchronous launch failure, cancellation or
+shutdown. Pending slots retire on confirmed model consumption, suppression by
+cancellation/generation change, or shutdown. A pre-start preparation failure keeps
+the slot Pending and pauses execution with a visible diagnostic; explicit stop or
+Session teardown retires it. It is not silently discarded or automatically retried.
+
+Running slots retire when the automatic continuation turn terminalizes: success,
+provider error, cancellation, or a supervised turn-task failure. Success does not
+require calling process. Provider failure retires the slot with a failed outcome
+and does not schedule another continuation. Terminalization must cover task panic
+and aborted worker paths, not only successful turn records. Persist/finalize through
+the existing turn boundary; if finalization fails, retain the recovery fence, but
+release the live capacity without authorizing another dispatch.
+
+Retired is a logical terminal outcome, not an unbounded tombstone collection.
+Removing a slot prevents later notifications from recreating it; only a fresh job
+reservation can allocate a slot. A running slot is not released early by a concurrent
+process read: consumption acknowledgement applies to Pending slots, and Running
+retirement belongs to its turn finalizer. Cancellation racing either path must be
+idempotent. Late finalization cannot decrement the count twice.
+
+Required tests: more than 128 sequential successful continuations without process
+calls; more than 128 terminal provider failures without retries; reservation rollback;
+Pending preparation failure then stop; Running cancellation; task panic/abort;
+finalization failure with recovery fencing; duplicate terminal/finalizer signals;
+and unchanged output retention after slot retirement. Assert capacity returns to
+baseline and no completion is dispatched twice in every terminal case.
+
 ### Consumption decision
 
 Track job identities in private turn-local metadata when a successful model-facing

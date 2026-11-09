@@ -1,21 +1,21 @@
 # BG-CONTINUE-001: Default Background Completion Continuation
 
-> Document status: Active / Claimed (proposed in #893; effective only after target-branch merge)
+> Document status: Refinement / Unclaimed (inactive; #893 is a design candidate only)
 > Deliverable: background success, failure and timeout resume the originating live Session without another user message or opt-in flag.
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
-| Responsible Actor | @wjhuang88 |
-| Executing Agent | Talos / gpt-6-astra |
+| Claim State | Unclaimed |
+| Responsible Actor | Not assigned |
+| Executing Agent | Not assigned |
 | Work Slice | Actor-owned terminal admission and default continuation, cancellation/consumption deduplication, bounded context, tests and docs |
-| Claimed At | 2026-11-09 |
+| Claimed At | Not applicable |
 | Source Issue | None |
-| Governance Claim PR | #893 |
-| Authorization Mode | Independent review |
-| Authorization Evidence | Proposed claim only. User authorized preparation and PR publication; independent review and exact-head checks remain pending. Ownership and activation take effect only on target-branch merge |
+| Governance Claim PR | Not applicable |
+| Authorization Mode | Not applicable |
+| Authorization Evidence | Review of ba402e6d requested changes. This candidate is explicitly inactive; no implementation authorization is asserted |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-09 |
 | Handoff / Release Condition | Accepted successor decision, effective target claim, tested implementation and exact-head review/CI |
@@ -85,6 +85,21 @@ Pinned toolchain and locked focused agent/core/CLI tests, standard release prefl
 both governance validators, exact-head CI and independent runtime/security review.
 README.md, README.zh-CN.md and applicable runtime/tool references explain default
 continuation and additional provider usage. Residual destination: this owner.
+
+## Review remediation
+
+User supplied independent REQUEST CHANGES for head ba402e6d against main 4646c02a.
+P2 slot lifecycle: ADR-100 now defines exactly-once retirement for successful
+continuation without process, terminal provider failure, cancellation, worker
+failure and pre-start/teardown paths, with capacity-exhaustion regression targets.
+P2 activation contradiction: this candidate is Refinement/Unclaimed, ADR Proposed.
+Merging this version would NOT activate implementation. Complete readiness and
+atomic claim/activation in this same open PR before seeking activation approval;
+do not claim the prior inventory is refreshed or create a redundant activation PR.
+The reviewer attributed remote reconciliation failure to global matrix omission
+#891, not this PR's runtime behavior. This is reviewer-provided evidence; retain
+that separate residual without editing unrelated owners here. Both findings still
+require independent re-review of the corrected head. No runtime tests were run.
 
 ## Execution ledger
 
