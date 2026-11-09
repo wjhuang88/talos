@@ -66,7 +66,7 @@ These are starting observations to verify again on the exact implementation base
 | E1 | ADR for placement and scope of host-facing composition boundary; map accepted #670 contracts and default local profile | Reviewed decision, no-duplication matrix, public API/source-compatibility plan |
 | E2 | Introduce minimal host-facing injection/selection by **direct delegation** to existing local constructors; preserve source-compatible RuntimeBuilder/CLI entrypoints | Old and new paths share one concrete implementation; no storage format/schema/SQL/transaction/FS behavior changes |
 | E3 | Converge actually supported CLI/TUI/embedded SDK/eligible Desktop host paths on equivalent composition, without dragging renderer into storage logic | Deterministic multi-host conformance including error/permission/ID/order/cancellation and default config parity |
-| E4 | Complete equivalence audit, public API docs, independent review, exact-head CI and owner-first governance closeout | Existing implementation commit SHA, no unresolved equivalence failures; Server prerequisite acceptance recorded |
+| E4 | Finalize equivalence audit, public API docs, independent review, exact-head CI and owner-first governance closeout | Existing implementation commit SHA, no unresolved equivalence failures; Server prerequisite acceptance recorded |
 
 The E0/E1 architecture slice may be separately accepted while #670 implementation progresses, but **E2/E3 must not reimplement or pre-empt a claimed #670 seam**. No X-series/new-server-backend implementation starts merely because E0/E1 exists.
 
