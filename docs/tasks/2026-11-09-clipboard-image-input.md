@@ -12,7 +12,7 @@
 | Work Slice | Explicit TUI clipboard image paste with native Wayland clipboard access, bounded ingestion, pending attachment integration and terminal documentation |
 | Claimed At | 2026-11-09 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #894 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User reports Linux Wayland+niri+Ghostty Ctrl+Shift+V cannot paste images and authorizes following Codex implementation logic; independent boundary review required |
 | Implementation PR | Not started |
