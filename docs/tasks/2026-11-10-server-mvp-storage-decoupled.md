@@ -192,6 +192,40 @@ Do not turn each capability taxonomy entry into a dynamic trait without a consum
 
 Do **not** use this MVP to rewrite all Session, Memory, Evolution and Exploration concrete backends, flatten the domain modules into one storage layer, create a universal ORM, or move business logic into a new `talos-core` mega-crate. If a second backend later reveals a genuine missing port, revise that domain's contract with a controlled migration and preserve prior tests. **The optimization is dependency direction and ownership, not maximizing the number of interfaces.**
 
+## Behavior-preserving architecture extraction protocol — equivalent transformation before expansion
+
+**Binding planning principle:** Architecture optimization uses **equivalent transformations first, functional extensions second**. Do not combine storage contract extraction, changed persistence behavior and new backend admission in one implementation Work Slice. Every equivalent transformation is reviewable, reversible and backed by characterization evidence. A new backend is never a prerequisite for validating the initial abstraction.
+
+### Equivalence boundary
+
+The "same behavior" contract is stronger than API compatibility. For the existing local profile, preserve:
+- all public and in-tree input/output semantics; session IDs and operation IDs; source-compatible supported SDK entry points;
+- SQLite schema, SQL, migration, WAL/locking/retry assumptions, index and FTS5 behavior;
+- TLOG/JSONL encoding, paths, history/archival/fork/recovery behavior, event order and transcript redaction;
+- turn finalization's atomic/idempotent observable semantics, first terminal outcome wins, pending custody, reconciliation and generation fencing;
+- errors (including closed-failure branches), permission decisions, cancellation and shutdown behavior;
+- CLI/TUI/Desktop startup/default storage selection and identical runtime results.
+
+Changes to execution latency or internal allocation are not in general byte-for-byte equal: compare bounded concurrency/failure/ordering contracts and collect baseline evidence. Do not claim mathematical equivalence from a passing happy-path test.
+
+### Ordered transformation gates (T1 sub-checkpoints)
+
+1. **E0 — Preserve baseline:** inventory actual dependencies and write paths in `talos-cli`, `talos-runtime`, `talos-session`, Memory, Evolution and Exploration. Capture deterministic golden/characterization tests including failure injection; identify the authoritative owner and data invariants for each call.
+2. **E1 — Make boundaries explicit without rerouting:** name and document every #670 capability and the semantics required by its current consumer. Keep actual implementations, call sites, constructors and dispatch unchanged. Unavailable vector/embedding/rerank explicitly report unavailability rather than returning imaginary functionality.
+3. **E2 — Extract domain ports by *semantic forwarding*:** introduce only the smallest traits/typed façades needed at real existing call sites; first implementation delegates directly to the old concrete method and preserves its errors/ordering. Do not translate to generalized SQL or reorganize transactional code at the same time.
+4. **E3 — Converge local composition:** move default adapter **selection** to a shared host-composition entry point where justified; keep the original `talos-cli` / `talos-runtime` constructors source compatible and route them to the exact same local factory. TUI stays a renderer, not a SQLite wiring owner. If a public API migration is unavoidable, stop and seek an ADR plus compatibility owner.
+5. **E4 — Retire redundant glue only after proof:** show that no business-rule implementation was duplicated, and all currently enabled local workflows invoke the canonical seam. Do not remove the old backend, change the storage layout or claim SQLite-free binary packaging. Record before/after API/test/failure/performance evidence; close #670 only if **its full** stated acceptance passed.
+6. **X1 — Extend after E4 is accepted:** a separately owned implementation may provide a genuinely new adapter, storage profile or Server behavior. Reuse the E-series conformance matrix; add backend-specific transaction/ownership failure checks. New functionality is a new implementation iteration, not a "refactor follow-up" hidden inside E2/E3.
+
+### Two protected invariants
+
+- **Domain semantics before technology:** a Session's durable settlement and custody cannot be reduced to CRUD or generic relational/SQL operations; semantic repositories remain owned by their corresponding domains. Generic capability names do not imply that an arbitrary backend supports the same atomicity.
+- **Implementation vs dependency separation:** `talos-runtime -> talos-session -> rusqlite` is a current dependency fact. Injecting a trait preserves source-level decoupling but does **not** magically remove the SQLite dependency from a Server binary. Actual physical crate splitting is optional, must be justified by a concrete requirement and requires its own equivalence gate.
+
+### Review rule
+
+Each E-series PR must state: exact unchanged behavior, original concrete call path, new indirection path, characterized negative cases, rollback path, validated target SHA and excluded future expansion. A passing test suite is evidence, not proof of all semantic equivalences. If any behavior must change, split it into an independently authorized X-series change. If equivalence cannot be established, stop the current migration at the previous accepted commit and record the uncovered invariant.
+
 ## Closure rule
 
 Mark `SERVER-MVP-001` Complete only when T0–T5 gates pass, all required/manual/security checks have evidence, docs and owner claims are consistent with merged commits, and unresolved optional/future work has an explicit residual destination. **Never close #142/#360/#361/#46/#670 merely because the narrower MVP runs.**
