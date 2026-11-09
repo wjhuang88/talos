@@ -50,6 +50,7 @@ Before implementation selection, refine and accept a contract that:
 ## Dependencies / Relationships
 
 - Parent architecture: [SERVER-001](SERVER-001-serve-connect-protocol-adapters.md) / Issue #142.
+- Reusable composition and domain port prerequisite: [ARCH-035](ARCH-035-behavior-preserving-host-composition.md) / Issue #897 and STORE-002 / #670. A remote relational adapter must consume these accepted boundaries rather than create vendor-bound Runtime/Session interfaces. Remote-backend work is a later, independent scope, not part of ARCH-035.
 - Storage topology: [DATA-002](DATA-002-storage-topology-and-runtime-ownership.md) / Issue #141.
 - Session authority: [SESSION-009](SESSION-009-multi-client-session-architecture.md) / Issue #46.
 - Runtime shutdown/lifecycle: RUNTIME-005 is Complete and remains authoritative for bounded finalization.
