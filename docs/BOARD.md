@@ -299,3 +299,10 @@ and external approval execution passed full local preflight, MSVC cross-check an
 exact-head native CI. Independent OS-sandbox registration remains explicitly deferred
 to [WORKTREE-SANDBOX-001](tasks/2026-11-08-sandbox-owned-worktrees.md)
 (Planned / Unclaimed).
+
+## Clipboard image input / CLIPBOARD-IMAGE-001
+
+[Owner](tasks/2026-11-09-clipboard-image-input.md) proposes Active / Claimed,
+ineffective until governance merge. Deliver explicit native clipboard image paste
+into pending TUI attachments, focused on Linux Wayland+niri+Ghostty, following Codex
+interaction logic while retaining Talos ingestion and permission boundaries.
