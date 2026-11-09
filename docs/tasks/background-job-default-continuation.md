@@ -88,6 +88,15 @@ continuation and additional provider usage. Residual destination: this owner.
 
 ## Execution ledger
 
+Draft PR #893 publishes design commit c57f8f7245dddd9d4645d7c1c7172ccc1283f454.
+Remote checkpoint: Issue/owner reconciliation failed; Rust validation still running;
+no reviews/comments returned. Workflow marks remote reconciliation continue-on-error.
+Cause remains unknown: full run logs were unavailable while the run was active;
+annotations only reported exit 1. Track this residual here until scoped attribution
+is known; do not infer it is caused by this slice or repair unrelated owners.
+Local governance and collaboration validators passed with zero warnings.
+This commit is design evidence only, not implementation completion evidence.
+
 Only source characterization and intake/design drafts exist. No effective claim,
 production changes, runtime tests, successor ADR approval or completion evidence.
 Next: resolve design, prepare atomic claim/activation and successor decision in a

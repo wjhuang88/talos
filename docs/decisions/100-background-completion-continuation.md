@@ -42,8 +42,8 @@ late terminal notifications cannot undo stop. Shutdown closes completion admissi
 before supervised cleanup. Stale generation events are ineligible.
 
 A process response read by a host is not proof of model consumption. Only terminal
-metadata successfully committed to a model-visible tool-result path suppresses a
-redundant completion turn. Record the identity, not a heuristic text match. Failure
+metadata acknowledged under the consumption decision below suppresses a redundant
+completion turn. Record the identity, not a heuristic text match. Failure
 to prepare a request retains bounded pending work and pauses rather than looping.
 Once a completion turn starts, provider failure is recorded, not automatically retried.
 
@@ -70,9 +70,36 @@ stop and amend this ADR with public API/version migration before implementation.
 Live process jobs do not survive restart. Already-started turns retain existing
 interrupted-turn recovery protections. Pending live completion identities must not
 be replayed as revived process jobs after restart. Do not claim durable completion
-delivery without storage evidence. Queue bounds and output expiration remain
-observable; saturation must not silently evict an eligible completion. Implementation
-must define and test the exact bound and fail-closed diagnostic before acceptance.
+delivery without storage evidence.
+
+### Bounded admission decision
+
+Reserve one completion slot together with each background job reservation. Set a
+private per-Session limit of 128 outstanding completion slots, counting reserved,
+pending and running entries. A failed launch releases its slot. When all slots are
+occupied, reject further background launches before spawn with a bounded diagnostic;
+foreground execution remains unchanged. Do not discard an admitted terminal event
+to make room for another job. This backpressure is separate from the existing
+nonterminal-process limit and does not broaden spawn authorization.
+
+Store only identity, generation, cancellation epoch, terminal state and optional
+exit status in each slot; no output buffers. Use a coalescing Notify to wake the
+Actor and inspect authoritative slot state, not a lossy channel as the only record.
+Consumed/suppressed entries release their slots; terminal transitions are monotonic
+and delayed notifications cannot reconstruct removed entries. Existing job-output
+retention remains separate, so process reads may explicitly report expired output.
+
+### Consumption decision
+
+Track job identities in private turn-local metadata when a successful model-facing
+process read/status result contains terminal state. List and host-only reads do not
+acknowledge consumption. Reconcile that metadata only after the corresponding tool
+result is included in a provider request whose response completes successfully;
+record the consumption alongside the turn commit. Merely appending a tool result
+before a failed provider request is not sufficient. A cancelled turn suppresses
+older-epoch completion through cancellation rather than claiming it was consumed.
+Tests must distinguish these cases. No string parsing of rendered tool output is
+permitted as an identity or acknowledgement mechanism.
 
 ## Consequences
 
