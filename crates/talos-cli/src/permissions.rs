@@ -1,6 +1,6 @@
 //! Permission planning and inspection commands.
 
-use crate::registry::build_print_tool_registry;
+use crate::registry::build_print_tool_registry_for_workspace;
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use serde_json::{Value, json};
@@ -157,10 +157,9 @@ fn parse_operation(raw: &str) -> Result<ParsedOperation> {
 }
 
 fn build_preflight_packet(operations: &[ParsedOperation]) -> Result<PermissionPreflightPacket> {
-    let registry = build_print_tool_registry(Vec::new());
-    let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
-        std::env::current_dir()?,
-    ));
+    let workspace = std::env::current_dir()?;
+    let registry = build_print_tool_registry_for_workspace(Vec::new(), workspace.clone());
+    let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(workspace));
     let context = PermissionContext::new(
         PermissionMode::Interactive,
         InteractionCapability::Available,

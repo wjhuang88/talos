@@ -11,7 +11,7 @@
 
 use std::panic::catch_unwind;
 
-use rust_websearch::html_utils::decode_html_entities;
+use super::compat_helpers::decode_html_entities;
 use serde::Deserialize;
 
 use super::{

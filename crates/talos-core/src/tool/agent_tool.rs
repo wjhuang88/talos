@@ -25,6 +25,12 @@ pub trait AgentTool: Send + Sync {
         None
     }
 
+    /// Activates host-bound workspace state when this runtime starts executing.
+    /// Only trusted built-in instances may supply this composition lifecycle hook.
+    fn activate_session_workspace(&self) -> Result<(), String> {
+        Ok(())
+    }
+
     /// Returns the unique name of this tool.
     fn name(&self) -> &str;
 

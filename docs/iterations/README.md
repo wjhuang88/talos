@@ -1,3 +1,28 @@
+# Iterations
+
+## I318 native key repeat — Review
+
+[I318](I318-native-key-repeat.md) / TUI-054 / #269 has locally validated native repeat-safe routing in PR #872.
+Claim #869 is effective; physical terminal/IME acceptance is deferred, not waived.
+
+## I317 / SEARCH-001-K post-merge closeout — 2026-11-07
+
+[I317](I317-search-compat-fallback-ownership.md) /
+[SEARCH-001-K](../backlog/active/SEARCH-001-K-compat-fallback-ownership.md) / #850
+is **Complete / Closed** on this governance closeout's merge.
+Existing Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (#860),
+[CI3862](https://github.com/wjhuang88/talos/actions/runs/42340480867) 8/8 and independent API/security/parity
+[review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750) no blockers. Remaining `rust-websearch` dependency, E/F/G/I
+and D/#644 zero native-provider admission are deliberately unchanged;
+parent SEARCH-001/#624 stays Open.
+
+## Completed session handoff
+
+I309 → I308/T8 → MODEL-014 → T4 → T5 → T1 → T6, including C0/T7 carryover,
+are complete in their owners. See [implementation, validation and audit evidence](../tasks/2026-10-10-session-todo-final-audit.md).
+Final status publication merged in PR #857 (`748557edc`); platform and API limits
+remain in the linked audit and owners.
+
 ## I314 / SEARCH-001-H complete — 2026-11-04
 
 [I314](I314-search-explicit-overrides.md) and
@@ -8,104 +33,6 @@ Exact-head CI3800/run `41787775314` passed 8/8; independent security/API review
 validation is claimed. I310 and other independently owned work remains unchanged;
 SEARCH-001-E/F/G and I remain separately gated. Older snapshots below are historical.
 
-## T1 atomic claim proposal — 2026-11-03
-
-I315 / VALIDATION-003 / #844 proposes model-callable validation and read-only agile
-summary after merged I313/T5. Claim/activation are ineffective until finalized
-claim PR #845 merge. Supported CLI/Runtime and Unix/Windows execution, applicability,
-permissions, cancellation and output bounds are binding acceptance. T6 remains
-later and unimplemented; full handoff Active. I310/I314 retain independent owners.
-
-## T5 completed — 2026-11-03
-
-I313 and MEM-005 are Complete with Completion Commit:
-`322574bc9707492ea6e9d5232794f73e687071d9` (#837). All eight exact-head checks in `41608342151`,
-independent full T5 API/privacy/storage/security review and merge CAS passed.
-Owners preserve fixture/platform/privacy limits. Earlier pending snapshots are
-historical. T1 and T6 remain unimplemented and unactivated.
-Full queue: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
-Full handoff remains Active; next is T1's own governed activation.
-
-## T5 stable-stage review — 2026-11-02
-
-I313 is Review/Partial with effective claim #819. Unix Actor/Runtime checkpoint,
-recovery and fork implementation remains unmerged; standard host preflight passed
-including both SDK modes. Native Windows evidence, long-session live compaction
-binding and remaining acceptance are open. First four queue stages are merged;
-T1/T6 remain unimplemented. See I313 owner for evidence and limitations; historical
-activation-proposal snapshots below do not override current owner truth.
-
-## T4 merged; T5 activation proposal — 2026-11-01
-
-I312 is Complete/Closed with Completion Commit:
-`65500a86931cfbadf8bef5e97e45321c20b62e7a` (#818). All eight exact-head CI jobs
-`41271309341`, independent static API/privacy/security review, both governance
-validators and CAS passed. MEM-003's ADR-096 replacement and MEM-005's eleven T4
-rows are accepted; MEM-005/#390 remains In Progress for T5.
-I313 proposes the full T5 delivery and all thirty Issue #390 regression rows;
-claim/Active state proposed in #819 are ineffective until its finalized head merges.
-Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
-The first four stages are merged; T5/T1/T6 remain unimplemented. Earlier snapshots
-below are historical and do not override current owner evidence.
-
-## MODEL-014 complete; T4 implementation — 2026-10-30
-
-[I311](I311-model014-capability-inference.md) and MODEL-014 are Complete/Closed. Completion Commit:
-`0469f8041ed0d24bb2dffb465e9ff7fa3609a034`, `b04421fb964737911551c7e0704d6c81e80aa406`.
-#816 merged as `ca4a79961366eba7bc722b90bd449404cc7b07d5` after all-eight-success
-CI, independent review and CAS. I312 is Active/Claimed after #817 merged at `02fee3cc9537e6bf688d167036389b4af3011aeb`; local implementation is partial.
-Full handoff remains Active: T4 → T5 → T1 → T6. Earlier snapshots below are historical.
-
-## MODEL-014 implementation review — 2026-10-30
-
-[I311](I311-model014-capability-inference.md) is Review after PR #815 merged as `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`; acceptance closeout remains pending.
-Local standard preflight and static independent security/API review passed;
-all eight exact-head CI checks passed in `41022658026`; independent static review and merge CAS passed. I310/ADR-094 remain independently
-owned by #811. Earlier activation/intake snapshots below are historical.
-Full handoff stays Active: MODEL-014 → T4 → T5 → T1 → T6.
-
-## I308/T8 completed — 2026-10-30
-
-I308 and PERM-007-H/G owners are Complete with Completion Commit `5dea4925a143151071ea231779c100a75734e6fe`
-(#809), all-eight-success exact-head CI `41007199388` and independent protected
-closure review. Owner boundaries and historical failures remain recorded.
-MODEL-014 is restored Refinement / Unclaimed; next is its atomic claim/activation.
-Full handoff remains Active: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
-Earlier Active/Partial rows below are historical, superseded by owner evidence.
-
-## I308 merged implementation — 2026-10-30
-
-I308/T8 remains Active / Partial pending owner/Story closeout review.
-#809 merged as `5dea4925a`; exact-head CI `41007199388` passed all eight checks.
-The I308 owner records independent static approval, full remote preflight success
-and the retained local ENOSPC/resumed SDK component verification history.
-No completion is claimed; the full handoff queue remains unchanged.
-
-## Completed gix upgrade — 2026-10-28
-
-[I309](I309-gix-090-upgrade.md) is Complete / Closed. Implementation #790 merged as
-`8b8c43e684bfd7c6bf326ea9cffd192b2cc480db`; post-merge dependency baseline #795
-merged as `958a391316c82181853d1df176687361b14ff82b` after exact-head CI and
-independent static review. Owner evidence preserves advisory and review limits.
-I308/T8 and all later handoff tasks remain incomplete.
-
-## Active T8 implementation — 2026-10-28
-
-[I308](I308-builtin-auto-review.md) is Active after #765 merged at `8f0ce2340`.
-Stages through #801 and #807 are merged; ordinary command/network Auto and
-Git operation evidence are implemented. Full H/G recovery/profile acceptance
-and final delivery gates remain open. See I308 for exact merged evidence.
-T7 is Complete; later handoff tasks remain incomplete.
-
-## Current I300/T7 closure — 2026-10-26
-
-[I300](I300-structured-git-repair.md) is Complete / Closed at #735 (`ee84889fd`).
-Owner records existing Completion Commit, all-success exact-head CI 40251434249,
-full locked preflight and independent security/API review. Earlier I300 Active or
-pending integration checkpoints below are historical. PERM-007-H/G is Active in I308;
-all later handoff tasks remain incomplete.
-
-# Iterations
 
 [I307](I307-bubblewrap-workspace-visibility.md) is Complete for #757 at #762
 (`f643d8775`). Native Linux isolation, full platform CI and independent security

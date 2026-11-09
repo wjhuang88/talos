@@ -10,7 +10,7 @@ use talos_core::tool::{AgentTool, ToolExecutionAuthorization, ToolFamily, ToolRe
 use talos_core::tool_parameters;
 
 use crate::file_tools::{FileToolError, resolve_authorized_path};
-use crate::search_engine::{RipgrepSearchEngine, SearchEngine, SearchError as EngineError};
+use crate::search_engine::{RipgrepSearchEngine, SearchError as EngineError};
 
 /// Input parameters for the [`GrepTool`].
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -80,11 +80,12 @@ impl GrepTool {
 
         let engine = RipgrepSearchEngine;
         let output = engine
-            .search(
+            .search_with_workspace(
                 &grep_input.pattern,
                 &search_path,
                 include_pattern.as_ref(),
                 max_results,
+                crate::file_tools::workspace_guard(&search_path, authorizations),
             )
             .map_err(|e| match e {
                 EngineError::InvalidRegex(msg) => {
@@ -275,13 +276,37 @@ impl GlobTool {
         };
 
         let mut paths: Vec<String> = Vec::new();
-        for entry in glob::glob_with(&pattern_str, opts)
-            .map_err(|e| FileToolError::InvalidInput(format!("invalid glob pattern: {e}")))?
-        {
-            let path =
-                entry.map_err(|e| FileToolError::InvalidInput(format!("glob error: {e}")))?;
-            let display_path = crate::workspace_relative_display(&path, &canonical_root);
-            paths.push(display_path);
+        if let Some(root) = crate::file_tools::workspace_guard(&base_path, authorizations) {
+            let pattern = glob::Pattern::new(&glob_input.pattern)
+                .map_err(|e| FileToolError::InvalidInput(e.to_string()))?;
+            let relative = base_path
+                .strip_prefix(root.root())
+                .map_err(|_| FileToolError::PathIdentityChanged)?;
+            let max_depth = (!glob_input.pattern.contains("**")).then(|| {
+                std::path::Path::new(&glob_input.pattern)
+                    .components()
+                    .count()
+                    .max(1)
+            });
+            for file in root.files(relative, 10_000, true, max_depth)? {
+                let path = root.root().join(&file);
+                if pattern.matches_path_with(
+                    path.strip_prefix(&base_path)
+                        .map_err(|_| FileToolError::PathIdentityChanged)?,
+                    opts,
+                ) {
+                    paths.push(crate::workspace_relative_display(&path, &canonical_root));
+                }
+            }
+        } else {
+            for entry in glob::glob_with(&pattern_str, opts)
+                .map_err(|e| FileToolError::InvalidInput(format!("invalid glob pattern: {e}")))?
+            {
+                let path =
+                    entry.map_err(|e| FileToolError::InvalidInput(format!("glob error: {e}")))?;
+                let display_path = crate::workspace_relative_display(&path, &canonical_root);
+                paths.push(display_path);
+            }
         }
 
         if paths.is_empty() {

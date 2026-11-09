@@ -139,6 +139,26 @@ struct State {
     authority_reset: u64,
 }
 
+// Revoke in memory before consulting grants or approval snapshots. Persistence
+// is deliberately not part of this fence: a failed receipt write cannot retain authority.
+fn revoke_invalid_roots(state: &mut State) -> Result<(), GrantError> {
+    if state
+        .engine
+        .additional_roots
+        .iter()
+        .all(|root| root.validate())
+    {
+        return Ok(());
+    }
+    let workspace = next_generation(state.revisions.workspace)?;
+    let store = next_generation(state.revisions.store)?;
+    state.engine.additional_roots.retain(|root| root.validate());
+    state.grants.clear();
+    state.revisions.workspace = workspace;
+    state.revisions.store = store;
+    Ok(())
+}
+
 /// Composition-root-owned policy, proposal, grant, and admission state.
 pub struct PermissionSessionState {
     state: Arc<Mutex<State>>,
@@ -172,10 +192,7 @@ impl PermissionSessionState {
         request: &PermissionRequest<'_>,
         context: &PermissionContext,
     ) -> Result<PermissionEvaluation, GrantError> {
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let state = self.lock_state()?;
         evaluate_locked(&state, request, context)
     }
 
@@ -219,13 +236,21 @@ impl PermissionSessionState {
     }
 
     fn lock_state(&self) -> Result<MutexGuard<'_, State>, GrantError> {
-        self.state.lock().map_err(|_| GrantError::StateUnavailable)
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| GrantError::StateUnavailable)?;
+        revoke_invalid_roots(&mut state)?;
+        Ok(state)
     }
 
     fn try_lock_state(&self) -> Result<MutexGuard<'_, State>, GrantError> {
-        self.state
+        let mut state = self
+            .state
             .try_lock()
-            .map_err(|_| GrantError::StateUnavailable)
+            .map_err(|_| GrantError::StateUnavailable)?;
+        revoke_invalid_roots(&mut state)?;
+        Ok(state)
     }
 
     /// Commits an invocation-local proposal without waiting for a contended Session fence.
@@ -390,10 +415,7 @@ impl PermissionSessionState {
         context: &PermissionContext,
         scope: GrantScope,
     ) -> Result<ProposedGrant, GrantError> {
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let state = self.lock_state()?;
         if evaluate_locked(&state, request, context)?.decision() != PermissionDecision::Ask {
             return Err(GrantError::NotAwaitingApproval);
         }
@@ -445,10 +467,7 @@ impl PermissionSessionState {
         request: &PermissionRequest<'_>,
         context: &PermissionContext,
     ) -> Result<Option<PendingInvocation>, GrantError> {
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let state = self.lock_state()?;
         let evaluation = evaluate_locked(&state, request, context)?;
         if evaluation.decision() != PermissionDecision::Allow {
             return Ok(None);
@@ -473,10 +492,7 @@ impl PermissionSessionState {
 
     /// Clears all grants and invalidates every issued-but-unstarted invocation.
     pub fn clear(&self) -> Result<(), GrantError> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let mut state = self.lock_state()?;
         let next_store = next_generation(state.revisions.store)?;
         let next_reset = next_generation(state.authority_reset)?;
         state.grants.clear();
@@ -487,29 +503,20 @@ impl PermissionSessionState {
 
     /// Returns the number of currently installed Session grants.
     pub fn grant_count(&self) -> Result<usize, GrantError> {
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let state = self.lock_state()?;
         Ok(state.grants.len())
     }
 
     /// Returns the opaque identity of this in-memory permission Session.
     pub fn session_id(&self) -> Result<PermissionSessionId, GrantError> {
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let state = self.lock_state()?;
         Ok(state.session_id)
     }
 
     /// Returns the current redaction-safe Session identity and revision
     /// generations for binding an external assessment.
     pub fn state_snapshot(&self) -> Result<PermissionStateSnapshot, GrantError> {
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let state = self.lock_state()?;
         Ok(PermissionStateSnapshot {
             session_id: state.session_id,
             revisions: state.revisions,
@@ -538,13 +545,11 @@ impl PermissionSessionState {
     /// Starts a new unrelated permission Session at a successful runtime
     /// publication boundary.
     pub fn rebind_session(&self) -> Result<(), GrantError> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let mut state = self.lock_state()?;
         let next_store = next_generation(state.revisions.store)?;
         state.session_id = PermissionSessionId::new();
         state.grants.clear();
+        state.engine.additional_roots.clear();
         state.revisions.store = next_store;
         Ok(())
     }
@@ -557,15 +562,13 @@ impl PermissionSessionState {
         &self,
         publish: impl FnOnce() -> Result<(), E>,
     ) -> Result<Result<(), E>, GrantError> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let mut state = self.lock_state()?;
         let result = publish();
         if result.is_ok() {
             let next_store = next_generation(state.revisions.store)?;
             state.session_id = PermissionSessionId::new();
             state.grants.clear();
+            state.engine.additional_roots.clear();
             state.revisions.store = next_store;
         }
         Ok(result)
@@ -573,11 +576,8 @@ impl PermissionSessionState {
 
     /// Replaces authoritative policy while preserving grants only when the
     /// workspace identity is unchanged.
-    pub fn replace_policy(&self, engine: PermissionEngine) -> Result<(), GrantError> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+    pub fn replace_policy(&self, mut engine: PermissionEngine) -> Result<(), GrantError> {
+        let mut state = self.lock_state()?;
         let next_policy = next_generation(state.revisions.policy)?;
         let workspace_changed = state.engine.workspace_root() != engine.workspace_root();
         let next_workspace = workspace_changed
@@ -586,6 +586,16 @@ impl PermissionSessionState {
         let next_store = workspace_changed
             .then(|| next_generation(state.revisions.store))
             .transpose()?;
+        // Host receipt protection is not user-editable policy. Preserve it on
+        // config reload; membership remains Session-owned when the root is unchanged.
+        for store in &state.engine.protected_workspace_stores {
+            if !engine.protected_workspace_stores.contains(store) {
+                engine.protected_workspace_stores.push(store.clone());
+            }
+        }
+        if !workspace_changed {
+            engine.additional_roots = state.engine.additional_roots.clone();
+        }
         state.engine = engine;
         state.revisions.policy = next_policy;
         if let (Some(next_workspace), Some(next_store)) = (next_workspace, next_store) {
@@ -593,6 +603,43 @@ impl PermissionSessionState {
             state.revisions.store = next_store;
             state.grants.clear();
         }
+        Ok(())
+    }
+
+    /// Protects host receipt storage from model-visible path tools.
+    pub fn protect_workspace_receipts(&self, root: &std::path::Path) -> Result<(), GrantError> {
+        let mut state = self.lock_state()?;
+        let base = state
+            .engine
+            .workspace_root()
+            .ok_or(GrantError::StateUnavailable)?;
+        let canonical = talos_core::tool::normalize_authorized_path(base, &root.to_string_lossy())
+            .map_err(|_| GrantError::StateUnavailable)?;
+        if !state.engine.protected_workspace_stores.contains(&canonical) {
+            state.engine.protected_workspace_stores.push(canonical);
+        }
+        state.revisions.policy = next_generation(state.revisions.policy)?;
+        Ok(())
+    }
+
+    /// Atomically persists and installs a validated additional workspace snapshot.
+    /// The host owns receipt verification; persistence failure leaves membership unchanged.
+    pub fn install_workspace_roots(
+        &self,
+        roots: Vec<Arc<dyn talos_core::tool::WorkspaceRootCapability>>,
+        persist: impl FnOnce() -> Result<(), String>,
+    ) -> Result<(), GrantError> {
+        let mut state = self.lock_state()?;
+        if roots.len() > 32 || roots.iter().any(|root| !root.validate()) {
+            return Err(GrantError::AdmissionInvalidated);
+        }
+        let workspace = next_generation(state.revisions.workspace)?;
+        let store = next_generation(state.revisions.store)?;
+        persist().map_err(|_| GrantError::StateUnavailable)?;
+        state.engine.additional_roots = roots;
+        state.revisions.workspace = workspace;
+        state.revisions.store = store;
+        state.grants.clear();
         Ok(())
     }
 
@@ -620,10 +667,7 @@ impl PermissionSessionState {
         &self,
         field: impl Fn(&mut PermissionStateRevisions) -> &mut u64,
     ) -> Result<(), GrantError> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let mut state = self.lock_state()?;
         let value = field(&mut state.revisions);
         *value = next_generation(*value)?;
         Ok(())
@@ -633,10 +677,7 @@ impl PermissionSessionState {
         &self,
         field: impl Fn(&mut PermissionStateRevisions) -> &mut u64,
     ) -> Result<(), GrantError> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| GrantError::StateUnavailable)?;
+        let mut state = self.lock_state()?;
         let next_field = next_generation(*field(&mut state.revisions))?;
         let next_store = next_generation(state.revisions.store)?;
         *field(&mut state.revisions) = next_field;
@@ -887,10 +928,11 @@ impl AdmittedInvocation {
         self,
         request: &PermissionRequest<'_>,
     ) -> Result<Vec<ToolExecutionAuthorization>, GrantError> {
-        let state = self
+        let mut state = self
             .state
             .try_lock()
             .map_err(|_| GrantError::StateUnavailable)?;
+        revoke_invalid_roots(&mut state)?;
         if state.session_id != self.session_id || state.revisions != self.revisions {
             return Err(GrantError::AdmissionInvalidated);
         }

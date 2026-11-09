@@ -1,3 +1,30 @@
+# Product Backlog
+
+## TUI-ELLIPSIS-001 — proposed activation
+
+[Owner / Required Reads](../tasks/2026-11-08-tui-result-ellipsis.md): tool-result
+line clipping and muted Nord background. Active / Claimed proposed in #876;
+ineffective until target merge. TUI-034 completion remains historical.
+
+## SEARCH-001-K / I317 post-merge closeout — 2026-11-07
+
+[SEARCH-001-K](active/SEARCH-001-K-compat-fallback-ownership.md) /
+[I317](../iterations/I317-search-compat-fallback-ownership.md) / #850
+is **Complete / Closed** on publication of the owner-first governance closeout.
+Existing implementation Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (#860),
+[CI3862](https://github.com/wjhuang88/talos/actions/runs/42340480867) passed 8/8, [independent security/API review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750)
+no blockers, merge CAS passed. Original `rust-websearch` remains for legacy rollback and
+upstream tests. Parent #624 stays Open, D/#644 BLOCKED / ZERO-ADMISSION;
+D2/#848 research and E/F/G/I gates unchanged. I310, #768 and QUALITY-001
+retain separate ownership.
+
+## Completed session handoff
+
+I309 → I308/T8 → MODEL-014 → T4 → T5 → T1 → T6, including C0/T7 carryover,
+are complete in their owners. See [implementation, validation and audit evidence](../tasks/2026-10-10-session-todo-final-audit.md).
+Final status publication merged in PR #857 (`748557edc`); platform and API limits
+remain in the linked audit and owners.
+
 ## SEARCH-001-H / I314 post-merge closeout — 2026-11-04
 
 [SEARCH-001-H](active/SEARCH-001-H-explicit-search-overrides.md) / #832 and
@@ -10,52 +37,6 @@ E/F/G stay blocked, SEARCH-001-I remains separately gated, and `rust-websearch`
 remains. Previous T1/I314 Active snapshots below are historical and do not
 override these owner-derived terminal states.
 
-## T1 atomic claim proposal — 2026-11-03
-
-I315 / VALIDATION-003 / #844 proposes model-callable validation and read-only agile
-summary after merged I313/T5. Claim/activation are ineffective until finalized
-claim PR #845 merge. Supported CLI/Runtime and Unix/Windows execution, applicability,
-permissions, cancellation and output bounds are binding acceptance. T6 remains
-later and unimplemented; full handoff Active. I310/I314 retain independent owners.
-
-## MODEL-014 complete; T4 preparation — 2026-10-30
-
-[I311](../iterations/I311-model014-capability-inference.md) and MODEL-014 are Complete/Closed. Completion Commit:
-`0469f8041ed0d24bb2dffb465e9ff7fa3609a034`, `b04421fb964737911551c7e0704d6c81e80aa406`.
-#816 merged as `ca4a79961366eba7bc722b90bd449404cc7b07d5` after all-eight-success
-CI, independent review and CAS. I312 is proposed Active/Claimed in #817, ineffective until merge.
-Full handoff remains Active: T4 → T5 → T1 → T6. Earlier snapshots below are historical.
-
-## MODEL-014 atomic activation proposal — 2026-10-30
-
-[I311](../iterations/I311-model014-capability-inference.md) proposes full handoff T2+T3 after completed I308/#812.
-Proposed Active/Claimed state in #813 is ineffective until merge; ADR-095 defines authority.
-No implementation before finalized claim/activation merges. I310/ADR-094 remain
-reserved by independent Gemini proposal #811. Full handoff stays Active.
-
-## I308/T8 completed — 2026-10-30
-
-I308 and PERM-007-H/G owners are Complete with Completion Commit `5dea4925a143151071ea231779c100a75734e6fe`
-(#809), all-eight-success exact-head CI `41007199388` and independent protected
-closure review. Owner boundaries and historical failures remain recorded.
-MODEL-014 is restored Refinement / Unclaimed; next is its atomic claim/activation.
-Full handoff remains Active: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
-Earlier Active/Partial rows below are historical, superseded by owner evidence.
-
-## MODEL-014 restored intake — 2026-10-30
-
-[MODEL-014](active/MODEL-014-catalog-capability-inference.md) remains Refinement /
-Unclaimed. Its original full custom-model capability/output/variant scope is
-restored; authority/schema proposal review does not activate implementation.
-Handoff order remains I308 → MODEL-014 → T4 → T5 → T1 → T6 after completed I309.
-
-## Proposed T8 selection — 2026-10-26
-
-[I308](../iterations/I308-builtin-auto-review.md) proposes full PERM-007-H/G Auto coverage in #765.
-Claimed/Active values are ineffective until the reviewed, validated governance record merges.
-Implementation must start from that merge or later main. T7 is Complete; later handoff tasks remain incomplete.
-
-# Product Backlog
 
 This file is the compact current-state backlog entrypoint. Story scope, acceptance criteria,
 implementation evidence, and residual ownership live in the linked owner documents.
@@ -150,7 +131,7 @@ deferred behind this cycle, not cancelled.
 | 1 | Dashboard availability in Logo prefix | TUI-037 / I202 is Complete at Completion Commit `6d3f85ea`; PR #230 merged as `e0cc782a` after exact-head CI `31775126382`, independent security approval `5290402214`, real-terminal acceptance and CAS `5290414997`. One display-only token-free Logo entry replaces the success Tip and token log; failures remain Tips. | `docs/backlog/active/TUI-037-dashboard-logo-link.md`; `docs/iterations/I202-tui037-dashboard-logo-link.md`; ADR-031; ADR-054; Issue #104; PR #230 |
 | 1 | TUI regression intake | TUI-041/I199, TUI-042/I200, TUI-043/I201, TUI-045/I197, I229/TUI-058/#329 and I230/TUI-059/#330 are Complete/Closed. TUI-061/#334 separately owns continuation padding. TUI-062/I289 owns the anchored-history return-to-bottom hint and Ctrl+Down affordance; Complete / Closed at #628 merge 1226f313 after full preflight, six CI checks, Agent review and native acceptance. The premature historical claim remains disclosed. | `docs/backlog/active/TUI-041-thinking-preview-wrap-and-height.md`; `docs/backlog/active/TUI-042-noop-history-scroll-stability.md`; `docs/backlog/active/TUI-043-tool-placeholder-suppression.md`; `docs/backlog/active/TUI-045-permission-prompt-layout-anchor.md`; `docs/backlog/active/TUI-058-permission-mediated-tool-activity-correlation.md`; `docs/iterations/I229-tui058-permission-tool-correlation.md`; `docs/backlog/active/TUI-059-permission-prompt-composer-docking.md`; `docs/iterations/I230-tui059-permission-prompt-docking.md`; `docs/backlog/active/TUI-061-history-continuation-padding-regression.md`; `docs/backlog/active/TUI-062-history-return-to-bottom.md`; `docs/backlog/active/VALIDATION-002-deferred-human-validation-batch.md` |
 | 1 | Steering and capability seam serial plan | I207/TUI-049 Complete / Closed; I208/TUI-050 Complete / Closed; I246/CAP-001-P0 Complete / Closed at Completion Commit `9a3c1d86` via PR #492. | `docs/tasks/2026-09-04-steering-and-capability-seam-serial-plan.md`; `docs/backlog/active/TUI-049-steering-wrap-padding.md`; `docs/iterations/I207-tui049-steering-wrap-padding.md`; `docs/backlog/active/TUI-050-steering-insertion-boundary.md`; `docs/iterations/I208-tui050-steering-insertion-boundary.md`; `docs/backlog/active/CAP-001-P0-progressive-capability-compatibility-preparation.md`; `docs/iterations/I246-cap001-p0-compatibility-preparation.md`; Issues #267/#467 |
-| 1 | Remaining TUI interaction intake | TUI-053/#268 is Complete: implementation 1647f9d8, numeric isolation tests and maintainer-confirmed Chinese IME acceptance; historical claim gap remains disclosed in its owner. TUI-052/#266, TUI-054/#269 and TUI-055/#280 remain Intake / Unclaimed; TUI-056/#298 and TUI-057/#310 join TUI-061/#334 in I279: Complete/Closed through #580 merge 52276f55; native acceptance, CI and independent review passed. Remaining intake is unselected. TUI-051/#272 is Complete through I209. | `docs/backlog/active/TUI-052-todo-rendering-muted-readability.md`; `docs/backlog/active/TUI-053-numeric-permission-shortcuts.md`; `docs/backlog/active/TUI-054-native-key-repeat-routing.md`; `docs/backlog/active/TUI-055-narrow-markdown-table-layout.md`; `docs/backlog/active/TUI-056-collapsible-reasoning-history.md`; `docs/backlog/active/TUI-057-live-activity-status-headers.md`; `docs/backlog/active/TUI-051-resumed-session-interactivity.md` |
+| 1 | Remaining TUI interaction intake | TUI-053/#268 is Complete: implementation 1647f9d8, numeric isolation tests and maintainer-confirmed Chinese IME acceptance; historical claim gap remains disclosed in its owner. TUI-054/#269 is Review in I318 after claim #869 merge, with locally validated implementation PR #872 and physical terminal/IME acceptance deferred; TUI-052/#266 and TUI-055/#280 remain Intake / Unclaimed; TUI-056/#298 and TUI-057/#310 join TUI-061/#334 in I279: Complete/Closed through #580 merge 52276f55; native acceptance, CI and independent review passed. Remaining intake is unselected. TUI-051/#272 is Complete through I209. | `docs/backlog/active/TUI-052-todo-rendering-muted-readability.md`; `docs/backlog/active/TUI-053-numeric-permission-shortcuts.md`; `docs/backlog/active/TUI-054-native-key-repeat-routing.md`; `docs/backlog/active/TUI-055-narrow-markdown-table-layout.md`; `docs/backlog/active/TUI-056-collapsible-reasoning-history.md`; `docs/backlog/active/TUI-057-live-activity-status-headers.md`; `docs/backlog/active/TUI-051-resumed-session-interactivity.md` |
 | 1 | Desktop Preset Session templates | DESKTOP-002/#308 is Blocked / Unclaimed. It defines Presets as one-time Session Environment templates and must wait for MODEL-012/#146, SESSION-009 and DESKTOP-001 shared prerequisites before child decomposition or implementation. | `docs/backlog/active/DESKTOP-002-preset-session-environment-templates.md`; `docs/backlog/active/MODEL-012-utility-model-role-and-bounded-routing.md`; `docs/backlog/active/SESSION-009-multi-client-session-architecture.md`; `docs/backlog/active/DESKTOP-001-desktop-product-direction.md` |
 | 1 | Custom-model context-window catalog inference | MODEL-013/I212 is Complete/Closed at Completion Commit `5a1709cb`; PR #318 merge gates and the integrated exact/prefix/override/unknown no-request walkthrough passed. | `docs/backlog/active/MODEL-013-catalog-context-window-inference.md`; `docs/iterations/I212-model013-catalog-context-window-inference.md`; `docs/backlog/active/MODEL-011-custom-model-capability-probe.md`; ADR-022 |
 | 1 | Desktop D0 renderer/host boundary | `DESKTOP-001-D0` / I194 Complete at `0a47208c` after PR #215 merge `1beaca68`; GPUI/Iced source snapshots and crates.io metadata are recorded, while the transitive graph probe remains negative evidence. The parent DESKTOP-001 remains Deferred / Unclaimed / Selected Iteration None; D0 does not authorize GPUI, i18n, native dependencies or Desktop implementation. | `docs/backlog/active/DESKTOP-001-D0-renderer-host-boundary.md`; `docs/iterations/I194-desktop-renderer-host-boundary.md`; `docs/backlog/active/DESKTOP-001-desktop-product-direction.md`; ADR-042; ADR-052; ADR-059; `docs/reference/DESKTOP-I194-DEPENDENCY-SECURITY-MATRIX.md` |
@@ -173,7 +154,7 @@ deferred behind this cycle, not cancelled.
 | 2 | Dashboard opt-in token delivery boundary | SEC-002 is Refinement / Unclaimed / Selected Iteration None. Decide a threat-modeled ephemeral delivery, authentication redesign or mode deprecation before any production change; do not reuse I202 or WEB-001-A authorization. | `docs/backlog/active/SEC-002-dashboard-token-delivery-boundary.md`; ADR-031; ADR-023; WEB-001 |
 | 2 | Dynamic provider authentication program | PROVIDER-003 / Issue #132 is a Refinement Epic only. PROVIDER-003-A must accept the capability ADR and threat model before any child can be selected; B/C own shared lifecycle/request contracts and D-G own bounded provider/acquisition slices. | `docs/backlog/active/PROVIDER-003-dynamic-provider-credentials.md`; ADR-013; ADR-023; ADR-057; Issue #132 |
 | 2 | TOOL-023 residual configuration work | TOOL-023-A/C are Complete through I170. TOOL-023-B alone owns the 300-second default/configuration proposal and is not implemented by I170. | `docs/backlog/active/TOOL-023-cross-platform-shell-and-timeout.md`; `docs/backlog/active/TOOL-023-B-configurable-timeout-default.md` |
-| 3 | Deferred product architecture | DESKTOP-001 remains a Deferred/Unclaimed parent while its separately governed D0 child is proposed above; multi-agent, health monitoring, persistent tasks and A2A remain Deferred/Refinement until explicitly reprioritized and ADR-gated. | DESKTOP-001; DESKTOP-001-D0; AGENT-003; RUNTIME-004; TASK-001; A2A-001 |
+| 3 | Deferred product architecture | DESKTOP-001 remains a Deferred/Unclaimed parent while its separately governed D0 child is proposed above; multi-agent, health monitoring and A2A remain Deferred/Refinement. TASK-001/#38 is superseded; persistent recovery differences remain deferred in its owner until explicitly selected and ADR-gated. | DESKTOP-001; DESKTOP-001-D0; AGENT-003; RUNTIME-004; TASK-001; A2A-001 |
 
 ## I169 Closeout
 
@@ -264,7 +245,8 @@ Required reads:
 | TOOL-026 / I191 | Closed / Delivered | Owner evidence `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213` and independent review `5274917099`. TOOL-024-A/I188 later completed independently at `245eddeb`; production children remain separately blocked. [Story](active/TOOL-026-noninteractive-terminal-containment.md) / [Iteration](../iterations/I191-noninteractive-terminal-containment.md) |
 | SESSION-010 / I192 | Complete | Completion Commit `512ff32f389167364c02e7058151879b9ce6859a`; final head `6b2dbdb5`, CI `31587076213` and independent review `5274917099`. Its SESSION-008-B residual was completed later by I193; RUNTIME-005 remains independently governed. [Story](active/SESSION-010-runtime-resume-empty-artifact-closure.md) / [Iteration](../iterations/I192-session-runtime-recovery-closure.md) |
 | TOOL-023 | Partial | A/C Complete; decide TOOL-023-B independently. |
-| PERM-004 | Partial | Issue #22 stays open for broader sandbox/security residuals. |
+| TASK-001 | Cancelled / Superseded | #38 separate-engine proposal retired; reuse shared Work/Goal/Mission. Unimplemented durable recovery differences retained in [owner](active/TASK-001-persistent-task-runtime-spike.md). |
+| PERM-004 | Cancelled / Superseded | Original #22 umbrella retired after delivered-slice reconciliation; retained unimplemented design options stay in [owner](active/PERM-004-workspace-trust-sandbox.md). PERM-006-D/E remain independent. |
 | PROVIDER-001 | Review | Complete accurate OpenAI-compatible streaming usage evidence. |
 | TUI-017 / TUI-018 / TOOL-015 / TUI-019 | Review | Reconcile with their owner docs and dependent provider/tool evidence before closure. |
 

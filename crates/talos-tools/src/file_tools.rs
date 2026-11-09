@@ -225,3 +225,45 @@ pub fn is_skip_dir(name: &str) -> bool {
 #[cfg(all(test, feature = "file-write"))]
 #[allow(warnings)]
 mod tests;
+
+// Additional workspace IO uses the retained root rather than reopening an ambient path.
+#[cfg(feature = "file-read")]
+pub(crate) fn workspace_guard<'a>(
+    path: &Path,
+    tokens: &'a [talos_core::tool::ToolExecutionAuthorization],
+) -> Option<&'a std::sync::Arc<dyn talos_core::tool::WorkspaceRootCapability>> {
+    tokens
+        .iter()
+        .filter(|token| token.normalized_path() == path)
+        .find_map(|token| token.workspace_capability())
+}
+
+#[cfg(feature = "file-read")]
+fn workspace_read(
+    path: &Path,
+    tokens: &[talos_core::tool::ToolExecutionAuthorization],
+    limit: u64,
+) -> Result<Option<Vec<u8>>, FileToolError> {
+    use std::io::Read;
+    let Some(root) = workspace_guard(path, tokens) else {
+        return Ok(None);
+    };
+    let relative = path
+        .strip_prefix(root.root())
+        .map_err(|_| FileToolError::PathIdentityChanged)?;
+    let file = root.open_read(relative)?;
+    if !file.metadata()?.is_file() {
+        return Err(FileToolError::PathIdentityChanged);
+    }
+    let mut bytes = Vec::new();
+    file.take(limit.saturating_add(1)).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > limit {
+        return Err(FileToolError::SnapshotLimit(
+            "file size limit exceeded".into(),
+        ));
+    }
+    if !root.validate() {
+        return Err(FileToolError::PathIdentityChanged);
+    }
+    Ok(Some(bytes))
+}

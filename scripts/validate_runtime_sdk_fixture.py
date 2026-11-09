@@ -2,6 +2,7 @@
 """Check and run the independently resolved single-direct-Talos-dependency consumer."""
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -34,10 +35,14 @@ def main():
             raise ValueError(f"internal Talos import in {source}: {imports}")
     print("runtime SDK fixture boundary: one direct Talos dependency, independent Cargo root", flush=True)
     if not args.check_only:
+        # Honor the same cache selection as the enclosing workspace preflight.
+        target_dir = Path(os.environ.get("CARGO_TARGET_DIR", root / "target"))
+        if not target_dir.is_absolute():
+            target_dir = Path.cwd() / target_dir
         for features in ([], ["--features", "coding"]):
             subprocess.run([
                 "cargo", "run", "--locked", "--manifest-path", str(manifest),
-                "--target-dir", str(root / "target"), *features,
+                "--target-dir", str(target_dir), *features,
             ], cwd=fixture, check=True)
 
 

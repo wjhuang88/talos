@@ -167,6 +167,7 @@ pub(crate) async fn run_rpc_mode(cli: Cli) -> Result<()> {
     let mut registry =
         crate::mode_print::configured_registry::build_print_tool_registry_with_search(
             Vec::new(),
+            workspace_root.clone(),
             search,
         )?;
     let sched_pending = crate::registry::register_builtin_scheduler(&mut registry)?;

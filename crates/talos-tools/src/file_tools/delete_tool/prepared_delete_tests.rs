@@ -81,9 +81,15 @@ async fn captured_delete_preserves_changes_and_restores_successful_deletion() {
         } else {
             admit(root.path(), operation.as_ref(), &input)
         };
-        let PreparedNormalStage::Complete(output) = operation.execute_stage(proof).await else {
+        let (stage, changed) =
+            talos_core::tool::observe_file_mutation(operation.execute_stage(proof)).await;
+        let PreparedNormalStage::Complete(output) = stage else {
             panic!("deletion")
         };
+        assert_eq!(
+            changed, !output.result.is_error,
+            "actual prepared mutation evidence"
+        );
         if scenario == "changed" || scenario == "missing_proof" {
             assert!(output.result.is_error);
             assert_eq!(

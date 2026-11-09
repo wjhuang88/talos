@@ -71,11 +71,12 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     let mut registry =
         crate::mode_print::configured_registry::build_print_tool_registry_with_search(
             Vec::new(),
+            workspace_root.clone(),
             search,
         )?;
     let sched_pending = crate::registry::register_builtin_scheduler(&mut registry)?;
     let mcp_approval = Arc::new(std::sync::Mutex::new(ApprovalPrompt::new(
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf()),
+        crate::registry::product_permission_engine(workspace_root.to_path_buf()),
     )));
     register_permission_aware_tools(
         &mut registry,
@@ -91,8 +92,32 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     )
     .map_err(anyhow::Error::msg)?;
 
+    let session_manager =
+        talos_session::SessionManager::new().context("failed to initialize session manager")?;
+    let display_name = workspace_display_name(&workspace_root);
+    let workspace_root_str = canonical_workspace_root(&workspace_root);
+    let session = resolve_session_for_workspace(
+        &session_manager,
+        &workspace_root_str,
+        &display_name,
+        &cli,
+        ResumeSelection::Disabled,
+        true,
+    )?;
+
     let permission_engine =
-        talos_permission::PermissionEngine::with_workspace_root(workspace_root.to_path_buf());
+        crate::registry::product_permission_engine(workspace_root.to_path_buf());
+    let permission_state = Arc::new(talos_permission::PermissionSessionState::new(
+        permission_engine,
+    ));
+    crate::registry::bind_session_worktrees(
+        &mut registry,
+        &workspace_root,
+        session.id,
+        session_manager.sessions_dir(),
+        permission_state.clone(),
+    )
+    .map_err(anyhow::Error::msg)?;
     let mut agent = Agent::with_security_and_hooks(
         provider,
         registry,
@@ -102,9 +127,7 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
         hooks,
     )
     .with_permission_pipeline(
-        Arc::new(talos_permission::PermissionSessionState::new(
-            permission_engine,
-        )),
+        permission_state,
         talos_permission::PermissionContext::new(
             talos_permission::PermissionMode::Headless,
             talos_permission::InteractionCapability::Unavailable,
@@ -147,19 +170,6 @@ pub(crate) async fn run_inline_mode(cli: Cli) -> Result<()> {
     if let Some(ref append) = cli.append_system_prompt {
         agent.set_append_prompt(append.clone());
     }
-
-    let session_manager =
-        talos_session::SessionManager::new().context("failed to initialize session manager")?;
-    let display_name = workspace_display_name(&workspace_root);
-    let workspace_root_str = canonical_workspace_root(&workspace_root);
-    let session = resolve_session_for_workspace(
-        &session_manager,
-        &workspace_root_str,
-        &display_name,
-        &cli,
-        ResumeSelection::Disabled,
-        true,
-    )?;
 
     set_todo_prompt_provider(&mut agent, &session_manager, &session);
 

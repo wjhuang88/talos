@@ -5,6 +5,42 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-08 - Crash fencing needs a safe recovery path
+
+- Trigger: power loss followed by `talos -c` permanently refused input because Running custody lacked terminal proof (SESSION-CRASH-001).
+- Root cause: no-replay fencing had no abandoned-turn terminalization path; partial transcript text cannot establish success.
+- Fix: acquire cooperative cross-process ownership, strictly validate history, preserve existing outcomes or durably record interruption before releasing custody; retain identities and never replay old tool work.
+- Prevention: test process death, competing live owners, Actor abort with surviving workers, interrupted recovery retries and genuinely new input. Sync failures must not become success merely because appended bytes are readable; cleanup must verify candidates while holding ownership.
+- Checks: `runtime_lease` tests and `i169_terminal_outcome_recovery`; native platform execution remains required.
+- Delivery lesson: rebuilding a shared target binary from an isolated worktree does not update the user's `cargo run` source. Verify the actual launch directory and synchronize source before claiming the fix is available. Give independent worktrees separate target directories: concurrent builds can replace dependencies between Cargo compilation and rustdoc execution.
+
+## 2026-11-08 - Protection stops must cross the live and durable boundaries
+
+- Trigger: User reported a silent stop after editing and rejected a manual continue workaround (AGENT-PAUSE-001).
+- Symptom: Runtime returned an explanatory success string, but no TextDelta or assistant history entry existed; the UI became idle without a reason.
+- Root cause: Guard exits bypassed ordinary finalized message publication. Repeat signatures also ignored real file changes between validation commands. The historical live guard subtype was not retained; deterministic regressions confirmed both code defects.
+- Fix: Publish and persist synthetic guard explanations once before completion. Refresh only built-in command signatures after invocation-scoped, successful built-in file changes; preserve the total budget and other signatures.
+- Prevention: Test real edit/validation sequences, no-op/failure/unknown tools, prepared mutations, Session durable reopen and Conversation rendering. Returning final text alone is not proof of user-visible delivery; asking the user to continue does not repair a silent stop.
+- Promoted to rule/check: `crates/talos-agent/src/tests/protection_stop.rs`, Session protection-stop regression, Conversation protection-stop projection and file mutation observation tests.
+
+## 2026-11-08 - Prompt wording participates in runtime budgets and review evidence
+
+- Trigger: TOOL-ROUTE-001 standard preflight after shared routing guidance and tool-description edits.
+- Symptom: The existing 20k history-compaction fixture exceeded capacity; process cancellation fell back to denied approval.
+- Root cause: Shared instructions contribute to the sealed request budget. Tool descriptions also enter Auto evidence, where the standalone word `authorization` triggers the existing secret-like text filter.
+- Fix: Compress guidance while preserving scope; shorten tool descriptions and remove the false-positive wording. Keep safety checks, context limits and existing test assertions intact.
+- Prevention: Validate prompt assembly and real dispatch/compaction paths after prose changes; do not assume descriptions are display-only or weaken security checks to accommodate wording.
+- Promoted to rule/check: Existing `actor_compacts_long_recovered_text_without_replacing_raw_history` and `process_auto_cancellation_uses_owned_instance_and_exact_job` regression tests; prompt assembly coverage in `crates/talos-agent/src/prompt/tests.rs`.
+
+## 2026-11-05 - Follow the existing Windows xwin validation route
+
+- Trigger: Maintainer correction during I316 process-memory implementation.
+- Symptom: GNU test cross-check failed on missing MinGW, incorrectly recorded as a local validation blocker.
+- Root cause: Selected an installed target without reading the existing Windows cross-compilation SOP.
+- Fix: Use installed cargo-xwin with the pinned MSVC target, locked dependencies and all-feature test compilation; authorize existing SDK cache setup through the normal tool gate.
+- Prevention: Read LOCAL-DEV before choosing the Windows command; never infer the supported route from installed targets alone. A cross-check is not native runtime acceptance.
+- Promoted to rule/check: `AGENTS.md` Windows cross-check rule; `docs/sop/LOCAL-DEV.md` already defined the required route.
+
 ## 2026-11-01 - Check decoded strings before privacy-sensitive rendering
 
 - Trigger: Independent I313 review of model-submitted checkpoint preparation.
@@ -105,6 +141,8 @@ repeating known mistakes.
 - Promoted to rule/check: `checkout_existing_local_branch_preserves_onbranch_configuration` covers post-checkout and reference-transaction command refusal.
 
 ## Lesson Index
+
+- [Test persisted workloads across the actual consumer boundary](#2026-11-06---test-persisted-workloads-across-the-actual-consumer-boundary) — QUALITY-001.
 
 - [Parse URL authority and propagate connection errors](#2026-10-28---parse-url-authority-and-propagate-connection-errors) — I306.
 
@@ -1648,3 +1686,21 @@ visible; distinguish passed assertions from independently emitted evidence.
   commit under one fence; acquire the inner permission lock nonblockingly under the
   runtime lock, forbid callback reentry, and test both reset-before and reset-after
   commit orderings. Narrow helper success does not prove the model-visible path.
+
+## 2026-11-06 - Test persisted workloads across the actual consumer boundary
+
+- Trigger: QUALITY-001 delivery assessment and failed standard preflight.
+- Symptom: a valid large stored record could not be restored; normal workspace checks exceeded fixed execution budgets; a checkout fixture retained a superseded refusal expectation.
+- Root cause: writer/reader limits and real Cargo workloads were not tested together; the hook fixture selected a different branch from the attempted creation.
+- Fix: incremental host-record restoration with separate model limits; quiet Cargo tests with finite workload-sized budgets; matching conditional-hook refusal plus safe-creation assertions.
+- Prevention: use writer-produced large records and real Cargo execution, and verify the actual selected branch/configuration before changing security behavior.
+- Promoted to rule/check: message_scan large-record regressions, CLI validation_workspace integration fixture, and conditional checkout regression.
+
+## 2026-11-08 - Approval must reach the production file capability
+
+- Trigger: an approved external worktree write still failed with `path escapes workspace root`.
+- Symptom: permission approval succeeded but the CLI-installed atomic creator rejected absolute paths.
+- Root cause: bare-tool authorization tests omitted the production capability; workspace membership and execution authority were treated as interchangeable.
+- Fix: preserve exact external authorization through capability-relative creation; separately bind Session-owned worktree receipts and invalidate old approvals when root identities change.
+- Prevention: test real approval delivery with CLI-equivalent capabilities, approved/denied external paths, and stale Once/Session grants after worktree replacement.
+- Promoted to rule/check: `external_write_tui_approval_reaches_capability_execution`, `workspace_defaults_and_external_auto_fallback_reach_real_write`, and Session worktree custody/revocation tests. Implementation remains under review; this entry is not delivery evidence.

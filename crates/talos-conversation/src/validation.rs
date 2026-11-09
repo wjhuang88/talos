@@ -1,9 +1,14 @@
 //! Internal validation service shared by CLI, TUI, and future runtime callers.
 
+mod host;
+pub use host::{
+    ValidationHostExecutor, ValidationHostFailure, ValidationHostFuture, ValidationHostOutput,
+    run_validation_plan_with_executor,
+};
+
 use std::fmt;
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::json;
 
@@ -426,50 +431,71 @@ fn checks_for_profile(profile: ValidationProfile) -> Vec<ValidationCheck> {
             },
             ValidationCheck {
                 id: "provider-usage",
-                command: "cargo test -p talos-provider",
+                command: "cargo test --quiet --locked -p talos-provider",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["test", "-p", "talos-provider"],
+                args: &["test", "--quiet", "--locked", "-p", "talos-provider"],
                 required: true,
                 source: "T101",
                 ecosystem: Some("rust"),
             },
             ValidationCheck {
                 id: "tui-status",
-                command: "cargo test -p talos-tui status_bar",
+                command: "cargo test --quiet --locked -p talos-tui status_bar",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["test", "-p", "talos-tui", "status_bar"],
+                args: &[
+                    "test",
+                    "--quiet",
+                    "--locked",
+                    "-p",
+                    "talos-tui",
+                    "status_bar",
+                ],
                 required: true,
                 source: "T102/T103",
                 ecosystem: Some("rust"),
             },
             ValidationCheck {
                 id: "tool-results",
-                command: "cargo test -p talos-tools file_tool_tests",
+                command: "cargo test --quiet --locked -p talos-tools file_tool_tests",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["test", "-p", "talos-tools", "file_tool_tests"],
+                args: &[
+                    "test",
+                    "--quiet",
+                    "--locked",
+                    "-p",
+                    "talos-tools",
+                    "file_tool_tests",
+                ],
                 required: true,
                 source: "T104",
                 ecosystem: Some("rust"),
             },
             ValidationCheck {
                 id: "model-switch",
-                command: "cargo test -p talos-cli model_switch_marker",
+                command: "cargo test --quiet --locked -p talos-cli model_switch_marker",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["test", "-p", "talos-cli", "model_switch_marker"],
+                args: &[
+                    "test",
+                    "--quiet",
+                    "--locked",
+                    "-p",
+                    "talos-cli",
+                    "model_switch_marker",
+                ],
                 required: true,
                 source: "T106",
                 ecosystem: Some("rust"),
             },
             ValidationCheck {
                 id: "check",
-                command: "cargo check --workspace",
+                command: "cargo check --locked --workspace",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["check", "--workspace"],
+                args: &["check", "--locked", "--workspace"],
                 required: true,
                 source: "I076 planned validation",
                 ecosystem: Some("rust"),
@@ -489,20 +515,20 @@ fn checks_for_profile(profile: ValidationProfile) -> Vec<ValidationCheck> {
             },
             ValidationCheck {
                 id: "check",
-                command: "cargo check --workspace",
+                command: "cargo check --locked --workspace",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["check", "--workspace"],
+                args: &["check", "--locked", "--workspace"],
                 required: true,
                 source: "workspace validation",
                 ecosystem: Some("rust"),
             },
             ValidationCheck {
                 id: "test",
-                command: "cargo test --workspace",
+                command: "cargo test --quiet --locked --workspace",
                 execution_mode: ValidationExecutionMode::HostTool,
                 program: Some("cargo"),
-                args: &["test", "--workspace"],
+                args: &["test", "--quiet", "--locked", "--workspace"],
                 required: true,
                 source: "workspace validation",
                 ecosystem: Some("rust"),
@@ -531,141 +557,36 @@ fn requires_cargo_manifest(checks: &[ValidationCheck]) -> bool {
     })
 }
 
-/// Execute a validation plan.
-pub fn run_validation_plan(workspace: &Path, plan: ValidationPlan) -> ValidationEvidence {
-    let authority = "allowlisted validation execution; no arbitrary commands accepted";
-    let mut findings = plan.findings;
-    findings.push(ValidationFinding {
-        severity: FindingSeverity::Info,
-        message: "Run mode executes only the selected profile's allowlisted commands".to_string(),
-    });
-    let records = plan
-        .checks
-        .iter()
-        .map(|check| run_validation_check(workspace, plan.profile, check))
-        .collect();
-
+/// Execute only the built-in governance validator, without host process authority.
+///
+/// This synchronous entry accepts neither a plan nor commands. Hosts that execute
+/// build checks must use [`run_validation_plan_with_executor`] and own admission,
+/// cancellation and cleanup.
+pub fn run_governance_validation(workspace: &Path) -> ValidationEvidence {
+    let plan = collect_validation_plan(workspace, ValidationProfile::Governance);
     ValidationEvidence {
-        profile: plan.profile,
-        authority,
-        findings: findings
+        profile: ValidationProfile::Governance,
+        authority: "in-process governance validation; no host commands",
+        findings: plan
+            .findings
             .into_iter()
             .filter(|finding| {
                 finding.message != "Plan mode is read-only: commands are listed but not executed"
             })
             .collect(),
-        records,
+        records: vec![run_internal_validation_check(
+            workspace,
+            &governance_check(),
+            "internal read-only governance check; no host execution requested".to_string(),
+        )],
     }
 }
 
-fn run_validation_check(
-    workspace: &Path,
-    profile: ValidationProfile,
-    check: &ValidationCheck,
-) -> ValidationEvidenceRecord {
-    let permission_decision = format!("allowlisted validation profile: {profile}");
-    if check.execution_mode == ValidationExecutionMode::Internal {
-        return run_internal_validation_check(workspace, check, permission_decision);
-    }
-
-    let Some(program) = check.program else {
-        return ValidationEvidenceRecord {
-            id: check.id,
-            command: check.command,
-            execution_mode: check.execution_mode,
-            required: check.required,
-            source: check.source,
-            ecosystem: check.ecosystem,
-            permission_decision,
-            status: EvidenceStatus::NotStarted,
-            exit_status: None,
-            stdout_summary: "<empty>".to_string(),
-            stderr_summary: "host-tool validation check missing program".to_string(),
-        };
-    };
-
-    match run_bounded_host_check(program, check.args, workspace) {
-        Ok(output) => {
-            let status = if output.status.success() {
-                EvidenceStatus::Passed
-            } else {
-                EvidenceStatus::Failed
-            };
-            ValidationEvidenceRecord {
-                id: check.id,
-                command: check.command,
-                execution_mode: check.execution_mode,
-                required: check.required,
-                source: check.source,
-                ecosystem: check.ecosystem,
-                permission_decision,
-                status,
-                exit_status: output.status.code(),
-                stdout_summary: summarize_output(&output.stdout),
-                stderr_summary: summarize_output(&output.stderr),
-            }
-        }
-        Err(err) => ValidationEvidenceRecord {
-            id: check.id,
-            command: check.command,
-            execution_mode: check.execution_mode,
-            required: check.required,
-            source: check.source,
-            ecosystem: check.ecosystem,
-            permission_decision,
-            status: EvidenceStatus::NotStarted,
-            exit_status: None,
-            stdout_summary: "<empty>".to_string(),
-            stderr_summary: err.to_string(),
-        },
-    }
-}
-
-const HOST_CHECK_TIMEOUT: Duration = Duration::from_secs(30);
-const HOST_OUTPUT_LIMIT: usize = 16 * 1024;
-
-fn run_bounded_host_check(
-    program: &str,
-    args: &[&str],
-    workspace: &Path,
-) -> std::io::Result<std::process::Output> {
-    let mut child = Command::new(program)
-        .args(args)
-        .current_dir(workspace)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    let deadline = Instant::now() + HOST_CHECK_TIMEOUT;
-    loop {
-        if let Some(status) = child.try_wait()? {
-            let output = child.wait_with_output()?;
-            return Ok(std::process::Output {
-                status,
-                stdout: bound_host_output(output.stdout),
-                stderr: bound_host_output(output.stderr),
-            });
-        }
-        if Instant::now() >= deadline {
-            let _ = child.kill();
-            let status = child.wait()?;
-            return Ok(std::process::Output {
-                status,
-                stdout: Vec::new(),
-                stderr: b"validation host command timed out after 30s".to_vec(),
-            });
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
-}
-
-fn bound_host_output(mut output: Vec<u8>) -> Vec<u8> {
-    if output.len() > HOST_OUTPUT_LIMIT {
-        output.truncate(HOST_OUTPUT_LIMIT);
-        output.extend_from_slice(b"\n[output truncated]");
-    }
-    output
-}
+// A fixed host policy, not model-controlled input. Cold builds and full workspace
+// tests need minutes; quiet test progress avoids spending the output budget on
+// one line per passing test. Overflow still fails under ADR-097.
+const HOST_CHECK_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+const HOST_OUTPUT_LIMIT: usize = 2 * 1024 * 1024;
 
 fn run_internal_validation_check(
     workspace: &Path,
@@ -902,6 +823,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn synchronous_governance_validation_never_selects_workspace_host_checks() {
+        let dir = tempdir().expect("workspace");
+        fs::write(dir.path().join("Cargo.toml"), "[workspace]\n").expect("manifest");
+        let evidence = run_governance_validation(dir.path());
+        assert_eq!(evidence.profile, ValidationProfile::Governance);
+        assert_eq!(evidence.records.len(), 1);
+        assert_eq!(evidence.records[0].id, "governance");
+        assert_eq!(
+            evidence.records[0].execution_mode,
+            ValidationExecutionMode::Internal
+        );
+        assert!(
+            !evidence.records[0]
+                .permission_decision
+                .contains("allowlisted")
+        );
+        assert!(!dir.path().join("Cargo.lock").exists());
+        assert!(!dir.path().join("target").exists());
+    }
+
+    #[test]
     fn governance_plan_lists_internal_check_without_executing_script() {
         let dir = tempdir().expect("operation should succeed");
         let script_dir = dir.path().join("scripts");
@@ -944,6 +886,23 @@ mod tests {
                     .message
                     .contains("internal governance validator available")
         }));
+    }
+
+    #[test]
+    fn cargo_build_profiles_preserve_lockfile_and_match_displayed_commands() {
+        for profile in [ValidationProfile::I076, ValidationProfile::Workspace] {
+            let checks = checks_for_profile(profile);
+            let builds: Vec<_> = checks
+                .iter()
+                .filter(|check| matches!(check.args.first(), Some(&"check" | &"test")))
+                .collect();
+            assert!(!builds.is_empty());
+            for check in builds {
+                assert_eq!(check.program, Some("cargo"));
+                assert!(check.args.contains(&"--locked"), "{}", check.id);
+                assert_eq!(check.command, format!("cargo {}", check.args.join(" ")));
+            }
+        }
     }
 
     #[test]
@@ -1111,32 +1070,6 @@ mod tests {
                     .message
                     .contains("Cargo host-tool adapter unavailable")
         }));
-    }
-
-    #[test]
-    fn run_records_missing_program_without_hiding_failure() {
-        let dir = tempdir().expect("operation should succeed");
-        let check = ValidationCheck {
-            id: "missing",
-            command: "talos-validation-command-that-should-not-exist",
-            execution_mode: ValidationExecutionMode::HostTool,
-            program: Some("talos-validation-command-that-should-not-exist"),
-            args: &[],
-            required: true,
-            source: "test",
-            ecosystem: None,
-        };
-
-        let record = run_validation_check(dir.path(), ValidationProfile::Workspace, &check);
-
-        assert_eq!(record.status, EvidenceStatus::NotStarted);
-        assert_eq!(record.exit_status, None);
-        assert!(
-            record
-                .permission_decision
-                .contains("allowlisted validation profile: workspace")
-        );
-        assert_ne!(record.stderr_summary, "<empty>");
     }
 
     #[test]

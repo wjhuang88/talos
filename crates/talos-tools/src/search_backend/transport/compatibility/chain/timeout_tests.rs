@@ -299,16 +299,18 @@ async fn source_timeout_retry_can_recover_without_later_query_disclosure() {
         manifest.clone(),
         Arc::new(AllowAuthority(manifest)),
         Arc::new(
-            TransportBudget::new(Duration::from_secs(1), 3, 1_048_576).expect("shared budget"),
+            TransportBudget::new(Duration::from_secs(5), 3, 1_048_576).expect("shared budget"),
         ),
         dns.clone(),
     )
     .expect("transport");
 
+    // The first DNS call stalls for 10s, so a 1s source window still forces
+    // timeout while allowing the real loopback retry to run under suite load.
     let rows = chain
         .execute_with_policy(
             &transport,
-            Duration::from_millis(100),
+            Duration::from_secs(1),
             Duration::from_millis(10),
         )
         .await

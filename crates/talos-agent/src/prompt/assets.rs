@@ -14,3 +14,6 @@ pub const TOOL_CALLING_STRICT: &str = include_str!("../../prompts/tool_calling_s
 /// matures. It is embedded now so prompt assembly can reference it without
 /// runtime file reads.
 pub const MEMORY_PROMPT: &str = include_str!("../../prompts/memory.md");
+
+/// Shared routing guidance retained even when a custom identity is supplied.
+pub(super) const TOOL_SELECTION: &str = include_str!("../../prompts/tool_selection.txt");

@@ -52,6 +52,9 @@ impl AutoPermissionAssessor for Assessor {
         let previous_calls = self.calls.fetch_add(1, Ordering::SeqCst);
         assert_eq!(request.action.schema, "ordinary-invocation/v1");
         assert!(request.directory_identity.is_some());
+        if previous_calls == 1 && self.scenario == "changed_memory" {
+            assert_eq!(request.action.input["memory_limit_mib"], 4096);
+        }
         if previous_calls == 1 && self.scenario == "changed_input" {
             if request.action.tool == "exec" {
                 assert_eq!(request.action.input["steps"][0]["command"], "echo");
@@ -105,6 +108,7 @@ async fn real_shell_and_exec_auto_control_effects() {
             "replacement",
             "replay",
             "changed_input",
+            "changed_memory",
         ] {
             let root = tempfile::tempdir().expect("workspace");
             let mut registry = ToolRegistry::new();
@@ -177,8 +181,15 @@ async fn real_shell_and_exec_auto_control_effects() {
                 ],
                 text_done_events("done"),
             ];
-            if matches!(scenario, "replay" | "changed_input") {
+            if matches!(scenario, "replay" | "changed_input" | "changed_memory") {
                 let mut repeated = responses[0].clone();
+                if scenario == "changed_memory" {
+                    for event in &mut repeated {
+                        if let AgentEvent::ToolCall { call, .. } = event {
+                            call.input["memory_limit_mib"] = serde_json::json!(4096);
+                        }
+                    }
+                }
                 if scenario == "changed_input" {
                     for event in &mut repeated {
                         if let AgentEvent::ToolCall { call, .. } = event {
@@ -213,14 +224,15 @@ async fn real_shell_and_exec_auto_control_effects() {
                 .run("create nested and then create an empty effect file inside it".into())
                 .await
                 .expect("run");
-            let expected_calls = if matches!(scenario, "replay" | "changed_input") {
-                2
-            } else {
-                usize::from(!matches!(
-                    scenario,
-                    "deny" | "human" | "external" | "replacement"
-                ))
-            };
+            let expected_calls =
+                if matches!(scenario, "replay" | "changed_input" | "changed_memory") {
+                    2
+                } else {
+                    usize::from(!matches!(
+                        scenario,
+                        "deny" | "human" | "external" | "replacement"
+                    ))
+                };
             assert_eq!(
                 calls.load(Ordering::SeqCst),
                 expected_calls,
@@ -231,17 +243,43 @@ async fn real_shell_and_exec_auto_control_effects() {
                 expected_calls,
                 "scenario not reached: {tool_name}/{scenario}"
             );
+            if matches!(
+                scenario,
+                "allow" | "replay" | "changed_input" | "changed_memory"
+            ) {
+                let messages = captured.lock().await;
+                let result = messages
+                    .last()
+                    .expect("continuation")
+                    .iter()
+                    .find_map(|message| match message {
+                        Message::Tool { result } if result.tool_use_id == "command" => Some(result),
+                        _ => None,
+                    })
+                    .expect("command result");
+                assert!(
+                    !result.is_error,
+                    "{tool_name}/{scenario}: {}",
+                    result.content
+                );
+            }
             assert_eq!(
                 root.path().join("nested/effect").exists(),
-                matches!(scenario, "allow" | "replay" | "changed_input"),
+                matches!(
+                    scenario,
+                    "allow" | "replay" | "changed_input" | "changed_memory"
+                ),
                 "{scenario}"
             );
             assert_eq!(
                 root.path().join("nested").exists(),
-                matches!(scenario, "allow" | "replay" | "changed_input"),
+                matches!(
+                    scenario,
+                    "allow" | "replay" | "changed_input" | "changed_memory"
+                ),
                 "{scenario}"
             );
-            if matches!(scenario, "replay" | "changed_input") {
+            if matches!(scenario, "replay" | "changed_input" | "changed_memory") {
                 let messages = captured.lock().await;
                 let results: Vec<_> = messages
                     .last()

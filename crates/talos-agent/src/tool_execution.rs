@@ -575,6 +575,14 @@ impl Agent {
         };
         let mut call = effective_call.expect("tool call should be present");
 
+        for shell in ["bash", "powershell"] {
+            if registry.is_builtin_instance(shell)
+                && let Some(host) = registry.get(shell)
+                && let Err(error) = host.activate_session_workspace()
+            {
+                tracing::warn!(%error, "additional workspace activation unavailable; using normal path authorization");
+            }
+        }
         let tool = match registry.get(&call.name) {
             Some(t) => t,
             None => {
@@ -765,6 +773,7 @@ impl Agent {
         }
 
         let mut prepared_output = None;
+        let mut prepared_file_changed = false;
         let mut prepared_reserved = false;
         let mut stage_history = talos_core::tool::PreparedStageHistory::default();
         let prepared_deadline_at = prepared
@@ -1096,12 +1105,12 @@ impl Agent {
                     Vec::new(),
                 ));
             }
-            let stage = match tokio::time::timeout_at(
-                deadline_at,
-                operation.execute_stage(Box::new(admission)),
+            let (stage, changed) = talos_core::tool::observe_file_mutation(
+                tokio::time::timeout_at(deadline_at, operation.execute_stage(Box::new(admission))),
             )
-            .await
-            {
+            .await;
+            prepared_file_changed |= changed;
+            let stage = match stage {
                 Ok(stage) => stage,
                 Err(_) => {
                     return Ok((
@@ -1155,6 +1164,7 @@ impl Agent {
 
         let normalized_input = call.input.clone();
 
+        let mut file_changed = false;
         let (mut result, parts) = if let Some(network) = prepared_network {
             let Some(authority) = network_authority else {
                 return Ok((
@@ -1269,25 +1279,36 @@ impl Agent {
                 (output.result, output.next_provider_parts)
             }
         } else {
-            let output = match background_permit.take() {
-                Some(permit) => {
-                    tool.execute_background_authorized_with_output(
-                        normalized_input,
-                        permit,
-                        authorizations.as_deref().unwrap_or(&[]),
-                    )
-                    .await
-                }
-                None => match authorizations.as_deref() {
-                    Some(grants) => {
-                        tool.execute_authorized_with_output(normalized_input, grants)
-                            .await
+            let (output, changed) = talos_core::tool::observe_file_mutation(async {
+                match background_permit.take() {
+                    Some(permit) => {
+                        tool.execute_background_authorized_with_output(
+                            normalized_input,
+                            permit,
+                            authorizations.as_deref().unwrap_or(&[]),
+                        )
+                        .await
                     }
-                    None => tool.execute_with_output(normalized_input).await,
-                },
-            };
+                    None => match authorizations.as_deref() {
+                        Some(grants) => {
+                            tool.execute_authorized_with_output(normalized_input, grants)
+                                .await
+                        }
+                        None => tool.execute_with_output(normalized_input).await,
+                    },
+                }
+            })
+            .await;
+            file_changed = changed;
             (output.result, output.next_provider_parts)
         };
+        if (file_changed || prepared_file_changed)
+            && !result.is_error
+            && registry.is_builtin_instance(&call.name)
+            && matches!(call.name.as_str(), "write" | "edit" | "delete")
+        {
+            crate::protection_progress::record();
+        }
 
         // Eligibility is an explicit registered producer capability, never a
         // match on a tool name or data supplied by an extension.

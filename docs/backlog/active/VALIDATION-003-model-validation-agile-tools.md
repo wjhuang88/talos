@@ -3,13 +3,18 @@
 | Field | Value |
 |---|---|
 | Story ID | VALIDATION-003 |
-| Status | In Progress (proposed in #845; ineffective until merge) |
+| Status | Complete (#847 merged; evidence below) |
 | Priority | P1 |
 | Source Issue | #844 |
 | Owner | I315 |
 | Depends On | I313/T5 complete; VALIDATION-001 shared service; GOV-003 supported summary |
 
 This bounded child owns handoff T1, not GOV-003 automation or T6 memory limits.
+Completion Commit: `add669403734d4e2469eb479939066f57027c74d`.
+CI `41849101811` passed all eight exact-head jobs including native Windows;
+independent protected review and merge CAS passed. I315 records detailed coverage
+and platform/API boundaries. Original source findings below describe the published
+pre-implementation baseline; T6 remains separately unimplemented.
 [Iteration and claim](../../iterations/I315-model-validation-agile-tools.md) owns
 activation. No implementation before finalized target-branch claim merge.
 
@@ -117,7 +122,8 @@ Unavailable does not satisfy Windows acceptance; Unix evidence is not portable p
 Run meaningful real permission/runtime regressions above, pinned locked checks,
 Clippy, standard preflight with SDK modes, native platform CI, independent protected
 review and merge CAS. Update README en/zh and tool/SDK docs; owner-first evidence
-before derived views. No Completion Commit or implementation evidence exists yet.
+before derived views. These gates passed for #847 as recorded in I315 and the
+completion evidence above; this does not close the full handoff or T6.
 
 ## Required Reads
 

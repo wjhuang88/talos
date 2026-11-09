@@ -13,6 +13,84 @@ use tokio::sync::mpsc;
 
 type Receiver<T> = mpsc::Receiver<T>;
 
+#[tokio::test]
+async fn protection_stop_reaches_session_and_durable_replay() {
+    for budget in [false, true] {
+        let root = tempfile::tempdir().expect("root");
+        let durable =
+            talos_session::DurableSession::open_or_create(root.path(), "guard").expect("session");
+        let responses = (0..if budget { 51 } else { 3 }).map(|i| vec![
+            AgentEvent::TurnStart,
+            AgentEvent::ToolCall { call: talos_core::message::ToolCall {
+                id: format!("guard_{i}"), name: "echo".into(),
+                input: serde_json::json!({"message":if budget { i.to_string() } else { "same".into() }}),
+            }, provenance: Default::default(), summary_fields: vec![] },
+            AgentEvent::TurnEnd { stop_reason: StopReason::ToolUse, usage: Default::default() },
+        ]).collect();
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(EchoTool));
+        #[allow(deprecated)]
+        let agent = Agent::new(Arc::new(MockModel::new(responses)), registry);
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_durable_persistence(durable.clone(), Default::default());
+        let task = tokio::spawn(async move { actor.run().await });
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "run".into(),
+            })
+            .await
+            .expect("submit");
+        let events = collect_until_completions(&mut handle.eq_rx, 1).await;
+        let reason = events
+            .iter()
+            .find_map(|event| match completed_status(event) {
+                Some(TurnCompletionStatus::Success { final_text, .. }) => Some(final_text.clone()),
+                _ => None,
+            })
+            .expect("bounded stop");
+        assert!(reason.contains(if budget { "limit" } else { "repeated" }));
+        let deltas = events
+            .iter()
+            .filter_map(|event| match progress_event(event) {
+                Some(AgentEvent::TextDelta { delta }) => Some(delta),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(deltas, vec![&reason]);
+        let live_index = events
+            .iter()
+            .position(|e| matches!(progress_event(e), Some(AgentEvent::TextDelta { .. })))
+            .expect("live reason");
+        let completed_index = events
+            .iter()
+            .position(|e| completed_status(e).is_some())
+            .expect("completion");
+        assert!(live_index < completed_index);
+        let messages = durable.read_messages().expect("durable replay");
+        assert_eq!(messages.iter().filter(|m| matches!(m, Message::Assistant { content, tool_calls, .. } if content == &reason && tool_calls.is_empty())).count(), 1);
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        task.await.expect("actor");
+        drop(durable);
+        let reopened = talos_session::DurableSession::open_existing(root.path(), "guard")
+            .expect("reopen")
+            .expect("existing");
+        assert_eq!(reopened.read_messages().expect("replay"), messages);
+    }
+}
+
 fn is_turn_started(event: &SessionEvent) -> bool {
     matches!(
         event,
@@ -855,6 +933,16 @@ async fn session_process_cancels_only_its_own_running_job() {
     let result = tool_result(&events);
     assert!(!result.is_error, "{}", result.content);
     let started: serde_json::Value = serde_json::from_str(&result.content).expect("receipt");
+    assert!(
+        started["memory_policy"]
+            .as_str()
+            .is_some_and(|value| value.contains("2048"))
+    );
+    assert!(
+        started["memory_child_evidence"]
+            .as_str()
+            .is_some_and(|value| value.contains("effective_soft_bytes="))
+    );
     let id = started["job_id"].as_str().expect("job id").to_owned();
     for (session, action) in [(1, "status"), (1, "cancel"), (0, "status"), (0, "cancel")] {
         sessions[session].1.lock().expect("responses").extend([
@@ -2362,7 +2450,7 @@ struct BoundaryBlockingTool {
 }
 
 #[tokio::test]
-async fn boundary_injection_ambiguous_running_recovery_fences_new_execution() {
+async fn boundary_injection_interruption_recovers_both_identities_without_replay() {
     let temp = tempfile::tempdir().expect("temporary directory");
     let manager = talos_session::SessionManager::with_dir(temp.path().to_path_buf());
     let session = manager
@@ -2397,54 +2485,27 @@ async fn boundary_injection_ambiguous_running_recovery_fences_new_execution() {
             .mark_running(id, "interrupted-before-transcript")
             .expect("running");
     }
-    handle
-        .sq_tx
-        .send(SessionOp::SubmitStructured {
-            submission: structured_submission(
-                "new",
-                "new-item",
-                1,
-                "must not start",
-                SubmissionSource::User,
-            ),
-        })
-        .await
-        .expect("queued before recovery");
     let task = tokio::spawn(async move { actor.run().await });
-    let (receipt_tx, mut receipt_rx) = tokio::sync::mpsc::unbounded_channel();
-    handle
-        .sq_tx
-        .send(SessionOp::SubmitStructuredTracked {
-            submission: structured_submission(
-                "tracked-new",
-                "tracked-new-item",
-                1,
-                "must reject",
-                SubmissionSource::User,
-            ),
-            receipt_tx: Some(receipt_tx),
-        })
-        .await
-        .expect("tracked submit");
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !store.recover_running().expect("running").is_empty() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("recovery");
+    for id in ["original", "injected"] {
+        assert_eq!(
+            store.get(id).expect("lookup").expect("identity").state,
+            talos_core::session::PendingSubmissionState::TerminalError
+        );
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
     handle
         .sq_tx
         .send(SessionOp::Shutdown)
         .await
         .expect("shutdown");
-    tokio::time::timeout(Duration::from_secs(5), task)
-        .await
-        .expect("recovery terminates")
-        .expect("actor joins");
-    let receipt = receipt_rx.try_recv().expect("explicit tracked rejection");
-    assert!(matches!(
-        receipt.disposition,
-        SubmissionReceiptDisposition::Rejected {
-            reason: SubmissionRejectionReason::SessionClosed
-        }
-    ));
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
-    assert!(store.get("new").expect("lookup").is_none());
-    assert_eq!(store.recover_running().expect("frozen identities").len(), 2);
+    task.await.expect("join");
 }
 
 #[tokio::test]
@@ -5977,15 +6038,18 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
             })
             .await
             .expect("restart submit");
+        // The child repeats multiple bounded reads over 8300+ records and
+        // persists a final turn. Its integration budget is distinct from each
+        // product operation deadline and remains inside the parent's 30 seconds.
+        // Native CI reached final provider step 12 but exceeded the old 10-second
+        // fixture budget; record elapsed time rather than claiming a latency fix.
+        let recovery_started = std::time::Instant::now();
         let events = tokio::time::timeout(
-            Duration::from_secs(10),
-            // Recovery may bind multiple disk pages without emitting an event.
-            // Keep the outer ten-second total bound rather than imposing the
-            // ordinary helper's shorter two-second idle bound on native CI.
+            Duration::from_secs(20),
             collect_until_completions_with_idle_timeout(
                 &mut restarted_handle.eq_rx,
                 1,
-                Duration::from_secs(10),
+                Duration::from_secs(20),
             ),
         )
         .await
@@ -5997,6 +6061,10 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                 restarted_task.is_finished(),
             )
         });
+        eprintln!(
+            "checkpoint_restart identity={identity} elapsed_ms={}",
+            recovery_started.elapsed().as_millis()
+        );
         assert!(events.iter().any(|event| matches!(
             completed_status(event),
             Some(TurnCompletionStatus::Success { .. })

@@ -38,20 +38,21 @@ fn product_registries_have_no_uninventoried_native_operations() {
     let temp = tempfile::tempdir().expect("sessions directory");
     let sessions_dir = temp.path().join("sessions");
     let session_id = Uuid::new_v4();
-    let print = build_print_tool_registry_with_todo_contributions(
+    let print = build_print_registry_bound_to_workspace(
         Vec::new(),
         todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id),
+        temp.path().to_owned(),
     );
     let (tx, _rx) = mpsc::unbounded_channel();
     let tui = build_tui_tool_registry_with_todo_contributions(
-        Arc::new(TuiApprovalHandler::new(tx, PathBuf::from("."))),
-        PathBuf::from("."),
+        Arc::new(TuiApprovalHandler::new(tx, temp.path().to_owned())),
+        temp.path().to_owned(),
         Vec::new(),
         todo_tool_contributions_for_sessions_dir(&sessions_dir, session_id),
         None,
         None,
     );
-    let mcp = build_mcp_tool_registry();
+    let mcp = build_mcp_tool_registry_for_workspace(temp.path().to_owned());
     let shared = [
         "exec",
         "read",

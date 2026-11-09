@@ -10,6 +10,7 @@ mod highlight;
 mod history_projection;
 mod inline_terminal;
 mod panel_state;
+mod process_poll;
 mod scrollback;
 mod scrollback_input;
 mod scrollback_markdown;
@@ -22,6 +23,7 @@ mod stream_markdown;
 mod theme;
 mod tool_display;
 mod transcript;
+mod validation_display;
 mod widgets;
 
 pub use app::Tui;

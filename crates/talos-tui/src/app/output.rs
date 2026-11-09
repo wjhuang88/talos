@@ -628,6 +628,19 @@ impl Tui {
 
     pub(super) fn handle_ui_output(&mut self, output: UiOutput) -> bool {
         match output {
+            UiOutput::ClipboardPastePending(active) => {
+                self.clipboard_paste_pending = active;
+                if !active
+                    && self
+                        .state
+                        .pending_approval_response
+                        .as_ref()
+                        .is_some_and(|response| response.is_closed())
+                {
+                    self.state.pending_approval_response = None;
+                    self.state.approval_state = ApprovalState::Hidden;
+                }
+            }
             UiOutput::Content(content) => match content {
                 ContentOutput::Start { source } => {
                     if self.active_stream.is_some() {
@@ -765,6 +778,7 @@ impl Tui {
             }
             UiOutput::SessionIdentity { id } => {
                 if self.session_id.as_ref() != Some(&id) {
+                    self.repeat_key = None;
                     self.tool_activities.clear();
                 }
                 self.session_id = Some(id);

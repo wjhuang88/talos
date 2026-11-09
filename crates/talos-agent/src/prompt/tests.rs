@@ -639,11 +639,50 @@ fn test_identity_prompt_still_covers_task_interruption() {
 }
 
 #[test]
-fn test_identity_prompt_prefers_builtin_git_tools_over_bash_git() {
-    assert!(DEFAULT_IDENTITY.contains("git_status"));
-    assert!(DEFAULT_IDENTITY.contains("git_diff"));
-    assert!(DEFAULT_IDENTITY.contains("Host shell Git is an explicit fallback"));
-    assert!(!DEFAULT_IDENTITY.contains("builds, tests, git, package managers"));
+fn routing_guidance_survives_identity_protocol_and_catalog_changes() {
+    use super::assets::TOOL_SELECTION;
+    for custom in [false, true] {
+        for textual in [false, true] {
+            for available in [false, true] {
+                let mut builder = SystemPromptBuilder::new();
+                if custom {
+                    builder = builder.with_custom_prompt("Custom identity.".into());
+                }
+                if textual {
+                    builder = builder.with_strict_tool_format();
+                }
+                if available {
+                    builder = builder.with_tools(vec![ToolDescription {
+                        name: "read".into(),
+                        description: "Read a file".into(),
+                        ..Default::default()
+                    }]);
+                }
+                let prompt = builder.build();
+                assert_eq!(prompt.matches(TOOL_SELECTION).count(), 1);
+                assert_eq!(
+                    builder
+                        .build_stable_prefix()
+                        .matches(TOOL_SELECTION)
+                        .count(),
+                    1
+                );
+                let (cached, markers) = builder.build_with_cache_markers();
+                let rules_begin = cached
+                    .find(TOOL_SELECTION)
+                    .expect("rules in assembled prompt");
+                assert!(markers.iter().any(|m| m.offset <= rules_begin
+                    && m.offset + m.length >= rules_begin + TOOL_SELECTION.len()));
+                assert_eq!(prompt.contains("## read\n"), available);
+                if !available {
+                    assert!(prompt.contains("No tools available."));
+                }
+                if custom {
+                    assert!(!prompt.contains("You are Talos"));
+                }
+            }
+        }
+    }
 }
 
 // --- Memory section tests ---

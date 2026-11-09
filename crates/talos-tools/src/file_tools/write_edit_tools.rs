@@ -1,4 +1,4 @@
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
@@ -86,34 +86,48 @@ impl WriteTool {
             return Err(FileToolError::FileExists(write_input.path));
         }
 
-        if let Some(capability) = &self.atomic_create {
-            let requested = Path::new(&write_input.path);
-            if requested.is_absolute()
-                || requested
-                    .components()
-                    .any(|component| matches!(component, Component::ParentDir))
-            {
-                return Err(FileToolError::PathEscape(write_input.path));
-            }
-            // The capability is deliberately limited to direct children. Nested
-            // human-approved writes retain the legacy create_dir_all path until
-            // a nested-parent capability contract is separately reviewed.
-            if requested.components().count() != 1 {
-                // Fall through to the compatibility path below.
+        let workspace_guard = super::workspace_guard(&path, authorizations);
+        if workspace_guard.is_some() || self.atomic_create.is_some() {
+            let root = self.workspace_root.canonicalize()?;
+            if let Some(guard) = workspace_guard {
+                let relative = path
+                    .strip_prefix(guard.root())
+                    .map_err(|_| FileToolError::PathIdentityChanged)?;
+                guard.create_file(relative, write_input.content.as_bytes())?;
+            } else if path.parent() == Some(root.as_path()) {
+                let name = path
+                    .file_name()
+                    .ok_or_else(|| FileToolError::InvalidInput("file name is missing".into()))?;
+                self.atomic_create
+                    .as_ref()
+                    .ok_or(FileToolError::PathIdentityChanged)?
+                    .create_new(Path::new(name), write_input.content.as_bytes())?;
             } else {
-                capability
-                    .create_new(requested, write_input.content.as_bytes())
-                    .map_err(FileToolError::Io)?;
-                if let Some(registry) = &self.snapshots {
-                    registry.invalidate_path(&path)?;
+                let (parent, relative) = super::atomic_create::authorized_parent(&path)?;
+                // Recheck the exact authorization after opening the parent. A
+                // changed symlink must not redirect the reviewed target.
+                if resolve_authorized_path(
+                    &self.workspace_root,
+                    &write_input.path,
+                    "write",
+                    ToolNature::Write,
+                    authorizations,
+                )? != path
+                {
+                    return Err(FileToolError::PathIdentityChanged);
                 }
-                return Ok(format!(
-                    "wrote {} bytes to {}\npreview:\n{}",
-                    write_input.content.len(),
-                    write_input.path,
-                    bounded_preview(&write_input.content)
-                ));
+                parent.create_new_with_parents(&relative, write_input.content.as_bytes())?;
             }
+            if let Some(registry) = &self.snapshots {
+                registry.invalidate_path(&path)?;
+            }
+            talos_core::tool::record_file_mutation();
+            return Ok(format!(
+                "wrote {} bytes to {}\npreview:\n{}",
+                write_input.content.len(),
+                write_input.path,
+                bounded_preview(&write_input.content)
+            ));
         }
 
         if let Some(parent) = path.parent() {
@@ -157,6 +171,7 @@ impl WriteTool {
             })?;
         }
 
+        talos_core::tool::record_file_mutation();
         Ok(format!(
             "wrote {} bytes to {}\npreview:\n{}",
             write_input.content.len(),
@@ -302,7 +317,12 @@ impl EditTool {
                 .as_ref()
                 .map(|registry| registry.path_lock(&path))
                 .transpose()?;
-            self.recovery.restore(&path, id, path_lock.as_deref())?;
+            self.recovery.restore_guarded(
+                &path,
+                id,
+                path_lock.as_deref(),
+                super::workspace_guard(&path, authorizations),
+            )?;
             if let Some(registry) = &self.snapshots {
                 registry.invalidate_path(&path).map_err(|error| {
                     FileToolError::AtomicWriteFailed(format!(
@@ -352,7 +372,18 @@ impl EditTool {
             return Err(FileToolError::FileNotFound(edit_input.path));
         }
 
-        let content = if retain_backup {
+        let content = if let Some(bytes) = super::workspace_read(
+            &path,
+            authorizations,
+            if retain_backup {
+                2 * 1024 * 1024
+            } else {
+                u64::MAX
+            },
+        )? {
+            String::from_utf8(bytes)
+                .map_err(|_| FileToolError::BinaryFile(edit_input.path.clone()))?
+        } else if retain_backup {
             String::from_utf8(super::recovery::read_bounded_regular_file(&path)?.0)
                 .map_err(|_| FileToolError::BinaryFile(edit_input.path.clone()))?
         } else {
@@ -377,14 +408,22 @@ impl EditTool {
             .map(|registry| registry.path_lock(&path))
             .transpose()?;
         let recovery = if retain_backup {
-            recovery_receipt(self.recovery.replace(
+            recovery_receipt(self.recovery.replace_guarded(
                 &path,
                 content.as_bytes(),
                 new_content.as_bytes(),
                 path_lock.as_deref(),
+                super::workspace_guard(&path, authorizations),
             )?)
         } else {
-            tokio::fs::write(&path, &new_content).await?;
+            if let Some(root) = super::workspace_guard(&path, authorizations) {
+                let relative = path
+                    .strip_prefix(root.root())
+                    .map_err(|_| FileToolError::PathIdentityChanged)?;
+                root.replace_file(relative, content.as_bytes(), new_content.as_bytes())?;
+            } else {
+                tokio::fs::write(&path, &new_content).await?;
+            }
             String::new()
         };
         if let Some(registry) = &self.snapshots {
@@ -395,6 +434,9 @@ impl EditTool {
             })?;
         }
 
+        if content != new_content {
+            talos_core::tool::record_file_mutation();
+        }
         Ok(format!(
             "edited {}{recovery}\ndiff:\n{}",
             edit_input.path,
@@ -437,7 +479,17 @@ impl EditTool {
             return Err(FileToolError::FileNotFound(anchored.path));
         }
         let snapshot = registry.get(&anchored.snapshot_id, &path)?;
-        let current = if retain_backup {
+        let current = if let Some(bytes) = super::workspace_read(
+            &path,
+            authorizations,
+            if retain_backup {
+                2 * 1024 * 1024
+            } else {
+                u64::MAX
+            },
+        )? {
+            bytes
+        } else if retain_backup {
             super::recovery::read_bounded_regular_file(&path)?.0
         } else {
             tokio::fs::read(&path).await?
@@ -450,12 +502,25 @@ impl EditTool {
         )?;
         let path_lock = registry.path_lock(&path)?;
         let recovery = if retain_backup {
-            recovery_receipt(
-                self.recovery
-                    .replace(&path, &current, &updated, Some(&path_lock))?,
-            )
+            recovery_receipt(self.recovery.replace_guarded(
+                &path,
+                &current,
+                &updated,
+                Some(&path_lock),
+                super::workspace_guard(&path, authorizations),
+            )?)
         } else {
-            atomic_replace(&path, &updated, snapshot.file_revision, &path_lock)?;
+            if let Some(root) = super::workspace_guard(&path, authorizations) {
+                let _lock = path_lock
+                    .lock()
+                    .map_err(|_| FileToolError::SnapshotRegistryUnavailable)?;
+                let relative = path
+                    .strip_prefix(root.root())
+                    .map_err(|_| FileToolError::PathIdentityChanged)?;
+                root.replace_file(relative, &current, &updated)?;
+            } else {
+                atomic_replace(&path, &updated, snapshot.file_revision, &path_lock)?;
+            }
             String::new()
         };
         registry.invalidate_path(&path).map_err(|error| {
@@ -463,6 +528,9 @@ impl EditTool {
                 "file edited{recovery}; snapshot invalidation failed: {error}"
             ))
         })?;
+        if current != updated {
+            talos_core::tool::record_file_mutation();
+        }
         Ok(format!("edited {}{recovery}\ndiff:\n{diff}", anchored.path))
     }
 }

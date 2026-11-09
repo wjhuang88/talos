@@ -5,7 +5,6 @@ use crate::topology::{workspace_dir_name, workspace_root_from_dir_name};
 use crate::{
     DurableSession, OrphanSidecarReconciliationPolicy, OrphanSidecarReconciliationReport, Session,
     SessionArtifactCleanupReport, SessionError, SessionInfo,
-    remove_session_sidecars_for_transcript, remove_session_transcript,
 };
 use chrono::{DateTime, Duration, Utc};
 use std::fs;
@@ -664,24 +663,24 @@ impl SessionManager {
         id: &Uuid,
         transcript_path: &Path,
     ) -> Result<SessionArtifactCleanupReport, SessionError> {
-        let mut report = remove_session_sidecars_for_transcript(transcript_path)?;
-        crate::durable::remove_binding_for_session(&self.sessions_dir, id)?;
-        let mut guard = self
-            .get_or_create_index()
-            .map_err(|error| SessionError::IndexCleanup {
-                session_id: *id,
-                message: error.to_string(),
-            })?;
-        if let Some(index) = guard.as_mut() {
-            index
-                .delete_session(&id.to_string())
-                .map_err(|error| SessionError::IndexCleanup {
-                    session_id: *id,
-                    message: error.to_string(),
+        crate::artifacts::cleanup_session_with_index(transcript_path, || {
+            crate::durable::remove_binding_for_session(&self.sessions_dir, id)?;
+            let mut guard =
+                self.get_or_create_index()
+                    .map_err(|error| SessionError::IndexCleanup {
+                        session_id: *id,
+                        message: error.to_string(),
+                    })?;
+            if let Some(index) = guard.as_mut() {
+                index.delete_session(&id.to_string()).map_err(|error| {
+                    SessionError::IndexCleanup {
+                        session_id: *id,
+                        message: error.to_string(),
+                    }
                 })?;
-        }
-        report.merge(remove_session_transcript(transcript_path)?);
-        Ok(report)
+            }
+            Ok(())
+        })
     }
 
     /// Discover and remove safe transcript-less pending SQLite artifacts.

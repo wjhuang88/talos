@@ -71,6 +71,16 @@ explicit opt-in only; Auto remains zero-key and `rust-websearch` is retained.
 The wider parent #624 remains open, SEARCH-001-E/F/G remain blocked after the
 D ZERO-ADMISSION outcome, and SEARCH-001-I remains separately gated.
 
+## SEARCH-001-K Completion Checkpoint — 2026-11-07
+
+[I317 / SEARCH-001-K](SEARCH-001-K-compat-fallback-ownership.md) / #850 delivered
+private Talos-owned compatibility helpers in #860, existing Completion Commit
+`e32ea0a6220889e8346676d368110310171e2cce`. [CI3862](https://github.com/wjhuang88/talos/actions/runs/42340480867) passed 8/8; [independent API/network/security review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750) found no blockers.
+The protected zero-key compatibility fallback is still **one existing provider family**,
+not two independently admitted native providers. The dormant `rust-websearch` package,
+legacy tool and test oracle remain; D/#644 is still ZERO-ADMISSION, E/F/G blocked,
+I unactivated. Parent #624 remains Open and all other parent completion gates unchanged.
+
 ## Child Dependency Map
 
 The table is a proposal for child **outcomes**, not blanket implementation authorization. Completed
@@ -87,9 +97,10 @@ accepted claims before executable work.
 | SEARCH-001-F | Second meaningfully independent native zero-key provider | C + D admission + E interface | **Blocked** — D admission did not occur; no implementation authorization |
 | SEARCH-001-G | Global auto-routing, change recovery, smoke/soak validation | E / F | Blocked on E/F |
 | SEARCH-001-H | Opt-in premium and self-hosted overrides, secret and fallback policy | C | [#832](https://github.com/wjhuang88/talos/issues/832) / [owner](SEARCH-001-H-explicit-search-overrides.md), **Complete / Closed** at I314; existing Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e` (#842), CI3800 8/8, independent review |
+| SEARCH-001-K | Own protected zero-key compatibility helpers; preserve legacy rollback | C / H | [#850](https://github.com/wjhuang88/talos/issues/850) / [owner](SEARCH-001-K-compat-fallback-ownership.md), **Complete / Closed** in I317 on governance publication; existing Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (#860), CI3862 8/8, independent review |
 | SEARCH-001-I | Evidence-based `rust-websearch` de-risk/retirement gate | G / H | Proposed only; H complete but G blocked on E/F, so I is not activated and `rust-websearch` remains |
 
-Each child needs its own selection, claim, tests, review and rollback. SEARCH-001-H was separately authorized via #841 and merged in #842; this does **not** authorize E/F/G/I, which retain their own unfulfilled gates.
+Each child needs its own selection, claim, tests, review and rollback. SEARCH-001-K was separately authorized in #851 and implemented in #860; SEARCH-001-H was separately authorized via #841 and merged in #842; this does **not** authorize E/F/G/I, which retain their own unfulfilled gates.
 
 ## Historical Coordination Checkpoint — 2026-11-01
 
@@ -121,6 +132,7 @@ real target-network observations; CI cannot stand in for missing geographic evid
 - Completed router child: [SEARCH-001-C](SEARCH-001-C-search-router.md) / #643.
 - Completed blocked provider-evidence child: [SEARCH-001-D](SEARCH-001-D-provider-evidence-gate.md) / #644.
 - Completed explicit opt-in child: [SEARCH-001-H](SEARCH-001-H-explicit-search-overrides.md) / #832, Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e`.
+- Completed protected compatibility-helper child: [SEARCH-001-K](SEARCH-001-K-compat-fallback-ownership.md) / #850, existing Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (#860); no native provider admission, Cargo removal or parent closure.
 - Compact inventory: `docs/backlog/PRODUCT-BACKLOG.md`; selected work only on `docs/BOARD.md`.
 
 ## Required Reads

@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use talos_core::message::Message;
 
-use crate::history_page::{HistoryEncoding, HistoryPageError, open_source, read_message_page};
+use crate::history_page::{HistoryPageError, MessagePageBuffer, open_source};
 use crate::jsonl::HistoryMessageDecoder;
 use crate::recovery_stamp::FileStamp;
 
@@ -16,7 +16,7 @@ use crate::recovery_stamp::FileStamp;
 /// provenance receipt and cannot authorize history search or model disclosure.
 pub struct SessionMessageScan {
     path: PathBuf,
-    encoding: HistoryEncoding,
+    buffer: MessagePageBuffer,
     stamp: Option<FileStamp>,
     end: u64,
     offset: u64,
@@ -34,8 +34,9 @@ impl crate::Session {
     /// Custom stores must opt into a built-in encoding; otherwise this returns
     /// unavailable, never a whole-file fallback. Missing new-session files are
     /// empty. Malformed records are content-free errors, except legacy JSONL's
-    /// skipped invalid lines and an incomplete final TLOG record. Oversized
-    /// individual records are refused. No history is published before finish.
+    /// skipped invalid lines and an incomplete final TLOG record. Large records
+    /// are accumulated across bounded reads. Memory remains proportional to the
+    /// restored messages, not the I/O page size. Nothing is published before finish.
     pub fn begin_message_scan(&self) -> Result<SessionMessageScan, HistoryPageError> {
         let encoding = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             self.store.history_encoding()
@@ -59,7 +60,7 @@ impl crate::Session {
         };
         Ok(SessionMessageScan {
             path: self.file_path.clone(),
-            encoding,
+            buffer: MessagePageBuffer::new(encoding, end),
             stamp,
             end,
             offset: 0,
@@ -149,15 +150,9 @@ impl SessionMessageScan {
             return Ok(true);
         }
         let mut counter = self.synthetic_counter;
-        let page = read_message_page(
-            &self.path,
-            self.encoding,
-            self.offset,
-            self.end,
-            deadline,
-            &stopped,
-            &mut counter,
-        )?;
+        let page = self
+            .buffer
+            .read(&self.path, self.offset, deadline, &stopped, &mut counter)?;
         let last_entry = page.entries.last().cloned();
         let mut decoder = self.decoder.clone();
         let mut messages = Vec::new();
@@ -175,6 +170,8 @@ impl SessionMessageScan {
         }
         self.decoder = decoder;
         self.synthetic_counter = counter;
+        self.buffer
+            .commit((page.next_offset - self.offset) as usize);
         self.offset = page.next_offset;
         self.complete = page.complete;
         Ok(self.complete)
@@ -226,6 +223,7 @@ impl SessionMessageScan {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::history_page::{HISTORY_PAGE_BYTES, HistoryEncoding};
     use crate::{Session, SessionMetadata, SessionStore};
     use std::sync::Arc;
     use std::time::Duration;
@@ -602,7 +600,7 @@ mod tests {
     }
 
     #[test]
-    fn incomplete_tlog_tail_is_not_a_message_and_oversized_record_is_not_silently_lost() {
+    fn incomplete_tlog_tail_never_allocates_from_its_declared_length() {
         let root = tempfile::tempdir().expect("root");
         let owner = session(root.path().join("history.tlog"));
         std::fs::write(
@@ -618,8 +616,160 @@ mod tests {
             &owner.file_path,
             b"TALOS\t1\t1000\nE\t0\t1000\tid\t-\t2097153:x",
         )
-        .expect("oversized");
-        assert!(finish_error(owner.begin_message_scan().expect("scan")));
+        .expect("incomplete large record");
+        assert!(finish(owner.begin_message_scan().expect("scan")).is_empty());
+    }
+
+    #[test]
+    fn large_writer_records_restore_across_pages_without_expanding_model_authority() {
+        for extension in ["tlog", "jsonl"] {
+            let root = tempfile::tempdir().expect("root");
+            let owner = session(root.path().join(format!("history.{extension}")));
+            let content = "large 界\n\t".repeat(HISTORY_PAGE_BYTES / 4);
+            let entries: Vec<_> = ["before", content.as_str(), "after"]
+                .into_iter()
+                .enumerate()
+                .map(|(i, content)| crate::SessionEntry {
+                    id: i.to_string(),
+                    parent_id: None,
+                    timestamp: chrono::Utc::now(),
+                    role: "user".into(),
+                    content: content.into(),
+                    metadata: Default::default(),
+                })
+                .collect();
+            owner
+                .store
+                .replace_entries_atomically(&owner.file_path, &entries)
+                .expect("writer");
+            let original = std::fs::read(&owner.file_path).expect("bytes");
+            let expected = owner.read_messages().expect("legacy reader");
+            let mut scan = owner.begin_message_scan().expect("scan");
+            let mut steps = 0;
+            loop {
+                let before = scan.offset + scan.buffer.bytes_len() as u64;
+                let complete = scan
+                    .step(Instant::now() + Duration::from_secs(5), || false)
+                    .expect("step");
+                let after = scan.offset + scan.buffer.bytes_len() as u64;
+                assert!(after - before <= HISTORY_PAGE_BYTES as u64);
+                steps += 1;
+                if complete {
+                    break;
+                }
+                // Retrying a cancelled step cannot duplicate or lose a record.
+                let position = scan.offset;
+                assert!(matches!(
+                    scan.step(Instant::now() + Duration::from_secs(5), || true),
+                    Err(HistoryPageError::Stopped)
+                ));
+                assert_eq!(scan.offset, position);
+            }
+            assert!(steps >= 3);
+            assert_eq!(scan.finish().expect("complete"), expected);
+            assert_eq!(
+                std::fs::read(&owner.file_path).expect("unchanged"),
+                original
+            );
+            // The stricter model index still refuses the same large record.
+            let mut offset = 0;
+            loop {
+                match crate::history_page::read_history_page(
+                    &owner.file_path,
+                    owner.store.history_encoding().expect("encoding"),
+                    offset,
+                    original.len() as u64,
+                    Instant::now() + Duration::from_secs(5),
+                    || false,
+                ) {
+                    Err(HistoryPageError::RecordTooLarge) => break,
+                    Ok(page) if !page.complete => offset = page.next_offset,
+                    other => panic!("large record must not acquire model authority: {other:?}"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn cancellation_during_large_record_accumulation_retries_exactly() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = session(root.path().join("history.tlog"));
+        let entry = crate::SessionEntry {
+            id: "large".into(),
+            parent_id: None,
+            timestamp: chrono::Utc::now(),
+            role: "user".into(),
+            content: "x".repeat(3 * HISTORY_PAGE_BYTES),
+            metadata: Default::default(),
+        };
+        owner
+            .store
+            .append_entry(&owner.file_path, &entry)
+            .expect("writer");
+        let mut scan = owner.begin_message_scan().expect("scan");
+        for _ in 0..2 {
+            assert!(
+                !scan
+                    .step(Instant::now() + Duration::from_secs(5), || false)
+                    .expect("partial")
+            );
+        }
+        assert!(scan.buffer.bytes_len() > HISTORY_PAGE_BYTES);
+        let before = (scan.offset, scan.buffer.bytes_len());
+        let checks = std::cell::Cell::new(0);
+        let stopped = || {
+            checks.set(checks.get() + 1);
+            checks.get() == 8
+        };
+        assert!(matches!(
+            scan.step(Instant::now() + Duration::from_secs(5), stopped),
+            Err(HistoryPageError::Stopped)
+        ));
+        assert_eq!((scan.offset, scan.buffer.bytes_len()), before);
+        assert_eq!(finish(scan), owner.read_messages().expect("legacy parity"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn large_record_partial_read_cannot_publish_a_changed_source() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = session(root.path().join("history.tlog"));
+        let entry = crate::SessionEntry {
+            id: "large".into(),
+            parent_id: None,
+            timestamp: chrono::Utc::now(),
+            role: "user".into(),
+            content: "x".repeat(3 * HISTORY_PAGE_BYTES),
+            metadata: Default::default(),
+        };
+        owner
+            .store
+            .append_entry(&owner.file_path, &entry)
+            .expect("writer");
+        let mut scan = owner.begin_message_scan().expect("scan");
+        assert!(
+            !scan
+                .step(Instant::now() + Duration::from_secs(5), || false)
+                .expect("partial")
+        );
+        assert!(matches!(
+            scan.finish_with_tail(),
+            Err(HistoryPageError::Stopped)
+        ));
+        let mut scan = owner.begin_message_scan().expect("scan");
+        assert!(
+            !scan
+                .step(Instant::now() + Duration::from_secs(5), || false)
+                .expect("partial")
+        );
+        owner
+            .store
+            .append_entry(&owner.file_path, &entry)
+            .expect("concurrent append");
+        assert!(matches!(
+            scan.step(Instant::now() + Duration::from_secs(5), || false),
+            Err(HistoryPageError::Stale)
+        ));
     }
 
     #[cfg(unix)]

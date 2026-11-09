@@ -1,3 +1,84 @@
+# Talos Board
+
+## Interrupted session recovery / SESSION-CRASH-001
+
+- Complete / Closed: [owner](tasks/2026-11-08-crash-resume.md), #884 (`c7a4b28e`). User confirmed original cargo-run session continues; full preflight, MSVC tests, independent safety/API review and native CI passed.
+
+## Validation result presentation / VALIDATION-DISPLAY-001
+
+- Complete / Closed: [owner](tasks/2026-11-08-validation-result-display.md), #883 (`bbea3dcf`). Readable plan/run and real history replay passed full preflight, MSVC checks, independent review and native CI; excludes clipping/theme and execution behavior.
+
+## Protection stops / AGENT-PAUSE-001
+
+[Owner](tasks/2026-11-08-silent-protection-pause.md) is Complete / Closed through
+#881 (`7a439172`); local preflight, MSVC tests, independent review and native CI passed.
+
+## Tool result clipping / TUI-ELLIPSIS-001
+
+[Owner](tasks/2026-11-08-tui-result-ellipsis.md) is Complete / Closed through #886
+(`b7706d64`). Local preflight, cargo-xwin, independent review and Linux/Windows CI
+passed; user confirmed the deferred real-terminal visual acceptance on 2026-11-08.
+
+## Tool routing / TOOL-ROUTE-001
+
+[Owner](tasks/2026-11-08-tool-routing-guidance.md) is Complete / Closed through #877 (`25c7769b`).
+Dedicated-tool routing and foreground defaults passed preflight/xwin, independent review and exact-head CI.
+Owner retains the unrelated first-attempt macOS storage-test diagnostic observation.
+
+## Background process polling / TUI-POLL-001
+
+[Owner](tasks/2026-11-08-process-poll-grouping.md) is Complete / Closed.
+Same-job summaries and expansion shipped in #875 (`ae66e309`); preflight/xwin, independent review and native CI passed.
+
+## I318 / TUI-054 native key repeat — Review
+
+[I318](iterations/I318-native-key-repeat.md) / #269 has implementation PR #872 for editing/navigation repeat routing with
+one-shot approval/submission and focus isolation locally validated. Claim #869 is merged; physical
+Ghostty/second-terminal hold and IME acceptance is explicitly deferred and remains required. #38 is closed independently by supersession.
+
+## Issue #38 persistent-task proposal — 2026-11-07
+
+[TASK-001](backlog/active/TASK-001-persistent-task-runtime-spike.md) is Cancelled / Superseded.
+Reuse shared Goal/Work/Mission and Session foundations instead of a parallel engine. Phase checkpoint
+recovery, durable lifecycle/scheduling and concurrent task recovery remain explicitly deferred in
+the owner; no persistent engine implementation or automatic execution is claimed.
+
+## Issue #22 workspace-trust reconciliation — 2026-11-07
+
+[PERM-004](backlog/active/PERM-004-workspace-trust-sandbox.md) is Cancelled / Superseded.
+Bounded trust, exact external-path grants and I308 Auto admission replace the old umbrella.
+Unimplemented discovery/DSL/universal confinement options remain explicitly deferred in the owner;
+PERM-006-D/E retain their separate scope. No runtime or permission-policy change.
+
+## Delivery quality repairs / QUALITY-001
+
+[Repair owner](tasks/2026-11-06-quality001-delivery-repair.md) is Complete / Closed.
+Completion Commit `95546b1f91e06ba969554fd602faf0d01c60f25a` (#865); local preflight,
+cargo-xwin MSVC tests, independent Agent review and CI42227450980 passed,
+including native Windows/macOS and Desktop gates.
+
+## SEARCH-001-K / I317 complete — 2026-11-07
+
+[SEARCH-001-K](backlog/active/SEARCH-001-K-compat-fallback-ownership.md) /
+[I317](iterations/I317-search-compat-fallback-ownership.md) / #850 is
+**Complete / Closed** on governance closeout merge. Existing K1 implementation
+Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (#860),
+[CI3862](https://github.com/wjhuang88/talos/actions/runs/42340480867) 8/8, [independent security/API review](https://github.com/wjhuang88/talos/pull/860#issuecomment-6702564750)
+no blockers, latest-main CAS. Original legacy rollback/Cargo dependency remains.
+QUALITY-001, #768 and PERM-004/#22 remain separately governed;
+D/#644 ZERO-ADMISSION, D2/#848 research only, E/F/G/I gated, #624 Open.
+
+## Issue #768 fixture repair
+
+[Independent task](tasks/2026-11-06-issue768-search-refusal-fixtures.md) is Complete / Closed. Implementation #862 merged as `317934290` after exact-head native CI and independent review. Historical cause and external-binder limits remain in the owner; production policy unchanged.
+
+## Completed session handoff
+
+I309 → I308/T8 → MODEL-014 → T4 → T5 → T1 → T6, including C0/T7 carryover,
+are complete in their owners. See [implementation, validation and audit evidence](tasks/2026-10-10-session-todo-final-audit.md).
+Final status publication merged in PR #857 (`748557edc`); platform and API limits
+remain in the linked audit and owners.
+
 ## SEARCH-001-H explicit override completed — 2026-11-04
 
 [SEARCH-001-H](backlog/active/SEARCH-001-H-explicit-search-overrides.md) / #832
@@ -8,96 +89,6 @@ reported no blocking findings; merge CAS passed. SEARCH-001 parent #624 stays
 open, D still admitted zero native providers, E/F/G/I remain separately gated;
 I310 and other claim owners are not modified. Earlier snapshots remain historical.
 
-## T1 atomic claim proposal — 2026-11-03
-
-I315 / VALIDATION-003 / #844 proposes model-callable validation and read-only agile
-summary after merged I313/T5. Claim/activation are ineffective until finalized
-claim PR #845 merge. Supported CLI/Runtime and Unix/Windows execution, applicability,
-permissions, cancellation and output bounds are binding acceptance. T6 remains
-later and unimplemented; full handoff Active. I310/I314 retain independent owners.
-
-## T5 completed — 2026-11-03
-
-I313 and MEM-005 are Complete with Completion Commit:
-`322574bc9707492ea6e9d5232794f73e687071d9` (#837). All eight exact-head checks in `41608342151`,
-independent full T5 API/privacy/storage/security review and merge CAS passed.
-Owners preserve fixture/platform/privacy limits. Earlier pending snapshots are
-historical. T1 and T6 remain unimplemented and unactivated.
-Full queue: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
-Full handoff remains Active; next is T1's own governed activation.
-
-## T5 stable-stage review — 2026-11-02
-
-I313 is Review/Partial with effective claim #819. Unix Actor/Runtime checkpoint,
-recovery and fork implementation remains unmerged; standard host preflight passed
-including both SDK modes. Native Windows evidence, long-session live compaction
-binding and remaining acceptance are open. First four queue stages are merged;
-T1/T6 remain unimplemented. See I313 owner for evidence and limitations; historical
-activation-proposal snapshots below do not override current owner truth.
-
-## T4 merged; T5 activation proposal — 2026-11-01
-
-I312 is Complete/Closed with Completion Commit:
-`65500a86931cfbadf8bef5e97e45321c20b62e7a` (#818). All eight exact-head CI jobs
-`41271309341`, independent static API/privacy/security review, both governance
-validators and CAS passed. MEM-003's ADR-096 replacement and MEM-005's eleven T4
-rows are accepted; MEM-005/#390 remains In Progress for T5.
-I313 proposes the full T5 delivery and all thirty Issue #390 regression rows;
-claim/Active state proposed in #819 are ineffective until its finalized head merges.
-Full queue remains I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
-The first four stages are merged; T5/T1/T6 remain unimplemented. Earlier snapshots
-below are historical and do not override current owner evidence.
-
-## MODEL-014 complete; T4 implementation — 2026-10-30
-
-[I311](iterations/I311-model014-capability-inference.md) and MODEL-014 are Complete/Closed. Completion Commit:
-`0469f8041ed0d24bb2dffb465e9ff7fa3609a034`, `b04421fb964737911551c7e0704d6c81e80aa406`.
-#816 merged as `ca4a79961366eba7bc722b90bd449404cc7b07d5` after all-eight-success
-CI, independent review and CAS. I312 is Active/Claimed after #817 merged at `02fee3cc9537e6bf688d167036389b4af3011aeb`; local implementation is partial.
-Full handoff remains Active: T4 → T5 → T1 → T6. Earlier snapshots below are historical.
-
-## MODEL-014 implementation review — 2026-10-30
-
-[I311](iterations/I311-model014-capability-inference.md) is Review after PR #815 merged as `0469f8041ed0d24bb2dffb465e9ff7fa3609a034`; acceptance closeout remains pending.
-Local standard preflight and static independent security/API review passed;
-all eight exact-head CI checks passed in `41022658026`; independent static review and merge CAS passed. I310/ADR-094 remain independently
-owned by #811. Earlier activation/intake snapshots below are historical.
-Full handoff stays Active: MODEL-014 → T4 → T5 → T1 → T6.
-
-## I308/T8 completed — 2026-10-30
-
-I308 and PERM-007-H/G owners are Complete with Completion Commit `5dea4925a143151071ea231779c100a75734e6fe`
-(#809), all-eight-success exact-head CI `41007199388` and independent protected
-closure review. Owner boundaries and historical failures remain recorded.
-Historical snapshot (superseded by the current Review entry above): MODEL-014 was restored Refinement / Unclaimed; next was its atomic claim/activation.
-Full handoff remains Active: I309 → T8/I308 → T2+T3 MODEL-014 → T4 → T5 → T1 → T6.
-Earlier Active/Partial rows below are historical, superseded by owner evidence.
-
-## I308 merged implementation — 2026-10-30
-
-I308/T8 remains Active / Partial pending owner/Story closeout review.
-#809 merged as `5dea4925a`; exact-head CI `41007199388` passed all eight checks.
-The I308 owner records independent static approval, full remote preflight success
-and the retained local ENOSPC/resumed SDK component verification history.
-No completion is claimed; the full handoff queue remains unchanged.
-
-## Completed gix upgrade — 2026-10-28
-
-[I309](iterations/I309-gix-090-upgrade.md) is Complete / Closed. Implementation #790 merged as
-`8b8c43e684bfd7c6bf326ea9cffd192b2cc480db`; post-merge dependency baseline #795
-merged as `958a391316c82181853d1df176687361b14ff82b` after exact-head CI and
-independent static review. Owner evidence preserves advisory and review limits.
-I308/T8 and all later handoff tasks remain incomplete.
-
-## Active T8 implementation — 2026-10-28
-
-[I308](iterations/I308-builtin-auto-review.md) is Active after #765 merged at `8f0ce2340`.
-Stages through #801 and #807 are merged; ordinary command/network Auto and
-Git operation evidence are implemented. Full H/G recovery/profile acceptance
-and final delivery gates remain open. See I308 for exact merged evidence.
-T7 is Complete; later handoff tasks remain incomplete.
-
-# Talos Board
 
 [I307](iterations/I307-bubblewrap-workspace-visibility.md) / #757 is Complete
 at #762 (`f643d8775`) with native isolation evidence. I300/T7 is also Complete / Closed
@@ -131,9 +122,10 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 
 | Item | State | Owner Doc | Gate |
 |---|---|---|---|
+| Protected zero-key compatibility helpers / SEARCH-001-K | Complete / Closed | [SEARCH-001-K](backlog/active/SEARCH-001-K-compat-fallback-ownership.md) / [I317](iterations/I317-search-compat-fallback-ownership.md) / #850 | Existing Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (#860); CI3862 8/8, independent security review no blockers and CAS passed; #624 remains Open, legacy dependency retained. |
 | Explicit search provider overrides / SEARCH-001-H | Complete / Closed | [SEARCH-001-H](backlog/active/SEARCH-001-H-explicit-search-overrides.md) / [I314](iterations/I314-search-explicit-overrides.md) / #832 | Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e` (#842); CI3800 8/8, independent security review no blockers, CAS passed. Parent #624 and E/F/G/I remain separate. |
 | Whole-request compaction / T4 | Complete / Closed | [I312](iterations/I312-whole-request-compaction.md) | #818 merged `65500a869`; eight CI jobs, independent review and CAS passed. |
-| Actor checkpoint/history / T5 | Review / Partial / Claimed | [I313](iterations/I313-model-checkpoint-history.md) | Effective #819 claim; stable stage local preflight passed, implementation unmerged and acceptance incomplete. |
+| Actor checkpoint/history / T5 | Complete / Closed | [I313](iterations/I313-model-checkpoint-history.md) | Completion Commit `322574bc9707492ea6e9d5232794f73e687071d9` (#837); CI41608342151 and independent API/privacy/storage/security review passed. Later quality repairs are separately owned by QUALITY-001. |
 | Protocol architecture / OpenAI Responses | Complete / Closed | [PROVIDER-008-A](backlog/active/PROVIDER-008-A-openai-responses-protocol.md) / [I306](iterations/I306-provider008a-openai-responses.md) / #748 | Implementation through #803 `dd6c5f8`; all 52 reviewed HTTP pairs active. CI3570 8/8 and technical acceptance review passed. #748 closes after owner closure merge; #724 stays open for unimplemented B/C/D. |
 | Windows known-resource acceptance | Complete / Closed | [TEST-004](backlog/active/TEST-004-windows-known-resource-acceptance.md) / [I305](iterations/I305-windows-known-resource-acceptance.md) / #729 | #716 merged `b5b8241e`; I305/TEST004 cite existing Completion Commit. CI3221 all6jobs and protected review/CAS passed; only known-resource criterion closed, #717 residual open. |
 | Absent-journal pause without initialization | Complete / Closed | [RUNTIME-011](backlog/active/RUNTIME-011-absent-journal-pause.md) / [I304](iterations/I304-absent-journal-pause.md) | #726 implementation `aa1c477f` merged `c869a9af`; CI3203/review/CAS and CI3206 post-repair2220/2220 passed. I304 retains local failures; #705 retains broader timeout residuals. |
@@ -173,7 +165,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 | Four-Month Trust And Productization Plan | Complete (2026-07-12) | [developer long task](tasks/2026-07-12-developer-trust-productization-long-task.md) / [2026-07-12 plan](tasks/2026-07-12-four-month-trust-productization-plan.md) / [security review](reference/I117-PERMISSION-SECURITY-REVIEW-2026-07-12.md) / [REL-002 report](reference/REL-002-READINESS-REPORT-2026-07-12.md) | I116-I119 and LT002 complete. Permission evidence remains diagnostic-only; installer local fixture and socket-capable preflight pass; I085 terminal walkthrough passed. REL-002 remains NO-GO and no release is authorized. |
 | Four-Month Scheduled Follow-Ups | Complete — I124-I127 (2026-07-15) | [execution package](tasks/2026-07-13-scheduled-followups-execution-package.md) / [program plan](tasks/2026-07-13-four-month-scheduled-followups-plan.md) / [I127](iterations/I127-scheduler-reliability-closeout.md) | I127 closes production full-queue handling (`try_send` → bounded tool error) and an independently replayed clean-HOME register/fire/list/cancel/shutdown packet. Full locked validation and governance pass. REL-002 remains NO-GO; no release action. |
 | Embedded Durable Runtime Sessions | Complete — I128 (2026-07-15) | [I128](iterations/I128-embedded-durable-runtime-sessions.md) / [ADR-042](decisions/042-embedded-durable-runtime-session-boundary.md) | Host-selected directory and opaque external ID bind to UUID TLOG state; atomic successful-turn persistence, transcript filtering, runtime rebuild, lifecycle, and locked workspace evidence are complete. |
-| Four-Month Product And Risk Plan | P100-P150 Complete — Program Delivered (2026-07-16) | [program plan](tasks/2026-07-15-four-month-product-risk-plan.md) / [execution package](tasks/2026-07-15-product-risk-execution-package.md) / [I132](iterations/I132-task001-persistent-task-defer.md) / [ADR-043](decisions/043-defer-persistent-task-runtime.md) | I129-I133 Complete. SESSION-006 and Issue #36 were subsequently closed by I135 on 2026-07-17. TASK-001/Issue #38 and A2A-001/Issue #40 remain Deferred under ADR-043/044. |
+| Four-Month Product And Risk Plan | P100-P150 Complete — Program Delivered (2026-07-16) | [program plan](tasks/2026-07-15-four-month-product-risk-plan.md) / [execution package](tasks/2026-07-15-product-risk-execution-package.md) / [I132](iterations/I132-task001-persistent-task-defer.md) / [ADR-043](decisions/043-defer-persistent-task-runtime.md) | I129-I133 Complete. SESSION-006 and Issue #36 were subsequently closed by I135 on 2026-07-17. TASK-001/#38 is now superseded with deferred differences retained in its owner; A2A-001/#40 remains Deferred under ADR-044. |
 | I134 Snapshot-Anchored File Edits | Complete (2026-07-16) | [I134](iterations/I134-model-private-snapshot-anchored-file-edits.md) / [TOOL-022](backlog/active/TOOL-022-model-private-snapshot-anchored-edits.md) / [ADR-045](decisions/045-transient-model-private-tool-projection.md) | Two-hex model anchors, full-revision atomic edit, current permission enforcement, sanitized UI/Hook/TLOG projections, legacy compatibility, real allowed/denied Runtime flows, and the full locked validation ladder pass. |
 | Four-Month Reliability, Extensibility, And Memory Quality | Complete — v0.3.8 (2026-07-17) | [program](tasks/2026-07-16-four-month-reliability-extensibility-plan.md) / [execution package](tasks/2026-07-16-reliability-extensibility-execution-package.md) / [I139](iterations/I139-four-month-reliability-closeout.md) | N200-N250 Complete. I135-I139, SEC-001, RUNTIME-001 all delivered. v0.3.8 tagged and pushed. All validation green. REL-002 remains NO-GO. |
 | I140 SEC-001 External-Path Authorization | Complete (2026-07-17) | [I140](iterations/I140-sec001-external-path-authorization.md) / [SEC-001](backlog/active/SEC-001-external-path-authorization.md) / [security review](reference/I140-SEC001-SECURITY-REVIEW-2026-07-17.md) | Exact tool/nature/path approval across Runtime/CLI/TUI and all five file operations accepted after Deny/headless/symlink fail-closed review and the full locked validation ladder. |
@@ -298,3 +290,19 @@ owner for scope, acceptance and complete active/review/planned inventory.
 
 PROVIDER-008-B / #810 / I310 is proposed Active / Claimed in #811; ineffective until merge.
 Owner: [Gemini](backlog/active/PROVIDER-008-B-google-gemini.md). No implementation yet.
+
+## Session-owned worktrees / WORKTREE-001
+
+[Owner](tasks/2026-11-08-session-owned-worktrees.md) is Complete / Closed (PR #890;
+completion 2fa9b188). CLI/TUI Session-created worktree admission, resume/revocation
+and external approval execution passed full local preflight, MSVC cross-check and
+exact-head native CI. Independent OS-sandbox registration remains explicitly deferred
+to [WORKTREE-SANDBOX-001](tasks/2026-11-08-sandbox-owned-worktrees.md)
+(Planned / Unclaimed).
+
+## Clipboard image input / CLIPBOARD-IMAGE-001
+
+[Owner](tasks/2026-11-09-clipboard-image-input.md) is Review / Claimed under #894.
+Implementation validation is in progress for explicit native clipboard image paste
+into pending TUI attachments, focused on Linux Wayland+niri+Ghostty, following Codex
+interaction logic while retaining Talos ingestion and permission boundaries.

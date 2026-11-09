@@ -127,3 +127,37 @@ does not grant an independent architectural Provider or prove upstream independe
 Links: [Parent #624](https://github.com/wjhuang88/talos/issues/624) ·
 [Historical D #644](https://github.com/wjhuang88/talos/issues/644) ·
 [New D2 #848](https://github.com/wjhuang88/talos/issues/848).
+
+## 8. Dated follow-up: Parallel MCP 2.0 (2026-11-10)
+
+**Source-only correction to the 2026-11-04 snapshot; no MCP wire call or production admission.**
+Parallel announced MCP 2.0 on **2026-11-05**, after this packet's initial
+source checkpoint. Official launch: https://parallel.ai/blog/parallel-mcp-2 ;
+current product setup: https://parallel.ai/mcp ; official compatibility note:
+https://parallel.ai/articles/hermes-agent-web-search .
+
+- Recommended new no-key endpoint: `https://mcp.parallel.ai/mcp`.
+  Earlier `https://search.parallel.ai/mcp` remains a *legacy* Search MCP endpoint
+  reported as operational but no longer receiving updates. It must not be
+  treated as the canonical current endpoint without fresh verification.
+- Public 2.0 tool descriptions: anonymous `web_search`, `web_fetch` and
+  `web_decisions`; `web_research` requires sign-in/billed usage. The search
+  candidate concerns **only** `web_search` and must not silently expose or
+  dispatch the other tools. This replaces the earlier two-tool assumption for
+  new 2.0 connections, but does not retroactively change the historical D2-06/07
+  evidence recorded above.
+- The official announcement indicates product-level configurability and
+  organizational controls for signed-in users. **This does not establish a
+  default anonymous redistribution/commercial embedding license**, free-scale
+  guarantee, independence from Exa, valid real-result wire, or target-region
+  reachability. Separate current applicable terms or explicit vendor permission
+  remain necessary before default-search admission.
+- Do not infer an observed 2.0 `tools/list` or query schema from marketing
+  tables. A future separately governed acquisition must pin the new URL,
+  negotiate the protocol, capture actual bounded search-only fixtures, and
+  keep normal Network/permission/endpoint-manifest limits.
+
+**Updated decision remains: Exa BLOCKED / NOT ADMITTED; Parallel BLOCKED / NOT
+ADMITTED.** Existing E/F/G/I gates and the unrelated browser feasibility #891
+are unchanged. This supplement is read-only documentary evidence, not an
+implementation authorization or final legal clearance.

@@ -80,26 +80,192 @@ pub fn read_history_page(
     read_page_impl(path, encoding, offset, source_end, deadline, stopped, None)
 }
 
-// Compatibility mode is private and produces no recovery authority. The caller
-// commits the synthetic counter only after a successfully validated whole page.
-pub(crate) fn read_message_page(
-    path: &Path,
+// Host crash reconciliation must accept writer-produced records larger than a
+// model-facing page. Unlike compatibility restoration, every byte must decode.
+pub(crate) fn validate_host_transcript(path: &Path) -> Result<(), HistoryPageError> {
+    let mut file = open_source(path)?;
+    let jsonl = path.extension().is_some_and(|ext| ext == "jsonl");
+    let deadline = Instant::now() + std::time::Duration::from_secs(5);
+    let mut bytes = Vec::new();
+    let mut first = !jsonl;
+    let mut counter = 0;
+    let mut eof = false;
+    loop {
+        if Instant::now() >= deadline {
+            return Err(HistoryPageError::Stopped);
+        }
+        let mut consumed = 0;
+        while consumed < bytes.len() {
+            if Instant::now() >= deadline {
+                return Err(HistoryPageError::Stopped);
+            }
+            let remaining = &bytes[consumed..];
+            if first {
+                if remaining.starts_with(b"E\t") {
+                    first = false;
+                } else {
+                    let Some(end) = remaining.iter().position(|b| *b == b'\n') else {
+                        break;
+                    };
+                    let header = std::str::from_utf8(&remaining[..end])
+                        .map_err(|_| HistoryPageError::InvalidRecord)?;
+                    let fields: Vec<_> = header.split('\t').collect();
+                    if fields.len() != 3
+                        || fields[0] != "TALOS"
+                        || fields[1] != "1"
+                        || fields[2].parse::<i64>().is_err()
+                    {
+                        return Err(HistoryPageError::InvalidRecord);
+                    }
+                    first = false;
+                    consumed += end + 1;
+                    continue;
+                }
+            }
+            if matches!(remaining[0], b'\n' | b'\r') {
+                consumed += 1;
+                continue;
+            }
+            if jsonl {
+                let end = match remaining.iter().position(|b| *b == b'\n') {
+                    Some(end) => end,
+                    None if eof => remaining.len(),
+                    None => break,
+                };
+                let line = std::str::from_utf8(&remaining[..end])
+                    .map_err(|_| HistoryPageError::InvalidRecord)?;
+                crate::store::decode_jsonl_history_line(line, &mut counter)
+                    .ok_or(HistoryPageError::InvalidRecord)?;
+                consumed += end + usize::from(end < remaining.len());
+            } else {
+                let Some((_, length)) = decode_tlog_record(remaining, usize::MAX)? else {
+                    break;
+                };
+                consumed += length;
+            }
+        }
+        bytes.drain(..consumed);
+        if eof {
+            return if bytes.is_empty() {
+                Ok(())
+            } else {
+                Err(HistoryPageError::InvalidRecord)
+            };
+        }
+        let mut chunk = [0; 8192];
+        let count = file.read(&mut chunk)?;
+        eof = count == 0;
+        bytes.try_reserve(count).map_err(|_| {
+            HistoryPageError::Io(std::io::Error::other("recovery record allocation failed"))
+        })?;
+        bytes.extend_from_slice(&chunk[..count]);
+    }
+}
+
+// Host restoration buffers only the unfinished record plus one I/O page. It does
+// not grant model-disclosure authority or relax read_history_page's limits.
+pub(crate) struct MessagePageBuffer {
     encoding: HistoryEncoding,
-    offset: u64,
     source_end: u64,
-    deadline: Instant,
-    stopped: impl Fn() -> bool,
-    synthetic_counter: &mut u64,
-) -> Result<HistoryPage, HistoryPageError> {
-    read_page_impl(
-        path,
-        encoding,
-        offset,
-        source_end,
-        deadline,
-        stopped,
-        Some(synthetic_counter),
-    )
+    bytes: Vec<u8>,
+}
+
+impl MessagePageBuffer {
+    pub(crate) fn new(encoding: HistoryEncoding, source_end: u64) -> Self {
+        Self {
+            encoding,
+            source_end,
+            bytes: Vec::new(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn bytes_len(&self) -> usize {
+        self.bytes.len()
+    }
+
+    pub(crate) fn commit(&mut self, consumed: usize) {
+        self.bytes.drain(..consumed);
+    }
+
+    pub(crate) fn read(
+        &mut self,
+        path: &Path,
+        offset: u64,
+        deadline: Instant,
+        stopped: impl Fn() -> bool,
+        counter: &mut u64,
+    ) -> Result<HistoryPage, HistoryPageError> {
+        let check = || {
+            if stopped() || Instant::now() >= deadline {
+                Err(HistoryPageError::Stopped)
+            } else {
+                Ok(())
+            }
+        };
+        check()?;
+        // Consume buffered complete records before reading more. In particular,
+        // the entry limit must not cause an ever-growing backlog of source pages.
+        if !self.bytes.is_empty() {
+            let page = decode_page(
+                &self.bytes,
+                self.encoding,
+                offset,
+                self.source_end,
+                &check,
+                Some(counter),
+            )?;
+            if page.next_offset != offset || page.complete {
+                return Ok(HistoryPage {
+                    bytes_read: 0,
+                    ..page
+                });
+            }
+        }
+        let start = offset
+            .checked_add(self.bytes.len() as u64)
+            .filter(|start| *start <= self.source_end)
+            .ok_or(HistoryPageError::Stale)?;
+        let mut file = open_source(path)?;
+        if file.metadata()?.len() < self.source_end {
+            return Err(HistoryPageError::Stale);
+        }
+        file.seek(SeekFrom::Start(start))?;
+        let amount = (self.source_end - start).min(HISTORY_PAGE_BYTES as u64) as usize;
+        // Allocate from actual captured file bytes, never an untrusted length prefix.
+        self.bytes.try_reserve(amount).map_err(|_| {
+            HistoryPageError::Io(std::io::Error::other("history message allocation failed"))
+        })?;
+        let previous = self.bytes.len();
+        let result = (|| {
+            let mut chunk = [0; 8192];
+            while self.bytes.len() - previous < amount {
+                check()?;
+                let wanted = chunk.len().min(amount - (self.bytes.len() - previous));
+                let n = file.read(&mut chunk[..wanted])?;
+                if n == 0 {
+                    return Err(HistoryPageError::Stale);
+                }
+                self.bytes.extend_from_slice(&chunk[..n]);
+            }
+            let page = decode_page(
+                &self.bytes,
+                self.encoding,
+                offset,
+                self.source_end,
+                &check,
+                Some(counter),
+            )?;
+            Ok(HistoryPage {
+                bytes_read: amount,
+                ..page
+            })
+        })();
+        if result.is_err() {
+            self.bytes.truncate(previous);
+        }
+        result
+    }
 }
 
 fn read_page_impl(
@@ -109,7 +275,7 @@ fn read_page_impl(
     source_end: u64,
     deadline: Instant,
     stopped: impl Fn() -> bool,
-    mut synthetic_counter: Option<&mut u64>,
+    synthetic_counter: Option<&mut u64>,
 ) -> Result<HistoryPage, HistoryPageError> {
     let check = || {
         if stopped() || Instant::now() >= deadline {
@@ -136,6 +302,24 @@ fn read_page_impl(
         }
         bytes.extend_from_slice(&chunk[..n]);
     }
+    decode_page(
+        &bytes,
+        encoding,
+        offset,
+        source_end,
+        &check,
+        synthetic_counter,
+    )
+}
+
+fn decode_page(
+    bytes: &[u8],
+    encoding: HistoryEncoding,
+    offset: u64,
+    source_end: u64,
+    check: &impl Fn() -> Result<(), HistoryPageError>,
+    mut synthetic_counter: Option<&mut u64>,
+) -> Result<HistoryPage, HistoryPageError> {
     let mut pos = 0;
     // Older SessionManager-created empty files could receive records before a
     // creation header. Only host message restoration accepts that legacy form;
@@ -180,12 +364,7 @@ fn read_page_impl(
                 let end = match newline {
                     Some(end) => end,
                     None if at_eof => remaining.len(),
-                    None => {
-                        if pos == 0 {
-                            return Err(HistoryPageError::RecordTooLarge);
-                        }
-                        break;
-                    }
+                    None => break,
                 };
                 let line = std::str::from_utf8(&remaining[..end])
                     .map_err(|_| HistoryPageError::InvalidRecord)?;
@@ -198,7 +377,8 @@ fn read_page_impl(
                 }
             }
             (HistoryEncoding::Jsonl, None) => json_record(&bytes[pos..], at_eof)?,
-            (HistoryEncoding::Tlog, _) => tlog_record(&bytes[pos..])?,
+            (HistoryEncoding::Tlog, Some(_)) => decode_tlog_record(&bytes[pos..], usize::MAX)?,
+            (HistoryEncoding::Tlog, None) => tlog_record(&bytes[pos..])?,
         };
         let Some((entry, consumed)) = decoded else {
             if offset + bytes.len() as u64 == source_end {
@@ -209,7 +389,7 @@ fn read_page_impl(
                 }
                 return Err(HistoryPageError::InvalidRecord);
             }
-            if entries.is_empty() && pos == 0 {
+            if synthetic_counter.is_none() && entries.is_empty() && pos == 0 {
                 return Err(HistoryPageError::RecordTooLarge);
             }
             break;
@@ -342,6 +522,13 @@ fn json_record(
 }
 
 pub(crate) fn tlog_record(bytes: &[u8]) -> Result<Option<(SessionEntry, usize)>, HistoryPageError> {
+    decode_tlog_record(bytes, HISTORY_PAGE_BYTES)
+}
+
+fn decode_tlog_record(
+    bytes: &[u8],
+    limit: usize,
+) -> Result<Option<(SessionEntry, usize)>, HistoryPageError> {
     let mut fields = Vec::with_capacity(5);
     let mut pos = 0;
     for _ in 0..5 {
@@ -369,7 +556,7 @@ pub(crate) fn tlog_record(bytes: &[u8]) -> Result<Option<(SessionEntry, usize)>,
         .ok()
         .and_then(chrono::DateTime::from_timestamp_millis)
         .ok_or(HistoryPageError::InvalidRecord)?;
-    let Some(content) = prefixed(bytes, &mut pos)? else {
+    let Some(content) = prefixed(bytes, &mut pos, limit)? else {
         return Ok(None);
     };
     if bytes.get(pos) != Some(&b'\t') {
@@ -380,7 +567,7 @@ pub(crate) fn tlog_record(bytes: &[u8]) -> Result<Option<(SessionEntry, usize)>,
         };
     }
     pos += 1;
-    let Some(metadata) = prefixed(bytes, &mut pos)? else {
+    let Some(metadata) = prefixed(bytes, &mut pos, limit)? else {
         return Ok(None);
     };
     if bytes.get(pos) != Some(&b'\n') {
@@ -409,7 +596,11 @@ pub(crate) fn tlog_record(bytes: &[u8]) -> Result<Option<(SessionEntry, usize)>,
     )))
 }
 
-fn prefixed<'a>(bytes: &'a [u8], pos: &mut usize) -> Result<Option<&'a [u8]>, HistoryPageError> {
+fn prefixed<'a>(
+    bytes: &'a [u8],
+    pos: &mut usize,
+    limit: usize,
+) -> Result<Option<&'a [u8]>, HistoryPageError> {
     let Some(colon) = bytes[*pos..].iter().position(|b| *b == b':') else {
         return Ok(None);
     };
@@ -417,7 +608,7 @@ fn prefixed<'a>(bytes: &'a [u8], pos: &mut usize) -> Result<Option<&'a [u8]>, Hi
         .ok()
         .and_then(|s| s.parse::<usize>().ok())
         .ok_or(HistoryPageError::InvalidRecord)?;
-    if len > HISTORY_PAGE_BYTES {
+    if len > limit {
         return Err(HistoryPageError::RecordTooLarge);
     }
     let start = *pos + colon + 1;

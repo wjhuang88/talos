@@ -69,8 +69,16 @@ pub mod git;
 pub mod http_request;
 #[cfg(feature = "image")]
 pub mod image_validation;
-#[cfg(any(feature = "shell", feature = "git"))]
+#[cfg(any(
+    feature = "shell",
+    feature = "git",
+    all(windows, feature = "project-management")
+))]
 mod process_boundary;
+#[cfg(feature = "shell")]
+mod process_memory;
+#[cfg(feature = "project-management")]
+pub mod project_management;
 #[cfg(feature = "image")]
 pub mod read_image_tool;
 #[cfg(all(feature = "network", feature = "file-write"))]
@@ -183,3 +191,6 @@ pub(crate) fn workspace_relative_display(path: &std::path::Path, root: &std::pat
         .to_string_lossy()
         .replace('\\', "/")
 }
+
+#[cfg(all(feature = "git", feature = "shell"))]
+pub mod session_worktrees;

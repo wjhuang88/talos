@@ -1,5 +1,27 @@
 # Talos
 
+### Process memory policy (I316 development)
+
+Foreground shell output on Unix and Windows retains up to 1 MiB of raw bytes per stream,
+reports truncation, and exposes an owner for process-group or Job cleanup confirmation.
+It displays stdout followed by stderr; arrival ordering between streams is not retained.
+
+Shell and `exec` accept optional `memory_limit_mib`, an integer from 64 to 65536
+(1 MiB = 1048576 bytes); omission retains the 2048 MiB default policy. Exec steps
+inherit the request value, with explicit per-step overrides in sequential,
+parallel and pipeline modes. Limits apply to each process separately. Background
+execution supports a single command, not compositions.
+
+Unix uses virtual address-space limits (`RLIMIT_AS`), not RSS. Omitted limits are
+best-effort; explicit setup failure refuses startup, including on macOS hosts
+that reject the requested limit. Inherited hard limits are never raised. Windows
+uses Job per-process committed-memory limits; default enforcement on Windows is
+new and may reject commands previously allowed to allocate more than 2 GiB.
+Neither mechanism is an aggregate process-tree quota. Tool output describes the
+policy; it does not turn best-effort setup into proof of enforcement. Permissions
+still apply to the full request. This development change requires next-minor API
+migration and is not a 0.10 patch-release promise.
+
 [![Release](https://github.com/wjhuang88/talos/actions/workflows/release.yml/badge.svg)](https://github.com/wjhuang88/talos/actions/workflows/release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/wjhuang88/talos?include_prereleases)](https://github.com/wjhuang88/talos/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
@@ -47,6 +69,15 @@ return errors; raw history is preserved. `/resume` and model switching also use
 paged restoration; failed resume retains the active session. CLI fork stages
 bounded raw-byte pages from the same captured history, with cleanup on cancellation;
 it requires filesystem hard-link support. See the [startup compatibility limits](docs/reference/RUNTIME-SDK-CONTRACT.md#cli-startup-history-restoration-i313-candidate).
+
+### TUI tool-result display (unreleased)
+
+Tool-result lines that exceed the available terminal width end with `…` instead of
+wrapping. Explicit newlines remain separate rows; summaries and head/tail previews
+follow the same width limit. This affects display only: original tool results and
+`/export` content remain unchanged. Tool-call arguments and chat messages retain
+their existing wrapping behavior. The default Nord composer and user-message
+background is slightly closer to the base color for a less prominent surface.
 
 ### TUI thinking and activity
 
@@ -612,8 +643,23 @@ talos validate run --profile workspace
 ```
 
 Validation execution accepts only built-in profiles. Each evidence record includes the command,
-exit status, stdout/stderr summaries, and the allowlisted-profile permission decision. It does not
-accept arbitrary commands, edit repository files, push, publish, or tag releases.
+exit status and bounded stdout/stderr summaries. Cargo checks may run build scripts,
+download dependencies and write build artifacts; run mode is not read-only.
+Profile allowlisting is not a permission grant. Arbitrary commands and release
+operations are not exposed by this interface. Each host check has a fixed 15-minute
+deadline and a 2 MiB limit per output stream. Cargo tests use quiet progress output;
+output overflow, timeout and unconfirmed cleanup remain failures, even if partial
+output is available. Evidence summaries are bounded separately.
+
+The model tools `agile_summary` and `validate_project` were delivered in I315. Use the summary for explicit progress/backlog requests or task-relevant
+governance questions, not ordinary chat or repeated unchanged status refreshes.
+A governance manifest or any two canonical Board/iteration-index/backlog files
+enable summary discovery, including small or Planned projects. Validation uses
+recognized project markers independently: a Cargo-only project qualifies without
+governance files. `validate_project` accepts only `mode: plan|run` and
+`profile: governance|i076|workspace`; plan starts no commands, while run requires
+Execute admission. Neither tool edits task records, activates iterations or changes
+Issues. Missing prerequisites are reported, not created to enable discovery.
 
 ### Permission Preflight
 
@@ -902,10 +948,27 @@ basic permissions, not ownership, ACLs or timestamps. Failures can leave a parti
 restored file; inspect the reported effect before retrying. It does not provide isolation
 from concurrent external path replacement or make destructive operations Auto-eligible.
 
-File tools remain workspace-confined by default. When an interactive permission-aware mode requests
-an external path, Talos asks the operator; approval carries only the selected tool operation and
-normalized path. Denial, missing headless approval, path reuse, operation reuse, and changed
-symlink targets fail closed.
+In CLI/TUI/inline modes, ordinary built-in workspace read/write/edit operations are allowed by
+default. Explicit Ask/Deny and sensitive-path restrictions retain precedence. External paths use
+the existing permission pipeline: eligible automatic review may approve; otherwise interactive
+modes ask the operator. Approval covers the selected operation and normalized path, and works
+with the CLI's atomic file creator. Headless modes cannot invent human approval.
+
+In interactive Sessions, successful foreground literal commands such as
+`git worktree add -b feature ../feature` or `git worktree add --detach ../check HEAD`
+register only the created root in that Session. The host owns directory creation and verifies
+Git metadata and directory identities; sibling worktrees and the parent directory gain no
+access. Resume revalidates the persisted receipt. Replacement or invalid metadata revokes
+membership and old approvals; a fresh external-path approval remains possible.
+
+Registration currently recognizes `git worktree add [-b branch|--detach] path [startpoint]`;
+without `-b`/`--detach`, an explicit startpoint is required. Arguments may use simple quotes.
+Dynamic/compound commands, background execution and sandbox-dispatched shell commands retain
+normal execution/authorization and do not mint a host creation receipt. The command's ordinary
+execution approval is still required. SDK users opt into product defaults and Session binding;
+print mode has no durable Session binding. Registered-root searches use bounded capability traversal and never follow paths outside
+the held root. Grep skips hidden entries, `target` and `node_modules`; it currently does not
+apply `.gitignore` filtering. Glob includes directory and hidden-entry matches.
 
 Approval choices are explicit authority classes. Approve once is consumed by one official adapter
 invocation and is never stored. Always approve creates an in-memory grant for the active Talos
@@ -1324,3 +1387,24 @@ For current engineering status, use the project governance docs instead of this 
 ## License
 
 Talos is licensed under the [Apache License 2.0](LICENSE).
+
+### Clipboard images in the CLI TUI
+
+With an image-capable model selected, press **Ctrl+V** or **Alt+V**, or run
+`/paste-image`, to add a clipboard image to the pending attachments. Wait for the
+attachment confirmation before sending. `/attachments` lists images and `/detach`
+removes them. Existing image count, byte and pixel limits apply. Clipboard file
+paths use the same authorization as `/attach`.
+
+On Wayland, Talos reads the native clipboard with arboard's data-control support;
+`wl-paste` is not required. Ghostty's default **Ctrl+Shift+V** invokes terminal text
+paste and does not forward image data to terminal programs. Use Ctrl+V/Alt+V for
+images. Ctrl+Shift+V also works if your terminal forwards that key. Ordinary
+terminal text paste is unchanged. SSH/headless sessions need access to a graphical
+clipboard on the host running Talos; otherwise use `/attach <path>`.
+
+Clipboard PNGs are staged privately under `~/.talos/clipboard`. Unsubmitted staged
+files are removed when detached or when the composer closes. Files retained for
+submitted messages must remain available for session recovery; they are not
+currently removed by session deletion. Delete them manually only when their
+messages no longer need image recovery.

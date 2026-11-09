@@ -49,13 +49,37 @@ pub enum ToolAuthorizationScope {
     Session,
 }
 
+/// Host-owned, identity-checked additional workspace root.
+/// Implementations must fail closed after root or Git metadata replacement.
+pub trait WorkspaceRootCapability: std::fmt::Debug + Send + Sync {
+    /// Canonical root spelling, never a shared parent directory.
+    fn root(&self) -> &Path;
+    /// Revalidates the original held root and repository registration.
+    fn validate(&self) -> bool;
+    /// Opens a file relative to the retained root, rejecting escapes.
+    fn open_read(&self, relative: &Path) -> io::Result<std::fs::File>;
+    /// Lists bounded descendants through the retained root without following links.
+    /// Search mode returns ordinary files; glob mode also includes directories and hidden entries.
+    fn files(
+        &self,
+        relative: &Path,
+        max_entries: usize,
+        glob_mode: bool,
+        max_depth: Option<usize>,
+    ) -> io::Result<Vec<PathBuf>>;
+    /// Creates a new file through the retained root, without overwriting.
+    fn create_file(&self, relative: &Path, contents: &[u8]) -> io::Result<()>;
+    /// Replaces exact expected bytes using the retained directory capability.
+    fn replace_file(&self, relative: &Path, expected: &[u8], contents: &[u8]) -> io::Result<()>;
+}
+
 /// A concrete, path-bound authorization for one tool operation.
 ///
 /// Permission-aware composition roots create this value only after resolving
 /// `Allow`/`Ask`/`Deny`. File tools compare the normalized path and operation
 /// before allowing an invocation to leave the workspace boundary. Calling a
 /// file tool through [`AgentTool::execute`] does not provide this capability.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct ToolExecutionAuthorization {
     tool_name: String,
     nature: ToolNature,
@@ -63,9 +87,39 @@ pub struct ToolExecutionAuthorization {
     normalized_resource: PathBuf,
     named_capability: Option<String>,
     scope: ToolAuthorizationScope,
+    workspace_guard: Option<Arc<dyn WorkspaceRootCapability>>,
 }
 
+impl PartialEq for ToolExecutionAuthorization {
+    fn eq(&self, other: &Self) -> bool {
+        self.tool_name == other.tool_name
+            && self.nature == other.nature
+            && self.resource_kind == other.resource_kind
+            && self.normalized_resource == other.normalized_resource
+            && self.named_capability == other.named_capability
+            && self.scope == other.scope
+            && match (&self.workspace_guard, &other.workspace_guard) {
+                (None, None) => true,
+                (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+                _ => false,
+            }
+    }
+}
+impl Eq for ToolExecutionAuthorization {}
+
 impl ToolExecutionAuthorization {
+    /// Attaches the host workspace identity guard to this exact path token.
+    #[must_use]
+    pub fn with_workspace_guard(mut self, guard: Arc<dyn WorkspaceRootCapability>) -> Self {
+        self.workspace_guard = Some(guard);
+        self
+    }
+
+    /// Returns the retained workspace capability for this exact authorized path.
+    pub fn workspace_capability(&self) -> Option<&Arc<dyn WorkspaceRootCapability>> {
+        self.workspace_guard.as_ref()
+    }
+
     /// Creates a path-bound authorization using the workspace as the base for
     /// relative resources.
     ///
@@ -86,6 +140,7 @@ impl ToolExecutionAuthorization {
             normalized_resource: normalize_authorized_path(workspace_root, resource)?,
             named_capability: None,
             scope,
+            workspace_guard: None,
         })
     }
 
@@ -102,6 +157,7 @@ impl ToolExecutionAuthorization {
             normalized_resource: PathBuf::new(),
             named_capability: Some("git:auxiliary-path-resolution".into()),
             scope,
+            workspace_guard: None,
         }
     }
 
@@ -116,6 +172,7 @@ impl ToolExecutionAuthorization {
             normalized_resource: PathBuf::new(),
             named_capability: Some("git:pull-bounded-discovery".into()),
             scope,
+            workspace_guard: None,
         }
     }
 
@@ -136,7 +193,10 @@ impl ToolExecutionAuthorization {
         workspace_root: &Path,
         resource: &str,
     ) -> bool {
-        self.tool_name == tool_name
+        self.workspace_guard
+            .as_ref()
+            .is_none_or(|guard| guard.validate())
+            && self.tool_name == tool_name
             && self.nature == nature
             && self.resource_kind == ToolResourceKind::Path
             && normalize_authorized_path(workspace_root, resource)

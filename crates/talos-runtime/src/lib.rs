@@ -4848,6 +4848,198 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "shared-composition")]
+    #[tokio::test]
+    async fn shared_validation_dispatch_denial_returns_tool_error_without_build_artifacts() {
+        // Observe entry to the actual contribution, without replacing its permission
+        // profile or the production Agent dispatch/admission path.
+        struct ObservedValidation {
+            inner: Arc<dyn AgentTool>,
+            entries: Arc<AtomicUsize>,
+        }
+        struct ObservedPreparedValidation {
+            inner: Box<dyn talos_core::tool::PreparedNormalToolInvocation>,
+            entries: Arc<AtomicUsize>,
+        }
+        #[async_trait]
+        impl talos_core::tool::PreparedNormalToolInvocation for ObservedPreparedValidation {
+            fn plan_identity(&self) -> Option<&talos_core::tool::PreparedPlanIdentity> {
+                self.inner.plan_identity()
+            }
+            fn permission_profile(&self) -> &[talos_core::tool::ToolPermissionFacet] {
+                self.inner.permission_profile()
+            }
+            fn cleanup_receipt(&self) -> Option<Arc<dyn talos_core::tool::ToolCleanupReceipt>> {
+                self.inner.cleanup_receipt()
+            }
+            async fn execute(
+                self: Box<Self>,
+                proof: Box<dyn std::any::Any + Send>,
+            ) -> talos_core::tool::ToolExecutionOutput {
+                self.entries.fetch_add(1, Ordering::SeqCst);
+                self.inner.execute(proof).await
+            }
+        }
+        #[async_trait]
+        impl AgentTool for ObservedValidation {
+            fn prepare_normalized_with_provenance(
+                &self,
+                input: &Value,
+                provenance: talos_core::tool::ToolProvenance,
+            ) -> Result<Option<Box<dyn talos_core::tool::PreparedNormalToolInvocation>>, String>
+            {
+                Ok(self
+                    .inner
+                    .prepare_normalized_with_provenance(input, provenance)?
+                    .map(|inner| {
+                        Box::new(ObservedPreparedValidation {
+                            inner,
+                            entries: self.entries.clone(),
+                        })
+                            as Box<dyn talos_core::tool::PreparedNormalToolInvocation>
+                    }))
+            }
+            fn execution_working_directory(&self) -> Option<std::path::PathBuf> {
+                self.inner.execution_working_directory()
+            }
+            fn name(&self) -> &str {
+                self.inner.name()
+            }
+            fn description(&self) -> &str {
+                self.inner.description()
+            }
+            fn parameters(&self) -> Value {
+                self.inner.parameters()
+            }
+            fn nature(&self) -> ToolNature {
+                self.inner.nature()
+            }
+            fn permission_profile(
+                &self,
+                input: &Value,
+            ) -> Vec<talos_core::tool::ToolPermissionFacet> {
+                self.inner.permission_profile(input)
+            }
+            fn execution_admission(
+                &self,
+                input: &Value,
+            ) -> Result<talos_core::background_job::ToolExecutionAdmission, String> {
+                self.inner.execution_admission(input)
+            }
+            fn cleanup_receipt(&self) -> Option<Arc<dyn talos_core::tool::ToolCleanupOwner>> {
+                self.inner.cleanup_receipt()
+            }
+            async fn execute(&self, input: Value) -> ToolResult {
+                self.entries.fetch_add(1, Ordering::SeqCst);
+                self.inner.execute(input).await
+            }
+            async fn execute_authorized(
+                &self,
+                input: Value,
+                authorizations: &[talos_core::tool::ToolExecutionAuthorization],
+            ) -> ToolResult {
+                self.entries.fetch_add(1, Ordering::SeqCst);
+                self.inner.execute_authorized(input, authorizations).await
+            }
+        }
+        for (decision, expected_denial) in [
+            (
+                PermissionDecision::Deny("validation dispatch blocked".into()),
+                "Permission denied: approval denied",
+            ),
+            (
+                PermissionDecision::Ask,
+                "Permission denied: approval required but no resolver is configured",
+            ),
+        ] {
+            let root = tempfile::tempdir().expect("workspace");
+            std::fs::write(
+                root.path().join("Cargo.toml"),
+                "[package]\nname='validation-denial-fixture'\nversion='0.1.0'\nedition='2024'\n",
+            )
+            .expect("manifest");
+            std::fs::create_dir(root.path().join("src")).expect("source directory");
+            std::fs::write(root.path().join("src/lib.rs"), "pub fn fixture() {}\n")
+                .expect("source");
+            let provider = Arc::new(
+                MockProvider::new()
+                    .with_tool_call(
+                        "validate_project",
+                        serde_json::json!({"mode":"run","profile":"workspace"}),
+                    )
+                    .with_response("denial observed"),
+            );
+            let entries = Arc::new(AtomicUsize::new(0));
+            let mut builder = RuntimeBuilder::new()
+                .provider(provider)
+                .workspace_root(root.path())
+                .shared_tools()
+                .permission_rule(PermissionRule::new_nature(
+                    ToolNature::Execute,
+                    None,
+                    None,
+                    decision,
+                ));
+            let registration = builder
+                .tools
+                .iter_mut()
+                .find(|registration| registration.tool().name() == "validate_project")
+                .expect("shared validation registration");
+            *registration =
+                RuntimeToolRegistration::Builtin(talos_core::tool::ToolContribution::new(
+                    talos_core::tool::ToolContributionSource::new("builtin.project-management"),
+                    Arc::new(ObservedValidation {
+                        inner: registration.tool().clone(),
+                        entries: entries.clone(),
+                    }),
+                ));
+            let mut runtime = builder.build().expect("runtime");
+            runtime
+                .submit("run workspace validation")
+                .await
+                .expect("submit");
+            let observed = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                let mut denied = false;
+                while let Some(event) = runtime.next_event().await {
+                    match event {
+                        SessionEvent::TurnEvent {
+                            payload:
+                                talos_core::session::TurnEventPayload::Progress {
+                                    event: AgentEvent::ToolResult { result, .. },
+                                },
+                            ..
+                        } => {
+                            assert!(result.is_error);
+                            assert!(
+                                result.content.contains(expected_denial),
+                                "{}",
+                                result.content
+                            );
+                            denied = true;
+                        }
+                        SessionEvent::TurnEvent {
+                            payload: talos_core::session::TurnEventPayload::Completed { .. },
+                            ..
+                        } => break,
+                        _ => {}
+                    }
+                }
+                denied
+            })
+            .await
+            .expect("bounded turn");
+            assert!(observed, "production dispatch must report its denial");
+            runtime.shutdown().await.expect("shutdown cleanup");
+            assert_eq!(
+                entries.load(Ordering::SeqCst),
+                0,
+                "denial must prevent entry into the validation executor"
+            );
+            assert!(!root.path().join("target").exists());
+            assert!(!root.path().join("Cargo.lock").exists());
+        }
+    }
+
     #[tokio::test]
     async fn runtime_approval_handler_can_approve_ask_tool() {
         let provider = Arc::new(
@@ -6219,3 +6411,6 @@ mod owned_process_shutdown_tests {
 
 #[cfg(all(test, any(unix, windows)))]
 mod checkpoint_coding_tests;
+
+#[cfg(all(test, feature = "shared-composition", unix))]
+mod validation_dispatch_tests;

@@ -2,6 +2,7 @@ use super::*;
 use talos_core::tool::AgentTool;
 
 mod delete;
+mod mutation_progress;
 
 mod file_tool_tests {
     use super::*;
@@ -454,6 +455,42 @@ mod file_tool_tests {
             fs::read_to_string(temp_dir.path().join("capability.txt")).unwrap(),
             "first"
         );
+    }
+
+    #[tokio::test]
+    async fn capability_write_accepts_exact_external_approval_and_absolute_local_paths() {
+        use talos_core::tool::{ToolAuthorizationScope, ToolExecutionAuthorization, ToolNature};
+        let root = tempfile::tempdir().expect("root");
+        let outside = tempfile::tempdir().expect("outside");
+        let tool = WriteTool::new(root.path().to_owned()).with_atomic_create_capability(Arc::new(
+            CapStdAtomicCreateCapability::open(root.path()).expect("capability"),
+        ));
+        let local = root.path().join("local.txt");
+        let result = tool
+            .execute(json!({"path": local, "content": "local"}))
+            .await;
+        assert!(!result.is_error, "{}", result.content);
+        for relative in ["outside.txt", "nested/missing/file.txt"] {
+            let path = outside.path().join(relative);
+            let input = json!({"path": path, "content": "approved"});
+            assert!(tool.execute(input.clone()).await.is_error);
+            assert!(!path.exists());
+            let grant = ToolExecutionAuthorization::for_path(
+                "write",
+                ToolNature::Write,
+                root.path(),
+                path.to_str().expect("path"),
+                ToolAuthorizationScope::Once,
+            )
+            .expect("grant");
+            let result = tool
+                .execute_authorized(input.clone(), std::slice::from_ref(&grant))
+                .await;
+            assert!(!result.is_error, "{}", result.content);
+            assert_eq!(fs::read_to_string(&path).expect("created"), "approved");
+            assert!(tool.execute_authorized(input, &[grant]).await.is_error);
+            assert_eq!(fs::read_to_string(&path).expect("unchanged"), "approved");
+        }
     }
 
     #[test]

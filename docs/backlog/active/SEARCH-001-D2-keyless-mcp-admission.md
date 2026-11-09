@@ -76,3 +76,13 @@ representative valid-query evidence, and independent/regional qualification.
 a distributable default client, free-versus-production limits, and independent/regional qualification.
 
 No evidence from this intake changes the parent #624 acceptance or authorizes E/F.
+
+## Documentary source refresh — 2026-11-10
+
+Parallel's official 2026-11-05 MCP 2.0 launch changed the recommended
+anonymous endpoint to `https://mcp.parallel.ai/mcp` and expanded its published
+free tool set (including `web_decisions`). The prior `https://search.parallel.ai/mcp`
+remains a legacy endpoint; see the [dated source supplement](../../reference/SEARCH-001-D2-MCP-TRIAGE-2026-11-04.md#8-dated-follow-up-parallel-mcp-20-2026-11-10).
+This is source-only triage: no live request, no applicability-of-terms approval,
+no provider admission and no change to default Auto or claimed ownership.
+**Exa and Parallel both remain BLOCKED / NOT ADMITTED.**

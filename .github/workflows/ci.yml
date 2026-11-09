@@ -282,6 +282,29 @@ jobs:
       - name: Clippy workspace
         run: cargo clippy --workspace --locked -- -D warnings
 
+      - name: Native model validation lifecycle tests
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $tests = @(
+            'project_management::windows_validation::tests::native_cargo_execution_returns_output_and_operation_cleanup',
+            'project_management::windows_validation::tests::preparation_budget_and_cancellation_refuse_before_path_discovery',
+            'project_management::windows_validation::tests::cancellation_before_preparation_never_resolves_or_launches_cargo',
+            'process_boundary::windows_foreground::tests::cancelled_preparation_remains_owned_until_blocking_worker_returns',
+            'process_boundary::windows_foreground::tests::foreground_launch_observes_pre_cancel_closed_sender_and_expired_deadline',
+            'process_boundary::windows_foreground::tests::launch_checkpoints_refuse_before_payload_can_run',
+            'process_boundary::windows_foreground::tests::typed_start_evidence_preserves_preflight_refusal_and_started_timeout'
+          )
+          $listed = @(cargo test -p talos-tools --features project-management --locked --lib -- --list)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($test in $tests) {
+            if ($listed -notcontains "${test}: test") {
+              throw "Required Windows validation regression is missing: $test"
+            }
+            cargo test -p talos-tools --features project-management --locked --lib $test -- --exact --nocapture
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
       - name: Structured Git executable and path identity guard tests
         # Independent evidence must still run after a Desktop failure.
         # Earlier failures remain failures of the job.

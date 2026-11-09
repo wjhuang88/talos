@@ -112,8 +112,66 @@ pub struct OwnedCommandOperation {
     cleanup: std::sync::Arc<supervisor::Cleanup>,
 }
 
+/// Retained output metadata for command tools using truncation rather than
+/// treating an output limit as an execution failure.
+/// Use a fresh instance for each execution; never share or modify it while running.
+#[cfg(unix)]
+#[derive(Debug, Default)]
+pub struct CommandCapture {
+    /// Total stdout bytes observed, including bytes discarded after the limit.
+    pub stdout_bytes: std::sync::atomic::AtomicUsize,
+    /// Total stderr bytes observed, including bytes discarded after the limit.
+    pub stderr_bytes: std::sync::atomic::AtomicUsize,
+    /// Whether the command reached its execution deadline.
+    pub timed_out: std::sync::atomic::AtomicBool,
+}
+
 #[cfg(unix)]
 impl OwnedCommandOperation {
+    /// Execute with bounded retained streams and explicit timeout metadata.
+    /// Lifecycle ownership and cleanup are identical to strict-output execution.
+    /// A deadline returns retained output after confirmed cleanup, so callers must
+    /// inspect `capture.timed_out` even when the result is `Ok`.
+    pub async fn execute_captured(
+        &self,
+        command: std::process::Command,
+        deadline: std::time::Duration,
+        output_limit: usize,
+        input: Option<Vec<u8>>,
+        capture: std::sync::Arc<CommandCapture>,
+    ) -> Result<std::process::Output, OwnedCommandFailure> {
+        supervisor::execute_with_capture(
+            command,
+            self.cleanup.clone(),
+            deadline,
+            (),
+            output_limit,
+            input,
+            Some(capture),
+        )
+        .await
+    }
+
+    /// Execute with typed startup evidence, preserving the existing cleanup scope.
+    /// A failure's startup state is not cleanup evidence; retain and wait for the
+    /// operation receipt after completion or after dropping a cancelled future.
+    pub async fn execute_with_start_evidence(
+        &self,
+        command: std::process::Command,
+        deadline: std::time::Duration,
+        output_limit: usize,
+    ) -> Result<std::process::Output, OwnedCommandFailure> {
+        supervisor::execute_with_start_evidence(
+            command,
+            self.cleanup.clone(),
+            deadline,
+            (),
+            output_limit,
+            None,
+        )
+        .await
+    }
+
     /// Executes an authorized command with finite, caller-owned standard input.
     /// Input delivery shares output collection's deadline and cancellation scope;
     /// the pipe closes after delivery. Input is not an authorization grant.
@@ -226,6 +284,29 @@ impl talos_core::tool::ToolCleanupOwner for OwnedCommandExecutor {
     fn seal(&self) {
         OwnedCommandExecutor::seal(self);
     }
+}
+
+/// Process startup evidence attached to an owned command failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandStartState {
+    /// Admission or normal spawn failure: no successfully started command.
+    NotStarted,
+    /// Spawn returned an owned child before the failure.
+    Started,
+    /// A panic prevented reliable startup classification.
+    Unknown,
+}
+
+/// Owned command failure with startup evidence independent of diagnostic text.
+/// Cleanup still requires the operation's retained receipt.
+#[derive(Debug, Error)]
+#[error("{source}")]
+pub struct OwnedCommandFailure {
+    /// Whether command startup was confirmed, refused, or uncertain.
+    pub start_state: CommandStartState,
+    /// Original execution error, retained for existing diagnostic consumers.
+    #[source]
+    pub source: SandboxError,
 }
 
 /// Errors that can occur during sandboxed command execution.

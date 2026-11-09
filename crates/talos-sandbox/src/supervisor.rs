@@ -10,7 +10,7 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{Notify, oneshot};
 
-use crate::SandboxError;
+use crate::{CommandStartState, OwnedCommandFailure, SandboxError};
 
 const POLL: Duration = Duration::from_millis(10);
 const CLEANUP_LIMIT: Duration = Duration::from_secs(2);
@@ -149,7 +149,38 @@ struct OwnedChild {
     may_signal: bool,
 }
 
+#[cfg(target_os = "macos")]
+async fn retry_darwin_group_termination(
+    mut terminate: impl FnMut() -> io::Result<()>,
+) -> io::Result<()> {
+    let until = tokio::time::Instant::now() + POLL * 10;
+    loop {
+        match terminate() {
+            Err(error)
+                if error.raw_os_error() == Some(libc::EPERM)
+                    && tokio::time::Instant::now() < until =>
+            {
+                // Darwin excludes zombies from group signalling. Exit
+                // observation and group enumeration can lag that transition.
+                // Retry the SAME ownership/proof checks; never accept EPERM
+                // itself as cleanup and never reap before proof succeeds.
+                tokio::time::sleep(POLL).await;
+            }
+            result => return result,
+        }
+    }
+}
+
 impl OwnedChild {
+    async fn terminate_group_confirmed(&mut self) -> io::Result<()> {
+        #[cfg(target_os = "macos")]
+        {
+            retry_darwin_group_termination(|| self.terminate_group()).await
+        }
+        #[cfg(not(target_os = "macos"))]
+        self.terminate_group()
+    }
+
     fn observe(&mut self) -> io::Result<bool> {
         // SAFETY: zero is a valid initialization for the output-only siginfo_t.
         // waitid receives a valid writable pointer and a positive owned child ID.
@@ -304,15 +335,52 @@ pub(crate) async fn execute_with_limit(
 }
 
 pub(crate) async fn execute_with_input(
-    mut command: Command,
+    command: Command,
     cleanup: Arc<Cleanup>,
     deadline: Duration,
     resources: impl Send + 'static,
     output_limit: usize,
     input: Option<Vec<u8>>,
 ) -> Result<Output, SandboxError> {
+    execute_with_start_evidence(command, cleanup, deadline, resources, output_limit, input)
+        .await
+        .map_err(|failure| failure.source)
+}
+
+pub(crate) async fn execute_with_start_evidence(
+    command: Command,
+    cleanup: Arc<Cleanup>,
+    deadline: Duration,
+    resources: impl Send + 'static,
+    output_limit: usize,
+    input: Option<Vec<u8>>,
+) -> Result<Output, OwnedCommandFailure> {
+    execute_with_capture(
+        command,
+        cleanup,
+        deadline,
+        resources,
+        output_limit,
+        input,
+        None,
+    )
+    .await
+}
+
+pub(crate) async fn execute_with_capture(
+    mut command: Command,
+    cleanup: Arc<Cleanup>,
+    deadline: Duration,
+    resources: impl Send + 'static,
+    output_limit: usize,
+    input: Option<Vec<u8>>,
+    capture: Option<Arc<crate::CommandCapture>>,
+) -> Result<Output, OwnedCommandFailure> {
     let started = tokio::time::Instant::now();
-    let mut receipt = cleanup.register()?;
+    let mut receipt = cleanup.register().map_err(|source| OwnedCommandFailure {
+        start_state: CommandStartState::NotStarted,
+        source,
+    })?;
     command
         .stdin(if input.is_some() {
             Stdio::piped()
@@ -337,15 +405,19 @@ pub(crate) async fn execute_with_input(
         Ok(Ok(child)) => child,
         Ok(Err(error)) => {
             receipt.finish(None);
-            return Err(failed(format!(
-                "sandbox spawn/session setup failed: {error}"
-            )));
+            return Err(OwnedCommandFailure {
+                start_state: CommandStartState::NotStarted,
+                source: failed(format!("sandbox spawn/session setup failed: {error}")),
+            });
         }
         Err(_) => {
             receipt.finish(Some(
                 "sandbox process spawn panicked; cleanup unconfirmed".into(),
             ));
-            return Err(failed("sandbox process spawn panicked"));
+            return Err(OwnedCommandFailure {
+                start_state: CommandStartState::Unknown,
+                source: failed("sandbox process spawn panicked"),
+            });
         }
     };
     let pgid = match libc::pid_t::try_from(child.id()) {
@@ -358,7 +430,10 @@ pub(crate) async fn execute_with_input(
             receipt.finish(Some(
                 "sandbox returned invalid process ID; cleanup unconfirmed".into(),
             ));
-            return Err(failed("sandbox returned invalid process ID"));
+            return Err(OwnedCommandFailure {
+                start_state: CommandStartState::Started,
+                source: failed("sandbox returned invalid process ID"),
+            });
         }
     };
     let owner = OwnedChild {
@@ -376,16 +451,21 @@ pub(crate) async fn execute_with_input(
             deadline.saturating_sub(started.elapsed()),
             output_limit,
             input,
+            capture,
         )
         .await;
         receipt.finish(result.1);
         result.0
     });
-    let result = task
-        .await
-        .map_err(|error| failed(format!("sandbox supervisor failed: {error}")))?;
+    let result = task.await.map_err(|error| OwnedCommandFailure {
+        start_state: CommandStartState::Started,
+        source: failed(format!("sandbox supervisor failed: {error}")),
+    })?;
     drop(cancel);
-    result
+    result.map_err(|source| OwnedCommandFailure {
+        start_state: CommandStartState::Started,
+        source,
+    })
 }
 
 #[cfg(test)]
@@ -404,7 +484,7 @@ async fn supervise_limited(
     deadline: Duration,
     output_limit: usize,
 ) -> (Result<Output, SandboxError>, Option<String>) {
-    supervise_limited_with_input(owner, cancel, deadline, output_limit, None).await
+    supervise_limited_with_input(owner, cancel, deadline, output_limit, None, None).await
 }
 
 async fn supervise_limited_with_input(
@@ -413,6 +493,7 @@ async fn supervise_limited_with_input(
     deadline: Duration,
     output_limit: usize,
     input: Option<Vec<u8>>,
+    capture: Option<Arc<crate::CommandCapture>>,
 ) -> (Result<Output, SandboxError>, Option<String>) {
     let stdin = owner.child.stdin.take();
     let input = async move {
@@ -460,6 +541,7 @@ async fn supervise_limited_with_input(
         (stdout, stderr),
         output_limit,
         input,
+        capture,
     )
     .await
 }
@@ -479,6 +561,7 @@ async fn supervise_io(
         (stdout, stderr),
         usize::MAX,
         async { Ok(()) },
+        None,
     )
     .await
 }
@@ -490,9 +573,11 @@ async fn supervise_io_limited(
     (mut stdout, mut stderr): (impl AsyncRead + Unpin, impl AsyncRead + Unpin),
     output_limit: usize,
     input: impl std::future::Future<Output = io::Result<()>>,
+    capture: Option<Arc<crate::CommandCapture>>,
 ) -> (Result<Output, SandboxError>, Option<String>) {
     tokio::pin!(input);
     let mut input_done = false;
+    let mut timed_out = false;
     let mut out = Vec::new();
     let mut err = Vec::new();
     let mut out_eof = false;
@@ -513,10 +598,20 @@ async fn supervise_io_limited(
                 Err(error) => break Some(format!("sandbox stdin write failed: {error}")),
             },
             _ = &mut cancel => break Some("sandbox execution cancelled".into()),
-            _ = &mut deadline => break Some("sandbox execution timed out".into()),
+            _ = &mut deadline => {
+                timed_out = true;
+                if let Some(capture) = &capture { capture.timed_out.store(true, std::sync::atomic::Ordering::SeqCst); }
+                break Some("sandbox execution timed out".into());
+            },
             read = stdout.read(&mut out_buf), if !out_eof => match read {
                 Ok(0) => out_eof = true,
                 Ok(n) => {
+                    if let Some(capture) = &capture {
+                        record_bytes(&capture.stdout_bytes, n);
+                        let retain = n.min(output_limit.saturating_sub(out.len()));
+                        out.extend_from_slice(&out_buf[..retain]);
+                        continue;
+                    }
                     if out.len().saturating_add(n) > output_limit { break Some("command output limit exceeded".into()); }
                     out.extend_from_slice(&out_buf[..n]);
                 },
@@ -525,6 +620,12 @@ async fn supervise_io_limited(
             read = stderr.read(&mut err_buf), if !err_eof => match read {
                 Ok(0) => err_eof = true,
                 Ok(n) => {
+                    if let Some(capture) = &capture {
+                        record_bytes(&capture.stderr_bytes, n);
+                        let retain = n.min(output_limit.saturating_sub(err.len()));
+                        err.extend_from_slice(&err_buf[..retain]);
+                        continue;
+                    }
                     if err.len().saturating_add(n) > output_limit { break Some("command output limit exceeded".into()); }
                     err.extend_from_slice(&err_buf[..n]);
                 },
@@ -533,7 +634,8 @@ async fn supervise_io_limited(
             _ = tokio::time::sleep(POLL) => {},
         }
     };
-    if let Err(error) = owner.terminate_group() {
+    let cleanup_started = tokio::time::Instant::now();
+    if let Err(error) = owner.terminate_group_confirmed().await {
         let detail = match reason {
             Some(reason) => format!("{reason}; sandbox process-group cleanup failed: {error}"),
             None => format!("sandbox process-group cleanup failed: {error}"),
@@ -541,7 +643,7 @@ async fn supervise_io_limited(
         return (Err(failed(&detail)), Some(detail));
     }
     let cleanup = tokio::time::timeout(
-        CLEANUP_LIMIT,
+        CLEANUP_LIMIT.saturating_sub(cleanup_started.elapsed()),
         finish_cleanup_limited(
             &mut owner,
             &mut stdout,
@@ -551,12 +653,18 @@ async fn supervise_io_limited(
             out_eof,
             err_eof,
             output_limit,
+            capture.as_deref(),
         ),
     )
     .await;
     match cleanup {
         Ok(Ok(status)) => {
             let result = match reason {
+                Some(_) if capture.is_some() && timed_out => Ok(Output {
+                    status,
+                    stdout: out,
+                    stderr: err,
+                }),
                 Some(reason) => Err(failed(reason)),
                 None => Ok(Output {
                     status,
@@ -592,6 +700,7 @@ async fn finish_cleanup(
         out_eof,
         err_eof,
         usize::MAX,
+        None,
     )
     .await
 }
@@ -606,6 +715,7 @@ async fn finish_cleanup_limited(
     mut out_eof: bool,
     mut err_eof: bool,
     output_limit: usize,
+    capture: Option<&crate::CommandCapture>,
 ) -> io::Result<std::process::ExitStatus> {
     let mut out_buf = [0u8; 8192];
     let mut err_buf = [0u8; 8192];
@@ -619,12 +729,22 @@ async fn finish_cleanup_limited(
         tokio::select! {
             read = stdout.read(&mut out_buf), if !out_eof => match read {
                 Ok(0) => out_eof = true,
-                Ok(n) => out.extend_from_slice(&out_buf[..n.min(output_limit.saturating_sub(out.len()))]),
+                Ok(n) => {
+                    if let Some(capture) = capture {
+                        record_bytes(&capture.stdout_bytes, n);
+                    }
+                    out.extend_from_slice(&out_buf[..n.min(output_limit.saturating_sub(out.len()))]);
+                },
                 Err(error) => return Err(error),
             },
             read = stderr.read(&mut err_buf), if !err_eof => match read {
                 Ok(0) => err_eof = true,
-                Ok(n) => err.extend_from_slice(&err_buf[..n.min(output_limit.saturating_sub(err.len()))]),
+                Ok(n) => {
+                    if let Some(capture) = capture {
+                        record_bytes(&capture.stderr_bytes, n);
+                    }
+                    err.extend_from_slice(&err_buf[..n.min(output_limit.saturating_sub(err.len()))]);
+                },
                 Err(error) => return Err(error),
             },
             _ = tokio::time::sleep(POLL) => owner.terminate_group()?,
@@ -633,9 +753,211 @@ async fn finish_cleanup_limited(
     owner.reap().await
 }
 
+fn record_bytes(counter: &std::sync::atomic::AtomicUsize, bytes: usize) {
+    let _ = counter.try_update(
+        std::sync::atomic::Ordering::SeqCst,
+        std::sync::atomic::Ordering::SeqCst,
+        |current| Some(current.saturating_add(bytes)),
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn captured_byte_count_saturates_without_losing_truncation_evidence() {
+        let counter = std::sync::atomic::AtomicUsize::new(usize::MAX - 1);
+        record_bytes(&counter, 4);
+        record_bytes(&counter, 1);
+        assert_eq!(
+            counter.load(std::sync::atomic::Ordering::SeqCst),
+            usize::MAX
+        );
+    }
+
+    #[tokio::test]
+    async fn captured_cleanup_counts_bytes_beyond_retained_streams() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let mut owner = test_owner(shell("printf abcdef; printf uvwxyz >&2", directory.path()));
+        // Wait without reaping so this test specifically exercises buffered
+        // cleanup reads, rather than racing cleanup's group termination.
+        tokio::time::timeout(Duration::from_secs(3), async {
+            while !owner.observe().expect("observe leader") {
+                tokio::time::sleep(POLL).await;
+            }
+        })
+        .await
+        .expect("leader completed writes");
+        let mut stdout =
+            tokio::process::ChildStdout::from_std(owner.child.stdout.take().expect("stdout"))
+                .expect("async stdout");
+        let mut stderr =
+            tokio::process::ChildStderr::from_std(owner.child.stderr.take().expect("stderr"))
+                .expect("async stderr");
+        let capture = crate::CommandCapture::default();
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        tokio::time::timeout(
+            Duration::from_secs(3),
+            finish_cleanup_limited(
+                &mut owner,
+                &mut stdout,
+                &mut stderr,
+                &mut out,
+                &mut err,
+                false,
+                false,
+                3,
+                Some(&capture),
+            ),
+        )
+        .await
+        .expect("bounded drain")
+        .expect("cleanup");
+        assert_eq!(out, b"abc");
+        assert_eq!(err, b"uvw");
+        assert_eq!(
+            capture
+                .stdout_bytes
+                .load(std::sync::atomic::Ordering::SeqCst),
+            6
+        );
+        assert_eq!(
+            capture
+                .stderr_bytes
+                .load(std::sync::atomic::Ordering::SeqCst),
+            6
+        );
+        assert!(!owner.may_signal);
+    }
+
+    #[tokio::test]
+    async fn captured_command_truncates_without_losing_owned_cleanup() {
+        let owner = crate::OwnedCommandExecutor::default();
+        let capture = Arc::new(crate::CommandCapture::default());
+        let mut command = Command::new("sh");
+        command.args(["-c", "printf abcdef; printf uvwxyz >&2"]);
+        let output = owner
+            .operation()
+            .execute_captured(command, Duration::from_secs(3), 3, None, capture.clone())
+            .await
+            .expect("captured execution");
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"abc");
+        assert_eq!(output.stderr, b"uvw");
+        assert_eq!(
+            capture
+                .stdout_bytes
+                .load(std::sync::atomic::Ordering::SeqCst),
+            6
+        );
+        assert_eq!(
+            capture
+                .stderr_bytes
+                .load(std::sync::atomic::Ordering::SeqCst),
+            6
+        );
+        owner.seal();
+        owner
+            .cleanup_receipt()
+            .wait_confirmed(Duration::from_secs(3))
+            .await
+            .expect("owned cleanup");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[tokio::test]
+    async fn darwin_retry_keeps_persistent_permission_and_ownership_failures_closed() {
+        let mut attempts = 0;
+        let failure = tokio::time::timeout(
+            Duration::from_secs(1),
+            retry_darwin_group_termination(|| {
+                attempts += 1;
+                Err(io::Error::from_raw_os_error(libc::EPERM))
+            }),
+        )
+        .await
+        .expect("bounded retry")
+        .expect_err("persistent denial");
+        assert_eq!(failure.raw_os_error(), Some(libc::EPERM));
+        assert!(attempts > 1);
+
+        let mut attempts = 0;
+        let failure = retry_darwin_group_termination(|| {
+            attempts += 1;
+            Err(io::Error::from_raw_os_error(libc::ECHILD))
+        })
+        .await
+        .expect_err("lost ownership");
+        assert_eq!(failure.raw_os_error(), Some(libc::ECHILD));
+        assert_eq!(attempts, 1);
+
+        let mut attempts = 0;
+        retry_darwin_group_termination(|| {
+            attempts += 1;
+            if attempts == 1 {
+                Err(io::Error::from_raw_os_error(libc::EPERM))
+            } else {
+                Ok(())
+            }
+        })
+        .await
+        .expect("later complete proof succeeds");
+        assert_eq!(attempts, 2);
+    }
+
+    #[tokio::test]
+    async fn startup_evidence_distinguishes_refusal_spawn_failure_and_started_timeout() {
+        let directory = tempfile::tempdir().expect("workspace");
+        let cleanup = Arc::new(Cleanup::default());
+        let missing = Command::new(directory.path().join("missing-executable"));
+        let failure = execute_with_start_evidence(
+            missing,
+            cleanup.clone(),
+            Duration::from_secs(1),
+            (),
+            1024,
+            None,
+        )
+        .await
+        .expect_err("missing executable");
+        assert_eq!(failure.start_state, CommandStartState::NotStarted);
+        cleanup
+            .wait_confirmed(Duration::from_secs(1))
+            .await
+            .expect("no child to clean");
+
+        let mut running = Command::new("/bin/sh");
+        running.args(["-c", "exec sleep 30"]);
+        let failure = execute_with_start_evidence(
+            running,
+            cleanup.clone(),
+            Duration::from_millis(50),
+            (),
+            1024,
+            None,
+        )
+        .await
+        .expect_err("deadline");
+        assert_eq!(failure.start_state, CommandStartState::Started);
+        cleanup
+            .wait_confirmed(Duration::from_secs(3))
+            .await
+            .expect("started child cleaned");
+
+        cleanup.seal();
+        let mut forbidden = Command::new("/bin/sh");
+        forbidden
+            .current_dir(directory.path())
+            .args(["-c", "touch should-not-exist"]);
+        let failure =
+            execute_with_start_evidence(forbidden, cleanup, Duration::from_secs(1), (), 1024, None)
+                .await
+                .expect_err("sealed owner");
+        assert_eq!(failure.start_state, CommandStartState::NotStarted);
+        assert!(!directory.path().join("should-not-exist").exists());
+    }
 
     #[tokio::test]
     async fn finite_input_drains_output_and_closes_the_pipe() {

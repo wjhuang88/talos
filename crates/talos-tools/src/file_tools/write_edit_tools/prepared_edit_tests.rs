@@ -61,9 +61,15 @@ async fn captured_edit_executes_and_restores_through_owning_tool() {
     assert_eq!(evidence.description().before, "hi hi");
     assert_eq!(evidence.description().after.as_deref(), Some("hello hi"));
     let proof = admit(root.path(), operation.as_ref(), &input);
-    let PreparedNormalStage::Complete(output) = operation.execute_stage(proof).await else {
+    let (stage, changed) =
+        talos_core::tool::observe_file_mutation(operation.execute_stage(proof)).await;
+    let PreparedNormalStage::Complete(output) = stage else {
         panic!("mutation stage");
     };
+    assert_eq!(
+        changed, !output.result.is_error,
+        "actual prepared mutation evidence"
+    );
     assert!(!output.result.is_error, "{}", output.result.content);
     assert_eq!(std::fs::read_to_string(&path).expect("edited"), "hello hi");
     let id = output
@@ -92,9 +98,15 @@ async fn oversized_result_is_refused_before_continuation_or_write() {
         .expect("prepare")
         .expect("operation");
     let proof = admit(root.path(), operation.as_ref(), &input);
-    let PreparedNormalStage::Complete(output) = operation.execute_stage(proof).await else {
+    let (stage, changed) =
+        talos_core::tool::observe_file_mutation(operation.execute_stage(proof)).await;
+    let PreparedNormalStage::Complete(output) = stage else {
         panic!("oversized result cannot be offered for review");
     };
+    assert_eq!(
+        changed, !output.result.is_error,
+        "actual prepared mutation evidence"
+    );
     assert!(output.result.is_error);
     assert_eq!(std::fs::read_to_string(&path).expect("unchanged"), "hi");
 }
@@ -122,9 +134,15 @@ async fn capture_requires_admission_and_changed_contents_are_never_overwritten()
     };
     std::fs::write(&path, "someone else's update").expect("concurrent update");
     let proof = admit(root.path(), operation.as_ref(), &input);
-    let PreparedNormalStage::Complete(output) = operation.execute_stage(proof).await else {
+    let (stage, changed) =
+        talos_core::tool::observe_file_mutation(operation.execute_stage(proof)).await;
+    let PreparedNormalStage::Complete(output) = stage else {
         panic!("mutation");
     };
+    assert_eq!(
+        changed, !output.result.is_error,
+        "actual prepared mutation evidence"
+    );
     assert!(output.result.is_error);
     assert_eq!(
         std::fs::read_to_string(&path).expect("preserved"),

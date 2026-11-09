@@ -122,11 +122,12 @@ impl PreparedEdit {
                 .map_err(|e| e.to_string())?;
             let id = self
                 .recovery
-                .replace(
+                .replace_guarded(
                     &path,
                     description.before.as_bytes(),
                     after.as_bytes(),
                     lock.as_deref(),
+                    super::super::workspace_guard(&path, &authorizations),
                 )
                 .map_err(|e| e.to_string())?;
             let receipt = super::recovery_receipt(id);
@@ -144,9 +145,16 @@ impl PreparedEdit {
             )));
         }
         let before = String::from_utf8(
-            super::super::recovery::read_bounded_regular_file(&path)
+            match super::super::workspace_read(&path, &authorizations, 2 * 1024 * 1024)
                 .map_err(|e| e.to_string())?
-                .0,
+            {
+                Some(bytes) => bytes,
+                None => {
+                    super::super::recovery::read_bounded_regular_file(&path)
+                        .map_err(|e| e.to_string())?
+                        .0
+                }
+            },
         )
         .map_err(|_| "edit requires a text file")?;
         let after = match &self.edit {
