@@ -111,14 +111,28 @@ claiming its historical completion evidence. Preserve TOOL-024 and ADR-060 as
 historical baselines; ADR-101 supplies the proposed narrow successor decision.
 No Source Issue is assigned to this new scope merely by inheriting TOOL-024's #59.
 
-Activation is not yet ready under AGENT-COLLABORATION's existing-task rule:
-#838 overlaps the private request-preparation integration. The next activation
-candidate must explicitly settle merge order or obtain a non-overlapping Work Slice
-agreement with that owner, and obtain independent authorization of ADR-101 and the
-atomic claim. Do not describe the previously approved inactive remediation as that
-authorization. This is a concrete coordination gate, not a need for another progress
-snapshot, global Board repair, or another governance PR. Until resolved, retain
-Refinement/Unclaimed and do not start production implementation.
+Correction: shared source files with #838 establish an integration risk, not by
+themselves a conflicting Work Slice or mandatory merge-order dependency. Proposed
+scope separation keeps Gemini/private replay with #838 and completion admission,
+deduplication and dispatch here. Preserve replay state and identity resets when
+sharing preparation; require combined regression coverage when both coexist.
+The coordination request is published at
+https://github.com/wjhuang88/talos/pull/838#issuecomment-6744155268.
+No owner agreement has been observed. Do not assert agreement, but do not treat
+silence alone as proof of a scope conflict. Resolve any concrete conflicting change
+before implementation. Independent authorization of ADR-101 and the atomic claim
+remains required; inactive-remediation approval is not that authorization.
+
+## Issue-index coordination resolution
+
+Feedback at https://github.com/wjhuang88/talos/issues/891#issuecomment-6744246534
+confirms #892 merged as 4646c02ad839c8e45fc487c8a99d1bffb8131159 and registered
+#891's authoritative intake. This closes that coordination residual on main, not
+browser feasibility or any implementation. It does not answer #838's replay
+coordination request. Earlier reconciliation failures remain historical failures;
+do not describe missing #891 registration as a current main defect or infer a
+fresh candidate CI pass. Any remaining failure needs exact-head log attribution.
+No duplicate intake or unrelated owner repair is needed in this slice.
 
 ## Target comparison and overlapping implementation slice
 
