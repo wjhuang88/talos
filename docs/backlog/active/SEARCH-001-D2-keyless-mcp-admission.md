@@ -26,7 +26,8 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | None |
-| Last Updated | 2026-11-04 |
+| Last Updated | 2026-11-10 |
+| Handoff / Release Condition | Intake-only; remain Proposed / Unclaimed with both providers BLOCKED until policy/use rights, live protocol and regional evidence are verified. Any activation requires separately approved claim and iteration; no Auto or E/F admission. |
 
 ## Objective
 
