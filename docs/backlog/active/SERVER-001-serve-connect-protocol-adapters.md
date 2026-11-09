@@ -39,6 +39,8 @@ mandatory property of every future server deployment.
 
 ## Dependencies
 
+**Server implementation architecture prerequisite:** [ARCH-035](ARCH-035-behavior-preserving-host-composition.md) / Issue #897 must first complete behavior-equivalent domain/runtime host-composition convergence, consuming STORE-002 / #670 without duplicating its storage contracts. SERVER-001 architecture/ADR refinement may proceed, but production ServerHost integration is blocked until the accepted ARCH-035 evidence is on the target branch. This is separate from later SERVER-002 remote database work.
+
 Coordinate with #46 SESSION-009, #47 ACP-001, #49 runtime shutdown, #52 PERM-006, and DATA-002
 (#141). Keep this scope separate from R02 CLI/TUI decomposition.
 
