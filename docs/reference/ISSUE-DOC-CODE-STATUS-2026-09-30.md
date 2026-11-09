@@ -89,7 +89,11 @@
 
 | [#891](https://github.com/wjhuang88/talos/issues/891) | Browser SERP feasibility intake | [SEARCH-001-BROWSER-SPIKE](../tasks/2026-11-09-browser-search-feasibility-intake.md) | Proposed / Unclaimed | Offline direct mapping rejected; real browser connector dependency #452 blocks reconsideration. Registration only, no claim or implementation. |
 
+| [#897](https://github.com/wjhuang88/talos/issues/897) | Behavior-preserving domain persistence and host composition decoupling (ARCH-035) | [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) | Intake / Unclaimed | Independent cross-host composition prerequisite to #142/#361; consumes #670 capability contracts. Only equivalence migration; no implementation claim, backend switch or Server behavior. |
+
 ## Synchronization Notes
+
+2026-11-10: Registered open Issue #897 as ARCH-035, independent behavior-preserving host/runtime composition owner. SERVER-001/#142 and SERVER-001-C/#361 require its accepted equivalence evidence before production Server integration; STORE-002/#670 continues to own storage capability contracts. Proposed planning documentation PR #896 does not activate implementation or supersede SERVER-002/#360. Earlier dated rows are preserved as historical provenance.
 
 2026-10-22: Added #748 against PROVIDER-008-A after splitting child A from parent #724 so the parent
 retains its own Source Issue/owner relationship. Governance-only #747 proposes the child claim and
