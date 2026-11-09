@@ -131,6 +131,67 @@ Next item / exact prerequisite / recovery command:
 
 **Initial checkpoint (2026-11-10):** Plan prepared from current repository Issues #142/#361/#360/#670/#46 and collaboration/long-task SOP; no implementation claim, no validation evidence, no database adapter implementation, and no production server is asserted. AG-UI child/version requires T0 refinement. #38 is already Closed / Superseded; it is not a dependency for this MVP.
 
+## Architecture refinement — domain-first ports, host-selected adapters (2026-11-10)
+
+### Decision: extract once for every host, not once per Server
+
+The server request exposes a broader architecture opportunity: CLI/TUI, Desktop, embedded SDK and Server must consume **the same domain/session contracts**. A `talos-server::StorageProvider` wrapper around concrete SQLite types is not the required decoupling.
+
+**But "move data abstractions into core and instantiate SQLite in TUI" is too literal.** Repository source currently shows:
+- `talos-core` is the minimal shared type/trait foundation; avoid giving it SQL/FS, migrations, connection pools, `PathBuf` persistence ownership or domain-specific repository methods.
+- `talos-session::SessionStore` is a *format/path* abstraction for TLOG/JSONL, not a repository capable of fulfilling remote database Session semantics.
+- `talos-session::SessionManager` currently owns local session-directory, SQLite index and file-format composition. `talos-session` itself depends on `rusqlite`; simply adding a trait does not make the **compiled dependency closure** database-free.
+- `talos-cli` is the existing product composition root; `talos-tui` is a renderer. `talos-runtime` already has `RuntimeBuilder` and optional `shared-composition`. Reuse these boundaries before inventing another shared composition crate.
+
+### Target layering and placement rule
+
+```text
+PRODUCT HOSTS (composition roots)
+  talos-cli (drives TUI) | talos-desktop | talos-server | embedded host
+       │ select profile + inject capabilities, no domain rule implementations
+       ▼
+talos-runtime (stable application/SDK facade)
+       │ composes shared Session/Agent/services; no vendor-specific API
+       ▼
+DOMAIN-OWNED PORTS + SEMANTICS
+  talos-session: Session repository, durable Turn settlement,
+                 submission custody and generation/lease invariants
+  talos-memory / evolution / exploration: own their domain persistence
+  storage capability taxonomy: Log/Relational/Object/Search/Vector/etc.
+       ▲ concrete adapters implement ports
+       │
+LOCAL IMPLEMENTATION (existing SQLite/TLOG/JSONL) | FUTURE REMOTE IMPLEMENTATION
+```
+
+Place a trait where its **domain semantics are owned** (normally in the corresponding domain crate, or a small neutral contract module if actual dependency direction requires it), not automatically in `talos-core` and never exclusively in Server/TUI. Shared cross-domain capability identifiers/types may live in the minimal foundation, but `SessionRepository` is not a generic `RelationalStorage`.
+
+Do not turn each capability taxonomy entry into a dynamic trait without a consumer. Stage #670 taxonomy and explicit availability first; extract behaviorally meaningful ports at real call sites. No `dyn` object, factory crate or new dependency is justified merely by conceptual symmetry. The public SDK remains additive/source compatible through a default local factory and opt-in host injection.
+
+### Two different kinds of decoupling (do not conflate)
+
+1. **Contract decoupling, MVP requirement:** Domain APIs, runtime construction and protocol DTOs must contain no PostgreSQL, SQLite SQL syntax, SQL transaction handles or vendor-specific error types. Local adapter reuses current storage implementation; no behavior changes.
+2. **Physical crate/dependency decoupling, separately accepted step:** Today `talos-runtime -> talos-session -> rusqlite`. If a future backend profile must produce a binary **without compiling/bundling SQLite**, separate local adapter code from the domain contract into a physically independent crate/module boundary in a reviewed additive migration. Trait injection alone does **not** meet that requirement. No premature crate split in the first no-behavior-change phase.
+
+### Repository contracts should preserve behavior, not mimic an RDBMS
+
+- A Session operation is not a CRUD aggregate: turn commit, first-terminal-outcome-wins, custody/receipts, idempotency, recovery and generation fencing have explicit invariants.
+- Preserve current local multi-resource ordering between SQLite and TLOG; no false claim of one transaction spanning both. Domain contract specifies externally observed result/recovery, not the native transaction method.
+- Keep storage capability selection distinct from **runtime capability selection** (file, shell, network, S3 tools) and from Session ownership. Do not inject a generic `Provider` because Talos also has LLM/provider terminology.
+- Separate session authority data from rebuildable FTS/search indexes and from semantic/vector computations. One vendor need not implement every capability.
+- Profile default: `Local` reuses current production code; test profile supplies fake/controlled failures; remote profile is **future** and separately validated. Database-agnostic API does not by itself prove backend portability: require a second implementation plus a common conformance suite before claiming it.
+
+### Implications for task order
+
+- **T0:** include a crate dependency/call-site matrix; record existing local factory and UI vs host ownership, pin semantics to protect, and decide exact trait home(s). Reconcile this with SERVER-001, STORE-002, SERVER-002 and SESSION-009 without reopening their independent claimed scopes.
+- **T1:** classify all #670 capabilities and extract the minimum domain seams *across existing consumers* with exact behavioral characterization. Preserve current `RuntimeBuilder::durable_session` and all current CLI/TUI/Desktop paths. Do not move storage construction into `talos-tui`.
+- **T2/T3:** shared SessionHost and Runtime receive capability bundles through one accepted composition contract; CLI continues to choose current local default, Server chooses the same local default for MVP. Avoid separate Server `SessionManager` and separate Agent loop.
+- **T4:** protocol adapter only authenticates/translates/projections; it cannot directly construct SQLite or issue persistence writes.
+- **T5:** verify an unchanged CLI/SDK path and Server path using the **same domain contracts**, plus absence of vendor types from public API. Treat optional SQLite-free binary packaging as a separate, explicitly owned acceptance.
+
+### Architectural optimization threshold
+
+Do **not** use this MVP to rewrite all Session, Memory, Evolution and Exploration concrete backends, flatten the domain modules into one storage layer, create a universal ORM, or move business logic into a new `talos-core` mega-crate. If a second backend later reveals a genuine missing port, revise that domain's contract with a controlled migration and preserve prior tests. **The optimization is dependency direction and ownership, not maximizing the number of interfaces.**
+
 ## Closure rule
 
 Mark `SERVER-MVP-001` Complete only when T0–T5 gates pass, all required/manual/security checks have evidence, docs and owner claims are consistent with merged commits, and unresolved optional/future work has an explicit residual destination. **Never close #142/#360/#361/#46/#670 merely because the narrower MVP runs.**
