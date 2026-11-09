@@ -314,6 +314,15 @@ static COMMAND_REGISTRY: std::sync::LazyLock<CommandRegistry> = std::sync::LazyL
             available: always_available,
         },
         CommandDefinition {
+            name: "/paste-image",
+            aliases: &[],
+            usage: "/paste-image",
+            description: "Paste a clipboard image (CLI TUI only; Ctrl+V or Alt+V)",
+            arg_hint: None,
+            origin: CommandOrigin::Builtin,
+            available: always_available,
+        },
+        CommandDefinition {
             name: "/attach",
             aliases: &[],
             usage: "/attach <path>",

@@ -15,10 +15,9 @@
 
 ## Tool result clipping / TUI-ELLIPSIS-001
 
-[Owner](tasks/2026-11-08-tui-result-ellipsis.md) is Review / Claimed. Implementation
-merged in #886 (`b7706d64`); local preflight, cargo-xwin, independent exact-head
-review and Linux/Windows CI passed. User deferred real-terminal ellipsis, newline,
-resize and background acceptance until after merge and cleanup.
+[Owner](tasks/2026-11-08-tui-result-ellipsis.md) is Complete / Closed through #886
+(`b7706d64`). Local preflight, cargo-xwin, independent review and Linux/Windows CI
+passed; user confirmed the deferred real-terminal visual acceptance on 2026-11-08.
 
 ## Tool routing / TOOL-ROUTE-001
 
@@ -291,3 +290,19 @@ owner for scope, acceptance and complete active/review/planned inventory.
 
 PROVIDER-008-B / #810 / I310 is proposed Active / Claimed in #811; ineffective until merge.
 Owner: [Gemini](backlog/active/PROVIDER-008-B-google-gemini.md). No implementation yet.
+
+## Session-owned worktrees / WORKTREE-001
+
+[Owner](tasks/2026-11-08-session-owned-worktrees.md) is Complete / Closed (PR #890;
+completion 2fa9b188). CLI/TUI Session-created worktree admission, resume/revocation
+and external approval execution passed full local preflight, MSVC cross-check and
+exact-head native CI. Independent OS-sandbox registration remains explicitly deferred
+to [WORKTREE-SANDBOX-001](tasks/2026-11-08-sandbox-owned-worktrees.md)
+(Planned / Unclaimed).
+
+## Clipboard image input / CLIPBOARD-IMAGE-001
+
+[Owner](tasks/2026-11-09-clipboard-image-input.md) is Review / Claimed under #894.
+Implementation validation is in progress for explicit native clipboard image paste
+into pending TUI attachments, focused on Linux Wayland+niri+Ghostty, following Codex
+interaction logic while retaining Talos ingestion and permission boundaries.

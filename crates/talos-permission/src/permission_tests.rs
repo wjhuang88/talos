@@ -1764,3 +1764,99 @@ fn rule_ids_survive_unrelated_insertions() {
         .expect("prepend unrelated configured rule");
     assert_eq!(evaluate_id(&engine), before);
 }
+
+#[test]
+fn ordinary_workspace_default_preserves_explicit_policy_and_external_boundary() {
+    use talos_core::tool::{ToolNature, ToolPermissionFacet, ToolResourceKind};
+    let root = tempfile::tempdir().expect("root");
+    let outside = tempfile::tempdir().expect("outside");
+    for (resource, expected) in [
+        (root.path().join("file.txt"), PermissionDecision::Allow),
+        (outside.path().join("file.txt"), PermissionDecision::Ask),
+        (root.path().join(".env"), PermissionDecision::Ask),
+        (root.path().join(".git/config"), PermissionDecision::Ask),
+    ] {
+        let mut engine = PermissionEngine::with_workspace_root(root.path().to_owned());
+        engine.set_ordinary_workspace_files(true);
+        let input = serde_json::json!({"path":resource});
+        let facets = [ToolPermissionFacet::with_resource(
+            ToolNature::Write,
+            resource.to_string_lossy(),
+            ToolResourceKind::Path,
+        )];
+        let request = crate::PermissionRequest::native("write", &facets, &input)
+            .with_ordinary_workspace_file();
+        assert_eq!(
+            engine
+                .evaluate_request(&request, &crate::PermissionContext::compatibility())
+                .decision(),
+            expected
+        );
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Ask,
+        ));
+        assert_eq!(
+            engine
+                .evaluate_request(&request, &crate::PermissionContext::compatibility())
+                .decision(),
+            PermissionDecision::Ask
+        );
+        engine.add_rule(PermissionRule::new_nature(
+            ToolNature::Write,
+            None,
+            None,
+            PermissionDecision::Deny("explicit".into()),
+        ));
+        assert!(matches!(
+            engine
+                .evaluate_request(&request, &crate::PermissionContext::compatibility())
+                .decision(),
+            PermissionDecision::Deny(_)
+        ));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn missing_workspace_targets_resolve_aliases_and_reject_symlink_escape() {
+    let temp = tempfile::tempdir().expect("temp");
+    let root = temp.path().join("workspace");
+    let outside = temp.path().join("outside");
+    let alias = temp.path().join("alias");
+    std::fs::create_dir(&root).expect("root");
+    std::fs::create_dir(&outside).expect("outside");
+    std::os::unix::fs::symlink(&root, &alias).expect("alias");
+    std::os::unix::fs::symlink(&outside, root.join("escape")).expect("escape");
+    assert!(super::is_path_in_workspace(
+        alias.join("nested/new.txt").to_str().expect("path"),
+        &root,
+    ));
+    assert!(!super::is_path_in_workspace(
+        root.join("escape/nested/new.txt").to_str().expect("path"),
+        &root,
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn workspace_boundary_preserves_symlink_parent_traversal() {
+    let temp = tempfile::tempdir().expect("temp");
+    let root = temp.path().join("workspace");
+    let outside = temp.path().join("outside");
+    std::fs::create_dir(&root).expect("root");
+    std::fs::create_dir_all(outside.join("child")).expect("outside");
+    std::fs::write(outside.join("secret"), "external").expect("secret");
+    std::os::unix::fs::symlink(outside.join("child"), root.join("link")).expect("link");
+    std::os::unix::fs::symlink(outside.join("absent"), root.join("dangling")).expect("dangling");
+    for resource in [
+        "dangling/new.txt",
+        "link/../secret",
+        "link/../missing/new.txt",
+        "absent/../new.txt",
+    ] {
+        assert!(!super::is_path_in_workspace(resource, &root), "{resource}");
+    }
+}

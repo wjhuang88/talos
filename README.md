@@ -948,10 +948,27 @@ basic permissions, not ownership, ACLs or timestamps. Failures can leave a parti
 restored file; inspect the reported effect before retrying. It does not provide isolation
 from concurrent external path replacement or make destructive operations Auto-eligible.
 
-File tools remain workspace-confined by default. When an interactive permission-aware mode requests
-an external path, Talos asks the operator; approval carries only the selected tool operation and
-normalized path. Denial, missing headless approval, path reuse, operation reuse, and changed
-symlink targets fail closed.
+In CLI/TUI/inline modes, ordinary built-in workspace read/write/edit operations are allowed by
+default. Explicit Ask/Deny and sensitive-path restrictions retain precedence. External paths use
+the existing permission pipeline: eligible automatic review may approve; otherwise interactive
+modes ask the operator. Approval covers the selected operation and normalized path, and works
+with the CLI's atomic file creator. Headless modes cannot invent human approval.
+
+In interactive Sessions, successful foreground literal commands such as
+`git worktree add -b feature ../feature` or `git worktree add --detach ../check HEAD`
+register only the created root in that Session. The host owns directory creation and verifies
+Git metadata and directory identities; sibling worktrees and the parent directory gain no
+access. Resume revalidates the persisted receipt. Replacement or invalid metadata revokes
+membership and old approvals; a fresh external-path approval remains possible.
+
+Registration currently recognizes `git worktree add [-b branch|--detach] path [startpoint]`;
+without `-b`/`--detach`, an explicit startpoint is required. Arguments may use simple quotes.
+Dynamic/compound commands, background execution and sandbox-dispatched shell commands retain
+normal execution/authorization and do not mint a host creation receipt. The command's ordinary
+execution approval is still required. SDK users opt into product defaults and Session binding;
+print mode has no durable Session binding. Registered-root searches use bounded capability traversal and never follow paths outside
+the held root. Grep skips hidden entries, `target` and `node_modules`; it currently does not
+apply `.gitignore` filtering. Glob includes directory and hidden-entry matches.
 
 Approval choices are explicit authority classes. Approve once is consumed by one official adapter
 invocation and is never stored. Always approve creates an in-memory grant for the active Talos
@@ -1370,3 +1387,24 @@ For current engineering status, use the project governance docs instead of this 
 ## License
 
 Talos is licensed under the [Apache License 2.0](LICENSE).
+
+### Clipboard images in the CLI TUI
+
+With an image-capable model selected, press **Ctrl+V** or **Alt+V**, or run
+`/paste-image`, to add a clipboard image to the pending attachments. Wait for the
+attachment confirmation before sending. `/attachments` lists images and `/detach`
+removes them. Existing image count, byte and pixel limits apply. Clipboard file
+paths use the same authorization as `/attach`.
+
+On Wayland, Talos reads the native clipboard with arboard's data-control support;
+`wl-paste` is not required. Ghostty's default **Ctrl+Shift+V** invokes terminal text
+paste and does not forward image data to terminal programs. Use Ctrl+V/Alt+V for
+images. Ctrl+Shift+V also works if your terminal forwards that key. Ordinary
+terminal text paste is unchanged. SSH/headless sessions need access to a graphical
+clipboard on the host running Talos; otherwise use `/attach <path>`.
+
+Clipboard PNGs are staged privately under `~/.talos/clipboard`. Unsubmitted staged
+files are removed when detached or when the composer closes. Files retained for
+submitted messages must remain available for session recovery; they are not
+currently removed by session deletion. Delete them manually only when their
+messages no longer need image recovery.

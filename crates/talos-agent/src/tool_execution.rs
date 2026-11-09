@@ -575,6 +575,14 @@ impl Agent {
         };
         let mut call = effective_call.expect("tool call should be present");
 
+        for shell in ["bash", "powershell"] {
+            if registry.is_builtin_instance(shell)
+                && let Some(host) = registry.get(shell)
+                && let Err(error) = host.activate_session_workspace()
+            {
+                tracing::warn!(%error, "additional workspace activation unavailable; using normal path authorization");
+            }
+        }
         let tool = match registry.get(&call.name) {
             Some(t) => t,
             None => {

@@ -87,6 +87,8 @@
 | [#810](https://github.com/wjhuang88/talos/issues/810) | Native Gemini with AI Studio and Vertex authentication | [PROVIDER-008-B](../backlog/active/PROVIDER-008-B-google-gemini.md) | Intake / claim proposal pending | Proposed atomically in #811; ineffective until merge, no implementation yet. |
 | [#832](https://github.com/wjhuang88/talos/issues/832) | explicit premium and self-hosted search overrides | [SEARCH-001-H](../backlog/active/SEARCH-001-H-explicit-search-overrides.md) | Proposed / Unclaimed | Dependency-ready after completed SEARCH-001-C; intake only. Select a bounded iteration and effective claim before implementation; D zero-admission keeps E/F separately blocked. |
 
+| [#891](https://github.com/wjhuang88/talos/issues/891) | Browser SERP feasibility intake | [SEARCH-001-BROWSER-SPIKE](../tasks/2026-11-09-browser-search-feasibility-intake.md) | Proposed / Unclaimed | Offline direct mapping rejected; real browser connector dependency #452 blocks reconsideration. Registration only, no claim or implementation. |
+
 ## Synchronization Notes
 
 2026-10-22: Added #748 against PROVIDER-008-A after splitting child A from parent #724 so the parent

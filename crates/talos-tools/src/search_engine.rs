@@ -114,13 +114,6 @@ pub trait SearchEngine: Send + Sync {
     ) -> Result<SearchOutput, SearchError>;
 }
 
-fn has_nul_prefix(path: &Path) -> std::io::Result<bool> {
-    let mut file = std::fs::File::open(path)?;
-    let mut buf = [0u8; BINARY_SNIFF_BYTES];
-    let n = file.read(&mut buf)?;
-    Ok(buf[..n].contains(&0u8))
-}
-
 /// Legacy search engine using regex + walkdir (preserves exact current behavior).
 pub struct LegacySearchEngine;
 
@@ -234,12 +227,32 @@ impl SearchEngine for RipgrepSearchEngine {
         include: Option<&glob::Pattern>,
         max_results: usize,
     ) -> Result<SearchOutput, SearchError> {
+        self.search_with_workspace(pattern, search_path, include, max_results, None)
+    }
+}
+impl RipgrepSearchEngine {
+    pub(crate) fn search_with_workspace(
+        &self,
+        pattern: &str,
+        search_path: &Path,
+        include: Option<&glob::Pattern>,
+        max_results: usize,
+        workspace: Option<&Arc<dyn talos_core::tool::WorkspaceRootCapability>>,
+    ) -> Result<SearchOutput, SearchError> {
         let matcher =
             RegexMatcher::new(pattern).map_err(|e| SearchError::InvalidRegex(e.to_string()))?;
         let started = Instant::now();
         let mut stats = SearchStats::default();
 
-        let files: Vec<std::path::PathBuf> = if search_path.is_file() {
+        let files: Vec<std::path::PathBuf> = if let Some(root) = workspace {
+            let relative = search_path
+                .strip_prefix(root.root())
+                .map_err(|_| std::io::Error::other("invalid workspace search path"))?;
+            root.files(relative, MAX_SEARCH_FILES, false, None)?
+                .into_iter()
+                .map(|path| root.root().join(path))
+                .collect()
+        } else if search_path.is_file() {
             vec![search_path.to_path_buf()]
         } else {
             let mut walker_builder = WalkBuilder::new(search_path);
@@ -321,27 +334,48 @@ impl SearchEngine for RipgrepSearchEngine {
                 }
             }
 
-            let metadata = match std::fs::metadata(file_path) {
+            let file = match workspace {
+                Some(root) => root.open_read(
+                    file_path
+                        .strip_prefix(root.root())
+                        .map_err(|_| std::io::Error::other("invalid search path"))?,
+                ),
+                None => std::fs::File::open(file_path),
+            };
+            let mut file = match file {
+                Ok(file) => file,
+                Err(error) if workspace.is_some() => return Err(SearchError::Io(error)),
+                Err(_) => {
+                    stats.skipped_errors += 1;
+                    continue;
+                }
+            };
+            let metadata = match file.metadata() {
                 Ok(metadata) => metadata,
                 Err(_) => {
                     stats.skipped_errors += 1;
                     continue;
                 }
             };
-            if metadata.len() > MAX_FILE_BYTES {
+            if !metadata.is_file() || metadata.len() > MAX_FILE_BYTES {
                 stats.skipped_oversized += 1;
                 continue;
             }
-            match has_nul_prefix(file_path) {
-                Ok(true) => {
-                    stats.skipped_binary += 1;
-                    continue;
-                }
-                Ok(false) => {}
-                Err(_) => {
-                    stats.skipped_errors += 1;
-                    continue;
-                }
+            if stats.input_bytes.saturating_add(metadata.len()) > MAX_TOTAL_BYTES {
+                stats.skipped_budget += 1;
+                continue;
+            }
+            let mut bytes = Vec::new();
+            file.by_ref()
+                .take(MAX_FILE_BYTES + 1)
+                .read_to_end(&mut bytes)?;
+            if bytes.len() as u64 > MAX_FILE_BYTES {
+                stats.skipped_oversized += 1;
+                continue;
+            }
+            if bytes.iter().take(BINARY_SNIFF_BYTES).any(|byte| *byte == 0) {
+                stats.skipped_binary += 1;
+                continue;
             }
             if stats.input_bytes.saturating_add(metadata.len()) > MAX_TOTAL_BYTES {
                 stats.skipped_budget += 1;
@@ -357,7 +391,6 @@ impl SearchEngine for RipgrepSearchEngine {
             let output_bytes_ref = Arc::clone(&output_bytes);
             let output_truncated_ref = Arc::clone(&output_truncated);
             let display_path_ref = display_path.clone();
-            let file_path = file_path.clone();
 
             let search_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let mut searcher = SearcherBuilder::new()
@@ -429,7 +462,7 @@ impl SearchEngine for RipgrepSearchEngine {
                     path: display_path_ref,
                 };
 
-                searcher.search_path(&matcher, &file_path, sink)
+                searcher.search_slice(&matcher, &bytes, sink)
             }));
 
             match search_result {

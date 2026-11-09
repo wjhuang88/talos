@@ -268,6 +268,10 @@ impl ConversationEngine {
             "/validate" => {
                 outputs.extend(self.handle_validate_command(arg));
             }
+            "/paste-image" => {
+                outputs.push(content_block(MessageSource::Error,
+                    "[Error] Clipboard image paste requires the local CLI TUI. Use /attach <path> here.\n".into()));
+            }
             "/attach" => {
                 if arg.trim().is_empty() {
                     let text =

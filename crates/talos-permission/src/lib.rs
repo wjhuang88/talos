@@ -166,6 +166,9 @@ pub struct PermissionEngine {
     rule_metadata: Vec<PermissionRuleMetadata>,
     workspace_root: Option<PathBuf>,
     trusted_workspace: bool,
+    ordinary_workspace_files: bool,
+    additional_roots: Vec<std::sync::Arc<dyn talos_core::tool::WorkspaceRootCapability>>,
+    protected_workspace_stores: Vec<PathBuf>,
     next_rule_id: u64,
 }
 
@@ -184,6 +187,9 @@ impl PermissionEngine {
             rule_metadata: Vec::new(),
             workspace_root: None,
             trusted_workspace: false,
+            ordinary_workspace_files: false,
+            additional_roots: Vec::new(),
+            protected_workspace_stores: Vec::new(),
             next_rule_id: 0,
         }
     }
@@ -202,6 +208,12 @@ impl PermissionEngine {
         let mut engine = Self::new();
         engine.workspace_root = Some(root);
         engine
+    }
+
+    /// Enables ordinary built-in workspace file defaults for interactive products.
+    /// SDK engines retain their existing policy unless the host opts in.
+    pub fn set_ordinary_workspace_files(&mut self, enabled: bool) {
+        self.ordinary_workspace_files = enabled;
     }
 
     pub fn set_workspace_root(&mut self, root: PathBuf) {
@@ -359,7 +371,12 @@ impl PermissionEngine {
 
         for (facet_index, facet) in facets.iter().enumerate() {
             let (decision, source) = transitive_restriction.clone().unwrap_or_else(|| {
-                self.evaluate_facet_structured(request.tool_name(), facet, request.input())
+                self.evaluate_facet_structured(
+                    request.tool_name(),
+                    facet,
+                    request.input(),
+                    self.ordinary_workspace_files && request.ordinary_workspace_file(),
+                )
             });
             match &decision {
                 PermissionDecision::Allow => {}
@@ -401,12 +418,30 @@ impl PermissionEngine {
         tool_name: &str,
         facet: &ToolPermissionFacet,
         input: &Value,
+        ordinary_workspace_file: bool,
     ) -> (PermissionDecision, PermissionDecisionSource) {
         debug_assert_eq!(self.rules.len(), self.rule_metadata.len());
         if let Some(restriction) = self.native_pull_command_restriction(tool_name, facet) {
             return restriction;
         }
         let nature = facet.nature;
+        if facet.resource_kind == Some(ToolResourceKind::Path)
+            && let Some(root) = &self.workspace_root
+            && let Some(resource) = facet
+                .resource
+                .as_ref()
+                .cloned()
+                .or_else(|| ResourceExtractor::extract(nature, input))
+            && let Ok(path) = talos_core::tool::normalize_authorized_path(root, &resource)
+            && self.protected_workspace_stores.iter().any(|store| {
+                path.starts_with(store) || (nature == ToolNature::Write && store.starts_with(&path))
+            })
+        {
+            return (
+                PermissionDecision::Deny("host-owned workspace receipt store".into()),
+                PermissionDecisionSource::WorkspaceBoundary,
+            );
+        }
 
         let mut matched_rule = None;
         let mut matched_deny = None;
@@ -453,6 +488,44 @@ impl PermissionEngine {
             );
         }
 
+        if ordinary_workspace_file {
+            // Explicit human checkpoints are not defaults and must survive the
+            // product's ordinary-file convenience policy.
+            if let Some((_, metadata)) =
+                self.rules
+                    .iter()
+                    .zip(&self.rule_metadata)
+                    .find(|(rule, metadata)| {
+                        metadata.source == PermissionRuleSource::Explicit
+                            && rule.decision == PermissionDecision::Ask
+                            && rule
+                                .matches(
+                                    tool_name,
+                                    nature,
+                                    input,
+                                    facet.resource.as_deref(),
+                                    facet.resource_kind,
+                                )
+                                .unwrap_or(false)
+                    })
+            {
+                return (PermissionDecision::Ask, matched_source(*metadata));
+            }
+            if matches!(tool_name, "read" | "write" | "edit")
+                && matches!(nature, ToolNature::Read | ToolNature::Write)
+                && facet_uses_path_resource(facet, input)
+                && let Some(root) = &self.workspace_root
+                && let Some(resource) = facet.resource.as_deref()
+                && self.workspace_path_allowed(input, root, Some(resource))
+                && ordinary_file_target(root, resource)
+            {
+                return (
+                    PermissionDecision::Allow,
+                    PermissionDecisionSource::WorkspaceTrust,
+                );
+            }
+        }
+
         if self.trusted_workspace
             && let Some(ref root) = self.workspace_root
             && nature == ToolNature::Write
@@ -471,7 +544,9 @@ impl PermissionEngine {
             && let Some(root) = &self.workspace_root
         {
             let in_workspace =
-                is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref());
+                is_workspace_path_allowed_with_resource(input, root, facet.resource.as_deref())
+                    || (ordinary_workspace_file
+                        && self.workspace_path_allowed(input, root, facet.resource.as_deref()));
             if !in_workspace {
                 if let Some((rule, metadata)) = matched_rule
                     && rule_has_concrete_path_scope(rule)
@@ -497,6 +572,21 @@ impl PermissionEngine {
             }
         };
         (decision, PermissionDecisionSource::DefaultBehavior)
+    }
+
+    fn workspace_path_allowed(&self, input: &Value, root: &Path, resource: Option<&str>) -> bool {
+        if is_workspace_path_allowed_with_resource(input, root, resource) {
+            return true;
+        }
+        let Some(resource) = resource.or_else(|| input.get("path").and_then(Value::as_str)) else {
+            return false;
+        };
+        let Ok(path) = talos_core::tool::normalize_authorized_path(root, resource) else {
+            return false;
+        };
+        self.additional_roots
+            .iter()
+            .any(|entry| path.starts_with(entry.root()) && entry.validate())
     }
 
     /// Returns the configured workspace root, if any.
@@ -566,6 +656,21 @@ impl PermissionEngine {
                     "failed to normalize authorized path '{resource}': {error}"
                 ))
             })?;
+            let authorization = if let Some(guard) = self
+                .additional_roots
+                .iter()
+                .find(|entry| authorization.normalized_path().starts_with(entry.root()))
+            {
+                if guard.validate() {
+                    authorization.with_workspace_guard(guard.clone())
+                } else {
+                    return Err(PermissionError::InvalidRule(
+                        "workspace identity changed during admission".into(),
+                    ));
+                }
+            } else {
+                authorization
+            };
             authorizations.push(authorization);
         }
         Ok(authorizations)
@@ -789,37 +894,34 @@ fn rule_has_concrete_path_scope(rule: &PermissionRule) -> bool {
 /// Checks whether `path` is within (or relative to) the workspace `root`.
 ///
 /// Relative paths are resolved against the workspace root. Existing paths are
-/// canonicalized so symlink escapes are rejected; missing write targets use a
-/// lexical normalization that still rejects `..` escapes.
+/// canonicalized through their nearest existing ancestor so missing targets
+/// respect workspace aliases while symlink escapes remain outside the boundary.
 fn is_path_in_workspace(path_str: &str, root: &Path) -> bool {
+    let Ok(root) = std::fs::canonicalize(root) else {
+        return false;
+    };
     let path = Path::new(path_str);
-    let root = match std::fs::canonicalize(root) {
-        Ok(root) => root,
-        Err(_) => return false,
-    };
-    let candidate = if path.is_relative() {
-        root.join(path)
+    let candidate = if path.is_absolute() {
+        path.to_owned()
     } else {
-        path.to_path_buf()
+        root.join(path)
     };
-
-    if let Ok(canonical) = std::fs::canonicalize(&candidate) {
-        return canonical.starts_with(&root);
-    }
-
-    let mut normalized = PathBuf::new();
-    for component in candidate.components() {
-        match component {
-            std::path::Component::CurDir => {}
-            std::path::Component::ParentDir => {
-                if !normalized.pop() {
-                    return false;
-                }
-            }
-            other => normalized.push(other.as_os_str()),
+    let mut ancestor = candidate.as_path();
+    loop {
+        if let Ok(resolved) = ancestor.canonicalize() {
+            return resolved.starts_with(&root);
         }
+        // Existing but unresolvable entries (including dangling links) are not
+        // missing suffixes. Do not collapse `..` across a symlink or missing
+        // component: preserve OS path traversal semantics.
+        if ancestor.symlink_metadata().is_ok() || ancestor.file_name().is_none() {
+            return false;
+        }
+        let Some(parent) = ancestor.parent() else {
+            return false;
+        };
+        ancestor = parent;
     }
-    normalized.starts_with(root)
 }
 
 impl Default for PermissionEngine {
@@ -834,3 +936,31 @@ mod tests;
 
 #[cfg(test)]
 mod transitive_effect_tests;
+
+fn ordinary_file_target(root: &Path, resource: &str) -> bool {
+    let Ok(path) = talos_core::tool::normalize_authorized_path(root, resource) else {
+        return false;
+    };
+    if path.is_dir() {
+        return false;
+    }
+    !path.components().any(|part| {
+        let name = part.as_os_str().to_string_lossy().to_ascii_lowercase();
+        matches!(
+            name.as_str(),
+            ".git"
+                | ".ssh"
+                | ".aws"
+                | ".talos"
+                | ".codex"
+                | ".agents"
+                | ".gnupg"
+                | ".env"
+                | "credentials"
+                | "id_rsa"
+                | "id_ed25519"
+        ) || name.starts_with(".env.")
+            || name.ends_with(".pem")
+            || name.ends_with(".key")
+    })
+}

@@ -241,6 +241,22 @@ impl ToolRegistry {
         Ok(())
     }
 
+    /// Replaces an existing built-in instance with host-configured implementation.
+    /// This is a trusted composition API, never a model/plugin registration route.
+    pub fn replace_builtin(&mut self, tool: Arc<dyn AgentTool>) -> Result<(), ToolError> {
+        let name = tool.name().to_owned();
+        if !self.is_builtin_instance(&name) {
+            return Err(ToolError::ToolNotFound(name));
+        }
+        let source = self.contribution_sources.get(&name).cloned();
+        self.register(tool);
+        self.builtin_instances.insert(name.clone());
+        if let Some(source) = source {
+            self.contribution_sources.insert(name, source);
+        }
+        Ok(())
+    }
+
     /// Reports explicit product ownership of the currently registered instance.
     /// Ordinary replacement clears this designation, even for an identical name.
     #[must_use]

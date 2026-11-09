@@ -57,6 +57,8 @@ pub struct BashInput {
 /// Commands are run with a configurable timeout and working directory.
 /// Output is captured from both stdout and stderr.
 pub struct BashTool {
+    #[cfg(feature = "git")]
+    worktrees: Option<std::sync::Arc<crate::session_worktrees::SessionWorktrees>>,
     working_dir: PathBuf,
     working_dir_identity: Option<String>,
     timeout: Duration,
@@ -173,6 +175,8 @@ impl BashTool {
     /// The default timeout is 120 seconds.
     pub fn new(working_dir: PathBuf) -> Self {
         Self {
+            #[cfg(feature = "git")]
+            worktrees: None,
             working_dir_identity: directory_identity(&working_dir),
             working_dir,
             timeout: Duration::from_secs(120),
@@ -181,6 +185,17 @@ impl BashTool {
             #[cfg(windows)]
             executor: crate::process_boundary::windows_foreground::OwnedCommandExecutor::default(),
         }
+    }
+
+    /// Binds verified worktree creation to the host's current logical Session.
+    #[cfg(feature = "git")]
+    #[must_use]
+    pub fn with_session_worktrees(
+        mut self,
+        host: std::sync::Arc<crate::session_worktrees::SessionWorktrees>,
+    ) -> Self {
+        self.worktrees = Some(host);
+        self
     }
 
     /// Sets a custom timeout for command execution.
@@ -487,17 +502,40 @@ impl BashTool {
 impl AgentTool for BashTool {
     #[cfg(any(unix, windows))]
     fn cleanup_receipt(&self) -> Option<std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner>> {
-        Some(std::sync::Arc::new(self.executor.clone()))
+        let shell: std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner> =
+            std::sync::Arc::new(self.executor.clone());
+        #[cfg(feature = "git")]
+        if let Some(worktrees) = self
+            .worktrees
+            .as_ref()
+            .and_then(|host| host.cleanup_receipt())
+        {
+            return Some(std::sync::Arc::new(CombinedCleanup(shell, worktrees)));
+        }
+        Some(shell)
+    }
+
+    fn activate_session_workspace(&self) -> Result<(), String> {
+        #[cfg(feature = "git")]
+        if let Some(host) = &self.worktrees {
+            host.activate()?;
+        }
+        Ok(())
     }
 
     fn invocation_review_configuration(&self) -> Option<Value> {
-        Some(serde_json::json!({
+        let mut configuration = serde_json::json!({
             "backend": if cfg!(windows) { "powershell.exe" } else { "sh -c" },
             "working_directory": self.working_dir.to_str()?,
             "constructor_directory_identity": self.working_dir_identity,
             "default_timeout_ms": self.timeout.as_millis(),
             "environment": "inherited",
-        }))
+        });
+        #[cfg(feature = "git")]
+        if let Some(host) = &self.worktrees {
+            configuration["worktree_creation"] = host.review_configuration();
+        }
+        Some(configuration)
     }
 
     fn execution_working_directory(&self) -> Option<PathBuf> {
@@ -556,7 +594,23 @@ impl AgentTool for BashTool {
                 .with_description(format!("{} supervised background", self.name())),
             ]
         } else {
-            vec![foreground]
+            let mut profile = vec![foreground];
+            #[cfg(feature = "git")]
+            if let Some(target) = self
+                .worktrees
+                .as_ref()
+                .and_then(|host| host.destination(input))
+            {
+                profile.push(
+                    ToolPermissionFacet::with_resource(
+                        ToolNature::Write,
+                        target.to_string_lossy(),
+                        ToolResourceKind::Path,
+                    )
+                    .with_description("create Git worktree and register it in this Session"),
+                );
+            }
+            profile
         }
     }
 
@@ -669,6 +723,12 @@ impl AgentTool for BashTool {
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
+        #[cfg(feature = "git")]
+        if let Some(host) = &self.worktrees
+            && let Some(result) = host.execute(&input).await
+        {
+            return result;
+        }
         let bash_input = match parse_input(input) {
             Ok(i) => i,
             Err(e) => return ToolResult::error(e.to_string()),
@@ -2020,5 +2080,27 @@ mod tests {
         assert!(!is_expected_exit_code("grep foo | wc -l", 1));
         // cargo fmt without --check is not expected
         assert!(!is_expected_exit_code("cargo fmt", 1));
+    }
+}
+
+#[cfg(all(feature = "git", any(unix, windows)))]
+struct CombinedCleanup(
+    std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner>,
+    std::sync::Arc<dyn talos_core::tool::ToolCleanupOwner>,
+);
+#[cfg(all(feature = "git", any(unix, windows)))]
+#[async_trait]
+impl talos_core::tool::ToolCleanupReceipt for CombinedCleanup {
+    async fn wait(&self, timeout: Duration) -> Result<(), talos_core::tool::ToolCleanupError> {
+        let started = std::time::Instant::now();
+        self.0.wait(timeout).await?;
+        self.1.wait(timeout.saturating_sub(started.elapsed())).await
+    }
+}
+#[cfg(all(feature = "git", any(unix, windows)))]
+impl talos_core::tool::ToolCleanupOwner for CombinedCleanup {
+    fn seal(&self) {
+        self.0.seal();
+        self.1.seal();
     }
 }
