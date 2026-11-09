@@ -101,6 +101,59 @@ The reviewer attributed remote reconciliation failure to global matrix omission
 that separate residual without editing unrelated owners here. Both findings still
 require independent re-review of the corrected head. No runtime tests were run.
 
+## Source integration checkpoint (candidate tree)
+
+Inspection of `crates/talos-agent/src/session.rs` confirms the dispatch loop gates
+pending turns on current turn, fork, manual compaction and pause state (lines
+515–519), then calls runtime `commit_start` before `start_submission` (534–546).
+`start_submission` currently takes a public `StructuredSubmission` (1251–1256)
+and prepares messages from its items (1285–1295). Thus private completion input
+cannot simply call this function unchanged without misrepresenting provenance.
+Implementation must extract/reuse private preparation and finalization machinery,
+not fabricate a user submission or add a parallel unguarded dispatch loop.
+These are candidate-source observations, not evidence of implemented behavior or
+proof that all target-branch integration seams have been audited.
+
+Remote main decision-directory inspection currently ends at ADR-099; neither
+competing ADR-100 is merged. A unique renumbering remains necessary before
+activation. No number reservation or other PR modification has been performed.
+
+## ADR namespace conflict discovered during follow-up
+
+Open-PR file inspection found #895 (`fix/clipboard-image-input`) adds
+`docs/decisions/100-native-clipboard-image-input.md` and edits the ADR index.
+#893 independently proposes ADR-100. Therefore the provisional number is NOT
+cleared for activation. Coordinate a unique successor number and update references
+before proposing acceptance; recheck target and competing PRs at merge time.
+Do not modify #895 or assume either candidate owns the number from PR order alone.
+
+## Follow-up readiness checkpoint
+
+User reports independent remediation re-review passed for e1c77bc2. This is
+user-supplied review evidence; GitHub reviews API currently returns no reviews.
+Read-only remote verification confirms PR #893 OPEN at
+`e1c77bc20a169e99f00b2e9811225f330380820b`, base
+`4646c02ad839c8e45fc487c8a99d1bffb8131159`. Exact-head Rust
+Format + Check + Clippy + Test, scope classification and Windows installer fixture
+passed; Windows workspace and Desktop jobs were skipped. Remote reconciliation
+still failed; attribution to #891 remains reviewer-provided, not independently
+revalidated here. No claim effectiveness or ADR acceptance follows from this check.
+
+Candidate-tree iteration header inventory was repeated: I310 Active retained;
+I277, I302 and I318 Review retained with their existing acceptance gates; I249
+Planned deferred. I162 is Complete with a recorded historical Review outcome,
+not reopened. TEMPLATE is not an iteration. No Blocked owner header matched.
+This is a candidate-tree checkpoint, not yet a complete current-target inventory:
+target-tree owner comparison and open-PR file/claim overlap remain activation gates.
+
+ADR-100 already selects private Actor input without extending public exhaustive
+enums, requires shared admission/finalization and specifies provenance, cancellation,
+consumption and recovery fencing. Verify those integration seams against current
+target source before replacing the historical Design readiness entry with a final
+activation decision. Keep this candidate inactive until these checks and successor
+ADR authorization are complete. Do not reinterpret remediation approval as approval
+of a changed activation candidate.
+
 ## Execution ledger
 
 Draft PR #893 publishes design commit c57f8f7245dddd9d4645d7c1c7172ccc1283f454.
