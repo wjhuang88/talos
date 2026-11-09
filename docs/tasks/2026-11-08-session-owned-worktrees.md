@@ -1,13 +1,13 @@
 # WORKTREE-001: Session-owned worktree workspace admission
 
-> Document status: Review / Claimed (effective governance merge #889)
+> Document status: Complete / Closed (CLI/TUI scope; sandbox follow-up remains Planned)
 > Deliverable: a worktree verifiably created by the current Session becomes an additional workspace root for that Session without a second workspace-admission prompt.
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | Verified Session-owned worktree creation receipts, additional workspace capabilities, resume revalidation, tool/permission integration and adversarial tests |
@@ -16,8 +16,8 @@
 | Governance Claim PR | #889 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requests automatic workspace admission for worktrees created by the Session; independent security design review identifies receipt and capability prerequisites |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-08 |
+| Implementation PR | #890 |
+| Last Updated | 2026-11-09 |
 | Handoff / Release Condition | Reviewed ADR and effective implementation claim; full preflight, cargo-xwin and native Windows identity checks; independent security review |
 
 ## Problem and evidence
@@ -216,3 +216,24 @@ creation progressed past publication but Git rejected the canonical `\\?\` desti
 spelling. The final follow-up gives Git a conventional argument only after unchanged
 Win32 normalization and directory identity comparison, rejecting reserved/verbatim-only
 names. Permission and receipt paths remain canonical. Native success is still required.
+
+## Completion evidence
+
+Completion Commit: 2fa9b18894f523e9c3de5e3f2d6166eea2229151
+
+Implementation PR #890 merged after exact-head independent Agent security APPROVE
+for bb75b0b26ff33acd80109fa09929b3c3f65c2ba9 against d29fbebe40f7077b5c0a254bc6748746918e0f99
+and all checks passed in [CI run 42494047202](https://github.com/wjhuang88/talos/actions/runs/42494047202).
+Local locked full preflight and MSVC cargo-xwin test cross-check passed. Native
+Windows verified actual Agent creation-to-write, ordinary/external permission flows,
+resume/revocation, stale grants, fresh approval, no-clobber and junction protection.
+The final Windows run initially failed an unchanged history lease preparation test;
+the same-head failed-job rerun passed the full workspace and CLI smoke. No test was
+skipped or deadline relaxed. macOS full preflight and CLI/TUI Auto acceptance passed.
+Review is by a separate Agent sharing the maintainer GitHub identity, not a separate
+human approval. Merge-time claim, base, overlap and exact-head checks were unchanged.
+
+Accepted CLI/TUI scope is complete. WORKTREE-SANDBOX-001 remains Planned/Unclaimed.
+Nonblocking limitation: if Git path conversion or execution fails after directory
+publication, an empty owned destination may remain; it is not registered and cannot
+grant workspace authority.
