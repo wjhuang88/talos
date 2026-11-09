@@ -1,21 +1,21 @@
 # BG-CONTINUE-001: Default Background Completion Continuation
 
-> Document status: Refinement / Unclaimed
+> Document status: Active / Claimed (proposed in #893; effective only after target-branch merge)
 > Deliverable: background success, failure and timeout resume the originating live Session without another user message or opt-in flag.
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Talos / gpt-6-astra |
 | Work Slice | Actor-owned terminal admission and default continuation, cancellation/consumption deduplication, bounded context, tests and docs |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-09 |
 | Source Issue | None |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | User requests implementation closure; no independent review or effective claim yet |
+| Governance Claim PR | #893 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Proposed claim only. User authorized preparation and PR publication; independent review and exact-head checks remain pending. Ownership and activation take effect only on target-branch merge |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-09 |
 | Handoff / Release Condition | Accepted successor decision, effective target claim, tested implementation and exact-head review/CI |
