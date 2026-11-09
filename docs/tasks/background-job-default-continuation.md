@@ -101,6 +101,53 @@ The reviewer attributed remote reconciliation failure to global matrix omission
 that separate residual without editing unrelated owners here. Both findings still
 require independent re-review of the corrected head. No runtime tests were run.
 
+## Owner disposition and remaining activation gate
+
+Read the TOOL-024 owner directly at target
+4646c02ad839c8e45fc487c8a99d1bffb8131159: it is Complete/Closed and explicitly
+excludes automatic model continuation, reserving it for a later product decision.
+BG-CONTINUE-001 therefore owns a new behavior rather than reopening TOOL-024 or
+claiming its historical completion evidence. Preserve TOOL-024 and ADR-060 as
+historical baselines; ADR-101 supplies the proposed narrow successor decision.
+No Source Issue is assigned to this new scope merely by inheriting TOOL-024's #59.
+
+Activation is not yet ready under AGENT-COLLABORATION's existing-task rule:
+#838 overlaps the private request-preparation integration. The next activation
+candidate must explicitly settle merge order or obtain a non-overlapping Work Slice
+agreement with that owner, and obtain independent authorization of ADR-101 and the
+atomic claim. Do not describe the previously approved inactive remediation as that
+authorization. This is a concrete coordination gate, not a need for another progress
+snapshot, global Board repair, or another governance PR. Until resolved, retain
+Refinement/Unclaimed and do not start production implementation.
+
+## Target comparison and overlapping implementation slice
+
+GitHub compare of candidate b378ce845192d0d9122007df06881363637aa479
+against target 4646c02ad839c8e45fc487c8a99d1bffb8131159 reports divergence:
+11 target-only commits and 6 candidate-only commits. Target-side changed paths
+include permission/tool execution and session-owned worktrees, but no iteration
+owner files and no session.rs/request_plan.rs/background_jobs.rs changes. Thus the
+candidate iteration-header inventory remains applicable at that target SHA; it
+is not a claim that all task owners or permission integration are unchanged.
+Preserve target permission changes when implementation begins from the effective
+claim merge; do not implement on the old design branch.
+
+Open PR #838 has a real integration overlap, not merely a related title:
+its session.rs patch adds generation/session-scoped PrivateReplayStore state and
+passes it into prepare_session_turn_at_revision; request_plan.rs extends the
+preparation signature and seeds request tokens from that store. BG-CONTINUE-001
+owns completion admission/dispatch, not Gemini private replay. Any shared private
+preparation extraction must preserve replay state, identity reset and pruning;
+do not overwrite or duplicate #838's owner. Recheck merge order and add a combined
+preparation regression when both implementations coexist. #861/#849 are search
+slices with no agent source paths in the inspected file lists. This establishes
+file-level overlap disposition, not authorization from another owner.
+
+At this checkpoint b378ce84 Rust CI was still in progress; scope/installer passed,
+remote reconciliation failed, and Windows/Desktop jobs were skipped. No complete
+current-head CI pass is asserted. Activation and successor ADR acceptance remain
+pending; this record does not turn remediation approval into implementation approval.
+
 ## ADR numbering resolution
 
 The preceding checkpoints describe the historical ADR-100 candidate. This revision
