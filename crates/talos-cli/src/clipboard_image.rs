@@ -107,11 +107,19 @@ pub(crate) async fn acquire(cancel: tokio_util::sync::CancellationToken) -> Resu
         .stderr(Stdio::null())
         .kill_on_drop(true);
     let mut child = command.spawn().context("starting clipboard worker")?;
+    read_child(&mut child, cancel, TIMEOUT).await
+}
+
+async fn read_child(
+    child: &mut tokio::process::Child,
+    cancel: tokio_util::sync::CancellationToken,
+    timeout: Duration,
+) -> Result<Capture> {
     let output = child
         .stdout
         .take()
         .context("clipboard worker stdout unavailable")?;
-    let operation = tokio::time::timeout(TIMEOUT, async {
+    let operation = tokio::time::timeout(timeout, async {
         let mut bytes = Vec::new();
         output
             .take(crate::image_validation::max_single_image_bytes() + 2)
@@ -293,5 +301,46 @@ mod tests {
                 .is_err()
         );
         assert!(writer.0.is_empty());
+    }
+    #[test]
+    fn clipboard_worker_hang_fixture() {
+        if std::env::var_os("TALOS_CLIPBOARD_TEST_HANG").is_some() {
+            std::thread::sleep(Duration::from_secs(30));
+        }
+    }
+
+    #[tokio::test]
+    async fn timeout_and_cancellation_reap_clipboard_worker() {
+        for cancelled in [false, true] {
+            let mut command = tokio::process::Command::new(std::env::current_exe().unwrap());
+            command
+                .args([
+                    "--exact",
+                    "clipboard_image::tests::clipboard_worker_hang_fixture",
+                    "--nocapture",
+                ])
+                .env("TALOS_CLIPBOARD_TEST_HANG", "1")
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .kill_on_drop(true);
+            let mut child = command.spawn().unwrap();
+            let cancel = tokio_util::sync::CancellationToken::new();
+            if cancelled {
+                cancel.cancel();
+            }
+            let error = read_child(&mut child, cancel, Duration::from_millis(100))
+                .await
+                .unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(if cancelled { "cancelled" } else { "timed out" })
+            );
+            assert!(
+                child.try_wait().unwrap().is_some(),
+                "worker must be reaped before return"
+            );
+        }
     }
 }
