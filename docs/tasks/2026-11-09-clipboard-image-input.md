@@ -1,6 +1,6 @@
 # CLIPBOARD-IMAGE-001: Explicit clipboard image attachments
 
-> Document status: Active / Claimed (proposed; effective only after governance merge)
+> Document status: Review / Claimed
 
 ## Collaboration Claim
 
@@ -67,3 +67,25 @@ I318 key-repeat review and existing permission/search/provider work remain with 
 owners; none admits clipboard work. Open PRs #838/#849/#861 and #893 are non-overlapping.
 Preserve BG-CONTINUE files/worktree and session-auto-approval proposal. No iteration
 activation is selected; this standalone task owns the runnable deliverable.
+
+## Execution record
+
+Governance claim #894 merged as `682d47cf`; implementation in progress on
+`fix/clipboard-image-input`. Independent claim review approved exact head
+`f9d5ef57714c499200ac16ead55958b330c658c9`. Local governance validators passed.
+
+ADR-100 records the native clipboard OS boundary, isolated worker and durable
+clipboard file policy. Final implementation `485e1a9fe93cc5c21e1ecbbdd7d51545e85695a9` passed the full
+locked release preflight and cargo-xwin MSVC `--tests` check. One preflight attempt
+hit an unrelated git-daemon fixture port collision before Talos dispatch; the
+focused coding-feature test and complete unchanged-source preflight rerun passed.
+Independent exact-head technical/permission/native review approved this commit
+against `682d47cf5023649f3c08f47e1f9dca966e237ebd` with shared-identity disclosure.
+After the user copied an image, the native Wayland worker returned PNG successfully:
+1356x852 pixels, 312719 PNG bytes. No image contents were logged or saved. This
+validates host acquisition/encoding; final Ghostty key-to-composer acceptance remains. Tests cover draft retention,
+repeat/modal guards, cancellable file authorization, current limits, staged cleanup
+and committed-image retention. A deterministic child-process fixture passed timeout/cancellation reaping checks. Native Windows execution remains a remote CI gate.
+Residual owned here: reference-aware cleanup of successfully submitted clipboard
+images is not implemented; retain these files for session recovery. Device acceptance
+on Wayland+niri+Ghostty remains required. Do not mark this task Complete yet.

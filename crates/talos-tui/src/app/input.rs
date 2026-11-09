@@ -410,6 +410,24 @@ impl Tui {
                     }
                     return false;
                 }
+                if matches!(key.code, KeyCode::Char('v' | 'V'))
+                    && key
+                        .modifiers
+                        .intersects(event::KeyModifiers::CONTROL | event::KeyModifiers::ALT)
+                    && !self.state.slash_menu.is_open
+                {
+                    if self
+                        .last_image_paste
+                        .is_none_or(|last| last.elapsed() >= Duration::from_millis(250))
+                    {
+                        self.last_image_paste = Some(Instant::now());
+                        self.clipboard_paste_pending = true;
+                        if let Some(tx) = &self.user_input_tx {
+                            let _ = tx.send(UserInput::Message("/paste-image".into()));
+                        }
+                    }
+                    return false;
+                }
                 match key.code {
                     KeyCode::Char('a') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
@@ -502,6 +520,7 @@ impl Tui {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         self.state.input_cursor_right();
                     }
+                    KeyCode::Enter if self.clipboard_paste_pending => {}
                     KeyCode::Enter => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
                         if key.modifiers.contains(event::KeyModifiers::SHIFT) {
@@ -519,7 +538,10 @@ impl Tui {
                     }
                     KeyCode::Esc => {
                         self.state.ctrl_c_state = CtrlCState::Idle;
-                        if self.state.status.is_processing || self.state.compaction_pending {
+                        if self.state.status.is_processing
+                            || self.state.compaction_pending
+                            || self.clipboard_paste_pending
+                        {
                             if let Some(ref tx) = self.user_input_tx {
                                 let _ = tx.send(UserInput::Cancel);
                             }

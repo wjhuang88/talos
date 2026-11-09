@@ -14,6 +14,7 @@
 
 mod approval;
 mod background_projection;
+mod clipboard_image;
 mod colors;
 mod dashboard_helpers;
 mod diagnostics;
@@ -87,6 +88,9 @@ pub enum Mode {
 /// Top-level subcommands for talos.
 #[derive(Subcommand, Clone)]
 pub(crate) enum TalosCommand {
+    /// Internal isolated clipboard reader.
+    #[command(hide = true)]
+    ClipboardImageWorker,
     /// Run first-run setup wizard for model configuration.
     Init {
         /// Print setup instructions without launching interactive wizard.
@@ -396,6 +400,9 @@ pub(crate) struct Cli {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    if matches!(cli.command, Some(TalosCommand::ClipboardImageWorker)) {
+        return clipboard_image::worker();
+    }
 
     // Subcommand dispatch (takes priority over flat flags)
     if let Some(TalosCommand::Init { non_interactive }) = &cli.command {

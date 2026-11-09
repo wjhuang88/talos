@@ -265,6 +265,8 @@ pub enum ToolActivity {
 }
 
 pub enum UiOutput {
+    /// Host clipboard acquisition state; composer submission waits while true (ADR-100).
+    ClipboardPastePending(bool),
     /// Request manual compaction through the active typed session transport.
     CompactRequest,
     /// Transient manual-operation activity, independent of transcript turn status.
