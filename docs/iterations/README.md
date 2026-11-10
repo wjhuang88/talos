@@ -1,6 +1,6 @@
 # Iterations
 
-## I319 / SEARCH-001-L — proposed Active / Unclaimed
+## I319 / SEARCH-001-L — Active / Claimed proposal (ineffective until #902 merge)
 
 [I319](I319-search-legacy-dependency-retirement.md) / [SEARCH-001-L](../backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) / #901: own legacy `WebSearchTool` without `rust-websearch` build dependency, preserve independent parity and public schema; claim and activation are proposed in #902 and require governance merge. I318/TUI, I310/Gemini and DEPENDENCY-003-A remain independent; E/F/G/I blocked gate unaffected.
 
