@@ -240,12 +240,22 @@ These modes omit native function declarations, validate textual calls before rel
 and retain signed model text unchanged on continuation. A signed native-tool turn cannot be
 rewritten as textual-tool history; start a new conversation to change that mode. Request-local
 images remain request-local in both textual modes. `auto` must be resolved before dispatch.
-Browser invocation is still refused in every mode: original argument syntax alone is insufficient
-to make signed continuation safe for durable history. Reasoning controls and their model
-boundaries are described above. Failures never trigger an automatic retry over a different wire.
+Native mode supports the existing permission-gated browser tool. Gemini's signed call and its
+original arguments stay in the running session's memory and are restored when encoding a
+continuation for the same provider and model. The transcript and exports receive a filtered
+projection. A reopened or forked session has no access to the original call. Start a new
+conversation if Talos reports that the private replay context is unavailable. Browser tools
+remain unavailable in textual tool modes.
+
+Reasoning controls and their model boundaries are described above. Failures never trigger an
+automatic retry over a different wire.
 There is no live-vendor success claim or packaged Gemini catalog activation in this candidate.
 
 `ProviderConfig` gains optional `gemini: Option<GeminiTransportConfig>`; downstream exhaustive
 struct literals must supply `gemini: None` or use `..Default::default()`. The protocol and catalog
 enums gain `GoogleGemini`; keep catch-all match arms. These public changes require the next
-pre-1.0 minor migration, together with ADR-094, rather than a patch release.
+pre-1.0 minor migration, together with ADR-094. Provider integrations that match
+`ProviderInvocationEvent` also need a catch-all arm. An integration that opts into private
+replay uses `LanguageModel::stream_with_replay_context` and must keep the carrier out of
+logs, serialized events, and durable history. The default implementation refuses private
+attachments and delegates ordinary requests to the existing dispatch method.

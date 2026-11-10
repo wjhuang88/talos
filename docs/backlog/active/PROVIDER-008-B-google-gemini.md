@@ -124,3 +124,14 @@ EPERM; standalone AF_UNIX creation is denied too. A later Runtime socket fixture
 host failure. Remaining --no-fail-fast package, MCP and external SDK runs are still collecting
 results; native CI and all full B acceptance gates remain required. See I310 for exact tests,
 counts, preserved successes and resume instructions. This is a Draft stage, not B completion.
+
+### Native browser replay checkpoint — 2026-11-04
+
+Checkpoint 5349cd3c records native Gemini browser original-argument ingress and live signed
+continuation. Mock HTTP tests cover mixed ordinary/browser execution, safe events and exports,
+live continuation and durable reopen refusal. At ed1c5c8c, pinned locked library tests passed
+Core 129, Agent 664 and Provider 284. Independent source review confirmed the three privacy
+corrections recorded in I310. The fixture-only follow-up passed targeted all-target Clippy and
+the five Agent replay tests. Full preflight and candidate CI are separate gates.
+Browser Compat/TalosStrict, final UI/provenance, catalog data, sourced SSE fixtures and final
+acceptance remain open. Status stays Active / Claimed. Completion Commit: Pending.
