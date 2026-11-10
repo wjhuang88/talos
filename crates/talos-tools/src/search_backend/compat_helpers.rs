@@ -237,3 +237,6 @@ mod tests {
         assert_eq!(threshold % USER_AGENTS.len(), 0);
     }
 }
+
+#[cfg(test)]
+mod frozen_oracle_tests;
