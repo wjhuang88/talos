@@ -1,6 +1,6 @@
 # Iteration I320: ARCH-035 E0/E1 Host Composition Baseline
 
-> Document status: Active / Claimed (proposed via #905; ineffective until governance merge)
+> Document status: Review / Claimed (effective claim #905; E0/E1 review candidate #906; no E2/E3 authorization)
 > Published plan date: 2026-11-10
 > Planned objective: reproducibly inventory current cross-host persistence composition and propose a behavior-preserving architecture decision without competing with STORE-002.
 > Baseline rule: this bounded E0/E1 documentation and architecture-review slice does not authorize production code, storage contract/adapters, dependency or default behavior changes.
@@ -18,8 +18,8 @@
 | Source Issue | #897 |
 | Governance Claim PR | #905 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User requested continued non-overlapping E0/E1 progress. No independent approval is recorded; docs-only single-maintainer option is proposed, subject to exact-head CI, both governance validators, recorded maintainer reason, no blocking feedback and merge-time CAS. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim #905 merged as `b211e590f6b1180af0679be8b1b03d77b0a19615` after exact-head CI3992 passed, both governance validators reported 0 warnings and single-maintainer documentation-only fallback was recorded in PR comments; CAS confirmed no competing owner or branch lag. |
+| Implementation PR | #906 |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | The claim takes effect only after #905 merge. E0/E1 decision acceptance remains independently reviewable; E2/E3 require accepted #670 seams and separate activation. |
 
@@ -105,3 +105,18 @@ I319 search legacy dependency retirement has a separate proposed claim; I318 TUI
 - `scripts/validate_project_governance.sh .` and `scripts/validate_collaboration_claims.sh .`; exact-head GitHub CI
 
 **Not executed:** these commands are a proposed baseline, not claimed green evidence. Additional call-site tracing and acceptance review remain necessary.
+
+## Activation and E0/E1 execution ledger
+
+| Date | Stage | Evidence and limitations |
+|---|---|---|
+| 2026-11-10 | Atomic claim+activation | Governance #905 squash merge `b211e590f6b1180af0679be8b1b03d77b0a19615`, exact-head [CI #3992](https://github.com/wjhuang88/talos/actions/runs/42784639228) succeeded; project-governance and collaboration-claim validators each 0 warnings; documented single-maintainer fallback; no overlapping PR or target-branch claimant at CAS. |
+| 2026-11-10 | E0 source inventory candidate | [Code-truth matrix](../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) reviews Rust paths and existing test entrypoints on claim merge base. No regression tests run locally in this docs-only slice; source inventory is not behavioral equivalence proof. |
+| 2026-11-10 | E1 design review candidate | [Proposed host-composition decision](../proposals/arch-035-host-composition-boundary.md) and [PR #906](https://github.com/wjhuang88/talos/pull/906) bind the E0 matrix and defer public injection signatures until #670 accepts concrete seams. No ADR accepted and no E2/E3 code implemented. |
+
+### Review and residuals
+
+- The E0 evidence doc enumerates existing tests and missing fault-injection/ABI/native evidence; E2/E4 require before/after runs against real code changes.
+- Required architecture/API review and maintainer acceptance for E1 are pending. Do not treat docs-only CI as runtime behavior conformance.
+- STORE-002/#670 remains the sole contract owner and has not published accepted implementation seams at this checkpoint.
+- No Completion Commit is claimed for #897. I320 may close only for its independently accepted documentation slice; #897 remains open through E2/E4.
