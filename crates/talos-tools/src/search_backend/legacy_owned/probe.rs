@@ -8,7 +8,7 @@ use std::{
 };
 
 use super::{LegacyConfig, SearchBackendError};
-use reqwest_legacy::Client;
+use reqwest_legacy_test::Client;
 
 const TTL: Duration = Duration::from_secs(30);
 
