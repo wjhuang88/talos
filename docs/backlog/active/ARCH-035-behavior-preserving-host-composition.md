@@ -4,15 +4,16 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Active (proposed on governance branch; ineffective until claim PR merges) |
+| Status | Review / Claimed — E0/E1 code-truth and E1 proposed architecture in PR #906; E2/E3 blocked |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
-| Selected Iteration | [I320](../../iterations/I320-arch-035-host-composition-baseline.md) — E0/E1 architecture baseline only (proposed) |
+| Selected Iteration | [I320](../../iterations/I320-arch-035-host-composition-baseline.md) — E0/E1 active via claim #905 merge `b211e590f6b1180af0679be8b1b03d77b0a19615` |
 | Parent / consumer | [SERVER-001](SERVER-001-serve-connect-protocol-adapters.md) / #142; [SERVER-001-C](SERVER-001-C-standalone-server-host-composition.md) / #361 |
 | Depends On | [STORE-002](STORE-002-storage-capability-contracts.md) / #670: accepted capability/domain seam; RUNTIME-001 SDK compatibility |
 | Coordinates | SESSION-009 / #46; SESSION-011 / #612; DATA-002 / #141; SERVER-002 / #360 |
 | Long-task planning | [SERVER-MVP-001](../../tasks/2026-11-10-server-mvp-storage-decoupled.md) proposed in draft PR #896 |
 | E1 review artifact | [Host composition proposal](../../proposals/arch-035-host-composition-boundary.md) — non-binding until reviewed and accepted |
+| E0 audit artifact | [Code-truth and regression inventory](../../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) — review candidate, existing tests not rerun |
 
 ## Collaboration Claim
 
@@ -26,8 +27,8 @@
 | Source Issue | #897 |
 | Governance Claim PR | #905 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User-directed non-overlapping E0/E1 documentation-only architecture selection; proposed single-maintainer path because no approving independent review is recorded. Exact-head CI, both governance validators, documented maintainer reason, no blocking review and merge-time CAS are mandatory before #905 merge; no implementation authority before merge. |
-| Implementation PR | Not started |
+| Authorization Evidence | #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615` following exact-head [CI #3992](https://github.com/wjhuang88/talos/actions/runs/42784639228), both governance validators with 0 warnings, recorded single-maintainer documentation-only fallback and passing merge-time CAS; this authorizes E0/E1 only. |
+| Implementation PR | #906 |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | E0/E1 only; E2/E3 blocked until accepted STORE-002 seams and separately governed activation; no implementation before effective claim |
 

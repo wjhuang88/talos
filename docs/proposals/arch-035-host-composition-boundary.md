@@ -6,6 +6,12 @@
 > Dependency: STORE-002 / #670 (unclaimed at preparation time)
 > Existing accepted baseline: ADR-042 embedded durable runtime session boundary
 
+## Evidence before decision
+
+E0 reproducible [cross-host code-truth inventory](../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) identifies the current CLI `AppServerSession` construction, Desktop/SDK `RuntimeBuilder` usage, existing SQL/file domain stores, and baseline regression tests. Its paths are anchored to main at #905 merge `b211e590f6b1180af0679be8b1b03d77b0a19615`.
+
+**Acceptance is deliberately split:** the host/domain ownership decision below is reviewable now. Public injection signatures and adapter selection **cannot** become Accepted without consuming concrete, accepted #670 contracts. No E2/E3 code may start merely from this proposal.
+
 ## Context
 
 CLI/TUI, Desktop and embedders use existing runtime/session paths but differ in host-side construction. `talos-session::SessionManager` owns local directory, SQLite index and TLOG/JSONL stores; `talos-runtime` depends on `talos-session` and exports `RuntimeBuilder`; CLI TUI uses `AppServerSession` and a separate host builder; Desktop already imports `RuntimeBuilder`.
@@ -38,3 +44,13 @@ STORE-002 / #670 owns capability taxonomy and all domain persistence contracts a
 - E4: full locked workspace, cross-host and platform conformance, security/API review, exact-head CI, owner-first completion with existing evidence SHA.
 
 No runtime implementation or test result is asserted by this proposal.
+
+## E1 review questions and disposition conditions
+
+1. Does preserving `RuntimeBuilder::durable_session(DurableSession)` (ADR-042) and CLI's direct `AppServerSession` path require an additive builder composition profile or can an existing #670 entrypoint be reused exactly? **Decision deferred pending #670**, not an invented public API.
+2. Is there one terminal/recovery/permission authority under every supported host, with no product-owned persistence semantics? **Required**, verify against E0 call-site matrix.
+3. Does TUI remain a renderer and does Desktop continue as a thin Runtime adapter? **Required**, no independent storage trait in either surface.
+4. Do local SQLite/TLOG/JSONL/FTS5 behavior and bundled binary closure stay unchanged? **Required**, verified only once E2/E4 conformance evidence exists.
+5. Which operations cannot be transparently injected (e.g., session ownership, migration/reset, generation fencing, cross-resource durability)? **Must be explicitly documented**; no generic CRUD facade or fictional atomicity.
+
+Status remains Proposed until required independent API/architecture review and explicit maintainer acceptance. The nonbinding E0 inventory may be acknowledged separately; it does not unblock E2/E3.
