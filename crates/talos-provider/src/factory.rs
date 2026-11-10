@@ -136,6 +136,72 @@ fn build_with_connection(
                 .with_timeout_config(timeout);
             Ok(Arc::new(provider))
         }
+        ProviderProtocol::GoogleGemini => {
+            use talos_config::GeminiTransportConfig;
+            if reasoning.is_some() {
+                return Err(ProviderError::InvalidResponse(
+                    "Gemini reasoning settings are not yet supported".into(),
+                ));
+            }
+            let profile = provider_config.gemini.as_ref().ok_or_else(|| {
+                ProviderError::InvalidResponse(
+                    "google-gemini requires an explicit gemini transport profile".into(),
+                )
+            })?;
+            let provider = match profile {
+                GeminiTransportConfig::AiStudio => {
+                    if base_url.as_deref().is_some_and(|base| {
+                        !matches!(
+                            base.trim_end_matches('/'),
+                            "https://generativelanguage.googleapis.com"
+                                | "https://generativelanguage.googleapis.com/v1beta"
+                        )
+                    }) {
+                        return Err(ProviderError::InvalidResponse(
+                            "custom Gemini destinations require a separate credential profile"
+                                .into(),
+                        ));
+                    }
+                    let transport = crate::gemini_transport::GeminiTransport::ai_studio(
+                        &config.model,
+                        api_key,
+                        true,
+                    )?;
+                    crate::gemini_provider::GeminiProvider::new(
+                        transport,
+                        config.provider.clone(),
+                        config
+                            .model
+                            .strip_prefix("models/")
+                            .unwrap_or(&config.model)
+                            .to_owned(),
+                        output_limit,
+                        timeout,
+                    )?
+                }
+                GeminiTransportConfig::Vertex {
+                    project,
+                    location,
+                    allow_metadata,
+                } => {
+                    if base_url.is_some() {
+                        return Err(ProviderError::InvalidResponse(
+                            "Vertex ADC refuses replacement endpoints".into(),
+                        ));
+                    }
+                    crate::gemini_provider::GeminiProvider::vertex(
+                        project.clone(),
+                        location.clone(),
+                        *allow_metadata,
+                        config.provider.clone(),
+                        config.model.clone(),
+                        output_limit,
+                        timeout,
+                    )?
+                }
+            };
+            Ok(Arc::new(provider))
+        }
         ProviderProtocol::OpenAIResponses => {
             let mut provider = OpenAIResponsesProvider::new(api_key, &config.model)
                 .with_provider_key(&config.provider);
@@ -163,6 +229,56 @@ fn build_with_connection(
 mod tests {
     use super::*;
     use talos_core::tool::{CapabilityProbe, ProtocolCapabilities};
+
+    #[test]
+    fn explicit_gemini_profiles_build_without_ambient_adc_and_refuse_relocation() {
+        use talos_config::{GeminiTransportConfig, ProviderConfig};
+        let mut config = Config {
+            provider: "fixture-google".into(),
+            model: "gemini-2.5-flash".into(),
+            providers: std::collections::HashMap::from([(
+                "fixture-google".into(),
+                ProviderConfig {
+                    protocol: ProviderProtocol::GoogleGemini,
+                    gemini: Some(GeminiTransportConfig::AiStudio),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        assert!(build_configured_provider(&config, "fixture-key").is_ok());
+        config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider")
+            .base_url = Some("https://custom.invalid/v1beta".into());
+        assert!(build_configured_provider(&config, "fixture-key").is_err());
+        let entry = config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider");
+        entry.base_url = None;
+        entry.gemini = Some(GeminiTransportConfig::Vertex {
+            project: "fixture-project".into(),
+            location: "global".into(),
+            allow_metadata: false,
+        });
+        // No files/env/metadata are consulted until dispatch.
+        assert!(build_configured_provider(&config, "").is_ok());
+        config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider")
+            .base_url = Some("https://custom.invalid".into());
+        assert!(build_configured_provider(&config, "").is_err());
+        let entry = config
+            .providers
+            .get_mut("fixture-google")
+            .expect("provider");
+        entry.base_url = None;
+        entry.gemini = None;
+        assert!(build_configured_provider(&config, "fixture-key").is_err());
+    }
 
     #[test]
     fn model014_direct_factory_suppresses_disabled_reasoning_parameters() {

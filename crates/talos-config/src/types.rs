@@ -43,6 +43,9 @@ pub enum ProviderProtocol {
     /// OpenAI Responses API.
     #[serde(rename = "openai-responses")]
     OpenAIResponses,
+    /// Google Gemini generateContent wire format.
+    #[serde(rename = "google-gemini")]
+    GoogleGemini,
 }
 
 impl ProviderProtocol {
@@ -60,6 +63,7 @@ impl std::fmt::Display for ProviderProtocol {
             Self::AnthropicMessages => "anthropic-messages",
             Self::OpenAIChat => "openai-chat",
             Self::OpenAIResponses => "openai-responses",
+            Self::GoogleGemini => "google-gemini",
         })
     }
 }
@@ -186,6 +190,24 @@ impl Default for ProviderTimeoutConfig {
     }
 }
 
+/// Explicit authentication/destination profile for the native Gemini wire.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(tag = "transport", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum GeminiTransportConfig {
+    /// Official AI Studio destination with the provider's configured API key.
+    AiStudio,
+    /// Standard Vertex project/location endpoint with request-owned ADC.
+    Vertex {
+        /// Google Cloud project identifier or project number.
+        project: String,
+        /// Regional location or `global`.
+        location: String,
+        /// Allow fixed metadata credentials only when local ADC is absent.
+        #[serde(default)]
+        allow_metadata: bool,
+    },
+}
+
 /// Named provider configuration.
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ProviderConfig {
@@ -194,6 +216,9 @@ pub struct ProviderConfig {
     pub protocol: ProviderProtocol,
     #[serde(default)]
     pub tool_protocol: talos_core::tool::ToolProtocol,
+    /// Explicit Gemini profile. Required when selecting `google-gemini`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gemini: Option<GeminiTransportConfig>,
     #[serde(default)]
     pub base_url: Option<String>,
     /// Inline API key written directly in the config file.
@@ -223,6 +248,7 @@ impl std::fmt::Debug for ProviderConfig {
         f.debug_struct("ProviderConfig")
             .field("protocol", &self.protocol)
             .field("tool_protocol", &self.tool_protocol)
+            .field("gemini", &self.gemini)
             .field("base_url", &self.base_url)
             .field("api_key", &self.api_key.as_deref().map(|_| "***"))
             .field("api_key_env", &self.api_key_env)
@@ -638,5 +664,35 @@ impl Default for RpcConfig {
             methods_allowlist: Vec::new(),
             max_concurrent: Self::default_max_concurrent(),
         }
+    }
+}
+
+#[cfg(test)]
+mod gemini_profile_tests {
+    use super::*;
+    #[test]
+    fn profiles_roundtrip_without_changing_old_provider_defaults() {
+        let old: ProviderConfig = toml::from_str("protocol = 'openai-chat'").expect("old config");
+        assert!(old.gemini.is_none());
+        for profile in [
+            GeminiTransportConfig::AiStudio,
+            GeminiTransportConfig::Vertex {
+                project: "project".into(),
+                location: "global".into(),
+                allow_metadata: false,
+            },
+        ] {
+            let config = ProviderConfig {
+                protocol: ProviderProtocol::GoogleGemini,
+                gemini: Some(profile),
+                ..Default::default()
+            };
+            assert_eq!(
+                toml::from_str::<ProviderConfig>(&toml::to_string(&config).expect("serialize"))
+                    .expect("restore"),
+                config
+            );
+        }
+        assert!(toml::from_str::<ProviderConfig>("protocol='google-gemini'\n[gemini]\ntransport='vertex'\nproject='p'\nlocation='global'\nunknown=true").is_err());
     }
 }

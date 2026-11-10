@@ -304,6 +304,7 @@ fn test_base_url_getter() {
             ProviderConfig {
                 protocol: ProviderProtocol::OpenAIChat,
                 tool_protocol: Default::default(),
+                gemini: None,
                 base_url: Some("https://example.com/v1".to_string()),
                 api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
                 ..Default::default()
@@ -413,6 +414,7 @@ fn test_custom_provider_api_key_env() {
             ProviderConfig {
                 protocol: ProviderProtocol::OpenAIChat,
                 tool_protocol: Default::default(),
+                gemini: None,
                 base_url: Some("https://example.com/v1".to_string()),
                 api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
                 ..Default::default()
@@ -468,6 +470,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
             ProviderConfig {
                 protocol: ProviderProtocol::OpenAIChat,
                 tool_protocol: Default::default(),
+                gemini: None,
                 base_url: Some("https://example.com/v1".to_string()),
                 api_key: None,
                 api_key_env: Some("DASHSCOPE_API_KEY".to_string()),
@@ -740,6 +743,7 @@ fn test_validate_accepts_either_api_key_or_api_key_env() {
             ProviderConfig {
                 protocol: ProviderProtocol::OpenAIChat,
                 tool_protocol: Default::default(),
+                gemini: None,
                 api_key: Some("inline".to_string()),
                 ..Default::default()
             },
@@ -756,6 +760,7 @@ fn test_validate_accepts_either_api_key_or_api_key_env() {
             ProviderConfig {
                 protocol: ProviderProtocol::OpenAIChat,
                 tool_protocol: Default::default(),
+                gemini: None,
                 api_key_env: Some("CUSTOM_KEY".to_string()),
                 ..Default::default()
             },
@@ -776,6 +781,7 @@ fn test_validate_rejects_neither_api_key_nor_api_key_env() {
             ProviderConfig {
                 protocol: ProviderProtocol::OpenAIChat,
                 tool_protocol: Default::default(),
+                gemini: None,
                 ..Default::default()
             },
         )]),
