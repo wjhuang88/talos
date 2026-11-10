@@ -4,6 +4,7 @@
 **Source Issue**: [#901](https://github.com/wjhuang88/talos/issues/901).
 **Parent**: [SEARCH-001 / #624](SEARCH-001-zero-config-global-search.md).
 **Selected iteration**: [I319](../../iterations/I319-search-legacy-dependency-retirement.md) — proposed.
+**ADR gate**: [ADR-085 A1](../../decisions/085-talos-owned-search-routing-boundary.md#amendment-a1--equivalent-build-package-retirement-2026-11-10-proposed-902), proposed in #902 and not effective before merge.
 **Source truth**: [SEARCH-001-I retirement preflight](../../reference/SEARCH-001-I-DEPENDENCY-RETIREMENT-PREFLIGHT-2026-11-10.md), published in #900.
 **Completed predecessor**: [SEARCH-001-K / #850](SEARCH-001-K-compat-fallback-ownership.md) (I317/#860).
 
@@ -19,7 +20,7 @@
 | Source Issue | #901 |
 | Governance Claim PR | #902 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Proposed authorization: user explicitly selected this non-overlapping L1 work; exact-head CI and both governance validators, independent API/security reviewer findings and merge-time CAS must be checked before #902 merge; governance effect is not established until then. |
+| Authorization Evidence | Single-maintainer documentation-only claim proposal: no formal independent approving maintainer review was available at this checkpoint; Copilot advisory is COMMENTED rather than APPROVED. The user selected this non-overlapping L1 scope. Exact-head governance CI, both validators, no blocking reviews and merge-time CAS are required before #902 merge. The later Rust/Cargo implementation requires independent API/network/permission/security review. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | Effective after claim+iteration merge; code changes require exact-head cross-platform CI and independent API/network/security/dependency review. No provider admission or parent closure. |

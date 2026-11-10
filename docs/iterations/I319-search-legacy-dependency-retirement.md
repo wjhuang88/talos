@@ -18,7 +18,7 @@
 | Source Issue | #901 |
 | Governance Claim PR | #902 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Proposed authorization: user explicitly selected this non-overlapping L1 work; exact-head CI and both governance validators, independent API/security reviewer findings and merge-time CAS must be checked before #902 merge; governance effect is not established until then. |
+| Authorization Evidence | Single-maintainer documentation-only claim proposal: no formal independent approving maintainer review was available at this checkpoint; Copilot advisory is COMMENTED rather than APPROVED. The user selected this non-overlapping L1 scope. Exact-head governance CI, both validators, no blocking reviews and merge-time CAS are required before #902 merge. The later Rust/Cargo implementation requires independent API/network/permission/security review. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | Only after accepted code, independent review, and exact-head multi-platform CI may governance close. |
@@ -49,6 +49,7 @@
 
 ### Scope
 
+- L1 implementation may begin only after the [ADR-085 A1 amendment](../decisions/085-talos-owned-search-routing-boundary.md#amendment-a1--equivalent-build-package-retirement-2026-11-10-proposed-902) and this atomic claim take effect together on main via #902.
 - Preserve supported `WebSearchTool` public API and old zero-key behavior with Talos-owned
   helper/compatibility implementation and offline bounded protocol fixtures.
 - Convert upstream comparison tests to independent pinned expected-value fixtures
