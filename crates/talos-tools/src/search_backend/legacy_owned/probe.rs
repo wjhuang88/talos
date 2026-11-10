@@ -7,8 +7,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use reqwest::Client;
 use super::{LegacyConfig, SearchBackendError};
+use reqwest::Client;
 
 const TTL: Duration = Duration::from_secs(30);
 
@@ -31,7 +31,8 @@ fn cache() -> &'static Mutex<Cache> {
 }
 
 fn valid(entry: Option<Entry>, now: Instant) -> Option<bool> {
-    entry.filter(|e| now.saturating_duration_since(e.checked) < TTL)
+    entry
+        .filter(|e| now.saturating_duration_since(e.checked) < TTL)
         .map(|e| e.reachable)
 }
 
@@ -45,20 +46,31 @@ pub(super) async fn reachability(
         (valid(state.ddg, now), valid(state.bing, now))
     };
     if previous_ddg.is_some() && previous_bing.is_some() {
-        return (previous_ddg.unwrap_or(false), previous_bing.unwrap_or(false));
+        return (
+            previous_ddg.unwrap_or(false),
+            previous_bing.unwrap_or(false),
+        );
     }
 
     let http = match client_for(Duration::from_secs(3), 2) {
         Ok(client) => client,
-        Err(_) => return (previous_ddg.unwrap_or(false), previous_bing.unwrap_or(false)),
-    };
-    let ddg = async {
-        match previous_ddg {
-            Some(cached) => cached,
-            None => probe_one(http.clone(), "https://duckduckgo.com/").await,
+        Err(_) => {
+            return (
+                previous_ddg.unwrap_or(false),
+                previous_bing.unwrap_or(false),
+            );
         }
     };
-    let bing = async {
+    // Each async move owns its client handle; do not borrow the same handle
+    // in the first future and then move it into the second (E0505).
+    let ddg_client = http.clone();
+    let ddg = async move {
+        match previous_ddg {
+            Some(cached) => cached,
+            None => probe_one(ddg_client, "https://duckduckgo.com/").await,
+        }
+    };
+    let bing = async move {
         match previous_bing {
             Some(cached) => cached,
             None => probe_one(http, "https://cn.bing.com/").await,
@@ -67,10 +79,16 @@ pub(super) async fn reachability(
     let (ddg, bing) = tokio::join!(ddg, bing);
     let mut state = cache().lock().unwrap_or_else(|e| e.into_inner());
     if previous_ddg.is_none() {
-        state.ddg = Some(Entry { reachable: ddg, checked: now });
+        state.ddg = Some(Entry {
+            reachable: ddg,
+            checked: now,
+        });
     }
     if previous_bing.is_none() {
-        state.bing = Some(Entry { reachable: bing, checked: now });
+        state.bing = Some(Entry {
+            reachable: bing,
+            checked: now,
+        });
     }
     (ddg, bing)
 }
@@ -79,8 +97,13 @@ async fn probe_one(client: Client, url: &str) -> bool {
     // Upstream falls back to GET only on a non-successful HEAD response,
     // not on a HEAD connection error; no query text enters either probe.
     match client.head(url).send().await {
-        Ok(response) if response.status().is_success() || response.status().is_redirection() => true,
-        Ok(_) => client.get(url).send().await
+        Ok(response) if response.status().is_success() || response.status().is_redirection() => {
+            true
+        }
+        Ok(_) => client
+            .get(url)
+            .send()
+            .await
             .map(|r| r.status().is_success() || r.status().is_redirection())
             .unwrap_or(false),
         Err(_) => false,
