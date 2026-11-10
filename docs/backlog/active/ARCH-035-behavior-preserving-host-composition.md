@@ -4,10 +4,10 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Intake / Unclaimed |
+| Status | Active (proposed on governance branch; ineffective until claim PR merges) |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
-| Selected Iteration | None |
+| Selected Iteration | I320 — E0/E1 architecture baseline only (proposed) |
 | Parent / consumer | [SERVER-001](SERVER-001-serve-connect-protocol-adapters.md) / #142; [SERVER-001-C](SERVER-001-C-standalone-server-host-composition.md) / #361 |
 | Depends On | [STORE-002](STORE-002-storage-capability-contracts.md) / #670: accepted capability/domain seam; RUNTIME-001 SDK compatibility |
 | Coordinates | SESSION-009 / #46; SESSION-011 / #612; DATA-002 / #141; SERVER-002 / #360 |
@@ -17,18 +17,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed (proposed; ineffective until merge) |
+| Responsible Actor | `@wjhuang88` |
+| Executing Agent | ChatGPT GPT-6 / ARCH-035 E0-E1 session |
+| Work Slice | E0 code-truth inventory and E1 ADR / cross-host composition API placement only; no production code, no STORE-002 capability contracts or adapters |
+| Claimed At | 2026-11-10 |
 | Source Issue | #897 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | Pending PR-number backfill |
+| Authorization Mode | Single-maintainer merge (proposed; requires exact-head CI, validators and CAS) |
+| Authorization Evidence | Pending exact-head CI, validators, review and pre-merge CAS |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-10 |
-| Handoff / Release Condition | Select bounded iteration and establish effective target-branch claim before code; SERVER-001-C implementation waits on accepted equivalent transformation |
+| Handoff / Release Condition | E0/E1 only; E2/E3 blocked until accepted STORE-002 seams and separately governed activation; no implementation before effective claim |
 
 ## Requirement and value
 
