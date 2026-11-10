@@ -80,7 +80,7 @@ Update this iteration, STORE-002 owner, `docs/iterations/README.md`, `docs/backl
 ### Risks and rollback
 
 - Trait proliferation/duplicate Provider: bind terminology to existing `talos-core::capability` metadata and retain domain authority; reject speculative CRUD/SQL traits.
-- Advertised availability without operational implementation: distinguish descriptive capability and resolvable binding; future providers default unavailable.
+- Advertised availability without operational implementation: existing registry yields metadata only; no operational `Bound<T>` marker is introduced in B. Genuine domain-bound provider types and unavailable semantics belong to C/D; current empty registry resolves all seven categories as `Unavailable`.
 - Source/API compatibility: additive code only, no existing domain method signature touched; revert A/B candidate if consumer compile or API/security review fails.
 - Parallel conflicts: avoid `Cargo.lock`, Search/CLI/runtime/Server files; if `talos-core` overlaps another PR, stop and reconcile before merge.
 
@@ -94,7 +94,8 @@ Update this iteration, STORE-002 owner, `docs/iterations/README.md`, `docs/backl
 - I321 governance #908 / CI #4011: **PASS**, docs-only exact head; both project and collaboration validators 0 warnings.
 - A source inventory: [source-backed capability and data authority matrix](../reference/STORE-002-I321-CAPABILITY-AUTHORITY-INVENTORY-2026-11-10.md).
 - B Rust contract source: `crates/talos-core/src/storage_capability.rs` (additive typed classification, no adapters).
-- **Rust cargo fmt/check/test, implementation exact-head CI and independent API review pending**; local Rust toolchain unavailable in current execution environment. Not a passing behavior-preservation proof.
+- [Historical CI #4030](https://github.com/wjhuang88/talos/actions/runs/42799763086) passed 8/8 for old head `5c38e6e` after rustfmt repair and latest-main integration. Independent [Copilot API review](https://github.com/wjhuang88/talos/pull/909#issuecomment-6765145292) reported a **blocking** ability to wrap metadata in generic `StorageCapabilityBinding<T>::Bound`. The implementation removes that type entirely instead of asserting operational readiness. Re-run exact-head CI and independent re-review before accepting revised code; neither is assumed passed.
+- Local Rust toolchain is unavailable in the current execution environment. No behavior-preservation proof of SQLite/TLOG delegation exists in A/B; only future C/D/E/F can establish it.
 
 ## Completion Evidence
 
