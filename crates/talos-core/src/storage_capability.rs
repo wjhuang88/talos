@@ -3,7 +3,9 @@
 //! This module is **descriptive and additive**. It introduces no storage engine,
 //! adapter, provider registry, runtime binding or persistence operation. A
 //! descriptor advertised through the existing capability registry is metadata,
-//! not evidence that an operational storage implementation is bound.
+//! not evidence that an operational storage implementation is bound. This
+//! module intentionally contains **no** `Bound`/`is_bound` abstraction: the
+//! operational binding API is deferred to domain-owned STORE-002 C/D work.
 //!
 //! Real Session/Memory/Evolution/Exploration contracts and existing adapters
 //! remain domain-owned and are introduced in separately governed STORE-002
@@ -15,7 +17,8 @@ use crate::capability::CapabilityRequest;
 ///
 /// Semantic retrieval is a composition of these capabilities, not an eighth
 /// standalone storage engine. The set deliberately covers currently unbound
-/// capabilities so their absence can be represented explicitly.
+/// capabilities so their unavailability can be queried explicitly using the
+/// existing capability registry.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum StorageCapabilityKind {
     /// Ordered durable record append and replay (existing TLOG/JSONL Session stores).
@@ -92,46 +95,6 @@ impl StorageCapabilityKind {
     }
 }
 
-/// Explicit presence or absence of a *typed operational binding*.
-///
-/// `Bound(T)` can only be constructed with a concrete caller-supplied binding;
-/// provider metadata alone must not be promoted to `Bound`. The type `T`
-/// remains selected by the owning domain contract, not by this foundation.
-/// There is no implicit filesystem/SQLite or remote fallback.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum StorageCapabilityBinding<T> {
-    /// No usable provider was bound for this requested capability.
-    Unavailable,
-    /// Caller supplied a typed implementation binding.
-    Bound(T),
-}
-
-impl<T> StorageCapabilityBinding<T> {
-    /// Whether an actual typed value is present, without invoking it.
-    #[must_use]
-    pub const fn is_bound(&self) -> bool {
-        matches!(self, Self::Bound(_))
-    }
-
-    /// Borrow an existing binding without changing its availability.
-    #[must_use]
-    pub fn as_ref(&self) -> StorageCapabilityBinding<&T> {
-        match self {
-            Self::Unavailable => StorageCapabilityBinding::Unavailable,
-            Self::Bound(value) => StorageCapabilityBinding::Bound(value),
-        }
-    }
-
-    /// Extract the bound value, keeping unavailability explicit as `None`.
-    #[must_use]
-    pub fn into_option(self) -> Option<T> {
-        match self {
-            Self::Unavailable => None,
-            Self::Bound(value) => Some(value),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,22 +138,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn missing_binding_never_invents_a_default() {
-        let absent = StorageCapabilityBinding::<String>::Unavailable;
-        assert!(!absent.is_bound());
-        assert!(absent.as_ref().into_option().is_none());
-        assert_eq!(absent.into_option(), None);
-    }
-
-    #[test]
-    fn typed_binding_preserves_the_exact_supplied_value() {
-        let binding = StorageCapabilityBinding::Bound(String::from("local-test-handle"));
-        assert!(binding.is_bound());
-        assert_eq!(
-            binding.as_ref().into_option().map(String::as_str),
-            Some("local-test-handle")
-        );
-        assert_eq!(binding.into_option().as_deref(), Some("local-test-handle"));
-    }
 }
