@@ -75,6 +75,7 @@ impl Agent {
                     &definitions,
                     &mut Vec::new(),
                     &PrivateTokens::default(),
+                    None,
                 )
                 .await
                 .map_err(|_| ())?;

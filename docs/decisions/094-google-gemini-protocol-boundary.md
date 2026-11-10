@@ -157,3 +157,13 @@ which refuses private markers/attachments unless explicitly implemented. The def
 unchanged requests to the existing image/invocation path. New custody types intentionally implement
 neither Serialize nor Clone; Arc ownership remains session/request-local. These are draft
 implementation decisions requiring final privacy/protocol review and acceptance, not delivery.
+
+The live store preserves a previously published projection only after it verifies the whole
+message against custody. A value first classified as private in a later provider response
+filters subsequent output. It does not retroactively rewrite a published sealed projection.
+Unknown browser v2 field names reject the batch before any protected output is emitted.
+Mixed ordinary tool calls bind the original signed argument before permission normalization.
+The privacy filter covers the original string and its deterministic trimmed/path-cleaned forms.
+Substring collisions with routing fields still fail closed, including collisions with public
+schema names. Browser result content is outside this raw-invocation filter unless the tool
+explicitly supplies private tokens.

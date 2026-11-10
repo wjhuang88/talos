@@ -68,22 +68,44 @@ impl TransientReplay {
         }
         let mut private_values = Vec::new();
         for (safe, raw) in public_calls.iter().zip(private_calls) {
-            if safe.input == serde_json::json!({"protocolVersion":2}) && safe.input != raw.input {
-                if let Some(fields) = raw.input.as_object() {
-                    for (name, value) in fields {
-                        if name == "operation"
-                            && value
-                                .as_str()
-                                .and_then(crate::tool::PreparedInvocationError::browser_operation)
-                                .is_some()
-                        {
-                            continue;
-                        }
-                        if let Some(value) = value.as_str().filter(|value| !value.is_empty()) {
-                            if !private_values.iter().any(|stored| stored == value) {
-                                private_values.push(value.to_owned());
-                            }
-                        }
+            if safe.input == serde_json::json!({"protocolVersion":2})
+                && safe.input != raw.input
+                && let Some(fields) = raw.input.as_object()
+            {
+                for (name, value) in fields {
+                    // Only browser v2 schema keys are public. An arbitrary key can
+                    // itself carry private data, so refuse the batch before observation.
+                    if !matches!(
+                        name.as_str(),
+                        "protocolVersion"
+                            | "operation"
+                            | "tabRef"
+                            | "frameRef"
+                            | "snapshotRef"
+                            | "elementRef"
+                            | "text"
+                            | "option"
+                            | "url"
+                            | "visibility"
+                            | "direction"
+                            | "key"
+                            | "amount"
+                            | "milliseconds"
+                    ) {
+                        return Err(invalid());
+                    }
+                    if name == "operation"
+                        && value
+                            .as_str()
+                            .and_then(crate::tool::PreparedInvocationError::browser_operation)
+                            .is_some()
+                    {
+                        continue;
+                    }
+                    if let Some(value) = value.as_str().filter(|value| !value.is_empty())
+                        && !private_values.iter().any(|stored| stored == value)
+                    {
+                        private_values.push(value.to_owned());
                     }
                 }
             }

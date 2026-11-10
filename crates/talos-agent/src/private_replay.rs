@@ -75,6 +75,17 @@ impl PrivateReplayStore {
         Ok(())
     }
 
+    pub(crate) fn owns_projection(&self, message: &Message) -> bool {
+        let Ok(Some((marker, _))) = TransientReplay::marker(message) else {
+            return false;
+        };
+        self.0.lock().is_ok_and(|store| {
+            store
+                .get(marker)
+                .is_some_and(|replay| replay.matches(message))
+        })
+    }
+
     /// Bind the final sealed request before provider selection/HTTP. A missing whole exchange
     /// may have been compacted; surviving partial IDs/results must still be refused.
     pub(crate) fn for_request(
@@ -159,7 +170,11 @@ impl crate::Agent {
         // Only the trusted persistence/privacy projection may change this view. Hook edits
         // were already compared above, before any tool or durable effect.
         let projected = self
-            .persistence_projection_with_tokens(std::slice::from_ref(effective), private_tokens)
+            .persistence_projection_with_tokens(
+                std::slice::from_ref(effective),
+                private_tokens,
+                None,
+            )
             .into_iter()
             .next()
             .ok_or_else(invalid)?;
@@ -210,6 +225,51 @@ mod tests {
             .expect("replay"),
         )
     }
+    struct UnusedProvider;
+    #[async_trait::async_trait]
+    impl talos_core::provider::LanguageModel for UnusedProvider {
+        async fn stream(
+            &self,
+            _: &[Message],
+        ) -> talos_core::provider::ProviderResult<
+            talos_core::provider::Receiver<talos_core::message::AgentEvent>,
+        > {
+            panic!("snapshot must not dispatch")
+        }
+    }
+
+    #[test]
+    fn snapshot_keeps_only_verified_sealed_projection_stable() {
+        let store = PrivateReplayStore::default();
+        let replay = replay("b");
+        let sealed = replay.projected_message().clone();
+        store.insert(replay, &sealed).expect("seal");
+        let mut later = crate::transient_text::PrivateTokens::default();
+        assert!(later.extend_private_replay(["safe".into()]));
+        let agent = crate::Agent::new(
+            Arc::new(UnusedProvider),
+            talos_core::tool::ToolRegistry::new(),
+        );
+        let snapshot =
+            agent.persistence_snapshot(std::slice::from_ref(&sealed), &later, Some(&store));
+        assert_eq!(snapshot.messages, [sealed.clone()]);
+        assert!(
+            store
+                .for_request(&snapshot.messages, Some("p"), Some("m"))
+                .is_ok()
+        );
+
+        let mut edited = sealed;
+        let Message::Assistant { content, .. } = &mut edited else {
+            unreachable!()
+        };
+        *content = "safe edited".into();
+        let snapshot = agent.persistence_snapshot(&[edited], &later, Some(&store));
+        assert!(
+            matches!(&snapshot.messages[0], Message::Assistant { content, .. } if content == "[private] edited")
+        );
+    }
+
     #[test]
     fn live_custody_restores_identity_but_fresh_actor_rejects_markers() {
         let store = PrivateReplayStore::default();

@@ -120,6 +120,7 @@ impl ToolDefinition {
 #[async_trait::async_trait]
 pub trait LanguageModel: Send + Sync {
     /// Dispatches with session-private replay custody; unsupported adapters refuse it.
+    #[allow(clippy::too_many_arguments)] // Extends the existing image dispatch contract with custody.
     async fn stream_with_replay_context(
         &self,
         messages: &[Message],

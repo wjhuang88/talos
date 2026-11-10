@@ -30,11 +30,11 @@ impl AgentTool for OrdinaryFixture {
     }
 
     fn parameters(&self) -> Value {
-        json!({"type":"object","properties":{"text":{"type":"string"}},"required":["text"]})
+        json!({"type":"object","properties":{"content":{"type":"string"}},"required":["content"]})
     }
 
     async fn execute(&self, input: Value) -> ToolResult {
-        assert_eq!(input["text"], PRIVATE);
+        assert_eq!(input["content"], PRIVATE);
         ToolResult::success("ordinary completed")
     }
 }
@@ -64,7 +64,7 @@ impl AgentTool for BrowserFixture {
         &self,
         args: BrowserRawArguments,
     ) -> Result<Box<dyn PreparedToolInvocation>, PreparedInvocationError> {
-        assert_eq!(args.fields()["text"], PRIVATE);
+        assert_eq!(args.fields()["text"], format!(" {PRIVATE} "));
         Ok(Box::new(Self(self.0.clone())))
     }
 }
@@ -144,8 +144,8 @@ async fn browser_signed_replay_survives_two_live_submissions_but_not_durable_reo
     let mut server = mockito::Server::new_async().await;
     let parts = json!([
         {"text":format!("thought {PRIVATE}"),"thought":true,"thoughtSignature":"private-thought-signature"},
-        {"functionCall":{"id":"b","name":"browser","args":{"protocolVersion":2,"operation":"fill","text":PRIVATE}},"thoughtSignature":"private-call-signature"},
-        {"functionCall":{"id":"o","name":"ordinary","args":{"text":PRIVATE}}},
+        {"functionCall":{"id":"b","name":"browser","args":{"protocolVersion":2,"operation":"fill","text":format!(" {PRIVATE} ")}},"thoughtSignature":"private-call-signature"},
+        {"functionCall":{"id":"o","name":"ordinary","args":{"content":format!(" {PRIVATE} ")}}},
         {"text":format!("opening {PRIVATE}")}
     ]);
     let first = server
@@ -292,4 +292,52 @@ async fn browser_signed_replay_survives_two_live_submissions_but_not_durable_reo
     actor.await.expect("Actor joins");
     unexpected.assert_async().await;
     assert_eq!(effects.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn browser_batch_with_unknown_field_is_rejected_before_protected_output() {
+    let temp = tempfile::tempdir().expect("workspace");
+    let root = temp.path().canonicalize().expect("root");
+    let mut server = mockito::Server::new_async().await;
+    let request = server
+        .mock("POST", "/")
+        .with_body(wire(json!([
+            {"text":format!("echo {PRIVATE}")},
+            {"functionCall":{"id":"b","name":"browser","args":{
+                "protocolVersion":2,"operation":"fill",(PRIVATE):true
+            }},"thoughtSignature":"private-call-signature"}
+        ])))
+        .expect(1)
+        .create_async()
+        .await;
+    let effects = Arc::new(AtomicUsize::new(0));
+    let (mut handle, mut actor) = talos_agent::session::AppServerSession::new(
+        agent(provider(server.url()), root.clone(), effects.clone()),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root,
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    let actor = tokio::spawn(async move { actor.run().await });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "use browser".into(),
+        })
+        .await
+        .expect("input");
+    assert!(matches!(
+        complete(&mut handle.eq_rx).await,
+        TurnCompletionStatus::Error { .. }
+    ));
+    assert_eq!(effects.load(Ordering::SeqCst), 0);
+    request.assert_async().await;
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    actor.await.expect("Actor joins");
 }
