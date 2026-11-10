@@ -17,6 +17,7 @@ mod copilot;
 mod gemini_auth;
 mod gemini_endpoint;
 mod gemini_provider;
+mod gemini_reasoning;
 mod gemini_replay;
 mod gemini_request;
 mod gemini_sse;

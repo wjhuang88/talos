@@ -19,6 +19,8 @@ pub(crate) struct GeminiProvider {
     provider: String,
     model: String,
     output_limit: Option<u32>,
+    thinking: Option<serde_json::Value>,
+    reasoning_disabled: bool,
     timeout: ProviderTimeoutConfig,
 }
 
@@ -49,6 +51,8 @@ impl GeminiProvider {
             provider,
             model,
             output_limit,
+            thinking: None,
+            reasoning_disabled: false,
             timeout,
         })
     }
@@ -80,8 +84,31 @@ impl GeminiProvider {
             provider,
             model,
             output_limit,
+            thinking: None,
+            reasoning_disabled: false,
             timeout,
         })
+    }
+
+    pub(crate) fn with_reasoning(
+        mut self,
+        options: Option<&talos_config::ReasoningOptions>,
+    ) -> ProviderResult<Self> {
+        let thinking = crate::gemini_reasoning::thinking_config(&self.model, options)?;
+        self.thinking = if self.reasoning_disabled {
+            None
+        } else {
+            thinking
+        };
+        Ok(self)
+    }
+
+    pub(crate) fn with_reasoning_disabled(mut self, disabled: bool) -> Self {
+        self.reasoning_disabled = disabled;
+        if disabled {
+            self.thinking = None;
+        }
+        self
     }
 
     async fn dispatch(
@@ -114,6 +141,9 @@ impl GeminiProvider {
             tools,
             self.output_limit,
         )?;
+        if let Some(thinking) = &self.thinking {
+            body["generationConfig"]["thinkingConfig"] = thinking.clone();
+        }
         let image_deadline = crate::image_io::append_gemini_ephemeral_images(&mut body, images)?;
         // Image lifetime bounds initialization, credentials and every retry, not the response stream.
         let dispatch_deadline = image_deadline.map_or(deadline, |expires| expires.min(deadline));
@@ -333,6 +363,11 @@ impl LanguageModel for GeminiProvider {
         crate::validate_decision_messages(messages, limits)?;
         let mut isolated = self.clone();
         isolated.output_limit = Some(limits.max_output_tokens);
+        isolated.thinking = if self.reasoning_disabled {
+            None
+        } else {
+            crate::gemini_reasoning::decision_config(&self.model)
+        };
         isolated.timeout.max_attempts = limits.max_retries.min(self.timeout.max_attempts);
         isolated.dispatch(messages, &[], None, true).await
     }
@@ -713,73 +748,231 @@ mod tests {
     #[tokio::test]
     async fn isolated_decision_caps_output_without_mutating_conversation_settings() {
         use talos_core::provider::DecisionRequestLimits;
-        let mut server = mockito::Server::new_async().await;
-        let wire = format!(
-            "data: {}\n\n",
-            json!({"candidates":[{"content":{"parts":[{"text":"private-decision-thought","thought":true,"thoughtSignature":"private-decision-signature"},{"text":"yes"}]},"finishReason":"STOP"}]})
-        );
-        let decision = server
+        for (model, decision_budget) in [
+            ("gemini-2.5-flash", 0),
+            ("gemini-2.5-pro", 128),
+            ("gemini-2.5-flash-lite", 0),
+        ] {
+            let mut server = mockito::Server::new_async().await;
+            let wire = format!(
+                "data: {}\n\n",
+                json!({"candidates":[{"content":{"parts":[{"text":"private-decision-thought","thought":true,"thoughtSignature":"private-decision-signature"},{"text":"yes"}]},"finishReason":"STOP"}]})
+            );
+            let decision = server
+                .mock("POST", "/")
+                .match_body(mockito::Matcher::PartialJson(
+                    json!({"generationConfig":{"maxOutputTokens":17}}),
+                ))
+                .match_request(move |request| {
+                    let body: serde_json::Value =
+                        serde_json::from_slice(request.body().expect("body")).expect("JSON");
+                    body.get("tools").is_none()
+                        && body["generationConfig"]["thinkingConfig"]
+                            == json!({"includeThoughts":false,"thinkingBudget":decision_budget})
+                })
+                .with_body(wire.clone())
+                .create_async()
+                .await;
+            let conversation = server
             .mock("POST", "/")
             .match_body(mockito::Matcher::PartialJson(
-                json!({"generationConfig":{"maxOutputTokens":17}}),
-            ))
-            .match_request(|request| {
-                let body: serde_json::Value =
-                    serde_json::from_slice(request.body().expect("body")).expect("JSON");
-                body.get("tools").is_none()
-                    && body["generationConfig"].get("thinkingConfig").is_none()
-            })
-            .with_body(wire.clone())
-            .create_async()
-            .await;
-        let conversation = server
-            .mock("POST", "/")
-            .match_body(mockito::Matcher::PartialJson(
-                json!({"generationConfig":{"maxOutputTokens":100}}),
+                json!({"generationConfig":{"maxOutputTokens":100,"thinkingConfig":{"thinkingBudget":1024,"includeThoughts":true}}}),
             ))
             .with_body(wire)
             .create_async()
             .await;
-        let transport = GeminiTransport::ai_studio("model", "key", true)
+            let transport = GeminiTransport::ai_studio(model, "key", true)
+                .expect("transport")
+                .with_test_endpoint(server.url());
+            let provider = GeminiProvider::new(
+                transport,
+                "google".into(),
+                model.into(),
+                Some(100),
+                Default::default(),
+            )
+            .expect("provider")
+            .with_reasoning(Some(&talos_config::ReasoningOptions {
+                budget_tokens: Some(1024),
+                ..Default::default()
+            }))
+            .expect("conversation reasoning");
+            let messages = [Message::User {
+                content: "decide".into(),
+            }];
+            let mut events = provider
+                .stream_auto_review(
+                    &messages,
+                    DecisionRequestLimits {
+                        max_output_tokens: 17,
+                        max_retries: 0,
+                    },
+                )
+                .await
+                .expect("decision");
+            let mut ended = false;
+            while let Some(event) = events.recv().await {
+                assert!(!matches!(
+                    event,
+                    AgentEvent::ToolCall { .. }
+                        | AgentEvent::ReasoningComplete { .. }
+                        | AgentEvent::ThinkingDelta { .. }
+                        | AgentEvent::Error { .. }
+                ));
+                ended |= matches!(event, AgentEvent::TurnEnd { .. });
+            }
+            assert!(ended);
+            let mut events = provider.stream(&messages).await.expect("conversation");
+            while events.recv().await.is_some() {}
+            decision.assert_async().await;
+            conversation.assert_async().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn confirmed_effort_profiles_reach_native_http_without_budget_fields() {
+        use talos_config::{ReasoningEffort, ReasoningOptions};
+        for (model, options, level) in [
+            (
+                "gemini-3.8-flash",
+                ReasoningOptions {
+                    effort: Some(ReasoningEffort::High),
+                    ..Default::default()
+                },
+                "high",
+            ),
+            ("gemini-4-argon", ReasoningOptions::default(), "medium"),
+        ] {
+            let mut server = mockito::Server::new_async().await;
+            let decision=server.mock("POST","/")
+                .match_body(mockito::Matcher::PartialJson(json!({"generationConfig":{
+                    "maxOutputTokens":17,"thinkingConfig":{"includeThoughts":false,"thinkingLevel":"low"}
+                }})))
+                .with_body(format!("data: {}\n\n",json!({"candidates":[{"content":{"parts":[{"text":"yes"}]},"finishReason":"STOP"}]})))
+                .expect(1).create_async().await;
+            let request = server.mock("POST","/")
+                .match_body(mockito::Matcher::PartialJson(json!({"generationConfig":{
+                    "maxOutputTokens":64,"thinkingConfig":{"includeThoughts":true,"thinkingLevel":level}
+                }})))
+                .match_request(|request| {
+                    let body:serde_json::Value=serde_json::from_slice(request.body().expect("body")).expect("JSON");
+                    body["generationConfig"]["thinkingConfig"].get("thinkingBudget").is_none()
+                })
+                .with_body(format!("data: {}\n\n",json!({"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}]})))
+                .expect(1).create_async().await;
+            let transport = GeminiTransport::ai_studio(model, "key", true)
+                .expect("transport")
+                .with_test_endpoint(server.url());
+            let provider = GeminiProvider::new(
+                transport,
+                "google".into(),
+                model.into(),
+                Some(64),
+                Default::default(),
+            )
+            .expect("provider")
+            .with_reasoning(Some(&options))
+            .expect("confirmed reasoning");
+            let mut isolated = provider
+                .stream_decision(
+                    &[Message::User {
+                        content: "decide".into(),
+                    }],
+                    talos_core::provider::DecisionRequestLimits {
+                        max_output_tokens: 17,
+                        max_retries: 0,
+                    },
+                )
+                .await
+                .expect("isolated level");
+            let mut decision_ended = false;
+            while let Some(event) = isolated.recv().await {
+                assert!(!matches!(
+                    event,
+                    AgentEvent::Error { .. }
+                        | AgentEvent::ThinkingDelta { .. }
+                        | AgentEvent::ReasoningComplete { .. }
+                ));
+                decision_ended |= matches!(event, AgentEvent::TurnEnd { .. });
+            }
+            assert!(decision_ended);
+            let mut stream = provider
+                .stream(&[Message::User {
+                    content: "hello".into(),
+                }])
+                .await
+                .expect("dispatch");
+            let mut ended = false;
+            while let Some(event) = stream.recv().await {
+                assert!(!matches!(event, AgentEvent::Error { .. }));
+                ended |= matches!(event, AgentEvent::TurnEnd { .. });
+            }
+            assert!(ended);
+            decision.assert_async().await;
+            request.assert_async().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn disabled_reasoning_capability_suppresses_normal_and_decision_controls() {
+        let mut server = mockito::Server::new_async().await;
+        let request = server
+            .mock("POST", "/")
+            .match_request(|request| {
+                let body: serde_json::Value =
+                    serde_json::from_slice(request.body().expect("body")).expect("JSON");
+                body["generationConfig"].get("thinkingConfig").is_none()
+            })
+            .with_body(format!(
+                "data: {}\n\n",
+                json!({"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}]})
+            ))
+            .expect(2)
+            .create_async()
+            .await;
+        let transport = GeminiTransport::ai_studio("gemini-2.5-flash", "key", true)
             .expect("transport")
             .with_test_endpoint(server.url());
         let provider = GeminiProvider::new(
             transport,
             "google".into(),
-            "model".into(),
+            "gemini-2.5-flash".into(),
             Some(100),
             Default::default(),
         )
-        .expect("provider");
+        .expect("provider")
+        .with_reasoning(Some(&talos_config::ReasoningOptions {
+            budget_tokens: Some(1024),
+            ..Default::default()
+        }))
+        .expect("options")
+        .with_reasoning_disabled(true)
+        .with_reasoning(Some(&talos_config::ReasoningOptions {
+            budget_tokens: Some(2048),
+            ..Default::default()
+        }))
+        .expect("reapplying options must not override disabled capability");
         let messages = [Message::User {
-            content: "decide".into(),
+            content: "hello".into(),
         }];
-        let mut events = provider
+        let mut decision = provider
             .stream_auto_review(
                 &messages,
-                DecisionRequestLimits {
+                talos_core::provider::DecisionRequestLimits {
                     max_output_tokens: 17,
                     max_retries: 0,
                 },
             )
             .await
             .expect("decision");
-        let mut ended = false;
-        while let Some(event) = events.recv().await {
-            assert!(!matches!(
-                event,
-                AgentEvent::ToolCall { .. }
-                    | AgentEvent::ReasoningComplete { .. }
-                    | AgentEvent::ThinkingDelta { .. }
-                    | AgentEvent::Error { .. }
-            ));
-            ended |= matches!(event, AgentEvent::TurnEnd { .. });
+        while let Some(event) = decision.recv().await {
+            assert!(!matches!(event, AgentEvent::Error { .. }));
         }
-        assert!(ended);
-        let mut events = provider.stream(&messages).await.expect("conversation");
-        while events.recv().await.is_some() {}
-        decision.assert_async().await;
-        conversation.assert_async().await;
+        let mut normal = provider.stream(&messages).await.expect("normal");
+        while let Some(event) = normal.recv().await {
+            assert!(!matches!(event, AgentEvent::Error { .. }));
+        }
+        request.assert_async().await;
     }
 
     #[tokio::test]
