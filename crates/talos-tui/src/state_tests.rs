@@ -413,6 +413,55 @@ fn paste_still_updates_slash_query_and_composer() {
 }
 
 #[test]
+fn slash_arguments_leave_completion_and_preserve_input() {
+    for command in [
+        "detach all",
+        "detach 1",
+        "attach /tmp/image.png",
+        "export file.md",
+        "model old",
+        "connect old",
+    ] {
+        for paste in [false, true] {
+            let mut state = TuiState::new();
+            state.open_slash_menu(talos_conversation::command_registry());
+            if paste {
+                state.input_paste(command);
+            } else {
+                for ch in command.chars() {
+                    state.append_slash_query_char(ch);
+                }
+            }
+            assert!(!state.slash_menu.is_open, "{command}, paste={paste}");
+            assert_eq!(state.input_buffer, format!("/{command}"));
+        }
+    }
+}
+
+#[test]
+fn slash_no_matches_cannot_execute_hidden_command() {
+    for complete in [false, true] {
+        let mut state = TuiState::new();
+        state.open_slash_menu(talos_conversation::command_registry());
+        state.input_paste("not-a-real-command-xyz");
+        assert!(
+            state
+                .slash_menu
+                .filtered_indices(state.panel_query())
+                .is_empty()
+        );
+        let before = state.input_buffer.clone();
+        let action = if complete {
+            state.complete_selected_panel_item()
+        } else {
+            state.accept_selected_panel_item()
+        };
+        assert_eq!(action, PanelAction::None);
+        assert_eq!(state.input_buffer, before);
+    }
+}
+
+#[test]
 fn approval_state_preserves_full_multibyte_arguments() {
     let cmd = "gh issue create --title \"feat: write 和 edit 工具应显示内容输出\" --label bug";
     let state = BottomPanelState::open_approval("bash", cmd);

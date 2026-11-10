@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-10 - Filtered menus must validate selection before execution
+
+- Trigger: Clipboard attachment removal via `/detach all` failed in the TUI.
+- Symptom: A command with arguments could activate an unrelated hidden menu item.
+- Root cause: The full command including arguments remained a completion query; an empty result reset selection to zero, and acceptance read the unfiltered item list.
+- Fix: End command-name completion when arguments start; validate selection against filtered items before Enter or Tab acts.
+- Prevention: Test actual typed/pasted input through submission and attachment state, plus no-match acceptance. Engine-only command tests cannot detect menu misrouting; downstream session guards must not be weakened to hide it.
+- Promoted to rule/check: `slash_arguments_leave_completion_and_preserve_input`, `slash_no_matches_cannot_execute_hidden_command`, and `detach_arguments_reach_engine_from_keyboard_and_paste` in talos-tui.
+
 ## 2026-11-08 - Crash fencing needs a safe recovery path
 
 - Trigger: power loss followed by `talos -c` permanently refused input because Running custody lacked terminal proof (SESSION-CRASH-001).

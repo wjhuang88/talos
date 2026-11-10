@@ -4237,6 +4237,45 @@ fn native_repeat_submit_is_one_shot_and_orphan_repeat_is_ignored() {
 }
 
 #[test]
+fn detach_arguments_reach_engine_from_keyboard_and_paste() {
+    for command in ["/detach 1", "/detach all"] {
+        for paste in [false, true] {
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(tx));
+            tui.handle_input_event(&repeat_event(KeyCode::Char('/'), KeyEventKind::Press));
+            if paste {
+                tui.handle_input_event(&Event::Paste(command[1..].into()));
+            } else {
+                for ch in command[1..].chars() {
+                    tui.handle_input_event(&repeat_event(KeyCode::Char(ch), KeyEventKind::Press));
+                }
+            }
+            tui.last_char_time = None;
+            tui.handle_input_event(&repeat_event(KeyCode::Enter, KeyEventKind::Press));
+            let UserInput::Message(message) = rx.try_recv().expect("submitted command") else {
+                panic!("expected command message");
+            };
+            assert_eq!(message, command);
+            let mut engine =
+                talos_conversation::ConversationEngine::new("model".into(), "provider".into());
+            engine
+                .pending_image_attachments
+                .push(talos_core::message::ContentPart::Image {
+                    path: "/tmp/test.png".into(),
+                    mime: "image/png".into(),
+                    byte_count: 100,
+                    content_digest: talos_core::message::ContentDigest::default(),
+                });
+            let outputs = engine.handle_slash_command(&message);
+            assert!(engine.pending_image_attachments.is_empty());
+            assert!(outputs.iter().any(|output| matches!(output,
+                talos_conversation::UiOutput::Status(status) if status.attachment_count == 0)));
+            assert!(rx.try_recv().is_err());
+        }
+    }
+}
+
+#[test]
 fn native_repeat_cannot_delete_composer_after_slash_closes() {
     use crossterm::event::KeyEventKind::{Press, Repeat};
     let mut tui = crate::app::Tui::for_test(TuiState::new(), None);

@@ -89,3 +89,37 @@ and committed-image retention. A deterministic child-process fixture passed time
 Residual owned here: reference-aware cleanup of successfully submitted clipboard
 images is not implemented; retain these files for session recovery. Device acceptance
 on Wayland+niri+Ghostty remains required. Do not mark this task Complete yet.
+
+### 2026-11-10 attachment removal regression follow-up
+
+Within this owner's pending-attachment acceptance scope, the user reported `/detach`
+reaching a session-mutation error after clipboard attachment. Local reproduction found
+that entering arguments kept the command menu open with no matches, reset selection
+to index zero, and Enter executed that hidden item. On the inspected revision the
+hidden item is `/compact`; the screenshot's exact session command is not established.
+This is an input-routing defect, not evidence that attachment removal needs relaxed
+session-mutation permissions.
+
+Local repair closes command completion when arguments start and checks the selected
+item against the current filtered results before Enter/Tab can activate it. Tests
+first reproduced both failures, then passed for typed/pasted arguments and the full
+keyboard → command → attachment-removal/status path. No permission or session guard
+is removed. README documents direct argument entry. This follow-up is prepared on
+`fix/clipboard-detach-routing` under Review; delivery completion is not claimed.
+
+Validation: `cargo test --locked -p talos-tui --lib` passed (640 tests).
+`cargo xwin check --locked -p talos-tui --tests --target x86_64-pc-windows-msvc`
+passed. The first full preflight passed checks/Clippy but failed two talos-core
+source-layout tests: the reused executable embedded deleted worktree paths instead
+of the current `CARGO_MANIFEST_DIR`. After `cargo clean -p talos-core`, the unchanged
+`i179_source_layout` suite passed both tests. The complete unchanged-source preflight
+rerun passed (exit 0), including locked workspace checks, Clippy, tests and external
+runtime SDK fixture. Logs: `/tmp/talos-detach-preflight-rerun.log` and
+`/tmp/talos-detach-xwin.log` (local, ephemeral). `git diff --check` passed.
+User acceptance (2026-11-10): after the request to restart with `cargo run -- -c`
+and verify attachment removal in Ghostty, the user confirmed “验证过了，没问题”.
+This closes the reported `/detach` real-terminal regression acceptance; the user did
+not specify which removal variant was exercised. Both variants have automated coverage.
+This confirmation does not establish all clipboard lifecycle/platform acceptance.
+Native Windows runtime, exact-head remote CI/review and merge remain delivery gates.
+The user authorized committing and pushing this follow-up after terminal acceptance.
