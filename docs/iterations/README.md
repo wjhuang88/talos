@@ -1,8 +1,8 @@
 # Iterations
 
-## I321 / STORE-002 — A/B Active / Claimed proposal (ineffective until #908 merge)
+## I321 / STORE-002 — A/B Review / Claimed (#909)
 
-[I321](I321-store-002-capability-contract-foundation.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: #908 proposes owner-first selection of the non-overlapping A/B inventory + additive contract foundation. E0/E1 ARCH-035 (#905/#906) only owns Host architecture; #897 E2/E3 awaits C/D/E/F functional local delegates. I319 Search, I318 TUI and I310 model remain independent.
+[I321](I321-store-002-capability-contract-foundation.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: #908 merged `201a9b61d72e704da3a86f5db283b9f6e4d92938`, activating the non-overlapping A/B inventory + additive typed contract foundation; candidate #909 remains under review. E0/E1 ARCH-035 (#905/#906) only owns Host architecture; #897 E2/E3 awaits C/D/E/F functional local delegates. I319 Search, I318 TUI and I310 model remain independent.
 
 
 ## I320 / ARCH-035 E0/E1 — Review / Claimed in #906
