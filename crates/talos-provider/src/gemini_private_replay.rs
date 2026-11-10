@@ -35,7 +35,11 @@ pub(crate) fn prepare(
         let mut ids = std::collections::HashSet::new();
         for event in &calls {
             let raw = match event {
-                ProviderInvocationEvent::BrowserToolCall { id, name, arguments } => ToolCall {
+                ProviderInvocationEvent::BrowserToolCall {
+                    id,
+                    name,
+                    arguments,
+                } => ToolCall {
                     id: id.clone(),
                     name: name.clone(),
                     input: serde_json::to_value(arguments.fields()).map_err(|_| invalid())?,
@@ -105,10 +109,14 @@ pub(crate) fn prepare(
     let blocks = blocks.ok_or_else(invalid)?;
     let mut end = end.ok_or_else(invalid)?;
     if !calls.is_empty()
-        && !matches!(&end, AgentEvent::TurnEnd {
-            stop_reason: talos_core::message::StopReason::EndTurn
-                | talos_core::message::StopReason::ToolUse, ..
-        })
+        && !matches!(
+            &end,
+            AgentEvent::TurnEnd {
+                stop_reason: talos_core::message::StopReason::EndTurn
+                    | talos_core::message::StopReason::ToolUse,
+                ..
+            }
+        )
     {
         return Err(invalid());
     }
@@ -118,12 +126,12 @@ pub(crate) fn prepare(
     {
         *stop_reason = talos_core::message::StopReason::ToolUse;
     }
-    let has_browser = calls.iter().any(|event|
-        matches!(event, ProviderInvocationEvent::BrowserToolCall { .. }));
-    if textual && !had_private_history && !has_browser {
+    if textual && !had_private_history && calls.is_empty() {
         let mut output = vec![
             ProviderInvocationEvent::Legacy(AgentEvent::ReasoningComplete { blocks }),
-            ProviderInvocationEvent::Legacy(AgentEvent::ThinkingDelta { delta: thoughts.into() }),
+            ProviderInvocationEvent::Legacy(AgentEvent::ThinkingDelta {
+                delta: thoughts.into(),
+            }),
             ProviderInvocationEvent::Legacy(AgentEvent::TextDelta { delta: text.into() }),
         ];
         output.extend(calls);
@@ -132,7 +140,9 @@ pub(crate) fn prepare(
     }
     let safe_text = if textual {
         crate::browser_text_arguments::outside_tool_blocks(text)
-            .map_err(|_| invalid())?.trim().to_owned()
+            .map_err(|_| invalid())?
+            .trim()
+            .to_owned()
     } else {
         talos_core::message::strip_tool_syntax(text)
     };
@@ -172,13 +182,46 @@ pub(crate) fn prepare(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use talos_core::{message::{StopReason, Usage}, tool::ToolProtocol};
+    use talos_core::{
+        message::{StopReason, Usage},
+        tool::ToolProtocol,
+    };
 
-    fn prepare_text(text: &str, protocol: ToolProtocol, stop_reason: StopReason) -> ProviderResult<Vec<ProviderInvocationEvent>> {
+    fn prepare_text(
+        text: &str,
+        protocol: ToolProtocol,
+        stop_reason: StopReason,
+    ) -> ProviderResult<Vec<ProviderInvocationEvent>> {
         let (tx, _rx) = tokio::sync::mpsc::channel(32);
-        let sink = InvocationSender::Original { tx, browser_tools: vec!["browser".into()] };
-        let blocks = vec![crate::gemini_replay::encode("google", "model", &[serde_json::json!({"text":text,"thoughtSignature":"opaque"})], &[]).expect("signed text")];
-        prepare("google", "model", text, "", vec![GeminiOutput::Event(AgentEvent::ReasoningComplete { blocks }), GeminiOutput::Event(AgentEvent::TurnEnd { stop_reason, usage: Usage::default() })], &sink, protocol, false)
+        let sink = InvocationSender::Original {
+            tx,
+            browser_tools: vec!["browser".into()],
+        };
+        let blocks = vec![
+            crate::gemini_replay::encode(
+                "google",
+                "model",
+                &[serde_json::json!({"text":text,"thoughtSignature":"opaque"})],
+                &[],
+            )
+            .expect("signed text"),
+        ];
+        prepare(
+            "google",
+            "model",
+            text,
+            "",
+            vec![
+                GeminiOutput::Event(AgentEvent::ReasoningComplete { blocks }),
+                GeminiOutput::Event(AgentEvent::TurnEnd {
+                    stop_reason,
+                    usage: Usage::default(),
+                }),
+            ],
+            &sink,
+            protocol,
+            false,
+        )
     }
 
     #[test]
@@ -186,18 +229,81 @@ mod tests {
         let text = r#"<tool_call>{"name":"browser","id":"b","args":{"protocolVersion":2,"operation":"fill","text":"secret\nvalue"}}</tool_call>after"#;
         for protocol in [ToolProtocol::Compat, ToolProtocol::TalosStrict] {
             let events = prepare_text(text, protocol, StopReason::EndTurn).expect("complete");
-            assert!(matches!(events.first(), Some(ProviderInvocationEvent::TransientReplay(_))));
-            let visible = events.iter().filter_map(|event| match event { ProviderInvocationEvent::Legacy(AgentEvent::TextDelta { delta }) => Some(delta.as_str()), _ => None }).collect::<String>();
+            assert!(matches!(
+                events.first(),
+                Some(ProviderInvocationEvent::TransientReplay(_))
+            ));
+            let visible = events
+                .iter()
+                .filter_map(|event| match event {
+                    ProviderInvocationEvent::Legacy(AgentEvent::TextDelta { delta }) => {
+                        Some(delta.as_str())
+                    }
+                    _ => None,
+                })
+                .collect::<String>();
             assert_eq!(visible, "after");
             assert!(prepare_text(text, protocol, StopReason::MaxTokens).is_err());
         }
     }
 
     #[test]
+    fn ordinary_signed_tool_frames_restore_exactly_with_browser_registered() {
+        for (protocol, text) in [
+            (
+                ToolProtocol::Compat,
+                "  ```json-tool\n{\"name\":\"ordinary\",\"id\":\"o\",\"args\":{}}\n```  ",
+            ),
+            (
+                ToolProtocol::TalosStrict,
+                "  <tool_call>{\"name\":\"ordinary\",\"id\":\"o\",\"args\":{}}</tool_call>  ",
+            ),
+        ] {
+            let events = prepare_text(text, protocol, StopReason::EndTurn).expect("complete");
+            let ProviderInvocationEvent::TransientReplay(replay) = &events[0] else {
+                panic!("signed tools require exact original custody")
+            };
+            let restored = replay
+                .restore(replay.projected_message(), "google", "model")
+                .expect("restore");
+            let result = Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: "o".into(),
+                    content: "done".into(),
+                    is_error: false,
+                },
+            };
+            let projected =
+                crate::gemini_compat::project("google", "model", &[restored, result], protocol)
+                    .expect("signed projection");
+            assert!(matches!(&projected[0], Message::Assistant { content, .. } if content == text));
+        }
+    }
+
+    #[test]
+    fn malformed_browser_batches_release_no_events() {
+        for protocol in [ToolProtocol::Compat, ToolProtocol::TalosStrict] {
+            for text in [
+                r#"<tool_call>{"name":"browser","id":"b","args":{"text":"secret","te\u0078t":"duplicate"}}</tool_call>"#,
+                r#"<tool_call>{"name":"browser","name":"ordinary","id":"b","args":{"text":"secret"}}</tool_call>"#,
+                r#"<tool_call>{"name":"browser","id":"b","args":{"text":"secret"}}"#,
+                r#"<tool_call>{"name":"browser","id":"b","args":{"text":"secret"}}</tool_call><tool_call>{"name":"browser","id":"b","args":{}}</tool_call>"#,
+            ] {
+                assert!(prepare_text(text, protocol, StopReason::EndTurn).is_err());
+            }
+        }
+    }
+
+    #[test]
     fn ordinary_text_does_not_acquire_private_custody() {
         for protocol in [ToolProtocol::Compat, ToolProtocol::TalosStrict] {
-            let events = prepare_text("ordinary response", protocol, StopReason::EndTurn).expect("ordinary");
-            assert!(events.iter().all(|event| !matches!(event, ProviderInvocationEvent::TransientReplay(_))));
+            let events =
+                prepare_text("ordinary response", protocol, StopReason::EndTurn).expect("ordinary");
+            assert!(
+                events
+                    .iter()
+                    .all(|event| !matches!(event, ProviderInvocationEvent::TransientReplay(_)))
+            );
         }
     }
 }
