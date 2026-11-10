@@ -140,9 +140,9 @@ mod file_tests {
     }
 }
 
-/// Request-owned authorized-user refresh. Service-account signing is integrated separately.
+/// Request-owned OAuth refresh for admitted user and service-account credentials.
 #[derive(Clone)]
-pub(crate) struct UserTokenSource {
+pub(crate) struct VertexTokenSource {
     client: reqwest::Client,
     credentials: std::sync::Arc<Value>,
     cache: std::sync::Arc<tokio::sync::Mutex<Option<CachedToken>>>,
@@ -154,9 +154,9 @@ struct CachedToken {
     refresh_at: std::time::Instant,
 }
 
-impl std::fmt::Debug for UserTokenSource {
+impl std::fmt::Debug for VertexTokenSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("UserTokenSource").finish_non_exhaustive()
+        f.debug_struct("VertexTokenSource").finish_non_exhaustive()
     }
 }
 
@@ -164,12 +164,41 @@ fn auth_error(message: &'static str) -> ProviderError {
     ProviderError::InvalidResponse(message.into())
 }
 
-impl UserTokenSource {
+/// Use only the official local service-account signer, never its token cache or ADC builder.
+async fn service_account_assertion(credentials: &Value) -> ProviderResult<String> {
+    use base64::Engine;
+    use futures_util::FutureExt;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let key = credentials["private_key"].as_str()
+        .ok_or_else(|| auth_error("invalid Vertex signing key"))?;
+    if key.len() > 16 * 1024 {
+        return Err(auth_error("Vertex signing key exceeds limit"));
+    }
+    let issued = SystemTime::now().duration_since(UNIX_EPOCH)
+        .map_err(|_| auth_error("invalid Vertex signing clock"))?.as_secs();
+    let expires = issued.checked_add(3600)
+        .ok_or_else(|| auth_error("invalid Vertex signing clock"))?;
+    let encode = |v: Value| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(v.to_string());
+    let header = encode(serde_json::json!({"alg":"RS256", "typ":"JWT", "kid":credentials["private_key_id"]}));
+    let claims = encode(serde_json::json!({
+        "iss":credentials["client_email"],
+        "scope":"https://www.googleapis.com/auth/cloud-platform",
+        "aud":"https://oauth2.googleapis.com/token", "iat":issued, "exp":expires,
+    }));
+    let input = format!("{header}.{claims}");
+    let signer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        google_cloud_auth::credentials::service_account::Builder::new(credentials.clone()).build_signer()
+    })).map_err(|_| auth_error("Vertex signer initialization failed"))?
+        .map_err(|_| auth_error("Vertex signer initialization failed"))?;
+    let signature = std::panic::AssertUnwindSafe(signer.sign(input.as_bytes())).catch_unwind().await
+        .map_err(|_| auth_error("Vertex signing failed"))?
+        .map_err(|_| auth_error("Vertex signing failed"))?;
+    Ok(format!("{input}.{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(signature)))
+}
+
+impl VertexTokenSource {
     pub(crate) fn from_bytes(bytes: &[u8]) -> ProviderResult<Self> {
         let credentials = parse_credentials(bytes)?;
-        if credentials["type"] != "authorized_user" {
-            return Err(auth_error("expected Vertex authorized-user credentials"));
-        }
         Ok(Self {
             client: reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
@@ -185,23 +214,33 @@ impl UserTokenSource {
         if deadline <= std::time::Instant::now() {
             return Err(auth_error("Vertex credential acquisition timed out"));
         }
-        tokio::time::timeout_at(deadline.into(), self.refresh()).await
+        tokio::time::timeout_at(deadline.into(), self.refresh(deadline)).await
             .map_err(|_| auth_error("Vertex credential acquisition timed out"))?
     }
 
-    async fn refresh(&self) -> ProviderResult<String> {
+    async fn refresh(&self, deadline: std::time::Instant) -> ProviderResult<String> {
         use std::time::{Duration, Instant};
         let mut cached = self.cache.lock().await;
         if let Some(token) = cached.as_ref().filter(|t| Instant::now() < t.refresh_at) {
             return Ok(token.token.clone());
         }
         let started = Instant::now();
-        let body = serde_json::json!({
-            "grant_type": "refresh_token",
-            "client_id": self.credentials["client_id"],
-            "client_secret": self.credentials["client_secret"],
-            "refresh_token": self.credentials["refresh_token"],
-        });
+        let body = if self.credentials["type"] == "service_account" {
+            serde_json::json!({
+                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                "assertion": service_account_assertion(&self.credentials).await?,
+            })
+        } else {
+            serde_json::json!({
+                "grant_type": "refresh_token",
+                "client_id": self.credentials["client_id"],
+                "client_secret": self.credentials["client_secret"],
+                "refresh_token": self.credentials["refresh_token"],
+            })
+        };
+        if std::time::Instant::now() >= deadline {
+            return Err(auth_error("Vertex credential acquisition timed out"));
+        }
         let mut response = self.client.post(&self.endpoint).json(&body).send().await
             .map_err(|_| auth_error("Vertex token request failed"))?;
         if !response.status().is_success() {
@@ -243,10 +282,45 @@ mod refresh_tests {
     use super::*;
     use std::time::{Duration, Instant};
 
-    fn source() -> UserTokenSource {
-        UserTokenSource::from_bytes(br#"{"type":"authorized_user","client_id":"fixture-client","client_secret":"fixture-secret","refresh_token":"fixture-refresh"}"#).expect("credentials")
+    fn source() -> VertexTokenSource {
+        VertexTokenSource::from_bytes(br#"{"type":"authorized_user","client_id":"fixture-client","client_secret":"fixture-secret","refresh_token":"fixture-refresh"}"#).expect("credentials")
     }
     fn deadline() -> Instant { Instant::now() + Duration::from_secs(5) }
+
+    #[tokio::test]
+    async fn service_account_exchanges_signed_assertion_and_caches_token() {
+        use base64::Engine;
+        let credentials = serde_json::json!({
+            "type":"service_account", "client_email":"fixture@example.invalid",
+            "private_key_id":"fixture-key", "project_id":"fixture-project",
+            "private_key":include_str!("../tests/fixtures/gemini/test-only-service-account.pem"),
+        });
+        let assertion = service_account_assertion(&credentials).await.expect("sign");
+        let parts: Vec<_> = assertion.split('.').collect();
+        assert_eq!(parts.len(), 3);
+        let decode = |s: &str| -> Value {
+            serde_json::from_slice(&base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(s).expect("base64")).expect("json")
+        };
+        assert_eq!(decode(parts[0])["alg"], "RS256");
+        let claims = decode(parts[1]);
+        assert_eq!(claims["aud"], "https://oauth2.googleapis.com/token");
+        assert_eq!(claims["exp"].as_u64().expect("expiry") - claims["iat"].as_u64().expect("issued"), 3600);
+        assert_eq!(base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(parts[2]).expect("signature").len(), 256);
+        let mut server = mockito::Server::new_async().await;
+        let mock = server.mock("POST", "/")
+            .match_body(mockito::Matcher::PartialJson(serde_json::json!({"grant_type":"urn:ietf:params:oauth:grant-type:jwt-bearer"})))
+            .with_body(r#"{"access_token":"fixture-token","token_type":"Bearer","expires_in":3600}"#)
+            .expect(1).create_async().await;
+        let mut auth = VertexTokenSource::from_bytes(credentials.to_string().as_bytes()).expect("source");
+        auth.endpoint = server.url();
+        assert_eq!(auth.token(deadline()).await.expect("exchange"), "fixture-token");
+        assert_eq!(auth.token(deadline()).await.expect("cached"), "fixture-token");
+        mock.assert_async().await;
+        let mut invalid = credentials;
+        invalid["private_key"] = "fixture-invalid-private-key".into();
+        let error = service_account_assertion(&invalid).await.expect_err("invalid key").to_string();
+        assert!(!error.contains("fixture-invalid-private-key"));
+    }
 
     #[tokio::test]
     async fn cache_reuses_valid_token_and_short_lifetime_refreshes() {
