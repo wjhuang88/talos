@@ -632,9 +632,13 @@ impl Config {
     /// Vertex ADC is selected lazily; this does not probe or validate credentials.
     pub fn model_authentication_configured(&self, provider: &str, model: &str) -> bool {
         self.provider_authenticated(provider)
-            || (self.resolve_model_protocol(provider, model).protocol == ProviderProtocol::GoogleGemini
+            || (self.resolve_model_protocol(provider, model).protocol
+                == ProviderProtocol::GoogleGemini
                 && self.providers.get(provider).is_some_and(|config| {
-                    matches!(config.gemini, Some(crate::GeminiTransportConfig::Vertex { .. }))
+                    matches!(
+                        config.gemini,
+                        Some(crate::GeminiTransportConfig::Vertex { .. })
+                    )
                 }))
     }
 
