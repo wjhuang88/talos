@@ -57,7 +57,7 @@ Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim 
 ## I321 A/B implementation candidate — PR #909
 
 - [Current capability and authority inventory](../../reference/STORE-002-I321-CAPABILITY-AUTHORITY-INVENTORY-2026-11-10.md): authoritative/derived/ephemeral data, all seven capability families, existing paths and residuals.
-- `crates/talos-core/src/storage_capability.rs`: typed `StorageCapabilityKind`, stable IDs/requests reusing existing capability identity, and `StorageCapabilityBinding<T>` with explicit `Unavailable`. No runtime/domain call site is changed.
+- `crates/talos-core/src/storage_capability.rs`: typed `StorageCapabilityKind`, stable IDs and `CapabilityRequest` integration with existing `CapabilityRegistry` whose empty resolution returns `ResolutionResult::Unavailable`. No operational binding type, domain call site, or runtime behavior is introduced.
 - Candidate code is additive and non-operational: it does **not** satisfy C/D/E/F, does not implement seven storage operation traits, and does not yet provide #897 a functional dependency to inject.
-- Validation: **pending** exact-head `cargo fmt/check/test`, governance validators, CI and independent API/architecture review. This entry does not assert a passing Rust test result.
+- Validation history: [CI #4030](https://github.com/wjhuang88/talos/actions/runs/42799763086) passed 8/8 on **previous** head `5c38e6e`; independent [Copilot review](https://github.com/wjhuang88/talos/pull/909#issuecomment-6765145292) identified one **blocking** unconstrained `StorageCapabilityBinding<T>` public API. The binding and its tests were removed. Revised exact-head CI and independent re-review remain **pending**; old CI/review must not be transferred to a changed head.
 - #670 remains open; avoid marking Complete or recording a fictitious Completion Commit. Future domain adapter delegation and local profile need separately authorized work.
