@@ -4554,7 +4554,7 @@ impl AddPlan {
                     .join(", ")
             )));
         }
-        if match &self.operation {
+        let structure_changed = match &self.operation {
             Operation::Push(_) | Operation::Pull(_) => false,
             Operation::Add => {
                 literal_add_paths(
@@ -4581,17 +4581,31 @@ impl AddPlan {
                 let (paths, gitlinks) = tracked_commit_sources(&self.repository.workdir)?;
                 paths != self.paths || gitlinks != self.gitlinks
             }
-        } || match &self.operation {
+        };
+        if structure_changed {
+            return Err(GitToolError::InvalidInput(
+                "Git source selection, submodule entries or checkout parent paths changed after preparation; request a fresh authorization".into(),
+            ));
+        }
+        let current_sources = match &self.operation {
             Operation::Push(_) | Operation::Pull(_) => Vec::new(),
             Operation::Add => capture_add_sources(&self.repository.workdir, &self.paths)?,
             Operation::Commit(_) | Operation::Checkout(_) => {
                 capture_tracked_sources(&self.repository.workdir, &self.paths)?
             }
-        } != self.sources
-        {
-            return Err(GitToolError::InvalidInput(
-                "Git repository or sources changed after preparation; request a fresh authorization".into(),
-            ));
+        };
+        if current_sources != self.sources {
+            let changed = current_sources
+                .iter()
+                .zip(&self.sources)
+                .position(|(current, expected)| current != expected)
+                .and_then(|index| self.paths.get(index));
+            let detail = changed
+                .map(|path| self.repository.workdir.join(path).display().to_string())
+                .unwrap_or_else(|| "source entry count".into());
+            return Err(GitToolError::InvalidInput(format!(
+                "Git source changed after preparation: {detail}; request a fresh authorization"
+            )));
         }
         if let Some(expected) = &self.commit_state
             && &super::repository_state::CommitState::capture(&self.repository)? != expected
@@ -4688,10 +4702,23 @@ fn capture_tracked_sources(
         entries: 4096,
         bytes: 16 * 1024 * 1024,
     };
+    // Bound scan work independently of retained memory: bodies are streamed in
+    // 64 KiB chunks, with one SHA-256 digest per regular tracked source.
+    let mut remaining_io = 1024 * 1024 * 1024_u64;
     paths
         .iter()
         .map(|path| {
             let absolute = workdir.join(path);
+            if std::fs::symlink_metadata(&absolute).is_ok_and(|metadata| metadata.is_file()) {
+                budget.entries = budget.entries.checked_sub(1).ok_or_else(|| {
+                    GitToolError::InvalidInput(
+                        "Git tracked-source entry limit (4096) exceeded; no operation prepared"
+                            .into(),
+                    )
+                })?;
+                return snapshot::Entry::capture_digest(&absolute, &mut remaining_io)
+                    .map_err(|error| GitToolError::InvalidInput(error.to_string()));
+            }
             if std::fs::symlink_metadata(&absolute).is_ok_and(|metadata| metadata.is_dir()) {
                 // Replacing a tracked file with a directory does not make its
                 // untracked descendants sources for status or commit --all.
@@ -4889,7 +4916,7 @@ fn selected_leaves(
                 selected_leaves(&path.join(name), child, output)?;
             }
         }
-        snapshot::Entry::File(..) => output.push(
+        snapshot::Entry::File(..) | snapshot::Entry::FileDigest(..) => output.push(
             path.to_str()
                 .ok_or_else(|| GitToolError::InvalidInput("Git source name is not UTF-8".into()))?
                 .to_owned(),

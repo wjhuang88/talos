@@ -2,8 +2,9 @@
 //! resolution authorization before capture and separately admit `resolved()`.
 //! This module performs no directory enumeration or file-content reads.
 
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
 use super::GitToolError;
 
@@ -147,7 +148,7 @@ fn inspect(path: &Path) -> Result<State, GitToolError> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct Record {
+pub(super) struct Record {
     path: PathBuf,
     state: State,
 }
@@ -157,7 +158,7 @@ struct Record {
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Resolution {
     resolved: PathBuf,
-    records: Vec<Record>,
+    records: Vec<Arc<Record>>,
     original_leaf_link: bool,
 }
 
@@ -176,14 +177,23 @@ impl Resolution {
         allow_missing: bool,
         budget: &mut Budget,
     ) -> Result<Self, GitToolError> {
-        Self::capture_endpoint(path, Endpoint::Directory, allow_missing, budget)
+        Self::capture_endpoint(
+            path,
+            Endpoint::Directory,
+            allow_missing,
+            budget,
+            &mut BTreeMap::new(),
+        )
     }
 
-    /// Resolves a local auxiliary file path, allowing only its final leaf to
-    /// be absent. Parent traversal and every earlier component must exist as a
-    /// directory, and regular-file contents remain a separate Read operation.
-    pub(super) fn capture_file(path: &Path, budget: &mut Budget) -> Result<Self, GitToolError> {
-        Self::capture_endpoint(path, Endpoint::File, true, budget)
+    /// Share immutable component evidence across an auxiliary frontier. Reused
+    /// components are checked again; their identity handles are retained once.
+    pub(super) fn capture_file_shared(
+        path: &Path,
+        budget: &mut Budget,
+        records: &mut BTreeMap<PathBuf, Arc<Record>>,
+    ) -> Result<Self, GitToolError> {
+        Self::capture_endpoint(path, Endpoint::File, true, budget, records)
     }
 
     fn capture_endpoint(
@@ -191,6 +201,7 @@ impl Resolution {
         endpoint: Endpoint,
         allow_missing: bool,
         budget: &mut Budget,
+        records: &mut BTreeMap<PathBuf, Arc<Record>>,
     ) -> Result<Self, GitToolError> {
         if !path.is_absolute() {
             return Err(invalid());
@@ -231,7 +242,7 @@ impl Resolution {
                         )
                     });
                     if result.resolved.is_absolute() && !root_follows {
-                        result.record(budget)?;
+                        result.record(budget, records)?;
                     }
                 }
                 Component::CurDir => {}
@@ -240,7 +251,7 @@ impl Resolution {
                         return Err(invalid());
                     }
                     if matches!(
-                        result.records.last(),
+                        result.records.last().map(AsRef::as_ref),
                         Some(Record {
                             path,
                             state: State::File(_),
@@ -252,7 +263,7 @@ impl Resolution {
                 }
                 Component::Normal(_) => {
                     result.resolved.push(&part);
-                    result.record(budget)?;
+                    result.record(budget, records)?;
                     match &result.records.last().ok_or_else(invalid)?.state {
                         State::Missing if !missing_allowed => return Err(invalid()),
                         State::Missing if endpoint == Endpoint::File => {
@@ -322,22 +333,41 @@ impl Resolution {
         Ok(result)
     }
 
-    fn record(&mut self, budget: &mut Budget) -> Result<(), GitToolError> {
+    fn record(
+        &mut self,
+        budget: &mut Budget,
+        records: &mut BTreeMap<PathBuf, Arc<Record>>,
+    ) -> Result<(), GitToolError> {
+        // Every traversal slot consumes bounded memory even when its identity
+        // is shared. Never reuse an unchecked ancestor after substitution.
+        budget.charge(0, std::mem::size_of::<Arc<Record>>())?;
+        if let Some(record) = records.get(&self.resolved) {
+            if inspect(&self.resolved)? != record.state {
+                return Err(invalid());
+            }
+            self.records.push(Arc::clone(record));
+            return Ok(());
+        }
         // Reserve before opening metadata/identity handles. On Windows charge
         // the retained handle and a conservative temporary comparison slot too.
         let entries = if cfg!(windows) { 3 } else { 1 };
         budget.charge(
             entries,
-            self.resolved.as_os_str().as_encoded_bytes().len() + 32,
+            self.resolved.as_os_str().as_encoded_bytes().len() * 2
+                + std::mem::size_of::<Record>()
+                + std::mem::size_of::<(PathBuf, Arc<Record>)>()
+                + 64,
         )?;
         let state = inspect(&self.resolved)?;
         if let State::Link(_, target) = &state {
             budget.charge(0, target.as_os_str().as_encoded_bytes().len())?;
         }
-        self.records.push(Record {
+        let record = Arc::new(Record {
             path: self.resolved.clone(),
             state,
         });
+        records.insert(self.resolved.clone(), Arc::clone(&record));
+        self.records.push(record);
         Ok(())
     }
 
