@@ -12,6 +12,7 @@
 | Depends On | [STORE-002](STORE-002-storage-capability-contracts.md) / #670: accepted capability/domain seam; RUNTIME-001 SDK compatibility |
 | Coordinates | SESSION-009 / #46; SESSION-011 / #612; DATA-002 / #141; SERVER-002 / #360 |
 | Long-task planning | [SERVER-MVP-001](../../tasks/2026-11-10-server-mvp-storage-decoupled.md) proposed in draft PR #896 |
+| E1 review artifact | [Host composition proposal](../../proposals/arch-035-host-composition-boundary.md) — non-binding until reviewed and accepted |
 
 ## Collaboration Claim
 
