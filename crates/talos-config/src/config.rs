@@ -628,6 +628,16 @@ impl Config {
         false
     }
 
+    /// Whether a model has an applicable authentication configuration.
+    /// Vertex ADC is selected lazily; this does not probe or validate credentials.
+    pub fn model_authentication_configured(&self, provider: &str, model: &str) -> bool {
+        self.provider_authenticated(provider)
+            || (self.resolve_model_protocol(provider, model).protocol == ProviderProtocol::GoogleGemini
+                && self.providers.get(provider).is_some_and(|config| {
+                    matches!(config.gemini, Some(crate::GeminiTransportConfig::Vertex { .. }))
+                }))
+    }
+
     /// Returns all available models: built-in catalog merged with user-configured
     /// models from `providers.*.models`.
     pub fn all_models(&self) -> Vec<model::ModelMetadata> {

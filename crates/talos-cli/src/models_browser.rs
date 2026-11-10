@@ -321,7 +321,7 @@ fn build_browser_rows(config: &Config) -> Vec<CatalogBrowserRow> {
                     .unwrap_or_else(|| provider.clone()),
                 model_id: model.id.clone(),
                 qualified: format!("{provider}/{}", model.id),
-                authenticated: config.provider_authenticated(&provider),
+                authenticated: config.model_authentication_configured(&provider, &model.id),
                 current: config.provider == provider && config.model == model.id,
                 context: ctx,
                 pricing,
@@ -658,6 +658,7 @@ mod tests {
             let rows = build_browser_rows(&config);
             let row = rows.iter().find(|row| row.provider == "google" && row.model_id == model.id).expect("overridden row");
             assert_eq!(row.effective_protocol, "openai-chat (Configured)");
+            assert_eq!(row.authenticated, config.provider_authenticated("google"));
         }
     }
 

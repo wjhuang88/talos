@@ -95,7 +95,7 @@ pub(crate) fn build_model_picker_data(config: &Config) -> ModelPickerData {
 
     let mut ready_models: Vec<ModelPickerItem> = Vec::new();
     for m in &catalog {
-        let provider_authed = config.provider_authenticated(&m.provider);
+        let provider_authed = config.model_authentication_configured(&m.provider, &m.id);
         let pricing_str = m.pricing.as_ref().map(|p| {
             let input = p.input_per_1m.map(|v| format!("${v}")).unwrap_or_default();
             let output = p.output_per_1m.map(|v| format!("${v}")).unwrap_or_default();
@@ -780,8 +780,12 @@ mod tests {
             assert!(row.label.contains("google-gemini (Configured)"), "{}", row.label);
             config.providers.get_mut("google").expect("provider").models.insert(model.id.clone(), talos_config::ModelConfig { protocol: Some(talos_config::ProviderProtocol::OpenAIChat), ..Default::default() });
             let data = build_model_picker_data(&config);
-            let row = data.ready_models.iter().find(|row| row.provider == "google" && row.model_id == model.id).expect("overridden row");
-            assert!(row.label.contains("openai-chat (Configured)"), "{}", row.label);
+            let row = data.ready_models.iter().find(|row| row.provider == "google" && row.model_id == model.id);
+            if config.provider_authenticated("google") {
+                assert!(row.expect("keyed override").label.contains("openai-chat (Configured)"));
+            } else {
+                assert!(row.is_none(), "OpenAI override cannot use Vertex ADC");
+            }
         }
     }
 
