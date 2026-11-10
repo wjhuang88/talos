@@ -304,7 +304,8 @@ impl WebSearchTool {
     #[cfg(test)]
     pub(crate) fn for_legacy_parity_test(proxy_url: &str) -> Self {
         Self {
-            duckduckgo_config: crate::search_backend::legacy_owned::LegacyConfig::default().with_proxy(proxy_url),
+            duckduckgo_config: crate::search_backend::legacy_owned::LegacyConfig::default()
+                .with_proxy(proxy_url),
             tavily_api_key: None,
             searxng_url: None,
         }
