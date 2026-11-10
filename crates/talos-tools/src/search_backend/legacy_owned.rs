@@ -13,13 +13,13 @@ mod probe;
 
 use std::time::Duration;
 
-use reqwest::{Client, Method, StatusCode, Url};
 use super::{
     SearchBackendError, SearchBackendResult, bing_parser,
     compat_helpers::random_user_agent,
     ddg_parser::{self, DdgFormat},
     instant_answer,
 };
+use reqwest::{Client, Method, StatusCode, Url};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct LegacyConfig {
@@ -34,9 +34,11 @@ impl LegacyConfig {
     }
 }
 
-fn client(config: &LegacyConfig, timeout: Duration, redirects: usize)
-    -> Result<Client, SearchBackendError>
-{
+fn client(
+    config: &LegacyConfig,
+    timeout: Duration,
+    redirects: usize,
+) -> Result<Client, SearchBackendError> {
     let mut builder = Client::builder()
         .timeout(timeout)
         .user_agent(random_user_agent())
@@ -57,7 +59,9 @@ fn client(config: &LegacyConfig, timeout: Duration, redirects: usize)
             builder = builder.add_root_certificate(cert);
         }
     }
-    builder.build().map_err(|_| SearchBackendError::RequestFailed("legacy client build".into()))
+    builder
+        .build()
+        .map_err(|_| SearchBackendError::RequestFailed("legacy client build".into()))
 }
 
 #[derive(Clone, Copy)]
@@ -83,27 +87,36 @@ impl Protocol {
     }
 
     fn method(self) -> Method {
-        if matches!(self, Self::Lite) { Method::POST } else { Method::GET }
+        if matches!(self, Self::Lite) {
+            Method::POST
+        } else {
+            Method::GET
+        }
     }
 }
 
-fn request_url_and_body(protocol: Protocol, query: &str)
-    -> Result<(Url, Option<String>), SearchBackendError>
-{
+fn request_url_and_body(
+    protocol: Protocol,
+    query: &str,
+) -> Result<(Url, Option<String>), SearchBackendError> {
     let mut url = Url::parse(protocol.url())
         .map_err(|_| SearchBackendError::RequestFailed("legacy static endpoint".into()))?;
     {
         let mut pairs = url.query_pairs_mut();
         pairs.append_pair("q", query);
         match protocol {
-            Protocol::Lite => { pairs.append_pair("kl", "wt-wt"); }
+            Protocol::Lite => {
+                pairs.append_pair("kl", "wt-wt");
+            }
             Protocol::Instant => {
                 pairs.append_pair("format", "json");
                 pairs.append_pair("no_html", "1");
                 pairs.append_pair("skip_disambig", "1");
                 pairs.append_pair("t", "rust-agent-websearch");
             }
-            Protocol::Bing => { pairs.append_pair("mkt", "zh-CN"); }
+            Protocol::Bing => {
+                pairs.append_pair("mkt", "zh-CN");
+            }
             Protocol::Html => {}
         }
     }
@@ -117,9 +130,13 @@ fn request_url_and_body(protocol: Protocol, query: &str)
 }
 
 fn classify(error: &reqwest::Error) -> SearchBackendError {
-    if error.is_timeout() { SearchBackendError::Timeout }
-    else if error.is_connect() { SearchBackendError::Unreachable }
-    else { SearchBackendError::RequestFailed("legacy transport failed".into()) }
+    if error.is_timeout() {
+        SearchBackendError::Timeout
+    } else if error.is_connect() {
+        SearchBackendError::Unreachable
+    } else {
+        SearchBackendError::RequestFailed("legacy transport failed".into())
+    }
 }
 
 async fn query_protocol(
@@ -133,7 +150,10 @@ async fn query_protocol(
         let mut request = http.request(protocol.method(), url.clone());
         if let Some(body) = &body {
             request = request
-                .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .header(
+                    reqwest::header::CONTENT_TYPE,
+                    "application/x-www-form-urlencoded",
+                )
                 .body(body.clone());
         }
         if matches!(protocol, Protocol::Bing) {
@@ -148,12 +168,36 @@ async fn query_protocol(
             Err(err) => return Err(classify(&err)),
             Ok(response) => {
                 let status = response.status();
-                let body = response.bytes().await.map_err(|_| SearchBackendError::Parse)?;
+                let body = successful_body(response).await?;
                 return parse_response(protocol, status, &body, query);
             }
         }
     }
     Err(SearchBackendError::NoResults)
+}
+
+// Reject non-success status at header time; never buffer a stalled or large
+// 403/429/503 body before falling back to the next fixed search destination.
+async fn successful_body(response: reqwest::Response) -> Result<Vec<u8>, SearchBackendError> {
+    let status = response.status();
+    if !status.is_success() {
+        return Err(SearchBackendError::HttpStatus(status.as_u16()));
+    }
+    response
+        .bytes()
+        .await
+        .map(|body| body.to_vec())
+        .map_err(|_| SearchBackendError::Parse)
+}
+
+// Upstream reqwest text() accepts malformed HTML UTF-8 and strips a leading BOM.
+// Keep strict JSON bytes unchanged. This adaptation belongs ONLY to the legacy
+// standalone Tool; protected SearchRouter parser policy is unmodified.
+fn legacy_html_bytes(body: &[u8]) -> Vec<u8> {
+    String::from_utf8_lossy(body)
+        .trim_start_matches('\u{feff}')
+        .as_bytes()
+        .to_vec()
 }
 
 fn parse_response(
@@ -165,21 +209,42 @@ fn parse_response(
     // The old rust-websearch config used ten results, with the Tool truncating
     // to the requested count after the coordinator returned its result list.
     const LEGACY_COUNT: u32 = 10;
+    let html_body;
+    let decoded_body = if matches!(protocol, Protocol::Instant) {
+        body
+    } else {
+        html_body = legacy_html_bytes(body);
+        &html_body
+    };
     let result = match protocol {
-        Protocol::Lite => ddg_parser::parse(DdgFormat::Lite, status.as_u16(), body, LEGACY_COUNT)
+        Protocol::Lite => ddg_parser::parse(
+            DdgFormat::Lite,
+            status.as_u16(),
+            decoded_body,
+            LEGACY_COUNT,
+        )
             .map(|x| x.into_candidates())
             .map_err(|_| SearchBackendError::Parse),
         Protocol::Instant => instant_answer::parse(status.as_u16(), body, query, LEGACY_COUNT)
             .map(|x| x.into_candidates())
             .map_err(|_| SearchBackendError::Parse),
-        Protocol::Html => ddg_parser::parse(DdgFormat::Html, status.as_u16(), body, LEGACY_COUNT)
+        Protocol::Html => ddg_parser::parse(
+            DdgFormat::Html,
+            status.as_u16(),
+            decoded_body,
+            LEGACY_COUNT,
+        )
             .map(|x| x.into_candidates())
             .map_err(|_| SearchBackendError::Parse),
-        Protocol::Bing => bing_parser::parse(status.as_u16(), body, LEGACY_COUNT)
+        Protocol::Bing => bing_parser::parse(status.as_u16(), decoded_body, LEGACY_COUNT)
             .map(|x| x.into_candidates())
             .map_err(|_| SearchBackendError::Parse),
     }?;
-    if result.is_empty() { Err(SearchBackendError::NoResults) } else { Ok(result) }
+    if result.is_empty() {
+        Err(SearchBackendError::NoResults)
+    } else {
+        Ok(result)
+    }
 }
 
 /// Historical direct Tool path only; the protected Tool never calls this.
@@ -187,9 +252,12 @@ pub(crate) async fn search(
     query: &str,
     config: &LegacyConfig,
 ) -> Result<Vec<SearchBackendResult>, SearchBackendError> {
-    if query.trim().is_empty() { return Err(SearchBackendError::NoResults); }
+    if query.trim().is_empty() {
+        return Err(SearchBackendError::NoResults);
+    }
     probe::rate_limit().await;
-    let (ddg, bing) = probe::reachability(config, |t, redirects| client(config, t, redirects)).await;
+    let (ddg, bing) =
+        probe::reachability(config, |t, redirects| client(config, t, redirects)).await;
     if ddg {
         for p in [Protocol::Lite, Protocol::Instant, Protocol::Html] {
             if let Ok(results) = query_protocol(p, query, config).await {
@@ -225,5 +293,82 @@ mod tests {
         let (bing, body) = request_url_and_body(Protocol::Bing, "rust").unwrap();
         assert!(body.is_none());
         assert_eq!(bing.host_str(), Some("cn.bing.com"));
+    }
+
+    fn spawn_http_fixture(
+        status: &'static str,
+        encoding: Option<&'static str>,
+        body: &'static [u8],
+        stall_body: bool,
+    ) -> (String, std::thread::JoinHandle<()>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("loopback fixture");
+        let url = format!("http://{}", listener.local_addr().expect("fixture address"));
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("fixture accept");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(3)))
+                .expect("fixture timeout");
+            let mut request = [0_u8; 2048];
+            let _ = stream.read(&mut request);
+            let content_encoding = encoding
+                .map(|value| format!("Content-Encoding: {value}\r\n"))
+                .unwrap_or_default();
+            let headers = format!(
+                "HTTP/1.1 {status}\r\n{content_encoding}Content-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            stream.write_all(headers.as_bytes()).expect("fixture headers");
+            if stall_body {
+                // A non-200 response must be rejected before this body is read.
+                std::thread::sleep(Duration::from_millis(500));
+            } else {
+                stream.write_all(body).expect("fixture body");
+            }
+        });
+        (url, server)
+    }
+
+    #[tokio::test]
+    async fn non_success_status_rejects_before_stalled_body() {
+        let (url, server) = spawn_http_fixture("503 Service Unavailable", None, b"never sent", true);
+        let http = client(&LegacyConfig::default(), Duration::from_secs(3), 0)
+            .expect("legacy client");
+        let response = http.get(url).send().await.expect("fixture response");
+        let result = tokio::time::timeout(Duration::from_millis(250), successful_body(response))
+            .await
+            .expect("error response must not wait for body");
+        assert!(matches!(result, Err(SearchBackendError::HttpStatus(503))));
+        server.join().expect("fixture thread");
+    }
+
+    #[tokio::test]
+    async fn legacy_client_decompresses_upstream_content_encodings() {
+        const GZIP: &[u8] = &[ 0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcb, 0x49, 0x4d, 0x4f, 0x4c, 0xae, 0x54, 0x48, 0xce, 0xcf, 0x2d, 0x28, 0x4a, 0x2d, 0x2e, 0x4e, 0x4d, 0x51, 0x48, 0xcb, 0xac, 0x28, 0x29, 0x2d, 0x4a, 0x05, 0x00, 0x13, 0x70, 0xfb, 0xdd, 0x19, 0x00, 0x00, 0x00 ];
+        const BROTLI: &[u8] = &[ 0x0b, 0x0c, 0x80, 0x6c, 0x65, 0x67, 0x61, 0x63, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x66, 0x69, 0x78, 0x74, 0x75, 0x72, 0x65, 0x03 ];
+        const DEFLATE: &[u8] = &[ 0x78, 0x9c, 0xcb, 0x49, 0x4d, 0x4f, 0x4c, 0xae, 0x54, 0x48, 0xce, 0xcf, 0x2d, 0x28, 0x4a, 0x2d, 0x2e, 0x4e, 0x4d, 0x51, 0x48, 0xcb, 0xac, 0x28, 0x29, 0x2d, 0x4a, 0x05, 0x00, 0x7f, 0x94, 0x09, 0xf2 ];
+        for (encoding, body) in [
+            ("gzip", GZIP),
+            ("br", BROTLI),
+            ("deflate", DEFLATE),
+        ] {
+            let (url, server) = spawn_http_fixture("200 OK", Some(encoding), body, false);
+            let http = client(&LegacyConfig::default(), Duration::from_secs(3), 0)
+                .expect("legacy client");
+            let response = http.get(url).send().await.expect("compressed response");
+            let decoded = successful_body(response).await.expect("decompress content encoding");
+            assert_eq!(decoded, b"legacy compressed fixture", "{encoding}");
+            server.join().expect("fixture thread");
+        }
+    }
+
+    #[test]
+    fn html_compatibility_decodes_malformed_utf8_and_bom_without_changing_json() {
+        let raw = b"\xef\xbb\xbf<p>caf\xe9</p>";
+        let normalized = legacy_html_bytes(raw);
+        assert_eq!(String::from_utf8(normalized).unwrap(), "<p>caf\u{fffd}</p>");
+        assert_eq!(raw[0..3], [0xef, 0xbb, 0xbf]);
+        // The Instant Answer path intentionally keeps its original strict JSON bytes.
+        assert!(matches!(Protocol::Instant, Protocol::Instant));
     }
 }
