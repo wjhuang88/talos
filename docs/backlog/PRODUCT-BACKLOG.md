@@ -1,5 +1,9 @@
 # Product Backlog
 
+## ARCH-035 / I320 — proposed E0/E1 architecture activation
+
+[ARCH-035](active/ARCH-035-behavior-preserving-host-composition.md) / [I320](../iterations/I320-arch-035-host-composition-baseline.md) / #897: governance PR #905 proposes a bounded, documentation-only E0 code-truth inventory and E1 host-composition decision. Target-branch claim is ineffective before merge. E2/E3 cannot begin without accepted STORE-002/#670 contracts and separate authorization; no ServerHost implementation is implied.
+
 ## SEARCH-001-L / I319 — proposed legacy dependency retirement
 
 [SEARCH-001-L](active/SEARCH-001-L-legacy-dependency-retirement.md) / [I319](../iterations/I319-search-legacy-dependency-retirement.md) / #901 proposes replacing dormant `WebSearchTool` upstream coupling, freezing independent parity, and removing the `rust-websearch` build package only after claim+activation. The existing SEARCH-001-I global provider gate stays blocked, E/F/G remain unadmitted, and current production search and external dependency owners are unaffected. Proposed governance PR #902 does not establish effective authorization until merge.
@@ -233,7 +237,7 @@ Required reads:
 | ARCH-034-R03 / I173 | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | ARCH-034-R04 / I181 / I182 / I183 / I185 | Partial / I185 Complete | Review-only matrix completed at `aea26ad0`; AG-4 at `ae31242b`; AG-7/I183 at `edf903aa`; [AG-12](active/ARCH-034-R04-AG12-sqlite-validator-integrity.md) / [I185](../iterations/I185-sqlite-validator-policy-integrity.md) at `af978322`. AG-1/2/3/5/6/8/9/10/11 remain separate. |
 | DATA-002 | Intake — Issue #141 | Storage topology and runtime ownership require ADR-backed filesystem policy, cross-runtime ownership, and fail-safe reconciliation refinement before implementation. [Owner](active/DATA-002-storage-topology-and-runtime-ownership.md) |
-| ARCH-035 | Intake / Unclaimed — Issue #897 | Behavior-preserving domain persistence and cross-host Runtime composition decoupling; consumes STORE-002 / #670, blocks ServerHost implementation. [Owner](active/ARCH-035-behavior-preserving-host-composition.md) |
+| ARCH-035 | Active / Claimed E0/E1 proposal (#905; ineffective until merge) — Issue #897 | Behavior-preserving domain persistence and cross-host Runtime composition decoupling; consumes STORE-002 / #670, blocks ServerHost implementation. [Owner](active/ARCH-035-behavior-preserving-host-composition.md) |
 | SERVER-001 | Intake — Issue #142 | Serve/connect protocol adapter architecture requires one authoritative runtime/session/permission path and dependency refinement before implementation. [Owner](active/SERVER-001-serve-connect-protocol-adapters.md) |
 | TOOL-025 | Intake — Issue #143 | RTK-derived shell filtering requires bounded source selection, provenance review, and preservation of Talos execution authorities before implementation. [Owner](active/TOOL-025-rtk-derived-semantic-output-filters.md) |
 | MODEL-007 follow-up | Deferred behind Desktop / Refinement / Unclaimed | 2026-09-22 Desktop scheduling supersedes the prior next-item order. Preserve verified provider/model reasoning-effort choices, catalog updates and picker-to-request requirements; not activated or cancelled. [Owner](active/MODEL-007-hierarchical-model-variant-selection.md#2026-09-22-scheduling-update) |

@@ -4,31 +4,32 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Intake / Unclaimed |
+| Status | Active (proposed on governance branch; ineffective until claim PR merges) |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
-| Selected Iteration | None |
+| Selected Iteration | [I320](../../iterations/I320-arch-035-host-composition-baseline.md) — E0/E1 architecture baseline only (proposed) |
 | Parent / consumer | [SERVER-001](SERVER-001-serve-connect-protocol-adapters.md) / #142; [SERVER-001-C](SERVER-001-C-standalone-server-host-composition.md) / #361 |
 | Depends On | [STORE-002](STORE-002-storage-capability-contracts.md) / #670: accepted capability/domain seam; RUNTIME-001 SDK compatibility |
 | Coordinates | SESSION-009 / #46; SESSION-011 / #612; DATA-002 / #141; SERVER-002 / #360 |
 | Long-task planning | [SERVER-MVP-001](../../tasks/2026-11-10-server-mvp-storage-decoupled.md) proposed in draft PR #896 |
+| E1 review artifact | [Host composition proposal](../../proposals/arch-035-host-composition-boundary.md) — non-binding until reviewed and accepted |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Not assigned |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
+| Work Slice | E0 code-truth inventory and E1 ADR / cross-host composition API placement only; no production code, no STORE-002 capability contracts or adapters |
+| Claimed At | 2026-11-10 |
 | Source Issue | #897 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #905 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User-directed non-overlapping E0/E1 documentation-only architecture selection; proposed single-maintainer path because no approving independent review is recorded. Exact-head CI, both governance validators, documented maintainer reason, no blocking review and merge-time CAS are mandatory before #905 merge; no implementation authority before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-10 |
-| Handoff / Release Condition | Select bounded iteration and establish effective target-branch claim before code; SERVER-001-C implementation waits on accepted equivalent transformation |
+| Handoff / Release Condition | E0/E1 only; E2/E3 blocked until accepted STORE-002 seams and separately governed activation; no implementation before effective claim |
 
 ## Requirement and value
 
