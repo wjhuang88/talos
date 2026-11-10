@@ -1,6 +1,6 @@
 # STORE-002: Storage And Retrieval Capability Contracts
 
-**Status**: Intake / Unclaimed
+**Status**: Active / Claimed — I321 A/B proposed, ineffective before governance PR merge
 
 **Type**: Architecture / Contract Convergence
 
@@ -19,6 +19,23 @@ Converge Talos's existing persistence, retrieval, and semantic capability bounda
 Define narrow capability contracts for Log, Relational, Object, Lexical Search, Vector Search, Embedding, and Rerank; preserve domain Stores/Repositories and their invariants; document authority and rebuildability; and provide one explicit local composition that delegates to the existing implementations.
 
 Vector search, embedding, and other unavailable capabilities must have explicit unavailable semantics. Zvec, PostgreSQL, S3, generic ORM/query DSL work, and production behavior changes are out of scope for the first phase.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
+| Work Slice | STORE-002 I321 A/B: source-truth authority/capability inventory, stable capability taxonomy and additive typed contract foundation for seven capability families; excludes domain adapter migration, SQL/format changes, host integration, Server and new engines |
+| Claimed At | 2026-11-10 |
+| Source Issue | #670 |
+| Governance Claim PR | Pending |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User explicitly selected #670 continuation. Governance-only non-overlapping proposed claim, exact-head CI and both governance validators and merge-time CAS required. No independent approving maintainer has been recorded; single-maintainer fallback must be documented before merge. |
+| Implementation PR | Not started |
+| Last Updated | 2026-11-10 |
+| Handoff / Release Condition | A/B candidate contracts must pass independent API/architecture review and all applicable tests; later C/D/E/F require separately scoped claims. E2/E3 ARCH-035 waits on accepted functional contract and local delegation. |
 
 ## Governance
 
