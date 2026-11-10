@@ -11,7 +11,7 @@
 
 mod probe;
 
-use std::time::Duration;
+use std::{io::Read, time::Duration};
 
 use super::{
     SearchBackendError, SearchBackendResult, bing_parser,
@@ -19,7 +19,7 @@ use super::{
     ddg_parser::{self, DdgFormat},
     instant_answer,
 };
-use reqwest_legacy_test::{Client, Method, StatusCode, Url};
+use reqwest::{Client, Method, StatusCode, Url};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct LegacyConfig {
@@ -39,25 +39,48 @@ fn client(
     timeout: Duration,
     redirects: usize,
 ) -> Result<Client, SearchBackendError> {
-    let mut builder = Client::builder()
-        .timeout(timeout)
-        .user_agent(random_user_agent())
-        .redirect(reqwest_legacy_test::redirect::Policy::limited(redirects));
-    if let Some(url) = &config.proxy_url {
-        let proxy = reqwest_legacy_test::Proxy::all(url)
-            .map_err(|_| SearchBackendError::RequestFailed("invalid legacy proxy".into()))?;
-        builder = builder.proxy(proxy);
-    }
+    // Retain Mozilla WebPKI roots ONLY for the historical standalone Tool;
+    // protected SearchRouter clients keep their existing reqwest 0.13 verifier.
+    let mut roots = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
     #[cfg(test)]
     {
-        // The historical upstream parity child provides its own local test CA.
         if let Some(path) = std::env::var_os("TALOS_SEARCH_PARITY_CA") {
+            use rustls::pki_types::pem::PemObject;
             let pem = std::fs::read(path)
                 .map_err(|_| SearchBackendError::RequestFailed("test CA read".into()))?;
-            let cert = reqwest_legacy_test::Certificate::from_pem(&pem)
-                .map_err(|_| SearchBackendError::RequestFailed("test CA parse".into()))?;
-            builder = builder.add_root_certificate(cert);
+            let mut count = 0;
+            for cert in rustls::pki_types::CertificateDer::pem_slice_iter(&pem) {
+                let der = cert
+                    .map_err(|_| SearchBackendError::RequestFailed("test CA parse".into()))?;
+                roots
+                    .add(der)
+                    .map_err(|_| SearchBackendError::RequestFailed("test CA invalid".into()))?;
+                count += 1;
+            }
+            if count == 0 {
+                return Err(SearchBackendError::RequestFailed("empty test CA".into()));
+            }
         }
+    }
+    let tls = rustls::ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    let mut builder = Client::builder()
+        .tls_backend_preconfigured(tls)
+        // Prevent automatic decompression even if unrelated crates enable
+        // the reqwest compression features in the unified Cargo graph.
+        .no_gzip()
+        .no_brotli()
+        .no_deflate()
+        .timeout(timeout)
+        .user_agent(random_user_agent())
+        .redirect(reqwest::redirect::Policy::limited(redirects));
+    if let Some(url) = &config.proxy_url {
+        let proxy = reqwest::Proxy::all(url)
+            .map_err(|_| SearchBackendError::RequestFailed("invalid legacy proxy".into()))?;
+        builder = builder.proxy(proxy);
     }
     builder
         .build()
@@ -129,7 +152,7 @@ fn request_url_and_body(
     }
 }
 
-fn classify(error: &reqwest_legacy_test::Error) -> SearchBackendError {
+fn classify(error: &reqwest::Error) -> SearchBackendError {
     if error.is_timeout() {
         SearchBackendError::Timeout
     } else if error.is_connect() {
@@ -147,18 +170,22 @@ async fn query_protocol(
     let (url, body) = request_url_and_body(protocol, query)?;
     for attempt in 0..=protocol.retries() {
         let http = client(config, Duration::from_secs(15), 5)?;
-        let mut request = http.request(protocol.method(), url.clone());
+        let mut request = http
+            .request(protocol.method(), url.clone())
+            // Preserve the old client's accepted formats without enabling
+            // Cargo-global automatic response decompression.
+            .header(reqwest::header::ACCEPT_ENCODING, "gzip, br, deflate");
         if let Some(body) = &body {
             request = request
                 .header(
-                    reqwest_legacy_test::header::CONTENT_TYPE,
+                    reqwest::header::CONTENT_TYPE,
                     "application/x-www-form-urlencoded",
                 )
                 .body(body.clone());
         }
         if matches!(protocol, Protocol::Bing) {
             request = request.header(
-                reqwest_legacy_test::header::ACCEPT_LANGUAGE,
+                reqwest::header::ACCEPT_LANGUAGE,
                 "zh-CN,zh;q=0.9,en;q=0.8",
             );
         }
@@ -182,17 +209,44 @@ async fn query_protocol(
 // Reject non-success status at header time; never buffer a stalled or large
 // 403/429/503 body before falling back to the next fixed search destination.
 async fn successful_body(
-    response: reqwest_legacy_test::Response,
+    response: reqwest::Response,
 ) -> Result<Vec<u8>, SearchBackendError> {
     let status = response.status();
     if !status.is_success() {
         return Err(SearchBackendError::HttpStatus(status.as_u16()));
     }
-    response
-        .bytes()
-        .await
-        .map(|body| body.to_vec())
-        .map_err(|_| SearchBackendError::Parse)
+    let encoding = response
+        .headers()
+        .get(reqwest::header::CONTENT_ENCODING)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase();
+    let wire = response.bytes().await.map_err(|_| SearchBackendError::Parse)?;
+    decode_legacy_content(&encoding, &wire)
+}
+
+// Decode ONLY this historical Tool's response bytes. Never enable reqwest's
+// shared gzip/br/deflate feature flags, which would change SearchRouter.
+fn decode_legacy_content(encoding: &str, body: &[u8]) -> Result<Vec<u8>, SearchBackendError> {
+    const MAX_DECOMPRESSED_BYTES: u64 = 8 * 1024 * 1024;
+    let reader: Box<dyn Read + '_> = match encoding {
+        "gzip" => Box::new(flate2::read::GzDecoder::new(body)),
+        "deflate" => Box::new(flate2::read::ZlibDecoder::new(body)),
+        "br" => Box::new(brotli::Decompressor::new(body, 4096)),
+        // The protected parser will reject an unsupported encoding; never
+        // accidentally reinterpret it as known compressed content.
+        _ => return Ok(body.to_vec()),
+    };
+    let mut decoded = Vec::new();
+    reader
+        .take(MAX_DECOMPRESSED_BYTES + 1)
+        .read_to_end(&mut decoded)
+        .map_err(|_| SearchBackendError::Parse)?;
+    if decoded.len() as u64 > MAX_DECOMPRESSED_BYTES {
+        return Err(SearchBackendError::Parse);
+    }
+    Ok(decoded)
 }
 
 // Upstream reqwest text() accepts malformed HTML UTF-8 and strips a leading BOM.
