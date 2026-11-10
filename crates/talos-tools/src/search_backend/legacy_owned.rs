@@ -54,8 +54,8 @@ fn client(
                 .map_err(|_| SearchBackendError::RequestFailed("test CA read".into()))?;
             let mut count = 0;
             for cert in rustls::pki_types::CertificateDer::pem_slice_iter(&pem) {
-                let der = cert
-                    .map_err(|_| SearchBackendError::RequestFailed("test CA parse".into()))?;
+                let der =
+                    cert.map_err(|_| SearchBackendError::RequestFailed("test CA parse".into()))?;
                 roots
                     .add(der)
                     .map_err(|_| SearchBackendError::RequestFailed("test CA invalid".into()))?;
@@ -186,10 +186,7 @@ async fn query_protocol(
                 .body(body.clone());
         }
         if matches!(protocol, Protocol::Bing) {
-            request = request.header(
-                reqwest::header::ACCEPT_LANGUAGE,
-                "zh-CN,zh;q=0.9,en;q=0.8",
-            );
+            request = request.header(reqwest::header::ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9,en;q=0.8");
         }
         match request.send().await {
             Err(err) if attempt < protocol.retries() => {
@@ -210,9 +207,7 @@ async fn query_protocol(
 
 // Reject non-success status at header time; never buffer a stalled or large
 // 403/429/503 body before falling back to the next fixed search destination.
-async fn successful_body(
-    response: reqwest::Response,
-) -> Result<Vec<u8>, SearchBackendError> {
+async fn successful_body(response: reqwest::Response) -> Result<Vec<u8>, SearchBackendError> {
     let status = response.status();
     if !status.is_success() {
         return Err(SearchBackendError::HttpStatus(status.as_u16()));
@@ -224,7 +219,10 @@ async fn successful_body(
         .unwrap_or_default()
         .trim()
         .to_ascii_lowercase();
-    let wire = response.bytes().await.map_err(|_| SearchBackendError::Parse)?;
+    let wire = response
+        .bytes()
+        .await
+        .map_err(|_| SearchBackendError::Parse)?;
     decode_legacy_content(&encoding, &wire)
 }
 
