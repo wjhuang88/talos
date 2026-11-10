@@ -12,6 +12,7 @@ fn invalid() -> ProviderError {
     ProviderError::InvalidResponse("invalid Gemini private replay response".into())
 }
 
+#[allow(clippy::too_many_arguments)] // One terminal response and its replay routing context.
 pub(crate) fn prepare(
     provider: &str,
     model: &str,
@@ -166,4 +167,37 @@ pub(crate) fn prepare(
     output.extend(calls);
     output.push(ProviderInvocationEvent::Legacy(end));
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use talos_core::{message::{StopReason, Usage}, tool::ToolProtocol};
+
+    fn prepare_text(text: &str, protocol: ToolProtocol, stop_reason: StopReason) -> ProviderResult<Vec<ProviderInvocationEvent>> {
+        let (tx, _rx) = tokio::sync::mpsc::channel(32);
+        let sink = InvocationSender::Original { tx, browser_tools: vec!["browser".into()] };
+        let blocks = vec![crate::gemini_replay::encode("google", "model", &[serde_json::json!({"text":text,"thoughtSignature":"opaque"})], &[]).expect("signed text")];
+        prepare("google", "model", text, "", vec![GeminiOutput::Event(AgentEvent::ReasoningComplete { blocks }), GeminiOutput::Event(AgentEvent::TurnEnd { stop_reason, usage: Usage::default() })], &sink, protocol, false)
+    }
+
+    #[test]
+    fn textual_browser_removes_raw_blocks_and_refuses_truncated_calls() {
+        let text = r#"<tool_call>{"name":"browser","id":"b","args":{"protocolVersion":2,"operation":"fill","text":"secret\nvalue"}}</tool_call>after"#;
+        for protocol in [ToolProtocol::Compat, ToolProtocol::TalosStrict] {
+            let events = prepare_text(text, protocol, StopReason::EndTurn).expect("complete");
+            assert!(matches!(events.first(), Some(ProviderInvocationEvent::TransientReplay(_))));
+            let visible = events.iter().filter_map(|event| match event { ProviderInvocationEvent::Legacy(AgentEvent::TextDelta { delta }) => Some(delta.as_str()), _ => None }).collect::<String>();
+            assert_eq!(visible, "after");
+            assert!(prepare_text(text, protocol, StopReason::MaxTokens).is_err());
+        }
+    }
+
+    #[test]
+    fn ordinary_text_does_not_acquire_private_custody() {
+        for protocol in [ToolProtocol::Compat, ToolProtocol::TalosStrict] {
+            let events = prepare_text("ordinary response", protocol, StopReason::EndTurn).expect("ordinary");
+            assert!(events.iter().all(|event| !matches!(event, ProviderInvocationEvent::TransientReplay(_))));
+        }
+    }
 }

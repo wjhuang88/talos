@@ -139,6 +139,20 @@ async fn complete(
 
 #[tokio::test]
 async fn browser_signed_replay_survives_two_live_submissions_but_not_durable_reopen() {
+    signed_replay_roundtrip(talos_core::tool::ToolProtocol::Native).await;
+}
+
+#[tokio::test]
+async fn compat_browser_signed_replay_survives_live_submissions_but_not_reopen() {
+    signed_replay_roundtrip(talos_core::tool::ToolProtocol::Compat).await;
+}
+
+#[tokio::test]
+async fn strict_browser_signed_replay_survives_live_submissions_but_not_reopen() {
+    signed_replay_roundtrip(talos_core::tool::ToolProtocol::TalosStrict).await;
+}
+
+async fn signed_replay_roundtrip(protocol: talos_core::tool::ToolProtocol) {
     let temp = tempfile::tempdir().expect("workspace");
     let root = temp.path().canonicalize().expect("root");
     let mut server = mockito::Server::new_async().await;
@@ -148,10 +162,15 @@ async fn browser_signed_replay_survives_two_live_submissions_but_not_durable_reo
         {"functionCall":{"id":"o","name":"ordinary","args":{"content":format!(" {PRIVATE} ")}}},
         {"text":format!("opening {PRIVATE}")}
     ]);
+    let textual = protocol != talos_core::tool::ToolProtocol::Native;
+    let parts = if textual {
+        let call = json!({"name":"browser","id":"b","args":{"protocolVersion":2,"operation":"fill","text":format!(" {PRIVATE} ")}});
+        json!([{"text":format!("<tool_call>{call}</tool_call>opening {PRIVATE}"),"thoughtSignature":"private-call-signature"}])
+    } else { parts };
     let first = server
         .mock("POST", "/")
         .match_request(|r| {
-            !String::from_utf8_lossy(r.body().expect("body")).contains("functionResponse")
+            !String::from_utf8_lossy(r.body().expect("body")).contains("browser completed")
         })
         .with_body(wire(parts.clone()))
         .expect(1)
@@ -162,9 +181,11 @@ async fn browser_signed_replay_survives_two_live_submissions_but_not_durable_reo
         let body:Value=serde_json::from_slice(r.body().expect("body")).expect("JSON");
         let contents=body["contents"].as_array().expect("contents");
         contents.iter().any(|item|item["role"]=="model" && item["parts"]==expected)
-            && ["browser completed", "ordinary completed"].iter().all(|result|
-                contents.iter().any(|item|item["parts"].as_array().is_some_and(|parts|
-                    parts.iter().any(|part|part.get("functionResponse").is_some_and(|response|response.to_string().contains(*result))))))
+            && (if textual { body.to_string().contains("browser completed") } else {
+                ["browser completed", "ordinary completed"].iter().all(|result|
+                    contents.iter().any(|item|item["parts"].as_array().is_some_and(|parts|
+                        parts.iter().any(|part|part.get("functionResponse").is_some_and(|response|response.to_string().contains(*result))))))
+            })
             && !contents.iter().any(|item|item["parts"].as_array().is_some_and(|parts|parts.iter().any(|part|part["text"]=="again")))
     }).with_body(wire(json!([{"text":format!("done {PRIVATE}"),"thoughtSignature":"private-final-signature"}]))).expect(1).create_async().await;
     let expected = parts;
@@ -195,8 +216,10 @@ async fn browser_signed_replay_survives_two_live_submissions_but_not_durable_reo
         initial_history: vec![],
         model_context_limit: 128_000,
     };
+    let mut live_agent = agent(provider(server.url()), root.clone(), effects.clone());
+    live_agent.set_tool_protocol(protocol);
     let (mut handle, mut actor) = talos_agent::session::AppServerSession::new(
-        agent(provider(server.url()), root.clone(), effects.clone()),
+        live_agent,
         config,
     );
     actor.set_persistence(session.clone(), talos_session::SessionMetadata::default());
@@ -253,8 +276,10 @@ async fn browser_signed_replay_survives_two_live_submissions_but_not_durable_reo
             .is_some()
     }));
     let unexpected = server.mock("POST", "/").expect(0).create_async().await;
+    let mut reopen_agent = agent(provider(server.url()), root.clone(), effects.clone());
+    reopen_agent.set_tool_protocol(protocol);
     let (mut reopened, mut actor) = talos_agent::session::AppServerSession::new(
-        agent(provider(server.url()), root.clone(), effects.clone()),
+        reopen_agent,
         SessionConfig {
             runtime_policy: RuntimePolicy::interactive(),
             workspace_root: root,
