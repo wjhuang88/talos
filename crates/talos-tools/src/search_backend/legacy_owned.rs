@@ -19,7 +19,7 @@ use super::{
     ddg_parser::{self, DdgFormat},
     instant_answer,
 };
-use reqwest::{Client, Method, StatusCode, Url};
+use reqwest_legacy::{Client, Method, StatusCode, Url};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct LegacyConfig {
@@ -42,9 +42,9 @@ fn client(
     let mut builder = Client::builder()
         .timeout(timeout)
         .user_agent(random_user_agent())
-        .redirect(reqwest::redirect::Policy::limited(redirects));
+        .redirect(reqwest_legacy::redirect::Policy::limited(redirects));
     if let Some(url) = &config.proxy_url {
-        let proxy = reqwest::Proxy::all(url)
+        let proxy = reqwest_legacy::Proxy::all(url)
             .map_err(|_| SearchBackendError::RequestFailed("invalid legacy proxy".into()))?;
         builder = builder.proxy(proxy);
     }
@@ -54,7 +54,7 @@ fn client(
         if let Some(path) = std::env::var_os("TALOS_SEARCH_PARITY_CA") {
             let pem = std::fs::read(path)
                 .map_err(|_| SearchBackendError::RequestFailed("test CA read".into()))?;
-            let cert = reqwest::Certificate::from_pem(&pem)
+            let cert = reqwest_legacy::Certificate::from_pem(&pem)
                 .map_err(|_| SearchBackendError::RequestFailed("test CA parse".into()))?;
             builder = builder.add_root_certificate(cert);
         }
@@ -129,7 +129,7 @@ fn request_url_and_body(
     }
 }
 
-fn classify(error: &reqwest::Error) -> SearchBackendError {
+fn classify(error: &reqwest_legacy::Error) -> SearchBackendError {
     if error.is_timeout() {
         SearchBackendError::Timeout
     } else if error.is_connect() {
@@ -151,13 +151,13 @@ async fn query_protocol(
         if let Some(body) = &body {
             request = request
                 .header(
-                    reqwest::header::CONTENT_TYPE,
+                    reqwest_legacy::header::CONTENT_TYPE,
                     "application/x-www-form-urlencoded",
                 )
                 .body(body.clone());
         }
         if matches!(protocol, Protocol::Bing) {
-            request = request.header(reqwest::header::ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9,en;q=0.8");
+            request = request.header(reqwest_legacy::header::ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9,en;q=0.8");
         }
         match request.send().await {
             Err(err) if attempt < protocol.retries() => {
@@ -178,7 +178,7 @@ async fn query_protocol(
 
 // Reject non-success status at header time; never buffer a stalled or large
 // 403/429/503 body before falling back to the next fixed search destination.
-async fn successful_body(response: reqwest::Response) -> Result<Vec<u8>, SearchBackendError> {
+async fn successful_body(response: reqwest_legacy::Response) -> Result<Vec<u8>, SearchBackendError> {
     let status = response.status();
     if !status.is_success() {
         return Err(SearchBackendError::HttpStatus(status.as_u16()));
