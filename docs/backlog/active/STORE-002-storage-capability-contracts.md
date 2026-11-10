@@ -30,16 +30,16 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Work Slice | STORE-002 I321 A/B: source-truth authority/capability inventory, stable capability taxonomy and additive typed contract foundation for seven capability families; excludes domain adapter migration, SQL/format changes, host integration, Server and new engines |
 | Claimed At | 2026-11-10 |
 | Source Issue | #670 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #908 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User explicitly selected #670 continuation. Governance-only non-overlapping proposed claim, exact-head CI and both governance validators and merge-time CAS required. No independent approving maintainer has been recorded; single-maintainer fallback must be documented before merge. |
+| Authorization Evidence | User explicitly selected #670 continuation. Governance-only non-overlapping #908 A/B proposal; no independent approving maintainer is available in its current review record. Single-maintainer claim path requires exact-head CI, both validators, documented authorization reason, no blocking feedback and merge-time CAS; protected implementation API review is still mandatory. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | A/B candidate contracts must pass independent API/architecture review and all applicable tests; later C/D/E/F require separately scoped claims. E2/E3 ARCH-035 waits on accepted functional contract and local delegation. |
 
 ## Governance
 
-No implementation is authorized by this intake owner. Select a bounded iteration and establish an effective claim before production changes. Independent API/security review, exact-head locked CI, characterization/conformance evidence, and governance validators are required for implementation slices.
+I321 A/B is a proposed atomic governance claim in #908 and is **ineffective before merge to main**. After merge, only bounded A/B source inventory and additive contract foundation may proceed; C/D/E/F and #897 host implementation remain independently gated. Independent API/architecture review, exact-head locked CI, characterization evidence where applicable, and governance validators are required before B implementation acceptance.
 
 ## Acceptance Direction
 
@@ -49,8 +49,7 @@ No implementation is authorized by this intake owner. Select a bounded iteration
 - A future talos-server profile and Zvec retrieval implementation can bind without another foundational rewrite.
 - The issue remains open until the complete contract layer and evidence are merged.
 
-| Field | Value |
-|---|---|
-| Claim State | Unclaimed |
-| Implementation PR | Not started |
-| Last Updated | 2026-10-07 |
+
+## Intake history
+
+Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim proposed on 2026-11-10 via #908. Source Issue #670 remains open for C/D/E/F after A/B.
