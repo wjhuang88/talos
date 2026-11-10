@@ -98,7 +98,7 @@ accepted claims before executable work.
 | SEARCH-001-G | Global auto-routing, change recovery, smoke/soak validation | E / F | Blocked on E/F |
 | SEARCH-001-H | Opt-in premium and self-hosted overrides, secret and fallback policy | C | [#832](https://github.com/wjhuang88/talos/issues/832) / [owner](SEARCH-001-H-explicit-search-overrides.md), **Complete / Closed** at I314; existing Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e` (#842), CI3800 8/8, independent review |
 | SEARCH-001-K | Own protected zero-key compatibility helpers; preserve legacy rollback | C / H | [#850](https://github.com/wjhuang88/talos/issues/850) / [owner](SEARCH-001-K-compat-fallback-ownership.md), **Complete / Closed** in I317 on governance publication; existing Completion Commit `e32ea0a6220889e8346676d368110310171e2cce` (#860), CI3862 8/8, independent review |
-| SEARCH-001-I | Evidence-based `rust-websearch` de-risk/retirement gate | G / H | Proposed only; H complete but G blocked on E/F, so I is not activated and `rust-websearch` remains |
+| SEARCH-001-I | Evidence-based `rust-websearch` de-risk/retirement gate | G / H (existing retirement gate; proposed split pending review) | **Blocked / not activated**. [2026-11-10 code-truth preflight](../../reference/SEARCH-001-I-DEPENDENCY-RETIREMENT-PREFLIGHT-2026-11-10.md) proposes considering build-dependency decoupling separately from G's multi-provider acceptance; this is **not** approval to edit the crate, remove the dependency, or weaken G |
 
 Each child needs its own selection, claim, tests, review and rollback. SEARCH-001-K was separately authorized in #851 and implemented in #860; SEARCH-001-H was separately authorized via #841 and merged in #842; this does **not** authorize E/F/G/I, which retain their own unfulfilled gates.
 
@@ -153,3 +153,16 @@ real target-network observations; CI cannot stand in for missing geographic evid
 - [ ] All child completion evidence, owner/Board/backlog status and remaining residuals are reconciled before Epic closure.
 
 Completing the router or closing D with blocked admission **must not** close this Epic.
+
+## 2026-11-10 SEARCH-001-I dependency-retirement preflight — proposal only
+
+The [current-code inventory and decision packet](../../reference/SEARCH-001-I-DEPENDENCY-RETIREMENT-PREFLIGHT-2026-11-10.md)
+examines the remaining `rust-websearch` calls in dormant `WebSearchTool`, test-only
+parity oracles, the `talos-tools/network` feature and Cargo/package locks.
+It proposes separating **physical dependency/legacy-path decoupling** from the
+unrelated E/F/G zero-key provider admission and worldwide availability claims.
+**This changes neither the published G/H prerequisite for SEARCH-001-I nor its
+unclaimed/blocked status until an explicit reviewed governance decision accepts a
+narrow scope amendment and independent atomic claim+iteration.** No code, default
+search behavior, API, permission, provider admission or Cargo manifest change is
+authorized by this preflight.
