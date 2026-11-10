@@ -64,7 +64,11 @@ const REDIRECT_ORACLE: &[(&str, &str)] = &[
 #[test]
 fn frozen_entity_values_match_owned_and_pinned_upstream() {
     for &(input, expected) in ENTITY_ORACLE {
-        assert_eq!(decode_html_entities(input), expected, "owned entity {input:?}");
+        assert_eq!(
+            decode_html_entities(input),
+            expected,
+            "owned entity {input:?}"
+        );
         assert_eq!(
             rust_websearch::html_utils::decode_html_entities(input),
             expected,
