@@ -576,6 +576,12 @@ Set the matching environment variable before starting Talos:
 export ANTHROPIC_API_KEY="..."
 ```
 
+
+The unreleased Gemini implementation candidate (#838) requires explicit `google-gemini` and an
+AI Studio or Vertex authentication profile. Browser calls, compatibility tool modes and catalog
+activation remain pending. Configuration examples, ADC discovery and migration limits are in the
+[Gemini transport guide](docs/reference/PROVIDER-PROTOCOLS.md#explicit-gemini-transports-unreleased-implementation-candidate).
+
 ## Run Talos
 
 Start the interactive TUI in the current directory:
