@@ -185,7 +185,7 @@ impl GeminiProvider {
         decision_only: bool,
         images: Vec<talos_core::provider::EphemeralImage>,
         sink: InvocationSender,
-        private_response: Option<bool>,
+        private_response: Option<(bool, ToolProtocol)>,
     ) -> ProviderResult<()> {
         let started = Instant::now();
         let deadline = started
@@ -384,10 +384,10 @@ impl GeminiProvider {
                                 let _ = sink.try_send(AgentEvent::Error{message:"Gemini isolated decision returned a tool call".into()});
                                 return;
                             }
-                            if let Some(had_private_history) = private_response {
+                            if let Some((had_private_history, private_protocol)) = private_response {
                                 let has_browser_call = terminal.iter().any(|event| matches!(event, GeminiOutput::FunctionCall{name,..} if sink.is_browser(name)));
-                                if had_private_history || has_browser_call {
-                                match crate::gemini_private_replay::prepare(&provider, &model, &private_text, &private_thoughts, terminal, &sink) {
+                                if had_private_history || has_browser_call || private_protocol != ToolProtocol::Native {
+                                match crate::gemini_private_replay::prepare(&provider, &model, &private_text, &private_thoughts, terminal, &sink, private_protocol, had_private_history) {
                                     Ok(events) => for event in events {
                                         if !matches!(tokio::time::timeout_at(deadline.into(), sink.send_invocation(event)).await, Ok(Ok(()))) {return;}
                                     },
@@ -521,9 +521,9 @@ impl LanguageModel for GeminiProvider {
                 )
                 .await;
         }
-        if protocol != ToolProtocol::Native {
+        if protocol == ToolProtocol::Auto {
             return Err(ProviderError::InvalidResponse(
-                "Gemini private browser replay requires native tool mode".into(),
+                "automatic tool protocol must be resolved before Gemini dispatch".into(),
             ));
         }
         let messages = talos_core::provider::TransientReplay::restore_history(
@@ -532,10 +532,16 @@ impl LanguageModel for GeminiProvider {
             &self.model,
             &replay,
         )?;
+        let messages = if protocol == ToolProtocol::Native {
+            messages
+        } else {
+            crate::gemini_compat::project(&self.provider, &self.model, &messages, protocol)?
+        };
+        let selected_tools = if protocol == ToolProtocol::Native { tools } else { &[] };
         let (tx, rx) = mpsc::channel(32);
         self.dispatch_to_sink(
             &messages,
-            tools,
+            selected_tools,
             Some(&progress),
             false,
             images,
@@ -543,7 +549,7 @@ impl LanguageModel for GeminiProvider {
                 tx,
                 browser_tools: browser_tools.to_vec(),
             },
-            Some(!replay.is_empty()),
+            Some((!replay.is_empty(), protocol)),
         )
         .await?;
         Ok(talos_core::provider::ProviderInvocationStream::original(rx))
