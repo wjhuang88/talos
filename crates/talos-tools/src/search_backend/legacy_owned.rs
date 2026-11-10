@@ -76,6 +76,10 @@ fn client(
         .no_gzip()
         .no_brotli()
         .no_deflate()
+        // When the CLI enables reqwest's system-proxy Cargo feature, feature
+        // unification must not opt this historical Tool into ambient HTTP(S)
+        // proxy routing. The only proxy it accepts is LegacyConfig::proxy_url.
+        .no_proxy()
         .timeout(timeout)
         .user_agent(random_user_agent())
         .redirect(reqwest::redirect::Policy::limited(redirects));
@@ -385,6 +389,86 @@ mod tests {
             }
         });
         (url, server)
+    }
+
+    // A child test process owns the proxy environment. Never mutate global
+    // process variables inside the parallel Rust test harness.
+    #[test]
+    fn ambient_system_proxy_cannot_intercept_legacy_requests() {
+        use std::process::Command;
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+
+        const CHILD: &str = "TALOS_LEGACY_AMBIENT_PROXY_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("legacy child runtime");
+            let outcome = runtime.block_on(async {
+                let http = client(&LegacyConfig::default(), Duration::from_millis(350), 0)
+                    .expect("legacy no-proxy client");
+                http.get("http://talos-search-probe.invalid/should-not-leak")
+                    .send()
+                    .await
+            });
+            assert!(outcome.is_err(), "unresolvable fixture must not succeed");
+            return;
+        }
+
+        let proxy = std::net::TcpListener::bind("127.0.0.1:0").expect("fixture proxy");
+        proxy.set_nonblocking(true).expect("nonblocking proxy");
+        let address = proxy.local_addr().expect("proxy fixture address");
+        let intercepted = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
+        let intercepted_for_worker = Arc::clone(&intercepted);
+        let stop_for_worker = Arc::clone(&stop);
+        let worker = std::thread::spawn(move || {
+            while !stop_for_worker.load(Ordering::SeqCst) {
+                match proxy.accept() {
+                    Ok(_) => {
+                        intercepted_for_worker.store(true, Ordering::SeqCst);
+                        break;
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(e) => panic!("proxy fixture accept: {e}"),
+                }
+            }
+        });
+
+        let proxy_url = format!("http://{address}");
+        let output = Command::new(std::env::current_exe().expect("test binary"))
+            .arg("--exact")
+            .arg("search_backend::legacy_owned::tests::ambient_system_proxy_cannot_intercept_legacy_requests")
+            .arg("--nocapture")
+            .env(CHILD, "1")
+            .env("HTTP_PROXY", &proxy_url)
+            .env("http_proxy", &proxy_url)
+            .env("HTTPS_PROXY", &proxy_url)
+            .env("https_proxy", &proxy_url)
+            .env("ALL_PROXY", &proxy_url)
+            .env("all_proxy", &proxy_url)
+            .env_remove("NO_PROXY")
+            .env_remove("no_proxy")
+            .output()
+            .expect("isolated proxy test child");
+
+        stop.store(true, Ordering::SeqCst);
+        worker.join().expect("proxy monitor");
+        assert!(
+            output.status.success(),
+            "isolated legacy client failed: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        assert!(
+            !intercepted.load(Ordering::SeqCst),
+            "the legacy client forwarded its private fixture URL to an ambient system proxy",
+        );
     }
 
     #[tokio::test]
