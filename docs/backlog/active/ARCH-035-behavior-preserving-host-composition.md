@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Active / Claimed — I320 E0/E1 source-truth and architecture review; E2/E3 blocked |
+| Status | Review / Claimed — E0/E1 code-truth and E1 proposed architecture in PR #906; E2/E3 blocked |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
 | Selected Iteration | [I320](../../iterations/I320-arch-035-host-composition-baseline.md) — E0/E1 active via claim #905 merge `b211e590f6b1180af0679be8b1b03d77b0a19615` |
@@ -28,7 +28,7 @@
 | Governance Claim PR | #905 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615` following exact-head [CI #3992](https://github.com/wjhuang88/talos/actions/runs/42784639228), both governance validators with 0 warnings, recorded single-maintainer documentation-only fallback and passing merge-time CAS; this authorizes E0/E1 only. |
-| Implementation PR | Not started |
+| Implementation PR | #906 |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | E0/E1 only; E2/E3 blocked until accepted STORE-002 seams and separately governed activation; no implementation before effective claim |
 
