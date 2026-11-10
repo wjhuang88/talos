@@ -61,14 +61,69 @@ impl GeminiProvider {
             tools,
             self.output_limit,
         )?;
+        let mut attempt = 0;
+        let (response, attempt_started) = loop {
+            if Instant::now() >= deadline {
+                return Err(ProviderError::InvalidResponse(
+                    "Gemini dispatch timed out".into(),
+                ));
+            }
+            if let Some(tx) = progress {
+                let event = if attempt == 0 {
+                    ProviderProgress::InitialDispatch {
+                        attempt,
+                        max_attempts: self.timeout.max_attempts,
+                    }
+                } else {
+                    ProviderProgress::RetryDispatch {
+                        attempt,
+                        max_attempts: self.timeout.max_attempts,
+                    }
+                };
+                let _ = tx.send(event);
+            }
+            let attempt_started = Instant::now();
+            match self.transport.dispatch(&body, deadline).await {
+                Ok(response) => break (response, attempt_started),
+                Err(error) => match crate::retry::classify_retry_with_backoff(
+                    &error,
+                    attempt,
+                    self.timeout.max_attempts,
+                    self.timeout.backoff_base_ms,
+                    self.timeout.backoff_max_ms,
+                ) {
+                    crate::retry::RetryDecision::DoNotRetry => return Err(error),
+                    crate::retry::RetryDecision::Retry {
+                        attempt: next,
+                        delay_ms,
+                    } => {
+                        if let Some(tx) = progress {
+                            let _ = tx.send(ProviderProgress::ScheduledBackoff {
+                                attempt: next,
+                                max_attempts: self.timeout.max_attempts,
+                                delay_ms,
+                            });
+                        }
+                        tokio::time::timeout_at(
+                            deadline.into(),
+                            tokio::time::sleep(Duration::from_millis(delay_ms)),
+                        )
+                        .await
+                        .map_err(|_| {
+                            ProviderError::InvalidResponse("Gemini retry deadline exceeded".into())
+                        })?;
+                        attempt = next;
+                    }
+                },
+            }
+        };
         if let Some(tx) = progress {
-            let _ = tx.send(ProviderProgress::InitialDispatch {
-                attempt: 0,
-                max_attempts: 0,
+            let _ = tx.send(ProviderProgress::FirstPacketWait {
+                attempt,
+                max_attempts: self.timeout.max_attempts,
             });
         }
-        let response = self.transport.dispatch(&body, deadline).await?;
-        let first_deadline = started
+        let first_deadline = attempt_started
             .checked_add(Duration::from_secs(self.timeout.first_packet_timeout_secs))
             .unwrap_or(deadline)
             .min(deadline);
@@ -173,6 +228,54 @@ impl LanguageModel for GeminiProvider {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[tokio::test]
+    async fn rate_limit_retries_are_bounded_and_report_progress() {
+        let mut server = mockito::Server::new_async().await;
+        let request = server
+            .mock("POST", "/")
+            .with_status(429)
+            .expect(2)
+            .create_async()
+            .await;
+        let transport = GeminiTransport::ai_studio("model", "key", true)
+            .expect("transport")
+            .with_test_endpoint(server.url());
+        let config = ProviderTimeoutConfig {
+            max_attempts: 1,
+            backoff_base_ms: 1,
+            backoff_max_ms: 1,
+            ..ProviderTimeoutConfig::default()
+        };
+        let provider =
+            GeminiProvider::new(transport, "google".into(), "model".into(), None, config)
+                .expect("provider");
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let result = provider
+            .stream_with_tools_and_progress(
+                &[Message::User {
+                    content: "hello".into(),
+                }],
+                &[],
+                tx,
+            )
+            .await;
+        assert!(matches!(result, Err(ProviderError::RateLimited(_))));
+        assert!(matches!(
+            rx.recv().await,
+            Some(ProviderProgress::InitialDispatch { attempt: 0, .. })
+        ));
+        assert!(matches!(
+            rx.recv().await,
+            Some(ProviderProgress::ScheduledBackoff { attempt: 1, .. })
+        ));
+        assert!(matches!(
+            rx.recv().await,
+            Some(ProviderProgress::RetryDispatch { attempt: 1, .. })
+        ));
+        assert!(rx.recv().await.is_none());
+        request.assert_async().await;
+    }
 
     #[test]
     fn rejects_nonstreaming_or_mismatched_transport_before_dispatch() {
