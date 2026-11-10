@@ -16,9 +16,9 @@
 | Work Slice | STORE-002 / #670 slices A/B only: inventory authority and existing capability usage; introduce narrow typed capability classification and common provider identity/availability foundation, without runtime wiring, domain adapters, new backends or host composition |
 | Claimed At | 2026-11-10 |
 | Source Issue | #670 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #908 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User requested #670 implementation; separate governance-only proposal from current main. Exact-head docs CI, two governance validators, recorded authorization and merge-time CAS required. No independent approving maintainer recorded at selection. |
+| Authorization Evidence | User requested #670 implementation; separate governance-only proposal from current main. Exact-head docs CI, two governance validators, recorded authorization and merge-time CAS required for governance #908. No independent approving maintainer recorded at selection; independent public API review required for subsequent B implementation. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | Stop at reviewed A/B artifact; C/D/E/F and #897 E2/E3 remain independently gated, preserving no duplicate domain/host ownership. |
@@ -86,7 +86,7 @@ Update this iteration, STORE-002 owner, `docs/iterations/README.md`, `docs/backl
 
 ## Actual Activation And Execution
 
-- Governance claim PR Pending; **no effective claim until merged to main**, and no implementation branch authorized before then.
+- Governance claim PR #908 proposed; **no effective claim until merged to main**, and no implementation branch authorized before then.
 
 ## Verification Evidence
 
