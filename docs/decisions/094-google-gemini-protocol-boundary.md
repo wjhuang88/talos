@@ -119,3 +119,41 @@ call IDs are local association keys, not added to signed parts. Signed native-to
 switch to textual mode by rewriting the envelope; reject that transition before HTTP. Unresolved
 Auto and all browser ingress remain refused. Browser support still requires the separately pending
 run-local replay/persistence boundary. This stage changes no public API or credential destination.
+
+## Native browser signed history — implementation candidate, 2026-11-04
+
+The Gemini wire must preserve signed function parts, while existing browser tools forbid raw
+original arguments in durable conversation events. Carry signed browser history through a
+nonserializable TransientReplay invocation event, never ReasoningComplete/Redacted payload data.
+A unique live AppServerSession Actor owns private custody across user submissions. Standalone
+Agent calls use execution-local custody; callers needing live cross-turn continuity use the Actor.
+Generation/persistence-identity replacement, reopened Actors and durable forks receive no private
+custody. Missing/foreign/modified/malformed/repeated markers fail explicitly before HTTP.
+
+Persist only an opaque marker and conservative full-private-byte reserve plus projected calls.
+Verify the exact effective assistant after text/tool hooks, before tool effects, then rebind only
+through the trusted privacy projection. Validate marker identity and the complete sealed request
+again before restoring signed parts inside the provider encoder. Hooks see projected inputs;
+permission/execution retain original admitted arguments. Budgeting conservatively reserves one
+token per serialized private byte, with normal safety/output reserves; malformed marker budgets
+saturate. Protected hook messages cannot be edited, stripped or duplicated. Complete checkpoint
+projection may omit an entire exchange; partial surviving calls/results fail. Canonical custody
+has a hard 32-block/16-MiB limit; request-only compaction does not silently reclaim that limit.
+Uncommitted canceled entries are pruned against canonical history at next preparation.
+
+The existing non-rescanning Agent privacy filter registers bounded explicit private fields before
+any text/thought/tool observations and retains tool-owned tokens in live custody. Limits are256
+values/64KiB, with synchronous filter-work and output admission. Only validated public operation
+discriminators are exempt; unknown operation strings remain private until semantic admission.
+Merely presenting a browser tool does not turn a plain response into private history. Native
+browser mode buffers its response through validated EOF. Compat/TalosStrict browser entry remains
+refused in this stage; ordinary textual tools remain supported. No browser capability, permission
+policy, stored-secret encryption, external credential destination or release is added here.
+
+API migration: ProviderInvocationEvent gains TransientReplay and becomes #[non_exhaustive].
+Downstream exhaustive matches must add a refusal/catch-all arm in the next pre-1.0 minor release;
+this must not ship as a patch. LanguageModel gains a default stream_with_replay_context entrypoint,
+which refuses private markers/attachments unless explicitly implemented. The default delegates
+unchanged requests to the existing image/invocation path. New custody types intentionally implement
+neither Serialize nor Clone; Arc ownership remains session/request-local. These are draft
+implementation decisions requiring final privacy/protocol review and acceptance, not delivery.
