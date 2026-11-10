@@ -311,3 +311,17 @@ signature in Debug. Auth/destination test injection is cfg(test)-only. The tests
 internal provider directly, not public factory-to-host wiring, and make no live cloud requests.
 Pinned rustfmt/diff checks pass. Cargo tests are still fetching dependencies after toolchain recovery;
 no new passing Agent or Provider result is claimed. Keep fixture work unaccepted until executed.
+
+### Controlled real Agent round validation — 2026-11-01
+
+Provider library run: 253 passed, zero failed/ignored/filtered (5.36s). After exact image-sequence
+matcher strengthening in fe5e3197ecd4e0fb484e937426c90dde4284233d, pinned locked targeted
+Agent tests rerun: 2 passed, zero failed/ignored, 251 filtered (0.08s). Final fixture blob
+008c1b978b227e0cadc9e7a435e4f16adfd17e40 matches the remote version. Covers AI Studio and
+explicit authorized-user ADC refresh/Bearer profiles through real Agent+PermissionEngine+ReadTool,
+two exact ordered images, signed next-turn replay and credential-free returned history.
+Independent read-only fixture review found no new blocker. This is controlled local HTTP and
+serde history evidence, not live cloud, actual TLOG recovery or public factory Vertex lazy-path
+acceptance. Test-only source/endpoint injection bypasses factory for the Agent fixture. Remaining
+host/factory Vertex entrypoint, capabilities/decision/ephemeral/browser, vendor fixtures, full
+workspace preflight, exact-head CI/review and parent requirements remain open.
