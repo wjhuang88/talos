@@ -1,0 +1,61 @@
+# Temporary and isolated I319 validation workflow. Never merge to the PR.
+name: I319 temporary reqwest 0.13 migration verification
+on:
+  push:
+    branches:
+      - tmp/i319-reqwest13-migration-20261110
+permissions:
+  contents: write
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Cargo lockfile regeneration and validation
+        shell: bash
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+        run: |
+          set -euo pipefail
+          for manifest in             Cargo.toml             tests/fixtures/runtime-sdk-external/Cargo.toml             tests/fixtures/browser-host-external/Cargo.toml; do
+            echo "::group::Regenerate $manifest"
+            cargo metadata --format-version 1 --manifest-path "$manifest" > /dev/null
+            echo "::endgroup::"
+          done
+          for lock in Cargo.lock tests/fixtures/runtime-sdk-external/Cargo.lock tests/fixtures/browser-host-external/Cargo.lock; do
+            if grep -q '^name = "reqwest"$' "$lock"; then
+              python3 - "$lock" <<'PY'
+          import pathlib, sys, re
+          path = pathlib.Path(sys.argv[1])
+          text = path.read_text()
+          versions = re.findall(r'\[\[package\]\]\s+name = "reqwest"\s+version = "([^"]+)"', text)
+          assert versions and all(v.startswith("0.13.") for v in versions), (path, versions)
+          print(f"{path}: reqwest {versions}")
+          PY
+            fi
+          done
+          git diff --check
+          git add Cargo.lock             tests/fixtures/runtime-sdk-external/Cargo.lock             tests/fixtures/browser-host-external/Cargo.lock
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git diff --cached --stat
+            git commit -m 'build(search): regenerate locks after reqwest 0.12 removal'
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+      - name: Tool source format and native compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check -p talos-tools --features network --locked
+          cargo clippy -p talos-tools --features network --locked --all-targets -- -D warnings
+      - name: Standalone legacy HTTP and oracle tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p talos-tools --features network --locked search_backend::legacy_owned -- --nocapture
+          cargo test -p talos-tools --features network --locked search_backend::compat_helpers::frozen_oracle_tests -- --nocapture
