@@ -126,17 +126,17 @@ plan regression asserts `large.bin` appears and the branch/HEAD remain unchanged
 The conservative tracked-source set and invalidation rules remain intact. Do not
 claim unrelated dirty working files are ignored or retry an old plan automatically.
 
-## Emergency authorization and Collaboration Claim
+## Collaboration Claim
 
 | Field | Value |
 |---|---|
 | Claim State | Claimed |
-| Responsible Actor | `@wjhuang88` |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | Git tracked-source digest and auxiliary evidence capacity, stale-path diagnostics |
 | Claimed At | 2026-11-10 |
 | Source Issue | None |
-| Governance Claim PR | Pending emergency reconciliation |
+| Governance Claim PR | Direct commit 457e1ac9 |
 | Authorization Mode | Emergency override |
 | Authorization Evidence | Maintainer explicitly answered “授权本次紧急本地提交” in this session after review of the concrete local repair branch; repeated Git business unavailability and unusable approval/input UI. Local commit only, not merge authority. |
 | Implementation PR | None |
@@ -168,3 +168,5 @@ acceptance remain deferred; local MSVC compilation is not native execution.
   `/tmp/talos-operation-complete-xwin.log`, `/tmp/talos-commit-governance.log`.
 - Independent merge review, remote/native Windows CI, and final human terminal
   acceptance are outstanding. No completion claim is made by the local commits.
+
+Local implementation commit: `457e1ac9`. This records local preservation only; status remains Review.

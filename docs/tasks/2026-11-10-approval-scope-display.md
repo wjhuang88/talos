@@ -121,17 +121,17 @@ zero-timeout native polling for available input and a live task waker when Pendi
 ready-input draining uses the live waker, not a noop-waker future probe. No second
 stdin reader or unbounded repeat queue is introduced.
 
-## Emergency authorization and Collaboration Claim
+## Collaboration Claim
 
 | Field | Value |
 |---|---|
 | Claim State | Claimed |
-| Responsible Actor | `@wjhuang88` |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | Operation approval UI, modal lifecycle, input repeat batching and atomic cursor drawing |
 | Claimed At | 2026-11-10 |
 | Source Issue | None |
-| Governance Claim PR | Pending emergency reconciliation |
+| Governance Claim PR | Direct commit 259a2c65 |
 | Authorization Mode | Emergency override |
 | Authorization Evidence | Maintainer explicitly answered “授权本次紧急本地提交” in this session after review of the concrete local repair branch; repeated Git business unavailability and unusable approval/input UI. Local commit only, not merge authority. |
 | Implementation PR | None |
@@ -163,3 +163,5 @@ acceptance remain deferred; local MSVC compilation is not native execution.
   `/tmp/talos-operation-complete-xwin.log`, `/tmp/talos-commit-governance.log`.
 - Independent merge review, remote/native Windows CI, and final human terminal
   acceptance are outstanding. No completion claim is made by the local commits.
+
+Local implementation commit: `259a2c65`. This records local preservation only; status remains Review.
