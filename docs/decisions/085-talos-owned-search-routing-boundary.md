@@ -1,6 +1,6 @@
 # ADR-085: Talos-Owned Web Search Routing And Backend Boundary
 
-*Status: Accepted / I288 (2026-10-03)*
+*Status: Accepted / I288 (2026-10-03); Amendment A1 proposed in #902, effective only on reviewed merge.*
 
 ## Context
 
@@ -162,7 +162,7 @@ auto-router do not qualify.
 | Tool family/contribution | Preserve |
 | Model-visible provider choice | None; runtime-owned |
 | Current output text | B preserves; later metadata changes separately reviewed |
-| `rust-websearch` | Compatibility adapter first, then optional/removable after G/H evidence |
+| `rust-websearch` | Preserve behavioral route retirement behind G/H; separately permit equivalent Cargo-package substitution only under Amendment A1 acceptance. |
 | Tavily/SearXNG | Preserve current behavior during B; H owns explicit target-selection migration |
 | Wikipedia fallback | Preserve only as necessary for compatibility; not target generic backend |
 | Cargo/public API | No new public crate/API in B |
@@ -205,8 +205,8 @@ crates/talos-tools/src/web_search/
 6. **G — global hardening**: network-change recovery, smoke/soak and provenance-backed multi-region
    evidence including a real mainland-China path or an explicitly unresolved gate.
 7. **H — explicit premium/self-hosted config**: no credential-implies-usage behavior.
-8. **I — rust-websearch disposition**: optional compatibility adapter or removal based on measured
-   evidence; default search must survive without it.
+8. **I — behavioral route disposition**: unchanged G/H evidence gate, independent provider qualification and measured global acceptance.
+9. **L — Cargo package ownership**: proposed A1 exception for behavior-preserving build dependency replacement, not new provider or route retirement.
 
 ## Validation And Reversal Triggers
 
@@ -254,3 +254,27 @@ Acceptance record: PR #629 was merged to `main` as `4567bf85ef1fb151fbb07a30e1f5
 after the architecture package, deterministic test, governance validation and locked focused
 tests were reviewed. The decision authorizes dependency-ready B/C/D planning; it does not itself
 authorize a provider implementation or change production search behavior.
+
+## Amendment A1 — Equivalent build-package retirement (2026-11-10; proposed #902)
+
+**State: Proposed. Only the reviewed merge of #902 can activate this amendment.**
+Source: SEARCH-001-L/#901 and the [retirement preflight](../reference/SEARCH-001-I-DEPENDENCY-RETIREMENT-PREFLIGHT-2026-11-10.md) (#900).
+The 2026-10-03 rule originally coupled removal of `rust-websearch` to G/H.
+This explicit amendment separates **physical Cargo dependency ownership** from
+**retirement of the existing default compatibility route**.
+
+L1 may replace the upstream crate in the *current* Talos build graph before G
+only if reviewed tests establish equivalence of the exported legacy
+`WebSearchTool`, model schema, permissions, fixed search endpoints, source
+order/attribution, retry/deadline/proxy/cancellation and data handling.
+Retain independently frozen upstream fixtures, source provenance and MIT notices.
+Do not invoke a protected prepared search operation from an unprepared context.
+Any public API or security regression stops the change and requires separate
+authorization; dependency removal by itself proves no geographic availability.
+
+**Unchanged:** SEARCH-001-D/E/F/G and I remain gated on genuine provider
+admission, independent-source/failure evidence, and G/H global acceptance.
+The default compatibility search behavior remains available after L1 even
+if its upstream Cargo package is replaced. No provider or new feature is admitted.
+L1 code requires a separately effective governance claim/iteration,
+independent API/network/security review and exact-head multi-platform CI.

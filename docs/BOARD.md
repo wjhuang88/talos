@@ -1,5 +1,10 @@
 # Talos Board
 
+## SEARCH-001-L / I319 — dependency retirement (proposed activation)
+
+[SEARCH-001-L](backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) / [I319](iterations/I319-search-legacy-dependency-retirement.md) / #901 proposes an **independently governed** Rust build-graph retirement slice for legacy `WebSearchTool`; proposed Claimed/Active by #902; effective only after atomic claim+activation merge. Do not touch protected SearchRouter or SEARCH-001-I's blocked E/F/G global provider gate. Coordinate any `Cargo.lock` overlap with DEPENDENCY-003-A. No source/code changes are authorized by this proposal.
+
+
 ## TUI rendering performance / TUI-PERF-001
 
 - Planned / Unclaimed: [owner and implementation guide](tasks/2026-11-10-tui-render-performance.md).
