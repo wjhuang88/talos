@@ -179,3 +179,13 @@ reconciliation. Independent security/API review and exact-head CI remain require
 before merge; device/manual acceptance remains in this owner and status stays Review.
 The final combined source matches the full preflight and MSVC cross-check candidate;
 both governance validators passed after merging main `f9bfac77`.
+
+## macOS CI fixture correction
+
+PR #903 exposed that rustix 1.1.x excludes `mkfifoat` on Apple targets.
+Use the existing repository test-only POSIX `mkfifo` fixture convention across
+Unix; this creates only a temporary fixture and never changes production tooling.
+Soft host dependency: missing `mkfifo` explicitly fails the Unix regression test,
+not skips it. Replace this fixture bridge when the existing Rust-native dependency
+provides a portable safe FIFO constructor. Linux/MSVC checks did not establish
+macOS compilation; retain the failed remote run as evidence.

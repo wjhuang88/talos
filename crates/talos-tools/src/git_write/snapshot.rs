@@ -808,7 +808,13 @@ mod digest_tests {
         symlink(&path, &link).expect("link");
         assert!(Entry::capture_digest(&link, &mut 100).is_err());
         let fifo = root.path().join("fifo");
-        rustix::fs::mkfifoat(rustix::fs::CWD, &fifo, rustix::fs::Mode::RUSR).expect("fifo");
+        assert!(
+            std::process::Command::new("mkfifo")
+                .arg(&fifo)
+                .status()
+                .expect("Unix FIFO fixture requires mkfifo")
+                .success()
+        );
         assert!(Entry::capture_digest(&fifo, &mut 100).is_err());
     }
 }
