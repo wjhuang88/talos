@@ -89,7 +89,7 @@ similar = { version = "3.2.0", optional = true }
 gix = { version = "0.90.0", default-features = false, optional = true, features = [
     "basic", "status", "revision", "blob-diff", "index", "sha1", "sha256"
 ] }
-reqwest = { version = "0.13.4", default-features = false, optional = true, features = ["rustls", "json"] }
+reqwest = { version = "0.13.4", default-features = false, optional = true, features = ["rustls", "json", "gzip", "brotli", "deflate"] }
 rust-websearch = { version = "0.1", optional = true }
 scraper = { version = "0.27", optional = true }
 uuid = { version = "1.26.0", optional = true, features = ["v4"] }
