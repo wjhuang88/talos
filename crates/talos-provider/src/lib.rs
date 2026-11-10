@@ -790,3 +790,6 @@ use anthropic_request::redact_secret;
 
 #[cfg(test)]
 mod ephemeral_deadline_tests;
+
+#[cfg(test)]
+mod gemini_agent_tests;
