@@ -338,13 +338,16 @@ fn redact_preview(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Object(fields) => {
             if fields.get("thought").and_then(serde_json::Value::as_bool) == Some(true)
-                && fields.contains_key("text") {
+                && fields.contains_key("text")
+            {
                 fields.insert("text".into(), serde_json::json!("***"));
             }
             for (key, value) in fields {
                 if key == "thoughtSignature" || key == "inlineData" {
                     *value = serde_json::json!("***");
-                } else { redact_preview(value); }
+                } else {
+                    redact_preview(value);
+                }
             }
         }
         serde_json::Value::Array(values) => values.iter_mut().for_each(redact_preview),
@@ -356,17 +359,25 @@ fn redact_preview(value: &mut serde_json::Value) {
 impl LanguageModel for GeminiProvider {
     fn request_preview(&self, messages: &[Message]) -> Option<serde_json::Value> {
         // Preview never opens ADC/image files or acquires credentials.
-        let messages: Vec<_> = messages.iter().map(|message| match message {
-            Message::Multimodal { parts } => Message::Multimodal {
-                parts: parts.iter().map(|part| match part {
-                    talos_core::message::ContentPart::Text { .. } => part.clone(),
-                    talos_core::message::ContentPart::Image { .. } => talos_core::message::ContentPart::Text {
-                        text: "[image omitted in preview]".into(),
-                    },
-                }).collect(),
-            },
-            _ => message.clone(),
-        }).collect();
+        let messages: Vec<_> = messages
+            .iter()
+            .map(|message| match message {
+                Message::Multimodal { parts } => Message::Multimodal {
+                    parts: parts
+                        .iter()
+                        .map(|part| match part {
+                            talos_core::message::ContentPart::Text { .. } => part.clone(),
+                            talos_core::message::ContentPart::Image { .. } => {
+                                talos_core::message::ContentPart::Text {
+                                    text: "[image omitted in preview]".into(),
+                                }
+                            }
+                        })
+                        .collect(),
+                },
+                _ => message.clone(),
+            })
+            .collect();
         let mut preview = if let Some(transport) = &self.transport {
             transport.preview_connection()
         } else {
@@ -377,7 +388,11 @@ impl LanguageModel for GeminiProvider {
         };
         preview["headers"]["Content-Type"] = serde_json::json!("application/json");
         match crate::gemini_request::build_request_for_identity(
-            &self.provider, &self.model, &messages, &[], self.output_limit,
+            &self.provider,
+            &self.model,
+            &messages,
+            &[],
+            self.output_limit,
         ) {
             Ok(mut body) => {
                 if let Some(thinking) = &self.thinking {
@@ -461,21 +476,103 @@ mod tests {
     #[test]
     fn preview_keeps_adc_lazy_and_hides_signed_thoughts() {
         use talos_core::message::AssistantReasoning;
-        let provider = GeminiProvider::vertex("project".into(), "global".into(), false,
-            "vertex".into(), "model".into(), Some(512), Default::default()).expect("provider");
+        let provider = GeminiProvider::vertex(
+            "project".into(),
+            "global".into(),
+            false,
+            "vertex".into(),
+            "model".into(),
+            Some(512),
+            Default::default(),
+        )
+        .expect("provider");
         let blocks = vec![crate::gemini_replay::encode("vertex", "model", &[
             json!({"text":"private-thought","thought":true,"thoughtSignature":"private-signature"}),
             json!({"text":"answer"}),
         ], &[]).expect("replay")];
-        let preview = provider.request_preview(&[Message::Assistant { content:"answer".into(),
-            tool_calls:vec![], reasoning:Some(AssistantReasoning {provider:"vertex".into(),model:"model".into(),blocks}) }]).expect("preview");
+        let preview = provider
+            .request_preview(&[Message::Assistant {
+                content: "answer".into(),
+                tool_calls: vec![],
+                reasoning: Some(AssistantReasoning {
+                    provider: "vertex".into(),
+                    model: "model".into(),
+                    blocks,
+                }),
+            }])
+            .expect("preview");
         assert!(preview.get("error").is_none());
         assert_eq!(preview["headers"]["Authorization"], "Bearer ***");
-        assert_eq!(preview["body"]["generationConfig"]["maxOutputTokens"],512);
+        assert_eq!(preview["body"]["generationConfig"]["maxOutputTokens"], 512);
         assert!(!preview.to_string().contains("private-thought"));
         assert!(!preview.to_string().contains("private-signature"));
         assert!(preview.to_string().contains("answer"));
-        assert!(provider.vertex.as_ref().expect("profile").transport.get().is_none());
+        assert!(
+            provider
+                .vertex
+                .as_ref()
+                .expect("profile")
+                .transport
+                .get()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn preview_omits_image_paths_bytes_and_api_key() {
+        use talos_core::message::{ContentDigest, ContentPart};
+        let provider = GeminiProvider::new(
+            GeminiTransport::ai_studio("model", "private-api-key", true).expect("transport"),
+            "google".into(),
+            "model".into(),
+            None,
+            Default::default(),
+        )
+        .expect("provider");
+        let preview = provider
+            .request_preview(&[Message::Multimodal {
+                parts: vec![
+                    ContentPart::Text {
+                        text: "visible user text".into(),
+                    },
+                    ContentPart::Image {
+                        path: "private-image-path".into(),
+                        mime: "image/png".into(),
+                        byte_count: 1,
+                        content_digest: ContentDigest::from_raw([0; 32]),
+                    },
+                ],
+            }])
+            .expect("preview");
+        assert_eq!(preview["headers"]["x-goog-api-key"], "***");
+        assert!(preview["body"]["contents"][0]["parts"][1]["text"] == "[image omitted in preview]");
+        let text = preview.to_string();
+        assert!(text.contains("visible user text"));
+        for private in ["private-image-path", "private-api-key", "inlineData"] {
+            assert!(!text.contains(private));
+        }
+    }
+
+    #[test]
+    fn invalid_replay_preview_returns_static_error_without_envelope() {
+        use talos_core::message::{AssistantReasoning, ReasoningBlock};
+        let provider = fixture_provider("https://generativelanguage.googleapis.com/".into());
+        let preview = provider
+            .request_preview(&[Message::Assistant {
+                content: String::new(),
+                tool_calls: vec![],
+                reasoning: Some(AssistantReasoning {
+                    provider: "foreign".into(),
+                    model: "model".into(),
+                    blocks: vec![ReasoningBlock::Redacted {
+                        data: "private-invalid-envelope".into(),
+                    }],
+                }),
+            }])
+            .expect("preview");
+        assert_eq!(preview["error"], "Gemini history cannot be previewed");
+        assert!(preview.get("body").is_none());
+        assert!(!preview.to_string().contains("private-invalid-envelope"));
     }
 
     fn ephemeral_fixture(bytes: &[u8], lifetime: Duration) -> talos_core::provider::EphemeralImage {
