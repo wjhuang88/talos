@@ -320,7 +320,7 @@ impl GeminiProvider {
                                 if Instant::now() >= deadline { return; }
                                 let sent = tokio::time::timeout_at(deadline.into(), async { match event {
                                     GeminiOutput::Event(event) => sink.send(event).await,
-                                    GeminiOutput::FunctionCall{id,name,arguments} => sink.native_call(id,name,&arguments.to_string()).await,
+                                    GeminiOutput::FunctionCall{id,name,arguments} => sink.native_call(id,name,&arguments).await,
                                 }}).await;
                                 if !matches!(sent, Ok(Ok(()))) { return; }
                             }

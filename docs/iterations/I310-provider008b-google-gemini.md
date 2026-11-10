@@ -526,3 +526,25 @@ A model-private transient replay/persistence boundary and original JSON routing-
 must be designed and verified together before this guard can be removed; do not put raw browser
 arguments into durable ToolCall.input or treat ReasoningBlock::Redacted as encryption. Draft
 #838 and parent #724 remain open; no completion, merge, release or tag.
+
+### Original native arguments checkpoint — 2026-11-02 (not accepted)
+
+Recovered remote head 5001b7b4 and confirmed main d324c334 is already included; no additional
+rebase or overwrite was needed. CI3741/run41407646766 has seven successful jobs; the macOS
+job remains running, with its Release preflight step successful. This is not an overall CI pass.
+
+Implemented a typed RawValue ingress before Value normalization. Duplicate routing fields,
+including escaped equivalents and null-first duplicates, are refused without payload diagnostics.
+Original function args retain whitespace, escapes, duplicate argument keys and numeric spelling
+through the SSE-to-invocation boundary. Same-record single-candidate/ordered-part association
+retains actual IDs and generated positional IDs. No tool is released before validated EOF.
+Tests cover every byte split, parallel calls, missing args and clearing buffered calls on malformed
+routing. Each duplicate fixture has a normalized-Value success control, so old terminal checks
+cannot masquerade as duplicate-field protection.
+
+Independent read-only Agent source review approved this bounded change after correcting a test
+that originally sent duplicate records after STOP. Pinned Rust1.99.0 formatting and diff whitespace
+checks pass. Locked Provider tests are still cold-compiling with CI debug=0/incremental=0/jobs=2;
+no passing test result is claimed for this checkpoint. Browser ingress remains refused: transient
+signed replay versus durable TLOG projection, compatibility modes and complete B acceptance still
+require implementation and tests. #838 stays Draft; Completion Commit remains Pending.

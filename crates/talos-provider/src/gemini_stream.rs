@@ -11,8 +11,57 @@ pub(crate) enum GeminiOutput {
     FunctionCall {
         id: String,
         name: String,
-        arguments: Value,
+        arguments: String,
     },
+}
+
+// Deserialize the routing spine directly from the wire. Serde rejects duplicate known
+// fields (including escaped spellings) before any map can silently keep the last value.
+// Argument objects remain RawValue: their duplicate keys belong to the invocation validator.
+#[derive(serde::Deserialize)]
+struct OriginalResponse<'a> {
+    #[serde(rename = "error", borrow)]
+    _error: Option<&'a serde_json::value::RawValue>,
+    #[serde(rename = "promptFeedback", borrow)]
+    _prompt_feedback: Option<&'a serde_json::value::RawValue>,
+    #[serde(borrow)]
+    candidates: Option<Vec<OriginalCandidate<'a>>>,
+}
+#[derive(serde::Deserialize)]
+struct OriginalCandidate<'a> {
+    #[serde(rename = "index", borrow)]
+    _index: Option<&'a serde_json::value::RawValue>,
+    #[serde(rename = "finishReason", borrow)]
+    _finish_reason: Option<&'a serde_json::value::RawValue>,
+    #[serde(borrow)]
+    content: Option<OriginalContent<'a>>,
+}
+#[derive(serde::Deserialize)]
+struct OriginalContent<'a> {
+    #[serde(rename = "role", borrow)]
+    _role: Option<&'a serde_json::value::RawValue>,
+    #[serde(borrow)]
+    parts: Option<Vec<OriginalPart<'a>>>,
+}
+#[derive(serde::Deserialize)]
+struct OriginalPart<'a> {
+    #[serde(rename = "functionCall", borrow)]
+    function_call: Option<OriginalCall<'a>>,
+    #[serde(rename = "text", borrow)]
+    _text: Option<&'a serde_json::value::RawValue>,
+    #[serde(rename = "thought", borrow)]
+    _thought: Option<&'a serde_json::value::RawValue>,
+    #[serde(rename = "thoughtSignature", borrow)]
+    _signature: Option<&'a serde_json::value::RawValue>,
+}
+#[derive(serde::Deserialize)]
+struct OriginalCall<'a> {
+    #[serde(rename = "name", borrow)]
+    _name: Option<&'a serde_json::value::RawValue>,
+    #[serde(rename = "id", borrow)]
+    _id: Option<&'a serde_json::value::RawValue>,
+    #[serde(borrow)]
+    args: Option<&'a serde_json::value::RawValue>,
 }
 
 /// No Debug: native model parts may contain confidential thought signatures.
@@ -64,6 +113,42 @@ impl GeminiStream {
     #[cfg(test)]
     pub(crate) fn model_parts(&self) -> &[Value] {
         &self.model_parts
+    }
+
+    /// Validate routing fields before Value normalization and retain exact argument JSON.
+    /// The positional walk is over the same single-candidate response used by apply().
+    pub(crate) fn apply_json(&mut self, json: &str) -> ProviderResult<Vec<GeminiOutput>> {
+        let result = (|| {
+            let original: OriginalResponse<'_> = serde_json::from_str(json)
+                .map_err(|_| invalid("invalid or ambiguous Gemini response fields"))?;
+            let chunk =
+                serde_json::from_str(json).map_err(|_| invalid("invalid Gemini response JSON"))?;
+            let mut output = self.apply(&chunk)?;
+            let mut arguments = original
+                .candidates
+                .iter()
+                .flatten()
+                .filter_map(|candidate| candidate.content.as_ref())
+                .flat_map(|content| content.parts.iter().flatten())
+                .filter_map(|part| part.function_call.as_ref())
+                .map(|call| call.args.map_or("{}", serde_json::value::RawValue::get));
+            for event in &mut output {
+                if let GeminiOutput::FunctionCall { arguments: raw, .. } = event {
+                    *raw = arguments
+                        .next()
+                        .ok_or_else(|| invalid("Gemini argument association mismatch"))?
+                        .to_owned();
+                }
+            }
+            if arguments.next().is_some() {
+                return Err(invalid("Gemini argument association mismatch"));
+            }
+            Ok(output)
+        })();
+        if result.is_err() {
+            self.ended = true;
+        }
+        result
     }
 
     pub(crate) fn apply(&mut self, chunk: &Value) -> ProviderResult<Vec<GeminiOutput>> {
@@ -201,7 +286,7 @@ impl GeminiStream {
                     output.push(GeminiOutput::FunctionCall {
                         id,
                         name,
-                        arguments,
+                        arguments: arguments.to_string(),
                     });
                 } else if part.get("thoughtSignature").is_none() {
                     return Err(invalid("unsupported Gemini content part"));
@@ -296,7 +381,7 @@ mod tests {
             {"functionCall":{"name":"ping"}}]},"finishReason":"STOP"}]}))
             .expect("zero arguments");
         assert!(
-            matches!(&output[0], GeminiOutput::FunctionCall{arguments,..} if arguments == &json!({}))
+            matches!(&output[0], GeminiOutput::FunctionCall{arguments,..} if arguments == "{}")
         );
     }
 
@@ -309,7 +394,7 @@ mod tests {
             {"functionCall":{"name":"lookup","args":{"q":2}}}]},"finishReason":"STOP"}]}))
             .expect("calls");
         assert!(
-            matches!(&calls[0], GeminiOutput::FunctionCall{id,name,arguments} if id == "actual" && name == "lookup" && arguments["q"] == 1)
+            matches!(&calls[0], GeminiOutput::FunctionCall{id,name,arguments} if id == "actual" && name == "lookup" && serde_json::from_str::<Value>(arguments).expect("args")["q"] == 1)
         );
         assert!(
             matches!(&calls[1], GeminiOutput::FunctionCall{id,..} if id != "actual" && id.starts_with("gemini_"))
