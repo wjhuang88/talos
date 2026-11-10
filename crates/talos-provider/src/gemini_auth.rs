@@ -196,6 +196,46 @@ mod refresh_tests {
     }
 
     #[tokio::test]
+    async fn dropping_inflight_refresh_closes_connection_and_releases_lock() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let mut auth = source();
+        auth.endpoint = format!("http://{}", listener.local_addr().expect("address"));
+        let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept");
+            // Consume the complete request before testing EOF; unread request bytes are not EOF.
+            let mut request = Vec::new();
+            let mut byte = [0];
+            while !request.ends_with(b"\r\n\r\n") {
+                socket.read_exact(&mut byte).await.expect("request header");
+                request.push(byte[0]);
+                assert!(request.len() < 8192);
+            }
+            let headers = String::from_utf8(request).expect("headers");
+            let length: usize = headers.lines().find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                name.eq_ignore_ascii_case("content-length").then(|| value.trim().parse().expect("length"))
+            }).expect("content length");
+            let mut body = vec![0; length];
+            socket.read_exact(&mut body).await.expect("request body");
+            socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n").await.expect("response headers");
+            entered_tx.send(()).expect("notify");
+            tokio::time::timeout(Duration::from_secs(2), socket.read(&mut byte)).await
+                .expect("connection closed").expect("EOF")
+        });
+        let mut refresh = Box::pin(auth.token(deadline()));
+        tokio::select! {
+            result = entered_rx => { result.expect("server ready"); },
+            _ = &mut refresh => panic!("refresh ended before cancellation"),
+        }
+        drop(refresh);
+        assert!(auth.cache.try_lock().is_ok());
+        assert_eq!(server.await.expect("server"), 0);
+        assert!(auth.cache.lock().await.is_none());
+    }
+
+    #[tokio::test]
     async fn deadline_bounds_cache_lock_wait() {
         let auth = source();
         let guard = auth.cache.lock().await;
