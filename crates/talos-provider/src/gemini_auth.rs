@@ -8,26 +8,48 @@ const MAX_CREDENTIAL_BYTES: usize = 1024 * 1024;
 /// Admit supported credential files before constructing any signer or HTTP request.
 /// Error messages intentionally exclude source JSON, paths and upstream errors.
 pub(crate) fn parse_credentials(bytes: &[u8]) -> ProviderResult<Value> {
-    let invalid = || ProviderError::InvalidResponse("invalid or unsupported Vertex credentials".into());
+    let invalid =
+        || ProviderError::InvalidResponse("invalid or unsupported Vertex credentials".into());
     if bytes.len() > MAX_CREDENTIAL_BYTES {
         return Err(invalid());
     }
     let value: Value = serde_json::from_slice(bytes).map_err(|_| invalid())?;
-    if !matches!(value.get("type").and_then(Value::as_str), Some("service_account" | "authorized_user"))
-        || value.get("credential_source").is_some()
+    if !matches!(
+        value.get("type").and_then(Value::as_str),
+        Some("service_account" | "authorized_user")
+    ) || value.get("credential_source").is_some()
         || value.get("service_account_impersonation_url").is_some()
-        || value.get("universe_domain").is_some_and(|v| v.as_str() != Some("googleapis.com"))
-        || value.get("token_uri").is_some_and(|v| !matches!(v.as_str(),
-            Some("https://oauth2.googleapis.com/token" | "https://accounts.google.com/o/oauth2/token")))
+        || value
+            .get("universe_domain")
+            .is_some_and(|v| v.as_str() != Some("googleapis.com"))
+        || value.get("token_uri").is_some_and(|v| {
+            !matches!(
+                v.as_str(),
+                Some(
+                    "https://oauth2.googleapis.com/token"
+                        | "https://accounts.google.com/o/oauth2/token"
+                )
+            )
+        })
     {
         return Err(invalid());
     }
     let fields: &[&str] = if value["type"] == "service_account" {
-        &["client_email", "private_key_id", "private_key", "project_id"]
+        &[
+            "client_email",
+            "private_key_id",
+            "private_key",
+            "project_id",
+        ]
     } else {
         &["client_id", "client_secret", "refresh_token"]
     };
-    if fields.iter().any(|name| value.get(*name).and_then(Value::as_str).is_none_or(str::is_empty)) {
+    if fields.iter().any(|name| {
+        value
+            .get(*name)
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+    }) {
         return Err(invalid());
     }
     Ok(value)
@@ -42,7 +64,10 @@ mod tests {
     fn admits_user_refresh_credentials() {
         let v = json!({"type":"authorized_user", "client_id":"fixture-client",
             "client_secret":"fixture-secret", "refresh_token":"fixture-refresh"});
-        assert_eq!(parse_credentials(v.to_string().as_bytes()).expect("valid"), v);
+        assert_eq!(
+            parse_credentials(v.to_string().as_bytes()).expect("valid"),
+            v
+        );
     }
 
     #[test]
@@ -67,13 +92,18 @@ pub(crate) async fn read_credentials(
 ) -> ProviderResult<Value> {
     use tokio::io::AsyncReadExt;
     tokio::time::timeout_at(deadline.into(), async {
-        let file = tokio::fs::File::open(path).await
+        let file = tokio::fs::File::open(path)
+            .await
             .map_err(|_| auth_error("cannot open Vertex credential file"))?;
         let mut bytes = Vec::new();
-        file.take((MAX_CREDENTIAL_BYTES + 1) as u64).read_to_end(&mut bytes).await
+        file.take((MAX_CREDENTIAL_BYTES + 1) as u64)
+            .read_to_end(&mut bytes)
+            .await
             .map_err(|_| auth_error("cannot read Vertex credential file"))?;
         parse_credentials(&bytes)
-    }).await.map_err(|_| auth_error("Vertex credential file read timed out"))?
+    })
+    .await
+    .map_err(|_| auth_error("Vertex credential file read timed out"))?
 }
 
 /// Load local ADC only after explicit Vertex dispatch. The caller resolves platform paths.
@@ -98,10 +128,14 @@ pub(crate) async fn read_local_adc(
             Err(_) => return Err(auth_error("cannot open Vertex credential file")),
         };
         let mut bytes = Vec::new();
-        file.take((MAX_CREDENTIAL_BYTES + 1) as u64).read_to_end(&mut bytes).await
+        file.take((MAX_CREDENTIAL_BYTES + 1) as u64)
+            .read_to_end(&mut bytes)
+            .await
             .map_err(|_| auth_error("cannot read Vertex credential file"))?;
         parse_credentials(&bytes).map(Some)
-    }).await.map_err(|_| auth_error("Vertex credential file read timed out"))?
+    })
+    .await
+    .map_err(|_| auth_error("Vertex credential file read timed out"))?
 }
 
 #[cfg(test)]
@@ -114,17 +148,38 @@ mod file_tests {
         let dir = tempfile::tempdir().expect("directory");
         let path = dir.path().join("adc.json");
         let deadline = || Instant::now() + Duration::from_secs(2);
-        assert!(read_local_adc(None, &path, deadline()).await.expect("absent").is_none());
-        assert!(read_local_adc(Some(&path), &path, deadline()).await.is_err());
+        assert!(
+            read_local_adc(None, &path, deadline())
+                .await
+                .expect("absent")
+                .is_none()
+        );
+        assert!(
+            read_local_adc(Some(&path), &path, deadline())
+                .await
+                .is_err()
+        );
         std::fs::write(&path, b"invalid JSON").expect("write");
         assert!(read_local_adc(None, &path, deadline()).await.is_err());
         let valid = br#"{"type":"authorized_user","client_id":"fixture-client","client_secret":"fixture-secret","refresh_token":"fixture-refresh"}"#;
         std::fs::write(&path, valid).expect("write");
-        assert_eq!(read_local_adc(None, &path, deadline()).await.expect("valid"),
-            Some(parse_credentials(valid).expect("credentials")));
+        assert_eq!(
+            read_local_adc(None, &path, deadline())
+                .await
+                .expect("valid"),
+            Some(parse_credentials(valid).expect("credentials"))
+        );
         let missing = dir.path().join("explicit-missing.json");
-        assert!(read_local_adc(Some(&missing), &path, deadline()).await.is_err());
-        assert!(read_local_adc(None, &path, Instant::now() - Duration::from_secs(1)).await.is_err());
+        assert!(
+            read_local_adc(Some(&missing), &path, deadline())
+                .await
+                .is_err()
+        );
+        assert!(
+            read_local_adc(None, &path, Instant::now() - Duration::from_secs(1))
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -133,10 +188,16 @@ mod file_tests {
         let path = dir.path().join("private-account-name.json");
         std::fs::write(&path, b"not credential JSON").expect("write");
         let error = read_credentials(&path, Instant::now() + Duration::from_secs(2))
-            .await.expect_err("invalid file").to_string();
+            .await
+            .expect_err("invalid file")
+            .to_string();
         assert!(!error.contains("private-account-name"));
         std::fs::write(&path, vec![b' '; MAX_CREDENTIAL_BYTES + 1]).expect("large file");
-        assert!(read_credentials(&path, Instant::now() + Duration::from_secs(2)).await.is_err());
+        assert!(
+            read_credentials(&path, Instant::now() + Duration::from_secs(2))
+                .await
+                .is_err()
+        );
     }
 }
 
@@ -170,17 +231,23 @@ async fn service_account_assertion(credentials: &Value) -> ProviderResult<String
     use base64::Engine;
     use futures_util::FutureExt;
     use std::time::{SystemTime, UNIX_EPOCH};
-    let key = credentials["private_key"].as_str()
+    let key = credentials["private_key"]
+        .as_str()
         .ok_or_else(|| auth_error("invalid Vertex signing key"))?;
     if key.len() > 16 * 1024 {
         return Err(auth_error("Vertex signing key exceeds limit"));
     }
-    let issued = SystemTime::now().duration_since(UNIX_EPOCH)
-        .map_err(|_| auth_error("invalid Vertex signing clock"))?.as_secs();
-    let expires = issued.checked_add(3600)
+    let issued = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| auth_error("invalid Vertex signing clock"))?
+        .as_secs();
+    let expires = issued
+        .checked_add(3600)
         .ok_or_else(|| auth_error("invalid Vertex signing clock"))?;
     let encode = |v: Value| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(v.to_string());
-    let header = encode(serde_json::json!({"alg":"RS256", "typ":"JWT", "kid":credentials["private_key_id"]}));
+    let header = encode(
+        serde_json::json!({"alg":"RS256", "typ":"JWT", "kid":credentials["private_key_id"]}),
+    );
     let claims = encode(serde_json::json!({
         "iss":credentials["client_email"],
         "scope":"https://www.googleapis.com/auth/cloud-platform",
@@ -188,13 +255,20 @@ async fn service_account_assertion(credentials: &Value) -> ProviderResult<String
     }));
     let input = format!("{header}.{claims}");
     let signer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        google_cloud_auth::credentials::service_account::Builder::new(credentials.clone()).build_signer()
-    })).map_err(|_| auth_error("Vertex signer initialization failed"))?
-        .map_err(|_| auth_error("Vertex signer initialization failed"))?;
-    let signature = std::panic::AssertUnwindSafe(signer.sign(input.as_bytes())).catch_unwind().await
+        google_cloud_auth::credentials::service_account::Builder::new(credentials.clone())
+            .build_signer()
+    }))
+    .map_err(|_| auth_error("Vertex signer initialization failed"))?
+    .map_err(|_| auth_error("Vertex signer initialization failed"))?;
+    let signature = std::panic::AssertUnwindSafe(signer.sign(input.as_bytes()))
+        .catch_unwind()
+        .await
         .map_err(|_| auth_error("Vertex signing failed"))?
         .map_err(|_| auth_error("Vertex signing failed"))?;
-    Ok(format!("{input}.{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(signature)))
+    Ok(format!(
+        "{input}.{}",
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(signature)
+    ))
 }
 
 /// Resolve documented ADC locations without logging account-specific filesystem paths.
@@ -211,10 +285,13 @@ fn adc_paths(
         return Ok((Some(path.clone()), path));
     }
     let root_name = if cfg!(windows) { "APPDATA" } else { "HOME" };
-    let root = lookup(root_name).filter(|value| !value.is_empty())
+    let root = lookup(root_name)
+        .filter(|value| !value.is_empty())
         .ok_or_else(|| auth_error("Vertex ADC directory is unavailable"))?;
     let mut path = PathBuf::from(root);
-    if !cfg!(windows) { path.push(".config"); }
+    if !cfg!(windows) {
+        path.push(".config");
+    }
     path.push("gcloud");
     path.push("application_default_credentials.json");
     Ok((None, path))
@@ -229,7 +306,8 @@ impl VertexTokenSource {
         Ok(Self {
             client: reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
-                .build().map_err(|_| auth_error("Vertex auth client initialization failed"))?,
+                .build()
+                .map_err(|_| auth_error("Vertex auth client initialization failed"))?,
             credentials: std::sync::Arc::new(credentials),
             cache: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
             endpoint: "https://oauth2.googleapis.com/token".into(),
@@ -262,7 +340,9 @@ impl VertexTokenSource {
         match credentials {
             Some(credentials) => Self::from_validated_credentials(credentials),
             None if allow_metadata => Self::metadata(),
-            None => Err(auth_error("Vertex ADC credentials unavailable; metadata is disabled")),
+            None => Err(auth_error(
+                "Vertex ADC credentials unavailable; metadata is disabled",
+            )),
         }
     }
 
@@ -270,12 +350,16 @@ impl VertexTokenSource {
     /// Ignore metadata host environment overrides and never send this request through proxies.
     pub(crate) fn metadata() -> ProviderResult<Self> {
         Ok(Self {
-            client: reqwest::Client::builder().no_proxy()
+            client: reqwest::Client::builder()
+                .no_proxy()
                 .redirect(reqwest::redirect::Policy::none())
-                .build().map_err(|_| auth_error("Vertex metadata client initialization failed"))?,
+                .build()
+                .map_err(|_| auth_error("Vertex metadata client initialization failed"))?,
             credentials: std::sync::Arc::new(Value::Null),
             cache: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
-            endpoint: "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token".into(),
+            endpoint:
+                "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token"
+                    .into(),
             metadata: true,
         })
     }
@@ -285,7 +369,8 @@ impl VertexTokenSource {
         if deadline <= std::time::Instant::now() {
             return Err(auth_error("Vertex credential acquisition timed out"));
         }
-        tokio::time::timeout_at(deadline.into(), self.refresh(deadline)).await
+        tokio::time::timeout_at(deadline.into(), self.refresh(deadline))
+            .await
             .map_err(|_| auth_error("Vertex credential acquisition timed out"))?
     }
 
@@ -315,14 +400,22 @@ impl VertexTokenSource {
             return Err(auth_error("Vertex credential acquisition timed out"));
         }
         let request = if self.metadata {
-            self.client.get(&self.endpoint).header("Metadata-Flavor", "Google")
+            self.client
+                .get(&self.endpoint)
+                .header("Metadata-Flavor", "Google")
         } else {
             self.client.post(&self.endpoint).json(&body)
         };
-        let mut response = request.send().await
+        let mut response = request
+            .send()
+            .await
             .map_err(|_| auth_error("Vertex token request failed"))?;
-        if self.metadata && response.headers().get("Metadata-Flavor")
-            .is_none_or(|value| value.as_bytes() != b"Google") {
+        if self.metadata
+            && response
+                .headers()
+                .get("Metadata-Flavor")
+                .is_none_or(|value| value.as_bytes() != b"Google")
+        {
             return Err(auth_error("invalid Vertex metadata response origin"));
         }
         if !response.status().is_success() {
@@ -330,8 +423,11 @@ impl VertexTokenSource {
         }
         const MAX_RESPONSE: usize = 64 * 1024;
         let mut bytes = Vec::new();
-        while let Some(chunk) = response.chunk().await
-            .map_err(|_| auth_error("Vertex token response failed"))? {
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|_| auth_error("Vertex token response failed"))?
+        {
             if chunk.len() > MAX_RESPONSE.saturating_sub(bytes.len()) {
                 return Err(auth_error("Vertex token response exceeds limit"));
             }
@@ -339,14 +435,23 @@ impl VertexTokenSource {
         }
         let response: Value = serde_json::from_slice(&bytes)
             .map_err(|_| auth_error("invalid Vertex token response"))?;
-        let token = response["access_token"].as_str().filter(|s| !s.is_empty()
-            && !s.bytes().any(|b| b.is_ascii_whitespace())
-            && reqwest::header::HeaderValue::from_str(s).is_ok())
+        let token = response["access_token"]
+            .as_str()
+            .filter(|s| {
+                !s.is_empty()
+                    && !s.bytes().any(|b| b.is_ascii_whitespace())
+                    && reqwest::header::HeaderValue::from_str(s).is_ok()
+            })
             .ok_or_else(|| auth_error("invalid Vertex access token"))?;
-        if response["token_type"].as_str().is_none_or(|s| !s.eq_ignore_ascii_case("Bearer")) {
+        if response["token_type"]
+            .as_str()
+            .is_none_or(|s| !s.eq_ignore_ascii_case("Bearer"))
+        {
             return Err(auth_error("invalid Vertex token type"));
         }
-        let lifetime = response["expires_in"].as_u64().filter(|n| *n > 0 && *n <= 86400)
+        let lifetime = response["expires_in"]
+            .as_u64()
+            .filter(|n| *n > 0 && *n <= 86400)
             .ok_or_else(|| auth_error("invalid Vertex token lifetime"))?;
         if started + Duration::from_secs(lifetime) <= Instant::now() {
             return Err(auth_error("Vertex token expired during acquisition"));
@@ -367,23 +472,33 @@ mod refresh_tests {
     fn source() -> VertexTokenSource {
         VertexTokenSource::from_bytes(br#"{"type":"authorized_user","client_id":"fixture-client","client_secret":"fixture-secret","refresh_token":"fixture-refresh"}"#).expect("credentials")
     }
-    fn deadline() -> Instant { Instant::now() + Duration::from_secs(5) }
+    fn deadline() -> Instant {
+        Instant::now() + Duration::from_secs(5)
+    }
 
     #[test]
     fn adc_environment_paths_preserve_priority_and_reject_missing_roots() {
         let (explicit, path) = adc_paths(|name| {
             assert_eq!(name, "GOOGLE_APPLICATION_CREDENTIALS");
             Some("fixture-explicit.json".into())
-        }).expect("explicit needs no home");
+        })
+        .expect("explicit needs no home");
         assert_eq!(explicit.as_deref(), Some(path.as_path()));
         assert!(adc_paths(|_| Some("".into())).is_err());
         assert!(adc_paths(|_| None).is_err());
         let (explicit, path) = adc_paths(|name| {
-            if name == "GOOGLE_APPLICATION_CREDENTIALS" { None } else { Some("fixture-root".into()) }
-        }).expect("default location");
+            if name == "GOOGLE_APPLICATION_CREDENTIALS" {
+                None
+            } else {
+                Some("fixture-root".into())
+            }
+        })
+        .expect("default location");
         assert!(explicit.is_none());
         let mut expected = std::path::PathBuf::from("fixture-root");
-        if !cfg!(windows) { expected.push(".config"); }
+        if !cfg!(windows) {
+            expected.push(".config");
+        }
         expected.push("gcloud/application_default_credentials.json");
         assert_eq!(path, expected);
     }
@@ -393,29 +508,64 @@ mod refresh_tests {
         let dir = tempfile::tempdir().expect("directory");
         let default = dir.path().join("default.json");
         let explicit = dir.path().join("explicit.json");
-        assert!(VertexTokenSource::from_adc(None, &default, false, deadline()).await.is_err());
-        assert!(VertexTokenSource::from_adc(None, &default, true, deadline()).await.expect("metadata").metadata);
-        assert!(VertexTokenSource::from_adc(Some(&explicit), &default, true, deadline()).await.is_err());
-        let credentials = |client: &str| serde_json::json!({"type":"authorized_user",
-            "client_id":client,"client_secret":"fixture-secret","refresh_token":"fixture-refresh"});
+        assert!(
+            VertexTokenSource::from_adc(None, &default, false, deadline())
+                .await
+                .is_err()
+        );
+        assert!(
+            VertexTokenSource::from_adc(None, &default, true, deadline())
+                .await
+                .expect("metadata")
+                .metadata
+        );
+        assert!(
+            VertexTokenSource::from_adc(Some(&explicit), &default, true, deadline())
+                .await
+                .is_err()
+        );
+        let credentials = |client: &str| {
+            serde_json::json!({"type":"authorized_user",
+            "client_id":client,"client_secret":"fixture-secret","refresh_token":"fixture-refresh"})
+        };
         std::fs::write(&default, credentials("default-client").to_string()).expect("default");
         std::fs::write(&explicit, credentials("explicit-client").to_string()).expect("explicit");
-        let selected = VertexTokenSource::from_adc(Some(&explicit), &default, true, deadline()).await.expect("explicit source");
+        let selected = VertexTokenSource::from_adc(Some(&explicit), &default, true, deadline())
+            .await
+            .expect("explicit source");
         assert!(!selected.metadata);
         assert_eq!(selected.credentials["client_id"], "explicit-client");
-        let fallback = VertexTokenSource::from_adc(None, &default, true, deadline()).await.expect("local ADC");
+        let fallback = VertexTokenSource::from_adc(None, &default, true, deadline())
+            .await
+            .expect("local ADC");
         assert!(!fallback.metadata);
         assert_eq!(fallback.credentials["client_id"], "default-client");
         std::fs::write(&explicit, b"invalid").expect("corrupt explicit");
-        assert!(VertexTokenSource::from_adc(Some(&explicit), &default, true, deadline()).await.is_err());
+        assert!(
+            VertexTokenSource::from_adc(Some(&explicit), &default, true, deadline())
+                .await
+                .is_err()
+        );
         std::fs::write(&default, b"invalid").expect("corrupt default");
-        assert!(VertexTokenSource::from_adc(None, &default, true, deadline()).await.is_err());
+        assert!(
+            VertexTokenSource::from_adc(None, &default, true, deadline())
+                .await
+                .is_err()
+        );
         // A corrupt fixture would mask a missing deadline check with a parse error.
         std::fs::write(&default, credentials("valid-client").to_string()).expect("valid default");
         for present in [true, false] {
-            if !present { std::fs::remove_file(&default).expect("remove default"); }
-            let error = VertexTokenSource::from_adc(None, &default, true,
-                Instant::now() - Duration::from_secs(1)).await.expect_err("expired deadline");
+            if !present {
+                std::fs::remove_file(&default).expect("remove default");
+            }
+            let error = VertexTokenSource::from_adc(
+                None,
+                &default,
+                true,
+                Instant::now() - Duration::from_secs(1),
+            )
+            .await
+            .expect_err("expired deadline");
             assert!(error.to_string().contains("timed out"));
         }
     }
@@ -428,7 +578,9 @@ mod refresh_tests {
                 .match_header("authorization", mockito::Matcher::Missing)
                 .with_body(r#"{"access_token":"fixture-metadata","token_type":"Bearer","expires_in":3600}"#)
                 .expect(1);
-            if let Some(value) = flavor { mock = mock.with_header("Metadata-Flavor", value); }
+            if let Some(value) = flavor {
+                mock = mock.with_header("Metadata-Flavor", value);
+            }
             let mock = mock.create_async().await;
             let mut auth = VertexTokenSource::metadata().expect("metadata source");
             assert!(auth.endpoint.starts_with("http://169.254.169.254/"));
@@ -436,7 +588,10 @@ mod refresh_tests {
             let result = auth.token(deadline()).await;
             if flavor == Some("Google") {
                 assert_eq!(result.expect("token"), "fixture-metadata");
-                assert_eq!(auth.token(deadline()).await.expect("cached"), "fixture-metadata");
+                assert_eq!(
+                    auth.token(deadline()).await.expect("cached"),
+                    "fixture-metadata"
+                );
             } else {
                 assert!(result.is_err());
                 assert!(auth.cache.lock().await.is_none());
@@ -450,9 +605,13 @@ mod refresh_tests {
         let mut server = mockito::Server::new_async().await;
         let mut target = mockito::Server::new_async().await;
         let forbidden = target.mock("GET", "/").expect(0).create_async().await;
-        let redirect = server.mock("GET", "/").with_status(302)
-            .with_header("Metadata-Flavor", "Google").with_header("Location", &target.url())
-            .create_async().await;
+        let redirect = server
+            .mock("GET", "/")
+            .with_status(302)
+            .with_header("Metadata-Flavor", "Google")
+            .with_header("Location", &target.url())
+            .create_async()
+            .await;
         let mut auth = VertexTokenSource::metadata().expect("source");
         auth.endpoint = server.url();
         assert!(auth.token(deadline()).await.is_err());
@@ -473,39 +632,80 @@ mod refresh_tests {
         let parts: Vec<_> = assertion.split('.').collect();
         assert_eq!(parts.len(), 3);
         let decode = |s: &str| -> Value {
-            serde_json::from_slice(&base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(s).expect("base64")).expect("json")
+            serde_json::from_slice(
+                &base64::engine::general_purpose::URL_SAFE_NO_PAD
+                    .decode(s)
+                    .expect("base64"),
+            )
+            .expect("json")
         };
         assert_eq!(decode(parts[0])["alg"], "RS256");
         let claims = decode(parts[1]);
         assert_eq!(claims["aud"], "https://oauth2.googleapis.com/token");
-        assert_eq!(claims["exp"].as_u64().expect("expiry") - claims["iat"].as_u64().expect("issued"), 3600);
-        assert_eq!(base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(parts[2]).expect("signature").len(), 256);
+        assert_eq!(
+            claims["exp"].as_u64().expect("expiry") - claims["iat"].as_u64().expect("issued"),
+            3600
+        );
+        assert_eq!(
+            base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(parts[2])
+                .expect("signature")
+                .len(),
+            256
+        );
         let mut server = mockito::Server::new_async().await;
-        let mock = server.mock("POST", "/")
-            .match_body(mockito::Matcher::PartialJson(serde_json::json!({"grant_type":"urn:ietf:params:oauth:grant-type:jwt-bearer"})))
-            .with_body(r#"{"access_token":"fixture-token","token_type":"Bearer","expires_in":3600}"#)
-            .expect(1).create_async().await;
-        let mut auth = VertexTokenSource::from_bytes(credentials.to_string().as_bytes()).expect("source");
+        let mock = server
+            .mock("POST", "/")
+            .match_body(mockito::Matcher::PartialJson(
+                serde_json::json!({"grant_type":"urn:ietf:params:oauth:grant-type:jwt-bearer"}),
+            ))
+            .with_body(
+                r#"{"access_token":"fixture-token","token_type":"Bearer","expires_in":3600}"#,
+            )
+            .expect(1)
+            .create_async()
+            .await;
+        let mut auth =
+            VertexTokenSource::from_bytes(credentials.to_string().as_bytes()).expect("source");
         auth.endpoint = server.url();
-        assert_eq!(auth.token(deadline()).await.expect("exchange"), "fixture-token");
-        assert_eq!(auth.token(deadline()).await.expect("cached"), "fixture-token");
+        assert_eq!(
+            auth.token(deadline()).await.expect("exchange"),
+            "fixture-token"
+        );
+        assert_eq!(
+            auth.token(deadline()).await.expect("cached"),
+            "fixture-token"
+        );
         mock.assert_async().await;
         let mut invalid = credentials;
         invalid["private_key"] = "fixture-invalid-private-key".into();
-        let error = service_account_assertion(&invalid).await.expect_err("invalid key").to_string();
+        let error = service_account_assertion(&invalid)
+            .await
+            .expect_err("invalid key")
+            .to_string();
         assert!(!error.contains("fixture-invalid-private-key"));
     }
 
     #[tokio::test]
     async fn cache_reuses_valid_token_and_short_lifetime_refreshes() {
         let mut server = mockito::Server::new_async().await;
-        let first = server.mock("POST", "/").with_body(r#"{"access_token":"first","token_type":"Bearer","expires_in":1}"#).expect(1).create_async().await;
+        let first = server
+            .mock("POST", "/")
+            .with_body(r#"{"access_token":"first","token_type":"Bearer","expires_in":1}"#)
+            .expect(1)
+            .create_async()
+            .await;
         let mut auth = source();
         auth.endpoint = server.url();
         assert_eq!(auth.token(deadline()).await.expect("first"), "first");
         first.assert_async().await;
         first.remove_async().await;
-        let next = server.mock("POST", "/").with_body(r#"{"access_token":"next","token_type":"Bearer","expires_in":3600}"#).expect(1).create_async().await;
+        let next = server
+            .mock("POST", "/")
+            .with_body(r#"{"access_token":"next","token_type":"Bearer","expires_in":3600}"#)
+            .expect(1)
+            .create_async()
+            .await;
         assert_eq!(auth.token(deadline()).await.expect("refresh"), "next");
         assert_eq!(auth.token(deadline()).await.expect("cached"), "next");
         next.assert_async().await;
@@ -517,11 +717,20 @@ mod refresh_tests {
         let mut server = mockito::Server::new_async().await;
         let mut target = mockito::Server::new_async().await;
         let forbidden = target.mock("POST", "/").expect(0).create_async().await;
-        let redirect = server.mock("POST", "/").with_status(307)
-            .with_header("Location", &target.url()).with_body("fixture-secret").create_async().await;
+        let redirect = server
+            .mock("POST", "/")
+            .with_status(307)
+            .with_header("Location", &target.url())
+            .with_body("fixture-secret")
+            .create_async()
+            .await;
         let mut auth = source();
         auth.endpoint = server.url();
-        let error = auth.token(deadline()).await.expect_err("redirect").to_string();
+        let error = auth
+            .token(deadline())
+            .await
+            .expect_err("redirect")
+            .to_string();
         assert!(!error.contains("fixture-secret"));
         redirect.assert_async().await;
         forbidden.assert_async().await;
@@ -530,7 +739,9 @@ mod refresh_tests {
     #[tokio::test]
     async fn dropping_inflight_refresh_closes_connection_and_releases_lock() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
         let mut auth = source();
         auth.endpoint = format!("http://{}", listener.local_addr().expect("address"));
         let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
@@ -545,16 +756,25 @@ mod refresh_tests {
                 assert!(request.len() < 8192);
             }
             let headers = String::from_utf8(request).expect("headers");
-            let length: usize = headers.lines().find_map(|line| {
-                let (name, value) = line.split_once(':')?;
-                name.eq_ignore_ascii_case("content-length").then(|| value.trim().parse().expect("length"))
-            }).expect("content length");
+            let length: usize = headers
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("content-length")
+                        .then(|| value.trim().parse().expect("length"))
+                })
+                .expect("content length");
             let mut body = vec![0; length];
             socket.read_exact(&mut body).await.expect("request body");
-            socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n").await.expect("response headers");
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n")
+                .await
+                .expect("response headers");
             entered_tx.send(()).expect("notify");
-            tokio::time::timeout(Duration::from_secs(2), socket.read(&mut byte)).await
-                .expect("connection closed").expect("EOF")
+            tokio::time::timeout(Duration::from_secs(2), socket.read(&mut byte))
+                .await
+                .expect("connection closed")
+                .expect("EOF")
         });
         let mut refresh = Box::pin(auth.token(deadline()));
         tokio::select! {
@@ -571,17 +791,28 @@ mod refresh_tests {
     async fn invalid_token_responses_never_enter_cache_or_errors() {
         for body in [
             r#"{"access_token":"fixture-secret","token_type":"Bearer","expires_in":0}"#.to_owned(),
-            r#"{"access_token":"fixture-secret","token_type":"Other","expires_in":3600}"#.to_owned(),
-            r#"{"access_token":"bad\r\nheader","token_type":"Bearer","expires_in":3600}"#.to_owned(),
-            r#"{"access_token":"fixture-secret","token_type":"Bearer","expires_in":86401}"#.to_owned(),
+            r#"{"access_token":"fixture-secret","token_type":"Other","expires_in":3600}"#
+                .to_owned(),
+            r#"{"access_token":"bad\r\nheader","token_type":"Bearer","expires_in":3600}"#
+                .to_owned(),
+            r#"{"access_token":"fixture-secret","token_type":"Bearer","expires_in":86401}"#
+                .to_owned(),
             "x".repeat(64 * 1024 + 1),
             "not JSON fixture-secret".into(),
         ] {
             let mut server = mockito::Server::new_async().await;
-            let mock = server.mock("POST", "/").with_body(body).create_async().await;
+            let mock = server
+                .mock("POST", "/")
+                .with_body(body)
+                .create_async()
+                .await;
             let mut auth = source();
             auth.endpoint = server.url();
-            let error = auth.token(deadline()).await.expect_err("invalid response").to_string();
+            let error = auth
+                .token(deadline())
+                .await
+                .expect_err("invalid response")
+                .to_string();
             assert!(!error.contains("fixture-secret"));
             assert!(auth.cache.lock().await.is_none());
             mock.assert_async().await;
@@ -595,8 +826,10 @@ mod refresh_tests {
             token: "fixture-cached-token".into(),
             refresh_at: Instant::now() + Duration::from_secs(3600),
         });
-        let error = auth.token(Instant::now() - Duration::from_secs(1))
-            .await.expect_err("expired caller deadline");
+        let error = auth
+            .token(Instant::now() - Duration::from_secs(1))
+            .await
+            .expect_err("expired caller deadline");
         assert!(!error.to_string().contains("fixture-cached-token"));
         assert!(auth.cache.try_lock().is_ok());
     }
@@ -605,7 +838,11 @@ mod refresh_tests {
     async fn deadline_bounds_cache_lock_wait() {
         let auth = source();
         let guard = auth.cache.lock().await;
-        assert!(auth.token(Instant::now() + Duration::from_millis(5)).await.is_err());
+        assert!(
+            auth.token(Instant::now() + Duration::from_millis(5))
+                .await
+                .is_err()
+        );
         drop(guard);
         assert!(auth.cache.try_lock().is_ok());
     }
