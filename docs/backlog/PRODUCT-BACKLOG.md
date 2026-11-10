@@ -1,5 +1,10 @@
 # Product Backlog
 
+## SEARCH-001-L / I319 — proposed legacy dependency retirement
+
+[SEARCH-001-L](active/SEARCH-001-L-legacy-dependency-retirement.md) / [I319](../iterations/I319-search-legacy-dependency-retirement.md) / #901 proposes replacing dormant `WebSearchTool` upstream coupling, freezing independent parity, and removing the `rust-websearch` build package only after claim+activation. The existing SEARCH-001-I global provider gate stays blocked, E/F/G remain unadmitted, and current production search and external dependency owners are unaffected. Proposed governance PR does not establish effective authorization until merge.
+
+
 ## TUI-ELLIPSIS-001 — proposed activation
 
 [Owner / Required Reads](../tasks/2026-11-08-tui-result-ellipsis.md): tool-result
