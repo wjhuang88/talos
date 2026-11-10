@@ -23,7 +23,7 @@
 | Work Slice | E0 code-truth inventory and E1 ADR / cross-host composition API placement only; no production code, no STORE-002 capability contracts or adapters |
 | Claimed At | 2026-11-10 |
 | Source Issue | #897 |
-| Governance Claim PR | Pending PR-number backfill |
+| Governance Claim PR | [#905](https://github.com/wjhuang88/talos/pull/905) |
 | Authorization Mode | Single-maintainer merge (proposed; requires exact-head CI, validators and CAS) |
 | Authorization Evidence | Pending exact-head CI, validators, review and pre-merge CAS |
 | Implementation PR | Not started |
