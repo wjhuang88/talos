@@ -184,7 +184,7 @@ fn build_with_connection(
                     location,
                     allow_metadata,
                 } => {
-                    if base_url.is_some() {
+                    if original_endpoint.is_some() {
                         return Err(ProviderError::InvalidResponse(
                             "Vertex ADC refuses replacement endpoints".into(),
                         ));
@@ -264,6 +264,12 @@ mod tests {
             allow_metadata: false,
         });
         // No files/env/metadata are consulted until dispatch.
+        assert!(matches!(
+            config.active_provider_config().gemini,
+            Some(GeminiTransportConfig::Vertex { .. })
+        ));
+        assert!(config.validate().is_ok());
+        assert_eq!(config.api_key().expect("ADC needs no API key"), "");
         assert!(build_configured_provider(&config, "").is_ok());
         config
             .providers

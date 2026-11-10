@@ -12,6 +12,7 @@ fn invalid(message: &'static str) -> ProviderError {
 }
 
 /// Assemble unsigned history. Opaque positional signature replay is a separate pending gate.
+#[cfg(test)]
 pub(crate) fn build_request(
     messages: &[Message],
     tools: &[ToolDefinition],
