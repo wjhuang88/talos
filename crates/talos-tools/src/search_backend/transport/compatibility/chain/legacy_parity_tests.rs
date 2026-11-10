@@ -197,7 +197,7 @@ async fn legacy_parity_child() {
         Case::TerminalPrimaryFallback,
         Case::UnreachableDuckDuckGo,
     ] {
-        rust_websearch::clear_probe_cache();
+        crate::search_backend::legacy_owned::clear_probe_cache_for_parity_test();
         super::super::probe::clear_cache_for_parity_test();
         let legacy_proxy = LegacyProxy::start(case, tls.clone()).await;
         let legacy_tool = WebSearchTool::for_legacy_parity_test(&legacy_proxy.url);

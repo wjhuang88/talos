@@ -247,8 +247,8 @@ fn parse_wikipedia(body: &Value, max_results: u32) -> Result<Vec<WebResult>, Sea
     Ok(results)
 }
 
-fn convert_rust_websearch(
-    results: Vec<rust_websearch::SearchResult>,
+fn convert_owned_legacy(
+    results: Vec<SearchBackendResult>,
     max_results: u32,
 ) -> Result<Vec<WebResult>, SearchBackendError> {
     let converted: Vec<WebResult> = results
@@ -274,7 +274,7 @@ fn convert_rust_websearch(
 
 /// A tool that performs web searches using multiple backends.
 ///
-/// **Default (zero config)**: DuckDuckGo via `rust-websearch` crate.
+/// **Default (zero config)**: Talos-owned legacy DDG/Bing compatibility chain.
 /// Falls back to Wikipedia OpenSearch if DuckDuckGo fails.
 ///
 /// The historical optional Tavily/SearXNG implementation is retained for source-level
@@ -282,7 +282,7 @@ fn convert_rust_websearch(
 /// Explicit optional selection is available through the protected production contribution;
 /// this legacy compatibility path remains DuckDuckGo with Wikipedia fallback.
 pub struct WebSearchTool {
-    duckduckgo_config: rust_websearch::SearchConfig,
+    duckduckgo_config: crate::search_backend::legacy_owned::LegacyConfig,
     tavily_api_key: Option<String>,
     searxng_url: Option<String>,
 }
@@ -295,7 +295,7 @@ impl WebSearchTool {
     /// The protected production search configuration is the sole explicit opt-in path.
     pub fn new() -> Self {
         Self {
-            duckduckgo_config: rust_websearch::SearchConfig::default(),
+            duckduckgo_config: crate::search_backend::legacy_owned::LegacyConfig::default(),
             tavily_api_key: None,
             searxng_url: None,
         }
@@ -304,7 +304,7 @@ impl WebSearchTool {
     #[cfg(test)]
     pub(crate) fn for_legacy_parity_test(proxy_url: &str) -> Self {
         Self {
-            duckduckgo_config: rust_websearch::SearchConfig::default().with_proxy(proxy_url),
+            duckduckgo_config: crate::search_backend::legacy_owned::LegacyConfig::default().with_proxy(proxy_url),
             tavily_api_key: None,
             searxng_url: None,
         }
@@ -315,19 +315,19 @@ impl WebSearchTool {
         self.execute_search(query, 1, true).await.0.len()
     }
 
-    /// Search DuckDuckGo via rust-websearch crate.
+    /// Search the original zero-key source family via a Talos-owned legacy coordinator.
     async fn search_duckduckgo(
         &self,
         query: &str,
         max_results: u32,
     ) -> Result<Vec<WebResult>, SearchBackendError> {
-        let results = rust_websearch::search(query, &self.duckduckgo_config)
+        let results = crate::search_backend::legacy_owned::search(query, &self.duckduckgo_config)
             .await
             .map_err(|error| {
                 SearchBackendError::RequestFailed(format!("DuckDuckGo search failed: {error}"))
             })?;
 
-        convert_rust_websearch(results.results, max_results)
+        convert_owned_legacy(results, max_results)
     }
 
     /// Search Tavily AI-optimized search API.
@@ -976,7 +976,7 @@ mod tests {
     #[tokio::test]
     async fn compatibility_unconfigured_adapters_fail_without_network() {
         let tool = WebSearchTool {
-            duckduckgo_config: rust_websearch::SearchConfig::default(),
+            duckduckgo_config: crate::search_backend::legacy_owned::LegacyConfig::default(),
             tavily_api_key: None,
             searxng_url: None,
         };
