@@ -43,6 +43,13 @@ impl Tui {
     }
 
     pub(super) fn draw_frame(&mut self) -> io::Result<()> {
+        let screen_size = self.terminal.size()?;
+        let view = &mut self.state.slash_menu.approval_view;
+        if view.width != screen_size.width {
+            view.offset = 0;
+            view.reviewed = 0;
+            view.width = screen_size.width;
+        }
         let state = &self.state;
         let status = &state.status;
 
@@ -106,7 +113,6 @@ impl Tui {
             max_height: u16::MAX,
         };
 
-        let screen_size = self.terminal.size()?;
         let width = screen_size.width;
         let is_startup = self.is_startup_mode();
         let approval_startup = self
@@ -200,16 +206,11 @@ impl Tui {
         bottom_panel.max_height = compressed.panel_max_height;
         preview.max_height = compressed.preview_max_height;
         tool_preview.max_height = compressed.preview_max_height;
-        self.approval_preview_fully_visible = match &state.slash_menu.kind {
-            Some(crate::state::PanelKind::Approval { preview, .. }) => {
-                crate::scrollback::approval_preview_fully_visible(
-                    width,
-                    compressed.panel_max_height,
-                    preview.as_deref(),
-                )
-            }
-            _ => true,
-        };
+        self.approval_preview_fully_visible = crate::scrollback::approval_scope_reviewed(
+            &state.slash_menu,
+            width,
+            compressed.panel_max_height,
+        );
 
         let input = crate::scrollback::InputComponent {
             state,
@@ -333,95 +334,99 @@ impl Tui {
             }
         });
 
-        self.terminal.draw(screen_size, |frame| {
-            if let Some(area) = app_layout.history {
-                let history_text = frame_history_lines(
-                    &history,
-                    &splash,
-                    frame_history_start,
-                    startup_spacer_rows,
-                );
-                frame.render_widget(Paragraph::new(history_text), area);
-            }
-            if let Some(area) = app_layout.preview {
-                if tool_preview_active {
-                    tool_preview.render(frame, area);
-                } else {
-                    preview.render(frame, area);
-                }
-            }
-            if let Some(area) = app_layout.queue {
-                queue.render(frame, area);
-            }
-            if let Some(area) = app_layout.tips {
-                tips.render(frame, area);
-            }
-            if let Some(area) = app_layout.panel {
-                bottom_panel.render(frame, area);
-            }
-            if let Some(area) = app_layout.composer_top_pad {
-                input_pad_top.render(frame, area);
-            }
-            if let Some(area) = app_layout.composer {
-                input.render(frame, area);
-            }
-            if let Some(area) = app_layout.composer_bottom_pad {
-                input_pad_bot.render(frame, area);
-            }
-            if let Some(area) = app_layout.status {
-                status_comp.render(frame, area);
-            }
-            if let Some((start, end)) = selection {
-                frame.highlight_selection(start, end);
-            }
-        })?;
-
-        {
-            let screen_w = screen_size.width;
-            if self.state.slash_menu.is_credential_input() {
-                let (Some(panel), Some(local)) = (
-                    app_layout.panel,
-                    crate::scrollback::credential_cursor_position(&self.state.slash_menu),
-                ) else {
-                    self.terminal.hide_cursor()?;
-                    return Ok(());
-                };
-                self.terminal
-                    .set_cursor_if_visible_in_rect(panel, local.col, local.row)?;
-            } else if self.state.slash_menu.is_provider_wizard() {
-                let (Some(panel), Some(local)) = (
-                    app_layout.panel,
-                    crate::scrollback::provider_wizard_local_cursor_position(
-                        &self.state.slash_menu,
-                    ),
-                ) else {
-                    self.terminal.hide_cursor()?;
-                    return Ok(());
-                };
-                self.terminal
-                    .set_cursor_if_visible_in_rect(panel, local.col, local.row)?;
+        let cursor = if state.slash_menu.is_approval() {
+            None
+        } else if state.slash_menu.is_credential_input() || state.slash_menu.is_provider_wizard() {
+            let local = if state.slash_menu.is_credential_input() {
+                crate::scrollback::credential_cursor_position(&state.slash_menu)
             } else {
-                let Some(composer_rect) = app_layout.composer else {
-                    self.terminal.hide_cursor()?;
-                    return Ok(());
-                };
-                let byte_pos = self.state.cursor_byte_pos();
-                let content_w = crate::scrollback::composer_content_width(screen_w);
-                let (cursor_row_offset, cursor_col_offset) =
-                    crate::scrollback::cursor_line_col_with_width(
-                        &self.state.input_buffer[..byte_pos],
-                        content_w,
-                    );
-                let scroll_offset = crate::scrollback::composer_scroll_offset(
-                    &self.state.input_buffer[..byte_pos],
-                    &self.state.input_buffer,
+                crate::scrollback::provider_wizard_local_cursor_position(&state.slash_menu)
+            };
+            app_layout.panel.zip(local).and_then(|(panel, local)| {
+                (local.row < panel.height)
+                    .then(|| {
+                        crate::inline_terminal::cursor_position_in_rect(panel, local.col, local.row)
+                    })
+                    .flatten()
+            })
+        } else {
+            app_layout.composer.and_then(|rect| {
+                let byte_pos = state.cursor_byte_pos();
+                let content_w = crate::scrollback::composer_content_width(screen_size.width);
+                let (row, col) = crate::scrollback::cursor_line_col_with_width(
+                    &state.input_buffer[..byte_pos],
                     content_w,
-                    composer_rect.height,
                 );
-                let local_row = cursor_row_offset.saturating_sub(scroll_offset);
-                let cursor_col = crate::scrollback::COMPOSER_LEFT_PAD + cursor_col_offset;
-                self.terminal
-                    .set_cursor_in_rect(composer_rect, cursor_col, local_row)?;
+                let offset = crate::scrollback::composer_scroll_offset(
+                    &state.input_buffer[..byte_pos],
+                    &state.input_buffer,
+                    content_w,
+                    rect.height,
+                );
+                crate::inline_terminal::cursor_position_in_rect(
+                    rect,
+                    crate::scrollback::COMPOSER_LEFT_PAD + col,
+                    row.saturating_sub(offset),
+                )
+            })
+        };
+
+        self.terminal
+            .draw_with_cursor(screen_size, cursor, |frame| {
+                if let Some(area) = app_layout.history {
+                    let history_text = frame_history_lines(
+                        &history,
+                        &splash,
+                        frame_history_start,
+                        startup_spacer_rows,
+                    );
+                    frame.render_widget(Paragraph::new(history_text), area);
+                }
+                if let Some(area) = app_layout.preview {
+                    if tool_preview_active {
+                        tool_preview.render(frame, area);
+                    } else {
+                        preview.render(frame, area);
+                    }
+                }
+                if let Some(area) = app_layout.queue {
+                    queue.render(frame, area);
+                }
+                if let Some(area) = app_layout.tips {
+                    tips.render(frame, area);
+                }
+                if let Some(area) = app_layout.panel {
+                    bottom_panel.render(frame, area);
+                }
+                if let Some(area) = app_layout.composer_top_pad {
+                    input_pad_top.render(frame, area);
+                }
+                if let Some(area) = app_layout.composer {
+                    input.render(frame, area);
+                }
+                if let Some(area) = app_layout.composer_bottom_pad {
+                    input_pad_bot.render(frame, area);
+                }
+                if let Some(area) = app_layout.status {
+                    status_comp.render(frame, area);
+                }
+                if let Some((start, end)) = selection {
+                    frame.highlight_selection(start, end);
+                }
+            })?;
+
+        if let Some(area) = app_layout.panel {
+            crate::scrollback::record_approval_page(
+                &mut self.state.slash_menu,
+                area.width,
+                area.height,
+            );
+            if self.state.slash_menu.is_approval() {
+                self.approval_preview_fully_visible = crate::scrollback::approval_scope_reviewed(
+                    &self.state.slash_menu,
+                    area.width,
+                    area.height,
+                );
             }
         }
 

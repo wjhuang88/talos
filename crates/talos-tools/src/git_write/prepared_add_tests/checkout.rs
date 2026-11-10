@@ -3275,3 +3275,89 @@ async fn checkout_target_filter_refuses_before_worktree_mutation() {
     );
     assert!(!root.path().join("marker").exists());
 }
+
+#[tokio::test]
+async fn checkout_and_commit_support_tracked_content_over_16_mib() {
+    let root = fixture();
+    integration_git(root.path(), &["config", "--local", "user.name", "Fixture"]);
+    integration_git(root.path(), &["config", "--local", "user.email", "fixture@example.invalid"]);
+    let large = root.path().join("large.bin");
+    let file = std::fs::File::create(&large).expect("large file");
+    file.set_len(17 * 1024 * 1024).expect("fixture size");
+    drop(file);
+    integration_git(root.path(), &["add", "file", "large.bin"]);
+    integration_git(root.path(), &["commit", "-m", "initial"]);
+    let original = integration_git(root.path(), &["rev-parse", "HEAD"]);
+    let original_branch = integration_git(root.path(), &["branch", "--show-current"]);
+    let plan = AddPlan::prepare_checkout(
+        root.path(),
+        &serde_json::json!({"branch":"large-repo", "create":true}),
+        ToolProvenance::Native,
+    ).expect("large tracked repository must prepare checkout");
+    let output = execute_approved(plan).await;
+    assert!(!output.result.is_error, "{}", output.result.content);
+    assert_eq!(integration_git(root.path(), &["branch", "--show-current"]), "large-repo");
+    assert_eq!(integration_git(root.path(), &["rev-parse", "HEAD"]), original);
+    std::fs::write(root.path().join("file"), "commit change").expect("edit");
+    let plan = AddPlan::prepare_commit(
+        root.path(),
+        &serde_json::json!({"message":"large repo commit", "all":true}),
+        ToolProvenance::Native,
+    ).expect("large tracked repository must prepare commit");
+    let output = execute_approved(plan).await;
+    assert!(!output.result.is_error, "{}", output.result.content);
+    assert_ne!(integration_git(root.path(), &["rev-parse", "HEAD"]), original);
+    let plan = AddPlan::prepare_checkout(
+        root.path(),
+        &serde_json::json!({"branch":original_branch}),
+        ToolProvenance::Native,
+    ).expect("switch existing branch in large repository");
+    let output = execute_approved(plan).await;
+    assert!(!output.result.is_error, "{}", output.result.content);
+    assert_eq!(std::fs::read(root.path().join("file")).expect("restored"), b"before");
+}
+
+#[tokio::test]
+async fn large_tracked_source_edit_after_preparation_blocks_checkout() {
+    use std::io::{Seek, SeekFrom, Write};
+    let root = fixture();
+    let large = root.path().join("large.bin");
+    let mut file = std::fs::File::create(&large).expect("large file");
+    file.set_len(17 * 1024 * 1024).expect("size");
+    integration_git(root.path(), &["add", "file", "large.bin"]);
+    integration_git(root.path(), &["commit", "-m", "initial"]);
+    let head = integration_git(root.path(), &["symbolic-ref", "HEAD"]);
+    let plan = AddPlan::prepare_checkout(
+        root.path(), &serde_json::json!({"branch":"must-not-exist", "create":true}),
+        ToolProvenance::Native,
+    ).expect("plan");
+    file.seek(SeekFrom::Start(16 * 1024 * 1024)).expect("seek");
+    file.write_all(b"changed").expect("late edit");
+    drop(file);
+    let output = execute_approved(plan).await;
+    assert!(output.result.is_error, "{}", output.result.content);
+    assert!(output.result.content.contains("source changed") && output.result.content.contains("large.bin"), "{}", output.result.content);
+    assert_eq!(integration_git(root.path(), &["symbolic-ref", "HEAD"]), head);
+    assert_eq!(integration_git(root.path(), &["branch", "--list", "must-not-exist"]), "");
+}
+
+#[tokio::test]
+async fn checkout_many_nested_directories_share_auxiliary_ancestor_evidence() {
+    let root = fixture();
+    // Real workspace-shaped depth: repeated ancestors formerly consumed all
+    // 4096 resolver slots before exact leaf Reads could be captured.
+    let base = root.path().join("workspace/project/crates/component/src/features");
+    for index in 0..160 {
+        let directory = base.join(format!("module-{index}"));
+        std::fs::create_dir_all(&directory).expect("directory");
+        std::fs::write(directory.join("file.rs"), "source").expect("source");
+    }
+    integration_git(root.path(), &["add", "."]);
+    integration_git(root.path(), &["commit", "-m", "many directories"]);
+    let plan = AddPlan::prepare_checkout(root.path(),
+        &serde_json::json!({"branch":"nested-layout", "create":true}),
+        ToolProvenance::Native).expect("plan");
+    let output = execute_approved(plan).await;
+    assert!(!output.result.is_error, "{}", output.result.content);
+    assert_eq!(integration_git(root.path(), &["branch", "--show-current"]), "nested-layout");
+}

@@ -156,9 +156,10 @@ fn prior_link_read_does_not_authorize_a_redirected_target() {
 #[test]
 fn double_root_network_namespace_is_rejected() {
     assert!(
-        super::pull_resolution::Resolution::capture_file(
+        super::pull_resolution::Resolution::capture_file_shared(
             Path::new("//server/share/config"),
             &mut super::pull_resolution::Budget::default(),
+            &mut BTreeMap::new(),
         )
         .is_err()
     );
@@ -230,4 +231,32 @@ fn continuation_refuses_replaced_prior_source_before_extending() {
     );
     assert_eq!(paths.sources.len(), 1);
     assert_eq!(paths.budget.entries, remaining);
+}
+
+#[test]
+fn shared_ancestor_evidence_rejects_replacement_during_extension() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let root = workspace.path().canonicalize().expect("canonical");
+    let parent = root.join("shared");
+    std::fs::create_dir(&parent).expect("parent");
+    let anchor = root.join(".git");
+    let authority = [
+        capability("git_checkout"),
+        read("git_checkout", &root, &anchor),
+    ];
+    let mut paths = AuxiliaryPaths::resolve(
+        "git_checkout",
+        &root,
+        &anchor,
+        [parent.join("first")],
+        &authority,
+    )
+    .expect("resolve");
+    std::fs::rename(&parent, root.join("old-shared")).expect("retain old inode");
+    std::fs::create_dir(&parent).expect("replacement");
+    assert!(
+        paths
+            .extend("git_checkout", [parent.join("second")], &authority)
+            .is_err()
+    );
 }

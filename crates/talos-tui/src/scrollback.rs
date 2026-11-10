@@ -1210,7 +1210,26 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             else {
                 return 0;
             };
+            if !self.menu.approval_view.expanded
+                && let Some(presentation) = &self.menu.approval_view.presentation
+            {
+                return u16::try_from(presentation.summary.len().saturating_add(7).saturating_add(
+                    approval_review_lines(preview.as_deref().unwrap_or_default(), w).len(),
+                ))
+                .unwrap_or(u16::MAX)
+                .min(20)
+                .min(self.max_height);
+            }
             return approval_natural_height_with_preview(w, arguments, preview.as_deref())
+                .min(if self.menu.approval_view.expanded {
+                    20
+                } else if self.menu.approval_view.presentation.is_some()
+                    || !approval_review_lines(preview.as_deref().unwrap_or_default(), w).is_empty()
+                {
+                    16
+                } else {
+                    12
+                })
                 .min(self.max_height);
         }
         if self.menu.is_credential_input() {
@@ -1676,8 +1695,7 @@ impl BottomPanelComponent<'_> {
         let width = area.width;
         let height = area.height as usize;
         let wide = width >= 60;
-        let preview_fully_visible =
-            approval_preview_fully_visible(width, area.height, preview.as_deref());
+        let preview_fully_visible = approval_scope_reviewed(self.menu, width, area.height);
 
         let mut lines: Vec<Line<'static>> = Vec::new();
 
@@ -1706,19 +1724,70 @@ impl BottomPanelComponent<'_> {
         let budget = height.saturating_sub(mandatory);
 
         if let Some(preview) = preview.as_deref().filter(|value| !value.trim().is_empty()) {
-            let scope_width = (width as usize).saturating_sub(4).max(1);
-            let scope_lines = wrap_text_to_lines(preview, scope_width, budget);
-            if !scope_lines.is_empty() {
+            let full = if !self.menu.approval_view.expanded
+                && self.menu.approval_view.presentation.is_some()
+            {
+                Vec::new()
+            } else {
+                approval_scope_lines(preview, width)
+            };
+            let capacity = budget.saturating_sub(2);
+            let compact = full.len() > capacity;
+            let title = if self.menu.approval_view.expanded {
+                format!(
+                    "  Scope details {}/{} [d] summary",
+                    self.menu
+                        .approval_view
+                        .offset
+                        .saturating_add(1)
+                        .min(full.len()),
+                    full.len()
+                )
+            } else if self.menu.approval_view.presentation.is_some() {
+                "  Operation approval [d] exact evidence".to_string()
+            } else if compact {
+                "  Permission scope summary [d] details".to_string()
+            } else {
+                "  Always approve scope:".to_string()
+            };
+            if budget > 0 {
                 lines.push(Line::from(Span::styled(
-                    "  Always approve scope:",
-                    Style::default().fg(accent).bg(input_bg).bold(),
+                    title,
+                    Style::default().fg(accent).bold(),
                 )));
-                for line in scope_lines.into_iter().take(budget.saturating_sub(1)) {
-                    lines.push(Line::from(Span::styled(
-                        format!("  {line}"),
-                        Style::default().fg(semantic::TEXT_PRIMARY).bg(input_bg),
-                    )));
-                }
+            }
+            let scope_lines = if self.menu.approval_view.expanded {
+                full.into_iter()
+                    .skip(self.menu.approval_view.offset)
+                    .take(capacity)
+                    .collect()
+            } else if let Some(presentation) = &self.menu.approval_view.presentation {
+                presentation
+                    .summary
+                    .iter()
+                    .map(|line| truncate_one_line(line, usize::from(width).saturating_sub(4)))
+                    .chain(approval_review_lines(preview, width))
+                    .collect()
+            } else if compact {
+                approval_scope_summary(preview, width)
+            } else {
+                full
+            };
+            for line in scope_lines.into_iter().take(capacity) {
+                lines.push(Line::from(Span::styled(
+                    format!("  {line}"),
+                    Style::default().fg(semantic::TEXT_PRIMARY),
+                )));
+            }
+            if lines.len() < height.saturating_sub(options_count) {
+                lines.push(Line::from(Span::styled(
+                    if self.menu.approval_view.expanded {
+                        "  PgUp/PgDn: scope pages; [d]: summary"
+                    } else {
+                        "  [d] full scope; summary does not widen grants"
+                    },
+                    Style::default().fg(dim),
+                )));
             }
         }
 
@@ -1745,8 +1814,16 @@ impl BottomPanelComponent<'_> {
             } else {
                 unselected_style
             };
-            let label = if i == 1 && !preview_fully_visible {
-                "[a] resize to review full scope"
+            let once_only = self
+                .menu
+                .approval_view
+                .presentation
+                .as_ref()
+                .is_some_and(|p| p.once_only);
+            let label = if i == 1 && once_only {
+                "[2] approve once (no reusable grant)"
+            } else if i == 1 && !preview_fully_visible {
+                "[2] review full scope first"
             } else {
                 item.label.as_str()
             };
@@ -1805,11 +1882,9 @@ fn approval_natural_height_with_preview(width: u16, arguments: &str, preview: Op
     let preview_rows = preview
         .filter(|value| !value.trim().is_empty())
         .map(|value| {
-            let scope_width = (width as usize).saturating_sub(4).max(1);
             let scope_rows =
-                u16::try_from(wrap_text_to_lines(value, scope_width, usize::MAX).len())
-                    .unwrap_or(u16::MAX);
-            1u16.saturating_add(scope_rows)
+                u16::try_from(approval_scope_lines(value, width).len()).unwrap_or(u16::MAX);
+            2u16.saturating_add(scope_rows)
         })
         .unwrap_or(0);
     BASE.saturating_add(argument_rows)
@@ -1824,11 +1899,138 @@ pub(crate) fn approval_preview_fully_visible(
     let Some(preview) = preview.filter(|value| !value.trim().is_empty()) else {
         return true;
     };
-    let scope_width = (width as usize).saturating_sub(4).max(1);
-    let scope_rows = wrap_text_to_lines(preview, scope_width, usize::MAX).len();
+    let scope_rows = approval_scope_lines(preview, width).len();
 
     // Keep the separator, tool header, scope title, and all three decisions visible.
-    usize::from(available_height) >= 6usize.saturating_add(scope_rows)
+    usize::from(available_height) >= 8usize.saturating_add(scope_rows)
+}
+
+// Scope entries retain explicit line boundaries; wrapping must not merge grants.
+pub(crate) fn approval_scope_lines(preview: &str, width: u16) -> Vec<String> {
+    preview
+        .lines()
+        .flat_map(|line| {
+            if line.is_empty() {
+                vec![String::new()]
+            } else {
+                wrap_text_to_lines(
+                    line,
+                    usize::from(width).saturating_sub(4).max(1),
+                    usize::MAX,
+                )
+            }
+        })
+        .collect()
+}
+
+// The CLI puts localized review effects and decision points before the exact scope.
+// Keep this bounded explanation visible when collapsing large evidence inventories.
+fn approval_review_lines(preview: &str, width: u16) -> Vec<String> {
+    preview
+        .strip_prefix("Auto review:\n")
+        .and_then(|text| text.split_once("\n\nPermission scope:\n"))
+        .map(|(review, _)| {
+            review
+                .lines()
+                .filter(|line| !line.trim().is_empty())
+                .take(5)
+                .map(|line| truncate_one_line(line, usize::from(width).saturating_sub(4)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn approval_scope_summary(preview: &str, width: u16) -> Vec<String> {
+    let mut counts = std::collections::BTreeMap::<&str, usize>::new();
+    let mut notes = 0;
+    for line in preview.lines().filter(|line| !line.trim().is_empty()) {
+        if let Some((kind, _)) = line.split_once(": ")
+            && let Some(category) =
+                ["Read", "Write", "Execute", "Network"]
+                    .into_iter()
+                    .find(|prefix| {
+                        kind.strip_prefix(prefix)
+                            .is_some_and(|rest| rest.starts_with(' '))
+                    })
+        {
+            *counts.entry(category).or_default() += 1;
+        } else {
+            notes += 1;
+        }
+    }
+    let total: usize = counts.values().sum();
+    let mut lines = approval_review_lines(preview, width);
+    lines.push(format!(
+        "{total} scope entries; {notes} explanation/detail lines"
+    ));
+    for (kind, count) in &counts {
+        lines.push(format!("{kind}: {count}"));
+    }
+    if total == 0 {
+        lines.push("Scope text is available in full details.".to_string());
+    }
+    lines
+        .into_iter()
+        .map(|line| truncate_one_line(&line, usize::from(width).saturating_sub(4)))
+        .collect()
+}
+
+pub(crate) fn approval_scope_reviewed(
+    menu: &crate::state::BottomPanelState,
+    width: u16,
+    height: u16,
+) -> bool {
+    let Some(crate::state::PanelKind::Approval {
+        preview: Some(preview),
+        ..
+    }) = &menu.kind
+    else {
+        return true;
+    };
+    if menu
+        .approval_view
+        .presentation
+        .as_ref()
+        .is_some_and(|p| p.once_only)
+    {
+        return false; // This surface never issues reusable decisions.
+    }
+    let rows = approval_scope_lines(preview, width).len();
+    let view = &menu.approval_view;
+    approval_preview_fully_visible(width, height, Some(preview))
+        || (view.width == width && view.reviewed >= rows)
+}
+
+pub(crate) fn record_approval_page(
+    menu: &mut crate::state::BottomPanelState,
+    width: u16,
+    height: u16,
+) {
+    let Some(crate::state::PanelKind::Approval {
+        preview: Some(preview),
+        ..
+    }) = &menu.kind
+    else {
+        return;
+    };
+    if !menu.approval_view.expanded && menu.approval_view.presentation.is_some() {
+        return; // Summary display is not evidence that exact rows were displayed.
+    }
+    let rows = approval_scope_lines(preview, width).len();
+    let view = &mut menu.approval_view;
+    if view.width != width {
+        view.reviewed = 0;
+        view.width = width;
+    }
+    view.total_rows = rows;
+    view.page_size = usize::from(height).saturating_sub(7);
+    if view.expanded && view.offset <= view.reviewed {
+        view.reviewed = view
+            .reviewed
+            .max(view.offset.saturating_add(view.page_size).min(rows));
+    } else if view.presentation.is_none() && rows <= view.page_size {
+        view.reviewed = rows;
+    }
 }
 
 pub(crate) fn wrap_text_to_lines(text: &str, max_width: usize, max_lines: usize) -> Vec<String> {

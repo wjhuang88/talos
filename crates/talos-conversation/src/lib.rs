@@ -46,16 +46,16 @@ pub use governance_summary::{
 };
 pub use project_tools::{agile_summary_available, project_validation_available};
 pub use types::{
-    ChatMessage, ConnectPickerData, ConnectPickerItem, ContentOutput, CopyScope,
-    CredentialRequestData, CredentialResponseData, ExtensionSnapshot, HookDeclarationDiagnostic,
-    HookSnapshot, LoadedPluginDiagnostic, McpServerDiagnostic, MessageRole, MessageSource,
-    MessageStatus, ModelInfo, ModelPickerData, ModelPickerItem, ModelPickerVariantItem,
-    ModelSwitchRequest, PluginObservation, ProviderSetupItem, ScrollbackState,
-    SessionDeleteRequest, SessionForkRequest, SessionNewRequest, SessionPickerItem,
-    SessionResumeRequest, SkillCommandRequest, SkillDiagnostic, StatusSnapshot, SteeringQueueEntry,
-    SteeringQueueSnapshot, StreamMessage, TipKind, TodoCommandAction, TodoCommandRequest,
-    TodoExportFormat, TodoPanelData, TodoPanelRow, ToolActivity, ToolCallDisplay, ToolCallInfo,
-    ToolResultDisplay, TurnPhase, UiOutput, UserInput,
+    ApprovalPresentation, ChatMessage, ConnectPickerData, ConnectPickerItem, ContentOutput,
+    CopyScope, CredentialRequestData, CredentialResponseData, ExtensionSnapshot,
+    HookDeclarationDiagnostic, HookSnapshot, LoadedPluginDiagnostic, McpServerDiagnostic,
+    MessageRole, MessageSource, MessageStatus, ModelInfo, ModelPickerData, ModelPickerItem,
+    ModelPickerVariantItem, ModelSwitchRequest, PluginObservation, ProviderSetupItem,
+    ScrollbackState, SessionDeleteRequest, SessionForkRequest, SessionNewRequest,
+    SessionPickerItem, SessionResumeRequest, SkillCommandRequest, SkillDiagnostic, StatusSnapshot,
+    SteeringQueueEntry, SteeringQueueSnapshot, StreamMessage, TipKind, TodoCommandAction,
+    TodoCommandRequest, TodoExportFormat, TodoPanelData, TodoPanelRow, ToolActivity,
+    ToolCallDisplay, ToolCallInfo, ToolResultDisplay, TurnPhase, UiOutput, UserInput,
 };
 pub use validation::{
     EvidenceStatus, FindingSeverity, ProjectType, ProjectTypeDetectorDescriptor, ValidationCheck,
