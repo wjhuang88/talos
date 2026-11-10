@@ -725,3 +725,11 @@ and to verify that replay is bound against those same messages before dispatch. 
 pass locally. A standalone AF_UNIX probe still reports EPERM on this host. This does not account
 for the I169 failure, which was a source regression in this change. The workspace no-fail-fast
 rerun and native CI are tracked separately.
+
+CI3801/run41789775260 on ab97796b finished with a failed aggregate. The native Format + Check +
+Clippy + Test job, both Desktop feature jobs, classifier, and installer fixture passed. The
+Windows workspace job had one failing target, the I169 source guard. Its assertion compared
+several source lines with hard-coded LF and failed with CRLF. The Windows aggregator reported the
+same failure. The advisory remote issue reconciliation still reports missing #844 and stale #390.
+The follow-up compares trimmed source lines through Rust's newline-aware iterator and retains the
+sealed dispatch and replay checks. No runtime behavior changes.

@@ -48,9 +48,11 @@ fn actor_and_provider_dispatch_share_the_sealed_plan() {
         .split_once(");")
         .expect("provider request arguments");
     assert!(
-        arguments.trim_start().starts_with(
-            "&plan.messages,\n                &plan.tool_definitions,\n                plan.tool_protocol,"
-        ),
+        arguments.trim_start().lines().map(str::trim).take(3).eq([
+            "&plan.messages,",
+            "&plan.tool_definitions,",
+            "plan.tool_protocol,",
+        ]),
         "Agent must dispatch the sealed messages, tools and protocol directly"
     );
     let (_, replay_binding) = before_dispatch
