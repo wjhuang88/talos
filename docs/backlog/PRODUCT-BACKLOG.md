@@ -1,5 +1,10 @@
 # Product Backlog
 
+## STORE-002 / I321 — proposed A/B storage capability foundation
+
+[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I321](../iterations/I321-store-002-capability-contract-foundation.md) / #670: proposed governance claim #908 covers source/authority classification plus additive seven-kind capability types only; claim is **ineffective before merge**. Later domain-contract extraction, existing SQLite/TLOG delegates, local bindings, characterization and #897 Host wiring remain separate.
+
+
 ## ARCH-035 / I320 — E0/E1 Review (PR #906)
 
 [ARCH-035](active/ARCH-035-behavior-preserving-host-composition.md) / [I320](../iterations/I320-arch-035-host-composition-baseline.md) / #897: governance PR #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615`, activating a bounded, documentation-only E0 code-truth inventory and E1 host-composition decision review. No implementation or acceptance is implied. E2/E3 cannot begin without accepted STORE-002/#670 contracts and separate authorization; no ServerHost implementation is implied.
