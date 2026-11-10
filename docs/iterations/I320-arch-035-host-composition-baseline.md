@@ -42,6 +42,8 @@ Record an exact-source-path matrix for host constructors and Runtime/Session/Mem
 
 ## Execution gates
 
+Decision review artifact: [ARCH-035 host-composition proposal](../proposals/arch-035-host-composition-boundary.md) (non-binding, no ADR number reserved).
+
 - E0: inspect runtime builder, session manager/store, CLI host, TUI renderer, Desktop and SDK call sites; classify persistence authority and compiled SQLite dependency; record baseline tests and negative/recovery invariants.
 - E1: review ADR for local default host profile, domain ownership, builder source compatibility and the #670 no-duplication matrix.
 - No E2/E3 code, schema, SQL, file format, migration, dependencies or Server behavior.
