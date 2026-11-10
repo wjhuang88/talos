@@ -44,7 +44,6 @@ network = [
     "dep:sha2",
     "dep:reqwest",
     "dep:reqwest-legacy-test",
-    "dep:rust-websearch",
     "dep:scraper",
     "dep:uuid",
     "tokio/fs",
@@ -94,7 +93,6 @@ reqwest = { version = "0.13.4", default-features = false, optional = true, featu
 # The historical standalone API needs gzip/br/deflate but must not flip
 # auto-decompression behavior on the protected production reqwest 0.13 client.
 reqwest-legacy-test = { package = "reqwest", version = "0.12.28", default-features = false, optional = true, features = ["rustls-tls-native-roots", "gzip", "brotli", "deflate"] }
-rust-websearch = { version = "0.1", optional = true }
 scraper = { version = "0.27", optional = true }
 uuid = { version = "1.26.0", optional = true, features = ["v4"] }
 sha2 = { version = "0.11", optional = true }
