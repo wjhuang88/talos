@@ -43,7 +43,10 @@ network = [
     "tokio/sync",
     "dep:sha2",
     "dep:reqwest",
-    "dep:reqwest-legacy-test",
+    "dep:flate2",
+    "dep:brotli",
+    "dep:rustls",
+    "dep:webpki-roots",
     "dep:scraper",
     "dep:uuid",
     "tokio/fs",
@@ -90,9 +93,12 @@ gix = { version = "0.90.0", default-features = false, optional = true, features 
     "basic", "status", "revision", "blob-diff", "index", "sha1", "sha256"
 ] }
 reqwest = { version = "0.13.4", default-features = false, optional = true, features = ["rustls", "json"] }
-# The historical standalone API needs gzip/br/deflate but must not flip
-# auto-decompression behavior on the protected production reqwest 0.13 client.
-reqwest-legacy-test = { package = "reqwest", version = "0.12.28", default-features = false, optional = true, features = ["rustls-tls-native-roots", "gzip", "brotli", "deflate"] }
+# Standalone compatibility has private WebPKI roots and compressed response
+# decoding; reqwest 0.13 feature flags stay unchanged for protected SearchRouter.
+flate2 = { version = "1.1.9", optional = true }
+brotli = { version = "8.0.4", optional = true }
+rustls = { version = "0.23.41", optional = true }
+webpki-roots = { version = "1.0.9", optional = true }
 scraper = { version = "0.27", optional = true }
 uuid = { version = "1.26.0", optional = true, features = ["v4"] }
 sha2 = { version = "0.11", optional = true }
@@ -123,7 +129,6 @@ talos-permission = { version = "0.10.1", path = "../talos-permission" }
 tempfile = "3"
 tokio = { version = "1.53.1", features = ["fs", "macros", "rt", "rt-multi-thread", "test-util"] }
 rcgen = { version = "0.14.5", default-features = false, features = ["crypto", "pem", "ring"] }
-reqwest-legacy-test = { package = "reqwest", version = "0.12.28", default-features = false, features = ["rustls-tls-native-roots"] }
 socket2 = "0.6.4"
 tokio-rustls = "0.26.4"
 
