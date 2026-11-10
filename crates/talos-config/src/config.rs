@@ -233,7 +233,8 @@ impl Config {
     ///    This is the conventional name for keys issued by OpenAI-compatible
     ///    gateways (DashScope / Bailian / Z.ai / self-hosted). It is checked
     ///    after `OPENAI_API_KEY` so existing setups are unaffected.
-    /// Resolve the selected provider's API key. Explicit Vertex ADC returns an empty string
+    ///
+    /// Explicit Vertex ADC returns an empty string
     /// because its credentials are acquired later by the admitted request transport.
     pub fn api_key(&self) -> Result<String, ConfigError> {
         // Legacy host API: Vertex uses request-owned ADC, so there is no API-key secret.
