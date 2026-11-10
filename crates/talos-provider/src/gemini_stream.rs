@@ -20,10 +20,12 @@ pub(crate) struct GeminiStream {
     model_parts: Vec<Value>,
     part_bytes: usize,
     call_ids: HashSet<String>,
+    call_bindings: Vec<(String, usize)>,
     response_key: String,
     stop: Option<StopReason>,
     usage: Usage,
     ended: bool,
+    completed: bool,
 }
 
 fn invalid(message: &'static str) -> ProviderError {
@@ -36,11 +38,26 @@ impl GeminiStream {
             model_parts: Vec::new(),
             part_bytes: 0,
             call_ids: HashSet::new(),
+            call_bindings: Vec::new(),
             response_key: uuid::Uuid::new_v4().to_string(),
             stop: None,
             usage: Usage::default(),
             ended: false,
+            completed: false,
         }
+    }
+
+    /// Encode only after a successful EOF; caller supplies actual transport identity.
+    pub(crate) fn replay_block(
+        &self,
+        provider: &str,
+        model: &str,
+    ) -> ProviderResult<talos_core::message::ReasoningBlock> {
+        if !self.completed {
+            return Err(invalid("Gemini replay requested before completion"));
+        }
+        crate::gemini_replay::encode(provider, model, &self.model_parts, &self.call_bindings)
+            .map_err(invalid)
     }
 
     /// Native ordered parts for later identity-scoped replay; never presentation content.
@@ -178,6 +195,8 @@ impl GeminiStream {
                     if !self.call_ids.insert(id.clone()) {
                         return Err(invalid("duplicate Gemini function id"));
                     }
+                    self.call_bindings
+                        .push((id.clone(), self.model_parts.len()));
                     output.push(GeminiOutput::FunctionCall {
                         id,
                         name,
@@ -219,6 +238,7 @@ impl GeminiStream {
             .stop
             .clone()
             .ok_or_else(|| invalid("Gemini stream ended without terminal outcome"))?;
+        self.completed = true;
         Ok(AgentEvent::TurnEnd {
             stop_reason,
             usage: self.usage.clone(),
