@@ -106,12 +106,19 @@ impl GeminiTransport {
             let response = request
                 .send()
                 .await
-                .map_err(|_| invalid("Gemini request failed"))?;
+                .map_err(|_| ProviderError::NetworkError("Gemini request failed".into()))?;
             if !response.status().is_success() {
                 // Upstream error bodies can contain request text/signatures or credentials.
-                return Err(invalid(
-                    "Gemini request rejected; verify protocol, endpoint and credentials",
-                ));
+                return Err(match response.status().as_u16() {
+                    401 | 403 => {
+                        ProviderError::AuthenticationFailed("Gemini credentials rejected".into())
+                    }
+                    429 => ProviderError::RateLimited("Gemini rate limit exceeded".into()),
+                    500..=599 => ProviderError::ServerError("Gemini upstream unavailable".into()),
+                    _ => invalid(
+                        "Gemini request rejected; verify protocol, endpoint and credentials",
+                    ),
+                });
             }
             Ok(response)
         })
@@ -184,6 +191,36 @@ mod tests {
         assert!(!error.to_string().contains("fixture-secret"));
         redirect.assert_async().await;
         forbidden.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn status_classification_preserves_retry_policy_without_response_secrets() {
+        use crate::retry::{RetryDecision, classify_retry};
+        for status in [400, 401, 403, 429, 500, 503] {
+            let mut server = mockito::Server::new_async().await;
+            let mock = server
+                .mock("POST", "/")
+                .with_status(status)
+                .with_body("fixture-upstream-secret")
+                .create_async()
+                .await;
+            let mut transport =
+                GeminiTransport::ai_studio("model", "fixture-key", false).expect("transport");
+            transport.endpoint = server.url();
+            let error = transport
+                .dispatch(&Value::Null, deadline())
+                .await
+                .expect_err("status");
+            assert!(!error.to_string().contains("fixture-upstream-secret"));
+            assert_eq!(
+                matches!(classify_retry(&error, 0, 2), RetryDecision::Retry { .. }),
+                status == 429 || status >= 500
+            );
+            if status == 401 || status == 403 {
+                assert!(matches!(error, ProviderError::AuthenticationFailed(_)));
+            }
+            mock.assert_async().await;
+        }
     }
 
     #[tokio::test]
