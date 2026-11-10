@@ -487,24 +487,14 @@ impl TuiState {
         self.refresh_slash_menu_after_input();
     }
 
-    /// Updates slash-menu filtering after text entry. `/model` and `/connect`
-    /// are direct-execution commands, but an argument-bearing form must still
-    /// reach the bridge so it can show its corrective picker message. Once a
-    /// separator follows either command, leave the command menu and preserve
-    /// the composer text verbatim for normal submission.
+    /// Completes command names only. Once arguments begin, preserve the composer
+    /// verbatim for normal submission instead of filtering by the entire command.
     pub(crate) fn refresh_slash_menu_after_input(&mut self) {
         if self.slash_menu.is_slash() && !self.input_buffer.starts_with('/') {
             self.slash_menu.close();
             return;
         }
-        if self.slash_menu.is_slash()
-            && matches!(
-                self.input_buffer
-                    .split_once(char::is_whitespace)
-                    .map(|(command, _)| command),
-                Some("/model" | "/connect")
-            )
-        {
+        if self.slash_menu.is_slash() && self.input_buffer.contains(char::is_whitespace) {
             self.slash_menu.close();
             return;
         }
@@ -531,6 +521,15 @@ impl TuiState {
     }
 
     fn accept_selected_panel_item_with_mode(&mut self, mode: PanelAcceptMode) -> PanelAction {
+        // A no-match query resets selection to zero. Never execute that hidden
+        // fallback (or any stale selection outside the currently visible items).
+        if !self
+            .slash_menu
+            .filtered_indices(self.panel_query())
+            .contains(&self.slash_menu.selected_index)
+        {
+            return PanelAction::None;
+        }
         let action = match self.slash_menu.items.get(self.slash_menu.selected_index) {
             Some(item) => item.action.clone(),
             None => return PanelAction::None,

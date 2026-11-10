@@ -1072,6 +1072,10 @@ mode.
 | `/attachments` (`/imgs`) | List pending image attachments with their index, byte size, and MIME type. Attachments are queued for the next user submit |
 | `/detach <index\|all>` | Remove a pending image attachment by 1-based index, or clear all pending attachments with `all`. The status line reflects the new count immediately |
 
+In the TUI, command completion closes when you start typing arguments. You can type
+`/detach all` or `/detach 1` directly and press Enter; Tab completion is optional.
+Enter and Tab never activate a hidden item when the menu has no matching results.
+
 ## Skills
 
 Talos discovers `SKILL.md` files at session startup and injects Level 0 metadata
