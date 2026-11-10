@@ -1,3 +1,9 @@
+//! Offline fixed-host legacy transport trace oracle for SEARCH-001-L / I319.
+//! Expected query and probe sequences were first observed with the pinned actual
+//! rust-websearch 0.1.2 at I317/#860 (CI3862); do not replace these literals with
+//! comparisons between two Talos-owned implementations alone.
+//! Original MIT attribution: crates/talos-tools/LICENSES/rust-websearch-MIT.txt.
+
 use super::*;
 use crate::search_backend::transport::{
     BodyFormat, PreparedTransportRequest, SearchDns, TransportBudget, tests::Server,
@@ -59,6 +65,17 @@ impl Case {
             Self::UnreachableDuckDuckGo => &["bing"],
         }
     }
+
+    /// Frozen query-free probe traces verified against the actual pinned upstream
+    /// in I317/CI3862, prior to its later standalone coordinator replacement.
+    fn expected_probes(self) -> Vec<(&'static str, &'static str)> {
+        let mut expected = vec![("ddg", "HEAD"), ("bing", "HEAD")];
+        if self == Self::UnreachableDuckDuckGo {
+            expected.push(("ddg", "GET"));
+        }
+        expected.sort_unstable();
+        expected
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,7 +120,7 @@ impl ObservedRequest {
 }
 
 #[test]
-fn actual_legacy_and_prepared_paths_match_query_recipient_sequences() {
+fn owned_legacy_and_prepared_paths_match_frozen_upstream_query_sequences() {
     let ca = TestCa::new();
     let output = Command::new(std::env::current_exe().expect("test executable"))
         .args([
@@ -248,8 +265,14 @@ async fn legacy_parity_child() {
         assert_probe_requests_are_query_free(&protected, case.name());
         assert_eq!(
             sorted_probes(legacy_probes),
+            case.expected_probes(),
+            "{} owned legacy probes vs frozen upstream",
+            case.name()
+        );
+        assert_eq!(
             sorted_probes(protected_probes),
-            "{} query-free probe set",
+            case.expected_probes(),
+            "{} protected probes vs frozen upstream",
             case.name()
         );
     }
