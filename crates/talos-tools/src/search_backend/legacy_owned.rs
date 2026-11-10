@@ -19,7 +19,7 @@ use super::{
     ddg_parser::{self, DdgFormat},
     instant_answer,
 };
-use reqwest_legacy::{Client, Method, StatusCode, Url};
+use reqwest_legacy_test::{Client, Method, StatusCode, Url};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct LegacyConfig {
@@ -42,9 +42,9 @@ fn client(
     let mut builder = Client::builder()
         .timeout(timeout)
         .user_agent(random_user_agent())
-        .redirect(reqwest_legacy::redirect::Policy::limited(redirects));
+        .redirect(reqwest_legacy_test::redirect::Policy::limited(redirects));
     if let Some(url) = &config.proxy_url {
-        let proxy = reqwest_legacy::Proxy::all(url)
+        let proxy = reqwest_legacy_test::Proxy::all(url)
             .map_err(|_| SearchBackendError::RequestFailed("invalid legacy proxy".into()))?;
         builder = builder.proxy(proxy);
     }
@@ -54,7 +54,7 @@ fn client(
         if let Some(path) = std::env::var_os("TALOS_SEARCH_PARITY_CA") {
             let pem = std::fs::read(path)
                 .map_err(|_| SearchBackendError::RequestFailed("test CA read".into()))?;
-            let cert = reqwest_legacy::Certificate::from_pem(&pem)
+            let cert = reqwest_legacy_test::Certificate::from_pem(&pem)
                 .map_err(|_| SearchBackendError::RequestFailed("test CA parse".into()))?;
             builder = builder.add_root_certificate(cert);
         }
@@ -129,7 +129,7 @@ fn request_url_and_body(
     }
 }
 
-fn classify(error: &reqwest_legacy::Error) -> SearchBackendError {
+fn classify(error: &reqwest_legacy_test::Error) -> SearchBackendError {
     if error.is_timeout() {
         SearchBackendError::Timeout
     } else if error.is_connect() {
@@ -151,13 +151,16 @@ async fn query_protocol(
         if let Some(body) = &body {
             request = request
                 .header(
-                    reqwest_legacy::header::CONTENT_TYPE,
+                    reqwest_legacy_test::header::CONTENT_TYPE,
                     "application/x-www-form-urlencoded",
                 )
                 .body(body.clone());
         }
         if matches!(protocol, Protocol::Bing) {
-            request = request.header(reqwest_legacy::header::ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9,en;q=0.8");
+            request = request.header(
+                reqwest_legacy_test::header::ACCEPT_LANGUAGE,
+                "zh-CN,zh;q=0.9,en;q=0.8",
+            );
         }
         match request.send().await {
             Err(err) if attempt < protocol.retries() => {
@@ -178,7 +181,9 @@ async fn query_protocol(
 
 // Reject non-success status at header time; never buffer a stalled or large
 // 403/429/503 body before falling back to the next fixed search destination.
-async fn successful_body(response: reqwest_legacy::Response) -> Result<Vec<u8>, SearchBackendError> {
+async fn successful_body(
+    response: reqwest_legacy_test::Response,
+) -> Result<Vec<u8>, SearchBackendError> {
     let status = response.status();
     if !status.is_success() {
         return Err(SearchBackendError::HttpStatus(status.as_u16()));
@@ -217,25 +222,19 @@ fn parse_response(
         &html_body
     };
     let result = match protocol {
-        Protocol::Lite => ddg_parser::parse(
-            DdgFormat::Lite,
-            status.as_u16(),
-            decoded_body,
-            LEGACY_COUNT,
-        )
-            .map(|x| x.into_candidates())
-            .map_err(|_| SearchBackendError::Parse),
+        Protocol::Lite => {
+            ddg_parser::parse(DdgFormat::Lite, status.as_u16(), decoded_body, LEGACY_COUNT)
+                .map(|x| x.into_candidates())
+                .map_err(|_| SearchBackendError::Parse)
+        }
         Protocol::Instant => instant_answer::parse(status.as_u16(), body, query, LEGACY_COUNT)
             .map(|x| x.into_candidates())
             .map_err(|_| SearchBackendError::Parse),
-        Protocol::Html => ddg_parser::parse(
-            DdgFormat::Html,
-            status.as_u16(),
-            decoded_body,
-            LEGACY_COUNT,
-        )
-            .map(|x| x.into_candidates())
-            .map_err(|_| SearchBackendError::Parse),
+        Protocol::Html => {
+            ddg_parser::parse(DdgFormat::Html, status.as_u16(), decoded_body, LEGACY_COUNT)
+                .map(|x| x.into_candidates())
+                .map_err(|_| SearchBackendError::Parse)
+        }
         Protocol::Bing => bing_parser::parse(status.as_u16(), decoded_body, LEGACY_COUNT)
             .map(|x| x.into_candidates())
             .map_err(|_| SearchBackendError::Parse),
@@ -265,10 +264,8 @@ pub(crate) async fn search(
             }
         }
     }
-    if bing {
-        if let Ok(results) = query_protocol(Protocol::Bing, query, config).await {
-            return Ok(results);
-        }
+    if bing && let Ok(results) = query_protocol(Protocol::Bing, query, config).await {
+        return Ok(results);
     }
     Err(SearchBackendError::NoResults)
 }
@@ -318,7 +315,9 @@ mod tests {
                 "HTTP/1.1 {status}\r\n{content_encoding}Content-Length: {}\r\nConnection: close\r\n\r\n",
                 body.len()
             );
-            stream.write_all(headers.as_bytes()).expect("fixture headers");
+            stream
+                .write_all(headers.as_bytes())
+                .expect("fixture headers");
             if stall_body {
                 // A non-200 response must be rejected before this body is read.
                 std::thread::sleep(Duration::from_millis(500));
@@ -331,9 +330,10 @@ mod tests {
 
     #[tokio::test]
     async fn non_success_status_rejects_before_stalled_body() {
-        let (url, server) = spawn_http_fixture("503 Service Unavailable", None, b"never sent", true);
-        let http = client(&LegacyConfig::default(), Duration::from_secs(3), 0)
-            .expect("legacy client");
+        let (url, server) =
+            spawn_http_fixture("503 Service Unavailable", None, b"never sent", true);
+        let http =
+            client(&LegacyConfig::default(), Duration::from_secs(3), 0).expect("legacy client");
         let response = http.get(url).send().await.expect("fixture response");
         let result = tokio::time::timeout(Duration::from_millis(250), successful_body(response))
             .await
@@ -344,19 +344,30 @@ mod tests {
 
     #[tokio::test]
     async fn legacy_client_decompresses_upstream_content_encodings() {
-        const GZIP: &[u8] = &[ 0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcb, 0x49, 0x4d, 0x4f, 0x4c, 0xae, 0x54, 0x48, 0xce, 0xcf, 0x2d, 0x28, 0x4a, 0x2d, 0x2e, 0x4e, 0x4d, 0x51, 0x48, 0xcb, 0xac, 0x28, 0x29, 0x2d, 0x4a, 0x05, 0x00, 0x13, 0x70, 0xfb, 0xdd, 0x19, 0x00, 0x00, 0x00 ];
-        const BROTLI: &[u8] = &[ 0x0b, 0x0c, 0x80, 0x6c, 0x65, 0x67, 0x61, 0x63, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x66, 0x69, 0x78, 0x74, 0x75, 0x72, 0x65, 0x03 ];
-        const DEFLATE: &[u8] = &[ 0x78, 0x9c, 0xcb, 0x49, 0x4d, 0x4f, 0x4c, 0xae, 0x54, 0x48, 0xce, 0xcf, 0x2d, 0x28, 0x4a, 0x2d, 0x2e, 0x4e, 0x4d, 0x51, 0x48, 0xcb, 0xac, 0x28, 0x29, 0x2d, 0x4a, 0x05, 0x00, 0x7f, 0x94, 0x09, 0xf2 ];
-        for (encoding, body) in [
-            ("gzip", GZIP),
-            ("br", BROTLI),
-            ("deflate", DEFLATE),
-        ] {
+        const GZIP: &[u8] = &[
+            0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcb, 0x49, 0x4d, 0x4f,
+            0x4c, 0xae, 0x54, 0x48, 0xce, 0xcf, 0x2d, 0x28, 0x4a, 0x2d, 0x2e, 0x4e, 0x4d, 0x51,
+            0x48, 0xcb, 0xac, 0x28, 0x29, 0x2d, 0x4a, 0x05, 0x00, 0x13, 0x70, 0xfb, 0xdd, 0x19,
+            0x00, 0x00, 0x00,
+        ];
+        const BROTLI: &[u8] = &[
+            0x0b, 0x0c, 0x80, 0x6c, 0x65, 0x67, 0x61, 0x63, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70,
+            0x72, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20, 0x66, 0x69, 0x78, 0x74, 0x75, 0x72, 0x65,
+            0x03,
+        ];
+        const DEFLATE: &[u8] = &[
+            0x78, 0x9c, 0xcb, 0x49, 0x4d, 0x4f, 0x4c, 0xae, 0x54, 0x48, 0xce, 0xcf, 0x2d, 0x28,
+            0x4a, 0x2d, 0x2e, 0x4e, 0x4d, 0x51, 0x48, 0xcb, 0xac, 0x28, 0x29, 0x2d, 0x4a, 0x05,
+            0x00, 0x7f, 0x94, 0x09, 0xf2,
+        ];
+        for (encoding, body) in [("gzip", GZIP), ("br", BROTLI), ("deflate", DEFLATE)] {
             let (url, server) = spawn_http_fixture("200 OK", Some(encoding), body, false);
-            let http = client(&LegacyConfig::default(), Duration::from_secs(3), 0)
-                .expect("legacy client");
+            let http =
+                client(&LegacyConfig::default(), Duration::from_secs(3), 0).expect("legacy client");
             let response = http.get(url).send().await.expect("compressed response");
-            let decoded = successful_body(response).await.expect("decompress content encoding");
+            let decoded = successful_body(response)
+                .await
+                .expect("decompress content encoding");
             assert_eq!(decoded, b"legacy compressed fixture", "{encoding}");
             server.join().expect("fixture thread");
         }
