@@ -1,8 +1,8 @@
 # Product Backlog
 
-## STORE-002 / I321 — proposed A/B storage capability foundation
+## STORE-002 / I321 — A/B implementation Review (#909)
 
-[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I321](../iterations/I321-store-002-capability-contract-foundation.md) / #670: proposed governance claim #908 covers source/authority classification plus additive seven-kind capability types only; claim is **ineffective before merge**. Later domain-contract extraction, existing SQLite/TLOG delegates, local bindings, characterization and #897 Host wiring remain separate.
+[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I321](../iterations/I321-store-002-capability-contract-foundation.md) / #670: governance #908 merged `201a9b61d72e704da3a86f5db283b9f6e4d92938`; candidate #909 provides source/authority classification plus additive seven-kind capability types only, pending independent API review and exact-head CI. Later domain-contract extraction, existing SQLite/TLOG delegates, local bindings, characterization and #897 Host wiring remain separate.
 
 
 ## ARCH-035 / I320 — E0/E1 Review (PR #906)
