@@ -1,6 +1,6 @@
 # SEARCH-001-L: Retire Legacy Rust-Websearch Build Dependency
 
-**Status**: Active / proposed activation — **ineffective until the claim/activation governance PR merges**.
+**Status**: Active / Claimed (proposed in governance #902; ineffective until target merge).
 **Source Issue**: [#901](https://github.com/wjhuang88/talos/issues/901).
 **Parent**: [SEARCH-001 / #624](SEARCH-001-zero-config-global-search.md).
 **Selected iteration**: [I319](../../iterations/I319-search-legacy-dependency-retirement.md) — proposed.
@@ -11,15 +11,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | SEARCH-001-L L1: replace the residual `rust-websearch` dependency in the dormant/public legacy `WebSearchTool` and test oracle, preserve API/behavior, then remove Cargo and current fixture locked package references only with independently verified tests |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-10 |
 | Source Issue | #901 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #902 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Proposed authorization: user explicitly selected this non-overlapping L1 work; exact-head CI and both governance validators, independent API/security reviewer findings and merge-time CAS must be checked before #902 merge; governance effect is not established until then. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | Effective after claim+iteration merge; code changes require exact-head cross-platform CI and independent API/network/security/dependency review. No provider admission or parent closure. |

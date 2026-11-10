@@ -1,6 +1,6 @@
 # Iteration I319: Retire `rust-websearch` Build Dependency (L1)
 
-> Document status: Active / proposed activation — no effect before governance PR merge
+> Document status: Active / Claimed (proposed via #902; no effect before governance PR merge)
 > Published plan date: 2026-11-10
 > Planned objective: remove third-party `rust-websearch` from the Talos normal network and supported build graphs by owning the residual legacy tool contract and freezing independent pinned-upstream test evidence.
 > Baseline rule: preserve public standalone `WebSearchTool` API, protected Auto and all existing permission/source/transport behaviors; do not equate dependency removal with E/F/G global search acceptance.
@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | SEARCH-001-L L1: source-level legacy Tool parity + freeze independent oracle + complete current Cargo/fixture dependency graph retirement |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-10 |
 | Source Issue | #901 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #902 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Proposed authorization: user explicitly selected this non-overlapping L1 work; exact-head CI and both governance validators, independent API/security reviewer findings and merge-time CAS must be checked before #902 merge; governance effect is not established until then. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | Only after accepted code, independent review, and exact-head multi-platform CI may governance close. |
@@ -86,7 +86,7 @@ dependency-wide upgrade or `rust-websearch` dynamic runtime fallback.
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-11-10 | Proposed atomic claim+activation | Governance PR pending; no production code until claim and Active state are merged. |
+| 2026-11-10 | Proposed atomic claim+activation | Governance PR #902 proposes both L1 claim and I319 activation; no production code until exact-head governance claim and Active state are merged. |
 
 ## Verification Evidence
 
