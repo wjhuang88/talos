@@ -246,13 +246,16 @@ mod tests {
         store.insert(replay, &sealed).expect("seal");
         let mut later = crate::transient_text::PrivateTokens::default();
         assert!(later.extend_private_replay(["safe".into()]));
-        let agent = crate::Agent::new(
+        let agent = crate::Agent::with_security(
             Arc::new(UnusedProvider),
             talos_core::tool::ToolRegistry::new(),
+            None,
+            None,
+            std::path::PathBuf::from("."),
         );
         let snapshot =
             agent.persistence_snapshot(std::slice::from_ref(&sealed), &later, Some(&store));
-        assert_eq!(snapshot.messages, [sealed.clone()]);
+        assert_eq!(snapshot.messages, std::slice::from_ref(&sealed));
         assert!(
             store
                 .for_request(&snapshot.messages, Some("p"), Some("m"))
@@ -308,10 +311,9 @@ mod tests {
             reasoning: Some(identity),
             ..
         } = &mut forged
+            && let ReasoningBlock::Redacted { data } = &mut identity.blocks[0]
         {
-            if let ReasoningBlock::Redacted { data } = &mut identity.blocks[0] {
-                data.push('0');
-            }
+            data.push('0');
         }
         assert!(store.for_request(&[forged], Some("p"), Some("m")).is_err());
     }
