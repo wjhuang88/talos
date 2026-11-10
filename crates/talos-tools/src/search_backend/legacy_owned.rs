@@ -41,9 +41,11 @@ fn client(
 ) -> Result<Client, SearchBackendError> {
     // Retain Mozilla WebPKI roots ONLY for the historical standalone Tool;
     // protected SearchRouter clients keep their existing reqwest 0.13 verifier.
-    let mut roots = rustls::RootCertStore {
+    let roots = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
+    #[cfg(test)]
+    let mut roots = roots;
     #[cfg(test)]
     {
         if let Some(path) = std::env::var_os("TALOS_SEARCH_PARITY_CA") {
