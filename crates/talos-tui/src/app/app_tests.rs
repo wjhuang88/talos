@@ -5037,3 +5037,91 @@ async fn ready_event_batch_reaches_release_before_redraw() {
         ]
     );
 }
+
+#[test]
+fn compact_approval_preserves_localized_review_effects_and_decisions() {
+    for point in [
+        "是否继续检查？",
+        "Continue this inspection?",
+        "検査を続行しますか？",
+    ] {
+        let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(100, 32));
+        let scope = (0..2000)
+            .map(|i| format!("Read Path: /workspace/file-{i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let preview = format!(
+            "Auto review:\nModel review requires a human decision.\n{point}\nDecision needed: {point}\n\nPermission scope:\n{scope}"
+        );
+        tui.show_approval_with_preview("bash", "command: pwd", Some(preview));
+        tui.draw_frame().expect("localized summary");
+        let rendered = tui.terminal.test_rendered_text();
+        assert!(
+            rendered
+                .split_whitespace()
+                .collect::<String>()
+                .contains(&point.split_whitespace().collect::<String>()),
+            "{rendered}"
+        );
+        assert!(rendered.contains("2000 scope entries"), "{rendered}");
+        assert!(rendered.contains("[3] deny"), "{rendered}");
+        assert!(!tui.approval_preview_fully_visible);
+        tui.state.slash_menu.approval_view.presentation =
+            Some(talos_conversation::ApprovalPresentation {
+                summary: vec![
+                    "Checkout branch topic".into(),
+                    "Execution is single-use".into(),
+                ],
+                once_only: true,
+            });
+        tui.draw_frame().expect("localized operation summary");
+        let rendered = tui.terminal.test_rendered_text();
+        assert!(
+            rendered
+                .split_whitespace()
+                .collect::<String>()
+                .contains(&point.split_whitespace().collect::<String>()),
+            "{rendered}"
+        );
+        assert!(rendered.contains("Checkout branch topic"), "{rendered}");
+        assert!(rendered.contains("[3] deny"), "{rendered}");
+        assert!(!tui.approval_preview_fully_visible);
+    }
+}
+
+#[test]
+fn operation_review_does_not_displace_trusted_effects_in_short_panel() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(100, 22));
+    let summary = vec![
+        "Switch branch: topic",
+        "Repository: workspace",
+        "Stage: execute",
+        "Evidence: paths",
+        "Effects: write files",
+        "Configured programs; no rollback guarantee",
+        "Approve once",
+    ];
+    let render = |tui: &mut crate::app::Tui, preview: String| {
+        tui.show_approval_with_preview("git", "checkout", Some(preview));
+        tui.state.slash_menu.approval_view.presentation =
+            Some(talos_conversation::ApprovalPresentation {
+                summary: summary.iter().map(|line| (*line).into()).collect(),
+                once_only: true,
+            });
+        tui.draw_frame().expect("compressed operation");
+        tui.terminal.test_rendered_text()
+    };
+    let before = render(&mut tui, "Read Path: /workspace".into());
+    let after = render(&mut tui, "Auto review:\nline one\nline two\nline three\nline four\nline five\n\nPermission scope:\nRead Path: /workspace".into());
+    assert!(before.contains("Stage: execute"));
+    for line in summary {
+        if before.contains(line) {
+            assert!(after.contains(line), "missing {line}: {after}");
+        }
+    }
+    assert!(after.contains("[3] deny"));
+}

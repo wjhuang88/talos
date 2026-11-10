@@ -1213,15 +1213,19 @@ impl ViewportComponent for BottomPanelComponent<'_> {
             if !self.menu.approval_view.expanded
                 && let Some(presentation) = &self.menu.approval_view.presentation
             {
-                return u16::try_from(presentation.summary.len().saturating_add(7))
-                    .unwrap_or(u16::MAX)
-                    .min(16)
-                    .min(self.max_height);
+                return u16::try_from(presentation.summary.len().saturating_add(7).saturating_add(
+                    approval_review_lines(preview.as_deref().unwrap_or_default(), w).len(),
+                ))
+                .unwrap_or(u16::MAX)
+                .min(20)
+                .min(self.max_height);
             }
             return approval_natural_height_with_preview(w, arguments, preview.as_deref())
                 .min(if self.menu.approval_view.expanded {
                     20
-                } else if self.menu.approval_view.presentation.is_some() {
+                } else if self.menu.approval_view.presentation.is_some()
+                    || !approval_review_lines(preview.as_deref().unwrap_or_default(), w).is_empty()
+                {
                     16
                 } else {
                     12
@@ -1762,6 +1766,7 @@ impl BottomPanelComponent<'_> {
                     .summary
                     .iter()
                     .map(|line| truncate_one_line(line, usize::from(width).saturating_sub(4)))
+                    .chain(approval_review_lines(preview, width))
                     .collect()
             } else if compact {
                 approval_scope_summary(preview, width)
@@ -1918,6 +1923,23 @@ pub(crate) fn approval_scope_lines(preview: &str, width: u16) -> Vec<String> {
         .collect()
 }
 
+// The CLI puts localized review effects and decision points before the exact scope.
+// Keep this bounded explanation visible when collapsing large evidence inventories.
+fn approval_review_lines(preview: &str, width: u16) -> Vec<String> {
+    preview
+        .strip_prefix("Auto review:\n")
+        .and_then(|text| text.split_once("\n\nPermission scope:\n"))
+        .map(|(review, _)| {
+            review
+                .lines()
+                .filter(|line| !line.trim().is_empty())
+                .take(5)
+                .map(|line| truncate_one_line(line, usize::from(width).saturating_sub(4)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn approval_scope_summary(preview: &str, width: u16) -> Vec<String> {
     let mut counts = std::collections::BTreeMap::<&str, usize>::new();
     let mut notes = 0;
@@ -1937,9 +1959,10 @@ fn approval_scope_summary(preview: &str, width: u16) -> Vec<String> {
         }
     }
     let total: usize = counts.values().sum();
-    let mut lines = vec![format!(
+    let mut lines = approval_review_lines(preview, width);
+    lines.push(format!(
         "{total} scope entries; {notes} explanation/detail lines"
-    )];
+    ));
     for (kind, count) in &counts {
         lines.push(format!("{kind}: {count}"));
     }

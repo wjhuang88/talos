@@ -174,3 +174,14 @@ reconciliation. Independent security/API review and exact-head CI remain require
 before merge; device/manual acceptance remains in this owner and status stays Review.
 The final combined source matches the full preflight and MSVC cross-check candidate;
 both governance validators passed after merging main `f9bfac77`.
+
+## Real TUI locale regression correction
+
+The macOS PTY acceptance revealed that compact scope summaries hid the existing
+localized model effect/decision explanation. Collapsed summaries now keep up to
+five explanation lines visible, truncating long rows with the existing marker;
+full text remains in exact details. This applies to ordinary and operation
+presentations without changing grants or reviewed-row accounting. Summary height
+remains bounded (16 rows with review text; operation plus review at most 20).
+Add a real rendered-frame regression for Chinese, English and Japanese and rerun
+the existing loopback real-TUI locale/resume/rotation acceptance.
