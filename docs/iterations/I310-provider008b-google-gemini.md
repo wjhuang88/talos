@@ -561,3 +561,38 @@ New exact-head CI3743/run41411287919 is pending, not passed. Earlier CI3741 stil
 successful jobs and a running macOS job; do not infer its final outcome from the preflight step.
 Next implementation gate remains transient browser signed replay and durable privacy projection,
 then compatibility, positive lazy factory/ADC, catalog/host/UI/fixtures/docs and full acceptance.
+
+### Positive lazy factory/ADC Agent acceptance — 2026-11-02
+
+Remote base 96c4bee1 completed CI3744/run41411570761 with all eight jobs successful,
+including native macOS preflight, Windows workspace and Linux/Windows Desktop. This does not
+complete B. Later main c2d8b441 adds only SEARCH-001-H/I314 planning/activation documents;
+AGENTS and runtime sources are unchanged. I314's effective claim explicitly preserves I310's
+non-overlapping ownership. Per ADR-071, unrelated governance alone does not force a rebase.
+
+Added isolated-process positive acceptance through the public factory and real Agent/PermissionEngine/
+ReadTool: explicit authorized_user ADC, standard well-known user ADC, and explicit service_account.
+The selected ADC file is absent when the factory is built, created before first dispatch, and removed
+by the token fixture after initialization. The signed native tool continuation must succeed using exactly
+one token exchange and two Bearer generation calls, without an API-key header. This exercises lazy
+OnceCell/from_environment initialization and cached source/token reuse rather than manually injecting
+an already-created credential source. Child processes clear inherited proxies and use loopback only.
+The endpoint seam is cfg(test) at both module and call site; production admission is unchanged.
+
+Checkpoint a0a9715c deliberately preserved uncompiled/unformatted code after toolchain/log loss.
+Restored pinned Rust1.99.0 under the task workspace. The first build failed before tests because
+an older target cache lacked serde_core rlib. Retained that failure and used a separate task-owned
+CARGO_TARGET_DIR with CI debug=0/incremental=0/jobs=2; no dependency or assertion was weakened.
+Clean focused acceptance passed (2 tests; parent covers all three credential/path cases, 2.33s).
+Full locked Provider library regression then passed **272 tests, zero failures** (5.33s); locked
+all-targets Provider Clippy with -D warnings passed (1m18s); rustfmt and diff whitespace passed.
+Independent read-only source review approved final fixture blob 8fc77a00 and the cfg(test) seam.
+Both governance validators passed with zero warnings. New exact-head CI is still required after
+the formatted/evidence checkpoint; no merge is authorized.
+
+Browser remains refused. Next implementation needs a nonserializable invocation replay carrier,
+run-local bounded ownership and planner-bound request attachments; ReasoningComplete/Redacted are
+durable and must not hold browser raw arguments. Hook edits, transcript pruning, token budgeting
+and missing continuation on resume must be handled without reconstructing signed arguments.
+Compatibility, host/UI, separate catalog activation, sourced fixtures/final docs and whole-candidate
+review/CI/CAS remain open. Active/Claimed, Completion Commit Pending; parent #724 stays open.
