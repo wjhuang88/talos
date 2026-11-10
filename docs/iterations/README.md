@@ -1,5 +1,9 @@
 # Iterations
 
+## I320 / ARCH-035 E0/E1 — Active / Claimed proposal (ineffective until #905 merge)
+
+[I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: E0 source-path matrix and E1 non-binding cross-host composition architecture proposal only. #905 claim+activation remains ineffective before governance merge. STORE-002/#670 exclusively owns storage contracts, so E2/E3 implementation is blocked; unrelated I319, I318, I310 and active work remain separate.
+
 ## I319 / SEARCH-001-L — Active / Claimed proposal (ineffective until #902 merge)
 
 [I319](I319-search-legacy-dependency-retirement.md) / [SEARCH-001-L](../backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) / #901: own legacy `WebSearchTool` without `rust-websearch` build dependency, preserve independent parity and public schema; claim and activation are proposed in #902 and require governance merge. I318/TUI, I310/Gemini and DEPENDENCY-003-A remain independent; E/F/G/I blocked gate unaffected.
