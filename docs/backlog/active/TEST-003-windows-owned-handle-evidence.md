@@ -1,5 +1,11 @@
 # TEST-003: Test-Only Current-Process Handle Evidence
 
+Native Windows follow-up (2026-11-10): source `c065236a` passed all 58
+`process_boundary` tests with the `shell` feature on Rust 1.99.0 MSVC.
+[Evidence and limits](../../reference/WINDOWS-VALIDATION-2026-11-10.md).
+This does not close unknown/untracked/native-private lifetime or establish global
+leak absence. The retained #717 residual and owner status remain unchanged.
+
 **Status**: Review / Claimed; #716 diagnostic candidate, native evidence/acceptance pending
 **Type**: Spike / Technical Story
 **Parent Epic**: None; related SEARCH-001-C/#643 and #716 CI blocker
