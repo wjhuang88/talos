@@ -238,6 +238,94 @@ impl ApprovalPrompt {
     }
 }
 
+/// Builds display-only checkout context from the trusted request and compiled scope.
+/// Exact facets remain the authorization source; no directory grant is synthesized.
+pub(crate) fn operation_approval_presentation(
+    request: &PermissionApprovalRequest,
+) -> Option<talos_conversation::ApprovalPresentation> {
+    use talos_core::tool::{ToolProvenance, ToolResourceKind};
+    if request.provenance != ToolProvenance::Native || request.tool_name != "git_checkout" {
+        return None;
+    }
+    let facets = request.preview.facets();
+    let execution = facets.iter().any(|f| {
+        f.nature == ToolNature::Execute
+            && f.resource_kind == ToolResourceKind::Remote
+            && f.normalized_scope == "git:checkout-command"
+    });
+    let discovery = facets.iter().any(|f| {
+        f.resource_kind == ToolResourceKind::Remote
+            && f.normalized_scope == "git:configuration-chain"
+    });
+    if !execution && !discovery {
+        return None;
+    }
+    // Native Checkout emits the repository root before metadata/source facets.
+    let root = &facets
+        .iter()
+        .find(|f| f.nature == ToolNature::Read && f.resource_kind == ToolResourceKind::Path)?
+        .normalized_scope;
+    let branch = request.arguments.get("branch")?.as_str()?;
+    let create = request
+        .arguments
+        .get("create")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let reads = facets
+        .iter()
+        .filter(|f| f.nature == ToolNature::Read && f.resource_kind == ToolResourceKind::Path)
+        .count();
+    let outside = facets
+        .iter()
+        .filter(|f| {
+            f.resource_kind == ToolResourceKind::Path
+                && !std::path::Path::new(&f.normalized_scope).starts_with(root)
+        })
+        .count();
+    let writes = facets
+        .iter()
+        .filter(|f| f.nature == ToolNature::Write)
+        .count();
+    let programs = facets
+        .iter()
+        .filter(|f| f.nature == ToolNature::Execute && f.resource_kind == ToolResourceKind::Command)
+        .count();
+    let operation = if create {
+        "Create and switch branch"
+    } else {
+        "Switch branch"
+    };
+    Some(talos_conversation::ApprovalPresentation {
+        once_only: true,
+        summary: vec![
+            format!(
+                "{operation}: {}",
+                serde_json::Value::String(branch.to_owned())
+            ),
+            format!("Repository: {}", root.escape_debug()),
+            if execution {
+                "Stage: execute the prepared checkout".into()
+            } else {
+                "Stage: inspect repository/configuration; checkout not yet authorized".into()
+            },
+            format!(
+                "Evidence: {reads} read paths; {outside} paths outside repository; {programs} programs"
+            ),
+            if execution {
+                format!("Effects: branch/HEAD, Git metadata and worktree; {writes} write scopes")
+            } else {
+                "Effects: inspect sources; additional effects require subsequent approval".into()
+            },
+            if execution {
+                "Configured programs may access files/network; no rollback guarantee".into()
+            } else {
+                "Source snapshots detect changes before execution".into()
+            },
+            "Approve this request once; exact evidence is optional under [d]".into(),
+        ],
+    })
+}
+
 pub(crate) fn format_grant_preview(preview: &GrantPreview) -> String {
     let mut formatted = preview
         .facets()
@@ -370,6 +458,75 @@ mod tests {
             .preview()
             .clone();
         approval
+    }
+
+    #[test]
+    fn checkout_operation_summary_retains_exact_scope_and_distinguishes_stages() {
+        let root = tempfile::tempdir().expect("repository");
+        let root_path = root.path().to_string_lossy().to_string();
+        let mut facets = vec![ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            &root_path,
+            ToolResourceKind::Path,
+        )];
+        for i in 0..2000 {
+            facets.push(ToolPermissionFacet::with_resource(
+                ToolNature::Read,
+                root.path().join(format!("file-{i}")).to_string_lossy(),
+                ToolResourceKind::Path,
+            ));
+        }
+        facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Read,
+            "git:configuration-chain",
+            ToolResourceKind::Remote,
+        ));
+        facets.push(ToolPermissionFacet::with_resource(
+            ToolNature::Execute,
+            root.path().join("git").to_string_lossy(),
+            ToolResourceKind::Command,
+        ));
+        let input = serde_json::json!({"branch":"topic", "create":true});
+        let state = PermissionSessionState::new(PermissionEngine::with_workspace_root(
+            root.path().to_owned(),
+        ));
+        let mut approval = approval_request();
+        approval.tool_name = "git_checkout".into();
+        approval.arguments = input.clone();
+        for execution in [false, true] {
+            if execution {
+                facets.push(ToolPermissionFacet::with_resource(
+                    ToolNature::Execute,
+                    "git:checkout-command",
+                    ToolResourceKind::Remote,
+                ));
+            }
+            let request = PermissionRequest::native("git_checkout", &facets, &input);
+            approval.preview = state
+                .propose(
+                    &request,
+                    &PermissionContext::compatibility(),
+                    talos_permission::GrantScope::Session,
+                )
+                .expect("proposal")
+                .preview()
+                .clone();
+            let before = format_grant_preview(&approval.preview);
+            let display = operation_approval_presentation(&approval).expect("operation summary");
+            let text = display.summary.join("\n");
+            assert!(display.once_only);
+            assert!(display.summary.len() <= 8);
+            assert!(text.contains("Create and switch branch"));
+            assert!(text.contains("2001 read paths"));
+            assert_eq!(text.contains("Stage: execute"), execution);
+            assert_eq!(text.contains("no rollback guarantee"), execution);
+            assert_eq!(format_grant_preview(&approval.preview), before);
+            assert!(before.contains("file-1999"));
+        }
+        approval.provenance = talos_core::tool::ToolProvenance::McpRemote {
+            server: "foreign".into(),
+        };
+        assert!(operation_approval_presentation(&approval).is_none());
     }
 
     #[test]

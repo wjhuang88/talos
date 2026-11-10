@@ -3,8 +3,9 @@
 //! The named resolver capability permits only bounded component metadata and
 //! link-target inspection. File bodies require fresh exact Path Read tokens.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use talos_core::tool::{ToolExecutionAuthorization, ToolNature};
 
@@ -25,6 +26,7 @@ pub(super) struct AuxiliaryPaths {
     anchor: PathBuf,
     sources: Vec<Source>,
     budget: pull_resolution::Budget,
+    records: BTreeMap<PathBuf, Arc<pull_resolution::Record>>,
 }
 
 impl AuxiliaryPaths {
@@ -54,11 +56,16 @@ impl AuxiliaryPaths {
         }
         let mut budget = pull_resolution::Budget::default();
         let mut sources = Vec::new();
+        let mut records = BTreeMap::new();
         for spelling in paths.into_iter().collect::<BTreeSet<_>>() {
             if !spelling.is_absolute() {
                 return Err(invalid());
             }
-            let resolution = pull_resolution::Resolution::capture_file(&spelling, &mut budget)?;
+            let resolution = pull_resolution::Resolution::capture_file_shared(
+                &spelling,
+                &mut budget,
+                &mut records,
+            )?;
             sources.push(Source {
                 spelling,
                 resolution,
@@ -71,6 +78,7 @@ impl AuxiliaryPaths {
             anchor: anchor.to_owned(),
             sources,
             budget,
+            records,
         })
     }
 
@@ -103,8 +111,11 @@ impl AuxiliaryPaths {
             if !spelling.is_absolute() {
                 return Err(invalid());
             }
-            let resolution =
-                pull_resolution::Resolution::capture_file(&spelling, &mut self.budget)?;
+            let resolution = pull_resolution::Resolution::capture_file_shared(
+                &spelling,
+                &mut self.budget,
+                &mut self.records,
+            )?;
             self.sources.push(Source {
                 spelling,
                 resolution,
@@ -213,18 +224,31 @@ impl AuxiliaryPaths {
             if let Some(evidence) = &source.leaf {
                 evidence
                     .revalidate(source.resolution.resolved())
-                    .map_err(|_| invalid())?;
+                    .map_err(|error| {
+                        source_error(&source.spelling, "retained content revalidation", error)
+                    })?;
                 continue;
             }
             let identity_handles = if cfg!(windows) { 3 } else { 1 };
-            self.budget.charge(identity_handles, 0)?;
+            self.budget.charge(identity_handles, 0).map_err(|error| {
+                source_error(&source.spelling, "leaf identity reservation", error)
+            })?;
             let mut allowance = snapshot::Budget {
                 entries: self.budget.entries,
                 bytes: self.budget.bytes,
             };
             let evidence =
                 snapshot::RegularEvidence::capture(source.resolution.resolved(), &mut allowance)
-                    .map_err(|_| invalid());
+                    .map_err(|error| {
+                        source_error(
+                            &source.spelling,
+                            "admitted content capture",
+                            format!(
+                                "{error}; remaining entries={}, bytes={}",
+                                allowance.entries, allowance.bytes
+                            ),
+                        )
+                    });
             let entries = self.budget.entries - allowance.entries;
             let bytes = self.budget.bytes - allowance.bytes;
             self.budget.charge(entries, bytes)?;
@@ -272,7 +296,9 @@ impl AuxiliaryPaths {
         for source in &self.sources {
             let target = source.resolution.resolved();
             let evidence = source.leaf.as_ref().ok_or_else(invalid)?;
-            evidence.revalidate(target).map_err(|_| invalid())?;
+            evidence
+                .revalidate(target)
+                .map_err(|error| source_error(&source.spelling, "content revalidation", error))?;
         }
         Ok(())
     }
@@ -291,7 +317,11 @@ impl AuxiliaryPaths {
                     target.to_str().unwrap_or_default(),
                 )
             }) {
-                return Err(invalid());
+                return Err(source_error(
+                    target,
+                    "exact Read admission",
+                    "missing matching authorization",
+                ));
             }
         }
         Ok(())
@@ -310,7 +340,9 @@ impl AuxiliaryPaths {
 
     fn revalidate_resolutions_inner(&self) -> Result<(), GitToolError> {
         for source in &self.sources {
-            source.resolution.revalidate()?;
+            source.resolution.revalidate().map_err(|error| {
+                source_error(&source.spelling, "path identity revalidation", error)
+            })?;
         }
         Ok(())
     }
@@ -321,6 +353,13 @@ fn invalid() -> GitToolError {
         "Git auxiliary path identity changed, lacks exact Read admission, or exceeded its limit"
             .into(),
     )
+}
+
+fn source_error(path: &Path, stage: &str, error: impl std::fmt::Display) -> GitToolError {
+    GitToolError::InvalidInput(format!(
+        "Git auxiliary {stage} failed for {}: {error}",
+        path.display()
+    ))
 }
 
 fn unsupported_hook(path: &Path) -> GitToolError {

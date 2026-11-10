@@ -186,6 +186,7 @@ impl TuiApprovalHandler {
                         tool_name: tool_name.to_string(),
                         arguments: presentation_input.clone(),
                         summary_fields,
+                        presentation: None,
                         preview: Some(crate::approval::format_grant_preview(session.preview())),
                         response: response_tx,
                     })
@@ -242,6 +243,7 @@ impl TuiApprovalHandler {
         request: PermissionApprovalRequest,
         explanation: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        let presentation = crate::approval::operation_approval_presentation(&request);
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
         if self
             .ui_output_tx
@@ -249,6 +251,7 @@ impl TuiApprovalHandler {
                 tool_name: request.tool_name,
                 arguments: request.arguments,
                 summary_fields: request.summary_fields,
+                presentation,
                 preview: Some(crate::approval::format_explained_grant_preview(
                     &request.preview,
                     explanation,

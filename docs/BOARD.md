@@ -14,6 +14,18 @@
 [SEARCH-001-L](backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) / [I319](iterations/I319-search-legacy-dependency-retirement.md) / #901 proposes an **independently governed** Rust build-graph retirement slice for legacy `WebSearchTool`; proposed Claimed/Active by #902; effective only after atomic claim+activation merge. Do not touch protected SearchRouter or SEARCH-001-I's blocked E/F/G global provider gate. Coordinate any `Cargo.lock` overlap with DEPENDENCY-003-A. No source/code changes are authorized by this proposal.
 
 
+## Large approval previews / TUI-APPROVAL-001
+
+- Review / Claimed (emergency local candidate): [local compact-summary candidate](tasks/2026-11-10-approval-scope-display.md).
+  Bounded summary, exact paginated details and preserved reusable-approval display gate;
+  local emergency commits authorized; merge review and real-terminal acceptance remain pending.
+
+## Structured Git snapshot capacity / GIT-SNAPSHOT-001
+
+- Review / Claimed (emergency local candidate): [local repair candidate](tasks/2026-11-10-git-tracked-snapshot-capacity.md).
+  Streaming tracked-source evidence fixes the 16 MiB Checkout/Commit preparation failure;
+  local emergency commits authorized; target-branch reconciliation and independent safety review remain pending.
+
 ## TUI rendering performance / TUI-PERF-001
 
 - Planned / Unclaimed: [owner and implementation guide](tasks/2026-11-10-tui-render-performance.md).

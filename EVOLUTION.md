@@ -5,6 +5,26 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-10 - Exact approval evidence needs bounded presentation
+
+- Trigger: thousands of Git Read facets overwhelmed the approval panel.
+- Cause: unbounded panel height and a prose wrapper that flattened scope newlines.
+- Local repair: bounded summary plus exact paginated details; retain original grants and gate reusable approval on contiguous successfully rendered detail rows.
+- Prevention: exercise thousands of facets, preserved newlines, visible decisions, paging without skipped rows, terminal resize, and request replacement. Summary grouping must never become broader authorization.
+- Follow-up: repeated Hide/Show resets native blink timing; submit frame and final cursor together, change visibility only on focus transitions, and test that idle frames emit no cursor commands. Drain ready keyboard events before drawing so Release can cancel queued repeats without deleting independent presses.
+- Follow-up: direct handler tests missed global history paging interception. Exercise the real keyboard dispatcher, and verify cursor ownership through modal open, redraw and dismissal; submit drawing and final cursor as one synchronized update.
+- Check: `approval_large_scope_is_compact_and_requires_contiguous_detail_pages`; delivery tracked in TUI-APPROVAL-001.
+
+## 2026-11-10 - Source evidence must scale beyond whole-body retention
+
+- Trigger: structured checkout could not create a branch in Talos's own repository.
+- Symptom: preparation rejected approximately 32.8 MiB of tracked files against a 16 MiB snapshot budget.
+- Root cause: the tracked-source evidence used by Checkout/Commit retained complete bodies, conflating memory protection with supported repository size.
+- Fix: local repair streams SHA-256 evidence and separates bounded scan work from retained data; keep stale-plan revalidation and existing authorization stages.
+- Prevention: exercise successful create/switch/commit above old limits and refusal after same-size edits, not only small fixtures and budget rejection. Document remaining bounds and do not substitute shell fallback for structured-tool repair.
+- Follow-up: the first fix exposed a second capacity failure: repeated auxiliary ancestors exhausted the resolver before absent-file capture. Real-repository read-only reproduction and full checkout in a disposable clone found the gap. Add directory-depth/count coverage, shared immutable ancestor evidence with identity revalidation, and actionable path/stage errors; file-size-only acceptance was insufficient.
+- Promoted to rule/check: `checkout_and_commit_support_tracked_content_over_16_mib`, `large_tracked_source_edit_after_preparation_blocks_checkout`, and snapshot `digest_tests`; delivery tracking in GIT-SNAPSHOT-001.
+
 ## 2026-11-10 - Filtered menus must validate selection before execution
 
 - Trigger: Clipboard attachment removal via `/detach all` failed in the TUI.

@@ -2821,6 +2821,7 @@ async fn authorize_attach_image(
                     tool_name: ATTACH_IMAGE_TOOL_NAME.to_string(),
                     arguments: serde_json::json!({ "path": canonical_str }),
                     summary_fields,
+                    presentation: None,
                     preview: Some(crate::approval::format_grant_preview(session.preview())),
                     response: response_tx,
                 })

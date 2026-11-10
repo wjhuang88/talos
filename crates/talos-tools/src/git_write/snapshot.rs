@@ -12,6 +12,9 @@ mod regular_tests;
 pub(super) enum Entry {
     Missing,
     File(std::fs::Permissions, Vec<u8>),
+    // Only tracked worktree content uses a digest. Configuration, executables,
+    // refs and recursive Add evidence retain their existing byte snapshots.
+    FileDigest(std::fs::Permissions, u64, gix::hash::ObjectId),
     Link(PathBuf),
     Directory(Vec<(std::ffi::OsString, Entry)>),
 }
@@ -280,6 +283,52 @@ fn windows_path_handle(path: &Path) -> std::io::Result<same_file::Handle> {
 }
 
 impl Entry {
+    /// Stream a tracked regular file without retaining its body. The shared I/O
+    /// allowance remains separate from the retained-evidence memory allowance.
+    pub(super) fn capture_digest(path: &Path, remaining_io: &mut u64) -> std::io::Result<Self> {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let changed = || std::io::Error::other("Git tracked source changed during hashing");
+            let before = LeafIdentity::capture(path)?.ok_or_else(changed)?;
+            let file = open_regular(path)?;
+            let opened = file.metadata()?;
+            if !opened.is_file() || !before.matches_file(&file)? {
+                return Err(changed());
+            }
+            if opened.len() > *remaining_io {
+                return Err(std::io::Error::other(format!(
+                    "Git tracked-source scan budget exceeded at {}: file {} bytes, remaining {} bytes; no operation prepared",
+                    path.display(), opened.len(), remaining_io
+                )));
+            }
+            let mut reader = file.take(opened.len().saturating_add(1));
+            let mut hasher = gix::hash::hasher(gix::hash::Kind::Sha256);
+            let mut buffer = [0_u8; 64 * 1024];
+            let mut read = 0_u64;
+            loop {
+                let count = match reader.read(&mut buffer) {
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                    result => result?,
+                };
+                if count == 0 { break; }
+                read += count as u64;
+                if read > opened.len() { return Err(changed()); }
+                hasher.update(&buffer[..count]);
+            }
+            let after = reader.get_ref().metadata()?;
+            if read != opened.len()
+                || after.len() != opened.len()
+                || after.permissions() != opened.permissions()
+                || after.modified()? != opened.modified()?
+                || LeafIdentity::capture(path)?.as_ref() != Some(&before)
+            {
+                return Err(changed());
+            }
+            *remaining_io -= read;
+            let digest = hasher.try_finalize().map_err(|error| std::io::Error::other(error.to_string()))?;
+            Ok(Self::FileDigest(opened.permissions(), read, digest))
+        })).map_err(|_| std::io::Error::other("Git tracked source hashing panicked"))?
+    }
+
     /// Capture one configuration source without descending into directories or
     /// following leaf links. Ancestor/content races remain TOCTOU residuals.
     pub(super) fn capture_regular(path: &Path, budget: &mut Budget) -> std::io::Result<Self> {
@@ -698,3 +747,74 @@ fn read_regular_body(reader: impl Read, remaining: &mut usize) -> std::io::Resul
 #[cfg(test)]
 #[path = "snapshot_budget_tests.rs"]
 mod budget_tests;
+
+#[cfg(test)]
+mod digest_tests {
+    use super::*;
+    use std::io::{Seek, SeekFrom, Write};
+
+    #[test]
+    fn tracked_digest_detects_same_length_edit_beyond_first_chunk_with_restored_mtime() {
+        let root = tempfile::tempdir().expect("fixture");
+        let path = root.path().join("source");
+        let mut file = std::fs::File::create(&path).expect("file");
+        file.set_len(128 * 1024).expect("size");
+        let modified = file
+            .metadata()
+            .expect("metadata")
+            .modified()
+            .expect("mtime");
+        let before = Entry::capture_digest(&path, &mut (256 * 1024)).expect("digest");
+        file.seek(SeekFrom::Start(100 * 1024)).expect("seek");
+        file.write_all(b"changed").expect("edit");
+        file.set_times(std::fs::FileTimes::new().set_modified(modified))
+            .expect("restore mtime");
+        let after = Entry::capture_digest(&path, &mut (256 * 1024)).expect("digest");
+        assert_ne!(before, after);
+        assert!(matches!(after, Entry::FileDigest(_, 131072, _)));
+    }
+
+    #[test]
+    fn tracked_digest_charges_shared_io_budget_and_reports_exhaustion() {
+        let root = tempfile::tempdir().expect("fixture");
+        let path = root.path().join("source");
+        std::fs::write(&path, b"1234").expect("file");
+        let mut budget = 7;
+        Entry::capture_digest(&path, &mut budget).expect("first");
+        assert_eq!(budget, 3);
+        let error = Entry::capture_digest(&path, &mut budget).expect_err("shared budget");
+        assert!(
+            error
+                .to_string()
+                .contains("file 4 bytes, remaining 3 bytes")
+        );
+        assert_eq!(budget, 3);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tracked_digest_rejects_links_and_special_files_and_detects_mode_changes() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        let root = tempfile::tempdir().expect("fixture");
+        let path = root.path().join("source");
+        std::fs::write(&path, b"content").expect("file");
+        let before = Entry::capture_digest(&path, &mut 100).expect("digest");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).expect("mode");
+        assert_ne!(
+            before,
+            Entry::capture_digest(&path, &mut 100).expect("changed mode")
+        );
+        let link = root.path().join("link");
+        symlink(&path, &link).expect("link");
+        assert!(Entry::capture_digest(&link, &mut 100).is_err());
+        let fifo = root.path().join("fifo");
+        assert!(
+            std::process::Command::new("mkfifo")
+                .arg(&fifo)
+                .status()
+                .expect("Unix FIFO fixture requires mkfifo")
+                .success()
+        );
+        assert!(Entry::capture_digest(&fifo, &mut 100).is_err());
+    }
+}

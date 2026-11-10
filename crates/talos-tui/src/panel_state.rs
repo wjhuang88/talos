@@ -142,6 +142,17 @@ pub(crate) enum CredentialField {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
+pub(crate) struct ApprovalView {
+    pub expanded: bool,
+    pub offset: usize,
+    pub reviewed: usize,
+    pub width: u16,
+    pub page_size: usize,
+    pub total_rows: usize,
+    pub presentation: Option<talos_conversation::ApprovalPresentation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub(crate) struct BottomPanelState {
     pub(crate) input_id: u64,
     pub(crate) is_open: bool,
@@ -154,6 +165,7 @@ pub(crate) struct BottomPanelState {
     /// Retained while any `/model` level is active so Level 2/3 can derive
     /// their items without an engine round-trip. `None` for non-ModelPicker panels.
     pub(crate) model_picker_data: Option<ModelPickerData>,
+    pub(crate) approval_view: ApprovalView,
 }
 
 impl BottomPanelState {
@@ -182,6 +194,7 @@ impl BottomPanelState {
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
             model_picker_data: None,
+            approval_view: ApprovalView::default(),
         }
     }
 
@@ -219,6 +232,7 @@ impl BottomPanelState {
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
             model_picker_data: None,
+            approval_view: ApprovalView::default(),
         }
     }
 
@@ -314,6 +328,7 @@ impl BottomPanelState {
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
             model_picker_data: Some(data.clone()),
+            approval_view: ApprovalView::default(),
         }
     }
 
@@ -374,6 +389,7 @@ impl BottomPanelState {
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
             model_picker_data: Some(data.clone()),
+            approval_view: ApprovalView::default(),
         }
     }
 
@@ -454,6 +470,7 @@ impl BottomPanelState {
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
             model_picker_data: None,
+            approval_view: ApprovalView::default(),
         }
     }
 
@@ -478,6 +495,7 @@ impl BottomPanelState {
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
             model_picker_data: None,
+            approval_view: ApprovalView::default(),
         }
     }
 
@@ -514,6 +532,7 @@ impl BottomPanelState {
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
             model_picker_data: data,
+            approval_view: ApprovalView::default(),
         }
     }
 
@@ -536,6 +555,7 @@ impl BottomPanelState {
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
             model_picker_data: None,
+            approval_view: ApprovalView::default(),
         }
     }
 
@@ -626,6 +646,7 @@ impl BottomPanelState {
             base_url_buffer: String::new(),
             credential_field: CredentialField::ApiKey,
             model_picker_data: None,
+            approval_view: ApprovalView::default(),
         }
     }
 

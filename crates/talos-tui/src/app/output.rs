@@ -416,6 +416,7 @@ mod tests {
             tool_name: "write_file".into(),
             arguments: serde_json::json!({"path": "README.md"}),
             summary_fields: vec!["path".into()],
+            presentation: None,
             preview: None,
             response,
         });
@@ -447,6 +448,7 @@ mod tests {
             tool_name: "write_file".into(),
             arguments: serde_json::json!({"path": "README.md"}),
             summary_fields: vec!["path".into()],
+            presentation: None,
             preview: None,
             response,
         });
@@ -472,6 +474,7 @@ mod tests {
             tool_name: "write_file".into(),
             arguments: serde_json::json!({"path": "README.md"}),
             summary_fields: vec!["path".into()],
+            presentation: None,
             preview: None,
             response,
         });
@@ -630,15 +633,8 @@ impl Tui {
         match output {
             UiOutput::ClipboardPastePending(active) => {
                 self.clipboard_paste_pending = active;
-                if !active
-                    && self
-                        .state
-                        .pending_approval_response
-                        .as_ref()
-                        .is_some_and(|response| response.is_closed())
-                {
-                    self.state.pending_approval_response = None;
-                    self.state.approval_state = ApprovalState::Hidden;
+                if !active {
+                    self.retire_closed_approval();
                 }
             }
             UiOutput::Content(content) => match content {
@@ -752,6 +748,7 @@ impl Tui {
                 tool_name,
                 arguments,
                 summary_fields,
+                presentation,
                 preview,
                 response,
             } => {
@@ -768,6 +765,7 @@ impl Tui {
                     &summary,
                     preview.filter(|value| !value.is_empty()),
                 );
+                self.state.slash_menu.approval_view.presentation = presentation;
             }
             UiOutput::Status(snapshot) => {
                 if !snapshot.is_processing {

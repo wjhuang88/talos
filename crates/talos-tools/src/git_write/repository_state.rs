@@ -289,7 +289,7 @@ impl RepositoryState {
 
 fn reference_entries_are_regular(entry: &snapshot::Entry) -> bool {
     match entry {
-        snapshot::Entry::Link(_) => false,
+        snapshot::Entry::Link(_) | snapshot::Entry::FileDigest(..) => false,
         snapshot::Entry::Directory(children) => children
             .iter()
             .all(|(_, child)| reference_entries_are_regular(child)),

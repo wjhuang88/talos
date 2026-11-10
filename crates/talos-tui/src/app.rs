@@ -538,6 +538,29 @@ impl Tui {
         );
     }
 
+    pub(super) fn retire_closed_approval(&mut self) -> bool {
+        if !self
+            .state
+            .pending_approval_response
+            .as_ref()
+            .is_some_and(|tx| tx.is_closed())
+        {
+            return false;
+        }
+        self.state.pending_approval_response = None;
+        self.hide_approval();
+        if self.state.slash_menu.is_approval() {
+            self.state.slash_menu.close();
+        }
+        self.append_styled_lines([ScrollbackLine::styled(
+            vec![HistorySegment::raw(
+                "Approval expired or was cancelled; no decision was submitted.",
+            )],
+            None,
+        )]);
+        true
+    }
+
     pub fn hide_approval(&mut self) {
         self.state.approval_state = ApprovalState::Hidden;
         self.approval_preview_fully_visible = true;
@@ -556,7 +579,32 @@ impl Tui {
 
         self.draw_frame()?;
 
-        loop {
+        'ui: loop {
+            self.retire_closed_approval();
+            if matches!(self.state.approval_state, ApprovalState::Hidden)
+                && !self.queued_outputs.is_empty()
+            {
+                while !self.queued_outputs.is_empty()
+                    && matches!(self.state.approval_state, ApprovalState::Hidden)
+                {
+                    let output = self.queued_outputs.remove(0);
+                    let is_tool = matches!(
+                        &output,
+                        UiOutput::ToolCall(_) | UiOutput::ToolApprovalRequest { .. }
+                    );
+                    if self.handle_ui_output(output) {
+                        self.state.should_exit = true;
+                        break;
+                    }
+                    if is_tool {
+                        self.commit_pending_transcript()?;
+                        self.draw_frame()?;
+                    }
+                }
+            }
+            if self.state.should_exit {
+                break;
+            }
             self.state.expire_tip();
             self.commit_pending_transcript()?;
             self.draw_frame()?;
@@ -564,23 +612,11 @@ impl Tui {
             tokio::select! {
                 _ = render_interval.tick() => self.advance_processing_frame(),
                 Some(Ok(event)) = event_stream.next() => {
-                    if self.handle_input_event(&event) {
-                        break;
-                    }
-                    if matches!(self.state.approval_state, ApprovalState::Hidden) && !self.queued_outputs.is_empty() {
-                        while !self.queued_outputs.is_empty()
-                            && matches!(self.state.approval_state, ApprovalState::Hidden)
-                        {
-                            let output = self.queued_outputs.remove(0);
-                            let is_tool = matches!(&output, UiOutput::ToolCall(_) | UiOutput::ToolApprovalRequest { .. });
-                            if self.handle_ui_output(output) {
-                                self.state.should_exit = true;
-                                break;
-                            }
-                            if is_tool {
-                                self.commit_pending_transcript()?;
-                                self.draw_frame()?;
-                            }
+                    // Drain ready events before rendering so Release can invalidate
+                    // queued repeats. Bound work to keep output/shutdown responsive.
+                    for event in input::ready_input_batch(event, &mut event_stream).await {
+                        if self.handle_input_event(&event) {
+                            break 'ui;
                         }
                     }
                 }
