@@ -1,5 +1,10 @@
 # Talos Board
 
+## STORE-002 / I321 — A/B capability contract foundation (proposed activation)
+
+[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I321](iterations/I321-store-002-capability-contract-foundation.md) / #670: governance #908 proposes an independent, bounded A inventory and B additive typed capability foundation. **No effective claim before #908 merges**; C/D/E/F local delegates and #897 E2/E3 Host composition remain gated. Search/TUI/model and ongoing ARCH-035 E0/E1 review are not modified.
+
+
 ## ARCH-035 / I320 — E0/E1 Review (PR #906)
 
 [ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [I320](iterations/I320-arch-035-host-composition-baseline.md) / #897: #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615`, activating only E0 code-truth inventory and E1 host API decision review; no E2/E3 implementation is authorized; no E2/E3 code or STORE-002/#670 capability implementation is authorized. ServerHost/#361 remains gated. Parallel Search/TUI/Provider owners are untouched.
