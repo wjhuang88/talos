@@ -374,7 +374,7 @@ mod tests {
             parse_response(
                 Protocol::Instant,
                 StatusCode::OK,
-                b"{\"Abstract\":\"\\xff\"}",
+                b"{\"Abstract\":\"\xff\"}",
                 "test",
             ),
             Err(SearchBackendError::Parse)
