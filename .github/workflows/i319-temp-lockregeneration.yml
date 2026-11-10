@@ -1,0 +1,47 @@
+# Temporary I319 utility. Isolated from PR #907; never merge this workflow.
+name: I319 temporary Cargo lockfile regeneration
+on:
+  push:
+    branches:
+      - tmp/i319-lockgen-20261110
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Refresh Cargo-resolved lockfiles
+        shell: bash
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+        run: |
+          set -euo pipefail
+          cargo --version
+          for manifest in             Cargo.toml             tests/fixtures/runtime-sdk-external/Cargo.toml             tests/fixtures/browser-host-external/Cargo.toml; do
+            echo "::group::Generate $manifest"
+            cargo metadata --format-version 1 --manifest-path "$manifest" > /dev/null
+            echo "::endgroup::"
+          done
+          for lock in             Cargo.lock             tests/fixtures/runtime-sdk-external/Cargo.lock             tests/fixtures/browser-host-external/Cargo.lock; do
+            if grep -q '^name = "rust-websearch"$' "$lock"; then
+              echo "::error file=$lock::stale rust-websearch package after Cargo regeneration"
+              exit 1
+            fi
+          done
+          git diff --check
+          git add Cargo.lock             tests/fixtures/runtime-sdk-external/Cargo.lock             tests/fixtures/browser-host-external/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "::notice::No lockfile changes were needed."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git diff --cached --stat
+          git commit -m 'build(search): Cargo-regenerate I319 root and external fixture locks'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
