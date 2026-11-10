@@ -43,6 +43,7 @@ network = [
     "tokio/sync",
     "dep:sha2",
     "dep:reqwest",
+    "dep:reqwest-legacy",
     "dep:rust-websearch",
     "dep:scraper",
     "dep:uuid",
@@ -89,7 +90,10 @@ similar = { version = "3.2.0", optional = true }
 gix = { version = "0.90.0", default-features = false, optional = true, features = [
     "basic", "status", "revision", "blob-diff", "index", "sha1", "sha256"
 ] }
-reqwest = { version = "0.13.4", default-features = false, optional = true, features = ["rustls", "json", "gzip", "brotli", "deflate"] }
+reqwest = { version = "0.13.4", default-features = false, optional = true, features = ["rustls", "json"] }
+# The historical standalone API needs gzip/br/deflate but must not flip
+# auto-decompression behavior on the protected production reqwest 0.13 client.
+reqwest-legacy = { package = "reqwest", version = "0.12.28", default-features = false, optional = true, features = ["rustls-tls-native-roots", "gzip", "brotli", "deflate"] }
 rust-websearch = { version = "0.1", optional = true }
 scraper = { version = "0.27", optional = true }
 uuid = { version = "1.26.0", optional = true, features = ["v4"] }
