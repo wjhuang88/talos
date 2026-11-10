@@ -92,6 +92,9 @@ impl GeminiTransport {
         let endpoint =
             gemini_endpoint::vertex(project, location, model, stream).map_err(invalid)?;
         let source = VertexTokenSource::from_environment(allow_metadata, deadline).await?;
+        // Test binary only: exercise real factory/ADC initialization against local HTTP fixtures.
+        #[cfg(test)]
+        let (source, endpoint) = crate::gemini_factory_tests::redirect_transport(source, endpoint)?;
         Ok(Self {
             endpoint,
             streaming: stream,
