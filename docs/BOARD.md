@@ -1,5 +1,12 @@
 # Talos Board
 
+## TUI rendering performance / TUI-PERF-001
+
+- Planned / Unclaimed: [owner and implementation guide](tasks/2026-11-10-tui-render-performance.md).
+  Reproducible profiling, event-driven drawing, asynchronous Git snapshots, and layout/component
+  caching; history incrementality is evidence-dependent. Documentation only so far; runtime
+  implementation and performance/terminal acceptance remain pending.
+
 ## Interrupted session recovery / SESSION-CRASH-001
 
 - Complete / Closed: [owner](tasks/2026-11-08-crash-resume.md), #884 (`c7a4b28e`). User confirmed original cargo-run session continues; full preflight, MSVC tests, independent safety/API review and native CI passed.
