@@ -35,8 +35,13 @@ static PROTOCOL_DATASET: LazyLock<ProtocolDataset> = LazyLock::new(|| {
     toml::from_str(&toml_str).expect("embedded model protocol metadata must be valid TOML")
 });
 
-pub(crate) fn has_exact_model(provider: &str, model: &str) -> bool {
-    PROTOCOL_DATASET.models.iter().any(|row| row.provider == provider && row.id == model)
+pub(crate) fn has_unoverridden_model(provider: &str, model: &str) -> bool {
+    PROTOCOL_DATASET.models.iter().any(|row| {
+        row.provider == provider
+            && row.id == model
+            && row.protocol.is_none()
+            && row.api_base_url.is_none()
+    })
 }
 
 /// Resolves confirmed model-level protocol evidence from the packaged catalog.
