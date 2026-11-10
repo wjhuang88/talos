@@ -235,9 +235,13 @@ executables, impersonation and arbitrary token destinations are not supported. T
 Do not set a custom provider/model `base_url` for Vertex; it is rejected before credential discovery.
 
 The candidate supports ordered images, native tool results and positional signature replay.
-Browser invocation and compatibility tool modes are currently refused; original browser argument
-syntax alone is insufficient to make signed continuation safe for durable history. Use only
-supported native non-browser tools while testing this branch. Reasoning controls and their model
+Ordinary tools also support explicit `compat` and `talos-strict` modes over the same Gemini wire.
+These modes omit native function declarations, validate textual calls before releasing any tool,
+and retain signed model text unchanged on continuation. A signed native-tool turn cannot be
+rewritten as textual-tool history; start a new conversation to change that mode. Request-local
+images remain request-local in both textual modes. `auto` must be resolved before dispatch.
+Browser invocation is still refused in every mode: original argument syntax alone is insufficient
+to make signed continuation safe for durable history. Reasoning controls and their model
 boundaries are described above. Failures never trigger an automatic retry over a different wire.
 There is no live-vendor success claim or packaged Gemini catalog activation in this candidate.
 

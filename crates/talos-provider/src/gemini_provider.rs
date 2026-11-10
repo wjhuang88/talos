@@ -9,7 +9,7 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::{
     LanguageModel, ProviderError, ProviderProgress, ProviderResult, ToolDefinition,
 };
-use talos_core::tool::{CapabilityProbe, ProtocolCapabilities};
+use talos_core::tool::{CapabilityProbe, ProtocolCapabilities, ToolProtocol};
 use tokio::sync::mpsc;
 
 #[derive(Clone)]
@@ -109,6 +109,38 @@ impl GeminiProvider {
             self.thinking = None;
         }
         self
+    }
+
+    async fn selected_stream(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: ToolProtocol,
+        progress: mpsc::UnboundedSender<ProviderProgress>,
+        images: Vec<talos_core::provider::EphemeralImage>,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        match protocol {
+            ToolProtocol::Native => {
+                self.dispatch_with_images(messages, tools, Some(&progress), false, images)
+                    .await
+            }
+            ToolProtocol::Auto => Err(ProviderError::InvalidResponse(
+                "automatic tool protocol must be resolved before Gemini dispatch".into(),
+            )),
+            ToolProtocol::Compat | ToolProtocol::TalosStrict => {
+                let deadline = Instant::now()
+                    .checked_add(Duration::from_secs(self.timeout.dispatch_timeout_secs))
+                    .ok_or_else(|| {
+                        ProviderError::InvalidResponse("invalid Gemini timeout".into())
+                    })?;
+                let projected =
+                    crate::gemini_compat::project(&self.provider, &self.model, messages, protocol)?;
+                let source = self
+                    .dispatch_with_images(&projected, &[], Some(&progress), false, images)
+                    .await?;
+                Ok(crate::gemini_compat::forward(source, protocol, deadline))
+            }
+        }
     }
 
     async fn dispatch(
@@ -406,6 +438,17 @@ impl LanguageModel for GeminiProvider {
         Some(preview)
     }
 
+    async fn stream_with_protocol(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: ToolProtocol,
+        progress: mpsc::UnboundedSender<ProviderProgress>,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        self.selected_stream(messages, tools, protocol, progress, vec![])
+            .await
+    }
+
     async fn stream_with_ephemeral_images(
         &self,
         messages: &[Message],
@@ -415,12 +458,12 @@ impl LanguageModel for GeminiProvider {
         browser_tools: &[String],
         images: Vec<talos_core::provider::EphemeralImage>,
     ) -> ProviderResult<talos_core::provider::ProviderInvocationStream> {
-        if protocol != talos_core::tool::ToolProtocol::Native || !browser_tools.is_empty() {
+        if !browser_tools.is_empty() {
             return Err(ProviderError::InvalidResponse(
-                "Gemini ephemeral images require native tools without browser arguments".into(),
+                "Gemini browser arguments require transient signature replay".into(),
             ));
         }
-        self.dispatch_with_images(messages, tools, Some(&progress), false, images)
+        self.selected_stream(messages, tools, protocol, progress, images)
             .await
             .map(talos_core::provider::ProviderInvocationStream::legacy)
     }
@@ -445,7 +488,7 @@ impl LanguageModel for GeminiProvider {
     fn protocol_capabilities(&self) -> CapabilityProbe {
         CapabilityProbe::Known(ProtocolCapabilities {
             native_tools: true,
-            compatibility: false,
+            compatibility: true,
         })
     }
     async fn stream(&self, messages: &[Message]) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
@@ -594,71 +637,141 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ephemeral_images_are_ordered_request_owned_and_not_replayed() {
-        use base64::Engine;
+    async fn textual_modes_keep_browser_and_auto_admission_closed() {
+        use talos_core::provider::LanguageModel;
         let mut server = mockito::Server::new_async().await;
-        let first = b"\x89PNG\r\n\x1a\nfirst";
-        let second = b"\x89PNG\r\n\x1a\nsecond";
-        let a = base64::engine::general_purpose::STANDARD.encode(first);
-        let b = base64::engine::general_purpose::STANDARD.encode(second);
-        let wire = format!(
-            "data: {}\n\n",
-            json!({"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}]})
-        );
-        let with_images = server
-            .mock("POST", "/")
-            .match_body(mockito::Matcher::Json(json!({"contents":[
-                {"role":"user","parts":[{"text":"look"}]},
-                {"role":"user","parts":[
-                    {"inlineData":{"mimeType":"image/png","data":a}},
-                    {"inlineData":{"mimeType":"image/png","data":b}}]}
-            ]})))
-            .with_body(wire.clone())
-            .expect(1)
-            .create_async()
-            .await;
-        let without_images = server
-            .mock("POST", "/")
-            .match_body(mockito::Matcher::Json(
-                json!({"contents":[{"role":"user","parts":[{"text":"look"}]}]}),
-            ))
-            .with_body(wire)
-            .expect(1)
-            .create_async()
-            .await;
+        let unexpected = server.mock("POST", "/").expect(0).create_async().await;
         let provider = fixture_provider(server.url());
-        let messages = vec![Message::User {
-            content: "look".into(),
-        }];
-        let saved = serde_json::to_value(&messages).expect("history");
+        assert_eq!(
+            provider.protocol_capabilities(),
+            CapabilityProbe::Known(ProtocolCapabilities {
+                native_tools: true,
+                compatibility: true,
+            })
+        );
         let (progress, _) = mpsc::unbounded_channel();
-        let mut stream = provider
-            .stream_with_ephemeral_images(
-                &messages,
-                &[],
-                talos_core::tool::ToolProtocol::Native,
-                progress,
-                &[],
-                vec![
-                    ephemeral_fixture(first, Duration::from_secs(30)),
-                    ephemeral_fixture(second, Duration::from_secs(30)),
-                ],
-            )
-            .await
-            .expect("image request");
-        let mut ended = false;
-        while let Some(event) = stream.recv().await {
-            if let talos_core::provider::ProviderInvocationEvent::Legacy(event) = event {
-                assert!(!matches!(event, AgentEvent::Error { .. }));
-                ended |= matches!(event, AgentEvent::TurnEnd { .. });
+        assert!(
+            provider
+                .stream_with_protocol(&[], &[], ToolProtocol::Auto, progress)
+                .await
+                .is_err()
+        );
+        for protocol in [
+            ToolProtocol::Native,
+            ToolProtocol::Compat,
+            ToolProtocol::TalosStrict,
+        ] {
+            let (progress, _) = mpsc::unbounded_channel();
+            assert!(
+                provider
+                    .stream_with_invocation_integrity(
+                        &[],
+                        &[],
+                        protocol,
+                        progress,
+                        &["browser".into()]
+                    )
+                    .await
+                    .is_err()
+            );
+            for images in [
+                vec![],
+                vec![ephemeral_fixture(
+                    b"\x89PNG\r\n\x1a\nprivate",
+                    Duration::from_secs(30),
+                )],
+            ] {
+                let (progress, _) = mpsc::unbounded_channel();
+                assert!(
+                    provider
+                        .stream_with_ephemeral_images(
+                            &[],
+                            &[],
+                            protocol,
+                            progress,
+                            &["browser".into()],
+                            images
+                        )
+                        .await
+                        .is_err()
+                );
             }
         }
-        assert!(ended);
-        assert_eq!(serde_json::to_value(&messages).expect("history"), saved);
-        let mut next = provider.stream(&messages).await.expect("next request");
-        while next.recv().await.is_some() {}
-        with_images.assert_async().await;
-        without_images.assert_async().await;
+        unexpected.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn ephemeral_images_are_ordered_request_owned_and_not_replayed() {
+        use base64::Engine;
+        for protocol in [
+            ToolProtocol::Native,
+            ToolProtocol::Compat,
+            ToolProtocol::TalosStrict,
+        ] {
+            let mut server = mockito::Server::new_async().await;
+            let first = b"\x89PNG\r\n\x1a\nfirst";
+            let second = b"\x89PNG\r\n\x1a\nsecond";
+            let a = base64::engine::general_purpose::STANDARD.encode(first);
+            let b = base64::engine::general_purpose::STANDARD.encode(second);
+            let wire = format!(
+                "data: {}\n\n",
+                json!({"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}]})
+            );
+            let with_images = server
+                .mock("POST", "/")
+                .match_body(mockito::Matcher::Json(json!({"contents":[
+                    {"role":"user","parts":[{"text":"look"}]},
+                    {"role":"user","parts":[
+                        {"inlineData":{"mimeType":"image/png","data":a}},
+                        {"inlineData":{"mimeType":"image/png","data":b}}]}
+                ]})))
+                .with_body(wire.clone())
+                .expect(1)
+                .create_async()
+                .await;
+            let without_images = server
+                .mock("POST", "/")
+                .match_body(mockito::Matcher::Json(
+                    json!({"contents":[{"role":"user","parts":[{"text":"look"}]}]}),
+                ))
+                .with_body(wire)
+                .expect(1)
+                .create_async()
+                .await;
+            let provider = fixture_provider(server.url());
+            let messages = vec![Message::User {
+                content: "look".into(),
+            }];
+            let saved = serde_json::to_value(&messages).expect("history");
+            let (progress, _) = mpsc::unbounded_channel();
+            let mut stream = provider
+                .stream_with_ephemeral_images(
+                    &messages,
+                    &[],
+                    protocol,
+                    progress,
+                    &[],
+                    vec![
+                        ephemeral_fixture(first, Duration::from_secs(30)),
+                        ephemeral_fixture(second, Duration::from_secs(30)),
+                    ],
+                )
+                .await
+                .expect("image request");
+            let mut ended = false;
+            while let Some(event) = stream.recv().await {
+                if let talos_core::provider::ProviderInvocationEvent::Legacy(event) = event {
+                    assert!(!matches!(event, AgentEvent::Error { .. }));
+                    ended |= matches!(event, AgentEvent::TurnEnd { .. });
+                }
+            }
+            assert!(ended);
+            assert_eq!(serde_json::to_value(&messages).expect("history"), saved);
+            let mut next = provider.stream(&messages).await.expect("next request");
+            while next.recv().await.is_some() {}
+            with_images.assert_async().await;
+            without_images.assert_async().await;
+        }
     }
 
     #[tokio::test]
