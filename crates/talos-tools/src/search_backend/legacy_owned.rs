@@ -368,7 +368,16 @@ mod tests {
         let normalized = legacy_html_bytes(raw);
         assert_eq!(String::from_utf8(normalized).unwrap(), "<p>caf\u{fffd}</p>");
         assert_eq!(raw[0..3], [0xef, 0xbb, 0xbf]);
-        // The Instant Answer path intentionally keeps its original strict JSON bytes.
-        assert!(matches!(Protocol::Instant, Protocol::Instant));
+        // Unlike the HTML compatibility adapter, Instant Answer must reject
+        // malformed JSON UTF-8 rather than silently replacing it.
+        assert!(matches!(
+            parse_response(
+                Protocol::Instant,
+                StatusCode::OK,
+                b"{\"Abstract\":\"\\xff\"}",
+                "test",
+            ),
+            Err(SearchBackendError::Parse)
+        ));
     }
 }
