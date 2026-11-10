@@ -18,6 +18,8 @@ enum Authentication {
 #[derive(Clone)]
 pub(crate) struct GeminiTransport {
     endpoint: String,
+    model: String,
+    streaming: bool,
     client: Client,
     authentication: Authentication,
 }
@@ -33,6 +35,20 @@ impl std::fmt::Debug for GeminiTransport {
 }
 
 impl GeminiTransport {
+    pub(crate) fn is_streaming(&self) -> bool {
+        self.streaming
+    }
+
+    pub(crate) fn model(&self) -> &str {
+        &self.model
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_test_endpoint(mut self, endpoint: String) -> Self {
+        self.endpoint = endpoint;
+        self
+    }
+
     fn client() -> ProviderResult<Client> {
         Client::builder()
             .redirect(reqwest::redirect::Policy::none())
@@ -50,6 +66,8 @@ impl GeminiTransport {
         key.set_sensitive(true);
         Ok(Self {
             endpoint,
+            streaming: stream,
+            model: model.strip_prefix("models/").unwrap_or(model).to_owned(),
             client: Self::client()?,
             authentication: Authentication::AiStudio(key),
         })
@@ -70,6 +88,8 @@ impl GeminiTransport {
         let source = VertexTokenSource::from_environment(allow_metadata, deadline).await?;
         Ok(Self {
             endpoint,
+            streaming: stream,
+            model: model.strip_prefix("models/").unwrap_or(model).to_owned(),
             client: Self::client()?,
             authentication: Authentication::Vertex(source),
         })

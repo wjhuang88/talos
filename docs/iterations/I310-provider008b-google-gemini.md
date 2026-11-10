@@ -246,12 +246,17 @@ Pinned rustfmt and diff checks pass. Locked Provider tests restarted and are com
 after workspace maintenance; no fresh test pass claimed. Factory/LanguageModel/real Agent and
 recorded vendor fixture acceptance remain outstanding; no completion or merge claim.
 
-### Replay composition validation — 2026-11-01
+### Internal LanguageModel composition checkpoint — 2026-11-01
 
-Rust 1.99.0 cargo test -p talos-provider --lib --locked completed: 246 passed,
-zero failed/ignored/filtered (5.24s). Validates latest request-side signed replay and response
-composition, ordered ReasoningComplete/tool/TurnEnd output, mixed generated/native IDs, serialized
-history restoration, reversed tool completions and failed-encode no-tool-release. Independent
-read-only source review found no new response-composition blocker and confirmed prior idless
-association fix. This is serde history restoration, not real TLOG/permission-gated Agent acceptance.
-Factory/LanguageModel, provider/model config/catalog and full required CI/preflight remain pending.
+Added crate-private GeminiProvider composing request/replay, admitted streaming transport, SSE and
+legacy native-tool ingress. Constructor checks transport model/stream mode and nonempty provider
+identity. Default trait paths refuse unsupported browser/ephemeral/decision/compat modes before
+network. Single dispatch only (reported max_attempts=0): retry integration remains pending.
+One owned reader/pump task observes receiver closure, retains terminal events until successful
+reader completion, and bounds text/terminal delivery by the shared deadline. Error notification
+uses try_send to avoid indefinite backpressure. Added HTTP LanguageModel tool/replay/usage test,
+nonstream/mismatched construction rejection and stalled-consumer deadline regression.
+Independent review raised backpressure/stream-mode findings; corresponding fixes and tests were
+added. Pinned rustfmt/diff checks pass, but Cargo is still restoring Git dependencies after toolchain
+recovery: these new tests have not yet completed. Factory/config and real Agent acceptance remain
+pending; this internal adapter is not a public completed integration or merge candidate.
