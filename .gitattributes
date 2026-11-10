@@ -1,2 +1,5 @@
 .gitattributes text eol=lf
 *.sh text eol=lf
+
+# SSE records require a terminal blank line; retain identical fixture bytes on Windows.
+crates/talos-provider/tests/fixtures/gemini/*.sse text eol=lf whitespace=-blank-at-eof
