@@ -320,7 +320,7 @@ mod tests {
         let mut server = mockito::Server::new_async().await;
         let wire = format!(
             "data: {}\n\n",
-            json!({"candidates":[{"content":{"parts":[{"text":"yes"}]},"finishReason":"STOP"}]})
+            json!({"candidates":[{"content":{"parts":[{"text":"private-decision-thought","thought":true,"thoughtSignature":"private-decision-signature"},{"text":"yes"}]},"finishReason":"STOP"}]})
         );
         let decision = server
             .mock("POST", "/")
