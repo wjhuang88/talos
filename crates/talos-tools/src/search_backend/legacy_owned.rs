@@ -368,6 +368,16 @@ mod tests {
         let normalized = legacy_html_bytes(raw);
         assert_eq!(String::from_utf8(normalized).unwrap(), "<p>caf\u{fffd}</p>");
         assert_eq!(raw[0..3], [0xef, 0xbb, 0xbf]);
+        // A real Lite result must remain usable after the standalone adapter
+        // converts the BOM and malformed UTF-8. The protected parser itself
+        // continues to reject the original wire bytes.
+        let lite = b"\xef\xbb\xbf<a class=\"result-link\" href=\"https://example.org/story\">caf\xe9</a><td class=\"result-snippet\">ok</td>";
+        assert!(ddg_parser::parse(DdgFormat::Lite, 200, lite, 10).is_err());
+        let rows = parse_response(Protocol::Lite, StatusCode::OK, lite, "test")
+            .expect("legacy HTML decode before protected parser");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].url, "https://example.org/story");
+        assert_eq!(rows[0].title, "caf\u{fffd}");
         // Unlike the HTML compatibility adapter, Instant Answer must reject
         // malformed JSON UTF-8 rather than silently replacing it.
         assert!(matches!(
