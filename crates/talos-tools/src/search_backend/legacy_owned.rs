@@ -466,6 +466,12 @@ mod tests {
             String::from_utf8_lossy(&output.stderr),
         );
         assert!(
+            String::from_utf8_lossy(&output.stdout).contains("1 passed; 0 failed"),
+            "the isolated exact-name child test did not run: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        assert!(
             !intercepted.load(Ordering::SeqCst),
             "the legacy client forwarded its private fixture URL to an ambient system proxy",
         );
