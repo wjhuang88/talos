@@ -1,6 +1,6 @@
 # Iteration I321: STORE-002 Capability Contract Foundation (A/B)
 
-> Document status: Active / Claimed (proposed in governance PR; ineffective until merge)
+> Document status: Review / Claimed — effective claim #908, bounded A/B code candidate #909 (no C/D/E/F)
 > Published plan date: 2026-11-10
 > Planned objective: inventory and classify every current persistence/retrieval responsibility, then publish a minimal additive, typed infrastructure capability contract foundation that does not alter any consumer's behavior.
 > Baseline rule: preserve SQLite/TLOG/JSONL/FTS5 schemas, SQL, paths, migration, transactions, locking, public domain interfaces and runtime behavior exactly.
@@ -18,8 +18,8 @@
 | Source Issue | #670 |
 | Governance Claim PR | #908 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User requested #670 implementation; separate governance-only proposal from current main. Exact-head docs CI, two governance validators, recorded authorization and merge-time CAS required for governance #908. No independent approving maintainer recorded at selection; independent public API review required for subsequent B implementation. |
-| Implementation PR | Not started |
+| Authorization Evidence | #908 merged `201a9b61d72e704da3a86f5db283b9f6e4d92938`; [CI #4011](https://github.com/wjhuang88/talos/actions/runs/42789979266) passed; both governance validators 0 warnings, documented docs-only authorization and merge-time CAS. B implementation public API requires independent review before merge. |
+| Implementation PR | #909 |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | Stop at reviewed A/B artifact; C/D/E/F and #897 E2/E3 remain independently gated, preserving no duplicate domain/host ownership. |
 
@@ -86,11 +86,15 @@ Update this iteration, STORE-002 owner, `docs/iterations/README.md`, `docs/backl
 
 ## Actual Activation And Execution
 
-- Governance claim PR #908 proposed; **no effective claim until merged to main**, and no implementation branch authorized before then.
+- 2026-11-10: atomic I321 A/B claim+activation became effective via governance #908 squash merge `201a9b61d72e704da3a86f5db283b9f6e4d92938`; exact-head CI #4011 and both governance validators succeeded, merge-time CAS found no competing claimant. No production implementation was in #908.
+- 2026-11-10: additive A/B candidate #909 opened against that merge. Later C/D/E/F are not activated by this claim.
 
 ## Verification Evidence
 
-- Not run at proposal stage. Record observed check outcomes and exact commit SHA after execution.
+- I321 governance #908 / CI #4011: **PASS**, docs-only exact head; both project and collaboration validators 0 warnings.
+- A source inventory: [source-backed capability and data authority matrix](../reference/STORE-002-I321-CAPABILITY-AUTHORITY-INVENTORY-2026-11-10.md).
+- B Rust contract source: `crates/talos-core/src/storage_capability.rs` (additive typed classification, no adapters).
+- **Rust cargo fmt/check/test, implementation exact-head CI and independent API review pending**; local Rust toolchain unavailable in current execution environment. Not a passing behavior-preservation proof.
 
 ## Completion Evidence
 
