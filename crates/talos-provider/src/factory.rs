@@ -231,6 +231,78 @@ mod tests {
     use talos_core::tool::{CapabilityProbe, ProtocolCapabilities};
 
     #[test]
+    fn vertex_factory_defers_isolated_adc_and_never_masks_invalid_explicit_file() {
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let path = directory.path().join("private-fixture-account.json");
+        std::fs::write(&path, b"invalid explicit ADC fixture").expect("fixture");
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .arg("--exact")
+            .arg("openai_responses::factory::tests::vertex_factory_subprocess_probe")
+            .arg("--nocapture")
+            .env("TALOS_GEMINI_ADC_CHILD", "1")
+            .env("GOOGLE_APPLICATION_CREDENTIALS", &path)
+            .env_remove("HOME")
+            .env_remove("APPDATA")
+            .env("GCE_METADATA_HOST", "127.0.0.1:9")
+            .output()
+            .expect("isolated subprocess");
+        assert!(
+            output.status.success(),
+            "Vertex factory subprocess failed: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+    }
+
+    #[tokio::test]
+    async fn vertex_factory_subprocess_probe() {
+        if std::env::var_os("TALOS_GEMINI_ADC_CHILD").is_none() {
+            return;
+        }
+        let config = Config {
+            provider: "fixture-vertex".into(),
+            model: "fixture-model".into(),
+            providers: std::collections::HashMap::from([(
+                "fixture-vertex".into(),
+                talos_config::ProviderConfig {
+                    protocol: ProviderProtocol::GoogleGemini,
+                    gemini: Some(talos_config::GeminiTransportConfig::Vertex {
+                        project: "fixture-project".into(),
+                        location: "global".into(),
+                        allow_metadata: true,
+                    }),
+                    timeout: talos_config::ProviderTimeoutConfig {
+                        dispatch_timeout_secs: 1,
+                        max_attempts: 0,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        config
+            .validate()
+            .expect("valid ADC config without key or home");
+        let key = config.api_key().expect("ADC host admission");
+        assert!(key.is_empty());
+        // Factory construction must not inspect even an invalid selected credential file.
+        let provider = build_configured_provider(&config, &key).expect("lazy factory");
+        let result = provider
+            .stream(&[talos_core::message::Message::User {
+                content: "hello".into(),
+            }])
+            .await;
+        let message = match result {
+            Ok(_) => panic!("invalid explicit ADC unexpectedly admitted"),
+            Err(error) => error.to_string(),
+        };
+        assert!(message.contains("invalid or unsupported Vertex credentials"));
+        assert!(!message.contains("private-fixture-account"));
+        assert!(!message.contains("invalid explicit ADC fixture"));
+    }
+
+    #[test]
     fn explicit_gemini_profiles_build_without_ambient_adc_and_refuse_relocation() {
         use talos_config::{GeminiTransportConfig, ProviderConfig};
         let mut config = Config {
