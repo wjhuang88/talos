@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-10 - Host Git discovery is a compatibility boundary
+
+- Trigger: native Windows tests exposed unsupported preflight queries on Git 2.36.1.
+- Symptom: ordinary checkout/commit could be refused before mutation; clearing inherited Git variables reduced but did not eliminate failures.
+- Root cause: Talos preflight assumed newer `git var` capabilities; gix installation discovery also needs auditing for hidden process execution, environment and process-level caching.
+- Fix: investigation and the gix-assisted compatibility design are recorded in `docs/proposals/gix-preflight-system-git-compatibility.md`; production repair remains unimplemented.
+- Prevention: test the selected oldest supported Git and actual package-manager environment, bind discovery to the execution binary, distinguish zero-test runs from passing validation, and never run concurrent rustup recovery against a toolchain being installed or used. `GIT_PAGER` is already permitted; attribute rejection to the actual variable.
+- Promoted to rule/check: none; proposed acceptance tests are not implemented tests.
+
 ## 2026-11-10 - Exact approval evidence needs bounded presentation
 
 - Trigger: thousands of Git Read facets overwhelmed the approval panel.

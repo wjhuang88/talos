@@ -1,5 +1,11 @@
 # SKILL-003: Policy-Controlled Linked Skill Discovery
 
+Native Windows follow-up (2026-11-10): source `c065236a` passed the existing 71
+`talos-skill` library tests on Rust 1.99.0 MSVC.
+[Evidence and limits](../../reference/WINDOWS-VALIDATION-2026-11-10.md).
+These tests do not establish Windows junction/directory-symlink behavior; that
+explicit residual remains unverified. Existing completion scope is unchanged.
+
 | Field | Value |
 | --- | --- |
 | Story ID | SKILL-003 |

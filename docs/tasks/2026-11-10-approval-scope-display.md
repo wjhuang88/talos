@@ -3,6 +3,15 @@
 > Document status: Review / Claimed (emergency local candidate)
 > Emergency local candidate authorized by the maintainer; delivery completion not claimed.
 
+## Native Windows validation — 2026-11-10
+
+Source `c065236a1960e45920e9732212003f92bdefc57b`: pinned Rust 1.99.0 MSVC
+`cargo +1.99.0-x86_64-pc-windows-msvc test --locked -p talos-tui --lib`
+passed 652/652 with no failures or ignored tests, including localized compact approval
+and large-scope rendering regressions. [Full evidence and limits](../reference/WINDOWS-VALIDATION-2026-11-10.md).
+This supplies native unit-test evidence only; real Windows terminal/manual acceptance,
+independent review and completion requirements remain as recorded. Status stays Review.
+
 ## Problem and deliverable
 
 Thousands of exact Git Read facets fill the approval panel and displace controls.

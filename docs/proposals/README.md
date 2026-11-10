@@ -43,6 +43,8 @@ docs/proposals/
 
 ## Current Proposals
 
+- [gix Preflight / System Git Compatibility](gix-preflight-system-git-compatibility.md) —
+  proposed safe gix-assisted discovery with continued Git 2.36 support; no implementation activation.
 - [I300 Native Pull Command Authorization](i300-native-pull-command-authorization.md) — accepted Bash-granularity command approval; implementation and activation tracked by I300 / ADR-089.
 - [Autonomous Validation Loop](autonomous-validation-loop.md) — proposed Phase 1/2/3 boundary for
   self-bootstrap validation planning, evidence, and no-hidden-pass rules.

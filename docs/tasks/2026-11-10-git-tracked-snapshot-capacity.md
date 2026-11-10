@@ -3,6 +3,18 @@
 > Document status: Review / Claimed (emergency local candidate)
 > Emergency local candidate authorized by the maintainer; delivery completion not claimed.
 
+## Native Windows validation — 2026-11-10
+
+Source `c065236a1960e45920e9732212003f92bdefc57b`: native Rust 1.99.0 MSVC
+Git-enabled tools tests ran against Git 2.36.1.windows.1. Inherited-environment run:
+259 passed / 113 failed; controlled test-process environment rerun: 292 passed / 80 failed.
+The focused large-tracked-source case refused on Git environment overrides before discovery.
+Unsupported `git var GIT_ATTR_SYSTEM/GLOBAL` and other Git semantic differences prevent
+claiming native snapshot acceptance. [Evidence and limits](../reference/WINDOWS-VALIDATION-2026-11-10.md).
+The maintainer selected continued Git 2.36 support; the separate
+[gix-assisted preflight proposal](../proposals/gix-preflight-system-git-compatibility.md)
+records the intended repair boundary, not an implementation. Status stays Review.
+
 ## Incident and scope
 
 User reported `git_checkout {branch: "feat/bg-default-continuation", create: true}`
