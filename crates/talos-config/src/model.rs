@@ -106,6 +106,7 @@ fn catalog_protocol_to_config(protocol: CatalogProviderProtocol) -> crate::Provi
         CatalogProviderProtocol::AnthropicMessages => crate::ProviderProtocol::AnthropicMessages,
         CatalogProviderProtocol::OpenAIChat => crate::ProviderProtocol::OpenAIChat,
         CatalogProviderProtocol::OpenAIResponses => crate::ProviderProtocol::OpenAIResponses,
+        CatalogProviderProtocol::GoogleGemini => crate::ProviderProtocol::GoogleGemini,
         _ => crate::ProviderProtocol::Unspecified,
     }
 }
@@ -364,6 +365,30 @@ fn is_leap(year: u64) -> bool {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gemini_catalog_provider_contract_loads_without_replacing_existing_wires() {
+        let dataset: TomlDataset = toml::from_str(
+            "models=[]\n[[providers]]\nid='google'\nprotocol='google-gemini'\napi_base_url='https://generativelanguage.googleapis.com/v1beta'\n[[providers]]\nid='custom'\nprotocol='openai-chat'\n"
+        ).expect("Gemini metadata must not make the entire catalog fail to load");
+        assert_eq!(dataset.providers.len(), 2);
+        let mut entries = dataset.providers.into_iter();
+        let gemini = entries.next().expect("Gemini");
+        assert_eq!(gemini.id, "google");
+        assert_eq!(
+            gemini.api_base_url.as_deref(),
+            Some("https://generativelanguage.googleapis.com/v1beta")
+        );
+        assert_eq!(
+            catalog_protocol_to_config(gemini.protocol.expect("protocol")),
+            crate::ProviderProtocol::GoogleGemini
+        );
+        let legacy = entries.next().expect("existing wire");
+        assert_eq!(
+            catalog_protocol_to_config(legacy.protocol.expect("protocol")),
+            crate::ProviderProtocol::OpenAIChat
+        );
+    }
 
     #[test]
     fn responses_catalog_contract_maps_to_runtime_protocol() {

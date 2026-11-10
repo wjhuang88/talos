@@ -422,3 +422,21 @@ live-provider acceptance. The initial failure remains part of the validation his
 
 Standard release_preflight.sh rerun has started after these fixes; full workspace tests and
 its final status are still pending. No final CI, merge, release or Gemini completion claim.
+
+### Catalog contract foundation and workspace Git admission — 2026-11-02
+
+Added GoogleGemini to the already non-exhaustive shared CatalogProviderProtocol and its explicit
+config mapping. A mixed Gemini/legacy provider TomlDataset regression verifies the new metadata
+does not prevent loading the entire dataset and preserves the endpoint and old wire mapping.
+No models.toml, protocol inference table, provider default or catalog activation is changed.
+Independent read-only diff review found no blocker. Focused pinned/locked Config regression
+passed (1 test); running its newly built full Config binary passed all 268 tests (1.95s).
+The full locked Config/Core rerun is pending; this does not supersede earlier 267/123 evidence.
+
+Full preflight's workspace tests stopped in talos-agent: 586 passed and one Git Auto-review
+fixture failed because the entry Git canonical path differs from its internal maintenance
+executable. On this host /usr/local/bin/git and /usr/local/libexec/git-core/git are hardlinks
+but remain distinct canonical paths. The unchanged failing test binary passed when PATH starts
+with the internal Git directory (1 passed, 586 filtered; 13.53s). No Git authority checks or
+permission source was modified. A Cargo focused rerun is also in progress; rerun full preflight
+with this explicit host PATH. Retain the failed baseline; do not claim workspace tests passed.
