@@ -137,5 +137,4 @@ mod tests {
             assert_eq!(registry.resolve(&request), ResolutionResult::Unavailable);
         }
     }
-
 }
