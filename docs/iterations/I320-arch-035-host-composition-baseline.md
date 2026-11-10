@@ -1,14 +1,40 @@
-# I320 — ARCH-035 E0/E1 host composition architecture baseline
+# Iteration I320: ARCH-035 E0/E1 Host Composition Baseline
+
+> Document status: Active / Claimed (proposed via #905; ineffective until governance merge)
+> Published plan date: 2026-11-10
+> Planned objective: reproducibly inventory current cross-host persistence composition and propose a behavior-preserving architecture decision without competing with STORE-002.
+> Baseline rule: this bounded E0/E1 documentation and architecture-review slice does not authorize production code, storage contract/adapters, dependency or default behavior changes.
+> Deliverable: reviewable source-path matrix, conformance baseline and proposed host-composition decision; E2/E3 remain gated.
+
+## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Status | Active (proposed; ineffective until governance claim merges) |
-| Story | ARCH-035 / #897 |
-| Scope | E0 dependency/code-truth inventory and E1 ADR / API placement only |
-| Owner | @wjhuang88 |
-| Claim | See authoritative ARCH-035 owner; no production implementation authorized |
-| Dependency | STORE-002 / #670 remains Intake / Unclaimed; E2/E3 blocked |
-| Coordination | #361 ServerHost, #360 remote adapter, CLI/TUI/Desktop/SDK |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
+| Work Slice | ARCH-035 I320 E0 source inventory and E1 host-composition architecture review only; exclude production code, STORE-002 contracts/adapters, ServerHost and E2/E3 |
+| Claimed At | 2026-11-10 |
+| Source Issue | #897 |
+| Governance Claim PR | #905 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User requested continued non-overlapping E0/E1 progress. No independent approval is recorded; docs-only single-maintainer option is proposed, subject to exact-head CI, both governance validators, recorded maintainer reason, no blocking feedback and merge-time CAS. |
+| Implementation PR | Not started |
+| Last Updated | 2026-11-10 |
+| Handoff / Release Condition | The claim takes effect only after #905 merge. E0/E1 decision acceptance remains independently reviewable; E2/E3 require accepted #670 seams and separate activation. |
+
+## Published Baseline
+
+| Field | Value |
+|---|---|
+| Selected Story | [ARCH-035 / #897](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) |
+| Status at selection | Intake / Unclaimed; bounded documentation slice selected at user direction |
+| Dependency | STORE-002/#670 contracts not yet accepted; E0/E1 independent read-only architecture analysis permitted |
+| Coordination | SERVER-001-C/#361, SERVER-002/#360, CLI/TUI/Desktop/SDK |
+| Non-goals | No new persistence provider, session authority, server endpoint, schema, SQL, TLOG/JSONL or dependency modification |
+| Risk / rollback | Proposed decision may disagree with #670; keep proposal non-binding and revert documentation claim PR without touching production state |
+| Acceptance | Code-backed E0 matrix, explicit no-overlap with #670, API/source compatibility constraints and reviewable E1 decision; no acceptance claimed until evidence reviewed |
+| Planned validation | Both governance shell validators, exact-head CI, source-path review and independent API/architecture review as applicable |
 
 ## Objective
 
