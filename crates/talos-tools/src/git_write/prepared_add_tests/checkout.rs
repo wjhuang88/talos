@@ -3279,6 +3279,8 @@ async fn checkout_target_filter_refuses_before_worktree_mutation() {
 #[tokio::test]
 async fn checkout_and_commit_support_tracked_content_over_16_mib() {
     let root = fixture();
+    integration_git(root.path(), &["config", "--local", "user.name", "Fixture"]);
+    integration_git(root.path(), &["config", "--local", "user.email", "fixture@example.invalid"]);
     let large = root.path().join("large.bin");
     let file = std::fs::File::create(&large).expect("large file");
     file.set_len(17 * 1024 * 1024).expect("fixture size");

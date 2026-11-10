@@ -189,3 +189,11 @@ Soft host dependency: missing `mkfifo` explicitly fails the Unix regression test
 not skips it. Replace this fixture bridge when the existing Rust-native dependency
 provides a portable safe FIFO constructor. Linux/MSVC checks did not establish
 macOS compilation; retain the failed remote run as evidence.
+
+Native Windows CI then exposed missing repository-local author identity in the
+large checkout/commit regression: the bootstrap helper supplied per-command
+identity, but the prepared commit correctly did not inherit it. The fixture now
+sets local user.name/user.email before preparation, without changing global Git
+configuration or production commit behavior. Validate the locally configured fixture and native Windows rerun. An attempted
+GIT_CONFIG_GLOBAL/SYSTEM override was explicitly rejected by the production
+environment guard, as required; no guard exception was introduced.
