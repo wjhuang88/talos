@@ -335,13 +335,13 @@ mod tests {
 
     #[test]
     fn fixed_destinations_and_request_shape_are_stable() {
-        let (lite, body) = request_url_and_body(Protocol::Lite, "中文 & rust").unwrap();
+        let (lite, body) = request_url_and_body(Protocol::Lite, "中文 & rust").expect("legacy Lite URL");
         assert_eq!(lite.as_str(), "https://lite.duckduckgo.com/lite/");
-        assert_eq!(body.unwrap(), "q=%E4%B8%AD%E6%96%87+%26+rust&kl=wt-wt");
-        let (instant, body) = request_url_and_body(Protocol::Instant, "rust").unwrap();
+        assert_eq!(body.expect("Lite POST form"), "q=%E4%B8%AD%E6%96%87+%26+rust&kl=wt-wt");
+        let (instant, body) = request_url_and_body(Protocol::Instant, "rust").expect("legacy Instant URL");
         assert!(body.is_none());
         assert!(instant.as_str().contains("t=rust-agent-websearch"));
-        let (bing, body) = request_url_and_body(Protocol::Bing, "rust").unwrap();
+        let (bing, body) = request_url_and_body(Protocol::Bing, "rust").expect("legacy Bing URL");
         assert!(body.is_none());
         assert_eq!(bing.host_str(), Some("cn.bing.com"));
     }
@@ -431,7 +431,7 @@ mod tests {
     fn html_compatibility_decodes_malformed_utf8_and_bom_without_changing_json() {
         let raw = b"\xef\xbb\xbf<p>caf\xe9</p>";
         let normalized = legacy_html_bytes(raw);
-        assert_eq!(String::from_utf8(normalized).unwrap(), "<p>caf\u{fffd}</p>");
+        assert_eq!(String::from_utf8(normalized).expect("lossy HTML produces valid UTF-8"), "<p>caf\u{fffd}</p>");
         assert_eq!(raw[0..3], [0xef, 0xbb, 0xbf]);
         // A real Lite result must remain usable after the standalone adapter
         // converts the BOM and malformed UTF-8. The protected parser itself
