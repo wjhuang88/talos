@@ -4752,3 +4752,288 @@ fn clipboard_loading_keeps_draft_and_allows_cancel_without_deferred_send() {
     );
     assert_eq!(tui.state.input_buffer, "keep this draft");
 }
+
+#[test]
+fn approval_large_scope_is_compact_and_requires_contiguous_detail_pages() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(100, 32));
+    let preview = (0..2000)
+        .map(|index| format!("Read Path: /workspace/file-{index:04}.rs"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    tui.show_approval_with_preview(
+        "git_checkout",
+        "branch: topic, create: true",
+        Some(preview.clone()),
+    );
+    tui.draw_frame().expect("summary");
+    let rendered = tui.terminal.test_rendered_text();
+    assert!(rendered.contains("2000 scope entries"), "{rendered}");
+    assert!(rendered.contains("Read: 2000"));
+    assert!(!rendered.contains("file-0000.rs"));
+    assert!(rendered.contains("[1] approve"));
+    assert!(rendered.contains("[3] deny"));
+    assert!(!tui.approval_preview_fully_visible);
+    tui.handle_input_event(&key_press(KeyCode::Char('2')));
+    assert!(tui.state.slash_menu.is_approval());
+    let comp = scrollback::BottomPanelComponent {
+        menu: &tui.state.slash_menu,
+        query: "",
+        max_height: u16::MAX,
+    };
+    assert!(comp.height_hint(100) <= 12);
+    tui.handle_input_event(&key_press(KeyCode::Char('d')));
+    // PageDown before any detail draw cannot jump over undisplayed content.
+    tui.handle_input_event(&key_press(KeyCode::PageDown));
+    assert_eq!(tui.state.slash_menu.approval_view.offset, 0);
+    tui.draw_frame().expect("first detail page");
+    assert!(tui.terminal.test_rendered_text().contains("file-0000.rs"));
+    assert!(!tui.approval_preview_fully_visible);
+    tui.handle_input_event(&key_press(KeyCode::PageDown));
+    assert!(tui.state.slash_menu.approval_view.offset > 0);
+    tui.draw_frame().expect("second page");
+    tui.handle_input_event(&key_press(KeyCode::PageUp));
+    assert_eq!(tui.state.slash_menu.approval_view.offset, 0);
+    tui.draw_frame().expect("back to first page");
+    for _ in 0..250 {
+        if tui.approval_preview_fully_visible {
+            break;
+        }
+        tui.handle_input_event(&key_press(KeyCode::PageDown));
+        tui.draw_frame().expect("next page");
+    }
+    assert!(
+        tui.approval_preview_fully_visible,
+        "all rows were displayed"
+    );
+    assert!(tui.terminal.test_rendered_text().contains("file-1999.rs"));
+    let last_offset = tui.state.slash_menu.approval_view.offset;
+    tui.handle_input_event(&key_press(KeyCode::PageDown));
+    assert_eq!(tui.state.slash_menu.approval_view.offset, last_offset);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(60, 24));
+    tui.draw_frame()
+        .expect("resize invalidates row-based review");
+    assert!(!tui.approval_preview_fully_visible);
+    tui.show_approval_with_preview("git_checkout", "branch: other", Some(preview));
+    assert_eq!(tui.state.slash_menu.approval_view.reviewed, 0);
+    assert!(!tui.state.slash_menu.approval_view.expanded);
+    tui.handle_input_event(&key_press(KeyCode::Char('1')));
+    assert!(!tui.state.slash_menu.is_approval());
+}
+
+#[test]
+fn approval_details_preserve_scope_line_breaks() {
+    let rows = scrollback::approval_scope_lines(
+        "Read Path: /one\nWrite Path: /two\n\nInvocation-only scope",
+        100,
+    );
+    assert_eq!(
+        rows,
+        vec![
+            "Read Path: /one",
+            "Write Path: /two",
+            "",
+            "Invocation-only scope"
+        ]
+    );
+}
+
+#[test]
+fn approval_hides_composer_cursor_and_restores_it_after_dismissal() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(100, 32));
+    tui.draw_frame().expect("composer");
+    assert!(tui.terminal.test_cursor_visible());
+    let composer_cursor = tui.terminal.test_cursor_position();
+    tui.show_approval_with_preview(
+        "git_checkout",
+        "branch: topic",
+        Some("Read Path: /one".into()),
+    );
+    for _ in 0..3 {
+        tui.draw_frame().expect("approval repaint");
+        assert!(!tui.terminal.test_cursor_visible());
+        assert_eq!(tui.terminal.test_cursor_position(), None);
+    }
+    tui.handle_pending_approval_input(KeyCode::Char('d'));
+    tui.draw_frame().expect("details");
+    assert!(!tui.terminal.test_cursor_visible());
+    tui.handle_pending_approval_input(KeyCode::Char('3'));
+    tui.draw_frame().expect("composer restored");
+    assert!(tui.terminal.test_cursor_visible());
+    assert_eq!(tui.terminal.test_cursor_position(), composer_cursor);
+}
+
+#[test]
+fn paged_approval_numeric_choices_reach_live_receiver() {
+    for (digit, expected) in [
+        ('1', ApprovalChoice::ApproveOnce),
+        ('2', ApprovalChoice::AlwaysApprove),
+    ] {
+        let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(100, 32));
+        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        tui.state.pending_approval_response = Some(tx);
+        tui.show_approval_with_preview(
+            "git_checkout",
+            "branch: topic",
+            Some(
+                (0..40)
+                    .map(|i| format!("Read Path: /file-{i}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+        );
+        tui.draw_frame().expect("summary");
+        tui.handle_input_event(&key_press(KeyCode::Char('d')));
+        for _ in 0..10 {
+            tui.draw_frame().expect("page");
+            if tui.approval_preview_fully_visible {
+                break;
+            }
+            tui.handle_input_event(&key_press(KeyCode::PageDown));
+        }
+        assert!(tui.approval_preview_fully_visible);
+        tui.handle_input_event(&key_press(KeyCode::Char(digit)));
+        assert_eq!(rx.try_recv().expect("decision delivered"), expected);
+        assert!(!tui.state.slash_menu.is_approval());
+    }
+}
+
+#[test]
+fn expired_approval_retires_both_modal_states_without_claiming_success() {
+    for via_clipboard in [false, true] {
+        let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        tui.state.pending_approval_response = Some(tx);
+        tui.show_approval("git_checkout", "branch: topic");
+        assert!(!tui.retire_closed_approval(), "live request remains open");
+        drop(rx);
+        if via_clipboard {
+            tui.handle_ui_output(talos_conversation::UiOutput::ClipboardPastePending(false));
+        } else {
+            tui.handle_input_event(&key_press(KeyCode::Char('1')));
+        }
+        assert!(matches!(tui.state.approval_state, ApprovalState::Hidden));
+        assert!(!tui.state.slash_menu.is_approval());
+        assert!(tui.state.pending_approval_response.is_none());
+        tui.commit_pending_transcript().expect("notice");
+        tui.draw_frame().expect("retired modal");
+        let text = tui.terminal.test_rendered_text();
+        assert!(text.contains("Approval expired or was cancelled"), "{text}");
+        assert!(!text.contains("approved: git_checkout"));
+    }
+}
+
+#[test]
+fn release_discards_queued_repeats_but_preserves_independent_presses() {
+    use crossterm::event::{KeyEvent, KeyEventKind, KeyModifiers};
+    let key = |kind| {
+        Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Backspace,
+            KeyModifiers::NONE,
+            kind,
+        ))
+    };
+    let mut batch = vec![key(KeyEventKind::Press)];
+    batch.extend((0..500).map(|_| key(KeyEventKind::Repeat)));
+    batch.push(key_press(KeyCode::Left));
+    batch.push(key(KeyEventKind::Release));
+    batch.push(key(KeyEventKind::Press));
+    let events = super::input::coalesce_key_repeats(batch);
+    assert_eq!(events.len(), 4);
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e, Event::Key(k) if k.kind == KeyEventKind::Repeat))
+    );
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.state.input_paste("abcdef");
+    for event in events {
+        tui.handle_input_event(&event);
+    }
+    assert_eq!(tui.state.input_buffer, "abce");
+    let held = super::input::coalesce_key_repeats(vec![
+        key(KeyEventKind::Press),
+        key(KeyEventKind::Repeat),
+        key(KeyEventKind::Repeat),
+    ]);
+    assert_eq!(
+        held.len(),
+        2,
+        "held keys make bounded progress without a release"
+    );
+}
+
+#[test]
+fn operation_summary_accepts_once_without_paging_or_reusable_grants() {
+    for digit in ['1', '2'] {
+        let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(110, 36));
+        let (response, mut rx) = tokio::sync::oneshot::channel();
+        tui.handle_ui_output(talos_conversation::UiOutput::ToolApprovalRequest {
+            tool_name: "git_checkout".into(),
+            arguments: serde_json::json!({"branch":"topic", "create":true}),
+            summary_fields: vec!["branch".into(), "create".into()],
+            presentation: Some(talos_conversation::ApprovalPresentation {
+                once_only: true,
+                summary: vec![
+                    "Create and switch branch: topic".into(),
+                    "Repository: /workspace".into(),
+                    "Stage: inspect repository/configuration".into(),
+                ],
+            }),
+            preview: Some(
+                (0..2000)
+                    .map(|i| format!("Read Path: /workspace/file-{i}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+            response,
+        });
+        tui.draw_frame().expect("operation summary");
+        let text = tui.terminal.test_rendered_text();
+        assert!(text.contains("Create and switch branch: topic"), "{text}");
+        assert!(text.contains("no reusable grant"));
+        assert!(!text.contains("file-0"));
+        assert!(!tui.approval_preview_fully_visible);
+        tui.handle_input_event(&key_press(KeyCode::Char(digit)));
+        assert_eq!(
+            rx.try_recv().expect("once decision"),
+            ApprovalChoice::ApproveOnce
+        );
+        assert!(!tui.state.slash_menu.is_approval());
+    }
+}
+
+#[tokio::test]
+async fn ready_event_batch_reaches_release_before_redraw() {
+    use crossterm::event::{KeyEvent, KeyEventKind, KeyModifiers};
+    let key = |kind| {
+        Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Down,
+            KeyModifiers::NONE,
+            kind,
+        ))
+    };
+    let mut queued = (0..500)
+        .map(|_| Ok(key(KeyEventKind::Repeat)))
+        .collect::<Vec<_>>();
+    queued.push(Ok(key(KeyEventKind::Release)));
+    queued.push(Ok(key_press(KeyCode::Char('x'))));
+    let mut stream = futures::stream::iter(queued);
+    let batch = super::input::ready_input_batch(key(KeyEventKind::Press), &mut stream).await;
+    assert_eq!(
+        batch,
+        vec![
+            key(KeyEventKind::Press),
+            key(KeyEventKind::Release),
+            key_press(KeyCode::Char('x'))
+        ]
+    );
+}

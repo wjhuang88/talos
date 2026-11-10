@@ -5,6 +5,15 @@ use talos_core::message::Usage;
 use talos_core::model::ImageInputCapability;
 use talos_core::tool::ToolProvenance;
 
+/// Trusted operation-oriented approval display. This carries no grant authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApprovalPresentation {
+    /// Bounded operation/stage/effect lines; exact scope stays in the preview.
+    pub summary: Vec<String>,
+    /// The surface must submit only single-use decisions for this request.
+    pub once_only: bool,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChatMessage {
     pub role: MessageRole,
@@ -307,6 +316,8 @@ pub enum UiOutput {
         tool_name: String,
         arguments: serde_json::Value,
         summary_fields: Vec<String>,
+        /// Trusted operation display; None retains the exact-scope legacy surface.
+        presentation: Option<ApprovalPresentation>,
         /// Compiler-derived Session scope, kept separate from caller-supplied arguments.
         preview: Option<String>,
         response: tokio::sync::oneshot::Sender<talos_core::ApprovalChoice>,

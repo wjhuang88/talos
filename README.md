@@ -325,6 +325,20 @@ Technical failures use fixed, content-free prompts in the configured fallback lo
 of detected history. Chinese (`zh`) and Japanese (`ja`) fixed copy is available; other locales use
 English for these prompts. Diagnostic reason codes and permission decisions remain unchanged.
 
+Native Git Checkout approvals show the operation, repository, branch, current
+inspection/execution stage and effects. Both approval shortcuts are labelled as
+single-use for this operation; full evidence is optional under `d`, with
+`PageUp` / `PageDown` navigation. Approving inspection does not authorize the
+later checkout stage or new effects. Other large approval scopes retain compact
+counts and require complete detail display before reusable approval. Exact grants
+and stale-source checks are unchanged. Approval owns paging and hides the input
+cursor; closed requests are dismissed with an expiry/cancellation notice.
+
+On terminals reporting key repeat/release events, pending repeated actions are
+coalesced before redraw and discarded when the corresponding release arrives.
+Independent key presses remain intact. Terminals without release reporting cannot
+reliably distinguish auto-repeat from separate presses.
+
 When auto assistance evaluates a shell approval request, the configured model receives a bounded
 copy of the exact command as untrusted data plus structural risk facts, the current user instruction,
 canonical workspace/cwd bindings, environment variable names and an opaque environment digest. A
@@ -873,6 +887,15 @@ Talos ships with built-in tools for common coding-agent work:
 - Search and inspection: `grep`, `diff`, `stat`
 - Code intelligence: `find_symbol`, `find_references`, `list_symbols`, `list_imports`
 - Git: `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`, `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout`
+
+Structured `git_checkout` and `git_commit` verify tracked file contents with streaming
+SHA-256 evidence rather than retaining complete file bodies. Their tracked-source scan
+is bounded to 4096 entries and 1 GiB of regular-file content per capture; content changes
+still invalidate prepared operations. Recursive `git_add` and Git configuration/ref
+snapshots retain their separate limits. Exceeding a scan budget does not execute the operation.
+Auxiliary attribute/ignore paths share unchanged ancestor identity evidence within an
+operation; each target still requires its own Read admission. Failures identify the
+affected path and validation stage.
 - Network: `fetch_url` (bounded URL context — public pages, HTML extraction, JSON), `http_request` (advanced HTTP/API inspection — custom methods/headers/bodies, disclosed on demand via continuation), `save_url` (download URL to local file — dual network+write permission), `web_search` (DuckDuckGo + Tavily + SearXNG + Wikipedia)
 
 `http_request` stops reading the response once its body limit is exceeded (64 KiB

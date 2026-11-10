@@ -8,6 +8,49 @@ pub(super) struct RepeatFocus {
     wizard: Option<crate::state::WizardStep>,
     credential: crate::state::CredentialField,
 }
+pub(super) async fn ready_input_batch(
+    first: Event,
+    stream: &mut (impl Stream<Item = io::Result<Event>> + Unpin),
+) -> Vec<Event> {
+    let mut batch = vec![first];
+    futures::future::poll_fn(|cx| {
+        // Use the live task waker even when draining stops at Pending.
+        for _ in 1..1024 {
+            match stream.poll_next_unpin(cx) {
+                std::task::Poll::Ready(Some(Ok(next))) => batch.push(next),
+                _ => break,
+            }
+        }
+        std::task::Poll::Ready(coalesce_key_repeats(std::mem::take(&mut batch)))
+    })
+    .await
+}
+
+// Coalesce only protocol-labelled repeats. Press events (including terminals
+// without release reporting), paste, resize and unrelated keys retain their order.
+pub(super) fn coalesce_key_repeats(events: Vec<Event>) -> Vec<Event> {
+    let mut pending = Vec::with_capacity(events.len());
+    for event in events {
+        if let Event::Key(key) = &event {
+            if key.kind == KeyEventKind::Release {
+                pending.retain(|queued| {
+                    !matches!(queued, Event::Key(previous)
+                    if previous.kind == KeyEventKind::Repeat
+                        && previous.code == key.code && previous.modifiers == key.modifiers)
+                });
+            } else if key.kind == KeyEventKind::Repeat
+                && matches!(pending.last(), Some(Event::Key(previous))
+                    if previous.kind == KeyEventKind::Repeat
+                        && previous.code == key.code && previous.modifiers == key.modifiers)
+            {
+                continue;
+            }
+        }
+        pending.push(event);
+    }
+    pending
+}
+
 impl Tui {
     fn repeat_focus(&self) -> RepeatFocus {
         RepeatFocus {
@@ -158,6 +201,30 @@ impl Tui {
 
     pub(super) fn handle_pending_approval_input(&mut self, key: KeyCode) {
         match key {
+            KeyCode::Char('d') => {
+                let view = &mut self.state.slash_menu.approval_view;
+                view.expanded = !view.expanded;
+                view.offset = 0;
+            }
+            KeyCode::PageDown => {
+                let view = &mut self.state.slash_menu.approval_view;
+                if view.expanded
+                    && view.page_size > 0
+                    && view.offset.saturating_add(view.page_size) < view.total_rows
+                {
+                    // Only advance past rows actually rendered, never skip a
+                    // hidden page and accidentally enable reusable approval.
+                    view.offset = view
+                        .offset
+                        .saturating_add(view.page_size)
+                        .min(view.reviewed)
+                        .min(view.total_rows.saturating_sub(1));
+                }
+            }
+            KeyCode::PageUp => {
+                let view = &mut self.state.slash_menu.approval_view;
+                view.offset = view.offset.saturating_sub(view.page_size);
+            }
             KeyCode::Up => {
                 self.state.slash_menu.select_prev("");
             }
@@ -191,13 +258,42 @@ impl Tui {
     }
 
     pub(super) fn resolve_approval(&mut self, choice: ApprovalChoice) {
+        if self.retire_closed_approval() {
+            return;
+        }
+        let choice = if matches!(choice, ApprovalChoice::AlwaysApprove)
+            && self
+                .state
+                .slash_menu
+                .approval_view
+                .presentation
+                .as_ref()
+                .is_some_and(|p| p.once_only)
+        {
+            ApprovalChoice::ApproveOnce
+        } else {
+            choice
+        };
         if matches!(choice, ApprovalChoice::AlwaysApprove) && !self.approval_preview_fully_visible {
             self.state.tip = Some(Tip {
                 kind: TipKind::Info,
-                text: "Resize the terminal to review the full reusable scope".to_string(),
+                text: "Press d and PageDown to review the full reusable scope".to_string(),
                 ttl: Duration::from_secs(3),
                 created_at: Instant::now(),
             });
+            return;
+        }
+        if let Some(response_tx) = self.state.pending_approval_response.take()
+            && response_tx.send(choice.clone()).is_err()
+        {
+            self.hide_approval();
+            self.state.slash_menu.close();
+            self.append_styled_lines([ScrollbackLine::styled(
+                vec![HistorySegment::raw(
+                    "Approval expired or was cancelled; no decision was submitted.",
+                )],
+                None,
+            )]);
             return;
         }
         let (icon, color, msg) = match &choice {
@@ -232,9 +328,6 @@ impl Tui {
             )));
         let _ = self.commit_pending_transcript();
 
-        if let Some(response_tx) = self.state.pending_approval_response.take() {
-            let _ = response_tx.send(choice);
-        }
         self.hide_approval();
         self.state.slash_menu.close();
         self.state.tip = Some(Tip {
@@ -252,6 +345,13 @@ impl Tui {
         match event {
             Event::Key(key) => {
                 if !self.admit_key_event(key) {
+                    return false;
+                }
+                // Modal scope navigation owns paging before global history shortcuts.
+                if !matches!(self.state.approval_state, ApprovalState::Hidden)
+                    && matches!(key.code, KeyCode::PageUp | KeyCode::PageDown)
+                {
+                    self.handle_pending_approval_input(key.code);
                     return false;
                 }
                 match key.code {

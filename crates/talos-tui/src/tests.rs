@@ -1451,7 +1451,7 @@ mod tests {
         };
 
         assert!(!approval_preview_fully_visible(40, h, scope));
-        assert!(all.contains("[a] resize to review full scope"));
+        assert!(all.contains("[2] review full scope first"));
         assert!(all.contains("[1] approve"));
         assert!(all.contains("[3] deny"));
     }

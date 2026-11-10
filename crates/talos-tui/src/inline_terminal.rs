@@ -10,7 +10,8 @@ use crossterm::{
     execute, queue,
     style::Color as CColor,
     terminal::{
-        self, Clear, ClearType, EnableLineWrap, EnterAlternateScreen, LeaveAlternateScreen,
+        self, BeginSynchronizedUpdate, Clear, ClearType, EnableLineWrap, EndSynchronizedUpdate,
+        EnterAlternateScreen, LeaveAlternateScreen,
     },
 };
 use ratatui::{
@@ -152,8 +153,9 @@ pub struct TerminalSession {
     lifecycle: TerminalLifecycleState,
     #[cfg(test)]
     test_mode: bool,
-    #[cfg(test)]
     cursor_visible: bool,
+    #[cfg(test)]
+    cursor_commands: usize,
     #[cfg(test)]
     test_cursor_position: Option<Position>,
 }
@@ -259,8 +261,9 @@ impl TerminalSession {
             lifecycle,
             #[cfg(test)]
             test_mode: false,
-            #[cfg(test)]
             cursor_visible: false,
+            #[cfg(test)]
+            cursor_commands: 0,
             #[cfg(test)]
             test_cursor_position: None,
         })
@@ -283,6 +286,7 @@ impl TerminalSession {
             lifecycle: TerminalLifecycleState::default(),
             test_mode: true,
             cursor_visible: false,
+            cursor_commands: 0,
             test_cursor_position: None,
         }
     }
@@ -329,6 +333,7 @@ impl TerminalSession {
         &self.backend
     }
 
+    #[cfg(test)]
     pub fn backend_mut(&mut self) -> &mut CrosstermBackend<Stdout> {
         &mut self.backend
     }
@@ -344,14 +349,25 @@ impl TerminalSession {
         Ok(size)
     }
 
+    #[cfg(test)]
     pub fn draw(&mut self, size: Size, draw_fn: impl FnOnce(&mut InlineFrame)) -> io::Result<()> {
+        self.draw_with_cursor(size, None, draw_fn)
+    }
+
+    /// Draws a frame and its final cursor together, without resetting visibility each frame.
+    pub(crate) fn draw_with_cursor(
+        &mut self,
+        size: Size,
+        cursor: Option<Position>,
+        draw_fn: impl FnOnce(&mut InlineFrame),
+    ) -> io::Result<()> {
         self.screen_size = size;
         let area = Rect::new(0, 0, size.width, size.height);
         let changed = self.frame_area != area;
         self.frame_area = area;
         self.buffers[0].resize(area);
         self.buffers[1].resize(area);
-        self.draw_inner(draw_fn, changed, size.height)
+        self.draw_inner(draw_fn, changed, size.height, cursor)
     }
 
     fn draw_inner(
@@ -359,6 +375,7 @@ impl TerminalSession {
         draw_fn: impl FnOnce(&mut InlineFrame),
         force_clear: bool,
         render_height: u16,
+        cursor: Option<Position>,
     ) -> io::Result<()> {
         let area = self.frame_area;
         let prev_idx = 1 - self.current;
@@ -380,45 +397,78 @@ impl TerminalSession {
             draw_fn(&mut frame);
         }
 
+        let blank = force_clear.then(|| Buffer::empty(area));
+        let previous = blank.as_ref().unwrap_or(&self.buffers[prev_idx]);
+        let cells: Vec<_> = previous.diff_iter(&self.buffers[self.current]).collect();
+        let dirty = force_clear || !cells.is_empty();
+        let cursor = cursor.and_then(|position| clamp_cursor(position, self.screen_size));
+        let move_cursor = cursor.filter(|position| {
+            dirty || !self.cursor_visible || *position != self.last_known_cursor_pos
+        });
+        let visibility_changed = self.cursor_visible != cursor.is_some();
+
         #[cfg(test)]
         if self.test_mode {
+            self.cursor_commands +=
+                usize::from(move_cursor.is_some()) + usize::from(visibility_changed);
+            self.cursor_visible = cursor.is_some();
+            self.test_cursor_position = cursor;
+            if let Some(position) = cursor {
+                self.last_known_cursor_pos = position;
+            }
             self.current = prev_idx;
             return Ok(());
         }
 
-        if force_clear {
-            let writer = self.backend_mut();
-            for y in area.y..area.bottom() {
-                queue!(writer, MoveTo(0, y))?;
-                queue!(writer, Clear(ClearType::UntilNewLine))?;
-            }
-            io::Write::flush(writer)?;
+        if dirty || move_cursor.is_some() || visibility_changed {
+            // Ghostty and other supporting terminals present only the final frame/cursor.
+            // Unsupported terminals ignore these standard synchronized-output markers.
+            queue!(self.backend, BeginSynchronizedUpdate)?;
+            let result = (|| -> io::Result<()> {
+                if force_clear {
+                    for y in area.y..area.bottom() {
+                        queue!(self.backend, MoveTo(0, y), Clear(ClearType::UntilNewLine))?;
+                    }
+                }
+                if dirty {
+                    self.backend.draw(cells.into_iter())?;
+                }
+                if let Some(position) = move_cursor {
+                    queue!(self.backend, MoveTo(position.x, position.y))?;
+                }
+                if visibility_changed {
+                    if cursor.is_some() {
+                        queue!(self.backend, Show)?;
+                    } else {
+                        queue!(self.backend, Hide)?;
+                    }
+                }
+                Ok(())
+            })();
+            // End synchronization even when drawing fails; never leave the display frozen.
+            let end = queue!(self.backend, EndSynchronizedUpdate);
+            let flush = Backend::flush(&mut self.backend);
+            result.and(end).and(flush)?;
         }
-
-        let prev_buf = &self.buffers[prev_idx];
-        let current = &self.buffers[self.current];
-
-        if force_clear {
-            let blank = Buffer::empty(area);
-            let cells: Vec<_> = blank.diff_iter(current).collect();
-            self.backend.draw(cells.into_iter())?;
-        } else {
-            let cells: Vec<_> = prev_buf.diff_iter(current).collect();
-            self.backend.draw(cells.into_iter())?;
+        self.cursor_visible = cursor.is_some();
+        if let Some(position) = cursor {
+            self.last_known_cursor_pos = position;
         }
-
-        Backend::flush(&mut self.backend)?;
-
         self.current = prev_idx;
-
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn set_cursor(&mut self, col: u16, row: u16) -> io::Result<()> {
         let Some(position) = clamp_cursor(Position::new(col, row), self.screen_size) else {
             return Ok(());
         };
+        if self.cursor_visible && self.last_known_cursor_pos == position {
+            return Ok(());
+        }
         self.last_known_cursor_pos = position;
+        let show = !self.cursor_visible;
+        self.cursor_visible = true;
         #[cfg(test)]
         if self.test_mode {
             self.cursor_visible = true;
@@ -427,12 +477,19 @@ impl TerminalSession {
         }
         let writer = self.backend_mut();
         queue!(writer, MoveTo(position.x, position.y))?;
-        queue!(writer, Show)?;
+        if show {
+            queue!(writer, Show)?;
+        }
         io::Write::flush(writer)?;
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn hide_cursor(&mut self) -> io::Result<()> {
+        if !self.cursor_visible {
+            return Ok(());
+        }
+        self.cursor_visible = false;
         #[cfg(test)]
         if self.test_mode {
             self.cursor_visible = false;
@@ -444,23 +501,10 @@ impl TerminalSession {
         io::Write::flush(writer)
     }
 
-    pub fn set_cursor_in_rect(
-        &mut self,
-        rect: Rect,
-        local_col: u16,
-        local_row: u16,
-    ) -> io::Result<()> {
-        if rect.width == 0 || rect.height == 0 {
-            return self.hide_cursor();
-        }
-        let position = cursor_position_in_rect(rect, local_col, local_row)
-            .expect("non-empty rectangle has a cursor position");
-        self.set_cursor(position.x, position.y)
-    }
-
     /// Sets a modal cursor only when its semantic row exists in the rendered
     /// component rectangle. Unlike the composer helper, this never clamps a
     /// vertical coordinate onto a different panel row.
+    #[cfg(test)]
     pub fn set_cursor_if_visible_in_rect(
         &mut self,
         rect: Rect,
@@ -487,7 +531,11 @@ impl TerminalSession {
     }
 }
 
-fn cursor_position_in_rect(rect: Rect, local_col: u16, local_row: u16) -> Option<Position> {
+pub(crate) fn cursor_position_in_rect(
+    rect: Rect,
+    local_col: u16,
+    local_row: u16,
+) -> Option<Position> {
     (rect.width > 0 && rect.height > 0).then(|| {
         let max_col = rect.width.saturating_sub(1);
         let max_row = rect.height.saturating_sub(1);
@@ -813,6 +861,59 @@ mod tests {
             Some(Position::new(7, 8))
         );
         assert_eq!(cursor_position_in_rect(Rect::new(0, 0, 0, 2), 0, 0), None);
+    }
+
+    #[test]
+    fn unchanged_frames_preserve_native_cursor_blink_and_dirty_frames_do_not_toggle_visibility() {
+        let mut session = TerminalSession::test_instance();
+        let size = Size::new(20, 10);
+        let cursor = Some(Position::new(2, 5));
+        session
+            .draw_with_cursor(size, cursor, |_| {})
+            .expect("initial frame");
+        let initial = session.cursor_commands;
+        for _ in 0..20 {
+            session
+                .draw_with_cursor(size, cursor, |_| {})
+                .expect("idle frame");
+        }
+        assert_eq!(
+            session.cursor_commands, initial,
+            "idle frames emit no cursor commands"
+        );
+        session
+            .draw_with_cursor(size, cursor, |frame| {
+                frame.render_widget(
+                    ratatui::widgets::Paragraph::new("tick"),
+                    Rect::new(0, 0, 10, 1),
+                );
+            })
+            .expect("animation");
+        assert_eq!(
+            session.cursor_commands,
+            initial + 1,
+            "restore position without Hide/Show"
+        );
+        assert!(session.test_cursor_visible());
+        session.draw_with_cursor(size, None, |_| {}).expect("modal");
+        let hidden = session.cursor_commands;
+        session
+            .draw_with_cursor(size, None, |_| {})
+            .expect("modal repaint");
+        assert_eq!(session.cursor_commands, hidden, "hidden remains hidden");
+    }
+
+    #[test]
+    fn drawing_hides_cursor_until_input_owner_restores_it() {
+        let mut session = TerminalSession::test_instance();
+        let size = Size::new(20, 10);
+        session.set_test_size(size);
+        session.set_cursor(2, 5).expect("input cursor");
+        assert!(session.test_cursor_visible());
+        session.draw(size, |_| {}).expect("draw");
+        assert!(!session.test_cursor_visible());
+        session.set_cursor(2, 5).expect("restore input cursor");
+        assert!(session.test_cursor_visible());
     }
 
     #[test]
