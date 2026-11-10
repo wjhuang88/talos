@@ -139,7 +139,7 @@ claim unrelated dirty working files are ignored or retry an old plan automatical
 | Governance Claim PR | Direct commit 457e1ac9 |
 | Authorization Mode | Emergency override |
 | Authorization Evidence | Maintainer explicitly answered “授权本次紧急本地提交” in this session after review of the concrete local repair branch; repeated Git business unavailability and unusable approval/input UI. Local commit only, not merge authority. |
-| Implementation PR | None |
+| Implementation PR | #903 |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | Reconcile claim on target branch within two business days; independent security/API review and exact-head CI before merge. |
 
@@ -170,3 +170,12 @@ acceptance remain deferred; local MSVC compilation is not native execution.
   acceptance are outstanding. No completion claim is made by the local commits.
 
 Local implementation commit: `457e1ac9`. This records local preservation only; status remains Review.
+
+## Main-branch consolidation
+
+The maintainer subsequently requested consolidation into main and cleanup of all
+safely removable branches. PR #903 carries this emergency repair and its claim
+reconciliation. Independent security/API review and exact-head CI remain required
+before merge; device/manual acceptance remains in this owner and status stays Review.
+The final combined source matches the full preflight and MSVC cross-check candidate;
+both governance validators passed after merging main `f9bfac77`.
