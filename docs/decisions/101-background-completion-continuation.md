@@ -2,8 +2,10 @@
 
 ## Status
 
-Proposed — BG-CONTINUE-001. Number provisional until target-branch CAS.
-No effective claim, implementation or approval is implied.
+Proposed for acceptance atomically with BG-CONTINUE-001 activation in #893.
+Acceptance takes effect only after independent exact-head decision/activation review
+and target-branch merge. No approval or implementation is currently implied.
+Recheck ADR-101 uniqueness at merge time; ADR-100 belongs to clipboard input.
 
 ## Context
 

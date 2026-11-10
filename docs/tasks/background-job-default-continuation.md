@@ -1,24 +1,71 @@
 # BG-CONTINUE-001: Default Background Completion Continuation
 
-> Document status: Refinement / Unclaimed (inactive; #893 is a design candidate only)
+> Document status: Active / Claimed (proposed atomic activation in #893; ineffective until independently authorized target-branch merge)
+> Historical checkpoints below describe their original revisions, not the current proposed disposition.
 > Deliverable: background success, failure and timeout resume the originating live Session without another user message or opt-in flag.
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Talos |
 | Work Slice | Actor-owned terminal admission and default continuation, cancellation/consumption deduplication, bounded context, tests and docs |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-09 |
 | Source Issue | None |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Review of ba402e6d requested changes. This candidate is explicitly inactive; no implementation authorization is asserted |
+| Governance Claim PR | #893 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Pending exact-head activation and ADR-101 review; user authorized candidate preparation, not independent approval. Earlier inactive-remediation re-review does not authorize this activation |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-09 |
 | Handoff / Release Condition | Accepted successor decision, effective target claim, tested implementation and exact-head review/CI |
+
+## Proposed atomic activation packet (not effective)
+
+This packet proposes atomic activation in #893 through the header and claim table
+above. Both are ineffective while this PR is open. The proposed claimant
+is @wjhuang88, executing agent Talos, using the Independent review authorization path.
+claim PR is #893; implementation PR is not started. No implementation branch may
+be created until the authorized claim reaches main.
+
+Decision requested: accept ADR-101's default live-Session continuation policy,
+including 128-slot backpressure, terminal retirement independent of process reads,
+private Context provenance, no automatic provider retry and unchanged permissions.
+Accept only the narrow successor to ADR-060's no-auto-continuation restriction;
+no restart recovery, new process launch authority or Gemini replay ownership.
+
+Runnable deliverable and verification scope: Actor mock-provider tests for idle,
+busy, cancellation, consumption and recovery fencing; more than 128 sequential
+success/failure continuations proving slot retirement; CLI background completion
+smoke without a second user message. Update README.md, README.zh-CN.md and runtime/
+process references with default continuation and additional provider usage.
+
+This candidate supplies the proposed header, claimant fields and ADR-101 acceptance
+request together. Historical checkpoints remain evidence of their original revisions.
+Independent review must cover activation, not rely on the inactive e1c77bc2 re-review.
+
+Before publishing that candidate: recheck target owner/ADR namespace and all relevant
+claims; verify source-branch freshness against the collaboration SOP; preserve the
+#838 scope separation and replay compatibility requirements below. At the latest
+remote checkpoint target remains 4646c02ad839c8e45fc487c8a99d1bffb8131159,
+recorded before the branch refresh. The user subsequently approved fetching main
+and merging it into this candidate (not merging the PR). Fetch and ordinary merge
+completed without conflicts; the local activation packet was preserved. The fetched
+main also includes the clipboard ADR-100. No rebase or force-push was performed.
+Run both governance validators and obtain exact-head independent activation review
+and CI before any target-branch merge.
+
+## Current activation candidate checkpoint
+
+After the approved main merge, iteration headers were re-inventoried: retain I310
+Active and I277/I302/I318 Review; defer I249 Planned; do not reopen I162 Complete
+for its historical Review wording. TEMPLATE is excluded; no Blocked header matched.
+The source integration and owner dispositions below remain the scoped baseline.
+The header and claim table now propose activation, not effective ownership. Earlier
+inactive checkpoints are historical. ADR-101 and its index explicitly request atomic
+acceptance; independent review of this candidate is still outstanding. No production
+implementation or runtime test evidence is supplied by these governance edits.
 
 ## Goal and scope
 
@@ -73,11 +120,13 @@ TUI-ELLIPSIS-001 remains Review for deferred visual acceptance.
 
 ## Design readiness
 
-Public SubmissionSource/SubmissionKind are exhaustive enums. Choose private Actor
-input versus a reviewed versioned extension and migration before activation. Define
-context provenance, cancel epoch, consumed-terminal tracking and admission recovery.
-A private inbox alone must not bypass the existing custody/recovery fencing.
-The proposal is not an accepted ADR and this owner does not activate implementation.
+ADR-101 selects private Actor input without extending public exhaustive enums.
+It defines Context provenance, cancellation epoch, acknowledged terminal consumption,
+bounded admission and exactly-once slot retirement. Shared preparation/finalization
+must preserve existing custody/recovery fencing and #838 replay semantics if present.
+If private integration cannot preserve these gates, stop and amend the decision
+before changing public APIs. Design acceptance is requested in this same activation
+candidate; it is not asserted as already granted.
 
 ## Verification and documentation
 

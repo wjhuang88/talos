@@ -28,6 +28,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
+| [101: Default background completion continuation](101-background-completion-continuation.md) | Proposed atomic acceptance in #893 | BG-CONTINUE-001; independent exact-head review and target-branch merge required; no current implementation authority. |
 | [100: Native clipboard image input](100-native-clipboard-image-input.md) | Proposed | Explicit host acquisition, OS ABI isolation, attachment retention and public UI event migration. |
 | [099: Session-owned worktree admission](099-session-owned-worktree-admission.md) | Accepted on #889 merge | Ordinary workspace files allowed; external paths require authorization with human fallback; verified Session worktrees join the same workspace boundary. |
 | [098: Model-Selectable Per-Process Memory Limits](098-model-process-memory-limits.md) | Proposed / independent design review passed | I316 / PROCESS-001; per-process memory policy, explicit inheritance, native enforcement/failure evidence; activation and implementation pending. |
