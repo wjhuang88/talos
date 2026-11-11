@@ -139,6 +139,7 @@ pub struct Tui {
     transcript: TranscriptStore,
     history_scroll: HistoryScrollState,
     history_projection_cache: HistoryProjectionCache,
+    git_snapshot: crate::scrollback_status_git::GitSnapshot,
     last_history_projection: HistoryProjection,
     last_history_viewport_height: u16,
     last_history_area: Option<ratatui::layout::Rect>,
@@ -237,6 +238,7 @@ impl Tui {
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
             history_projection_cache: HistoryProjectionCache::default(),
+            git_snapshot: crate::scrollback_status_git::GitSnapshot::default(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
             last_history_area: None,
@@ -287,6 +289,7 @@ impl Tui {
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
             history_projection_cache: HistoryProjectionCache::default(),
+            git_snapshot: crate::scrollback_status_git::GitSnapshot::default(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
             last_history_area: None,
@@ -580,13 +583,28 @@ impl Tui {
 
     async fn run_with_events(
         &mut self,
+        event_stream: impl Stream<Item = io::Result<Event>> + Unpin,
+    ) -> io::Result<()> {
+        self.run_with_scanner(event_stream, crate::git_snapshot_worker::Scan::start)
+            .await
+    }
+
+    async fn run_with_scanner(
+        &mut self,
         mut event_stream: impl Stream<Item = io::Result<Event>> + Unpin,
+        mut start_scan: impl FnMut(String, u64) -> io::Result<Option<crate::git_snapshot_worker::Scan>>,
     ) -> io::Result<()> {
         let _metrics_report = crate::render_metrics::ReportOnExit::new();
         let session_start = scheduling::now();
         let mut pending_input_metric = None;
         let mut cadence = scheduling::Cadence::default();
         let mut git_cadence = scheduling::Cadence::default();
+        let mut git_scan: Option<crate::git_snapshot_worker::Scan> = None;
+        let mut git_scan_deadline = None;
+        let mut git_workspace = String::new();
+        let mut git_generation = 0u64;
+        let mut git_refresh_requested = false;
+        let mut git_was_visible = false;
         let mut ui_output_rx = self.ui_output_rx.take().expect("ui_output_rx not set");
         let mut dirty = true;
         let mut stream_frame_deadline = None;
@@ -599,6 +617,7 @@ impl Tui {
             Stream(Option<String>),
             ApprovalClosed,
             Queued,
+            Git(Option<crate::git_snapshot_worker::ScanResult>),
         }
         let mut output_open = true;
         'ui: loop {
@@ -633,10 +652,56 @@ impl Tui {
             );
             let git_visible =
                 !self.state.status.workspace_path.is_empty() && self.terminal.size()?.width >= 80;
-            // Transitional visible-only refresh; asynchronous snapshots follow in P2.
-            git_cadence.update(git_visible, now, Duration::from_millis(500));
+            if git_workspace != self.state.status.workspace_path {
+                git_workspace.clone_from(&self.state.status.workspace_path);
+                git_generation = git_generation.wrapping_add(1);
+                git_scan = None;
+                git_scan_deadline = None;
+                git_cadence.update(false, now, Duration::from_secs(2));
+                git_refresh_requested = true;
+            }
+            if git_visible && !git_was_visible {
+                git_refresh_requested = true;
+            }
+            git_was_visible = git_visible;
+            if git_refresh_requested && git_visible && git_scan.is_none() {
+                match start_scan(git_workspace.clone(), git_generation) {
+                    Ok(Some(scan)) => {
+                        git_scan = Some(scan);
+                        git_scan_deadline = Some(now + Duration::from_secs(2));
+                        git_refresh_requested = false;
+                    }
+                    Ok(None) => {}
+                    Err(_) => {
+                        let changed = self.git_snapshot.publish(
+                            git_workspace.clone(),
+                            None,
+                            scheduling::now(),
+                        );
+                        git_refresh_requested = false;
+                        if changed {
+                            // This failure occurs after the draw phase. Submit the
+                            // unknown status before waiting for another UI event.
+                            dirty = true;
+                            stream_frame_deadline = None;
+                            continue;
+                        }
+                    }
+                }
+            }
+            if !git_visible {
+                git_scan = None;
+                git_scan_deadline = None;
+            }
+            git_cadence.update(git_visible, now, Duration::from_secs(2));
             let deadline = [
                 stream_frame_deadline,
+                git_scan_deadline,
+                if git_visible {
+                    self.git_snapshot.stale_deadline(&git_workspace)
+                } else {
+                    None
+                },
                 cadence.deadline(),
                 git_cadence.deadline(),
                 self.state.tip.as_ref().map(|tip| tip.created_at + tip.ttl),
@@ -653,6 +718,12 @@ impl Tui {
             let stream = &mut self.active_stream;
             let approval = &mut self.state.pending_approval_response;
             let wake = tokio::select! {
+                result = async {
+                    match git_scan.as_mut() {
+                        Some(scan) => scan.result().await,
+                        None => std::future::pending().await,
+                    }
+                } => Wake::Git(result),
                 _ = scheduling::wait_until(deadline) => Wake::Deadline,
                 event = event_stream.next() => Wake::Input(event),
                 output = ui_output_rx.recv(), if output_open && !queued => Wake::Output(output),
@@ -661,20 +732,44 @@ impl Tui {
                 _ = std::future::ready(()), if queued => Wake::Queued,
             };
             match wake {
+                Wake::Git(result) => {
+                    git_scan = None;
+                    git_scan_deadline = None;
+                    if let Some(result) = result
+                        && result.workspace == git_workspace
+                        && result.generation == git_generation
+                    {
+                        dirty |= self.git_snapshot.publish(
+                            result.workspace,
+                            result.summary,
+                            result.collected_at,
+                        );
+                    }
+                }
                 Wake::Deadline => {
                     if let Some(deadline) = deadline {
                         crate::render_metrics::deadline(deadline.into());
                     }
                     crate::render_metrics::count(crate::render_metrics::Stage::Timer);
                     let now = scheduling::now();
+                    dirty |= self.git_snapshot.expire(&git_workspace, now);
                     let steps = cadence.consume(now, PROCESSING_FRAME_INTERVAL);
                     if steps > 0 {
                         self.processing_frame = self.processing_frame.wrapping_add(steps - 1);
                         self.advance_processing_frame();
                         dirty = true;
                     }
-                    if git_cadence.consume(now, Duration::from_millis(500)) > 0 {
-                        dirty = true;
+                    if git_scan_deadline.is_some_and(|deadline| deadline <= now) {
+                        git_scan = None;
+                        git_scan_deadline = None;
+                        dirty |= self.git_snapshot.publish(
+                            git_workspace.clone(),
+                            None,
+                            scheduling::now(),
+                        );
+                    }
+                    if git_cadence.consume(now, Duration::from_secs(2)) > 0 {
+                        git_refresh_requested = true;
                     }
 
                     if self
@@ -709,6 +804,7 @@ impl Tui {
                         let previous_scroll = pending_input_metric
                             .as_ref()
                             .map(|_| self.history_scroll.clone());
+                        git_refresh_requested |= matches!(event, Event::FocusGained);
                         let exit = self.handle_input_event(&event);
                         if previous_scroll
                             .as_ref()
@@ -729,6 +825,7 @@ impl Tui {
                 Wake::Input(None) => break,
                 Wake::Output(None) => output_open = false,
                 Wake::Output(Some(output)) => {
+                    git_refresh_requested |= matches!(&output, UiOutput::ToolResult(_));
                     crate::render_metrics::count(crate::render_metrics::Stage::Output);
                     if !matches!(self.state.approval_state, ApprovalState::Hidden) {
                         self.queued_outputs.push(output);
@@ -747,6 +844,7 @@ impl Tui {
                 Wake::Queued => {
                     // One queued business event per select preserves FIFO and lets input compete.
                     let output = self.queued_outputs.remove(0);
+                    git_refresh_requested |= matches!(&output, UiOutput::ToolResult(_));
                     stream_frame_deadline = None;
                     self.state.should_exit |= self.handle_ui_output(output);
                     dirty |= !self.state.should_exit || !self.pending_transcript.is_empty();

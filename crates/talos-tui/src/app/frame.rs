@@ -169,7 +169,13 @@ impl Tui {
         } else {
             None
         };
-        let status_comp = crate::scrollback::StatusComponent { status, width };
+        let status_comp = crate::scrollback::StatusComponent {
+            status,
+            width,
+            git_summary: self
+                .git_snapshot
+                .get(&status.workspace_path, Instant::now()),
+        };
 
         let preview_natural = if is_startup {
             0

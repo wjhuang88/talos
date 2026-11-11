@@ -5339,3 +5339,101 @@ async fn event_loop_drag_scroll_stops_deadlines_after_mouse_release() {
         "initial, three scroll ticks, release; no post-release frames"
     );
 }
+
+#[tokio::test]
+async fn event_loop_remains_interactive_and_exits_while_actual_git_scan_is_blocked() {
+    use crate::git_snapshot_worker::{Scan, TEST_SCAN_LOCK, wait_for_test_slot};
+    use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+    let _serial = TEST_SCAN_LOCK.lock().await;
+    wait_for_test_slot().await;
+    let (user_tx, mut user_rx) = mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(user_tx));
+    tui.first_message_dispatched = true;
+    tui.state.status.workspace_path = "blocked-test-workspace".into();
+    let (output_tx, output_rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(output_rx);
+    let (input_tx, input_rx) = futures::channel::mpsc::unbounded();
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let mut entered_tx = Some(entered_tx);
+    let mut release_rx = Some(release_rx);
+    let mut launches = 0;
+    let mut requests = Vec::new();
+    let driver = async move {
+        entered_rx.await.expect("scanner started");
+        // Once the real worker is known to be blocked, advance only the UI clock.
+        tokio::time::pause();
+        tokio::time::sleep(std::time::Duration::from_millis(2100)).await;
+        output_tx
+            .send(talos_conversation::UiOutput::Status(
+                talos_conversation::StatusSnapshot {
+                    workspace_path: "replacement-workspace".into(),
+                    ..Default::default()
+                },
+            ))
+            .expect("workspace switch after timeout");
+        for _ in 0..20 {
+            input_tx
+                .unbounded_send(Ok(Event::FocusGained))
+                .expect("refresh request");
+        }
+        for code in [KeyCode::Char('x'), KeyCode::Enter] {
+            input_tx
+                .unbounded_send(Ok(Event::Key(KeyEvent::new(code, KeyModifiers::NONE))))
+                .expect("input");
+        }
+        assert!(
+            matches!(user_rx.recv().await, Some(UserInput::Message(_))),
+            "input must reach business channel before scanner is released"
+        );
+        output_tx
+            .send(talos_conversation::UiOutput::Exit)
+            .expect("exit");
+        // Keep input open until Exit wins; this test must not pass by input EOF.
+        (input_tx, release_tx)
+    };
+    let run = tui.run_with_scanner(input_rx, |workspace, generation| {
+        requests.push((workspace.clone(), generation));
+        let Some(entered) = entered_tx.take() else {
+            let attempted = Scan::start_with(workspace, generation, |_| None)?;
+            assert!(
+                attempted.is_none(),
+                "timeout/switch must not start another actual worker"
+            );
+            return Ok(None);
+        };
+        launches += 1;
+        let release = release_rx.take().expect("one actual scan");
+        Scan::start_with(workspace, generation, move |_| {
+            let _ = entered.send(());
+            let _ = release.recv();
+            None
+        })
+    });
+    let (result, (_input_tx, release_tx)) =
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            tokio::join!(run, driver)
+        })
+        .await
+        .expect("blocked scan must not delay input or exit");
+    result.expect("loop");
+    assert_eq!(launches, 1);
+    assert!(
+        requests.iter().any(
+            |(workspace, generation)| workspace == "replacement-workspace" && *generation == 2
+        )
+    );
+    assert!(
+        tui.git_snapshot
+            .get("replacement-workspace", super::scheduling::now())
+            .is_none()
+    );
+    assert!(
+        Scan::start_with("next-session".into(), 2, |_| None)
+            .expect("probe")
+            .is_none(),
+        "exiting must not free the actual worker slot"
+    );
+    release_tx.send(()).expect("release blocked worker");
+    wait_for_test_slot().await;
+}

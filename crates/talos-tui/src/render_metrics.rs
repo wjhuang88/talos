@@ -22,8 +22,9 @@ pub(crate) enum Stage {
     DeadlineLateness,
     FramePreparation,
     WorkspaceChange,
+    GitSnapshotAge,
 }
-const NAMES: [&str; 18] = [
+const NAMES: [&str; 19] = [
     "draw",
     "layout",
     "history_rebuild",
@@ -42,6 +43,7 @@ const NAMES: [&str; 18] = [
     "deadline_lateness",
     "frame_preparation",
     "workspace_change",
+    "git_snapshot_age",
 ];
 #[derive(Clone, Copy, Default)]
 struct Metric {
@@ -237,6 +239,21 @@ pub(crate) fn screen_size(width: u16, height: u16) {
             metrics.observe(Stage::ScreenResize, 0);
         }
         metrics.last_screen_size = Some(size);
+    }
+}
+
+/// Age of a successful snapshot when read for a frame, not a scan duration.
+/// Sampling is frame-weighted; unchanged idle snapshots do not generate samples.
+pub(crate) fn snapshot_age(age: Duration) {
+    if destination().is_some()
+        && let Ok(mut metrics) = METRICS.lock()
+    {
+        let ns = age.as_nanos().min(u128::from(u64::MAX)) as u64;
+        metrics.stages[Stage::GitSnapshotAge as usize].observe(ns);
+        // The age is a gauge observed now, so it does not cross the warmup boundary.
+        if metrics.in_window(0) {
+            metrics.steady_stages[Stage::GitSnapshotAge as usize].observe(ns);
+        }
     }
 }
 

@@ -1143,6 +1143,7 @@ impl ViewportComponent for InputComponent<'_> {
 
 pub(crate) struct StatusComponent<'a> {
     pub(crate) status: &'a talos_conversation::StatusSnapshot,
+    pub(crate) git_summary: Option<&'a crate::scrollback_status_git::GitStatusSummary>,
     pub(crate) width: u16,
 }
 
@@ -1152,7 +1153,7 @@ impl ViewportComponent for StatusComponent<'_> {
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let text = build_status_text(self.status, self.width);
+        let text = build_status_text(self.status, self.width, self.git_summary);
         frame.render_widget(Paragraph::new(text), area);
     }
 }
