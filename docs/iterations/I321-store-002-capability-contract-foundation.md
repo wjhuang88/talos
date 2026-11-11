@@ -1,6 +1,6 @@
 # Iteration I321: STORE-002 Capability Contract Foundation (A/B)
 
-> Document status: Review / Claimed — effective claim #908, bounded A/B code candidate #909 (no C/D/E/F)
+> Document status: Complete / Closed — bounded A/B only; parent #670 C/D/E/F OPEN
 > Published plan date: 2026-11-10
 > Planned objective: inventory and classify every current persistence/retrieval responsibility, then publish a minimal additive, typed infrastructure capability contract foundation that does not alter any consumer's behavior.
 > Baseline rule: preserve SQLite/TLOG/JSONL/FTS5 schemas, SQL, paths, migration, transactions, locking, public domain interfaces and runtime behavior exactly.
@@ -94,18 +94,23 @@ Update this iteration, STORE-002 owner, `docs/iterations/README.md`, `docs/backl
 - I321 governance #908 / CI #4011: **PASS**, docs-only exact head; both project and collaboration validators 0 warnings.
 - A source inventory: [source-backed capability and data authority matrix](../reference/STORE-002-I321-CAPABILITY-AUTHORITY-INVENTORY-2026-11-10.md).
 - B Rust contract source: `crates/talos-core/src/storage_capability.rs` (additive typed classification, no adapters).
-- [Historical CI #4030](https://github.com/wjhuang88/talos/actions/runs/42799763086) passed 8/8 for old head `5c38e6e` after rustfmt repair and latest-main integration. Independent [Copilot API review](https://github.com/wjhuang88/talos/pull/909#issuecomment-6765145292) reported a **blocking** ability to wrap metadata in generic `StorageCapabilityBinding<T>::Bound`. The implementation removes that type entirely instead of asserting operational readiness. Re-run exact-head CI and independent re-review before accepting revised code; neither is assumed passed.
+- Historical CI #4030 passed 8/8 before an independent Copilot reviewer blocked an unconstrained `StorageCapabilityBinding<T>` public API. The type and tests were removed; subsequent fmt failure corrected. **Final** [CI #4039](https://github.com/wjhuang88/talos/actions/runs/42848943669) passed 8/8 on exact merged head, and independent API re-review/delta check found no blockers.
 - Local Rust toolchain is unavailable in the current execution environment. No behavior-preservation proof of SQLite/TLOG delegation exists in A/B; only future C/D/E/F can establish it.
 
 ## Completion Evidence
 
-- None. Existing implementation merge evidence is required before `Complete`.
+- **I321 A/B complete for its bounded slice**: governance #908 merged `201a9b61d72e704da3a86f5db283b9f6e4d92938`, implementation [#909](https://github.com/wjhuang88/talos/pull/909) merged `a9914b7a62b0873027997c69d9966d17f3fd48ba`.
+- Completion Commit: `a9914b7a62b0873027997c69d9966d17f3fd48ba`.
+- [Exact-head CI #4039](https://github.com/wjhuang88/talos/actions/runs/42848943669) completed SUCCESS 8/8, both governance validators 0 warnings; independent [API/architecture review](https://github.com/wjhuang88/talos/pull/909#issuecomment-6772057381) and [exact-head confirmation](https://github.com/wjhuang88/talos/pull/909#issuecomment-6772113212) found no blockers; [merge-time CAS](https://github.com/wjhuang88/talos/pull/909#issuecomment-6785449447) passed.
+- Final B API removed the unconstrained `StorageCapabilityBinding<T>` that would falsely mark metadata as operational. Three taxonomy/registry tests remain.
+- Domain contracts C, adapters D, local composition E, conformance F and #897 E2/E3 are **not complete and not authorized by this milestone**. #670 remains OPEN.
 
 ## Variance And Residuals
 
-- C/D/E/F local adapters, domain contracts, local profile and full legacy conformance remain unclaimed and incomplete.
+- C domain-contract extraction is proposed in [I322](I322-store-002-domain-contract-extraction.md) and remains **ineffective until its own governance claim merges**. D/E/F local adapters, local profile and full legacy conformance remain unclaimed and incomplete.
 - #897 cannot consume a merely descriptive taxonomy as a functional storage adapter; a later accepted local delegation remains prerequisite.
 
 ## Retrospective
 
-- Pending.
+- Independent API review caught a premature generic `Bound<T>` design that permitted provider metadata to masquerade as an executable store. Defer binding types until real domain operations are accepted; keep typed capability identity descriptive.
+- Windows format failures were fixed without modifying production storage. Track exact-head CI and Board drift without conflating them with older #705 runtime timeouts.

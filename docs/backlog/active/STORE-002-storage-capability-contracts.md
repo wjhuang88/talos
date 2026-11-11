@@ -1,6 +1,6 @@
 # STORE-002: Storage And Retrieval Capability Contracts
 
-**Status**: Review / Claimed — I321 A/B candidate #909; C/D/E/F incomplete
+**Status**: Active / Claimed — I322 C proposed (ineffective until claim merge); D/E/F incomplete
 
 **Type**: Architecture / Contract Convergence
 
@@ -20,6 +20,13 @@ Define narrow capability contracts for Log, Relational, Object, Lexical Search, 
 
 Vector search, embedding, and other unavailable capabilities must have explicit unavailable semantics. Zvec, PostgreSQL, S3, generic ORM/query DSL work, and production behavior changes are out of scope for the first phase.
 
+## I321 A/B merged baseline (completed bounded slice; #670 OPEN)
+
+- Governance claim #908 merged `201a9b61d72e704da3a86f5db283b9f6e4d92938`; implementation [PR #909](https://github.com/wjhuang88/talos/pull/909) merged `a9914b7a62b0873027997c69d9966d17f3fd48ba`.
+- [Exact-head CI #4039](https://github.com/wjhuang88/talos/actions/runs/42848943669) passed **8/8**, both governance validators **0 warnings**, independent [API review](https://github.com/wjhuang88/talos/pull/909#issuecomment-6772057381) and [delta check](https://github.com/wjhuang88/talos/pull/909#issuecomment-6772113212) no blockers, [CAS](https://github.com/wjhuang88/talos/pull/909#issuecomment-6785449447) recorded.
+- Delivered: seven typed `StorageCapabilityKind` IDs, metadata-only `CapabilityRequest` helper and source-backed authority inventory. Speculative `Bound<T>` was removed; no SQL/runtime/default provider changes.
+- A/B milestone is complete; **C/D/E/F remain separately gated** and #897 Host E2/E3 is still blocked.
+
 ## Collaboration Claim
 
 | Field | Value |
@@ -27,19 +34,19 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
-| Work Slice | STORE-002 I321 A/B: source-truth authority/capability inventory, stable capability taxonomy and additive typed contract foundation for seven capability families; excludes domain adapter migration, SQL/format changes, host integration, Server and new engines |
-| Claimed At | 2026-11-10 |
+| Work Slice | STORE-002 I322 C only: extract domain-owned persistence/retrieval operational traits from existing Session/PendingSubmission/Todo, Memory, Evolution and Exploration data/error methods; no concrete storage, SQL/transactions/formats/paths, consumer/default/Host/Server change or new engine |
+| Claimed At | 2026-11-11 |
 | Source Issue | #670 |
-| Governance Claim PR | #908 |
+| Governance Claim PR | #911 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Governance claim #908 merged `201a9b61d72e704da3a86f5db283b9f6e4d92938`; exact-head [CI #4011](https://github.com/wjhuang88/talos/actions/runs/42789979266) passed, both governance validators 0 warnings, docs-only single-maintainer authorization and CAS recorded. Public B code candidate #909 still requires independent API review and tests. |
-| Implementation PR | #909 |
-| Last Updated | 2026-11-10 |
-| Handoff / Release Condition | A/B candidate contracts must pass independent API/architecture review and all applicable tests; later C/D/E/F require separately scoped claims. E2/E3 ARCH-035 waits on accepted functional contract and local delegation. |
+| Authorization Evidence | User explicitly requested continued #670 implementation after I321 #909 merge. Independent API review of A/B passed. I322 governance-only claim needs exact-head CI, both validators, recorded no-overlap CAS, single-maintainer fallback rationale before merge; independent public API review required for C code. |
+| Implementation PR | Not started |
+| Last Updated | 2026-11-11 |
+| Handoff / Release Condition | C effective only after governance claim merge; acceptance requires exact-head native CI and independent API review. D/E/F and #897 E2/E3 remain independent/gated. |
 
 ## Governance
 
-I321 A/B became effective with governance #908 merge `201a9b61d72e704da3a86f5db283b9f6e4d92938`. Only bounded A/B inventory and additive typed capability foundation are authorized; C/D/E/F and #897 host implementation remain independently gated. Independent API/architecture review, exact-head locked CI, characterization evidence where applicable, and governance validators are required before B implementation acceptance.
+I321 A/B is **merged and accepted** as a narrow descriptor/inventory foundation, not as a functional provider binding. The I322 C work slice is **proposed and ineffective until its separate governance claim merges**. It will extract domain-owned operational interfaces without changing consumers or existing implementation; D/E/F and #897 Host implementation remain gated. No generic `Bound<T>`, SQL/CRUD provider, or new backend is authorized.
 
 ## Acceptance Direction
 
@@ -54,10 +61,16 @@ I321 A/B became effective with governance #908 merge `201a9b61d72e704da3a86f5db2
 
 Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim proposed on 2026-11-10 via #908. Source Issue #670 remains open for C/D/E/F after A/B.
 
-## I321 A/B implementation candidate — PR #909
+## I321 A/B implementation history — PR #909 (merged)
 
 - [Current capability and authority inventory](../../reference/STORE-002-I321-CAPABILITY-AUTHORITY-INVENTORY-2026-11-10.md): authoritative/derived/ephemeral data, all seven capability families, existing paths and residuals.
 - `crates/talos-core/src/storage_capability.rs`: typed `StorageCapabilityKind`, stable IDs and `CapabilityRequest` integration with existing `CapabilityRegistry` whose empty resolution returns `ResolutionResult::Unavailable`. No operational binding type, domain call site, or runtime behavior is introduced.
 - Candidate code is additive and non-operational: it does **not** satisfy C/D/E/F, does not implement seven storage operation traits, and does not yet provide #897 a functional dependency to inject.
-- Validation history: [CI #4030](https://github.com/wjhuang88/talos/actions/runs/42799763086) passed 8/8 on **previous** head `5c38e6e`; independent [Copilot review](https://github.com/wjhuang88/talos/pull/909#issuecomment-6765145292) identified one **blocking** unconstrained `StorageCapabilityBinding<T>` public API. The binding and its tests were removed. Revised exact-head CI and independent re-review remain **pending**; old CI/review must not be transferred to a changed head.
+- Validation history: [CI #4030](https://github.com/wjhuang88/talos/actions/runs/42799763086) passed 8/8 on **previous** head `5c38e6e`; independent [Copilot review](https://github.com/wjhuang88/talos/pull/909#issuecomment-6765145292) identified one **blocking** unconstrained `StorageCapabilityBinding<T>` public API. The binding and its tests were removed. Final [CI #4039](https://github.com/wjhuang88/talos/actions/runs/42848943669) passed **8/8** on head `f3563138`, independent [no-blocker delta review](https://github.com/wjhuang88/talos/pull/909#issuecomment-6772113212) and merge-time CAS recorded. I321 A/B merged as `a9914b7a62b0873027997c69d9966d17f3fd48ba`.
 - #670 remains open; avoid marking Complete or recording a fictitious Completion Commit. Future domain adapter delegation and local profile need separately authorized work.
+
+## I322 C proposed activation
+
+- [I322 domain-owned contract extraction](../../iterations/I322-store-002-domain-contract-extraction.md) proposes narrow interfaces anchored in the existing Session/Pending/Todo, Memory, Evolution and Exploration contracts with existing errors, while preserving local concrete behavior.
+- Independent API review is required before C implementation merge. Explicit unavailable status for Object/Vector/Embedding/standalone Rerank does not imply fake executable providers.
+- The C claim #911 is ineffective until its governance PR merges; D/E/F and #897 E2/E3 remain unclaimed/blocked.

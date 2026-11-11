@@ -1,10 +1,8 @@
 # Product Backlog
 
-## STORE-002 / I321 — A/B implementation Review (#909)
+## STORE-002 / I322 C — proposed independent domain contracts
 
-[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I321](../iterations/I321-store-002-capability-contract-foundation.md) / #670: governance #908 merged `201a9b61d72e704da3a86f5db283b9f6e4d92938`; candidate #909 provides source/authority classification plus additive seven-kind capability types only, pending independent API review and exact-head CI. Later domain-contract extraction, existing SQLite/TLOG delegates, local bindings, characterization and #897 Host wiring remain separate.
-
-
+[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I322](../iterations/I322-store-002-domain-contract-extraction.md) / #670: I321 A/B completed in #909 at `a9914b7a62b0873027997c69d9966d17f3fd48ba`, CI #4039 8/8 and independent API review passed. I322 C domain-owned contract extraction is a **new, proposed governance claim #911** with no production code authorized before merge. Existing SQL/TLOG/JSONL/FTS, local composition, future engines, D/E/F, and #897 Host remain unchanged.
 ## ARCH-035 / I320 — E0/E1 Review (PR #906)
 
 [ARCH-035](active/ARCH-035-behavior-preserving-host-composition.md) / [I320](../iterations/I320-arch-035-host-composition-baseline.md) / #897: governance PR #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615`, activating a bounded, documentation-only E0 code-truth inventory and E1 host-composition decision review. No implementation or acceptance is implied. E2/E3 cannot begin without accepted STORE-002/#670 contracts and separate authorization; no ServerHost implementation is implied.
