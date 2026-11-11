@@ -1,5 +1,11 @@
 # Talos Board
 
+## EDIT-LOCATIONS-001 — proposed display work ownership
+
+[Line-location owner](tasks/edit-diff-line-locations.md): Refinement / Unclaimed pending
+governance PR finalization. Old/new diff coordinates and ordinary/prepared/anchored edit
+locations only; no effective claim or implementation activation yet.
+
 ## PROVIDER-008-C / #914 — Azure transport intake only
 
 [PROVIDER-008-C](backlog/active/PROVIDER-008-C-azure-openai.md) / [#914](https://github.com/wjhuang88/talos/issues/914):
