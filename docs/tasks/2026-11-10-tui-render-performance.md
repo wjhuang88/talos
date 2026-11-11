@@ -1189,3 +1189,36 @@ Focused locked TUI test passed1/1 (682 filtered) in a dedicated resource guard:
 CPUQuota100%, MemoryHigh2G, MemoryMax3G, swap0, tasks128, jobs1/testthreads1.
 Service exited normally0, runtime15.990s, CPU14.472s, peak2GiB, swap0. No full
 workspace pass is implied; Windows cross-check of this new test remains pending.
+
+### Delivery convergence checkpoint (supersedes pending statements above)
+
+Current implementation tip: `a04ab9e0` (local, not pushed). New snapshot test MSVC
+`cargo xwin check --locked -p talos-tui --tests --examples --target x86_64-pc-windows-msvc`
+passed under the same guard: normal exit0,2.202s, peak837.2M, swap0.
+
+P4 allocation follow-up is now recorded in
+[heaptrack-p4-guarded](evidence/tui-perf-001/heaptrack-p4-guarded/README.md).
+Three serial alternating P3/P4 pairs: median allocation calls13386688→765612;
+reported peak heap43.56M→26.11M. Six normal exits0, total3min50.941s, guard peak
+453.8M/swap0. These whole-run capped profiler observations are not CPU/latency
+comparisons or leak proofs. The sampled output window differs by one update in
+two P3 cases; exact business-event counts were not captured. Source receipts bind
+the binaries, with P4 preceding the shared ANSI submission extraction.
+
+The user identified excessive validation time. Consolidate remaining work into
+the following delivery gates; do not add experiments without an uncovered
+requirement, regression, or review finding. Reuse existing evidence within its
+actual source/platform/workload scope; do not erase the original acceptance.
+
+| Gate | Existing evidence | Remaining action |
+| --- | --- | --- |
+| Runtime implementation P1–P4 | Local commits, scheduling/Git/projection oracles, ANSI equivalence and snapshot lifecycle tests | Independent review of final candidate; repair findings only |
+| Performance and memory | Debug/Release P0–P3 pairs, P4 Release transcript pairs, capped P4 allocation comparison, fixed-history repeated replay | P4 Debug follow-up and growing-history/resize heap stability remain unverified; combine required coverage instead of expanding matrix |
+| Current-source local checks | Full TUI682+2+2 before test-only addition, new test1/1, current MSVC tests/examples, check/Clippy before test-only addition | Full workspace preflight was interrupted during linking; solve bounded resource execution, then one final preflight |
+| Native terminal behavior/resources | Byte/cell oracles and synthetic PTY only | Ghostty on Wayland+niri plus another supported terminal; native Windows unavailable; emulator accounting, IME/clipboard/modal/input acceptance remain open |
+| Documentation/delivery | README responsiveness entry and LOCAL-DEV profiling/resource instructions; this owner and evidence archives | Push stable candidate, implementation PR, exact-head CI/independent review, then owner/Board/Issue synchronization; never mark Complete without required gates |
+
+No test/profile process remains live at this checkpoint. Keep task Active and
+claim effective; these gaps are not a completion claim or an approved reduction
+of scope. Native unavailability must be reported as pending acceptance rather
+than compensated by more synthetic tests.

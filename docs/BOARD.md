@@ -41,8 +41,10 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 - Active / Claimed via merged #910: [owner and implementation guide](tasks/2026-11-10-tui-render-performance.md).
   Reproducible profiling, event-driven drawing, asynchronous Git snapshots, and layout/component
-  caching; history incrementality is evidence-dependent. P0 replay and measurement tooling in progress; runtime
-  optimization and performance/terminal acceptance remain pending.
+  caching and evidence-driven incremental history are implemented in local commits through `a04ab9e0`.
+  Paired performance, ANSI and snapshot lifecycle evidence is recorded in the owner. Final workspace
+  validation, remaining performance coverage, native terminals and remote CI/review remain pending;
+  no completion or published implementation is claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001
 
