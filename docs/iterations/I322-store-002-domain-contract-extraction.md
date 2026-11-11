@@ -1,6 +1,6 @@
 # Iteration I322: STORE-002 Domain-Owned Persistence/Retrieval Contracts (C)
 
-> Document status: Active / Claimed proposed — ineffective until governance PR merge
+> Document status: Review / Claimed — effective governance #911; C implementation candidate pending acceptance
 > Published plan date: 2026-11-11
 > Objective: extract existing domain-owned storage/retrieval operational interfaces **without changing implementation or a single existing caller**.
 > Existing A/B baseline: I321 completed in implementation #909, merge `a9914b7a62b0873027997c69d9966d17f3fd48ba` (exact-head CI #4039 8/8, independent API review no blockers).
@@ -18,10 +18,10 @@
 | Source Issue | #670 |
 | Governance Claim PR | #911 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User instructed continued #670 implementation; previous A/B #908 claim and #909 implementation merged with exact-head validation and independent API review. Proposed C governance-only activation requires own exact-head CI, both validators, CAS, and no competing claim before any implementation work. No independent approving maintainer on this governance-only candidate; independent public API review is mandatory for the later C implementation PR. |
-| Implementation PR | Not started |
+| Authorization Evidence | Governance-only C claim [#911](https://github.com/wjhuang88/talos/pull/911) merged `60da1bbadca00c9bdee6fbcb8f5ad990a4313331` after exact-head CI #4055, both governance validators 0 warnings, no-overlap CAS and documented single-maintainer path. Public C implementation requires independent API/architecture review. |
+| Implementation PR | Pending C review candidate |
 | Last Updated | 2026-11-11 |
-| Handoff / Release Condition | Independent API/architecture review accepts the implemented domain contracts with exact-head locked CI; future D delegates, E local profile, F conformance and #897 Host wiring require distinct governance authorization. |
+| Handoff / Release Condition | C claim #911 is effective. C implementation needs exact-head platform CI, both governance validators and independent API/architecture review; D/E/F and #897 Host wiring remain separately gated. |
 
 ## Scope and source of truth
 
@@ -74,4 +74,11 @@ C5. Object/VectorSearch/Embedding/standalone Rerank: classify as not bound at th
 
 ## Execution / Verification / Completion
 
-Governance claim #911 is a proposal; **no C production code is authorized until #911 merges into main**. Track claim PR, exact-head checks, merge commit, implementation PR, independent technical review, and residual D/E/F authorization here as they occur. `I322` is not Complete and #670 stays OPEN until an actual C implementation merge.
+Governance claim #911 merged to main as `60da1bbadca00c9bdee6fbcb8f5ad990a4313331` after exact-head [CI #4055](https://github.com/wjhuang88/talos/actions/runs/42948954104), both governance validators 0 warnings, and recorded merge-time CAS. **C code is authorized** under this bounded claim, but its implementation candidate is not accepted until independent public API review, exact-head CI and merge. D/E/F remain separately gated. `I322` is not Complete and #670 stays OPEN until an actual C implementation merge.
+
+## I322 C execution checkpoint — 2026-11-11
+
+- Effective governance: [#911](https://github.com/wjhuang88/talos/pull/911), merged `60da1bbadca00c9bdee6fbcb8f5ad990a4313331`.
+- [Source-aligned contract map](../reference/STORE-002-I322-DOMAIN-OPERATIONAL-CONTRACT-MAP-2026-11-11.md): existing `SessionStore` retained; PendingSubmission/Todo, Memory, Evolution and Exploration domain contracts exported, with concrete forwarding implementations and compile/in-memory tests.
+- No existing store, SQL/FTS, TLOG/JSONL, SQLite schema, transaction/locking, public constructor, runtime caller or Cargo manifest modified. Trait conformance does **not** mean alternate provider readiness.
+- **Implementation PR, native CI, independent public API review and merge-time CAS pending.** No C completion commit; #670 stays OPEN and D/E/F/Host blocked.
