@@ -571,7 +571,9 @@ impl Tui {
     }
 
     pub async fn run(&mut self) -> io::Result<()> {
+        let _metrics_report = crate::render_metrics::ReportOnExit::new();
         let session_start = Instant::now();
+        let mut pending_input_metric = None;
         let mut event_stream = EventStream::new();
         let mut render_interval = tokio::time::interval(PROCESSING_FRAME_INTERVAL);
         render_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -608,19 +610,39 @@ impl Tui {
             self.state.expire_tip();
             self.commit_pending_transcript()?;
             self.draw_frame()?;
+            if let Some(start) = pending_input_metric.take() {
+                crate::render_metrics::submitted(start);
+            }
 
             tokio::select! {
-                _ = render_interval.tick() => self.advance_processing_frame(),
+                scheduled = render_interval.tick() => {
+                    crate::render_metrics::deadline(scheduled);
+                    crate::render_metrics::count(crate::render_metrics::Stage::Timer);
+                    self.advance_processing_frame();
+                },
                 Some(Ok(event)) = event_stream.next() => {
+                    if pending_input_metric.is_none() {
+                        pending_input_metric = crate::render_metrics::start();
+                    }
                     // Drain ready events before rendering so Release can invalidate
                     // queued repeats. Bound work to keep output/shutdown responsive.
                     for event in input::ready_input_batch(event, &mut event_stream).await {
-                        if self.handle_input_event(&event) {
+                        crate::render_metrics::count(crate::render_metrics::Stage::Input);
+                        if matches!(event, Event::Resize(..)) {
+                            crate::render_metrics::count(crate::render_metrics::Stage::Resize);
+                        }
+                        let previous_scroll = pending_input_metric.as_ref().map(|_| self.history_scroll.clone());
+                        let exit = self.handle_input_event(&event);
+                        if previous_scroll.as_ref().is_some_and(|previous| *previous != self.history_scroll) {
+                            crate::render_metrics::count(crate::render_metrics::Stage::HistoryScroll);
+                        }
+                        if exit {
                             break 'ui;
                         }
                     }
                 }
                 Some(output) = ui_output_rx.recv() => {
+                    crate::render_metrics::count(crate::render_metrics::Stage::Output);
                     if !matches!(self.state.approval_state, ApprovalState::Hidden) {
                         self.queued_outputs.push(output);
                     } else {
@@ -635,6 +657,7 @@ impl Tui {
                     }
                 }
                 Some(chunk) = self.next_stream_chunk() => {
+                    crate::render_metrics::count(crate::render_metrics::Stage::Stream);
                     self.consume_stream_chunk(&chunk);
                 }
             }

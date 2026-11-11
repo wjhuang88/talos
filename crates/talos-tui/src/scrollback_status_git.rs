@@ -34,6 +34,7 @@ pub(crate) fn get_git_status(workspace: &str) -> Option<GitStatusSummary> {
     // gix is a native-code dependency (per ADR-010). Project hard constraint #9
     // (AGENTS.md) requires panic containment at the integration boundary so the
     // TUI draw loop can never crash on a repository read failure.
+    let _metric = crate::render_metrics::measure(crate::render_metrics::Stage::GitScan);
     let summary = catch_unwind(AssertUnwindSafe(|| {
         compute_git_status(Path::new(workspace))
     }))

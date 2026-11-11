@@ -399,7 +399,10 @@ impl TerminalSession {
 
         let blank = force_clear.then(|| Buffer::empty(area));
         let previous = blank.as_ref().unwrap_or(&self.buffers[prev_idx]);
+        let diff_metric = crate::render_metrics::measure(crate::render_metrics::Stage::Diff);
         let cells: Vec<_> = previous.diff_iter(&self.buffers[self.current]).collect();
+        drop(diff_metric);
+        crate::render_metrics::cells(cells.len());
         let dirty = force_clear || !cells.is_empty();
         let cursor = cursor.and_then(|position| clamp_cursor(position, self.screen_size));
         let move_cursor = cursor.filter(|position| {
@@ -447,7 +450,9 @@ impl TerminalSession {
             })();
             // End synchronization even when drawing fails; never leave the display frozen.
             let end = queue!(self.backend, EndSynchronizedUpdate);
+            let flush_metric = crate::render_metrics::measure(crate::render_metrics::Stage::Flush);
             let flush = Backend::flush(&mut self.backend);
+            drop(flush_metric);
             result.and(end).and(flush)?;
         }
         self.cursor_visible = cursor.is_some();

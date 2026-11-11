@@ -43,7 +43,11 @@ impl Tui {
     }
 
     pub(super) fn draw_frame(&mut self) -> io::Result<()> {
+        let _draw_metric = crate::render_metrics::measure(crate::render_metrics::Stage::Draw);
         let screen_size = self.terminal.size()?;
+        crate::render_metrics::screen_size(screen_size.width, screen_size.height);
+        let preparation_metric =
+            crate::render_metrics::measure(crate::render_metrics::Stage::FramePreparation);
         let view = &mut self.state.slash_menu.approval_view;
         if view.width != screen_size.width {
             view.offset = 0;
@@ -238,6 +242,7 @@ impl Tui {
             modal_natural,
         );
 
+        let layout_metric = crate::render_metrics::measure(crate::render_metrics::Stage::Layout);
         let app_layout = compute_app_layout(
             screen_size,
             ComponentMetrics {
@@ -258,6 +263,8 @@ impl Tui {
             },
             menu_placement,
         );
+        drop(layout_metric);
+        drop(preparation_metric);
         let history_height = app_layout.history.map_or(0, |rect| rect.height);
         self.last_history_viewport_height = history_height;
         self.last_history_area = app_layout.history;

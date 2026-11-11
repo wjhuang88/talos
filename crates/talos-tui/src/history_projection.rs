@@ -106,6 +106,8 @@ impl HistoryProjectionCache {
 
         let revision = transcript.revision();
         if self.transcript_revision != Some(revision) || self.width != width {
+            let _metric =
+                crate::render_metrics::measure(crate::render_metrics::Stage::HistoryRebuild);
             let (all_rows, logical_lines) = project_all_history(transcript, width);
             self.transcript_revision = Some(revision);
             self.width = width;
@@ -115,6 +117,8 @@ impl HistoryProjectionCache {
             {
                 self.rebuilds = self.rebuilds.saturating_add(1);
             }
+        } else {
+            crate::render_metrics::count(crate::render_metrics::Stage::HistoryHit);
         }
 
         project_viewport(

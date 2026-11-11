@@ -97,3 +97,58 @@ talos/
 - `cargo-outdated` — Check for outdated dependencies
 - `cargo-audit` — Security vulnerability check
 - `rust-analyzer` — IDE support (VS Code, Neovim)
+
+## TUI rendering diagnostics (TUI-PERF-001, P0 candidate)
+
+Set `TALOS_TUI_METRICS=/absolute/path/to/unique-report.json` before starting the
+TUI to opt into aggregate rendering measurements. Unset it for normal operation.
+The report is written when the UI loop exits (also on an error return); a killed
+process may not produce it. An unwritable destination silently loses diagnostics,
+so verify that a fresh report exists. Use a unique path per process/run.
+
+Counters cover draw, layout planning, history rebuild/cache hit, Git scan, diff,
+flush, input/output events and timer wakes; changed cells are accumulated. Timings
+use bounded 32-bucket log2 nanosecond histograms with a saturating overflow bucket.
+Durations are nested and must not be summed as exclusive CPU cost. No input,
+prompt, tool payload, clipboard data or rendered text is recorded. The counters
+in `stages` are process cumulative and include startup. Schema 2 additionally
+reports `steady_stages` after `TALOS_TUI_METRICS_WARMUP_MS` (bounded to one hour,
+default zero), measured from Tui::run entry; durations crossing the warmup
+boundary are excluded. The PTY sampler has a separate ready-state origin, so
+report both actual spans and do not assume exact boundary alignment. Instrumentation overhead still needs comparison
+with the switch disabled before interpreting baseline results.
+
+The offline example `tui_perf_replay` drives the real TUI without a provider or
+executing tools. The developer-only Linux script `scripts/measure_tui_perf.py`
+uses Python's PTY and procfs access to measure CPU/PSS/output; it is not a runtime
+dependency or proof of native terminal appearance. Its report explicitly lists
+currently missing child/terminal accounting and latency/allocation measurements.
+
+The sampler's `--input-probe` types and erases a synthetic character every 500 ms.
+`input_to_submit` measures the first received event of a batch through the next
+successful frame submission; cancelled/exiting batches without a submitted frame
+are not samples. Histogram quantiles are bounds, not exact latency values. Resize
+and stream wakes have separate counters. The sampler also supports `approval`,
+`scroll` and `resize` scenarios; these are display-only fixtures and cannot grant
+permission or execute tools. Every report records the sampled binary SHA-256 and
+OS identity. Record source revision, build profile, toolchain and host power mode
+with the eventual baseline report; a binary digest alone does not prove those.
+
+For a serial scenario matrix, use `scripts/replay_tui_perf_matrix.py` with
+`--binary baseline=/absolute/binary --output /new/report/directory --profile debug`.
+The default covers six scenarios, three history sizes and three rounds. Split by
+`--histories 100` (then 1000 and 10000) for shorter checkpoints. Add a second
+`--binary candidate=/absolute/binary` to alternate baseline/candidate within each
+case; never benchmark two processes simultaneously. `--metrics off` supports an
+instrumentation-overhead comparison. Output directories must be new; manifests
+retain completed cases on failure, and binaries are checked for changes before
+each launch. Do not compile concurrently. Profile is caller-supplied metadata;
+retain the actual build command and source-to-binary binding with the report.
+
+Matrix and standalone sampling both reject premature successful exits and gaps
+above 750 ms between steady samples. Matrix additionally parses metrics, checks
+histogram/count consistency, and requires steady scroll/resize state changes
+matching injected actions within one boundary event. Idle and approval waiting
+may legitimately have zero steady frames after scheduling optimization. Context
+switch counters currently describe the main thread; child-process CPU and
+per-thread totals remain unavailable rather than implicitly included.

@@ -1,6 +1,6 @@
 # TUI-PERF-001：TUI 事件驱动渲染与资源优化
 
-> Document status: Active / Claimed (proposed in #910; ineffective until target-branch merge)
+> Document status: Active / Claimed (#910 merged as d355dd68)
 > Created: 2026-11-10
 > Owner: 本文；Board 仅为派生入口。
 > 本轮交付为开发任务及实施指导。运行时代码尚未修改，性能收益尚未验证。
@@ -333,7 +333,118 @@ measure baseline and freeze budgets before P1.
 | Source Issue | None |
 | Governance Claim PR | #910 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Proposed only; target-branch merge and independent review pending |
+| Authorization Evidence | #910 merged as d355dd68; exact-head CI 42933711478 success; independent agent review APPROVE at 6c3e23df |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-11 |
 | Handoff / Release Condition | Full published acceptance including native terminal evidence; incomplete platforms remain Review |
+
+### P0 execution checkpoint — 2026-11-11
+
+Claim #910 is effective at `d355dd68bb2892ddcd9f042b4d83fd9b71fb65ae`.
+Implementation branch: `perf/tui-event-render`, isolated from the user's original
+worktree. The initial real-TUI offline replay supports deterministic 100/1000/10000
+message history, idle, animation and 20 Hz streaming. Locked example build passes.
+The Linux synthetic PTY sampler collects process CPU time, PSS and output bytes;
+its explicit ready signal excludes terminal startup from warmup/measurement.
+Python is developer-only measurement tooling, not a Talos runtime dependency.
+Without Linux procfs/PTY this sampler is unavailable; native platform acceptance
+remains independently required. Do not treat smoke tests as the three-round baseline.
+
+Still missing before P0 exit: approval/scroll/resize/Git fixture matrix, stage and
+latency instrumentation, child/terminal accounting, release-symbol builds, repeated
+raw statistics and frozen budgets. No scheduling or caching benefit claimed.
+
+P0 instrumentation checkpoint: opt-in bounded aggregate counters/timers now cover
+draw, layout rectangle planning, history rebuild/hit, Git scan, buffer diff,
+flush and input/output/timer wakes. `cargo test --locked -p talos-tui --lib`
+passed 652 tests; replay build and diagnostic smoke passed. Three-second idle
+smoke observed 23 draws/layouts/diffs, 20 timer wakes, 2 initial history rebuilds
+and 43 history cache hits, with no Git scan. This validates instrumentation and
+the repeated idle-draw path, not a representative performance budget. Reports:
+`/tmp/talos-perf-metrics-smoke.json`, `/tmp/talos-perf-metrics-sampler-smoke.json`.
+These ephemeral reports must be replaced by committed full baseline artifacts
+before P0 exit. Layout timing currently measures rectangle planning, not all
+component height calculations; input events are counts, not latency evidence.
+
+P0 follow-up: software input-to-submit latency and resize/legacy-stream wake
+counters added. Eight synthetic input batches produced eight submitted latency
+samples in the focused PTY smoke; this is not physical display latency. The TUI
+suite now passes 653 tests, including histogram overflow/saturation boundaries.
+Replay scenarios now include display-only approval, alternating PageUp/PageDown
+and alternating 80x30/120x40 resize. Build SHA-256 and OS identity are captured;
+full source/build/environment provenance and repeated baseline matrix still remain.
+
+### Scheduler dependency audit before P1
+
+Source inspection at the P0 candidate found two additional wake dependencies:
+
+- `retire_closed_approval` currently detects a dropped approval receiver only at
+  the next loop iteration. Removing the recurring tick requires explicitly
+  awaiting sender closure; an expired modal must not remain indefinitely.
+- `next_stream_chunk` mutates transcript state on legacy stream EOF, then returns
+  None; the select pattern `Some(chunk)` discards that branch's completion. The
+  timer currently supplies the later draw. P1 must represent EOF as a handled
+  event and submit final content without relying on another input or deadline.
+
+Keep the existing tip expiry, deferred reconnect and drag-edge deadlines as
+separate producers. Add controlled regressions for approval closure and legacy
+EOF as well as canonical FIFO Content::End. These are audit findings, not fixes.
+
+Initial three-round debug idle data and its limitations are retained in
+[evidence/tui-perf-001/initial-idle](evidence/tui-perf-001/initial-idle/README.md).
+CPU median 2.371%, range 2.270–2.404%; steady terminal bytes zero, but all three
+runs made 237 draw/layout/diff calls including startup and 234 timer wakes.
+This confirms repeated computation, not P0 completion or a final budget.
+Perf is unavailable; no sampled flamegraph is claimed.
+
+### Long-task execution contract
+
+Work mode: Standard. Deferred validation tracker: None; native terminal gates
+remain required in this owner. The user authorized full implementation closure;
+#910 established the effective claim. Outcome, scope, exclusions, dependencies,
+ordered P0–P4 items, gates and fallback remain the published sections above.
+
+Worktree `/tmp/talos-tui-perf-claim`, branch `perf/tui-event-render`. Preserve original
+worktree changes. Ordinary source edits, offline tests and requested PR delivery
+are authorized; no system security changes, external messages, destructive cleanup
+or release publication are implied. Raw reports and manifests live under the
+explicit experiment output directory and are retained with the evidence report.
+
+Measurement batches are serial, 35 seconds per scenario including 5-second
+warmup, 3 rounds per case, grouped by history size. Each process has a bounded
+startup/exit timeout; one failure stops the batch and retains successful samples.
+Do not silently resume using a changed binary, overwrite an output directory,
+or run builds/tests during timed samples. Inspect live process handles before
+retrying. No repeated CI submission or speculative benchmark rerun is authorized
+without new changes, a failed check, or an identified unresolved measurement issue.
+All incomplete rows stay here; this contract does not relax native acceptance or
+mark P0 complete. No deadline or token/cost budget was imposed by the maintainer.
+
+P0 independent static review requested changes before baseline acceptance:
+validate actual sample-window duration, parse/validate metrics rather than only
+checking file existence, and distinguish injected actions from actual scroll/size
+changes. Window/schema validators and their two regression tests now pass. Existing
+completed matrix samples pass the retrospective window/schema checks, but old
+schema-1 scroll/resize reports lack actual-state evidence and remain preliminary.
+Schema 2 adds actual history-scroll and observed screen-size counters, and counts
+every consumed input/resize event in a batch. Source edits are not rebuilt while
+the schema-1 batch is running, preserving its sampled binary. Full retest and
+replacement acceptance evidence are pending. Context switches currently describe
+the main thread, not all process threads.
+
+Native-platform constraint confirmed by maintainer: no Windows environment is
+available for physical terminal acceptance (2026-11-11). Keep that row pending;
+xwin and Windows CI are not substitutes for native terminal behavior. Linux
+implementation and independent automated gates continue. Overall Complete remains
+unavailable until the required device evidence exists; no scope waiver was given.
+
+The initial schema-1 debug history100 matrix completed all 18 cases. The corrected
+steady-window/schema-2 fixture smoke passed all six scenarios; actual scroll and
+observed terminal-size counters were nonzero in the corresponding cases. Full
+corrected baseline, release matrix and final gates remain pending.
+
+Steady-window diagnostics and explicit deadline-lateness/frame-preparation timers
+now compile; 653 TUI tests and MSVC xwin tests/examples check pass. Standalone
+and matrix sampling share duration/gap validation, and strict matrix acceptance
+checks steady actions rather than cumulative prewarm activity. Pure idle and
+approval waiting permit zero steady draws by design for the target scheduler.
