@@ -1,6 +1,6 @@
 # TUI-PERF-001：TUI 事件驱动渲染与资源优化
 
-> Document status: Planned / Unclaimed (activation proposal; ineffective until claim merge)
+> Document status: Active / Claimed (proposed in #910; ineffective until target-branch merge)
 > Created: 2026-11-10
 > Owner: 本文；Board 仅为派生入口。
 > 本轮交付为开发任务及实施指导。运行时代码尚未修改，性能收益尚未验证。
@@ -325,13 +325,13 @@ measure baseline and freeze budgets before P1.
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | TUI-PERF-001 P0 measurements, P1 event scheduling, P2 Git snapshots, P3 dependency caches, evidence-based P4 decision and full acceptance |
 | Claimed At | 2026-11-11 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #910 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Proposed only; target-branch merge and independent review pending |
 | Implementation PR | Not started |
