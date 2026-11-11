@@ -59,7 +59,7 @@ dashboard, broader dotagents compatibility, plugin carriers, and advanced docume
 - **Durable sessions and memory**: SQLite-backed session history, search, branch/fork support, export, semantic memory consolidation, and retention previews.
 - **Progressive context**: runtime Skill discovery plus explicit Skill body/reference activation without dumping hidden content into visible history.
 - **Request context budget**: the TUI shows `?` before admission evidence and `~N%` for the local request estimate, including tool definitions, safety margin and output reservation, not billing usage. Bounded recovery omits older complete tool exchanges from a request only, retaining instructions and the latest complete exchange; irreducible requests are rejected without replaying tools. Unreleased whole-request checkpoints preserve original Actor history; derived projections remain rebuildable and manual compaction is available in TUI/inline. Automatic attempts show transient progress, token estimates and bounded failure reasons without displaying checkpoint content.
-- **Model-directed checkpoints (unreleased, partial)**: Runtime and CLI register `compact_context` and `history_search`. The model first discovers an opaque snapshot; compaction admission is followed by a separate final outcome, while bounded search/detail recover eligible original history without rerunning the original tool. Durable recovery requires supported local storage and permitted recovery projections; legacy unverified tool results may be unavailable. Durable recovery uses Runtime/Session storage; legacy CLI storage does not yet provide recovery receipts, so its durable search/detail remains unavailable. Windows durable recovery/fork has an unmerged candidate with passing native workspace tests; full platform acceptance remains open. See [Runtime SDK contract](docs/reference/RUNTIME-SDK-CONTRACT.md) and [I313 acceptance status](docs/iterations/I313-model-checkpoint-history.md).
+- **Model-directed checkpoints (unreleased, partial)**: Runtime and CLI register `compact_context` and `history_search`. The model first discovers an opaque snapshot; compaction admission is followed by a separate final outcome, while bounded search/detail recover eligible original history without rerunning the original tool. Durable recovery requires supported local storage and permitted recovery projections; legacy unverified tool results may be unavailable. Unreleased CLI TLOG recovery binds the selected session in place and supports eligible user/assistant search/detail, revalidating the captured prefix after diagnostic appends. Legacy CLI tool results without recovery receipts remain unavailable. Legacy count-placeholder histories can restore and search original user/assistant records when exact archive overlap proves a unique order; ambiguous branches, conflicting records and missing sources are refused. Original parent IDs are retained, not repaired. Windows durable recovery/fork has an unmerged candidate with passing native workspace tests; full platform acceptance remains open. See [Runtime SDK contract](docs/reference/RUNTIME-SDK-CONTRACT.md) and [I313 acceptance status](docs/iterations/I313-model-checkpoint-history.md).
 - **Extensible surface**: MCP tools, hooks, JSON-RPC, governance-aware project status, and explicit local read-only WASM packages are implemented; remote plugin distribution and browser control remain bounded separately.
 
 Unreleased CLI startup history restoration uses cancellable bounded pages in TUI,
@@ -1333,6 +1333,15 @@ RUST_LOG=talos=debug talos
   Deny rules always take precedence over `always` rules.
 - **Session not resuming**: ensure the session UUID exists with `talos storage status`. Use
   `talos --continue` to resume the most recent workspace session.
+- **Older history missing after archival (unreleased diagnostics)**: preserve the TLOG and sibling
+  archives, then run `talos storage inspect-recovery --transcript /path/to/UUID.tlog` on an idle
+  session or isolated copy. It reports exact-overlap candidates, original record counts and source
+  hashes without rewriting history. `EvidenceOnly` does not mean history was installed or complete;
+  ambiguous branches, conflicting records and corrupt sources are refused. The unreleased startup
+  path restores uniquely proven original messages without rewriting those files; normal context
+  limits still apply: existing source-bound checkpoint folding reduces eligible history before
+  continuation; failed summaries or irreducible context pause submission. Archived-session forks
+  are currently refused because preserving their archive provenance in a child is not yet supported.
 - **Model picker is empty**: unauthenticated providers are omitted from `/model`. Use `/connect`
   to set up credentials first.
 

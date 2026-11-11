@@ -1,5 +1,12 @@
 # Talos Board
 
+## Session recovery integration
+
+- Partial / Emergency override: [recovery owner](tasks/session-archive-recovery-emergency.md) and
+  [checkpoint admission](tasks/compact-context-admission-emergency.md). Isolated CLI/Actor candidate
+  builds and passes three provider-path regressions; full validation and independent review pending.
+  Archived fork remains refused; default background continuation is unchanged.
+
 ## Session recovery storage prerequisite
 
 - Partial / Emergency override: [isolated storage candidate](tasks/session-recovery-storage-candidate.md).

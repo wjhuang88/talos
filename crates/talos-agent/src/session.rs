@@ -7,7 +7,7 @@
 
 use std::collections::VecDeque;
 use std::panic::AssertUnwindSafe;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -138,10 +138,9 @@ pub struct AppServerSession {
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     history: Vec<Message>,
     private_replays: Arc<crate::private_replay::PrivateReplayStore>,
+    session_file: Option<PathBuf>,
     recovered_source: Option<crate::compaction::HistorySource>,
     post_turn_pressure: crate::checkpoint_progress::PostTurnPressure,
-    session_file: Option<PathBuf>,
-    session_dir: Option<PathBuf>,
     persistence: Option<TurnPersistence>,
     durable_persistence: Option<DurableTurnPersistence>,
     pending_store: PendingSubmissionStore,
@@ -194,7 +193,6 @@ impl AppServerSession {
             history: config.initial_history,
             private_replays: Default::default(),
             session_file: None,
-            session_dir: None,
             persistence: None,
             durable_persistence: None,
             recovered_source: None,
@@ -254,12 +252,15 @@ impl AppServerSession {
         self.background_jobs.finalizer_handle()
     }
 
-    pub fn set_session_paths(&mut self, file: PathBuf, dir: PathBuf) {
+    /// Records the legacy session path and invalidates private replay on change.
+    ///
+    /// Automatic head trimming is disabled to preserve restart history. This
+    /// does not configure turn persistence; use `set_persistence` instead.
+    pub fn set_session_paths(&mut self, file: PathBuf, _dir: PathBuf) {
         if self.session_file.as_ref() != Some(&file) {
             self.private_replays = Default::default();
         }
         self.session_file = Some(file);
-        self.session_dir = Some(dir);
     }
 
     /// Assigns the durable session that owns successful turn-message writes.
@@ -276,7 +277,12 @@ impl AppServerSession {
         self.session_id = session.id.to_string();
         self.background_jobs
             .set_identity(self.session_id.clone(), self.session_generation);
-        self.persistence = Some(TurnPersistence { session, metadata });
+        self.persistence = Some(TurnPersistence {
+            session,
+            metadata,
+            history_owner: Arc::new(tokio::sync::Mutex::new(None)),
+            recovery_preparation: Arc::new(tokio::sync::Mutex::new(None)),
+        });
     }
 
     /// Assigns an atomic durable session used by the embedded runtime.
@@ -1266,11 +1272,6 @@ impl AppServerSession {
         turn_counter: u64,
         token: CancellationToken,
     ) -> Result<StartedTurn, UnstartedOutcome> {
-        // Durable segment archival retains original records and is independent
-        // of the model request projection. Never replace Actor history here.
-        if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
-            let _ = self.try_archive_session(file, dir);
-        }
         if let Some(estimated_tokens) = self.post_turn_pressure.take() {
             tracing::debug!(
                 estimated_tokens,
@@ -1691,39 +1692,6 @@ impl AppServerSession {
             boundary_rx,
             boundary_ack_rx,
         })
-    }
-
-    fn try_archive_session(
-        &self,
-        file: &Path,
-        dir: &Path,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        use talos_session::CompactTextSessionStore;
-        use talos_session::compaction_engine::CompactionEngine;
-
-        let store = std::sync::Arc::new(CompactTextSessionStore);
-        let engine = CompactionEngine::new(store);
-
-        if !engine.should_compact(file, 0) {
-            return Ok(());
-        }
-
-        match engine.compact_segment(file, dir, 0)? {
-            talos_session::compaction_engine::CompactionResult::Compacted {
-                segment_id,
-                original_count,
-                ..
-            } => {
-                let _ = self.eq_tx.send(SessionEvent::Error {
-                    message: format!(
-                        "Session compacted: {original_count} entries archived to {segment_id}"
-                    ),
-                });
-            }
-            talos_session::compaction_engine::CompactionResult::Skipped => {}
-        }
-
-        Ok(())
     }
 }
 

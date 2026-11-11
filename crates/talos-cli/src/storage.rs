@@ -14,6 +14,12 @@ use talos_session::{
 pub(crate) enum StorageCommand {
     /// Show local storage usage and status (read-only).
     Status,
+    /// Inspect overlapping archives for an idle TLOG without rewriting history.
+    InspectRecovery {
+        /// UUID-named selected TLOG, preferably an isolated evidence copy.
+        #[arg(long)]
+        transcript: PathBuf,
+    },
     /// Clean up old sessions (defaults to dry-run).
     Cleanup {
         /// Actually delete matched sessions (default is dry-run preview).
@@ -50,6 +56,11 @@ pub(crate) enum StorageCommand {
 pub(crate) fn run_storage_command(cmd: StorageCommand) -> Result<()> {
     match cmd {
         StorageCommand::Status => run_storage_status(),
+        StorageCommand::InspectRecovery { transcript } => {
+            let report = inspect_recovery(&transcript)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            Ok(())
+        }
         StorageCommand::Cleanup {
             apply,
             max_sessions,
@@ -73,6 +84,45 @@ pub(crate) fn run_storage_command(cmd: StorageCommand) -> Result<()> {
             reconcile,
         }),
     }
+}
+
+fn inspect_recovery(transcript: &Path) -> Result<serde_json::Value> {
+    let id = transcript
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .context("transcript must have a UUID filename")?;
+    let id = uuid::Uuid::parse_str(id).context("invalid transcript UUID")?;
+    anyhow::ensure!(
+        transcript.extension().is_some_and(|s| s == "tlog"),
+        "recovery inspection requires a TLOG"
+    );
+    // The permanent lock anchor coordinates with cooperating writers. No
+    // transcript, archive, pending journal or index bytes are rewritten.
+    let _lease = talos_session::SessionRuntimeLease::acquire(transcript)?;
+    let session = talos_session::Session::new(id, String::new(), String::new(), transcript.into());
+    let evidence = session.inspect_archive_recovery(
+        std::time::Instant::now() + std::time::Duration::from_secs(10),
+        || false,
+    )?;
+    let non_adjacent = evidence
+        .entries()
+        .windows(2)
+        .filter(|pair| pair[1].parent_id.as_deref() != Some(pair[0].id.as_str()))
+        .count();
+    Ok(serde_json::json!({
+        "status": "EvidenceOnly",
+        "session_id": id,
+        "original_records": evidence.entries().len(),
+        "omitted_count_placeholders": evidence.removed_placeholders(),
+        "excluded_archives": evidence.excluded_archives(),
+        "non_adjacent_original_parents": non_adjacent,
+        "sources": evidence.sources().iter().map(|source| serde_json::json!({
+            "file": source.path.file_name().and_then(|s| s.to_str()),
+            "sha256": source.sha256,
+        })).collect::<Vec<_>>(),
+        "installed": false,
+        "note": "Original IDs and parents are preserved. This evidence is not a checkpoint or proof of complete history."
+    }))
 }
 
 /// Aggregated CLI args for cleanup.
@@ -590,6 +640,33 @@ fn format_bytes(bytes: u64) -> String {
 mod tests {
     use super::*;
     use talos_permission::PermissionRule;
+
+    #[test]
+    fn recovery_inspection_reports_evidence_without_installing_or_overwriting() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().into());
+        let session = manager.create_session("inspection", "").expect("session");
+        for i in 0..205 {
+            session
+                .append(&talos_core::message::Message::User {
+                    content: format!("fact {i}"),
+                })
+                .expect("append");
+        }
+        session.compact_archived(50).expect("archive");
+        let before = session.snapshot_bytes().expect("bytes");
+        let report = inspect_recovery(&session.file_path).expect("report");
+        assert_eq!(report["status"], "EvidenceOnly");
+        assert_eq!(report["original_records"], 205);
+        assert_eq!(report["installed"], false);
+        assert_eq!(session.snapshot_bytes().expect("unchanged"), before);
+        let _lease =
+            talos_session::SessionRuntimeLease::acquire(&session.file_path).expect("active owner");
+        assert!(
+            inspect_recovery(&session.file_path).is_err(),
+            "do not inspect a live owned session"
+        );
+    }
 
     #[test]
     fn storage_cleanup_denied_by_permission_rule() {
