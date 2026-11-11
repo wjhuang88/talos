@@ -91,8 +91,7 @@ impl Session {
         {
             metadata.reasoning = Some(r.clone());
         }
-        let entry = self.build_entry(&role, &content, metadata)?;
-        self.append_entry_locked(&entry)
+        self.append_record(&role, &content, metadata)
     }
 
     pub fn append_terminal_diagnostic(
@@ -101,7 +100,7 @@ impl Session {
     ) -> Result<(), SessionError> {
         let content = encode_terminal_diagnostic(diagnostic)
             .map_err(|error| SessionError::InvalidJson(error.to_string()))?;
-        let entry = self.build_entry(
+        self.append_record(
             "system",
             &content,
             SessionMetadata {
@@ -109,8 +108,7 @@ impl Session {
                 model: diagnostic.model.clone(),
                 ..SessionMetadata::default()
             },
-        )?;
-        self.append_entry_locked(&entry)
+        )
     }
 
     pub fn read_terminal_diagnostics(
@@ -134,7 +132,7 @@ impl Session {
     ) -> Result<(), SessionError> {
         let content = encode_turn_transcript_outcome(outcome)
             .map_err(|error| SessionError::InvalidJson(error.to_string()))?;
-        let entry = self.build_entry(
+        self.append_record(
             "system",
             &content,
             SessionMetadata {
@@ -142,8 +140,7 @@ impl Session {
                     .then(|| outcome.turn_id.clone()),
                 ..SessionMetadata::default()
             },
-        )?;
-        self.append_entry_locked(&entry)
+        )
     }
 
     pub fn read_turn_transcript_outcomes(
@@ -165,47 +162,60 @@ impl Session {
         }
         let content =
             serde_json::to_string(event).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
-        let entry = self.build_entry("system", &content, SessionMetadata::default())?;
-        self.append_entry_locked(&entry)
+        self.append_record("system", &content, SessionMetadata::default())
     }
 
-    fn build_entry(
+    fn append_record(
         &self,
         role: &str,
         content: &str,
         metadata: SessionMetadata,
-    ) -> Result<SessionEntry, SessionError> {
-        let parent_id = {
-            let guard = self
-                .last_entry_id
-                .lock()
-                .expect("last_entry_id mutex poisoned");
-            if guard.is_none() {
-                drop(guard);
-                let id = self.store.read_last_entry_id(&self.file_path);
-                *self
-                    .last_entry_id
-                    .lock()
-                    .expect("last_entry_id mutex poisoned") = id.clone();
-                id
+    ) -> Result<(), SessionError> {
+        // Parent selection and publication are one critical section shared by
+        // cloned handles and durable turn commits. Events are entries too.
+        let _lock = self
+            .write_lock
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
+        let mut tip = self
+            .last_entry_id
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
+        if tip.is_none() {
+            // The tail may contain multiline or >16 KiB records; the legacy
+            // line-based tail probe cannot establish its entry identity.
+            *tip = if self.store.history_encoding().is_some() {
+                match crate::history_page::read_host_transcript_tip(&self.file_path) {
+                    Ok(tip) => tip,
+                    Err(crate::history_page::HistoryPageError::Io(error))
+                        if error.kind() == std::io::ErrorKind::NotFound =>
+                    {
+                        // Session::new historically creates the store lazily on
+                        // first append too; `persisted` tracks manager lifecycle,
+                        // not whether this direct constructor created a file.
+                        None
+                    }
+                    Err(error) => return Err(SessionError::ParseError(error.to_string())),
+                }
             } else {
-                guard.clone()
-            }
-        };
-
-        Ok(SessionEntry {
+                // Custom stores own their decoding contract.
+                self.store
+                    .read_entries(&self.file_path)?
+                    .last()
+                    .map(|entry| entry.id.clone())
+            };
+        }
+        let entry = SessionEntry {
             id: Uuid::new_v4().to_string(),
-            parent_id,
+            parent_id: tip.clone(),
             timestamp: Utc::now(),
             role: role.to_string(),
             content: content.to_string(),
             metadata,
-        })
-    }
-
-    fn append_entry_locked(&self, entry: &SessionEntry) -> Result<(), SessionError> {
-        let _lock = self.write_lock.lock().expect("write_lock mutex poisoned");
-        self.store.append_entry(&self.file_path, entry)
+        };
+        self.store.append_entry(&self.file_path, &entry)?;
+        *tip = Some(entry.id);
+        Ok(())
     }
 
     pub fn read_entries(&self) -> Result<Vec<SessionEntry>, SessionError> {

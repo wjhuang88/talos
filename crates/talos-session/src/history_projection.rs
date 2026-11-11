@@ -22,8 +22,10 @@ pub fn recovery_index_text(
         return None;
     }
     match source.role.as_str() {
-        "user" => Some(source.content.clone()),
-        "assistant" => Some(talos_core::message::strip_tool_syntax(&source.content)),
+        "user" => Some(crate::durable::redact(&source.content)),
+        "assistant" => Some(crate::durable::redact(
+            &talos_core::message::strip_tool_syntax(&source.content),
+        )),
         "system" => {
             let terminal = terminal?;
             if source.metadata.turn_id.is_none()

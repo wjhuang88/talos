@@ -26,6 +26,7 @@ pub struct SessionMessageScan {
     messages: Vec<Message>,
     last_entry: Option<crate::SessionEntry>,
     complete: bool,
+    archive_placeholder: bool,
 }
 
 impl crate::Session {
@@ -70,11 +71,18 @@ impl crate::Session {
             messages: Vec::new(),
             last_entry: None,
             complete: false,
+            archive_placeholder: false,
         })
     }
 }
 
 impl SessionMessageScan {
+    /// Whether a decoded record is the legacy count-only archive placeholder.
+    /// Hosts should restore its archived sources rather than treat counts as a
+    /// semantic summary. This flag never authorizes an archive by itself.
+    pub fn has_archive_placeholder(&self) -> bool {
+        self.archive_placeholder
+    }
     /// Read the next raw copy page from this same captured source version.
     ///
     /// Pages contain at most 2 MiB. Cancellation or source changes do not advance
@@ -156,8 +164,10 @@ impl SessionMessageScan {
         let last_entry = page.entries.last().cloned();
         let mut decoder = self.decoder.clone();
         let mut messages = Vec::new();
+        let mut archive_placeholder = self.archive_placeholder;
         for entry in page.entries {
             check()?;
+            archive_placeholder |= crate::archive_recovery::placeholder(&entry);
             if let Some((_, message)) = decoder.decode(entry) {
                 messages.push(message);
             }
@@ -165,6 +175,7 @@ impl SessionMessageScan {
         self.check_current()?;
         check()?;
         self.messages.extend(messages);
+        self.archive_placeholder = archive_placeholder;
         if last_entry.is_some() {
             self.last_entry = last_entry;
         }
