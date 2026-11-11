@@ -1,5 +1,14 @@
 # Product Backlog
 
+## PROVIDER-008-C / #914 — Azure OpenAI protocol intake (unclaimed)
+
+[PROVIDER-008-C](active/PROVIDER-008-C-azure-openai.md) / [#914](https://github.com/wjhuang88/talos/issues/914)
+is **Intake / Unclaimed** under parent #724. I323 and ADR-103 are proposals only;
+no implementation, credential-chain authority, deployment routing or model-default
+change is authorized until an independently reviewed atomic claim reaches main.
+This owner registration only repairs the remote Issue ↔ document inventory; it does
+not affect SEARCH-001-L / #901, already completed A/B, or the parent protocol gates.
+
 ## STORE-002 / I322 C — proposed independent domain contracts
 
 [STORE-002](active/STORE-002-storage-capability-contracts.md) / [I322](../iterations/I322-store-002-domain-contract-extraction.md) / #670: I321 A/B completed in #909 at `a9914b7a62b0873027997c69d9966d17f3fd48ba`, CI #4039 8/8 and independent API review passed. I322 C domain-owned contract extraction is a **new, proposed governance claim #911** with no production code authorized before merge. Existing SQL/TLOG/JSONL/FTS, local composition, future engines, D/E/F, and #897 Host remain unchanged.

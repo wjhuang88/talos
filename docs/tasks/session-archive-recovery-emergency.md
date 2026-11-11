@@ -103,7 +103,7 @@ ownership and archive provenance remain implementation work in this owner.
 
 ## CLI history integration implementation (local, not deployed)
 
-Implemented selected-session binding and Actor wiring per proposed ADR-103. The existing
+Implemented selected-session binding and Actor wiring per proposed ADR-104. The existing
 `set_persistence` path now prepares history using the same selected TLOG and caches its recovery
 owner/progress; embedded persistence still uses its original owner. No empty replacement session
 is created. Identity mismatch and symlink transcript/database bindings fail before indexing.
@@ -199,7 +199,7 @@ versions. It retains permission, scope revocation, opaque reference/cursor and r
 No linear parent check was relaxed. SQLite records owner scope and completed current-head scanning;
 archive results come from the authenticated in-memory corpus, not invented offsets. User/assistant
 projections are searchable; old tool results without receipts remain unavailable. Matching is a
-bounded case-insensitive substring scan, not the ordinary-head FTS ranking path. See ADR-103.
+bounded case-insensitive substring scan, not the ordinary-head FTS ranking path. See ADR-104.
 
 Verified so far: seven CLI history restoration tests passed; archived Actor/provider
 search/detail/forged-reference refusal passed; archive pagination, cursor replay/query mismatch,

@@ -776,7 +776,7 @@ Both startup `--fork` and interactive fork reject legacy count-placeholder histo
 before publishing a child. Copying only their current head would lose earlier history
 and introduce another live head with overlapping IDs. Complete child-owned archive
 provenance is not yet implemented. Ordinary non-archived forks retain existing behavior.
-See [ADR-103](../decisions/103-selected-session-history-recovery.md) and the
+See [ADR-104](../decisions/104-selected-session-history-recovery.md) and the
 [recovery owner](../tasks/session-archive-recovery-emergency.md) for candidate evidence
 and remaining review/deployment gates.
 

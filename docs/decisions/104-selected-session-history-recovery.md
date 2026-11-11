@@ -1,4 +1,4 @@
-# ADR-103: Selected CLI Session History Recovery
+# ADR-104: Selected CLI Session History Recovery
 
 Status: Proposed — emergency implementation under local validation; independent review pending.
 Owner: [Session archive / recovery emergency](../tasks/session-archive-recovery-emergency.md).
