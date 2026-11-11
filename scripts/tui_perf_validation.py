@@ -46,8 +46,13 @@ def validate_metrics(path, scenario=None, actions=0, warmup_ms=None, measurement
         validate_stage_table(data['steady_stages'], required)
         if measurement_seconds is not None and data['steady_elapsed_ns']/1e9 < measurement_seconds-warmup_ms/1000-.75:
             raise ValueError('metrics steady window too short')
-        if scenario in ('animation', 'stream', 'scroll', 'resize') and data['steady_stages']['draw']['count'] == 0:
+        if scenario in ('animation', 'stream', 'scroll', 'resize', 'transcript-commit') and data['steady_stages']['draw']['count'] == 0:
             raise ValueError('active scenario has no steady frames')
+    if scenario == 'transcript-commit':
+        table = data['steady_stages'] if warmup_ms is not None else data['stages']
+        minimum = max(1, int(measurement_seconds - warmup_ms / 1000) - 2) if measurement_seconds is not None and warmup_ms is not None else 1
+        if table['history_rebuild']['count'] < minimum or table['output']['count'] < minimum * 3:
+            raise ValueError('insufficient actual transcript updates')
     if scenario == 'workspace-switch':
         table = data['steady_stages'] if warmup_ms is not None else data['stages']
         validate_stage_table(table, ('workspace_change',))

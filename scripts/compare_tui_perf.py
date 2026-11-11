@@ -24,7 +24,7 @@ def compare(directory):
             next_cpu = candidate['aggregate']['cpu_percent']['median']
             memory_limit = baseline['aggregate']['peak_pss_kib']['max'] * 1.2 + 8192
             checks = {'peak_pss': candidate['aggregate']['peak_pss_kib']['max'] <= memory_limit}
-            if scenario in ('animation', 'stream', 'scroll', 'resize', 'workspace-switch'):
+            if scenario in ('animation', 'stream', 'scroll', 'resize', 'workspace-switch', 'transcript-commit'):
                 checks['active_cpu'] = next_cpu <= base_cpu * 1.2
             if scenario == 'idle' and not args.get('input_probe'):
                 if args['metrics'] == 'off':

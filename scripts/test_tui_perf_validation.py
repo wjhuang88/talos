@@ -7,6 +7,28 @@ from tui_perf_validation import STAGES, validate_metrics, validate_sample
 
 
 class EvidenceValidation(unittest.TestCase):
+    def test_transcript_commit_requires_steady_updates(self):
+        def metric(count):
+            return {'count': count, 'total_ns': 0, 'max_ns': 0,
+                    'log2_ns_buckets': [count]+[0]*31}
+
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/'metrics.json'
+            data = {'schema': 1, 'warmup_ms': 5000,
+                    'steady_elapsed_ns': 30_000_000_000,
+                    'stages': {name: metric(100) for name in STAGES},
+                    'steady_stages': {name: metric(0) for name in STAGES}}
+            data['steady_stages']['draw'] = metric(30)
+            for rebuilds, outputs in ((0, 90), (28, 83)):
+                data['steady_stages']['history_rebuild'] = metric(rebuilds)
+                data['steady_stages']['output'] = metric(outputs)
+                path.write_text(json.dumps(data))
+                with self.assertRaisesRegex(ValueError, 'actual transcript'):
+                    validate_metrics(path, 'transcript-commit', 0, 5000, 35)
+            data['steady_stages']['output'] = metric(84)
+            path.write_text(json.dumps(data))
+            validate_metrics(path, 'transcript-commit', 0, 5000, 35)
+
     def test_early_success_is_not_a_complete_measurement(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)/'sample.json'

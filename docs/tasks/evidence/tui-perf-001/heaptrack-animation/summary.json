@@ -1,0 +1,44 @@
+[
+  {
+    "case": "baseline-r1",
+    "allocation_calls": 851478,
+    "requested_bytes": 127667737,
+    "temporary_allocations": 187807,
+    "peak_heap_display": "31.32M"
+  },
+  {
+    "case": "baseline-r2",
+    "allocation_calls": 851478,
+    "requested_bytes": 127667737,
+    "temporary_allocations": 187807,
+    "peak_heap_display": "31.32M"
+  },
+  {
+    "case": "baseline-r3",
+    "allocation_calls": 851438,
+    "requested_bytes": 127665096,
+    "temporary_allocations": 187798,
+    "peak_heap_display": "31.32M"
+  },
+  {
+    "case": "candidate-r1",
+    "allocation_calls": 816389,
+    "requested_bytes": 124035102,
+    "temporary_allocations": 186769,
+    "peak_heap_display": "31.32M"
+  },
+  {
+    "case": "candidate-r2",
+    "allocation_calls": 816699,
+    "requested_bytes": 124076338,
+    "temporary_allocations": 186798,
+    "peak_heap_display": "31.32M"
+  },
+  {
+    "case": "candidate-r3",
+    "allocation_calls": 816698,
+    "requested_bytes": 124076306,
+    "temporary_allocations": 186798,
+    "peak_heap_display": "31.32M"
+  }
+]

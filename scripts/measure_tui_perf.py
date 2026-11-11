@@ -7,7 +7,7 @@ from tui_perf_processes import process_tree_snapshot
 
 p = argparse.ArgumentParser()
 p.add_argument('binary')
-p.add_argument('--scenario', choices=['idle', 'animation', 'stream', 'approval', 'scroll', 'resize', 'workspace-switch'], default='idle')
+p.add_argument('--scenario', choices=['idle', 'animation', 'stream', 'approval', 'scroll', 'resize', 'workspace-switch', 'transcript-commit'], default='idle')
 p.add_argument('--history', type=int, choices=[100, 1000, 10000], default=100)
 p.add_argument('--seconds', type=int, default=35)
 p.add_argument('--warmup', type=int, default=5)

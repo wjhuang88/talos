@@ -29,7 +29,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--profile', choices=['debug', 'release-with-symbols'], required=True)
     parser.add_argument('--scenarios', nargs='+', default=['idle', 'animation', 'stream', 'approval', 'scroll', 'resize'],
-                        choices=['idle', 'animation', 'stream', 'approval', 'scroll', 'resize', 'workspace-switch'])
+                        choices=['idle', 'animation', 'stream', 'approval', 'scroll', 'resize', 'workspace-switch', 'transcript-commit'])
     parser.add_argument('--histories', nargs='+', type=int, default=[100, 1000, 10000], choices=[100, 1000, 10000])
     parser.add_argument('--rounds', type=int, default=3)
     parser.add_argument('--seconds', type=int, default=35)
