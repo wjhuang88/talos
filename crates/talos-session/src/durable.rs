@@ -1754,9 +1754,14 @@ fn open_bindings(path: &std::path::Path) -> Result<Connection, SessionError> {
         fs::create_dir_all(parent)?;
     }
     let connection = open_binding_connection(path)?;
+    // rusqlite opens connections with a five-second busy handler. Disable it
+    // during initialization so each explicit retry cannot inherit that wait.
+    connection
+        .busy_timeout(std::time::Duration::ZERO)
+        .map_err(sql_error)?;
     // Initialize WAL mode and schema without busy_timeout so concurrent
     // first-time opens fail fast instead of blocking for 5s each. The
-    // bounded retry loop (20 × 25 ms ≤ 500 ms total) lets the first writer
+    // bounded retry loop (20 × 25 ms of retry sleeps) lets the first writer
     // complete. Only DatabaseBusy / DatabaseLocked are retried; all other
     // SQLite errors propagate immediately. After init succeeds, apply the
     // 5-second busy_timeout for subsequent transaction operations.
@@ -3974,6 +3979,40 @@ mod tests {
             elapsed < std::time::Duration::from_millis(400),
             "non-BUSY error took {elapsed:?}; should return immediately"
         );
+    }
+
+    #[test]
+    fn open_bindings_wal_schema_contention_does_not_inherit_driver_busy_timeout() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("durable-bindings.sqlite");
+        let holder = Connection::open(&db_path).expect("holder");
+        holder
+            .execute_batch("PRAGMA journal_mode=WAL; BEGIN IMMEDIATE; CREATE TABLE held(x);")
+            .expect("hold WAL schema writer");
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let result = open_bindings(&db_path).map(|_| ());
+            sender.send(result).expect("send init result");
+        });
+        // Keep the real write lock past the explicit 500ms retry budget, but
+        // release it before joining even if the driver incorrectly waits 5s.
+        let bounded = receiver.recv_timeout(std::time::Duration::from_secs(2));
+        holder.execute_batch("ROLLBACK").expect("release writer");
+        let finished_before_release = bounded.is_ok();
+        let result = bounded.unwrap_or_else(|_| {
+            receiver
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("init completes after releasing writer")
+        });
+        worker.join().expect("worker");
+        assert!(
+            finished_before_release,
+            "initialization exceeded its retry budget"
+        );
+        assert!(matches!(result, Err(SessionError::DurableTurn(_))));
+        // The failed initializer must not damage the database or poison retry.
+        open_bindings(&dir.path().join("durable-bindings.sqlite"))
+            .expect("fresh initialization after lock release");
     }
 
     #[test]
