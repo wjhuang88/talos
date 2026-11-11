@@ -1,5 +1,12 @@
 # Talos Board
 
+## PROVIDER-008-C / #914 — Azure transport intake only
+
+[PROVIDER-008-C](backlog/active/PROVIDER-008-C-azure-openai.md) / [#914](https://github.com/wjhuang88/talos/issues/914):
+**Intake / Unclaimed**. I323 / ADR-103 remain unaccepted proposals; no provider
+transport implementation or implicit credential discovery is authorized.
+Parent #724 stays open; unrelated SEARCH-001-L / #901 retains its own authority.
+
 Native Windows follow-up (2026-11-10, source `c065236a`):
 [validation evidence](reference/WINDOWS-VALIDATION-2026-11-10.md) records TUI 652,
 process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing
