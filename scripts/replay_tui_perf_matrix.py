@@ -29,12 +29,14 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--profile', choices=['debug', 'release-with-symbols'], required=True)
     parser.add_argument('--scenarios', nargs='+', default=['idle', 'animation', 'stream', 'approval', 'scroll', 'resize'],
-                        choices=['idle', 'animation', 'stream', 'approval', 'scroll', 'resize'])
+                        choices=['idle', 'animation', 'stream', 'approval', 'scroll', 'resize', 'workspace-switch'])
     parser.add_argument('--histories', nargs='+', type=int, default=[100, 1000, 10000], choices=[100, 1000, 10000])
     parser.add_argument('--rounds', type=int, default=3)
     parser.add_argument('--seconds', type=int, default=35)
     parser.add_argument('--warmup', type=int, default=5)
     parser.add_argument('--workspace', default='')
+    parser.add_argument('--alternate-workspace', default='')
+    parser.add_argument('--process-tree', action='store_true')
     parser.add_argument('--input-probe', action='store_true')
     parser.add_argument('--metrics', choices=['on', 'off'], default='on')
     args = parser.parse_args()
@@ -89,9 +91,12 @@ def main():
                         command = [sys.executable, str(source_root/'scripts/measure_tui_perf.py'), binary['path'],
                                    '--scenario', scenario, '--history', str(history), '--seconds', str(args.seconds),
                                    '--warmup', str(args.warmup), '--workspace', args.workspace,
+                                   '--alternate-workspace', args.alternate_workspace,
                                    '--output', str(args.output/(name+'.json'))]
                         if args.input_probe:
                             command.append('--input-probe')
+                        if args.process_tree:
+                            command.append('--process-tree')
                         subprocess.run(command, env=env, check=True)
                         coverage = validate_sample(args.output/(name+'.json'), args.seconds, args.warmup)
                         if args.metrics == 'on':

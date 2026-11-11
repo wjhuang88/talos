@@ -1,6 +1,7 @@
 //! Deterministic offline TUI performance replay; no provider or tools execute.
-//! Arguments: scenario (idle/animation/stream), history count, duration seconds,
-//! optional workspace. Drive scrolling/resize/approval through the PTY harness.
+//! Arguments: scenario (idle/animation/stream/approval/workspace-switch), history
+//! count, duration seconds, optional workspace and alternate workspace.
+//! Drive scrolling/resize through the PTY harness.
 use std::{io, time::Duration};
 use talos_conversation::{ContentOutput, MessageSource, StatusSnapshot, TurnPhase, UiOutput};
 use talos_core::message::Message;
@@ -11,7 +12,10 @@ use tokio::sync::mpsc;
 async fn main() -> io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let scenario = args.get(1).map(String::as_str).unwrap_or("idle");
-    if !matches!(scenario, "idle" | "animation" | "stream" | "approval") {
+    if !matches!(
+        scenario,
+        "idle" | "animation" | "stream" | "approval" | "workspace-switch"
+    ) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "unknown scenario",
@@ -32,6 +36,17 @@ async fn main() -> io::Result<()> {
         ));
     }
     let workspace = args.get(4).cloned().unwrap_or_default();
+    let alternate_workspace = args.get(5).cloned().unwrap_or_default();
+    if scenario == "workspace-switch"
+        && (workspace.is_empty()
+            || alternate_workspace.is_empty()
+            || workspace == alternate_workspace)
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "workspace-switch requires two distinct nonempty workspace paths",
+        ));
+    }
     let history: Vec<Message> = (0..count).map(|index| Message::Assistant {
         content: format!("Replay {index:05}: deterministic ASCII 中文 emoji 🦀 e\u{301}.\nSecond line for layout."),
         tool_calls: vec![], reasoning: None,
@@ -56,7 +71,7 @@ async fn main() -> io::Result<()> {
             phase: matches!(scenario, "animation" | "stream").then_some(TurnPhase::Thinking),
             ..Default::default()
         };
-        let _ = tx.send(UiOutput::Status(status));
+        let _ = tx.send(UiOutput::Status(status.clone()));
         if scenario == "stream" {
             let _ = tx.send(UiOutput::Content(ContentOutput::Start {
                 source: MessageSource::Assistant,
@@ -77,6 +92,20 @@ async fn main() -> io::Result<()> {
             let _ = tx.send(UiOutput::Content(ContentOutput::End));
             // Allow the final stream frame to be observed before fixture shutdown.
             tokio::time::sleep(Duration::from_millis(200)).await;
+        } else if scenario == "workspace-switch" {
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            interval.tick().await;
+            for index in 0..seconds {
+                interval.tick().await;
+                let mut switched = status.clone();
+                if index % 2 == 0 {
+                    switched.workspace_path.clone_from(&alternate_workspace);
+                }
+                if tx.send(UiOutput::Status(switched)).is_err() {
+                    return Ok(());
+                }
+            }
         } else {
             tokio::time::sleep(Duration::from_secs(seconds)).await;
         }

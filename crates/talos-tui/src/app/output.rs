@@ -963,6 +963,11 @@ impl Tui {
     }
 
     fn apply_status_snapshot(&mut self, snapshot: StatusSnapshot) {
+        if !snapshot.workspace_path.is_empty()
+            && snapshot.workspace_path != self.state.status.workspace_path
+        {
+            crate::render_metrics::count(crate::render_metrics::Stage::WorkspaceChange);
+        }
         let workspace_path = std::mem::take(&mut self.state.status.workspace_path);
         self.state.status = snapshot;
         if self.state.status.workspace_path.is_empty() {

@@ -48,6 +48,15 @@ class EvidenceValidation(unittest.TestCase):
                 validate_metrics(path, 'scroll', 1, 1000, 3)
             with self.assertRaisesRegex(ValueError, 'too short'):
                 validate_metrics(path, 'idle', 0, 1000, 35)
+            data['steady_stages']['workspace_change'] = {'count': 0, 'total_ns': 0, 'max_ns': 0,
+                                                        'log2_ns_buckets': [0]*32}
+            path.write_text(json.dumps(data))
+            with self.assertRaisesRegex(ValueError, 'actual workspace'):
+                validate_metrics(path, 'workspace-switch', 0, 1000, 3)
+            data['steady_stages']['workspace_change'] = {'count': 2, 'total_ns': 0, 'max_ns': 0,
+                                                        'log2_ns_buckets': [2]+[0]*31}
+            path.write_text(json.dumps(data))
+            validate_metrics(path, 'workspace-switch', 0, 1000, 3)
             data['stages']['draw']['count'] = 2
             path.write_text(json.dumps(data))
             with self.assertRaisesRegex(ValueError, 'inconsistent'):

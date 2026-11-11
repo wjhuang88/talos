@@ -448,3 +448,77 @@ now compile; 653 TUI tests and MSVC xwin tests/examples check pass. Standalone
 and matrix sampling share duration/gap validation, and strict matrix acceptance
 checks steady actions rather than cumulative prewarm activity. Pure idle and
 approval waiting permit zero steady draws by design for the target scheduler.
+
+P0 build checkpoint: both source-bound builds at `52263c6279c3fb068332d63edb6a3770081c9ce2`
+exit 0. Release explicitly uses `CARGO_PROFILE_RELEASE_DEBUG=1` and
+`CARGO_PROFILE_RELEASE_STRIP=false`; `readelf -S` confirms `.debug_info`,
+`.debug_line` and `.symtab`. Binary hashes and build settings are retained in
+[baseline-build/receipt.json](evidence/tui-perf-001/baseline-build/receipt.json).
+The release six-scenario / three-history / three-round matrix is running at
+`/tmp/talos-p0-release-full`; only its final validated manifest can establish
+completion. Do not rebuild or run tests during this measurement. Debug matrix,
+Git cases, input probes, instrumentation overhead and budget freeze remain pending.
+
+Developer Git fixtures now contain a non-repository, a clean one-file repository,
+and a repository with exactly 10,000 untracked files (verified by `git ls-files`).
+The new summary script reports histogram bounds for P95/P99, including overflow,
+rather than treating bucket boundaries as exact latency. Its initial smoke and
+boundary checks passed before measurement began; subsequent identity-validation
+changes and committed regression tests still require execution after sampling.
+P1–P3 remain unimplemented. Native Windows acceptance remains pending because the
+maintainer has no available Windows environment; this does not block Linux work.
+
+### P1 implementation notes from the baseline source audit
+
+The following choices are implementation guidance, not delivered behavior:
+
+- Select into a private event value before mutating `self`. The current
+  `next_stream_chunk(&mut self)` borrows the whole TUI across `select!`; waiting
+  for approval sender closure in the same select requires splitting the stream
+  and pending-response field borrows. Receive legacy chunks without side effects,
+  then handle `None` as an explicit EOF event and finalize outside the select.
+- Use an optional nearest deadline. Tip expiry is `created_at + ttl`, deferred
+  reconnect already carries its own deadline, and animation/drag cadence must
+  advance from their previous deadline rather than reset after every input.
+  Otherwise continuous input postpones animation indefinitely. Missed intervals
+  advance state without submitting catch-up frames.
+- Retain the current bounded input batch and release filtering. Drain business
+  outputs with a separate finite budget; do not drain through an approval barrier.
+  Queued outputs currently flush via an unbounded loop, so removing unconditional
+  draws must also preserve cancellation/input fairness during queue release.
+- Never count layout-cache hits as avoided work while still recomputing all
+  component heights. Cache the preparation inputs/results needed by the published
+  P3 dependency matrix, and keep full-buffer rendering until a retained-buffer
+  design has independent evidence. The current history-cap lookup constructs a
+  viewport solely to read total rows; a count-only cache accessor is a candidate
+  low-complexity improvement, subject to measured P4 justification.
+
+These notes preserve the published P0-before-P1 order. Only the optional
+workspace-switch replay was added during the immutable release baseline run;
+that fixture change has not been built or tested yet and is not part of the
+running binary. The active matrix manifest and build receipt retain the original
+`52263c62` source identity. Follow-up Git-switch measurements need a new build
+receipt rather than relabeling this binary.
+
+### P0 release matrix completed; remaining baseline work
+
+The source-bound release matrix exited 0 with all 54 cases validated. Raw reports,
+per-round metrics and summary are retained in
+[release-baseline](evidence/tui-perf-001/release-baseline/README.md).
+Idle CPU medians range from 0.334% to 0.370%; 10,000-entry resize has a 10.004%
+median (9.770–10.134%). These are pre-optimization measurements, not savings.
+The large-history resize cost requires inspection before the P4 decision.
+
+After sampling ended, all six Python regression tests passed, the TUI library
+suite passed 653 tests, and `cargo xwin check --locked -p talos-tui --tests
+--examples --target x86_64-pc-windows-msvc` passed. Workspace-switch smoke passed
+with five actual steady workspace changes and eight input-submission samples;
+all 27 optional process-tree snapshots were complete. This five-second smoke
+does not replace three-round Git/input measurements. Host Git fixtures now fix
+the branch/template and suppress hooks/signing; regenerated fixtures succeeded.
+
+Still pending before P0 exit: debug matrix, three-round Git/switch and input
+probes, instrumentation overhead, full evidence limitations and frozen budgets.
+Runtime event scheduling, asynchronous Git snapshots and preparation caches
+remain unimplemented. Full local preflight, implementation CI/review and native
+terminal acceptance also remain pending.

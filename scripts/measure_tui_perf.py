@@ -3,14 +3,17 @@
 import argparse, fcntl, json, os, pty, select, struct, subprocess, termios, time, tempfile, hashlib, platform, signal
 from pathlib import Path
 from tui_perf_validation import validate_sample
+from tui_perf_processes import process_tree_snapshot
 
 p = argparse.ArgumentParser()
 p.add_argument('binary')
-p.add_argument('--scenario', choices=['idle', 'animation', 'stream', 'approval', 'scroll', 'resize'], default='idle')
+p.add_argument('--scenario', choices=['idle', 'animation', 'stream', 'approval', 'scroll', 'resize', 'workspace-switch'], default='idle')
 p.add_argument('--history', type=int, choices=[100, 1000, 10000], default=100)
 p.add_argument('--seconds', type=int, default=35)
 p.add_argument('--warmup', type=int, default=5)
 p.add_argument('--workspace', default='')
+p.add_argument('--alternate-workspace', default='')
+p.add_argument('--process-tree', action='store_true', help='include bounded procfs tree snapshots; adds sampling overhead')
 p.add_argument('--output', required=True)
 p.add_argument('--input-probe', action='store_true', help='type then erase one character every 500ms')
 a = p.parse_args()
@@ -24,7 +27,7 @@ ready_at = None
 master, slave = pty.openpty()
 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 120, 0, 0))
 fixture_scenario = 'idle' if a.scenario in ('scroll', 'resize') else a.scenario
-proc = subprocess.Popen([a.binary, fixture_scenario, str(a.history), str(a.seconds), a.workspace],
+proc = subprocess.Popen([a.binary, fixture_scenario, str(a.history), str(a.seconds), a.workspace, a.alternate_workspace],
                         stdin=slave, stdout=slave, stderr=slave,
                         env={**os.environ, 'TERM': 'xterm-256color', 'TALOS_REPLAY_READY': str(ready_path)}, start_new_session=True)
 os.close(slave)
@@ -67,6 +70,8 @@ try:
                                 'voluntary_context_switches': int(status['voluntary_ctxt_switches']),
                                 'involuntary_context_switches': int(status['nonvoluntary_ctxt_switches']),
                                 'threads': int(status['Threads']), 'observed_direct_children': len(children)})
+                if a.process_tree:
+                    samples[-1]['process_tree'] = process_tree_snapshot(proc.pid)
             except (FileNotFoundError, ProcessLookupError):
                 pass
             last_sample = now
@@ -103,9 +108,12 @@ steady = [s for s in samples if ready_at is not None and ready_at + a.warmup <= 
 ready_dir.cleanup()
 result = {'binary_sha256': binary_digest, 'platform': platform.platform(),
           'action_count': action_count, 'input_probe_count': probe_count, 'scenario': a.scenario, 'history': a.history, 'geometry': [120,40],
+          'workspace': a.workspace, 'alternate_workspace': a.alternate_workspace,
+          'process_tree_enabled': a.process_tree,
           'terminal': 'synthetic Linux PTY', 'exit_code': exit_code, 'samples': samples,
           'ready_seconds': ready_at, 'warmup_seconds': a.warmup, 'wall_seconds': time.monotonic()-start,
-          'limitations': ['parent process only; child and terminal emulator accounting pending',
+          'limitations': ['top-level CPU/PSS describe parent only; optional process_tree contains live per-process snapshots',
+                         'process tree polling may miss short-lived children/threads; terminal emulator excluded',
                          'software input latency requires TALOS_TUI_METRICS; no pixel latency or allocation metrics']}
 if len(steady) >= 2:
     first, last = steady[0], steady[-1]

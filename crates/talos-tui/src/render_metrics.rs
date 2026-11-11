@@ -21,8 +21,9 @@ pub(crate) enum Stage {
     ScreenResize,
     DeadlineLateness,
     FramePreparation,
+    WorkspaceChange,
 }
-const NAMES: [&str; 17] = [
+const NAMES: [&str; 18] = [
     "draw",
     "layout",
     "history_rebuild",
@@ -40,6 +41,7 @@ const NAMES: [&str; 17] = [
     "screen_resize",
     "deadline_lateness",
     "frame_preparation",
+    "workspace_change",
 ];
 #[derive(Clone, Copy, Default)]
 struct Metric {
@@ -49,11 +51,11 @@ struct Metric {
     buckets: [u64; 32],
 }
 struct Metrics {
-    steady_stages: [Metric; 17],
+    steady_stages: [Metric; 18],
     started_at: Option<Instant>,
     warmup: Duration,
     steady_changed_cells: u64,
-    stages: [Metric; 17],
+    stages: [Metric; 18],
     changed_cells: u64,
     last_screen_size: Option<(u16, u16)>,
 }
@@ -64,7 +66,7 @@ const EMPTY: Metric = Metric {
     buckets: [0; 32],
 };
 static METRICS: Mutex<Metrics> = Mutex::new(Metrics {
-    steady_stages: [EMPTY; 17],
+    steady_stages: [EMPTY; 18],
     started_at: None,
     warmup: Duration::ZERO,
     steady_changed_cells: 0,
@@ -73,7 +75,7 @@ static METRICS: Mutex<Metrics> = Mutex::new(Metrics {
         total_ns: 0,
         max_ns: 0,
         buckets: [0; 32],
-    }; 17],
+    }; 18],
     changed_cells: 0,
     last_screen_size: None,
 });
@@ -128,7 +130,7 @@ impl ReportOnExit {
         if destination().is_some()
             && let Ok(mut metrics) = METRICS.lock()
         {
-            metrics.steady_stages = [EMPTY; 17];
+            metrics.steady_stages = [EMPTY; 18];
             metrics.steady_changed_cells = 0;
             metrics.last_screen_size = None;
             metrics.started_at = Some(Instant::now());
@@ -159,7 +161,7 @@ impl Metrics {
         }
     }
 }
-fn stage_json(values: &[Metric; 17]) -> serde_json::Map<String, serde_json::Value> {
+fn stage_json(values: &[Metric; 18]) -> serde_json::Map<String, serde_json::Value> {
     NAMES
         .iter()
         .zip(values)

@@ -48,6 +48,12 @@ def validate_metrics(path, scenario=None, actions=0, warmup_ms=None, measurement
             raise ValueError('metrics steady window too short')
         if scenario in ('animation', 'stream', 'scroll', 'resize') and data['steady_stages']['draw']['count'] == 0:
             raise ValueError('active scenario has no steady frames')
+    if scenario == 'workspace-switch':
+        table = data['steady_stages'] if warmup_ms is not None else data['stages']
+        validate_stage_table(table, ('workspace_change',))
+        minimum = max(1, int(measurement_seconds - warmup_ms / 1000) - 2) if measurement_seconds is not None and warmup_ms is not None else 1
+        if table['workspace_change']['count'] < minimum:
+            raise ValueError('insufficient actual workspace changes')
     if scenario in ('scroll', 'resize'):
         stage = 'history_scroll' if scenario == 'scroll' else 'screen_resize'
         table = data['steady_stages'] if warmup_ms is not None else data['stages']

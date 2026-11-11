@@ -152,3 +152,33 @@ matching injected actions within one boundary event. Idle and approval waiting
 may legitimately have zero steady frames after scheduling optimization. Context
 switch counters currently describe the main thread; child-process CPU and
 per-thread totals remain unavailable rather than implicitly included.
+
+Use `python3 scripts/summarize_tui_perf.py /completed/matrix` to emit a JSON
+summary after sampling ends. It validates the expected case identities and binary
+hashes, reports CPU/PSS/output medians and ranges, and preserves per-round stage
+counts and P95/P99 latency bounds. Empty latency histograms produce `null`, not
+zero latency. The overflow bucket uses the observed maximum as its upper bound.
+This report cannot replace raw samples, native terminal acceptance, or a profiler.
+
+Prepare isolated Git inputs with
+`python3 scripts/create_tui_perf_git_fixtures.py /new/fixture/directory`.
+This developer-only preparation uses host Git to create a one-file clean repository
+and one with 10,000 untracked files, plus an empty non-repository. If Git is absent,
+preparation fails explicitly; production TUI Git reads still use the Rust library.
+Replacement trigger: adopt a shared Rust fixture builder if these inputs become
+part of shipped runtime behavior or automated cross-platform acceptance.
+For release profiling, use both `CARGO_PROFILE_RELEASE_DEBUG=1` and
+`CARGO_PROFILE_RELEASE_STRIP=false`; retain a source-bound binary copy and verify
+debug sections before measurement. The workspace release profile strips symbols
+by default, so setting debug information alone is insufficient.
+
+`--scenarios workspace-switch --workspace /fixture/one --alternate-workspace
+/fixture/two` alternates the displayed workspace every second. Its metrics must
+contain actual `workspace_change` events; sending status updates alone is not
+acceptance evidence. `--process-tree` optionally records bounded live process-tree
+snapshots (up to 256 processes), gathering children from every live thread and
+identifying processes by PID and start ticks. Missing/racing reads and truncation
+are explicit. This adds sampler overhead and must be identical on both sides of
+a comparison. Top-level CPU/PSS remain main-process values. Short-lived children
+and exited threads can escape polling; do not subtract live-tree CPU sums across
+changing membership or call live-thread context-switch sums lifetime totals.
