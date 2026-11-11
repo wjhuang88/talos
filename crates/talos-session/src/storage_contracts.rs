@@ -45,15 +45,20 @@ pub trait PendingSubmissionPersistence {
     ) -> Result<(String, SubmissionReceiptDisposition), PendingSubmissionError>;
 
     /// Mark a committed turn without dropping its durable receipt.
-    fn mark_committed(&self, submission_id: &str, turn_id: &str)
-        -> Result<(), PendingSubmissionError>;
+    fn mark_committed(
+        &self,
+        submission_id: &str,
+        turn_id: &str,
+    ) -> Result<(), PendingSubmissionError>;
 
     /// Recover running submissions without inventing a new resume policy.
     fn recover_running(&self) -> Result<Vec<PendingSubmissionRecord>, PendingSubmissionError>;
 
     /// Read the existing durable custody record.
-    fn get(&self, submission_id: &str)
-        -> Result<Option<PendingSubmissionRecord>, PendingSubmissionError>;
+    fn get(
+        &self,
+        submission_id: &str,
+    ) -> Result<Option<PendingSubmissionRecord>, PendingSubmissionError>;
 }
 
 impl PendingSubmissionPersistence for PendingSubmissionStore {
