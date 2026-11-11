@@ -1,6 +1,6 @@
 # STORE-002: Storage And Retrieval Capability Contracts
 
-**Status**: Active / Claimed — I321 A/B proposed, ineffective before governance PR merge
+**Status**: Review / Claimed — I321 A/B candidate #909; C/D/E/F incomplete
 
 **Type**: Architecture / Contract Convergence
 
@@ -32,14 +32,14 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Source Issue | #670 |
 | Governance Claim PR | #908 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User explicitly selected #670 continuation. Governance-only non-overlapping #908 A/B proposal; no independent approving maintainer is available in its current review record. Single-maintainer claim path requires exact-head CI, both validators, documented authorization reason, no blocking feedback and merge-time CAS; protected implementation API review is still mandatory. |
-| Implementation PR | Not started |
+| Authorization Evidence | Governance claim #908 merged `201a9b61d72e704da3a86f5db283b9f6e4d92938`; exact-head [CI #4011](https://github.com/wjhuang88/talos/actions/runs/42789979266) passed, both governance validators 0 warnings, docs-only single-maintainer authorization and CAS recorded. Public B code candidate #909 still requires independent API review and tests. |
+| Implementation PR | #909 |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | A/B candidate contracts must pass independent API/architecture review and all applicable tests; later C/D/E/F require separately scoped claims. E2/E3 ARCH-035 waits on accepted functional contract and local delegation. |
 
 ## Governance
 
-I321 A/B is a proposed atomic governance claim in #908 and is **ineffective before merge to main**. After merge, only bounded A/B source inventory and additive contract foundation may proceed; C/D/E/F and #897 host implementation remain independently gated. Independent API/architecture review, exact-head locked CI, characterization evidence where applicable, and governance validators are required before B implementation acceptance.
+I321 A/B became effective with governance #908 merge `201a9b61d72e704da3a86f5db283b9f6e4d92938`. Only bounded A/B inventory and additive typed capability foundation are authorized; C/D/E/F and #897 host implementation remain independently gated. Independent API/architecture review, exact-head locked CI, characterization evidence where applicable, and governance validators are required before B implementation acceptance.
 
 ## Acceptance Direction
 
@@ -53,3 +53,11 @@ I321 A/B is a proposed atomic governance claim in #908 and is **ineffective befo
 ## Intake history
 
 Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim proposed on 2026-11-10 via #908. Source Issue #670 remains open for C/D/E/F after A/B.
+
+## I321 A/B implementation candidate — PR #909
+
+- [Current capability and authority inventory](../../reference/STORE-002-I321-CAPABILITY-AUTHORITY-INVENTORY-2026-11-10.md): authoritative/derived/ephemeral data, all seven capability families, existing paths and residuals.
+- `crates/talos-core/src/storage_capability.rs`: typed `StorageCapabilityKind`, stable IDs and `CapabilityRequest` integration with existing `CapabilityRegistry` whose empty resolution returns `ResolutionResult::Unavailable`. No operational binding type, domain call site, or runtime behavior is introduced.
+- Candidate code is additive and non-operational: it does **not** satisfy C/D/E/F, does not implement seven storage operation traits, and does not yet provide #897 a functional dependency to inject.
+- Validation history: [CI #4030](https://github.com/wjhuang88/talos/actions/runs/42799763086) passed 8/8 on **previous** head `5c38e6e`; independent [Copilot review](https://github.com/wjhuang88/talos/pull/909#issuecomment-6765145292) identified one **blocking** unconstrained `StorageCapabilityBinding<T>` public API. The binding and its tests were removed. Revised exact-head CI and independent re-review remain **pending**; old CI/review must not be transferred to a changed head.
+- #670 remains open; avoid marking Complete or recording a fictitious Completion Commit. Future domain adapter delegation and local profile need separately authorized work.

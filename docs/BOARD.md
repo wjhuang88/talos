@@ -6,9 +6,9 @@ process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing
 on Git 2.36.1; [gix-assisted compatibility](proposals/gix-preflight-system-git-compatibility.md)
 is a proposal, not an activated repair. Owner statuses and manual/native residuals remain unchanged.
 
-## STORE-002 / I321 — A/B capability contract foundation (proposed activation)
+## STORE-002 / I321 — A/B Review / Claimed (#909)
 
-[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I321](iterations/I321-store-002-capability-contract-foundation.md) / #670: governance #908 proposes an independent, bounded A inventory and B additive typed capability foundation. **No effective claim before #908 merges**; C/D/E/F local delegates and #897 E2/E3 Host composition remain gated. Search/TUI/model and ongoing ARCH-035 E0/E1 review are not modified.
+[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I321](iterations/I321-store-002-capability-contract-foundation.md) / #670: governance #908 merged `201a9b61d72e704da3a86f5db283b9f6e4d92938`, activating the bounded A inventory and B additive typed capability foundation; code candidate #909 is in **Review**; C/D/E/F local delegates and #897 E2/E3 Host composition remain gated. Search/TUI/model and ongoing ARCH-035 E0/E1 review are not modified.
 
 
 ## ARCH-035 / I320 — E0/E1 Review (PR #906)

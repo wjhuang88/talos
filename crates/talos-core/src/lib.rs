@@ -8,6 +8,7 @@ pub mod message;
 pub mod model;
 pub mod provider;
 pub mod session;
+pub mod storage_capability;
 pub mod submission;
 pub mod tool;
 pub mod tool_filter;
