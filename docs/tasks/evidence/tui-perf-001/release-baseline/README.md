@@ -45,3 +45,31 @@ Workspace is empty, so these are not Git-status performance measurements.
 Debug, Git/switch, input-probe and instrumentation-overhead matrices remain
 necessary before freezing the full P0 budget. Windows native acceptance remains
 pending because no environment is available.
+
+## Stage timing interpretation
+
+Median accumulated wall-clock stage durations across three runs (milliseconds
+per approximately 30-second steady window; nested timings are not additive):
+
+| Scenario/history | Draw | Preparation | History rebuild | Diff | Rebuild count per round |
+|---|---:|---:|---:|---:|---|
+| Idle/10000 | 94.45 | 11.12 | 0 | 17.02 | 0 / 0 / 0 |
+| Animation/10000 | 96.72 | 13.37 | 0 | 16.38 | 0 / 0 / 0 |
+| Stream/10000 | 592.48 | 194.46 | 21.96 | 66.01 | 1 / 1 / 1 |
+| Resize/100 | 138.27 | 35.96 | 24.79 | 17.57 | 60 / 60 / 60 |
+| Resize/1000 | 370.02 | 225.48 | 212.02 | 17.63 | 59 / 59 / 60 |
+| Resize/10000 | 3019.44 | 2453.91 | 2439.00 | 15.22 | 58 / 57 / 58 |
+
+These data support removing idle draws and avoiding stable preparation work.
+They also locate the large-history resize cost primarily in width-dependent
+history projection, rather than terminal diff. Width changes legitimately require
+reflow under the published design; append-only history caching cannot eliminate
+that work. The fixture streams into a preview and commits history at the end, so
+its single rebuild does not establish the cost of many incremental transcript
+commits. Do not use these results alone to approve or reject the optional P4
+incremental projection. Reassess after P1–P3 with matching state sequences.
+
+Elapsed stage times include scheduling delays and are not exclusive CPU samples.
+The lower-than-injected resize rebuild counts are consistent with boundary events
+and observation/coalescing, not evidence that every intermediate size was painted;
+the actual resize counters and accepted coverage remain in each raw report.

@@ -4,10 +4,26 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from summarize_tui_perf import percentile_bounds, summarize
+from summarize_tui_perf import observed_tree_usage, percentile_bounds, summarize
 
 
 class SummaryValidation(unittest.TestCase):
+    def test_tree_cpu_does_not_subtract_changing_membership(self):
+        def sample(processes):
+            return {'process_tree': {'complete': True, 'observed_tree_pss_kib': 10,
+                                    'processes': [{'pid': p, 'start_ticks': start, 'cpu_seconds': cpu}
+                                                  for p, start, cpu in processes]}}
+        result = observed_tree_usage([
+            sample([(1, 100, 10), (2, 200, 50)]),
+            sample([(1, 100, 11)]),
+            sample([(1, 100, 12), (2, 300, 1)]),
+            sample([(1, 100, 13), (2, 300, 2)]),
+        ])
+        self.assertEqual(result['observed_interval_cpu_seconds'], 4)
+        self.assertEqual(result['observed_process_lifetimes'], 3)
+        with self.assertRaisesRegex(ValueError, 'missing'):
+            observed_tree_usage([{}])
+
     def test_histogram_bounds_and_overflow(self):
         metric = {'count': 100, 'max_ns': 2**40, 'log2_ns_buckets': [0]*32}
         metric['log2_ns_buckets'][2] = 95
