@@ -40,7 +40,7 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Governance Claim PR | #911 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I322 C governance [#911](https://github.com/wjhuang88/talos/pull/911) merged `60da1bbadca00c9bdee6fbcb8f5ad990a4313331`; exact-head [CI #4055](https://github.com/wjhuang88/talos/actions/runs/42948954104) succeeded, both validators reported 0 warnings, docs-only single-maintainer authorization and CAS recorded. Independent API review of the C implementation remains mandatory. |
-| Implementation PR | Pending C implementation review |
+| Implementation PR | #912 (draft, Review; no completion evidence) |
 | Last Updated | 2026-11-11 |
 | Handoff / Release Condition | Claim #911 effective. C implementation must pass exact-head native CI, both governance validators and independent public API/architecture review; D/E/F and #897 E2/E3 remain independently gated. |
 
