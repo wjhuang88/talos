@@ -22,8 +22,11 @@ pub trait MemoryPersistence {
     fn insert_evidence(&self, link: EvidenceLink) -> Result<(), MemoryStoreError>;
 
     /// Return existing bounded, scored lexical retrieval results.
-    fn retrieve(&self, query: &str, limit: usize)
-        -> Result<Vec<RetrievalResult>, MemoryStoreError>;
+    fn retrieve(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<RetrievalResult>, MemoryStoreError>;
 
     /// Look up one memory by its stable domain identifier.
     fn get(&self, id: &str) -> Result<Option<MemoryItem>, MemoryStoreError>;
