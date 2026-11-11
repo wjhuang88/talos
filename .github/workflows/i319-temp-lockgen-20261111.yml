@@ -1,0 +1,55 @@
+# TEMPORARY I319 validation only. Never include this workflow in PR #907.
+name: I319 temporary Gemini-main Cargo lock regeneration
+on:
+  push:
+    branches:
+      - tmp/i319-l1b-lockgen-after-gemini-20261111
+permissions:
+  contents: write
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Regenerate and validate all three active Cargo locks
+        shell: bash
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+        run: |
+          set -euo pipefail
+          for manifest in Cargo.toml tests/fixtures/runtime-sdk-external/Cargo.toml tests/fixtures/browser-host-external/Cargo.toml; do
+            echo "::group::cargo metadata $manifest"
+            cargo metadata --format-version 1 --manifest-path "$manifest" >/dev/null
+            echo "::endgroup::"
+          done
+          python3 - <<'PY'
+          import pathlib, tomllib
+          for name in ("Cargo.lock", "tests/fixtures/runtime-sdk-external/Cargo.lock", "tests/fixtures/browser-host-external/Cargo.lock"):
+              data = tomllib.loads(pathlib.Path(name).read_text())
+              packages = data["package"]
+              banned = [p for p in packages if p["name"] == "rust-websearch" or (p["name"] == "reqwest" and p["version"].startswith("0.12."))]
+              assert not banned, (name, banned)
+              reqwest = sorted({p["version"] for p in packages if p["name"] == "reqwest"})
+              assert reqwest and all(v.startswith("0.13.") for v in reqwest), (name, reqwest)
+              print(f"VALID {name}: {len(packages)} packages; reqwest={reqwest}")
+          assert any(p["name"] == "google-cloud-auth" for p in tomllib.loads(pathlib.Path("Cargo.lock").read_text())["package"]), "new main provider dependencies vanished"
+          print("VALID upstream Gemini-main dependency preservation")
+          PY
+          git diff --check
+          git add Cargo.lock tests/fixtures/runtime-sdk-external/Cargo.lock tests/fixtures/browser-host-external/Cargo.lock
+          git diff --cached --stat
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'build(search): regenerate all locks preserving provider main'
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+      - name: Check format and new concurrent legacy limiter test
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo test -p talos-tools --features network --locked search_backend::legacy_owned::probe::tests::concurrent_waiters_preserve_global_spacing -- --nocapture
