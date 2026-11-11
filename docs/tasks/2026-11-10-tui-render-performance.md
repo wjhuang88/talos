@@ -1,6 +1,6 @@
 # TUI-PERF-001：TUI 事件驱动渲染与资源优化
 
-> Document status: Planned / Unclaimed
+> Document status: Planned / Unclaimed (activation proposal; ineffective until claim merge)
 > Created: 2026-11-10
 > Owner: 本文；Board 仅为派生入口。
 > 本轮交付为开发任务及实施指导。运行时代码尚未修改，性能收益尚未验证。
@@ -285,3 +285,55 @@ Complete 需要真实存在且已推送的实现 SHA 写入 `Completion Commit:`
 | 输入提交 P95/P99 | 待测 | 待冻结 | 待测 | 待填 |
 | deadline lateness / Git staleness | 待测 | 待冻结 | 待测 | 待填 |
 | PSS / 峰值堆 / 分配 / 输出量 | 待测 | 待冻结 | 待测 | 待填 |
+
+## Execution intake — 2026-11-11
+
+The maintainer requested implementation closure of this complete published plan.
+No P0–P3 acceptance is removed; P4 remains evidence-dependent. This is a task,
+not a new iteration. The published baseline above remains unchanged.
+
+Target snapshot: `a320b7a8`. Current original worktree has unrelated uncommitted
+background-continuation changes and approval/tool-summary fixes. Preserve them;
+performance work uses an isolated worktree. The approval follow-up may later
+require explicit integration and revalidation; it is not performance evidence.
+
+Nonterminal iteration inventory (owner document status, not historical index prose):
+
+| Owner | Current state | Disposition |
+|---|---|---|
+| I249 | Planned | Dependency upgrade deferred; no scope transfer |
+| I277 | Review | Desktop device acceptance; excluded |
+| I302 | Review | Windows owned-handle acceptance; excluded |
+| I310 | Active | Gemini provider, PR #838; preserve |
+| I318 | Review | Key repeat; preserve batching/release semantics and rerun regression |
+| I319 | Active | Search retirement, PR #907; no overlapping TUI source |
+| I320 | Review | Host composition; no activation or scope transfer |
+| I321 | Active | Storage foundation, PR #909; no overlapping TUI source |
+
+Open PR #861 also retains its search compatibility owner. No open PR in the
+2026-11-11 inventory claims TUI render scheduling or status snapshot caching.
+Related TUI approval, ellipsis, polling aggregation, clipboard and visual-stability
+owners retain their original scope and pending device acceptance. This task must
+regress those behaviors rather than declare them completed by association.
+
+Verified source still has a permanent 150 ms interval and unconditional loop draw
+in App::run, plus additional tool-output draws. This establishes work remains,
+not a measured cost allocation. Next: finalize claim, implement P0 replay/metrics,
+measure baseline and freeze budgets before P1.
+
+## Collaboration Claim
+
+| Field | Value |
+|---|---|
+| Claim State | Unclaimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | Codex / gpt-6 |
+| Work Slice | TUI-PERF-001 P0 measurements, P1 event scheduling, P2 Git snapshots, P3 dependency caches, evidence-based P4 decision and full acceptance |
+| Claimed At | 2026-11-11 |
+| Source Issue | None |
+| Governance Claim PR | Pending |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Proposed only; target-branch merge and independent review pending |
+| Implementation PR | Not started |
+| Last Updated | 2026-11-11 |
+| Handoff / Release Condition | Full published acceptance including native terminal evidence; incomplete platforms remain Review |
