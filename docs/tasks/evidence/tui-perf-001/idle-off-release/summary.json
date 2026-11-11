@@ -1,0 +1,419 @@
+{
+  "schema": 1,
+  "matrix": "/tmp/talos-perf-idle-off-release-539adfd2",
+  "cases": {
+    "baseline-idle-100": {
+      "rounds": [
+        {
+          "cpu_percent": 0.2021075541777113,
+          "peak_pss_kib": 4488,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.687163472990505,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.060000000000000005,
+            "peak_observed_tree_pss_kib": 4488,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.20211237982146696,
+          "peak_pss_kib": 4624,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.686454661015887,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.060000000000000005,
+            "peak_observed_tree_pss_kib": 4624,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.23559465309128708,
+          "peak_pss_kib": 4688,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.712049522990128,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.07,
+            "peak_observed_tree_pss_kib": 4688,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 0.20211237982146696,
+          "min": 0.2021075541777113,
+          "max": 0.23559465309128708
+        },
+        "peak_pss_kib": {
+          "median": 4624,
+          "min": 4488,
+          "max": 4688
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.687163472990505,
+          "min": 29.686454661015887,
+          "max": 29.712049522990128
+        }
+      }
+    },
+    "candidate-idle-100": {
+      "rounds": [
+        {
+          "cpu_percent": 0.0,
+          "peak_pss_kib": 4437,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.685945734992856,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.0,
+            "peak_observed_tree_pss_kib": 4437,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.0,
+          "peak_pss_kib": 4444,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.680061818973627,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.0,
+            "peak_observed_tree_pss_kib": 4444,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.0,
+          "peak_pss_kib": 4728,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.71168036601739,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.0,
+            "peak_observed_tree_pss_kib": 4728,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "peak_pss_kib": {
+          "median": 4444,
+          "min": 4437,
+          "max": 4728
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.685945734992856,
+          "min": 29.680061818973627,
+          "max": 29.71168036601739
+        }
+      }
+    },
+    "baseline-idle-1000": {
+      "rounds": [
+        {
+          "cpu_percent": 0.20209922870461722,
+          "peak_pss_kib": 7672,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.688386435009306,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.060000000000000005,
+            "peak_observed_tree_pss_kib": 7672,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.2337055163324861,
+          "peak_pss_kib": 7264,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.952224106003996,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.07,
+            "peak_observed_tree_pss_kib": 7264,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 120,
+            "snapshots": 120,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.269386483839777,
+          "peak_pss_kib": 7304,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.69710983999539,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.08,
+            "peak_observed_tree_pss_kib": 7304,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 0.2337055163324861,
+          "min": 0.20209922870461722,
+          "max": 0.269386483839777
+        },
+        "peak_pss_kib": {
+          "median": 7304,
+          "min": 7264,
+          "max": 7672
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.69710983999539,
+          "min": 29.688386435009306,
+          "max": 29.952224106003996
+        }
+      }
+    },
+    "candidate-idle-1000": {
+      "rounds": [
+        {
+          "cpu_percent": 0.0,
+          "peak_pss_kib": 7507,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.722039640997536,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.0,
+            "peak_observed_tree_pss_kib": 7507,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.0,
+          "peak_pss_kib": 7404,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.703659813996637,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.0,
+            "peak_observed_tree_pss_kib": 7404,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.0,
+          "peak_pss_kib": 7276,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.68984991600155,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.0,
+            "peak_observed_tree_pss_kib": 7276,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "peak_pss_kib": {
+          "median": 7404,
+          "min": 7276,
+          "max": 7507
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.703659813996637,
+          "min": 29.68984991600155,
+          "max": 29.722039640997536
+        }
+      }
+    },
+    "baseline-idle-10000": {
+      "rounds": [
+        {
+          "cpu_percent": 0.23491162484287284,
+          "peak_pss_kib": 38716,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.798440178012243,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.07,
+            "peak_observed_tree_pss_kib": 38716,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.235371740184985,
+          "peak_pss_kib": 38956,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.740188837022288,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.07,
+            "peak_observed_tree_pss_kib": 38956,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.2686037723032066,
+          "peak_pss_kib": 38856,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.783647233998636,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.08,
+            "peak_observed_tree_pss_kib": 38856,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 0.235371740184985,
+          "min": 0.23491162484287284,
+          "max": 0.2686037723032066
+        },
+        "peak_pss_kib": {
+          "median": 38856,
+          "min": 38716,
+          "max": 38956
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.783647233998636,
+          "min": 29.740188837022288,
+          "max": 29.798440178012243
+        }
+      }
+    },
+    "candidate-idle-10000": {
+      "rounds": [
+        {
+          "cpu_percent": 0.0,
+          "peak_pss_kib": 38035,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.74057867898955,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.0,
+            "peak_observed_tree_pss_kib": 38035,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.0,
+          "peak_pss_kib": 37573,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.729258479026612,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.0,
+            "peak_observed_tree_pss_kib": 37573,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 119,
+            "snapshots": 119,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        },
+        {
+          "cpu_percent": 0.0,
+          "peak_pss_kib": 38179,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.953782080003293,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.0,
+            "peak_observed_tree_pss_kib": 38179,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 120,
+            "snapshots": 120,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "peak_pss_kib": {
+          "median": 38035,
+          "min": 37573,
+          "max": 38179
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.74057867898955,
+          "min": 29.729258479026612,
+          "max": 29.953782080003293
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Latency percentiles are histogram bounds, not exact samples or pixel latency.",
+    "Stage timers overlap; do not sum nested timings as CPU cost.",
+    "Process PSS is not heap allocation volume; synthetic PTY excludes terminal emulator."
+  ]
+}

@@ -1,0 +1,531 @@
+{
+  "schema": 1,
+  "matrix": "/tmp/talos-perf-switch-release-df7411d2",
+  "cases": {
+    "baseline-workspace-switch-10000": {
+      "rounds": [
+        {
+          "cpu_percent": 1.5426936607495996,
+          "peak_pss_kib": 45770,
+          "steady_output_bytes": 3420,
+          "steady_covered_seconds": 29.817974346020492,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.45999999999999996,
+            "peak_observed_tree_pss_kib": 45770,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 117,
+            "snapshots": 117,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          },
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 290,
+            "draw": 290,
+            "flush": 31,
+            "frame_preparation": 290,
+            "git_scan": 61,
+            "history_hit": 580,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 118,
+            "input_to_submit": 59,
+            "layout": 290,
+            "output": 32,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200,
+            "workspace_change": 31
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 227758293,
+            "diff": 15921688,
+            "draw": 448328649,
+            "flush": 352597,
+            "frame_preparation": 11022359,
+            "git_scan": 358247653,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 55210312,
+            "layout": 80344,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0,
+            "workspace_change": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 8388608,
+                "upper_ns": 16777215
+              },
+              "p99": {
+                "lower_ns": 16777216,
+                "upper_ns": 21234698
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 2097152,
+                "upper_ns": 4194303
+              }
+            }
+          },
+          "animation_deadline_budget": null
+        },
+        {
+          "cpu_percent": 1.509232387894209,
+          "peak_pss_kib": 43958,
+          "steady_output_bytes": 3420,
+          "steady_covered_seconds": 29.816481783025665,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.45,
+            "peak_observed_tree_pss_kib": 43958,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 116,
+            "snapshots": 116,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          },
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 289,
+            "draw": 289,
+            "flush": 31,
+            "frame_preparation": 289,
+            "git_scan": 61,
+            "history_hit": 578,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 116,
+            "input_to_submit": 58,
+            "layout": 289,
+            "output": 32,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200,
+            "workspace_change": 31
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 210188426,
+            "diff": 17304090,
+            "draw": 433259441,
+            "flush": 269085,
+            "frame_preparation": 13015194,
+            "git_scan": 335601683,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 79844250,
+            "layout": 99395,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0,
+            "workspace_change": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 8388608,
+                "upper_ns": 16777215
+              },
+              "p99": {
+                "lower_ns": 16777216,
+                "upper_ns": 20256236
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 2097152,
+                "upper_ns": 4194303
+              }
+            }
+          },
+          "animation_deadline_budget": null
+        },
+        {
+          "cpu_percent": 1.247743342729967,
+          "peak_pss_kib": 44170,
+          "steady_output_bytes": 3420,
+          "steady_covered_seconds": 29.653534290991956,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.37,
+            "peak_observed_tree_pss_kib": 44170,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 114,
+            "snapshots": 114,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          },
+          "stage_counts": {
+            "deadline_lateness": 198,
+            "diff": 287,
+            "draw": 287,
+            "flush": 31,
+            "frame_preparation": 287,
+            "git_scan": 63,
+            "history_hit": 574,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 116,
+            "input_to_submit": 58,
+            "layout": 287,
+            "output": 32,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 198,
+            "workspace_change": 31
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 1225263841,
+            "diff": 11685001,
+            "draw": 649922113,
+            "flush": 5138184,
+            "frame_preparation": 7740208,
+            "git_scan": 552053715,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 44469587,
+            "layout": 52974,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0,
+            "workspace_change": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 524288,
+                "upper_ns": 1048575
+              },
+              "p99": {
+                "lower_ns": 16777216,
+                "upper_ns": 20275890
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 16777216,
+                "upper_ns": 33554431
+              },
+              "p99": {
+                "lower_ns": 134217728,
+                "upper_ns": 255253274
+              }
+            }
+          },
+          "animation_deadline_budget": null
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 1.509232387894209,
+          "min": 1.247743342729967,
+          "max": 1.5426936607495996
+        },
+        "peak_pss_kib": {
+          "median": 44170,
+          "min": 43958,
+          "max": 45770
+        },
+        "steady_output_bytes": {
+          "median": 3420,
+          "min": 3420,
+          "max": 3420
+        },
+        "steady_covered_seconds": {
+          "median": 29.816481783025665,
+          "min": 29.653534290991956,
+          "max": 29.817974346020492
+        }
+      }
+    },
+    "candidate-workspace-switch-10000": {
+      "rounds": [
+        {
+          "cpu_percent": 0.8750468910744041,
+          "peak_pss_kib": 39752,
+          "steady_output_bytes": 6061,
+          "steady_covered_seconds": 29.712693417008268,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.26,
+            "peak_observed_tree_pss_kib": 39752,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 117,
+            "snapshots": 117,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          },
+          "stage_counts": {
+            "animation_deadline_lateness": 0,
+            "deadline_lateness": 0,
+            "diff": 120,
+            "draw": 120,
+            "flush": 61,
+            "frame_preparation": 120,
+            "git_scan": 30,
+            "git_snapshot_age": 89,
+            "history_hit": 240,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 118,
+            "input_to_submit": 59,
+            "layout": 0,
+            "output": 32,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0,
+            "workspace_change": 31
+          },
+          "stage_total_ns": {
+            "animation_deadline_lateness": 0,
+            "deadline_lateness": 0,
+            "diff": 6360292,
+            "draw": 32819639,
+            "flush": 389313,
+            "frame_preparation": 732799,
+            "git_scan": 218748506,
+            "git_snapshot_age": 27292216269,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 17324842,
+            "layout": 0,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0,
+            "workspace_change": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 262144,
+                "upper_ns": 502531
+              },
+              "p99": {
+                "lower_ns": 262144,
+                "upper_ns": 502531
+              }
+            },
+            "deadline_lateness": {
+              "p95": null,
+              "p99": null
+            }
+          },
+          "animation_deadline_budget": {
+            "count": 0,
+            "over_50ms_count": 0,
+            "p99_within_50ms": false
+          }
+        },
+        {
+          "cpu_percent": 0.605813354232942,
+          "peak_pss_kib": 39755,
+          "steady_output_bytes": 6061,
+          "steady_covered_seconds": 29.712121520977234,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.18,
+            "peak_observed_tree_pss_kib": 39755,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 116,
+            "snapshots": 116,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          },
+          "stage_counts": {
+            "animation_deadline_lateness": 0,
+            "deadline_lateness": 0,
+            "diff": 120,
+            "draw": 120,
+            "flush": 61,
+            "frame_preparation": 120,
+            "git_scan": 30,
+            "git_snapshot_age": 88,
+            "history_hit": 240,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 118,
+            "input_to_submit": 59,
+            "layout": 0,
+            "output": 32,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0,
+            "workspace_change": 31
+          },
+          "stage_total_ns": {
+            "animation_deadline_lateness": 0,
+            "deadline_lateness": 0,
+            "diff": 5898135,
+            "draw": 31020127,
+            "flush": 343966,
+            "frame_preparation": 609571,
+            "git_scan": 143381417,
+            "git_snapshot_age": 26252818962,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 16792531,
+            "layout": 0,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0,
+            "workspace_change": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 262144,
+                "upper_ns": 500385
+              },
+              "p99": {
+                "lower_ns": 262144,
+                "upper_ns": 500385
+              }
+            },
+            "deadline_lateness": {
+              "p95": null,
+              "p99": null
+            }
+          },
+          "animation_deadline_budget": {
+            "count": 0,
+            "over_50ms_count": 0,
+            "p99_within_50ms": false
+          }
+        },
+        {
+          "cpu_percent": 0.5702213134303635,
+          "peak_pss_kib": 40170,
+          "steady_output_bytes": 6061,
+          "steady_covered_seconds": 29.812985940021463,
+          "observed_tree_usage": {
+            "observed_interval_cpu_seconds": 0.16999999999999998,
+            "peak_observed_tree_pss_kib": 40170,
+            "observed_process_lifetimes": 1,
+            "complete_snapshots": 117,
+            "snapshots": 117,
+            "limitations": "Only adjacent observations of identical PID/start ticks count; births, exits and missing intervals are excluded."
+          },
+          "stage_counts": {
+            "animation_deadline_lateness": 0,
+            "deadline_lateness": 0,
+            "diff": 120,
+            "draw": 120,
+            "flush": 61,
+            "frame_preparation": 120,
+            "git_scan": 30,
+            "git_snapshot_age": 89,
+            "history_hit": 240,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 118,
+            "input_to_submit": 59,
+            "layout": 0,
+            "output": 32,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0,
+            "workspace_change": 31
+          },
+          "stage_total_ns": {
+            "animation_deadline_lateness": 0,
+            "deadline_lateness": 0,
+            "diff": 4932433,
+            "draw": 26780877,
+            "flush": 478988,
+            "frame_preparation": 498938,
+            "git_scan": 148279750,
+            "git_snapshot_age": 27936195530,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 14222431,
+            "layout": 0,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0,
+            "workspace_change": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 262144,
+                "upper_ns": 469218
+              },
+              "p99": {
+                "lower_ns": 262144,
+                "upper_ns": 469218
+              }
+            },
+            "deadline_lateness": {
+              "p95": null,
+              "p99": null
+            }
+          },
+          "animation_deadline_budget": {
+            "count": 0,
+            "over_50ms_count": 0,
+            "p99_within_50ms": false
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 0.605813354232942,
+          "min": 0.5702213134303635,
+          "max": 0.8750468910744041
+        },
+        "peak_pss_kib": {
+          "median": 39755,
+          "min": 39752,
+          "max": 40170
+        },
+        "steady_output_bytes": {
+          "median": 6061,
+          "min": 6061,
+          "max": 6061
+        },
+        "steady_covered_seconds": {
+          "median": 29.712693417008268,
+          "min": 29.712121520977234,
+          "max": 29.812985940021463
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Latency percentiles are histogram bounds, not exact samples or pixel latency.",
+    "Stage timers overlap; do not sum nested timings as CPU cost.",
+    "Process PSS is not heap allocation volume; synthetic PTY excludes terminal emulator."
+  ]
+}

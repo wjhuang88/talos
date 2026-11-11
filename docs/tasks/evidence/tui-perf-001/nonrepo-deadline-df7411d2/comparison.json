@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "source_commits_from_external_receipts_required": true,
+  "matrix": "/tmp/talos-perf-nonrepo-deadline-df7411d2",
+  "cases": {
+    "animation-10000": {
+      "baseline_cpu_median": 1.7477598884624321,
+      "candidate_cpu_median": 1.5176615167174095,
+      "cpu_ratio": 0.8683466915198239,
+      "paired_cpu_percentage_point_deltas": [
+        -0.0056751815692965835,
+        -0.008673430002414717,
+        -0.4319209424007697
+      ],
+      "candidate_peak_pss_kib": 46312,
+      "peak_pss_budget_kib": 63777.2,
+      "input_p95_p99_budget_ms": [
+        20,
+        35
+      ],
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "stable_layout_history": true,
+        "input_p95": true,
+        "input_p99": true,
+        "animation_deadline_p99": true
+      },
+      "animation_deadline_evidence": [
+        "visible-animation threshold count",
+        "visible-animation threshold count",
+        "visible-animation threshold count"
+      ]
+    }
+  },
+  "evaluated_checks_pass": true,
+  "limitations": [
+    "Only listed checks are evaluated; this is not whole-task acceptance.",
+    "CPU ratios at zero baseline are unavailable, not zero.",
+    "Native terminal, allocations and long-run heap stability require separate evidence; input latency is checked only with probes and animation lateness only in animation cases.",
+    "Pair deltas follow manifest round order; fixed baseline-first ordering can retain host drift."
+  ]
+}

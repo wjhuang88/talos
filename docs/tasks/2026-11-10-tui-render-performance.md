@@ -522,3 +522,416 @@ probes, instrumentation overhead, full evidence limitations and frozen budgets.
 Runtime event scheduling, asynchronous Git snapshots and preparation caches
 remain unimplemented. Full local preflight, implementation CI/review and native
 terminal acceptance also remain pending.
+
+### P2 dependency audit: cancellation is not hard termination
+
+Inspected the locally pinned `gix 0.90.0` source before choosing the worker
+lifecycle. Upstream `src/status/iter/types.rs` (Parallel Operation) explicitly
+states that without `parallel`, status is computed in advance and the iterator
+is non-interruptible. `src/status/platform.rs` exposes `should_interrupt_owned`,
+but this does not establish hard cancellation for every execution path.
+`src/status/iter/mod.rs` also documents non-interruptible index work even on the
+parallel path. Primary source: https://github.com/GitoxideLabs/gitoxide/tree/gix-v0.90.0/gix/src/status
+(local Cargo.lock version and registry source were used for this inspection).
+
+The TUI manifest disables default features and does not directly request
+`parallel`; feature unification must be checked for the final CLI build before
+making feature-specific claims. Do not enable dependency parallelism merely to
+claim cancellability. P2 must keep one bounded scan ownership slot occupied until
+the underlying work actually returns, even if its result times out or its
+workspace generation becomes obsolete. Cooperative cancellation can supplement
+this invariant but cannot replace it. Shutdown must document any surviving work
+and avoid joining a stalled scanner on the UI thread. This is a verified upstream
+constraint and design requirement, not an implemented worker or cancellation test.
+
+### Frozen implementation budgets before P1
+
+Both six-scenario/three-history/three-round matrices, 36 input-probe samples,
+18 static Git samples, 24 diagnostic-overhead samples and three debug workspace
+switch samples passed. Raw reports are in `evidence/tui-perf-001/` under
+`debug-baseline`, `release-baseline`, `input-baseline`, `git-baseline`,
+`metrics-overhead`, and `workspace-switch`. The latter uses source `15ef42c1`;
+other baseline binaries use `52263c62`. Measurements justify starting P1 with
+the following fixed acceptance budgets, without claiming full P0 completion:
+
+| Metric | Budget | Basis |
+|---|---|---|
+| No-event idle | Zero steady draw/diff/flush; CPU <=0.10% release, <=0.20% debug without diagnostics | Baselines ~0.33–0.37% release, ~1.44–1.94% debug; zero unnecessary frames is the primary invariant |
+| Input P95/P99, excluding resize | <=10/20 ms release; <=20/35 ms debug | Baseline P99 upper <=1.64 ms release, <=8.74 ms debug; headroom for host scheduling and bounded batching |
+| Resize input P95/P99 at 10000 history | <=100/150 ms release; <=150/200 ms debug | Baseline P99 upper <=70.56/122.69 ms respectively; full width reflow remains required |
+| Animation cadence | 150 ms; P99 deadline lateness <=50 ms except resize; no catch-up frame bursts | Preserve established cadence; explicit bounded delay target for scheduler tests and replay |
+| Git freshness | Refresh every 2 s while visible; old results become explicitly stale/unknown at 5 s; scan timeout 2 s | 59 scans/30 s baseline is wasteful; bounded freshness independent of failed or stalled scans |
+| Active CPU/PSS regressions | No >20% median CPU regression in matching active scenarios; PSS peak <=baseline peak*1.20+8 MiB | Three-round variability and fixed-size caches need headroom; compare interleaved baseline/candidate |
+| Scanner lifetime | At most one actual scan at a time; timeout never frees the slot before worker return | Upstream cancellation limits and published lifecycle requirement |
+
+Remaining measurement limitations stay open: no allocation-volume profiler or
+native-terminal resource/visual evidence; process-tree polling misses short-lived
+work; workspace-switch release profile is not yet sampled; precise Git snapshot
+age only becomes meaningful with P2 snapshots. These residuals remain part of
+overall acceptance, not waived by the budget freeze. P1 implementation may now
+proceed using the measured baselines; P0 is Partial until its remaining evidence
+is resolved or explicitly scoped by the maintainer. Do not relabel P1–P3 complete.
+
+### P1 first local implementation checkpoint (uncommitted)
+
+The loop now selects explicit input/output/stream/approval-close/deadline events,
+draws only when dirty, removes duplicate initial/tool draws, and handles legacy
+stream EOF outside the select. Input batches retain release filtering. Queued
+business events are consumed one per select to preserve FIFO while allowing
+input to compete. Cadence deadlines survive input traffic and skip elapsed frames
+without catch-up renders; a deterministic time-arithmetic test covers this.
+
+The TUI suite passed 654 tests. Six three-second PTY smoke cases passed at
+`/tmp/talos-p1-first-smoke`: steady idle and approval draw/timer counts were zero;
+scroll/resize each drew four frames with zero timer wakes; animation drew 13
+frames with 13 timer wakes in the two-second steady window. These are smoke
+results, not the full comparison or native visual acceptance.
+
+P1 remains Partial: dedicated loop regressions for closed approvals, legacy EOF,
+tip/reconnect/drag deadlines, fairness and final stream frame are still needed;
+bounded stream display coalescing remains pending. Visible processing currently
+uses status.is_processing as a conservative animation trigger. A transitional
+500 ms Git deadline still draws when a workspace/status is visible; P2 must
+replace it with asynchronous snapshot delivery and unchanged-result suppression.
+P3 caches and P4 decision are not implemented. No implementation completion or
+push is claimed by this checkpoint.
+
+### P1–P3 local implementation checkpoint (supersedes earlier pending notes)
+
+All changes below remain uncommitted on `perf/tui-event-render` in the isolated
+`/tmp/talos-tui-perf-claim` worktree. The original project worktree is unchanged.
+
+- P1 now coalesces streaming frames at 33 ms, observes approval closure and legacy
+  EOF explicitly, and submits pending final content before Exit. Ordered 1000-token
+  Exit-without-End regression passes. A 200 Hz PTY smoke observed 802 output events,
+  119 frames and nine input latency samples (maximum 5.99 ms) in its steady window;
+  this does not prove final terminal contents or cancellation fairness.
+- P2 runs Git scanning off the UI thread with a process-wide single actual-worker
+  slot. Timeout/drop suppress publication without releasing ownership before return;
+  panic containment and abandoned-worker ownership tests pass. Workspace generation
+  checks reject obsolete results. Refresh/timeout/staleness are 2/2/5 seconds.
+  Unchanged snapshots do not redraw; a five-second steady smoke observed three
+  scans and zero draw/diff/flush calls. A spawn failure now immediately submits its
+  changed unknown status instead of waiting for another event.
+- P3 caches splash, layout and composer height, and computes history row count
+  without preparing a visible projection. The compressed preview plan is shared
+  between height calculation and drawing for ordinary and tool previews, avoiding
+  duplicate wrapping within a frame. This is not a cross-frame preview cache.
+  Unicode/newline/width/cursor oracle tests cover existing caches.
+
+The TUI suite passed 664 tests after the preview-plan change. MSVC xwin checking
+of TUI tests/examples passed at that checkpoint; the subsequent spawn-failure
+scheduling correction still requires the next checks. Full workspace preflight,
+final-frame/cancellation loop oracles, slow/switch Git integration, cache buffer
+and cursor equivalence, the formal interleaved performance comparison, P4 decision,
+implementation review and remote gates remain outstanding. P1–P3 remain Partial.
+The user explicitly has no native Windows environment; xwin is build evidence
+only and native Windows terminal acceptance remains unavailable, not passed.
+
+### Lifecycle and equivalence follow-up (local, uncommitted)
+
+The display snapshot is now owned by each TUI rather than a process-global cache;
+only actual Git scanner ownership is global. Tests cover two sessions sharing a
+workspace, workspace mismatch, exact expiry and unchanged-result freshness renewal.
+The final CLI dependency graph (`cargo tree --locked -p talos-cli -e features -i gix`)
+confirms gix 0.90 has no `parallel` feature, retaining the cancellation limitation.
+
+The production event loop now accepts a private input-stream seam. An actual-loop
+regression verifies cancellation amid 1000 queued ordered deltas, retention of all
+tokens in order, and submission of the last token to the terminal buffer before
+Exit without End. This strengthens the earlier handler-only evidence; it is not a
+native display or latency measurement. Animation scheduling uses the final visible
+preview rows, with a regression covering compression to a one-row window and
+restoration. A 28-step cache oracle compares full cells/styles/cursor/visibility
+against forced fresh planning across Unicode, explicit newlines, cursor moves,
+approval open/close, scrolling and resize.
+
+The full preflight reached 668 passing TUI unit tests, then failed the I174 source
+layout test because it named the removed `next_stream_chunk` method. That structural
+assertion has been migrated to the private scheduling module and its actual EOF
+wait call, preserving module encapsulation checks. Full preflight must be rerun;
+the failed run is not a passed workspace gate. Latest logs are
+`/tmp/talos-perf-preflight.log`, `/tmp/talos-perf-final-frame.log` and
+`/tmp/talos-perf-frame-oracle.log`. Other acceptance gaps listed above remain open.
+
+### Deterministic scheduling and preview cache checkpoint (local)
+
+P3 now has two single-entry preview geometry caches (natural/compressed height).
+Keys include width, bounded padding width, text, height cap, spinner presence and
+thinking-layout presence. Animated glyph/color/frame changes are excluded from
+geometry; the actual first-row prefix is restored for each frame. Tests compare
+cached plans with the full planner across empty/thinking/long/Unicode text,
+widths 0/1/2/3/7/80, caps 0/1/4/10/11, active/inactive states and animation frames;
+unchanged animation must not rebuild. The full-cell oracle also resets these
+caches on its fresh-planning path. This avoids wrap computation, not all per-frame
+buffer construction or bounded visible-row copies.
+
+The loop now uses Tokio's monotonic clock (converted to the existing Instant type)
+for its deadlines. Test-only Tokio clock control verifies: one initial draw in a
+minute of no-event idle; independent tip expiry and deferred reconnect without
+visible animation; three drag scroll ticks before mouse release and no later
+frames; at most four submitted frames for 1000 ready deltas plus cancellation and
+final Exit. No real sleeps are used to assert these scheduling outcomes.
+
+A controlled blocked-scanner integration test pauses the UI clock after worker
+entry, crosses the two-second timeout, switches workspace/generation, and confirms
+input submission and Exit remain responsive. Refreshes cannot create another
+actual worker; even a following session cannot acquire its slot until the blocked
+worker is explicitly released. Worker completion now supplies the snapshot
+collection timestamp. Optional frame-weighted Git age metrics are documented in
+LOCAL-DEV; no native display freshness claim follows from them.
+
+`cargo test --locked -p talos-tui` passes 673 unit tests, 2 structure integration
+tests and 2 doctests at this checkpoint. Full preflight, current xwin and final
+formal performance comparisons still need to run for this source. Earlier
+limitations concerning native Windows/terminal acceptance and profiling remain.
+
+Validation follow-up: `./scripts/release_preflight.sh` exited 0 on the complete
+local implementation above (`/tmp/talos-perf-preflight2.log`), including locked
+workspace check/Clippy/tests, governance checks and external runtime SDK fixture.
+`cargo xwin check --locked -p talos-tui --tests --examples --target
+x86_64-pc-windows-msvc` also exited 0 (`/tmp/talos-perf-cache-clock-xwin.log`).
+P0 baseline archives and summary-accounting changes are committed locally as
+`97764675`; runtime changes remain uncommitted. Neither local checks nor this
+baseline commit establish final performance/native acceptance or remote gates.
+
+### Local stage commits and candidate measurement boundary
+
+Runtime work is now separated into three reviewable local commits:
+
+- `61f2c322`: P1 event/deadline scheduling and deterministic loop regressions.
+- `1e574cd1`: P2 asynchronous Git worker, per-session snapshots and lifecycle tests.
+- `539adfd2`: P3 bounded layout/preview caches and complete-buffer equivalence tests.
+
+The exact P1 and P2 staged trees were exported without changing the working tree
+and tested independently (`cargo test --locked -p talos-tui`): respectively
+663 and 667 unit tests, plus 2 integration and 2 doc tests each. The final combined
+source matches the previously validated 673-test implementation; strict all-target
+TUI Clippy also passed (`/tmp/talos-perf-stage-clippy.log`). All commits remain
+local, not pushed; no phase is marked Complete on this basis.
+
+Candidate debug/release replay binaries are being built from `539adfd2`, with
+Rust build inputs verified clean against that commit. Release retains debug
+symbols (`CARGO_PROFILE_RELEASE_DEBUG=1`, `CARGO_PROFILE_RELEASE_STRIP=false`),
+with two build jobs. Immutable copies and SHA-256 receipt will live under
+`/tmp/talos-candidate-539adfd2`. Formal paired sampling starts only after both
+builds complete; use the existing source-52263c62 immutable baseline binaries and
+identical replay parameters. Do not compile or run tests during sampling.
+
+### Formal paired release sampling started
+
+Both candidate builds completed successfully at source `539adfd2`; the receipt is
+archived in `evidence/tui-perf-001/candidate-build/receipt.json`. `readelf -S`
+confirmed `.debug_info`, `.debug_line` and `.symtab` in the release binary.
+The formal release matrix is running at `/tmp/talos-perf-release-paired-539adfd2`:
+
+```sh
+python3 scripts/replay_tui_perf_matrix.py \
+  --binary baseline=/tmp/talos-p0-binaries-52263c62/release \
+  --binary candidate=/tmp/talos-candidate-539adfd2/release \
+  --output /tmp/talos-perf-release-paired-539adfd2 \
+  --profile release-with-symbols
+```
+
+Defaults retain six scenarios, histories 100/1000/10000, three rounds and 35-second
+runs including five seconds warmup, totaling 108 alternating samples. No builds
+or tests run during sampling. The first candidate idle/100 sample has zero steady
+draw/diff/flush/timer counts; this is preliminary evidence only, not a completed
+matrix or CPU-budget conclusion. New `compare_tui_perf.py` and its focused budget
+tests are prepared but unvalidated until sampling ends; they evaluate only their
+explicit CPU/PSS/idle/stable-layout checks and cannot close overall acceptance.
+
+### Release paired matrix completed; debug comparison started
+
+All 108 release cases completed with exit 0. Raw reports and validated derived
+summary/comparison are archived under `evidence/tui-perf-001/release-paired/`.
+Twelve Python evidence tests passed. Every explicitly evaluated release check
+passed (CPU/PSS budgets, idle/approval frame suppression, stable animation
+planning and animation deadline P99). Stream/10000 CPU median increased from
+1.440% to 1.491% (~3.5%, within the frozen +20% budget); do not claim universal
+speedup. Input probes were off and workspace empty, so input/Git/native/metrics-off
+budgets remain unverified by this matrix.
+
+The equivalent 108-case debug comparison is now running at
+`/tmp/talos-perf-debug-paired-539adfd2`, using baseline/candidate debug binaries
+from the same source-bound receipt directories and `--profile debug`. No builds
+or tests run during sampling. The task remains Active/Partial pending remaining
+measurement, acceptance and delivery gates.
+
+### Debug paired experiment: failed evidence and provenance investigation
+
+All 108 cases completed, but the stable animation layout gate failed for all
+three history sizes. Reports are preserved in `evidence/tui-perf-001/debug-paired/`.
+Other evaluated CPU/PSS/idle/approval/deadline gates passed; this is not acceptance.
+The captured debug executable lacks LayoutCache implementation symbols while
+containing earlier-stage code; its original build reused the shared target in
+0.27 seconds. The receipt therefore does not sufficiently prove source identity.
+An isolated target rebuild with Cargo JSON artifact paths is in progress.
+Do not attribute the failed comparison to current source until provenance is
+resolved, or use the old debug receipt as verified candidate evidence.
+
+### Debug provenance correction verified
+
+The old executable embeds `/tmp/talos-perf-p2-check`; a forced current library
+rebuild restores P3 cache symbols. A ten-second animation smoke (two-second
+warmup) records 53 steady draws, zero layouts and zero history rebuilds.
+No runtime source change was needed. The corrected receipt is
+`evidence/tui-perf-001/candidate-build/debug-rebuilt-receipt.json`.
+An attempted isolated target under /tmp exhausted tmpfs quota and was removed;
+project-disk shared dependencies were reused with forced current library rebuild
+and Cargo artifact-path verification. Full corrected debug comparison follows.
+
+### Corrected Debug paired comparison completed
+
+All 108 samples completed and all evaluated checks passed; raw and derived
+reports are archived in `evidence/tui-perf-001/debug-paired-rebuilt/`.
+Stream CPU medians fell from 11.249/11.279/11.016% to 7.825/8.260/8.089%
+for histories 100/1000/10000. Idle and approval steady draw/diff/flush counts
+are zero; stable animation layout/history rebuild counts are zero.
+Input probes, Git, metrics-off idle, allocation, long-run and native acceptance
+remain separate outstanding requirements. No whole-task completion is claimed.
+
+### Release input-probe comparison completed
+
+All 36 cases passed evaluated checks; archive: `evidence/tui-perf-001/input-paired-release/`.
+Worst-round ordinary input P99 upper bound is 1.190ms; resize with 10000 history
+entries is 66.975ms, within frozen release budgets. This is synthetic input-to-submit
+evidence, not native pixel latency. Debug input comparison follows with the corrected binary.
+
+### Debug input-probe comparison completed
+
+All 36 cases passed evaluated checks; archive: `evidence/tui-perf-001/input-paired-debug/`.
+Worst ordinary input P99 upper bound4.848ms; resize110.863ms, within frozen
+debug budgets. Uses corrected P3 binary. Native terminal, Git freshness,
+metrics-off idle, allocation and sustained/long-run workloads remain outstanding.
+
+### Release metrics-off idle completed
+
+All18 samples passed CPU/PSS budgets, with measured candidate CPU medians0.000%
+across all history sizes (procfs resolution limited). Archive:
+`evidence/tui-perf-001/idle-off-release/`. Debug metrics-off verification follows.
+
+### Debug metrics-off idle completed
+
+All 18 samples passed CPU/PSS budgets; measured CPU medians 0.000% across
+all history sizes (procfs resolution limited). Archive:
+`evidence/tui-perf-001/idle-off-debug/`. Both profiles now have metrics-off
+idle evidence; Git and native-terminal behavior remain separate gates.
+
+### Release large Git fixture measured
+
+Six paired cases with10000 untracked files pass evaluated gates. CPU median
+2.267%→0.976%;15 scans per30s steady window, max scan20.490ms, observed
+frame-weighted snapshot age max1.994s. Evidence: `evidence/tui-perf-001/git-many-release/`.
+Other fixtures, debug, workspace switch and external-change behavior remain open.
+
+### Debug large Git fixture measured
+
+Six cases passed evaluated gates: CPU median10.404%→4.471%,15 scans per30s,
+max scan66.404ms and observed snapshot age max2.005s. Archive:
+`evidence/tui-perf-001/git-many-debug/`. External-change/switch gates remain open.
+
+### Release clean Git fixture measured
+
+Six paired cases passed evaluated gates; CPU median0.438%→0.337%,15 scans/30s,
+max scan1.150ms and observed age max2.001s. Archive:
+`evidence/tui-perf-001/git-clean-release/`. Debug clean fixture follows.
+
+### Debug clean Git fixture measured
+
+Six paired cases passed evaluated gates: CPU median 1.960% to 1.858%,
+15 scans/30s, max scan 7.364ms and observed age max 2.003s. Archive:
+`evidence/tui-perf-001/git-clean-debug/`. Non-repository and switch coverage follows.
+
+### Release non-repository fixture measured
+
+Six cases passed evaluated gates. CPU median0.304% to0.334% (+10.0%,
+within20% budget; not a speedup). Archive: `evidence/tui-perf-001/git-nonrepo-release/`.
+
+### Debug non-repository gate remains unverified; main rebase
+
+The completed six-case experiment is preserved in
+`evidence/tui-perf-001/git-nonrepo-debug/`. Candidate round 2 fails the
+conservative deadline P99 upper-bound check (62.754 ms maximum); exact P99 and
+late deadline type are unavailable. CPU/PSS/input/stable preparation checks pass.
+Mixed deadline instrumentation requires diagnosis; no favorable rerun supersedes
+this failure. Task remains Active with acceptance incomplete.
+
+Rebased all six local commits onto origin/main `55617ad7`, new tip `5b25d891`.
+`git range-diff d355dd68..539adfd2 origin/main..HEAD` reports all six patches
+unchanged; `git diff --check` and unmerged-path checks pass. Uncommitted evidence
+and docs restored from stash `cf940fc8`; all untracked contents verified bytewise.
+Existing binary receipts and measurements retain their original source SHAs;
+new-baseline build/test and performance evidence are required before delivery.
+
+### Animation deadline diagnostic refinement — local commit df7411d2
+
+Added a separate due-visible-animation observation and bounded >50ms counter.
+The original combined deadline histogram is retained. Summary/comparator tests
+cover exact threshold ranks, no samples, malformed counts, and mixed/specific
+evidence disagreement; all 14 Python evidence tests passed. This refines
+measurement, not the rendering algorithm, and does not resolve the earlier
+failed run or establish new performance acceptance.
+
+Rebase workspace preflight: check and Clippy passed; tests failed with temporary
+filesystem quota errors. Removed only this turn's mistakenly created 1.3GB
+worktree target after approval. Redirecting TMPDIR inside the repository then
+caused the non-repository fixture to discover its ancestor Git repository;
+that isolated environment failure is retained in the test log. Subsequent
+tests use the restored default temporary directory and the disk-backed shared
+Cargo target. Full fresh preflight remains required.
+
+Validation after diagnostic refinement: full `./scripts/release_preflight.sh`
+passed (exit 0; `/tmp/talos-perf-deadline-preflight.log`), including locked
+workspace check/Clippy/tests and SDK fixture. TUI has 674 unit tests plus two
+integration and two doc tests. `cargo xwin check --locked -p talos-tui --tests
+--examples --target x86_64-pc-windows-msvc` passed (exit 0;
+`/tmp/talos-perf-deadline-xwin.log`). Fourteen Python evidence tests passed.
+The old failed experiment remains failed under the updated comparator.
+
+New source-bound Debug candidate: `df7411d2`, binary SHA-256
+`b5ab0cc7176b3b6bc502aec2ff407346d22ead3e03b6dfdf525b46f27d6de41c`.
+Receipt: `/tmp/talos-candidate-df7411d2/receipt.json`. A new non-repository
+three-round paired animation experiment is running in
+`/tmp/talos-perf-nonrepo-deadline-df7411d2`; no results claimed yet.
+
+### Rebased candidate specific animation measurement
+
+The new six-case non-repository Debug matrix completed successfully; all evaluated
+checks pass. Archive: `evidence/tui-perf-001/nonrepo-deadline-df7411d2/`, including
+source-bound binary receipt and raw reports. Across three candidate rounds,
+602 visible-animation observations have zero >50ms samples; maximum 4.399247ms.
+CPU median baseline1.747760% / candidate1.517662%; candidate peakPSS46312KiB.
+Input P95/P99 and zero stable layout/history rebuild checks pass.
+
+This is independent evidence for df7411d2, not a retrospective pass for the old
+failed run. The old delay's cause remains unknown; dependency and host drift
+limit attribution across rebases. Next: workspace-switch matrices, Git external
+freshness/stale completion oracle, high-rate and long-run evidence, P4 decision,
+ANSI/native acceptance, final source-bound CI/review and delivery.
+
+### Debug workspace-switch matrix completed
+
+Six cases at history10000 pass CPU/PSS/input gates; baseline15ef42c1 and
+candidate df7411d2 alternate 10000-untracked and clean workspaces every second.
+CPU medians6.765962% to3.488965%; peak candidatePSS61084KiB. Archive and both
+source receipts: `evidence/tui-perf-001/switch-debug-df7411d2/`. This establishes
+observed switching and latency, not the separate stale-result or freshness
+oracles. Release switch baseline must still be built from its fixture commit.
+
+### Release workspace-switch matrix completed
+
+Six Release cases also pass CPU/PSS/input gates, source-bound baseline15ef42c1
+and candidate df7411d2. CPU medians1.509232% to0.605813%; peak candidatePSS40170KiB.
+Each candidate round observes31 steady workspace changes. Archive:
+`evidence/tui-perf-001/switch-release-df7411d2/`. Both profiles now have formal
+switch measurements; external mutation freshness and stale-result behavior
+remain separate acceptance requirements. Runtime JSON confirms all new metric
+fields despite an inconclusive optimized-binary literal search.
+
+### Evidence recoverability after rebase
+
+`evidence/tui-perf-001/source-history/pre-rebase.bundle` preserves all six original
+commit objects referenced by old binary receipts. `git bundle verify` passes;
+the prerequisite d355dd68 is on main. Export instructions and SHA-256 are
+archived beside the bundle. No additional remote branch was created.

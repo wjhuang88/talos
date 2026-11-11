@@ -1,0 +1,42 @@
+{
+  "source_commit": "539adfd2e6e24353e936e13c1c001415a5e55982",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "binaries": [
+    {
+      "profile": "debug",
+      "binary": "/tmp/talos-candidate-539adfd2/debug",
+      "sha256": "a70c26cfbdaae93b80b2a975c90f553a5a508ab44352e47f002feef6e66c8030",
+      "build_command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "talos-tui",
+        "--example",
+        "tui_perf_replay"
+      ]
+    },
+    {
+      "profile": "release",
+      "binary": "/tmp/talos-candidate-539adfd2/release",
+      "sha256": "a07e16f76657c06d5cdf7d57ed890cae6033cf496df23313e09b55f25d58fae2",
+      "build_command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "talos-tui",
+        "--example",
+        "tui_perf_replay",
+        "--release"
+      ]
+    }
+  ],
+  "release_environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_STRIP": "false",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "build_result": "both builds exit 0; tracked Rust build inputs equal source commit",
+  "debug_provenance_correction": "Original debug executable contains /tmp/talos-perf-p2-check; excludes P3 caches. Invalid attribution to 539adfd2. See debug-rebuilt-receipt.json."
+}
