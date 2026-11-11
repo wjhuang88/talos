@@ -37,7 +37,7 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Work Slice | STORE-002 I322 C only: extract domain-owned persistence/retrieval operational traits from existing Session/PendingSubmission/Todo, Memory, Evolution and Exploration data/error methods; no concrete storage, SQL/transactions/formats/paths, consumer/default/Host/Server change or new engine |
 | Claimed At | 2026-11-11 |
 | Source Issue | #670 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #911 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly requested continued #670 implementation after I321 #909 merge. Independent API review of A/B passed. I322 governance-only claim needs exact-head CI, both validators, recorded no-overlap CAS, single-maintainer fallback rationale before merge; independent public API review required for C code. |
 | Implementation PR | Not started |
@@ -73,4 +73,4 @@ Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim 
 
 - [I322 domain-owned contract extraction](../../iterations/I322-store-002-domain-contract-extraction.md) proposes narrow interfaces anchored in the existing Session/Pending/Todo, Memory, Evolution and Exploration contracts with existing errors, while preserving local concrete behavior.
 - Independent API review is required before C implementation merge. Explicit unavailable status for Object/Vector/Embedding/standalone Rerank does not imply fake executable providers.
-- The C claim is ineffective until its governance PR merges; D/E/F and #897 E2/E3 remain unclaimed/blocked.
+- The C claim #911 is ineffective until its governance PR merges; D/E/F and #897 E2/E3 remain unclaimed/blocked.
