@@ -1,6 +1,6 @@
 # PROVIDER-008-C: Azure OpenAI transport and shape routing
 
-**Status**: Ready / Unclaimed
+**Status**: In Progress / Claimed (proposed; effective only on #918 merge)
 **Source Issue**: #914
 **Parent Epic**: PROVIDER-008 / #724
 **Selected Iteration**: I323
@@ -9,13 +9,13 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | PROVIDER-008-C Azure transport and per-model Chat/Responses routing only |
 | Claimed At | 2026-11-11 |
 | Source Issue | #914 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #918 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly authorized continuous #724 implementation, testing, independent review, merge and child closure. Distinct human approver unavailable; independent Agent protocol/auth/API review, exact-head CI, validators and CAS remain mandatory. Shared GitHub identity is not independent natural-person approval. |
 | Implementation PR | Not started |
@@ -95,3 +95,5 @@ Parent/derived summary drift about B is repaired in this governance batch; histo
 This governance-only proposal has no ownership or activation effect until finalized exact-head
 review/CI/CAS and merge. No implementation branch, production changes or dependencies yet.
 Completion Commit: Pending.
+
+#915 intake registration was inspected at main 6c81390a; it is the same unclaimed owner, not a competing claim. #918 supersedes intake only upon reviewed merge.

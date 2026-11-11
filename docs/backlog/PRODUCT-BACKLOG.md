@@ -331,3 +331,7 @@ Completion Commit `dbcf6163f34d73def923484ad409814fd4a98039` (#838). Exact-head 
 technical/document review and merge CAS passed. A is Complete; C/D and #724 remain open.
 
 [PROVIDER-008-C](active/PROVIDER-008-C-azure-openai.md) / #914 / I323: Ready / Unclaimed until atomic governance merge; ADR-103, Azure transport and shape routing only.
+
+## Prior intake registration
+
+#915 registered this same owner before #918; no competing implementation claim.

@@ -351,3 +351,7 @@ to [WORKTREE-SANDBOX-001](tasks/2026-11-08-sandbox-owned-worktrees.md)
 Implementation validation is in progress for explicit native clipboard image paste
 into pending TUI attachments, focused on Linux Wayland+niri+Ghostty, following Codex
 interaction logic while retaining Talos ingestion and permission boundaries.
+
+## Prior intake registration
+
+#915 registered this same owner before #918; no competing implementation claim.
