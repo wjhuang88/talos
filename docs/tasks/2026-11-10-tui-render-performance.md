@@ -935,3 +935,31 @@ fields despite an inconclusive optimized-binary literal search.
 commit objects referenced by old binary receipts. `git bundle verify` passes;
 the prerequisite d355dd68 is on main. Export instructions and SHA-256 are
 archived beside the bundle. No additional remote branch was created.
+
+### Actual-loop EOF and Git behavior oracles (local, uncommitted)
+
+Added test-only frame timestamp/observer hooks; no production rendering or
+scheduling changes. Three focused tests passed:
+
+- Legacy EOF: 1000 tokens each appear exactly once in order; final token reaches
+  the submitted buffer before a delayed Exit, with no input or explicit End.
+- External Git freshness: real gix-created repository, external untracked-file
+  creation/removal, submitted clean/dirty/clean frames without input. Each
+  external mutation publishes within the frozen5s freshness limit.
+- Successful obsolete scan: hold old worker until new-workspace frame is
+  submitted, then let it return a successful old branch result. Observe every
+  subsequent submitted frame until new scan publishes; no old branch appears.
+  Exactly two actual scans launch and the new snapshot remains current.
+
+Full TUI suite passes677 unit tests plus2integration/2doc tests; log
+`/tmp/talos-perf-behavior-tests.log`. These are software-buffer and lifecycle
+oracles, not native pixel/IME or long-run evidence. New Windows test cross-check
+and stable-candidate full preflight remain to be recorded before commit.
+
+Behavior-oracle validation follow-up: `cargo xwin check --locked -p talos-tui
+--tests --target x86_64-pc-windows-msvc` passed (exit0,
+`/tmp/talos-perf-behavior-xwin.log`). Full `./scripts/release_preflight.sh`
+passed (exit0, `/tmp/talos-perf-behavior-preflight.log`), including governance,
+locked workspace check/Clippy/tests and SDK fixture. All runtime changes in
+this checkpoint are behind cfg(test); performance candidate df7411d2 remains
+the production source used by the archived measurements.

@@ -13,14 +13,14 @@ new-baseline acceptance. Six rebased patches are unchanged according to range-di
 | Idle does not poll rendering | Paused-clock minute-idle loop test; release paired matrix passes zero steady frame checks across three rounds | Release and Debug metrics-off CPU/PSS passed; native terminal pending |
 | Visible animation only | Tiny-window hide/restore test; release matrix passes zero layout/history rebuild and deadline P99 budget | Changed-cell/ANSI coverage |
 | Tip/reconnect/drag deadlines | Actual-loop paused-clock tests; drag stops after release | Native terminal behavior |
-| Ordered output and cancellation | 1000-delta actual-loop test retains every token and submits final token; cancellation and <=4 draws | Sustained high-rate latency, direct legacy EOF final-frame oracle |
-| Async Git ownership | Controlled blocked worker crosses timeout and workspace switch; input/Exit responsive; global slot survives observer drop | Git fixture and Debug/Release switch matrices pass; external-change freshness and successful stale-result race coverage remain |
+| Ordered output and cancellation | 1000-delta actual-loop test retains every token and submits final token; cancellation and <=4 draws | Sustained high-rate latency; direct legacy EOF oracle now verifies pre-Exit submission (local tests) |
+| Async Git ownership | Controlled blocked worker crosses timeout and workspace switch; input/Exit responsive; global slot survives observer drop | Git fixture and Debug/Release switch matrices pass; new local actual-loop tests cover external clean/dirty/clean publication and successful obsolete scan suppression |
 | Git unknown/freshness | Per-session snapshot tests, exact expiry, unchanged refresh, worker completion timestamp | Frame-weighted age distributions recorded for clean/large fixtures; external-change freshness and native status display remain |
 | Cache correctness | Full-plan preview oracle and 28-step full-cell/style/cursor comparison; width/revision tests | Native terminal/ANSI equivalence; inspect remaining static preparation after measurements |
 | P4 decision | Baseline resize dominated by width reflow; stream fixture has few transcript commits | Candidate comparison and repeated transcript-commit evidence before deciding |
 | Bounded memory | Single-entry caches and one actual scan slot by construction | Long repeated replay/PSS stability; allocation evidence |
 | Input latency | Release and corrected Debug paired probes: 36 cases each; all P95/P99 budgets passed | Sustained high-rate workloads and native visible-pixel acceptance |
-| Build and tests | Full locked preflight passed at df7411d2; 674 TUI unit tests, integration/doc tests; xwin MSVC tests/examples passed | Fresh exact-head CI and prescribed independent review |
+| Build and tests | Full locked preflight passed after local behavior-oracle additions; 677 TUI unit tests, integration/doc tests; xwin MSVC tests/examples passed | Fresh exact-head CI and prescribed independent review |
 | Native platforms | User reports no available Windows environment | Linux Wayland+niri+Ghostty, another supported terminal, native Windows; unavailable stays Review |
 | Delivery | Rebased P1 `9065db99`, P2 `3835fbd4`, P3 `5b25d891`; diagnostics `df7411d2` | Final evidence/doc commits, stable candidate push/PR, review, owner/Board synchronization |
 

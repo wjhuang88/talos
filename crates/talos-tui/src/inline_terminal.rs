@@ -160,6 +160,10 @@ pub struct TerminalSession {
     test_cursor_position: Option<Position>,
     #[cfg(test)]
     test_draw_count: usize,
+    #[cfg(test)]
+    test_last_draw_at: Option<tokio::time::Instant>,
+    #[cfg(test)]
+    test_frame_observer: Option<tokio::sync::mpsc::UnboundedSender<String>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -270,6 +274,10 @@ impl TerminalSession {
             test_cursor_position: None,
             #[cfg(test)]
             test_draw_count: 0,
+            #[cfg(test)]
+            test_last_draw_at: None,
+            #[cfg(test)]
+            test_frame_observer: None,
         })
     }
 
@@ -294,6 +302,8 @@ impl TerminalSession {
             test_cursor_position: None,
             #[cfg(test)]
             test_draw_count: 0,
+            test_last_draw_at: None,
+            test_frame_observer: None,
         }
     }
 
@@ -315,6 +325,18 @@ impl TerminalSession {
     #[cfg(test)]
     pub(crate) fn test_draw_count(&self) -> usize {
         self.test_draw_count
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_last_draw_at(&self) -> Option<tokio::time::Instant> {
+        self.test_last_draw_at
+    }
+
+    #[cfg(test)]
+    pub(crate) fn observe_test_frames(&mut self) -> tokio::sync::mpsc::UnboundedReceiver<String> {
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        self.test_frame_observer = Some(sender);
+        receiver
     }
 
     #[cfg(test)]
@@ -429,6 +451,7 @@ impl TerminalSession {
         #[cfg(test)]
         if self.test_mode {
             self.test_draw_count += 1;
+            self.test_last_draw_at = Some(tokio::time::Instant::now());
             self.cursor_commands +=
                 usize::from(move_cursor.is_some()) + usize::from(visibility_changed);
             self.cursor_visible = cursor.is_some();
@@ -437,6 +460,9 @@ impl TerminalSession {
                 self.last_known_cursor_pos = position;
             }
             self.current = prev_idx;
+            if let Some(observer) = &self.test_frame_observer {
+                let _ = observer.send(self.test_rendered_text());
+            }
             return Ok(());
         }
 

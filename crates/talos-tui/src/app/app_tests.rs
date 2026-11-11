@@ -5195,6 +5195,53 @@ async fn event_loop_submits_final_ordered_frame_without_end_and_handles_cancel_d
     }
 }
 
+#[tokio::test(start_paused = true)]
+async fn legacy_stream_eof_submits_last_token_before_any_exit_or_input_event() {
+    use talos_conversation::{StreamMessage, UiOutput};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let tokens: Vec<_> = (0..1000).map(|i| format!("legacy{i:04} ")).collect();
+    tx.send(UiOutput::Stream(StreamMessage {
+        source: MessageSource::Assistant,
+        stream: Box::pin(futures::stream::iter(tokens)),
+    }))
+    .expect("legacy stream");
+    let exit_at = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
+    let exit = tokio::spawn(async move {
+        tokio::time::sleep_until(exit_at).await;
+        tx.send(UiOutput::Exit).expect("delayed exit");
+    });
+    tui.run_with_events(futures::stream::pending())
+        .await
+        .expect("legacy EOF loop");
+    exit.await.expect("exit sender");
+    assert!(tui.active_stream.is_none());
+    assert!(tui.pending_transcript.is_empty());
+    assert!(tui.terminal.test_rendered_text().contains("legacy0999"));
+    assert!(
+        tui.terminal.test_last_draw_at().expect("submitted frame") < exit_at,
+        "Exit must not be the event that flushes the final legacy frame"
+    );
+    let text = tui
+        .transcript
+        .entries()
+        .iter()
+        .filter_map(|entry| match &entry.block {
+            TranscriptBlock::StyledLine(line) => Some(line.text.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut offset = 0;
+    for i in 0..1000 {
+        let token = format!("legacy{i:04}");
+        assert_eq!(text.matches(&token).count(), 1, "each token exactly once");
+        offset += text[offset..].find(&token).expect("token order") + token.len();
+    }
+}
+
 #[test]
 fn compressed_away_processing_preview_does_not_request_animation() {
     let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
@@ -5508,5 +5555,158 @@ async fn event_loop_remains_interactive_and_exits_while_actual_git_scan_is_block
         "exiting must not free the actual worker slot"
     );
     release_tx.send(()).expect("release blocked worker");
+    wait_for_test_slot().await;
+}
+
+#[tokio::test]
+async fn external_git_changes_reach_submitted_frames_without_input() {
+    use crate::git_snapshot_worker::{TEST_SCAN_LOCK, wait_for_test_slot};
+    let _serial = TEST_SCAN_LOCK.lock().await;
+    wait_for_test_slot().await;
+    let directory = tempfile::tempdir().expect("repository fixture");
+    gix::init(directory.path()).expect("initialize fixture");
+    std::fs::write(
+        directory.path().join(".git/HEAD"),
+        "ref: refs/heads/freshness-oracle\n",
+    )
+    .expect("fixture branch");
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(200, 24));
+    tui.state.status.workspace_path = directory.path().to_string_lossy().into_owned();
+    let mut frames = tui.terminal.observe_test_frames();
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let file = directory.path().join("external-change.txt");
+    let driver = async move {
+        let mut phase = 0;
+        let mut changed_at = None;
+        while let Some(frame) = frames.recv().await {
+            let clean =
+                frame.contains("⎇ freshness-oracle") && !frame.contains("freshness-oracle*");
+            match phase {
+                0 if clean => {
+                    std::fs::write(&file, "external mutation").expect("create file");
+                    changed_at = Some(std::time::Instant::now());
+                    phase = 1;
+                }
+                1 if frame.contains("freshness-oracle*") => {
+                    assert!(changed_at.expect("mutation time").elapsed().as_secs_f64() < 5.0);
+                    std::fs::remove_file(&file).expect("remove fixture file");
+                    changed_at = Some(std::time::Instant::now());
+                    phase = 2;
+                }
+                2 if clean => {
+                    assert!(changed_at.expect("mutation time").elapsed().as_secs_f64() < 5.0);
+                    tx.send(talos_conversation::UiOutput::Exit).expect("exit");
+                    return;
+                }
+                _ => {}
+            }
+        }
+        panic!("frame observer closed before clean/dirty/clean transitions");
+    };
+    let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(12), async {
+        tokio::join!(tui.run_with_events(futures::stream::pending()), driver)
+    })
+    .await
+    .expect("external changes must become visible without input");
+    result.expect("loop");
+    wait_for_test_slot().await;
+}
+
+#[tokio::test]
+async fn successful_old_workspace_scan_cannot_publish_after_switch() {
+    use crate::git_snapshot_worker::{Scan, TEST_SCAN_LOCK, wait_for_test_slot};
+    use crate::scrollback_status_git::GitStatusSummary;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    use talos_conversation::{StatusSnapshot, UiOutput};
+    let _serial = TEST_SCAN_LOCK.lock().await;
+    wait_for_test_slot().await;
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(200, 24));
+    tui.state.status.workspace_path = "old-workspace".into();
+    let mut frames = tui.terminal.observe_test_frames();
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let mut entered = Some(entered_tx);
+    let mut release = Some(release_rx);
+    let old_returned = Arc::new(AtomicBool::new(false));
+    let returned = old_returned.clone();
+    let mut launches = 0;
+    let driver = async move {
+        entered_rx.await.expect("old scan entered");
+        tx.send(UiOutput::Status(StatusSnapshot {
+            workspace_path: "new-workspace".into(),
+            ..Default::default()
+        }))
+        .expect("switch");
+        let mut release = Some(release_tx);
+        let mut switched = false;
+        while let Some(frame) = frames.recv().await {
+            if frame.contains("new-workspace") {
+                switched = true;
+                if let Some(release) = release.take() {
+                    release.send(()).expect("let obsolete scan return success");
+                }
+            }
+            if switched {
+                assert!(!frame.contains("old-late"), "obsolete result in new frame");
+            }
+            if frame.contains("new-live") {
+                assert!(switched);
+                tx.send(UiOutput::Exit).expect("exit");
+                return;
+            }
+        }
+        panic!("new workspace never became visible");
+    };
+    let run = tui.run_with_scanner(futures::stream::pending(), |workspace, generation| {
+        let scan = if workspace == "old-workspace" {
+            let entered = entered.take().expect("one old scan");
+            let release = release.take().expect("one release");
+            let returned = returned.clone();
+            Scan::start_with(workspace, generation, move |_| {
+                let _ = entered.send(());
+                let _ = release.recv();
+                returned.store(true, Ordering::Release);
+                Some(GitStatusSummary {
+                    branch: Some("old-late".into()),
+                    dirty: true,
+                })
+            })?
+        } else {
+            Scan::start_with(workspace, generation, |_| {
+                Some(GitStatusSummary {
+                    branch: Some("new-live".into()),
+                    dirty: false,
+                })
+            })?
+        };
+        launches += usize::from(scan.is_some());
+        Ok(scan)
+    });
+    let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(6), async {
+        tokio::join!(run, driver)
+    })
+    .await
+    .expect("successful replacement scan");
+    result.expect("loop");
+    assert!(old_returned.load(Ordering::Acquire));
+    assert_eq!(launches, 2);
+    assert_eq!(
+        tui.git_snapshot
+            .get("new-workspace", super::scheduling::now())
+            .and_then(|summary| summary.branch.as_deref()),
+        Some("new-live")
+    );
     wait_for_test_slot().await;
 }
