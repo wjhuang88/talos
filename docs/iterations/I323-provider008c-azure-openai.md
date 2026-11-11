@@ -21,7 +21,7 @@
 | Authorization Evidence | User explicitly authorized continuous #724 implementation, testing, independent review, merge and child closure. Distinct human approver unavailable; independent Agent protocol/auth/API review, exact-head CI, validators and CAS remain mandatory. Shared GitHub identity is not independent natural-person approval. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-11 |
-| Handoff / Release Condition | Complete only after merged implementation evidence and all published acceptance; retain failures and resume gate. |
+| Handoff / Release Condition | Close only after merged implementation evidence and all published acceptance; retain failures and resume gate. |
 
 ## Published scope and acceptance
 
@@ -34,7 +34,7 @@
   v1 Chat/Responses use `/openai/v1/chat/completions` or `/openai/v1/responses`, with deployment
   in body `model`. Reject unsupported version/body combinations before credential acquisition.
 - API keys use `api-key`; explicit externally supplied Entra tokens use Bearer. Token mode reads
-  its named environment source at request dispatch, allowing external rotation; no automatic login,
+  its named environment source at request dispatch, observing changes within the running process environment only; a separate shell cannot rotate it; no automatic login,
   SDK credential chain, CLI subprocess, metadata discovery or inferred account authority.
 - Require an explicit HTTPS resource origin (HTTP loopback for controlled fixtures); reject URL
   credentials, query/fragment, ambiguous paths and unsafe deployment/version values. Disable
@@ -116,8 +116,8 @@ Parent/derived summary drift about B is repaired in this governance batch; histo
 
 Fresh clean clone at 55617ad75c84db75718f287d6c05b84cfe55085e; GitHub main independently agrees.
 No C/D effective claim found. Rust installation started in isolated local build directory.
-Governance validators and independent review pending finalized claim PR number. Implementation
-has not begun. Next: backfill claim PR, validate/review exact head, CAS and merge before T2.
+Claim PR #918 is backfilled. Governance validation and independent review are in progress. Implementation
+has not begun. Next: address review findings, validate/review the final exact head, CAS and merge before T2.
 Completion Commit: Pending.
 
 #915 intake registration was inspected at main 6c81390a; it is the same unclaimed owner, not a competing claim. #918 supersedes intake only upon reviewed merge.

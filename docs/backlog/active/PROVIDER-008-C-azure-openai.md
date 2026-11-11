@@ -20,7 +20,7 @@
 | Authorization Evidence | User explicitly authorized continuous #724 implementation, testing, independent review, merge and child closure. Distinct human approver unavailable; independent Agent protocol/auth/API review, exact-head CI, validators and CAS remain mandatory. Shared GitHub identity is not independent natural-person approval. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-11 |
-| Handoff / Release Condition | Complete only after merged implementation evidence and all published acceptance; retain failures and resume gate. |
+| Handoff / Release Condition | Close only after merged implementation evidence and all published acceptance; retain failures and resume gate. |
 
 ## Published scope and acceptance
 
@@ -33,7 +33,7 @@
   v1 Chat/Responses use `/openai/v1/chat/completions` or `/openai/v1/responses`, with deployment
   in body `model`. Reject unsupported version/body combinations before credential acquisition.
 - API keys use `api-key`; explicit externally supplied Entra tokens use Bearer. Token mode reads
-  its named environment source at request dispatch, allowing external rotation; no automatic login,
+  its named environment source at request dispatch, observing changes within the running process environment only; a separate shell cannot rotate it; no automatic login,
   SDK credential chain, CLI subprocess, metadata discovery or inferred account authority.
 - Require an explicit HTTPS resource origin (HTTP loopback for controlled fixtures); reject URL
   credentials, query/fragment, ambiguous paths and unsafe deployment/version values. Disable

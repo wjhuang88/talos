@@ -1,6 +1,6 @@
 # ADR-103: Azure OpenAI transport and body-shape boundary
 
-**Status**: Proposed (atomic acceptance with I323 governance; ineffective until reviewed merge)
+**Status**: Accepted (proposed; effective only upon reviewed #918 merge)
 **Date**: 2026-11-11
 **Owner**: PROVIDER-008-C / #914 / I323; parent #724
 
@@ -40,8 +40,7 @@ No endpoint or deployment is synthesized from a catalog model name.
 
 API-key profile uses the existing configured credential source in an `api-key` header, including
 on v1 where the Microsoft REST example supports it. Entra supplied-token profile uses only
-`Authorization: Bearer` and a separately named environment source, read at dispatch for external
-rotation. Never send both. Missing/invalid tokens fail explicitly and never fall back to API key.
+`Authorization: Bearer` and a separately named environment source, read at dispatch to observe changes in the running process environment only (not updates from another shell). Never send both. Missing/invalid tokens fail explicitly and never fall back to API key.
 Bound headers and mask all credential display/Debug/error/request-preview surfaces.
 This child implements supplied bearer tokens, not token minting, login, managed identity or
 automatic OAuth refresh. Those flows remain #132. The parent explicitly allows API key or Entra;

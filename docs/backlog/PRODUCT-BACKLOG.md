@@ -330,7 +330,7 @@ Complete / Closed; owner Completion Commit `1226f313e7136f4b2a3d8db6f9179c4ed520
 Completion Commit `dbcf6163f34d73def923484ad409814fd4a98039` (#838). Exact-head CI4046, independent
 technical/document review and merge CAS passed. A is Complete; C/D and #724 remain open.
 
-[PROVIDER-008-C](active/PROVIDER-008-C-azure-openai.md) / #914 / I323: Ready / Unclaimed until atomic governance merge; ADR-103, Azure transport and shape routing only.
+[PROVIDER-008-C](active/PROVIDER-008-C-azure-openai.md) / #914 / I323: In Progress / Claimed proposed; effective only on #918 merge; ADR-103, Azure transport and shape routing only.
 
 ## Prior intake registration
 
