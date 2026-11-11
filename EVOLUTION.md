@@ -679,6 +679,15 @@ repeating known mistakes.
 
 **Remedy**: 使用 `std::sync::Mutex` 保护环境变量修改，确保测试串行执行。
 
+**2026-11-11 follow-up (TUI-PERF-001 validation)**: Persisted-credential removal
+must be checked through loaded provider fields and the credentials file, not
+`api_key().is_err()`: resolution intentionally includes host environment fallback.
+An unlocked reader can observe another test's temporary key even when writers
+use a mutex. `store_unset_builtin_provider_clears_credentials` now checks the
+persisted boundary directly; removing the last key removes the file. Exact test
+filters must use the fully qualified test name and show one executed test.
+
+
 **Prevention**: 任何修改全局状态（环境变量、文件系统、网络端口）的测试都必须用锁保护。
 
 ---
