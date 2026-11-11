@@ -1,10 +1,12 @@
 # Iterations
 
-## I321 / STORE-002 — A/B Review / Claimed (#909)
+## I322 / STORE-002 C — proposed independent contract claim
 
-[I321](I321-store-002-capability-contract-foundation.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: #908 merged `201a9b61d72e704da3a86f5db283b9f6e4d92938`, activating the non-overlapping A/B inventory + additive typed contract foundation; candidate #909 remains under review. E0/E1 ARCH-035 (#905/#906) only owns Host architecture; #897 E2/E3 awaits C/D/E/F functional local delegates. I319 Search, I318 TUI and I310 model remain independent.
+[I322](I322-store-002-domain-contract-extraction.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: C proposes existing-domain operational trait interfaces across Session, Todo/PendingSubmission, Memory, Evolution and Exploration only; governance claim **ineffective until its PR merges**. No SQL/schema/caller/host changes, no generic `Bound<T>`. I321 A/B [Complete](I321-store-002-capability-contract-foundation.md) at #909 merge `a9914b7a62b0873027997c69d9966d17f3fd48ba` (CI #4039 8/8, independent API no blockers); D/E/F and #897 E2/E3 remain gated. 
 
+## I321 / STORE-002 A/B — Complete / Closed (bounded slice)
 
+[I321](I321-store-002-capability-contract-foundation.md): governance #908 and implementation #909 merged; exactly seven typed capability IDs, metadata-only registry requests and authority inventory, no functional provider binding or local storage migration. #670 OPEN for C/D/E/F.
 ## I320 / ARCH-035 E0/E1 — Review / Claimed in #906
 
 [I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: #905 claim+activation is effective at `b211e590f6b1180af0679be8b1b03d77b0a19615`; [E0 code-truth evidence](../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) (review PR #906) and E1 non-binding cross-host composition decision are under review. STORE-002/#670 exclusively owns storage contracts, so E2/E3 implementation is blocked; unrelated I319, I318, I310 and active work remain separate.
