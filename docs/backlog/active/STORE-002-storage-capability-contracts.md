@@ -1,6 +1,6 @@
 # STORE-002: Storage And Retrieval Capability Contracts
 
-**Status**: Active / Claimed — I322 C proposed (ineffective until claim merge); D/E/F incomplete
+**Status**: Review / Claimed — I322 C implementation candidate; D/E/F incomplete
 
 **Type**: Architecture / Contract Convergence
 
@@ -39,14 +39,14 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Source Issue | #670 |
 | Governance Claim PR | #911 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User explicitly requested continued #670 implementation after I321 #909 merge. Independent API review of A/B passed. I322 governance-only claim needs exact-head CI, both validators, recorded no-overlap CAS, single-maintainer fallback rationale before merge; independent public API review required for C code. |
-| Implementation PR | Not started |
+| Authorization Evidence | I322 C governance [#911](https://github.com/wjhuang88/talos/pull/911) merged `60da1bbadca00c9bdee6fbcb8f5ad990a4313331`; exact-head [CI #4055](https://github.com/wjhuang88/talos/actions/runs/42948954104) succeeded, both validators reported 0 warnings, docs-only single-maintainer authorization and CAS recorded. Independent API review of the C implementation remains mandatory. |
+| Implementation PR | Pending C implementation review |
 | Last Updated | 2026-11-11 |
-| Handoff / Release Condition | C effective only after governance claim merge; acceptance requires exact-head native CI and independent API review. D/E/F and #897 E2/E3 remain independent/gated. |
+| Handoff / Release Condition | Claim #911 effective. C implementation must pass exact-head native CI, both governance validators and independent public API/architecture review; D/E/F and #897 E2/E3 remain independently gated. |
 
 ## Governance
 
-I321 A/B is **merged and accepted** as a narrow descriptor/inventory foundation, not as a functional provider binding. The I322 C work slice is **proposed and ineffective until its separate governance claim merges**. It will extract domain-owned operational interfaces without changing consumers or existing implementation; D/E/F and #897 Host implementation remain gated. No generic `Bound<T>`, SQL/CRUD provider, or new backend is authorized.
+I321 A/B is **merged and accepted** as a narrow descriptor/inventory foundation, not as a functional provider binding. I322 C governance claim #911 **merged** as `60da1bbadca00c9bdee6fbcb8f5ad990a4313331`. Its narrow work slice is effective: add domain-owned operational interfaces and exact forwarding to unchanged stores; preserve all existing callers, SQL, error, schema and format behavior. The implementation is in Review and not yet accepted. D/E/F and #897 Host implementation remain gated. No generic `Bound<T>`, SQL/CRUD provider, or new backend is authorized.
 
 ## Acceptance Direction
 
@@ -73,4 +73,11 @@ Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim 
 
 - [I322 domain-owned contract extraction](../../iterations/I322-store-002-domain-contract-extraction.md) proposes narrow interfaces anchored in the existing Session/Pending/Todo, Memory, Evolution and Exploration contracts with existing errors, while preserving local concrete behavior.
 - Independent API review is required before C implementation merge. Explicit unavailable status for Object/Vector/Embedding/standalone Rerank does not imply fake executable providers.
-- The C claim #911 is ineffective until its governance PR merges; D/E/F and #897 E2/E3 remain unclaimed/blocked.
+- The C claim #911 is merged and effective; subsequent C implementation must satisfy exact-head CI and independent public API review before acceptance. D/E/F and #897 E2/E3 remain unclaimed/blocked.
+
+## I322 C implementation review candidate
+
+- [Domain contract mapping](../../reference/STORE-002-I322-DOMAIN-OPERATIONAL-CONTRACT-MAP-2026-11-11.md) documents Session (existing `SessionStore`, new PendingSubmission/Todo contracts), Memory, Evolution and Exploration.
+- Four new domain-local `storage_contracts.rs` files declare typed traits and forward methods to existing inherent store methods; four `lib.rs` files export the traits. No existing storage engine, constructor, SQL, transaction, path, schema, runtime caller or Cargo dependency is changed.
+- Status: implementation PR, exact-head Rust checks and independent public API/architecture review **pending**. No functional alternate provider, runtime swap, migration equivalence or C closure is asserted.
+- C closes only after implementation merge with CI, independent review and CAS evidence. D/E/F and #897 Host remain gated.
