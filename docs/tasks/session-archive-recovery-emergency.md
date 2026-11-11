@@ -462,3 +462,18 @@ The isolated provider deadline retry passed (1 test, 2.69 seconds) in
 `/tmp/talos-storage-provider-deadline-retry.log`; it does not prove the cause of the
 full-run failure. Integration preflight remains live as process 80429 in
 `/tmp/talos-integration-dedicated-resumed-preflight.log`. No final gate waived.
+
+
+## Unavailable diagnostic coverage
+
+All remaining checkpoint_tools generic execution-unavailable returns now emit fixed
+content-free reason literals: execution-state poisoning, issued/current snapshot absence,
+permission lease/commit rejection, delivery source/snapshot unavailability, delivery
+cancellation/deadline, query-state reset failure, missing execution scope and closed
+Actor channel. Model-visible errors and authorization behavior are unchanged. This
+covers the generic tool return points, not every internal `.ok()?` storage/preparation
+failure; precise underlying preparation errors remain a diagnostic residual.
+Existing checkpoint tool safety suite passes 13 tests in
+`/tmp/talos-checkpoint-reasons-tests.log`, including post-query mutation/reset/cancel.
+The running integration preflight began before this logging-only addition and cannot
+certify the final changed tree; finish collecting it, then validate the final candidate.
