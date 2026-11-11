@@ -15,6 +15,11 @@ process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing
 on Git 2.36.1; [gix-assisted compatibility](proposals/gix-preflight-system-git-compatibility.md)
 is a proposal, not an activated repair. Owner statuses and manual/native residuals remain unchanged.
 
+## Session recovery storage prerequisite
+
+- Partial / Emergency override: [isolated storage candidate](tasks/session-recovery-storage-candidate.md).
+  Parent repair and bounded archive evidence only; integration, independent review and delivery remain pending.
+
 Native Windows follow-up (2026-11-10, source `c065236a`):
 [validation evidence](reference/WINDOWS-VALIDATION-2026-11-10.md) records TUI 652,
 process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing

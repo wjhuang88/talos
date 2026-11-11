@@ -172,6 +172,13 @@ impl Session {
         let dir = self.file_path.parent().ok_or_else(|| {
             SessionError::ParseError("session file has no parent directory".into())
         })?;
+        let mut tip = self
+            .last_entry_id
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
+        // Compaction can replace the entire head (including when keeping zero
+        // entries), or fail after a partial rewrite. Never retain a stale tip.
+        *tip = None;
         engine.compact_segment(&self.file_path, dir, max_entries)
     }
     /// Create a new session with a single empty root branch.
@@ -314,6 +321,9 @@ impl Session {
         self.id = new_id;
         self.file_path = new_file_path;
         self.current_branch = branch_id;
+        // A fork has a different persisted tip. Do not share its cache with
+        // handles that continue appending to the original session.
+        self.last_entry_id = Arc::new(Mutex::new(None));
     }
 
     /// Get a reference to a branch by its ID.

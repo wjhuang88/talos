@@ -479,6 +479,61 @@ pub struct DurableSession {
 }
 
 impl DurableSession {
+    /// Bind a host-selected existing TLOG for history preparation without moving
+    /// or rewriting its transcript. The host must hold its session execution
+    /// lease. This does not certify parent integrity or authorize model reads;
+    /// source sealing, indexing, projection and permission checks still apply.
+    ///
+    /// Bindings are isolated from embedded sessions: reopening requires the
+    /// selected Session again, never an external ID interpreted as a path.
+    pub fn bind_existing_history(session: Session) -> Result<Self, SessionError> {
+        recovery_storage_boundary(|| {
+            let expected = format!("{}.tlog", session.id);
+            if session.file_path.file_name().and_then(|name| name.to_str()) != Some(&expected)
+                || session.store.file_extension() != "tlog"
+            {
+                return Err(SessionError::DurableTurn(
+                    "history binding requires a UUID TLOG".into(),
+                ));
+            }
+            let metadata = fs::symlink_metadata(&session.file_path)?;
+            if !metadata.file_type().is_file() {
+                return Err(SessionError::DurableTurn(
+                    "history binding requires a regular transcript".into(),
+                ));
+            }
+            let directory = session.file_path.parent().ok_or_else(|| {
+                SessionError::DurableTurn("history binding has no directory".into())
+            })?;
+            let bindings_path = directory.join("history-bindings.sqlite");
+            if let Ok(metadata) = fs::symlink_metadata(&bindings_path)
+                && !metadata.file_type().is_file()
+            {
+                return Err(SessionError::DurableTurn(
+                    "history binding database is not a regular file".into(),
+                ));
+            }
+            let connection = open_bindings(&bindings_path)?;
+            let identity = session.id.to_string();
+            connection
+                .execute(
+                    "INSERT OR IGNORE INTO durable_bindings(external_id,session_id) VALUES(?1,?1)",
+                    [&identity],
+                )
+                .map_err(sql_error)?;
+            let valid: bool = connection.query_row(
+                "SELECT EXISTS(SELECT 1 FROM durable_bindings WHERE external_id=?1 AND session_id=?1)",
+                [&identity], |row| row.get(0),
+            ).map_err(sql_error)?;
+            if !valid {
+                return Err(SessionError::DurableTurn(
+                    "history binding identity conflict".into(),
+                ));
+            }
+            Ok(Self::new(identity, session, bindings_path))
+        })
+    }
+
     /// Reconcile at most 32 recorded fork intents under this storage root.
     /// Active locks are skipped; only exact intent-derived unpublished files may
     /// be removed. Returns (scanned, retired, failed, next cursor). Continue with
@@ -492,7 +547,7 @@ impl DurableSession {
         after: Option<&str>,
     ) -> Result<(usize, usize, usize, Option<String>), SessionError> {
         recovery_storage_boundary(|| {
-            let connection = Connection::open(&self.bindings_path).map_err(sql_error)?;
+            let connection = open_binding_connection(&self.bindings_path)?;
             let _guard = crate::sqlite::install_budget(&connection, budget)
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             let directory = self
@@ -662,7 +717,7 @@ impl DurableSession {
             let mut previous_entry: Option<String> = None;
             // Disposable uniqueness state spills to SQLite temporary storage;
             // avoids a transcript-sized Rust set; this is not a hard RSS limit.
-            let connection = Connection::open(&self.bindings_path).map_err(sql_error)?;
+            let connection = open_binding_connection(&self.bindings_path)?;
             let _guard = crate::sqlite::install_budget(&connection, &budget)
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             connection
@@ -943,7 +998,7 @@ impl DurableSession {
             }
             // Schema was installed when this configured handle was opened. Avoid
             // open_bindings' initialization retries during bounded scan work.
-            let connection = Connection::open(&self.bindings_path).map_err(sql_error)?;
+            let connection = open_binding_connection(&self.bindings_path)?;
             let _budget_guard = crate::sqlite::install_budget(&connection, budget)
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             connection
@@ -1013,7 +1068,7 @@ impl DurableSession {
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             // Schema was installed when this configured handle was opened. Avoid
             // open_bindings' initialization retries during bounded scan work.
-            let connection = Connection::open(&self.bindings_path).map_err(sql_error)?;
+            let connection = open_binding_connection(&self.bindings_path)?;
             let _budget_guard = crate::sqlite::install_budget(&connection, budget)
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             connection
@@ -1061,7 +1116,7 @@ impl DurableSession {
             if !Arc::ptr_eq(&receipt.owner, &self.recovery_owner) {
                 return Err(SessionError::DurableTurn("foreign scan receipt".into()));
             }
-            let connection = Connection::open(&self.bindings_path).map_err(sql_error)?;
+            let connection = open_binding_connection(&self.bindings_path)?;
             let _guard = crate::sqlite::install_budget(&connection, budget)
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             let tx = connection.unchecked_transaction().map_err(sql_error)?;
@@ -1480,9 +1535,15 @@ impl DurableSession {
         }
         existing.push(marker_entry);
 
+        let mut tip = self
+            .session
+            .last_entry_id
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
         self.session
             .store
             .replace_entries_atomically(&self.session.file_path, &existing)?;
+        *tip = existing.last().map(|entry| entry.id.clone());
         Ok(TurnCommit {
             entry_ids,
             newly_committed: true,
@@ -1669,11 +1730,30 @@ pub(crate) fn remove_binding_for_session(
     Ok(())
 }
 
+fn open_binding_connection(path: &std::path::Path) -> Result<Connection, SessionError> {
+    // Enforce at SQLite open time as well as at the caller's metadata check:
+    // a binding path can be replaced between those two operations.
+    // SQLite also rejects ancestor symlinks. Resolve only the parent to retain
+    // host directory aliases (including macOS /tmp), never the database itself.
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty());
+    let directory = fs::canonicalize(parent.unwrap_or_else(|| std::path::Path::new(".")))?;
+    let name = path
+        .file_name()
+        .ok_or_else(|| SessionError::DurableTurn("binding database name unavailable".into()))?;
+    Connection::open_with_flags(
+        directory.join(name),
+        rusqlite::OpenFlags::default() | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(sql_error)
+}
+
 fn open_bindings(path: &std::path::Path) -> Result<Connection, SessionError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let connection = Connection::open(path).map_err(sql_error)?;
+    let connection = open_binding_connection(path)?;
     // Initialize WAL mode and schema without busy_timeout so concurrent
     // first-time opens fail fast instead of blocking for 5s each. The
     // bounded retry loop (20 × 25 ms ≤ 500 ms total) lets the first writer
@@ -1982,6 +2062,109 @@ fn is_sensitive_key(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn bindings_open_accepts_parent_directory_alias_but_not_database_alias() {
+        let root = tempfile::tempdir().expect("root");
+        let directory = root.path().join("real");
+        std::fs::create_dir(&directory).expect("directory");
+        let alias = root.path().join("alias");
+        std::os::unix::fs::symlink(&directory, &alias).expect("directory alias");
+        let path = alias.join("history-bindings.sqlite");
+        drop(super::open_bindings(&path).expect("parent alias supported"));
+        drop(super::open_binding_connection(&path).expect("reopen via alias"));
+        let database_alias = alias.join("other.sqlite");
+        std::os::unix::fs::symlink(&path, &database_alias).expect("database alias");
+        assert!(super::open_bindings(&database_alias).is_err());
+        assert!(super::open_binding_connection(&database_alias).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bindings_open_refuses_replaced_symlink_without_mutating_target() {
+        let root = tempfile::tempdir().expect("root");
+        let target = root.path().join("target.sqlite");
+        let connection = rusqlite::Connection::open(&target).expect("target");
+        connection
+            .execute_batch("CREATE TABLE sentinel(value TEXT);")
+            .expect("schema");
+        drop(connection);
+        let original = std::fs::read(&target).expect("original");
+        let path = root.path().join("history-bindings.sqlite");
+        std::fs::write(&path, []).expect("regular binding path");
+        assert!(
+            std::fs::symlink_metadata(&path)
+                .expect("metadata")
+                .is_file()
+        );
+        // Deterministically replace the path after the caller's metadata check.
+        std::fs::remove_file(&path).expect("replace test path");
+        std::os::unix::fs::symlink(&target, &path).expect("alias");
+        assert!(super::open_bindings(&path).is_err());
+        assert!(super::open_binding_connection(&path).is_err());
+        assert_eq!(std::fs::read(&target).expect("preserved"), original);
+        assert!(!root.path().join("target.sqlite-wal").exists());
+        assert!(!root.path().join("target.sqlite-shm").exists());
+    }
+
+    #[test]
+    fn selected_history_binding_preserves_identity_bytes_and_reopens_without_copying() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = crate::SessionManager::with_dir(root.path().into());
+        let session = manager.create_session("selected", "").expect("session");
+        session
+            .append(&talos_core::message::Message::User {
+                content: "original constraint".into(),
+            })
+            .expect("append");
+        let bytes = session.snapshot_bytes().expect("bytes");
+        let first = super::DurableSession::bind_existing_history(session.clone()).expect("bind");
+        assert_eq!(first.id(), session.id);
+        assert_eq!(first.file_path(), session.file_path);
+        assert_eq!(first.session().snapshot_bytes().expect("unchanged"), bytes);
+        let source = first.capture_recovery_source().expect("source");
+        let second = super::DurableSession::bind_existing_history(
+            manager.get_session(&session.id).expect("reopen"),
+        )
+        .expect("rebind");
+        assert!(
+            !second.owns_recovery_source(&source),
+            "reopen cannot inherit live authority"
+        );
+        assert_eq!(second.read_messages().expect("history").len(), 1);
+        assert!(
+            !root.path().join("durable").exists(),
+            "no replacement embedded session"
+        );
+        let mut forged = session.clone();
+        forged.id = uuid::Uuid::new_v4();
+        assert!(super::DurableSession::bind_existing_history(forged).is_err());
+        assert_eq!(session.snapshot_bytes().expect("preserved"), bytes);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn selected_history_binding_refuses_symlink_transcript_and_database() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = crate::SessionManager::with_dir(root.path().into());
+        let session = manager.create_session("selected", "").expect("session");
+        let database = session
+            .file_path
+            .parent()
+            .expect("parent")
+            .join("history-bindings.sqlite");
+        let victim = root.path().join("untouched");
+        std::fs::write(&victim, b"preserve").expect("victim");
+        std::os::unix::fs::symlink(&victim, &database).expect("alias");
+        assert!(super::DurableSession::bind_existing_history(session.clone()).is_err());
+        assert_eq!(std::fs::read(&victim).expect("unchanged"), b"preserve");
+        std::fs::remove_file(&database).expect("remove test alias");
+        std::fs::remove_file(&session.file_path).expect("remove test transcript");
+        std::os::unix::fs::symlink(&victim, &session.file_path).expect("alias");
+        assert!(super::DurableSession::bind_existing_history(session).is_err());
+        assert_eq!(std::fs::read(&victim).expect("unchanged"), b"preserve");
+    }
+
     #[cfg(any(unix, windows))]
     #[test]
     fn fork_cancellation_before_and_after_publication_preserves_authority() {
