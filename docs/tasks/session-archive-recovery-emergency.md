@@ -445,3 +445,20 @@ preflight resumed with CARGO_BUILD_JOBS=2 as process 30102, log
 `/tmp/talos-storage-dedicated-resumed-preflight.log`. Dedicated integration fork tests
 run as process 91696. Do not reuse the cross-worktree shared Cargo target for final
 validation, and do not count interrupted logs as passing results.
+
+
+## Native isolated integration acceptance
+
+Ran the actual binary built from the isolated integration candidate:
+`target/recovery-integration-candidate/debug/talos storage inspect-recovery --transcript`
+against the preserved isolated head. Exit 0; report
+`/tmp/talos-isolated-integration-native-report.json`: EvidenceOnly, 4288 originals,
+25 omitted count placeholders, 7 excluded archives, 4267 nonadjacent original parents,
+installed=false. All 36 original-file SHA256 values still match the preservation
+manifest. This validates the isolated CLI inspection path, not deployed continuation,
+live-provider summary quality or complete fork support. Live session files are untouched.
+
+The isolated provider deadline retry passed (1 test, 2.69 seconds) in
+`/tmp/talos-storage-provider-deadline-retry.log`; it does not prove the cause of the
+full-run failure. Integration preflight remains live as process 80429 in
+`/tmp/talos-integration-dedicated-resumed-preflight.log`. No final gate waived.
