@@ -2,7 +2,7 @@
 
 ## GIT-COMPAT-001 / I324 — Git 2.36 gix-assisted preflight (claim proposed)
 
-[GIT-COMPAT-001](backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](iterations/I324-git-236-preflight-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): proposed governance-only claim and activation, **ineffective until merge**. The November 10 design is not implementation. No change to ADR-089 permission admission or to GIT-SNAPSHOT-001 / TUI-APPROVAL-001 Review status; Git 2.36 Windows validation and independent security review remain mandatory.
+[GIT-COMPAT-001](backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](iterations/I324-git-236-preflight-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): proposed governance-only [claim #920](https://github.com/wjhuang88/talos/pull/920) and activation, **ineffective until merge**. The November 10 design is not implementation. No change to ADR-089 permission admission or to GIT-SNAPSHOT-001 / TUI-APPROVAL-001 Review status; Git 2.36 Windows validation and independent security review remain mandatory.
 
 
 ## PROVIDER-008-C / #914 — Azure transport intake only
