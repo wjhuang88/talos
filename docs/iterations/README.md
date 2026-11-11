@@ -2,7 +2,7 @@
 
 ## I324 / GIT-COMPAT-001 — proposed Git 2.36 preflight claim
 
-[I324](I324-git-236-preflight-compatibility.md) / [GIT-COMPAT-001](../backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): governance-only proposed claim, ineffective until merge. Native Windows Git 2.36 compatibility and independently reviewed unchanged prepared authorization are required; GIT-SNAPSHOT-001 and other Review/Active owners remain separate.
+[I324](I324-git-236-preflight-compatibility.md) / [GIT-COMPAT-001](../backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): governance-only proposed [claim #920](https://github.com/wjhuang88/talos/pull/920), ineffective until merge. Native Windows Git 2.36 compatibility and independently reviewed unchanged prepared authorization are required; GIT-SNAPSHOT-001 and other Review/Active owners remain separate.
 
 
 ## I322 / STORE-002 C — proposed independent contract claim
