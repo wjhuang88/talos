@@ -326,9 +326,10 @@ owner for scope, acceptance and complete active/review/planned inventory.
 
 ## Gemini implementation checkpoint — 2026-11-02
 
-PROVIDER-008-B / #810 / I310 is Active / Claimed, effective via #811.
-Owner: [Gemini](backlog/active/PROVIDER-008-B-google-gemini.md); implementation Draft #838.
-Branch code and focused regressions exist; full acceptance and merge gates remain pending.
+PROVIDER-008-B / #810 / I310 is Complete / Closed.
+Owner: [Gemini](backlog/active/PROVIDER-008-B-google-gemini.md); implementation #838 merged
+as `dbcf6163f34d73def923484ad409814fd4a98039`. CI4046 all eight jobs passed; independent technical/document
+review and merge CAS passed. Azure C, Bedrock D and parent #724 remain open.
 
 ## Session-owned worktrees / WORKTREE-001
 

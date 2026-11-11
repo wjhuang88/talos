@@ -434,5 +434,7 @@ Parent #724 remains open for unimplemented/unclaimed Gemini, Azure and Bedrock s
 
 ## I310 Gemini — 2026-10-30
 
-[I310](I310-provider008b-google-gemini.md) proposes atomic claim/activation in #811 for #810.
-See its complete nonterminal inventory and disposition. No implementation before claim merge.
+[I310](I310-provider008b-google-gemini.md) is Complete / Closed for #810.
+Completion Commit `dbcf6163f34d73def923484ad409814fd4a98039` (#838), exact-head CI4046 all eight
+jobs passed, independent technical/document review and merge CAS recorded in the owner.
+Azure C, Bedrock D and parent #724 remain open.
