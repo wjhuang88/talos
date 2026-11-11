@@ -34,7 +34,7 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 ## TUI rendering performance / TUI-PERF-001
 
-- Planned / Unclaimed: [owner and implementation guide](tasks/2026-11-10-tui-render-performance.md).
+- Active / Claimed proposal in #910 (ineffective until merge): [owner and implementation guide](tasks/2026-11-10-tui-render-performance.md).
   Reproducible profiling, event-driven drawing, asynchronous Git snapshots, and layout/component
   caching; history incrementality is evidence-dependent. Documentation only so far; runtime
   implementation and performance/terminal acceptance remain pending.
