@@ -604,3 +604,17 @@ restart probes. All 682 Agent tests pass with default parallel scheduling in
 `/tmp/talos-recovery-parallel-agent-after.log`. This is a test-only correction; production
 source remains the fully preflight-validated d54a2490 source. Native macOS failures remain
 unresolved until exact-head remote evidence and, if reproduced, a causal fix are obtained.
+
+
+## Discovery budget diagnostics and expiry regression — 2026-11-12
+
+Added fixed, content-free diagnostic reasons for expiry during reference construction,
+after scanning and after source metadata cloning in `refresh_cooperative`. The
+two-second budget, yields, source validation and publication guard are unchanged.
+A paused-clock regression polls the real refresh through multiple records, expires
+the budget, verifies discover refuses unpublished/old authority, then verifies a
+fresh refresh restores discover. This tests deadline behavior, not the cause of
+the remote macOS failure. Parallel Agent suite: 683 passed, exit 0, log
+`/tmp/talos-discovery-deadline-agent-tests.log`. Changes also applied as a checked
+patch to the preserved primary worktree without replacing unrelated edits.
+This follow-up remains local pending validation and review; task remains Partial.

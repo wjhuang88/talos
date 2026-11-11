@@ -113,6 +113,10 @@ impl Execution {
             for (index, message) in messages[..end].iter().enumerate() {
                 tokio::task::yield_now().await;
                 if tokio::time::Instant::now() >= deadline {
+                    tracing::warn!(
+                        reason = "discovery_reference_deadline",
+                        "history/checkpoint preparation unavailable"
+                    );
                     return None;
                 }
                 if matches!(message, Message::System { .. }) {
@@ -127,11 +131,19 @@ impl Execution {
                 }
             }
             if tokio::time::Instant::now() >= deadline {
+                tracing::warn!(
+                    reason = "discovery_scan_deadline",
+                    "history/checkpoint preparation unavailable"
+                );
                 return None;
             }
             // Cloning metadata is synchronous and O(history), not hard real-time.
             let source = source.clone();
             if tokio::time::Instant::now() >= deadline {
+                tracing::warn!(
+                    reason = "discovery_clone_deadline",
+                    "history/checkpoint preparation unavailable"
+                );
                 return None;
             }
             (!refs.is_empty()).then(|| Snapshot {
@@ -858,6 +870,48 @@ mod tests {
             result.is_error,
             "cancelled preparation cannot expose the old live snapshot"
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn expired_discovery_withdraws_authority_and_fresh_attempt_recovers() {
+        let (execution, _, raw) = fixture().await;
+        let source = HistorySource::bind(
+            0,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
+        )
+        .expect("source");
+        assert!(execution.state.lock().expect("state").current.is_some());
+        {
+            let refresh = execution.refresh_cooperative(Some(&source), &raw);
+            tokio::pin!(refresh);
+            // Poll through several records so expiry discards a partial scan.
+            for _ in 0..3 {
+                tokio::select! { biased;
+                    _ = &mut refresh => panic!("refresh must yield before publication"),
+                    _ = std::future::ready(()) => {},
+                }
+            }
+            tokio::time::advance(std::time::Duration::from_secs(2)).await;
+            refresh.await;
+        }
+        assert!(execution.state.lock().expect("state").current.is_none());
+        let unavailable = EXECUTION
+            .scope(
+                execution.clone(),
+                HistorySearchTool.execute(json!({"mode":"discover"})),
+            )
+            .await;
+        assert!(unavailable.is_error, "expired authority must not escape");
+        execution.refresh_cooperative(Some(&source), &raw).await;
+        let recovered = EXECUTION
+            .scope(
+                execution,
+                HistorySearchTool.execute(json!({"mode":"discover"})),
+            )
+            .await;
+        assert!(!recovered.is_error, "{}", recovered.content);
     }
 
     #[tokio::test]
