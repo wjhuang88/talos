@@ -1,5 +1,10 @@
 # Product Backlog
 
+## GIT-COMPAT-001 / #919 — Windows Git 2.36 prepared preflight
+
+[GIT-COMPAT-001](active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](../iterations/I324-git-236-preflight-compatibility.md): **Intake / Unclaimed** with atomic claim proposed, ineffective until target merge. Bounded gix-assisted host Git preflight compatibility only. Existing snapshot capacity, ADR-089 authorization and TUI approval owners do not transfer.
+
+
 ## PROVIDER-008-C / #914 — Azure OpenAI protocol intake (unclaimed)
 
 [PROVIDER-008-C](active/PROVIDER-008-C-azure-openai.md) / [#914](https://github.com/wjhuang88/talos/issues/914)
