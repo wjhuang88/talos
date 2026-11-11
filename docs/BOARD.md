@@ -2,8 +2,8 @@
 
 ## EDIT-LOCATIONS-001 — proposed display work ownership
 
-[Line-location owner](tasks/edit-diff-line-locations.md): Refinement / Unclaimed pending
-governance PR finalization. Old/new diff coordinates and ordinary/prepared/anchored edit
+[Line-location owner](tasks/edit-diff-line-locations.md): Active / Claimed proposed via #921;
+ineffective until governance merge. Old/new diff coordinates and ordinary/prepared/anchored edit
 locations only; no effective claim or implementation activation yet.
 
 ## PROVIDER-008-C / #914 — Azure transport intake only

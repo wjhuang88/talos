@@ -1,6 +1,6 @@
 # EDIT-LOCATIONS-001 — Edit and diff source line locations
 
-Status: Refinement — preserved local candidate; claim and delivery pending.
+Status: Active / Claimed proposed via #921; ineffective until this governance record merges to main.
 Owner: this document; originated in user-requested session handoff (preserved in the original worktree).
 
 ## Outcome and scope
@@ -21,14 +21,14 @@ No public API or persisted data format change is intended.
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | EDIT-LOCATIONS-001: old/new diff and edit preview line locations, regressions and user documentation |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-12 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
+| Governance Claim PR | #921 |
+| Authorization Mode | Independent review |
 | Authorization Evidence | User requested completion of the session handoff; standard effective claim remains required before committed implementation |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-12 |
@@ -72,5 +72,11 @@ Verify current target-branch owners and overlap before proposing a governance-on
 The claim becomes effective only after target merge under AGENT-COLLABORATION. Then apply
 and validate the isolated candidate, selectively include both README updates, obtain review
 and native acceptance, and record implementation/delivery evidence here. No iteration is
-selected or activated by this Refinement record. All remaining EDIT-LOCATIONS-001 work stays
+selected or activated by this task-level proposal. All remaining EDIT-LOCATIONS-001 work stays
 owned here; the handoff remains Partial.
+
+Preparation base: `6c81390a`. Open PR inventory #861/#907/#912 (Search/storage),
+#916 (approval history), #917 (recovery), #918 (Azure) and #920 (Git compatibility)
+showed no overlapping line-location owner. Existing iterations and claims remain unchanged.
+Both governance validators and scale assessment passed before PR creation; finalized
+claim validation and independent review precede merge. No implementation branch is created.
