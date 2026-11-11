@@ -423,3 +423,25 @@ warnings; logs `/tmp/talos-recovery-isolated-cli-tests.log`,
 `/tmp/talos-recovery-isolated-governance.log`, `/tmp/talos-recovery-isolated-claims.log`.
 Full integration preflight remains pending; run after storage validation completes to
 avoid unnecessary shared-target build contention.
+
+
+## Startup fork coverage correction
+
+Source review found that startup `--fork` bypassed the interactive staged-history
+archive guard. Real regression `startup_fork_refuses_archive_without_publishing_overlapping_child`
+failed before the fix because the startup path published a recent-head-only child;
+log `/tmp/talos-startup-fork-before-fixed-test.log`. It now scans with the existing
+bounded, version-checked decoder and refuses count-placeholder history before child
+creation. It retains the normal tail identity for ordinary forks. Both startup fork
+tests pass in `/tmp/talos-startup-fork-after.log`, including ordinary copied bytes,
+runtime identity and index, and archive refusal with unchanged source and all 205
+originals still recoverable. Dedicated integration repeat is running in
+`/tmp/talos-isolated-startup-fork-after.log`. This closes an unsafe containment gap;
+full child-owned archive provenance remains unimplemented.
+
+The earlier dedicated build handles 23241 and 3428 and regression handle 53184 are
+now absent; their logs end during compilation without success evidence. Storage
+preflight resumed with CARGO_BUILD_JOBS=2 as process 30102, log
+`/tmp/talos-storage-dedicated-resumed-preflight.log`. Dedicated integration fork tests
+run as process 91696. Do not reuse the cross-worktree shared Cargo target for final
+validation, and do not count interrupted logs as passing results.
