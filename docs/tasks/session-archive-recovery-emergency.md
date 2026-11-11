@@ -578,3 +578,29 @@ Final-source Session/Agent/CLI all-feature MSVC test compilation passed via pinn
 log `/tmp/talos-linear-and-fork-final-xwin.log`. The existing test-only History::prepare
 dead-code warning remains; no suppression was added. This is not native Windows
 execution or independent review.
+
+
+## Parallel validation follow-up — 2026-11-12
+
+CI main validation runs on macos-15, not Linux; earlier references to "Linux main"
+were inaccurate. Run 43046879069 failed two source-binding assertions in the Agent
+suite: cooperative committed-source availability and registered model checkpoint
+initial recovered-source binding. Both paths use bounded deadlines. Logs are retained
+in `/tmp/talos-ci-130620743862.log`. Deadline pressure is a hypothesis, not an established
+cause; no production/test deadline was increased. Current CI 43053922103 remains live.
+Its separate remote reconciliation failure is newly opened unrelated Issue #919 absent
+from the global matrix (`/tmp/talos-ci-130638511340.log`); this is separate governance
+drift under ADR-071, not evidence of a recovery defect or a waived CI gate.
+
+A local default-parallel Agent run found a different regression in the new log-capture
+test: no events captured, with 681 other tests passing. Explicit dynamic tracing
+callsite interest did not fix it. Consulted tracing-core 0.1.36 `src/callsite.rs`, whose
+documentation confirms process-global callsite registration/interest caching. The exact
+parallel interaction is not established. Log-capture acceptance now runs the same real
+I/O and disclosure assertions in an isolated child test process, consistent with existing
+restart probes. All 682 Agent tests pass with default parallel scheduling in
+`/tmp/talos-recovery-parallel-agent-isolated.log`; failed attempts remain in
+`/tmp/talos-recovery-parallel-agent-repro.log` and
+`/tmp/talos-recovery-parallel-agent-after.log`. This is a test-only correction; production
+source remains the fully preflight-validated d54a2490 source. Native macOS failures remain
+unresolved until exact-head remote evidence and, if reproduced, a causal fix are obtained.

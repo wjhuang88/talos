@@ -1030,6 +1030,23 @@ mod tests {
 
     #[tokio::test]
     async fn linear_preparation_reports_real_failures_without_source_content() {
+        // Tracing callsite interest is process-global. Run log-capture acceptance
+        // in its own process, as with the persisted-preparation restart probes,
+        // so parallel tests cannot disable the captured callsite.
+        const CHILD: &str = "TALOS_HISTORY_DIAGNOSTIC_CAPTURE_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+                .args(["--exact", "checkpoint_history::tests::linear_preparation_reports_real_failures_without_source_content", "--nocapture"])
+                .env(CHILD, "1")
+                .output().expect("capture child");
+            assert!(
+                output.status.success(),
+                "capture child failed: {} {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
         use std::io::Write;
         use talos_core::message::Message;
         let events = PreparationEvents::default();
