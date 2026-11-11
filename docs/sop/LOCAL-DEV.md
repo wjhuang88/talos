@@ -107,7 +107,9 @@ process may not produce it. An unwritable destination silently loses diagnostics
 so verify that a fresh report exists. Use a unique path per process/run.
 
 Counters cover draw, layout planning, history rebuild/cache hit, Git scan, diff,
-flush, input/output events and timer wakes; changed cells are accumulated. Timings
+flush, input/output events and timer wakes; changed cells are accumulated.
+`history_rebuild` counts projection refreshes, including incremental tail refreshes;
+it does not imply every historical entry was rebuilt. Timings
 use bounded 32-bucket log2 nanosecond histograms with a saturating overflow bucket.
 Durations are nested and must not be summed as exclusive CPU cost. No input,
 prompt, tool payload, clipboard data or rendered text is recorded. The counters

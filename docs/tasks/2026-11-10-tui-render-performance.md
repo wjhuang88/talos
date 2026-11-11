@@ -1001,3 +1001,113 @@ Sixteen Python evidence tests pass, including an actual PTY child test verifying
 rejection before launch. No production Rust changes in this sampling checkpoint.
 Longrun/allocations, repeated transcript commits/P4, ANSI/native and remote gates
 remain open.
+
+### Actual allocator profiling established
+
+Isolated Heaptrack1.5.0 CLI from verified Arch package collected three Release
+animation/history10000 pairs, baseline52263c62 vs candidate df7411d2. Archive:
+`evidence/tui-perf-001/heaptrack-animation/`, including raw profiles, allocator
+histograms, stacks, massif snapshots, exact runner and binary receipts.
+Median whole-run allocation calls851478 ->816698; requested bytes127667737
+->124076306. Both peaks31.32MB (rounded), so peak heap did not improve.
+Histogram counts were checked against profiler totals. Whole-run includes
+initial history construction; stack evidence includes history projection and
+ScrollbackLine cloning but does not isolate steady frame cost. No P4 conclusion
+is made until repeated transcript commits are measured. Profiler overhead and
+shutdown-live memory are explicitly distinguished from ordinary CPU/leaks.
+
+### Latest-main rebase and repeated transcript evidence
+
+Rebased ten local patches onto origin/main6c81390a; range-diff reports all
+unchanged, uncommitted work restored. New local head e42b9c9c; no push yet.
+Added identical transcript-commit fixture to baseline15ef42c1 source export
+and current candidate. Three Release pairs at10000 history/1complete message
+per second pass CPU/PSS/input budgets. Evidence:
+`evidence/tui-perf-001/transcript-release/`. CPU median5.099875% ->2.791949%,
+peak candidatePSS68918KiB, worst inputP99upper0.594405ms. Candidate31history
+rebuilds vs baseline62 per steady window, both94output events.
+
+History rebuild consumes81–82% of candidate draw duration (nested timers),
+so repeated revision changes establish a P4 hotspot despite aggregate budgets
+passing. P4 remains unimplemented; next allocator profile and conservative
+incremental projection design must preserve grouping/tail mutation, anchors,
+selection/logical lines and full-projection oracle. This35s growing workload
+is not long-run bounded-memory acceptance.
+
+Seventeen Python evidence tests and locked TUI replay example check pass after
+rebase. Release fixture binaries built with pinned toolchain and symbols;
+source/patch/binary receipts archived. Native terminal, longrun, ANSI equivalence,
+final full gates, exact-head CI and independent review remain open.
+
+### Transcript revision allocator profile completed
+
+Three Heaptrack Release pairs complete; archive
+`evidence/tui-perf-001/heaptrack-transcript/`. Whole-run median allocation calls
+26139343 ->13386688, requested bytes3793180204 ->1947615179. Histogram totals
+match profiler counts. All peak heap values43.56M rounded, no peak improvement.
+Totals include initialization/teardown and profiler overhead excludes CPU/PSS
+from normal budgets. This corroborates revision-dependent allocation cost;
+P4 implementation/oracles and bounded longrun stability remain outstanding.
+
+### P4 incremental projection — local implementation under validation
+
+Repeated transcript timing and allocator evidence above activates P4. The cache
+now retains a stable prefix and reprojects from the beginning of the final
+projection unit, including its incoming pending-call count. This backtracks over
+an entire final poll group, including a pending poll subsequently completed or
+failed. Width changes and any expansion/reasoning edit conservatively rebuild
+all history. No per-revision journal or second formatting algorithm is added.
+
+Rows/logical lines use Arc<Vec>; live old snapshots remain immutable via COW.
+At frame preparation, the consumed previous hit-map snapshot is released before
+updating the cache, avoiding deep copies of the stable prefix in the normal path.
+Cache capacity follows retained transcript size; this is not a fixed memory cap
+on conversation history. Existing history_rebuild metrics now count projection
+refreshes (full or tail), not exclusively full-history reconstruction.
+
+The full projection remains the oracle:256 successive state comparisons across
+four widths cover pending/adjacent/parallel polls, terminal observations,
+expansion edits, anchored views, copy text and retained old snapshots. A separate
+prefix-pointer test verifies append refresh does not clone stable text. Full
+TUI679unit+2integration+2doc tests pass; xwin MSVC --tests --examples passes.
+Logs:/tmp/talos-p4-tui-tests.log,/tmp/talos-p4-xwin.log. Release source-bound
+before/after measurement is next; no speedup or P4 acceptance claimed yet.
+
+### P4 Release paired result
+
+Three paired P3/P4 runs with identical fixture/dependencies pass listed
+CPU/PSS/input gates; archive `evidence/tui-perf-001/transcript-p4-release/`.
+CPU median2.828760% ->0.067683%,candidate peakPSS33532KiB. Three steady history
+refresh totals0.232/0.276/0.291ms, draw33.953/23.139/24.173ms; both process94
+output events. Worst candidate inputP99upper10.413224ms in first round, within
+20ms budget but retained as an unexplained long tail; remaining rounds<0.45ms.
+No pixel, longrun or whole-task acceptance claim. Full workspace preflight is
+running; evidence archives contain complete binary receipts and source patches.
+
+### Full-gate fixture failure and bounded repair
+
+First P4 preflight exited101 in talos-config's existing
+store_unset_builtin_provider_clears_credentials (272passed/1failed), with
+"builtin provider must not have resurrected credential". Source inspection
+shows an unlocked environment-reading api_key assertion while other tests set
+ANTHROPIC_API_KEY under ENV_MUTEX. Persisted removal does not prohibit host
+credential fallback, so the assertion tested the wrong boundary.
+
+Bounded test-only repair checks active_provider_config.api_key absence and
+removal of the last-key credentials file, without changing runtime behavior.
+SOP collaboration local-test-fix/bounded-fixture rules apply; keep this logical
+change separate in commits. The first attempted exact filter ran zero tests
+and is not evidence; a subsequent file-read assertion failed because last-key
+removal deletes the file. Corrected fully qualified isolated test executes1and
+passes. Logs:/tmp/talos-p4-preflight.log,/tmp/talos-p4-config-isolated-fixed2.log.
+Fresh fullpreflight follows in /tmp/talos-p4-preflight-fixed.log; failed evidence
+is retained. Evolution lesson3 updated with the persisted/environment boundary.
+
+Full P4 preflight after the test-only repair passed(exit0), including locked
+workspace check/Clippy/tests and external SDK fixtures:
+/tmp/talos-p4-preflight-fixed.log. Config Windows test cross-check also passes
+/tmp/talos-p4-config-xwin.log. TUI Windows --tests --examples passed earlier
+against unchanged P4 runtime source. Test repair committed18e9e117;
+transcript/allocator fixture evidence committed3bedbe23. These are local commits,
+not pushed completion evidence. P4 allocator follow-up, Debug/longrun coverage,
+changed-cell/ANSI/native checks and final remote gates remain open.

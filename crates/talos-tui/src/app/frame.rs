@@ -106,6 +106,15 @@ impl Tui {
         let _draw_metric = crate::render_metrics::measure(crate::render_metrics::Stage::Draw);
         let screen_size = self.terminal.size()?;
         crate::render_metrics::screen_size(screen_size.width, screen_size.height);
+        if self
+            .history_projection_cache
+            .needs_update(&self.transcript, screen_size.width)
+        {
+            // Input has consumed the previous frame's hit map. Release its shared
+            // snapshot before updating the cache so stable prefixes stay in place.
+            // Other retained snapshots remain immutable through Arc copy-on-write.
+            self.last_history_projection = Default::default();
+        }
         let preparation_metric =
             crate::render_metrics::measure(crate::render_metrics::Stage::FramePreparation);
         let view = &mut self.state.slash_menu.approval_view;
