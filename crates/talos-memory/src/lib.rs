@@ -25,6 +25,7 @@ mod entities;
 mod graph;
 mod prompt;
 mod store;
+mod storage_contracts;
 #[cfg(test)]
 mod tests;
 mod types;
@@ -38,6 +39,7 @@ pub use entities::extract_entities;
 pub use graph::{AssociationResult, GraphEdge, GraphNode};
 pub use prompt::{MemoryPromptConfig, format_memory_prompt};
 pub use store::MemoryStore;
+pub use storage_contracts::MemoryPersistence;
 pub use types::{
     Entity, EntityKind, EvidenceLink, MemoryItem, MemoryKind, MemoryStatus, MemoryStoreError,
     RetentionCandidate, RetentionPolicy, RetrievalResult,
