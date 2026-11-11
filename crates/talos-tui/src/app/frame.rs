@@ -378,6 +378,22 @@ impl Tui {
             })
         };
 
+        let preview_plan = if tool_preview_active {
+            tool_preview.plan(width)
+        } else {
+            preview.plan(width)
+        };
+        // Schedule only animation that survived layout compression. Completed tool
+        // titles have no animated prefix, even while the overall turn is active.
+        self.visible_processing_animation = status.is_processing
+            && app_layout.preview.is_some_and(|area| {
+                area.width > 0
+                    && preview_plan
+                        .rows
+                        .iter()
+                        .take(usize::from(area.height))
+                        .any(|row| !tool_preview_active || !row.prefix.trim().is_empty())
+            });
         self.terminal
             .draw_with_cursor(screen_size, cursor, |frame| {
                 if let Some(area) = app_layout.history {

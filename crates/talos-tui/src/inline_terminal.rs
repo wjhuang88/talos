@@ -158,6 +158,8 @@ pub struct TerminalSession {
     cursor_commands: usize,
     #[cfg(test)]
     test_cursor_position: Option<Position>,
+    #[cfg(test)]
+    test_draw_count: usize,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -266,6 +268,8 @@ impl TerminalSession {
             cursor_commands: 0,
             #[cfg(test)]
             test_cursor_position: None,
+            #[cfg(test)]
+            test_draw_count: 0,
         })
     }
 
@@ -288,6 +292,8 @@ impl TerminalSession {
             cursor_visible: false,
             cursor_commands: 0,
             test_cursor_position: None,
+            #[cfg(test)]
+            test_draw_count: 0,
         }
     }
 
@@ -304,6 +310,11 @@ impl TerminalSession {
     #[cfg(test)]
     pub(crate) const fn test_cursor_position(&self) -> Option<Position> {
         self.test_cursor_position
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_draw_count(&self) -> usize {
+        self.test_draw_count
     }
 
     #[cfg(test)]
@@ -412,6 +423,7 @@ impl TerminalSession {
 
         #[cfg(test)]
         if self.test_mode {
+            self.test_draw_count += 1;
             self.cursor_commands +=
                 usize::from(move_cursor.is_some()) + usize::from(visibility_changed);
             self.cursor_visible = cursor.is_some();

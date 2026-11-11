@@ -9,7 +9,10 @@ fn app_responsibilities_stay_private_behind_the_tui_facade() {
     let output = fs::read_to_string(crate_root.join("src/app/output.rs")).expect("read app output");
     let frame = fs::read_to_string(crate_root.join("src/app/frame.rs")).expect("read app frame");
 
-    for module in ["frame", "input", "output"] {
+    let scheduling = fs::read_to_string(crate_root.join("src/app/scheduling.rs"))
+        .expect("read private scheduling helpers");
+
+    for module in ["frame", "input", "output", "scheduling"] {
         assert!(facade.contains(&format!("mod {module};")));
         assert!(!facade.contains(&format!("pub mod {module};")));
         assert!(!facade.contains(&format!("pub(crate) mod {module};")));
@@ -20,11 +23,12 @@ fn app_responsibilities_stay_private_behind_the_tui_facade() {
     assert!(facade.contains("tokio::select!"));
     assert!(input.contains("fn handle_input_event"));
     assert!(output.contains("fn handle_ui_output"));
-    assert!(output.contains("fn next_stream_chunk"));
+    assert!(scheduling.contains("fn stream_event"));
+    assert!(facade.contains("scheduling::stream_event(stream)"));
     assert!(frame.contains("fn draw_frame"));
     assert!(frame.contains("fn anchor_frame_history_start"));
 
-    for responsibility in [&input, &output, &frame] {
+    for responsibility in [&input, &output, &frame, &scheduling] {
         assert!(!responsibility.contains("pub async fn run"));
         assert!(!responsibility.contains("tokio::select!"));
     }

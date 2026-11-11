@@ -107,6 +107,7 @@ finally:
 steady = [s for s in samples if ready_at is not None and ready_at + a.warmup <= s['seconds'] <= ready_at + a.seconds]
 ready_dir.cleanup()
 result = {'binary_sha256': binary_digest, 'platform': platform.platform(),
+          'replay_stream_hz': os.environ.get('TALOS_REPLAY_STREAM_HZ', '20'),
           'action_count': action_count, 'input_probe_count': probe_count, 'scenario': a.scenario, 'history': a.history, 'geometry': [120,40],
           'workspace': a.workspace, 'alternate_workspace': a.alternate_workspace,
           'process_tree_enabled': a.process_tree,

@@ -317,7 +317,7 @@ mod tests {
             ttl: Duration::from_millis(1),
             created_at: Instant::now() - Duration::from_secs(1),
         });
-        state.expire_tip();
+        state.expire_tip(std::time::Instant::now());
         assert!(state.tip.is_none());
     }
 
@@ -330,7 +330,7 @@ mod tests {
             ttl: Duration::from_secs(10),
             created_at: Instant::now(),
         });
-        state.expire_tip();
+        state.expire_tip(std::time::Instant::now());
         assert!(state.tip.is_some());
     }
 

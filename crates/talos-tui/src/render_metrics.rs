@@ -51,11 +51,11 @@ struct Metric {
     buckets: [u64; 32],
 }
 struct Metrics {
-    steady_stages: [Metric; 18],
+    steady_stages: [Metric; NAMES.len()],
     started_at: Option<Instant>,
     warmup: Duration,
     steady_changed_cells: u64,
-    stages: [Metric; 18],
+    stages: [Metric; NAMES.len()],
     changed_cells: u64,
     last_screen_size: Option<(u16, u16)>,
 }
@@ -66,7 +66,7 @@ const EMPTY: Metric = Metric {
     buckets: [0; 32],
 };
 static METRICS: Mutex<Metrics> = Mutex::new(Metrics {
-    steady_stages: [EMPTY; 18],
+    steady_stages: [EMPTY; NAMES.len()],
     started_at: None,
     warmup: Duration::ZERO,
     steady_changed_cells: 0,
@@ -75,7 +75,7 @@ static METRICS: Mutex<Metrics> = Mutex::new(Metrics {
         total_ns: 0,
         max_ns: 0,
         buckets: [0; 32],
-    }; 18],
+    }; NAMES.len()],
     changed_cells: 0,
     last_screen_size: None,
 });
@@ -130,7 +130,7 @@ impl ReportOnExit {
         if destination().is_some()
             && let Ok(mut metrics) = METRICS.lock()
         {
-            metrics.steady_stages = [EMPTY; 18];
+            metrics.steady_stages = [EMPTY; NAMES.len()];
             metrics.steady_changed_cells = 0;
             metrics.last_screen_size = None;
             metrics.started_at = Some(Instant::now());
@@ -161,7 +161,7 @@ impl Metrics {
         }
     }
 }
-fn stage_json(values: &[Metric; 18]) -> serde_json::Map<String, serde_json::Value> {
+fn stage_json(values: &[Metric; NAMES.len()]) -> serde_json::Map<String, serde_json::Value> {
     NAMES
         .iter()
         .zip(values)
@@ -223,30 +223,6 @@ impl Metric {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::Metric;
-
-    #[test]
-    fn histogram_bounds_include_zero_and_overflow_without_wrapping() {
-        let mut metric = Metric::default();
-        for ns in [0, 1, 2, 3, 1 << 31, u64::MAX] {
-            metric.observe(ns);
-        }
-        assert_eq!(metric.count, 6);
-        assert_eq!(metric.buckets.iter().sum::<u64>(), 6);
-        assert_eq!(metric.buckets[0], 1);
-        assert_eq!(metric.buckets[2], 2);
-        assert_eq!(metric.buckets[31], 2);
-        assert_eq!(metric.total_ns, u64::MAX);
-        metric.count = u64::MAX;
-        metric.buckets[0] = u64::MAX;
-        metric.observe(0);
-        assert_eq!(metric.count, u64::MAX);
-        assert_eq!(metric.buckets[0], u64::MAX);
-    }
-}
-
 /// Count actual terminal-size changes observed by rendering, not injected events.
 pub(crate) fn screen_size(width: u16, height: u16) {
     if destination().is_none() {
@@ -270,5 +246,29 @@ pub(crate) fn deadline(scheduled: tokio::time::Instant) {
             Stage::DeadlineLateness,
             scheduled.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Metric;
+
+    #[test]
+    fn histogram_bounds_include_zero_and_overflow_without_wrapping() {
+        let mut metric = Metric::default();
+        for ns in [0, 1, 2, 3, 1 << 31, u64::MAX] {
+            metric.observe(ns);
+        }
+        assert_eq!(metric.count, 6);
+        assert_eq!(metric.buckets.iter().sum::<u64>(), 6);
+        assert_eq!(metric.buckets[0], 1);
+        assert_eq!(metric.buckets[2], 2);
+        assert_eq!(metric.buckets[31], 2);
+        assert_eq!(metric.total_ns, u64::MAX);
+        metric.count = u64::MAX;
+        metric.buckets[0] = u64::MAX;
+        metric.observe(0);
+        assert_eq!(metric.count, u64::MAX);
+        assert_eq!(metric.buckets[0], u64::MAX);
     }
 }

@@ -67,6 +67,7 @@ def main():
                 'source_revision': command_output(['git', '-C', str(source_root), 'rev-parse', 'HEAD']),
                 'rustc': command_output(['rustc', '--version']), 'platform': platform.platform(),
                 'power': power, 'profile_asserted_by_caller': args.profile,
+                'replay_stream_hz': os.environ.get('TALOS_REPLAY_STREAM_HZ', '20'),
                 'arguments': {k: str(v) if isinstance(v, Path) else v for k,v in vars(args).items()},
                 'completed': [], 'limitations': ['Source hashes describe current checkout; caller must bind each prebuilt binary to its own source.',
                                                'Synthetic PTY is not native device or terminal emulator evidence.']}

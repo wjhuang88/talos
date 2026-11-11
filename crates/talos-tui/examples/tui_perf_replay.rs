@@ -35,6 +35,16 @@ async fn main() -> io::Result<()> {
             "replay bounds exceeded",
         ));
     }
+    let stream_hz = std::env::var("TALOS_REPLAY_STREAM_HZ")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(20);
+    if !(1..=1000).contains(&stream_hz) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "stream rate must be 1..=1000",
+        ));
+    }
     let workspace = args.get(4).cloned().unwrap_or_default();
     let alternate_workspace = args.get(5).cloned().unwrap_or_default();
     if scenario == "workspace-switch"
@@ -76,9 +86,10 @@ async fn main() -> io::Result<()> {
             let _ = tx.send(UiOutput::Content(ContentOutput::Start {
                 source: MessageSource::Assistant,
             }));
-            let mut interval = tokio::time::interval(Duration::from_millis(50));
+            let mut interval =
+                tokio::time::interval(Duration::from_nanos(1_000_000_000 / stream_hz));
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            for index in 0..seconds * 20 {
+            for index in 0..seconds * stream_hz {
                 interval.tick().await;
                 if tx
                     .send(UiOutput::Content(ContentOutput::Delta {
