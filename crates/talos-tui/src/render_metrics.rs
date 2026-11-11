@@ -23,8 +23,9 @@ pub(crate) enum Stage {
     FramePreparation,
     WorkspaceChange,
     GitSnapshotAge,
+    AnimationDeadlineLateness,
 }
-const NAMES: [&str; 19] = [
+const NAMES: [&str; 20] = [
     "draw",
     "layout",
     "history_rebuild",
@@ -44,12 +45,14 @@ const NAMES: [&str; 19] = [
     "frame_preparation",
     "workspace_change",
     "git_snapshot_age",
+    "animation_deadline_lateness",
 ];
 #[derive(Clone, Copy, Default)]
 struct Metric {
     count: u64,
     total_ns: u64,
     max_ns: u64,
+    over_50ms_count: u64,
     buckets: [u64; 32],
 }
 struct Metrics {
@@ -65,6 +68,7 @@ const EMPTY: Metric = Metric {
     count: 0,
     total_ns: 0,
     max_ns: 0,
+    over_50ms_count: 0,
     buckets: [0; 32],
 };
 static METRICS: Mutex<Metrics> = Mutex::new(Metrics {
@@ -76,6 +80,7 @@ static METRICS: Mutex<Metrics> = Mutex::new(Metrics {
         count: 0,
         total_ns: 0,
         max_ns: 0,
+        over_50ms_count: 0,
         buckets: [0; 32],
     }; NAMES.len()],
     changed_cells: 0,
@@ -173,6 +178,7 @@ fn stage_json(values: &[Metric; NAMES.len()]) -> serde_json::Map<String, serde_j
                 serde_json::json!({
                     "count": metric.count, "total_ns": metric.total_ns,
                     "max_ns": metric.max_ns, "log2_ns_buckets": metric.buckets,
+                    "over_50ms_count": metric.over_50ms_count,
                 }),
             )
         })
@@ -220,6 +226,9 @@ impl Metric {
         self.count = self.count.saturating_add(1);
         self.total_ns = self.total_ns.saturating_add(ns);
         self.max_ns = self.max_ns.max(ns);
+        if ns > 50_000_000 {
+            self.over_50ms_count = self.over_50ms_count.saturating_add(1);
+        }
         let bucket = (64 - ns.leading_zeros()).min(31) as usize;
         self.buckets[bucket] = self.buckets[bucket].saturating_add(1);
     }
@@ -257,10 +266,10 @@ pub(crate) fn snapshot_age(age: Duration) {
     }
 }
 
-pub(crate) fn deadline(scheduled: tokio::time::Instant) {
+pub(crate) fn deadline(stage: Stage, scheduled: tokio::time::Instant) {
     if destination().is_some() {
         record(
-            Stage::DeadlineLateness,
+            stage,
             scheduled.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64,
         );
     }
@@ -269,6 +278,19 @@ pub(crate) fn deadline(scheduled: tokio::time::Instant) {
 #[cfg(test)]
 mod tests {
     use super::Metric;
+
+    #[test]
+    fn budget_counter_distinguishes_values_inside_the_same_histogram_bucket() {
+        let mut metric = Metric::default();
+        for ns in [49_999_999, 50_000_000, 50_000_001] {
+            metric.observe(ns);
+        }
+        assert_eq!(metric.buckets[26], 3);
+        assert_eq!(metric.over_50ms_count, 1);
+        metric.over_50ms_count = u64::MAX;
+        metric.observe(50_000_001);
+        assert_eq!(metric.over_50ms_count, u64::MAX);
+    }
 
     #[test]
     fn histogram_bounds_include_zero_and_overflow_without_wrapping() {

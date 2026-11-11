@@ -182,3 +182,35 @@ are explicit. This adds sampler overhead and must be identical on both sides of
 a comparison. Top-level CPU/PSS remain main-process values. Short-lived children
 and exited threads can escape polling; do not subtract live-tree CPU sums across
 changing membership or call live-thread context-switch sums lifetime totals.
+
+For focused high-rate stream regressions, set `TALOS_REPLAY_STREAM_HZ=200`
+(default 20, allowed 1–1000). The fixture retains token order and emits a final
+Content::End; sampler and matrix reports record the requested rate. A higher
+rate also increases total text, so compare identical rates and durations. A
+successful process exit and reduced draw count alone do not prove final transcript
+content, cancellation fairness, or native visual correctness.
+
+The optional `git_snapshot_age` histogram samples successful snapshot age when a
+frame reads Git status. Collection time comes from worker completion, not UI
+receipt. These are frame-weighted age samples, not scan durations: idle unchanged
+snapshots produce no samples and unknown state has no age. Age observations use
+the observation's warmup window; they do not subtract the age from that window.
+
+For a completed alternating matrix whose binary labels are exactly `baseline`
+and `candidate`, `python3 scripts/compare_tui_perf.py /completed/matrix` reports
+per-case checks against TUI-PERF-001's frozen budgets. It checks active CPU median,
+peak PSS, idle/approval frame suppression, stable animation planning and animation
+deadline P99; input P95/P99 is checked only when input probes were enabled. Empty
+applicable latency histograms fail the check. Metrics-off idle CPU is evaluated
+separately from metrics-on frame counts. Its `evaluated_checks_pass` field covers
+only listed checks, not whole-task acceptance. Retain source-bound binary receipts,
+raw reports and the native/long-run/allocation evidence separately.
+
+The additional `animation_deadline_lateness` stage observes only a visible
+animation whose own cadence is due. `deadline_lateness` remains the combined
+timer-wakeup metric (including Git, stream and expiry work). Each metric also
+contains a bounded `over_50ms_count`; the animation comparator uses that count
+to test the frozen P99 <= 50 ms threshold exactly without pretending to know an
+exact percentile. Legacy reports retain their conservative mixed-deadline
+histogram check and are labeled accordingly. Neither observation proves visible
+pixel timing or identifies the cause of host scheduling delays.

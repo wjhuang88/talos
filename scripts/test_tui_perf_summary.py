@@ -4,10 +4,32 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from summarize_tui_perf import observed_tree_usage, percentile_bounds, summarize
+from summarize_tui_perf import animation_budget, observed_tree_usage, percentile_bounds, summarize
 
 
 class SummaryValidation(unittest.TestCase):
+    def test_animation_budget_checks_exact_threshold_without_quantile_guessing(self):
+        self.assertIsNone(animation_budget({}))
+        metric = {'count': 213, 'total_ns': 213 * 49_000_000,
+                  'max_ns': 50_000_001, 'log2_ns_buckets': [0] * 32,
+                  'over_50ms_count': 2}
+        metric['log2_ns_buckets'][26] = 213
+        table = {'animation_deadline_lateness': metric}
+        self.assertTrue(animation_budget(table)['p99_within_50ms'])
+        metric['over_50ms_count'] = 3
+        self.assertFalse(animation_budget(table)['p99_within_50ms'])
+        metric['over_50ms_count'] = 214
+        with self.assertRaisesRegex(ValueError, 'threshold count'):
+            animation_budget(table)
+        metric.update(count=0, total_ns=0, max_ns=0, over_50ms_count=0,
+                      log2_ns_buckets=[0] * 32)
+        self.assertFalse(animation_budget(table)['p99_within_50ms'])
+        metric.update(count=1, total_ns=50_000_000, max_ns=50_000_000,
+                      over_50ms_count=1)
+        metric['log2_ns_buckets'][26] = 1
+        with self.assertRaisesRegex(ValueError, 'contradicts maximum'):
+            animation_budget(table)
+
     def test_tree_cpu_does_not_subtract_changing_membership(self):
         def sample(processes):
             return {'process_tree': {'complete': True, 'observed_tree_pss_kib': 10,

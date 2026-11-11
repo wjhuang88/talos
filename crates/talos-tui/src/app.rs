@@ -760,11 +760,24 @@ impl Tui {
                 }
                 Wake::Deadline => {
                     if let Some(deadline) = deadline {
-                        crate::render_metrics::deadline(deadline.into());
+                        crate::render_metrics::deadline(
+                            crate::render_metrics::Stage::DeadlineLateness,
+                            deadline.into(),
+                        );
                     }
                     crate::render_metrics::count(crate::render_metrics::Stage::Timer);
                     let now = scheduling::now();
                     dirty |= self.git_snapshot.expire(&git_workspace, now);
+                    // The shared timer also serves Git, stream and expiry work.
+                    // Observe animation only when its own visible cadence is due.
+                    if self.visible_processing_animation
+                        && let Some(deadline) = cadence.deadline().filter(|d| *d <= now)
+                    {
+                        crate::render_metrics::deadline(
+                            crate::render_metrics::Stage::AnimationDeadlineLateness,
+                            deadline.into(),
+                        );
+                    }
                     let steps = cadence.consume(now, PROCESSING_FRAME_INTERVAL);
                     if steps > 0 {
                         self.processing_frame = self.processing_frame.wrapping_add(steps - 1);

@@ -6,7 +6,24 @@ import math
 from pathlib import Path
 import statistics
 
-from tui_perf_validation import validate_metrics, validate_sample
+from tui_perf_validation import validate_metrics, validate_sample, validate_stage_table
+
+
+def animation_budget(table):
+    """Exact threshold rank check; older mixed-deadline reports stay unavailable."""
+    stage = 'animation_deadline_lateness'
+    if stage not in table:
+        return None
+    validate_stage_table(table, (stage,))
+    metric = table[stage]
+    count, over = metric['count'], metric.get('over_50ms_count')
+    if type(over) is not int or not 0 <= over <= count:
+        raise ValueError('invalid animation deadline threshold count')
+    if (over > 0) != (metric['max_ns'] > 50_000_000):
+        raise ValueError('animation deadline threshold contradicts maximum')
+    rank = (99 * count + 99) // 100
+    return {'count': count, 'over_50ms_count': over,
+            'p99_within_50ms': count > 0 and count - over >= rank}
 
 
 def percentile_bounds(metric, percentile):
@@ -98,6 +115,7 @@ def summarize(directory):
             row['latency_bounds'] = {
                 stage: {f'p{p}': percentile_bounds(metrics['steady_stages'][stage], p) for p in (95, 99)}
                 for stage in ('input_to_submit', 'deadline_lateness')}
+            row['animation_deadline_budget'] = animation_budget(metrics['steady_stages'])
         groups.setdefault(key, []).append(row)
     result = {}
     for key, rows in groups.items():
