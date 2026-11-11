@@ -123,85 +123,12 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    #[test]
-    fn entity_table_exact_upstream_parity() {
-        let fixtures = [
-            "",
-            "&amp;",
-            "&lt;&gt;&quot;&#x27;&#39;&nbsp;",
-            "&amp;amp;",
-            "&amp;lt;",
-            "a &amp; b &nbsp; c",
-            "&apos;&copy;&#X27;&#x27;",
-            "&#x27;&#39; &#39;&#x27;",
-            "中&音符;&amp;🙂",
-        ];
-        for input in fixtures {
-            assert_eq!(
-                decode_html_entities(input),
-                rust_websearch::html_utils::decode_html_entities(input),
-                "entity parity for {input:?}"
-            );
-        }
-    }
+    // The frozen expected-value vectors now supply independent, pinned-upstream
+    // entity, HTML-cleanup and DDG-redirect tests. Do not duplicate an active
+    // dependency on the upstream helper functions here.
 
     #[test]
-    fn stripping_and_cleaning_exact_upstream_parity() {
-        let fixtures = [
-            "",
-            " plain  text ",
-            " \t<b>Hello</b>  &amp;  World\n ",
-            "<p>hi</p><span>there</span>",
-            "a<b>nested<i>words</i></b>z",
-            "2 < 3 and > 1",
-            "orphan <tag",
-            "mismatched >tag< x",
-            "a&nbsp;&nbsp;b\u{a0}\n\tc",
-            "😀 <a href='?x=1&amp;y=2'>你好</a> &amp; fin",
-        ];
-        for input in fixtures {
-            assert_eq!(
-                clean_html(input),
-                rust_websearch::html_utils::clean_html(input)
-            );
-            assert_eq!(
-                strip_html_tags(input),
-                rust_websearch::html_utils::strip_html_tags(input)
-            );
-        }
-    }
-
-    #[test]
-    fn ddg_redirect_and_invalid_byte_parity() {
-        let fixtures = [
-            "",
-            "https://example.org/a?x=1&amp;y=2",
-            "//example.org/相对?x=1&amp;y=2",
-            "/l/?uddg=https%3A%2F%2Fexample.org%2Fa%3Fx%3D1%26b%3D2",
-            "/l/?uddg=https%3A%2F%2Fexample.org%2Ffoo+bar",
-            "/l/?uddg=%E4%B8%AD%E6%96%87",
-            "/l/?uddg=%F0%9F%98%80",
-            "/l/?uddg=literal中文",
-            "/l/?uddg=%FF",
-            "/l/?uddg=%ZZ",
-            "/l/?uddg=%A",
-            "/l/?uddg=%",
-            "/l/?uddg=abc&amp;def=ghi",
-            "/l/?uddg=https%3a%2f%2fexample.org%2f%00",
-            "/l/?uddg=%C0%AF",
-            "/L/?uddg=https%3A%2F%2Fexample.org",
-        ];
-        for input in fixtures {
-            assert_eq!(
-                resolve_duckduckgo_url(input),
-                rust_websearch::html_utils::resolve_duckduckgo_url(input),
-                "redirect parity for {input:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn fixed_upstream_user_agent_set_and_selection_membership() {
+    fn fixed_user_agent_set_and_selection_membership() {
         assert_eq!(USER_AGENTS.len(), 12);
         let unique: HashSet<&str> = USER_AGENTS.into_iter().collect();
         assert_eq!(unique.len(), 12);
@@ -212,8 +139,6 @@ mod tests {
         }
         for _ in 0..256 {
             assert!(USER_AGENTS.contains(&random_user_agent()));
-            // Actual upstream random output must belong to the same pinned static set.
-            assert!(USER_AGENTS.contains(&rust_websearch::anti_detection::random_user_agent()));
         }
     }
 
