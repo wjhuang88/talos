@@ -898,6 +898,47 @@ fn session_entry_with_parent_child_relationship() {
 }
 
 #[test]
+fn archived_fork_refusal_preserves_branches_sources_and_continuation() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = SessionManager::with_dir(root.path().join("sessions"));
+    let mut session = manager.create_session("archive-fork", "").expect("session");
+    for index in 0..205 {
+        session
+            .append(&Message::User {
+                content: format!("original {index}"),
+            })
+            .expect("append");
+    }
+    session.compact_archived(50).expect("archive");
+    let bytes = session.snapshot_bytes().expect("original head");
+    let branches = session.list_branches();
+    let current = session.current_branch.clone();
+    let entries = session.read_entries().expect("head entries");
+    for fork_point in [&entries[0].id, &entries.last().expect("tail").id] {
+        assert!(session.fork(fork_point).is_err());
+        assert_eq!(session.current_branch, current);
+        assert_eq!(session.list_branches(), branches);
+        assert_eq!(session.snapshot_bytes().expect("preserved head"), bytes);
+    }
+    session
+        .append(&Message::User {
+            content: "continued original".into(),
+        })
+        .expect("continue source");
+    let evidence = session
+        .inspect_archive_recovery(
+            std::time::Instant::now() + std::time::Duration::from_secs(5),
+            || false,
+        )
+        .expect("all original records remain recoverable");
+    assert_eq!(evidence.entries().len(), 206);
+    assert_eq!(
+        evidence.entries().last().expect("continued").content,
+        "continued original"
+    );
+}
+
+#[test]
 fn fork_creates_new_branch_with_correct_parent_id() {
     let manager = test_manager();
     let mut session = manager

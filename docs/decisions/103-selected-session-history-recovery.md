@@ -123,9 +123,11 @@ new or removed candidate paths revoke previously prepared evidence.
 
 ADR-037 section 6 assumes a compacted head is sufficient to make its copied child
 independent. Legacy count placeholders do not satisfy that assumption: original context
-now comes from sibling archives. Both startup and interactive fork therefore refuse
-these histories pending a replacement provenance contract. This is a temporary behavior
-restriction, not complete fork support or a reinterpretation of preserved parent IDs.
+now comes from sibling archives. Startup, TUI staging and the shared `Session::fork`
+API (including the REPL path) therefore refuse these histories pending a replacement
+provenance contract. The shared guard runs before in-memory branch mutation. This is a
+temporary behavior restriction, not complete fork support or a reinterpretation of
+preserved parent IDs.
 
 The current SQLite fork index records only parent/child IDs, the fork entry ID and a
 timestamp; it contains no content digest or immutable source cutoff. It cannot authorize
