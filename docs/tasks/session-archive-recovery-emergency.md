@@ -548,3 +548,33 @@ An isolated rerun passed both plugin tests in 1.54 seconds,
 `/tmp/talos-linear-plugin-deadline-retry.log`; the original timeout cause remains
 unestablished. No deadline, policy or assertion was relaxed. The final combined
 preflight cited above subsequently passed; the earlier failure remains recorded.
+
+## Shared fork boundary correction
+
+Further entrypoint review found that the REPL `/fork` worker calls `Session::fork`
+directly, bypassing both startup and TUI staging checks. A real EventLoop input/worker
+regression failed before the fix by publishing a partial archived child; log
+`/tmp/talos-repl-archive-fork-before.log`. The shared Session API now refuses exact
+legacy count placeholders before mutating branch state. This also covers direct API
+callers. The existing EntryNotFound behavior remains for unknown fork points.
+
+Core coverage verifies no changed head/branches on refusal and then successfully
+appends to the original session, recovering all 206 originals. REPL coverage uses both
+implicit and explicit recent fork points and verifies no child session/index relation
+and all 205 originals recoverable. All 25 Session fork tests and 10 CLI fork tests pass
+in `/tmp/talos-core-archive-fork-after.log` and `/tmp/talos-repl-archive-fork-after.log`.
+The separate durable committed-tip API already rejects count placeholders through its
+mandatory turn-identity/parent validation before publication; it is not weakened.
+
+This closes another unsafe entrypoint only. Full archived-fork provenance remains
+unimplemented; do not turn a shared refusal into a full-fork completion claim. Final
+combined preflight passed (exit 0), log `/tmp/talos-linear-and-fork-final-preflight.log`.
+The formerly failing plugin fixture passed within that full run, without deadline or
+assertion changes. Independent review remains required. Original working tree/session
+files and background continuation defaults are unchanged.
+
+Final-source Session/Agent/CLI all-feature MSVC test compilation passed via pinned
+`cargo xwin check --locked --all-features --tests --target x86_64-pc-windows-msvc`,
+log `/tmp/talos-linear-and-fork-final-xwin.log`. The existing test-only History::prepare
+dead-code warning remains; no suppression was added. This is not native Windows
+execution or independent review.

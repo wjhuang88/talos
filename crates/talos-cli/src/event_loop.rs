@@ -889,3 +889,85 @@ mod approval_queue_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod archive_fork_tests {
+    use super::*;
+    use talos_core::message::Message;
+
+    #[tokio::test]
+    async fn repl_fork_refuses_archived_source_before_child_publication() {
+        for explicit_entry in [false, true] {
+            let root = tempfile::tempdir().expect("root");
+            let manager = SessionManager::with_dir(root.path().join("sessions"));
+            let source = manager.create_session("archive-repl", "").expect("source");
+            for index in 0..205 {
+                source
+                    .append(&Message::User {
+                        content: format!("original fact {index}"),
+                    })
+                    .expect("append");
+            }
+            source.compact_archived(50).expect("archive");
+            let before = source.snapshot_bytes().expect("before");
+            let tail = source
+                .read_entries()
+                .expect("entries")
+                .last()
+                .expect("tail")
+                .id
+                .clone();
+            let (event_tx, event_rx) = mpsc::unbounded_channel();
+            let (sq_tx, _sq_rx) = mpsc::channel(1);
+            let mut repl = EventLoop {
+                event_tx,
+                event_rx,
+                state: AppState::WaitingForInput,
+                first_ctrl_c_time: None,
+                workspace_root: root.path().to_path_buf(),
+                session: source.clone(),
+                branch_id: None,
+                session_manager: manager.clone(),
+                sq_tx,
+                approval_queue: VecDeque::new(),
+                displayed_approval: None,
+                approval_rollover_barrier: false,
+                background_tools: HashMap::new(),
+            };
+            let command = if explicit_entry {
+                format!("/fork {tail}")
+            } else {
+                "/fork".into()
+            };
+            repl.handle_event(AppEvent::UserInput(command));
+            let request = repl.event_rx.recv().await.expect("fork request");
+            assert!(matches!(request, AppEvent::ForkSession { .. }));
+            repl.handle_event(request);
+            let result = tokio::time::timeout(Duration::from_secs(10), repl.event_rx.recv())
+                .await
+                .expect("fork worker deadline")
+                .expect("fork worker event");
+            match result {
+                AppEvent::AgentError(message) => assert!(message.contains("archived history")),
+                AppEvent::ForkCompleted { .. } => panic!("REPL published a partial archived child"),
+                _ => panic!("unexpected fork worker event"),
+            }
+            assert_eq!(manager.list_sessions().expect("sessions").len(), 1);
+            assert!(
+                manager
+                    .get_forks(&source.id.to_string())
+                    .expect("forks")
+                    .is_empty()
+            );
+            assert_eq!(source.snapshot_bytes().expect("preserved head"), before);
+            assert_eq!(
+                source
+                    .inspect_archive_recovery(Instant::now() + Duration::from_secs(5), || false)
+                    .expect("all originals recoverable")
+                    .entries()
+                    .len(),
+                205
+            );
+        }
+    }
+}

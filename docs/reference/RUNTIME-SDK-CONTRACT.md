@@ -772,9 +772,11 @@ record IDs and parents, refuses ambiguous or changed sources, and subjects resto
 messages to normal request admission and source-bound checkpoint folding. This does
 not certify real-provider summary quality or native platform acceptance.
 
-Both startup `--fork` and interactive fork reject legacy count-placeholder histories
-before publishing a child. Copying only their current head would lose earlier history
-and introduce another live head with overlapping IDs. Complete child-owned archive
+Startup `--fork`, TUI staging and `Session::fork` (including REPL `/fork` and direct
+API callers) reject legacy count-placeholder histories before publishing a child.
+`Session::fork` returns `SessionError::ParseError` before changing branch state. Copying
+only their current head would lose earlier history and introduce another live head with
+overlapping IDs. Complete child-owned archive
 provenance is not yet implemented. Ordinary non-archived forks retain existing behavior.
 See [ADR-104](../decisions/104-selected-session-history-recovery.md) and the
 [recovery owner](../tasks/session-archive-recovery-emergency.md) for candidate evidence
