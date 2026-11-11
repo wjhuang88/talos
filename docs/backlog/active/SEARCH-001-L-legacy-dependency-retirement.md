@@ -18,7 +18,7 @@
 | Work Slice | SEARCH-001-L L1: replace the residual `rust-websearch` dependency in the dormant/public legacy `WebSearchTool` and test oracle, preserve API/behavior, then remove Cargo and current fixture locked package references only with independently verified tests |
 | Claimed At | 2026-11-10 |
 | Source Issue | #901 |
-| Governance Claim PR | #902 — merged as `135fd80508896c9bd3fa30879d4c125fc272a444` |
+| Governance Claim PR | #902 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance claim/ADR amendment are effective after #902 merged; #904 frozen upstream oracle is merged. This does not imply approval of Draft implementation #907; independent API/network/permission/security review and exact-head cross-platform CI remain mandatory. |
 | Implementation PR | L1a #904 merged; L1b [#907](https://github.com/wjhuang88/talos/pull/907) Draft / unmerged |
