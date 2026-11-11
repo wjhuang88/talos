@@ -110,34 +110,71 @@ async fn probe_one(client: Client, url: &str) -> bool {
     }
 }
 
-static LAST_REQUEST: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
+// Tokio's fair async mutex serializes the wait itself. A std::sync::Mutex
+// released before sleep allowed concurrent callers to read the same previous
+// timestamp, sleep together, and issue their legacy queries in a burst.
+static LAST_REQUEST: OnceLock<tokio::sync::Mutex<Option<Instant>>> = OnceLock::new();
 
-pub(super) async fn rate_limit() {
+async fn rate_limit_with(lock: &tokio::sync::Mutex<Option<Instant>>) -> Instant {
     // Preserve the pinned crate's 1s process-global minimum interval with
     // bounded +/-30% jitter, without carrying its rand dependency.
     const INTERVAL: Duration = Duration::from_secs(1);
-    let lock = LAST_REQUEST.get_or_init(|| Mutex::new(None));
-    let delay = {
-        let mut last = lock.lock().unwrap_or_else(|e| e.into_inner());
-        let now = Instant::now();
-        if let Some(previous) = *last {
-            let elapsed = now.saturating_duration_since(previous);
-            if elapsed < INTERVAL {
-                let jitter = i64::from(uuid::Uuid::new_v4().as_bytes()[0]) * 600 / 255 - 300;
-                let remaining = (INTERVAL - elapsed).as_millis() as i64;
-                Some(Duration::from_millis((remaining + jitter).max(0) as u64))
-            } else {
-                *last = Some(now);
-                None
-            }
-        } else {
-            *last = Some(now);
-            None
+    let mut last = lock.lock().await;
+    if let Some(previous) = *last {
+        let elapsed = Instant::now().saturating_duration_since(previous);
+        if elapsed < INTERVAL {
+            let jitter = i64::from(uuid::Uuid::new_v4().as_bytes()[0]) * 600 / 255 - 300;
+            let remaining = (INTERVAL - elapsed).as_millis() as i64;
+            tokio::time::sleep(Duration::from_millis((remaining + jitter).max(0) as u64)).await;
         }
-    };
-    if let Some(wait) = delay {
-        tokio::time::sleep(wait).await;
-        *lock.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
+    }
+    // Update only when this caller is actually admitted; the mutex remains
+    // held across the wait, including cancellation of a pending waiter.
+    let admitted = Instant::now();
+    *last = Some(admitted);
+    admitted
+}
+
+pub(super) async fn rate_limit() {
+    let lock = LAST_REQUEST.get_or_init(|| tokio::sync::Mutex::new(None));
+    let _ = rate_limit_with(lock).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn concurrent_waiters_preserve_global_spacing() {
+        // Private limiter avoids interference from unrelated workspace tests.
+        // All four waiters become runnable at once, exercising the exact race
+        // that a mutex dropped before sleep would permit.
+        const WAITERS: usize = 4;
+        let limiter = Arc::new(tokio::sync::Mutex::new(None));
+        let gate = Arc::new(tokio::sync::Barrier::new(WAITERS + 1));
+        let mut joins = tokio::task::JoinSet::new();
+        for _ in 0..WAITERS {
+            let limiter = Arc::clone(&limiter);
+            let gate = Arc::clone(&gate);
+            joins.spawn(async move {
+                gate.wait().await;
+                rate_limit_with(&limiter).await
+            });
+        }
+        gate.wait().await;
+        let mut admitted = Vec::new();
+        while let Some(next) = joins.join_next().await {
+            admitted.push(next.expect("rate limiter task"));
+        }
+        assert_eq!(admitted.len(), WAITERS);
+        admitted.sort_unstable();
+        for pair in admitted.windows(2) {
+            assert!(
+                pair[1].duration_since(pair[0]) >= Duration::from_millis(650),
+                "concurrent legacy searches must not share the same rate-limit interval"
+            );
+        }
     }
 }
 
