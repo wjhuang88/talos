@@ -38,10 +38,13 @@ def main():
     parser.add_argument('--alternate-workspace', default='')
     parser.add_argument('--process-tree', action='store_true')
     parser.add_argument('--input-probe', action='store_true')
+    parser.add_argument('--input-probe-interval-ms', type=int, default=500)
     parser.add_argument('--metrics', choices=['on', 'off'], default='on')
     args = parser.parse_args()
     if not 1 <= args.rounds <= 100 or not 0 <= args.warmup < args.seconds <= 3600:
         parser.error('invalid round or time bounds')
+    if not 10 <= args.input_probe_interval_ms <= 10000:
+        parser.error('input probe interval must be 10..10000 ms')
     binaries = []
     for spec in args.binary:
         label, sep, value = spec.partition('=')
@@ -95,7 +98,8 @@ def main():
                                    '--alternate-workspace', args.alternate_workspace,
                                    '--output', str(args.output/(name+'.json'))]
                         if args.input_probe:
-                            command.append('--input-probe')
+                            command.extend(['--input-probe', '--input-probe-interval-ms',
+                                            str(args.input_probe_interval_ms)])
                         if args.process_tree:
                             command.append('--process-tree')
                         subprocess.run(command, env=env, check=True)

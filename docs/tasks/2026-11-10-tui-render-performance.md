@@ -963,3 +963,41 @@ passed (exit0, `/tmp/talos-perf-behavior-preflight.log`), including governance,
 locked workspace check/Clippy/tests and SDK fixture. All runtime changes in
 this checkpoint are behind cfg(test); performance candidate df7411d2 remains
 the production source used by the archived measurements.
+
+### Sustained high-rate Debug evidence and failed baseline
+
+Original P0 fixtures are fixed20Hz. Prepared exact15ef42c1 source with an explicit
+fixture-only200Hz rate patch; all TUI runtime sources verified bytewise unchanged.
+Baseline200Hz plus50ms input probes reached65s watchdog at~97.37% CPU and was
+terminated; preserve incomplete evidence in `evidence/tui-perf-001/highrate-baseline-timeout/`.
+No valid CPU/PSS paired comparison exists for this workload yet.
+
+Candidate initially completed two samples but third report write exceeded/tmp
+user quota; archive `evidence/tui-perf-001/highrate-candidate-quota/` includes the
+truncated failure. Moved only this task's six binary-copy directories (~2.8GB)
+to system-disk target/tui-perf-artifacts, retained original symlinks and verified
+all SHA-256 digests. No artifacts were discarded.
+
+Sampler now supports explicit input interval(default500ms), fixed deadlines and
+skipped-probe count; default interval preserved. Final candidate-only three-round
+200Hz/50ms Debug matrix completed, steady output6034/6028/6033 events, no skipped
+input probes, P95/P99 upper bounds15.935096/12.489444/12.259310ms (within20/35ms).
+Total probe counts include drain time, not solely the steady window. Archive:
+`evidence/tui-perf-001/highrate-candidate-debug/`. This is absolute input-budget
+evidence, not paired CPU/PSS or final-pixel acceptance. Release highrate, longrun,
+allocation and P4 evidence remain open.
+
+### Release high-rate matrix completed
+
+All six paired cases pass CPU/PSS/input budgets at200Hz configured output and
+50ms fixed-deadline input probes. CPU medians34.657680% ->7.066650%; candidate
+peakPSS53965KiB, worst inputP99 upper5.095588ms. Baseline/candidate each process
+~6010steady output events per round; zero skipped input probe deadlines. Archive
+`evidence/tui-perf-001/highrate-release/` includes fixture-only baseline patch,
+both build receipts and raw reports. Debug baseline timeout is not superseded.
+
+Sixteen Python evidence tests pass, including an actual PTY child test verifying
+20ms probe delivery is not throttled by sampler polling and invalid interval
+rejection before launch. No production Rust changes in this sampling checkpoint.
+Longrun/allocations, repeated transcript commits/P4, ANSI/native and remote gates
+remain open.

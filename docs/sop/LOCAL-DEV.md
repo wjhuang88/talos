@@ -214,3 +214,12 @@ to test the frozen P99 <= 50 ms threshold exactly without pretending to know an
 exact percentile. Legacy reports retain their conservative mixed-deadline
 histogram check and are labeled accordingly. Neither observation proves visible
 pixel timing or identifies the cause of host scheduling delays.
+
+For sustained input probes, add `--input-probe-interval-ms 50` to the sampler or
+matrix alongside `--input-probe` (default500ms, allowed10..10000ms). Probes follow
+fixed deadlines and skip overdue slots without catch-up bursts. Reports include
+the interval and skipped count; total probes include post-window drain, so they
+are not steady-window event rates. Retain the original incomplete report if a
+watchdog or write failure prevents completion. A configured high stream rate
+must be supported by both replay binaries; old fixed20Hz fixtures need an
+explicit recorded fixture-only patch before use in high-rate comparisons.

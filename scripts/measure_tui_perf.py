@@ -15,10 +15,13 @@ p.add_argument('--workspace', default='')
 p.add_argument('--alternate-workspace', default='')
 p.add_argument('--process-tree', action='store_true', help='include bounded procfs tree snapshots; adds sampling overhead')
 p.add_argument('--output', required=True)
-p.add_argument('--input-probe', action='store_true', help='type then erase one character every 500ms')
+p.add_argument('--input-probe', action='store_true', help='repeatedly type then erase one character')
+p.add_argument('--input-probe-interval-ms', type=int, default=500)
 a = p.parse_args()
 if not 0 <= a.warmup < a.seconds <= 3600:
     p.error('require 0 <= warmup < seconds <= 3600')
+if not 10 <= a.input_probe_interval_ms <= 10000:
+    p.error('input probe interval must be 10..10000 ms')
 with open(a.binary, 'rb') as binary_file:
     binary_digest = hashlib.file_digest(binary_file, 'sha256').hexdigest()
 ready_dir = tempfile.TemporaryDirectory(prefix="talos-perf-")
@@ -37,8 +40,9 @@ samples = []
 byte_count = 0
 pending = b''
 exit_code = None
-last_probe = 0.0
+next_probe = None
 probe_count = 0
+probe_skipped_count = 0
 last_action = 0.0
 action_count = 0
 try:
@@ -46,6 +50,8 @@ try:
         now = time.monotonic()
         if ready_at is None and ready_path.exists():
             ready_at = now - start
+            if a.input_probe:
+                next_probe = now + a.warmup
         if a.scenario in ('scroll', 'resize') and ready_at is not None and now-start >= ready_at+a.warmup and now-last_action >= .5:
             if a.scenario == 'scroll':
                 os.write(master, b'\x1b[5~' if action_count % 2 == 0 else b'\x1b[6~')
@@ -55,9 +61,12 @@ try:
                 os.kill(proc.pid, signal.SIGWINCH)
             action_count += 1
             last_action = now
-        if a.input_probe and ready_at is not None and now-start >= ready_at+a.warmup and now-last_probe >= .5:
+        if next_probe is not None and now >= next_probe:
             os.write(master, b'x\x7f')
-            last_probe = now
+            interval = a.input_probe_interval_ms / 1000
+            steps = int((now - next_probe) / interval) + 1
+            next_probe += steps * interval
+            probe_skipped_count += steps - 1
             probe_count += 1
         if now - last_sample >= .25:
             try:
@@ -75,7 +84,8 @@ try:
             except (FileNotFoundError, ProcessLookupError):
                 pass
             last_sample = now
-        ready, _, _ = select.select([master], [], [], .05)
+        timeout = .05 if next_probe is None else min(.05, max(0, next_probe - time.monotonic()))
+        ready, _, _ = select.select([master], [], [], timeout)
         if ready:
             try:
                 data = os.read(master, 65536)
@@ -107,6 +117,8 @@ finally:
 steady = [s for s in samples if ready_at is not None and ready_at + a.warmup <= s['seconds'] <= ready_at + a.seconds]
 ready_dir.cleanup()
 result = {'binary_sha256': binary_digest, 'platform': platform.platform(),
+          'input_probe_interval_ms': a.input_probe_interval_ms,
+          'input_probe_skipped_count': probe_skipped_count,
           'replay_stream_hz': os.environ.get('TALOS_REPLAY_STREAM_HZ', '20'),
           'action_count': action_count, 'input_probe_count': probe_count, 'scenario': a.scenario, 'history': a.history, 'geometry': [120,40],
           'workspace': a.workspace, 'alternate_workspace': a.alternate_workspace,
