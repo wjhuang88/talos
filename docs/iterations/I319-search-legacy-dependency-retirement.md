@@ -16,7 +16,7 @@
 | Work Slice | SEARCH-001-L L1: source-level legacy Tool parity + freeze independent oracle + complete current Cargo/fixture dependency graph retirement |
 | Claimed At | 2026-11-10 |
 | Source Issue | #901 |
-| Governance Claim PR | #902 — merged as `135fd80508896c9bd3fa30879d4c125fc272a444` |
+| Governance Claim PR | #902 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | The claim and ADR A1 became effective on main after #902 merged. This does not grant review approval for implementation #907; independent API/network/security review, native CI and merge-time CAS remain necessary. |
 | Implementation PR | L1a #904 merged; L1b #907 Draft / unmerged |
