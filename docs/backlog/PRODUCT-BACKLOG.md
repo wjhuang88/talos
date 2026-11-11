@@ -326,5 +326,6 @@ Complete / Closed; owner Completion Commit `1226f313e7136f4b2a3d8db6f9179c4ed520
 
 ## Gemini child selection — 2026-10-30
 
-[PROVIDER-008-B](active/PROVIDER-008-B-google-gemini.md) / #810 / I310 proposes Active / Claimed
-in governance #811; effective only on merge. A is Complete; C/D remain unclaimed; #724 open.
+[PROVIDER-008-B](active/PROVIDER-008-B-google-gemini.md) / #810 / I310 is Complete / Closed.
+Completion Commit `dbcf6163f34d73def923484ad409814fd4a98039` (#838). Exact-head CI4046, independent
+technical/document review and merge CAS passed. A is Complete; C/D and #724 remain open.

@@ -1,6 +1,6 @@
 # Iteration I310: Native Google Gemini
 
-> Document status: Active
+> Document status: Complete
 > Published plan date: 2026-10-30
 > Planned objective: complete child B, including AI Studio and Vertex OAuth.
 > Baseline rule: preserve this scope; changed objectives require a new iteration.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | PROVIDER-008-B native Gemini wire with AI Studio and Vertex authentication only |
@@ -19,9 +19,9 @@
 | Governance Claim PR | #811 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer authorized completing parent #724; distinct human reviewer unavailable in this session. Exact-head checks, independent protocol/auth review and merge CAS required. |
-| Implementation PR | #838 (Draft; not accepted) |
-| Last Updated | 2026-11-03 |
-| Handoff / Release Condition | Claim effective via #811; retain Claimed until full child acceptance, exact-head CI/review and merge CAS. |
+| Implementation PR | #838 (merged) |
+| Last Updated | 2026-11-11 |
+| Handoff / Release Condition | Implementation #838 merged after CI4046, independent technical/document review and merge CAS. No release/tag. |
 
 ## Scope and deliverable
 
@@ -799,3 +799,32 @@ bounded exact two-pair Flash catalog inference are implemented on the candidate.
 SDK, README en/zh and unreleased migration documentation are being synchronized. Full B remains
 Active / Claimed with Completion Commit Pending until final documentation validation/review and
 merge-time CAS. No merge, release, live-vendor success or parent #724 completion is claimed.
+
+
+## Completion — 2026-11-11
+
+Completion Commit: dbcf6163f34d73def923484ad409814fd4a98039
+
+PR #838 merged the implementation and documentation after exact-head CI4046
+(run42947754213, head836af8eebb3bec143b92f2c65bb068dbb65e0b37) completed SUCCESS
+with all eight jobs passing. Both governance validators passed with zero warnings. Independent
+protocol/auth/API/privacy source review approved implementation9da0e8a8; the subsequent eight
+documents received bounded consistency review, including the private-marker-only reopen limit.
+Single-maintainer authorization from #811 applied because a distinct human reviewer was unavailable.
+Merge CAS confirmed the claimant/work slice, prerequisites, mergeability and absence of overlapping
+Gemini PRs or unresolved review feedback. This is independent Agent review with shared account
+identity, not a separate human GitHub approval.
+
+All six acceptance rows are covered by native CI and recorded regressions. Both transports have
+permission-gated ordered-image/tool Agent rounds. Signed parts, call/result IDs and privacy
+projections remain bound. Malformed/safety/terminal/auth failures are explicit and bounded.
+User/service-account ADC initialization, refresh, expiry and cache/destination constraints are
+tested. Old configurations, explicit overrides, custom endpoints and UI provenance retain their
+contracts. Exact Flash catalog/profile inference passed the frozen-source preservation audit.
+README en/zh, protocol reference, architecture, SDK and unreleased migration notes are synchronized.
+
+Historical failed runs above remain failed evidence. Mock HTTP and sourced SDK SSE fixtures do
+not constitute live vendor verification. Synchronous RSA cannot be preempted; private replay
+needs live custody and fails after reopen/fork when markers survive. Public API changes require
+the next pre-1.0 minor release. No release/tag was performed. These documented product boundaries
+do not transfer or close #132. Child A is Complete; Azure C and Bedrock D and parent #724 remain open.
