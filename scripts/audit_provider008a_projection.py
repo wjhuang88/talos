@@ -114,6 +114,14 @@ def main():
     if digest != SOURCE_SHA256:
         raise SystemExit(f"source hash mismatch: {digest}")
     source = json.loads(raw)
+    # The Gemini resolver additionally requires an explicit matching transport.
+    # Anchor its two conditional routes to this digest-verified upstream snapshot.
+    for provider, sdk in [("google", "@ai-sdk/google"), ("google-vertex", "@ai-sdk/google-vertex")]:
+        host = source[provider]
+        row = host["models"]["gemini-2.5-flash"]
+        if host.get("npm") != sdk or host.get("api") or row.get("provider") or row.get("id") != "gemini-2.5-flash":
+            raise SystemExit(f"Gemini route evidence changed for {provider}")
+
     catalog = tomllib.loads((ROOT / "crates/talos-config/src/models.toml").read_text(encoding="utf-8"))
     providers = {provider["id"]: provider for provider in catalog["providers"]}
     endpoint_count = sum(model.get("api_base_url") is not None for model in catalog["models"])

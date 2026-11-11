@@ -4,7 +4,10 @@ use crate::{message::AgentEvent, tool::BrowserRawArguments};
 use tokio::sync::mpsc;
 
 /// One provider event owned by the active request; never persisted or cloned for replay.
+#[non_exhaustive]
 pub enum ProviderInvocationEvent {
+    /// Session-private signed message; never forward to observers or serialize it.
+    TransientReplay(std::sync::Arc<super::TransientReplay>),
     /// Existing event without original browser argument evidence.
     Legacy(AgentEvent),
     /// Complete browser invocation validated at trusted original transport ingress.
@@ -22,6 +25,9 @@ pub enum ProviderInvocationEvent {
 impl std::fmt::Debug for ProviderInvocationEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::TransientReplay(_) => {
+                f.write_str("ProviderInvocationEvent::TransientReplay { .. }")
+            }
             Self::Legacy(_) => f.write_str("ProviderInvocationEvent::Legacy { .. }"),
             Self::BrowserToolCall { .. } => {
                 f.write_str("ProviderInvocationEvent::BrowserToolCall { .. }")

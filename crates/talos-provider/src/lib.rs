@@ -14,6 +14,17 @@
 //! long-lived integration code.
 
 mod copilot;
+mod gemini_auth;
+mod gemini_compat;
+mod gemini_endpoint;
+mod gemini_private_replay;
+mod gemini_provider;
+mod gemini_reasoning;
+mod gemini_replay;
+mod gemini_request;
+mod gemini_sse;
+mod gemini_stream;
+mod gemini_transport;
 mod image_io;
 pub mod mock;
 pub mod openai;
@@ -782,3 +793,12 @@ use anthropic_request::redact_secret;
 
 #[cfg(test)]
 mod ephemeral_deadline_tests;
+
+#[cfg(test)]
+mod gemini_agent_tests;
+
+#[cfg(test)]
+mod gemini_factory_tests;
+
+#[cfg(test)]
+mod gemini_browser_tests;

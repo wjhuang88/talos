@@ -1,0 +1,272 @@
+//! Credential-isolated official Gemini HTTP dispatch.
+
+use std::time::Instant;
+
+use reqwest::{Client, Response};
+use serde_json::Value;
+use talos_core::provider::{ProviderError, ProviderResult};
+
+use crate::{gemini_auth::VertexTokenSource, gemini_endpoint};
+
+#[derive(Clone)]
+enum Authentication {
+    AiStudio(reqwest::header::HeaderValue),
+    Vertex(VertexTokenSource),
+}
+
+/// An admitted destination and its matching credential profile. No custom origin accepts ADC.
+#[derive(Clone)]
+pub(crate) struct GeminiTransport {
+    endpoint: String,
+    model: String,
+    streaming: bool,
+    client: Client,
+    authentication: Authentication,
+}
+
+fn invalid(message: &'static str) -> ProviderError {
+    ProviderError::InvalidResponse(message.into())
+}
+
+impl std::fmt::Debug for GeminiTransport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GeminiTransport").finish_non_exhaustive()
+    }
+}
+
+impl GeminiTransport {
+    #[cfg(test)]
+    pub(crate) fn with_test_vertex_source(mut self, source: VertexTokenSource) -> Self {
+        self.authentication = Authentication::Vertex(source);
+        self
+    }
+
+    pub(crate) fn is_streaming(&self) -> bool {
+        self.streaming
+    }
+
+    pub(crate) fn model(&self) -> &str {
+        &self.model
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_test_endpoint(mut self, endpoint: String) -> Self {
+        self.endpoint = endpoint;
+        self
+    }
+
+    pub(crate) fn preview_connection(&self) -> Value {
+        let headers = match &self.authentication {
+            Authentication::AiStudio(_) => serde_json::json!({"x-goog-api-key":"***"}),
+            Authentication::Vertex(_) => serde_json::json!({"Authorization":"Bearer ***"}),
+        };
+        serde_json::json!({"method":"POST","url":self.endpoint,"headers":headers})
+    }
+
+    fn client() -> ProviderResult<Client> {
+        Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|_| invalid("Gemini HTTP client initialization failed"))
+    }
+
+    pub(crate) fn ai_studio(model: &str, key: &str, stream: bool) -> ProviderResult<Self> {
+        let endpoint = gemini_endpoint::ai_studio(model, stream).map_err(invalid)?;
+        if key.is_empty() {
+            return Err(invalid("Gemini API key is empty"));
+        }
+        let mut key = reqwest::header::HeaderValue::from_str(key)
+            .map_err(|_| invalid("invalid Gemini API key"))?;
+        key.set_sensitive(true);
+        Ok(Self {
+            endpoint,
+            streaming: stream,
+            model: model.strip_prefix("models/").unwrap_or(model).to_owned(),
+            client: Self::client()?,
+            authentication: Authentication::AiStudio(key),
+        })
+    }
+
+    /// Validate all URL components before any environment/file credential discovery.
+    /// Discovery and subsequent dispatch must receive the same caller-owned deadline.
+    pub(crate) async fn vertex_adc(
+        project: &str,
+        location: &str,
+        model: &str,
+        stream: bool,
+        allow_metadata: bool,
+        deadline: Instant,
+    ) -> ProviderResult<Self> {
+        let endpoint =
+            gemini_endpoint::vertex(project, location, model, stream).map_err(invalid)?;
+        let source = VertexTokenSource::from_environment(allow_metadata, deadline).await?;
+        // Test binary only: exercise real factory/ADC initialization against local HTTP fixtures.
+        #[cfg(test)]
+        let (source, endpoint) = crate::gemini_factory_tests::redirect_transport(source, endpoint)?;
+        Ok(Self {
+            endpoint,
+            streaming: stream,
+            model: model.strip_prefix("models/").unwrap_or(model).to_owned(),
+            client: Self::client()?,
+            authentication: Authentication::Vertex(source),
+        })
+    }
+
+    /// Dispatch only this profile; callers own body reading/stream deadlines and protocol retry.
+    /// Token acquisition and HTTP headers share one deadline; no cross-protocol fallback occurs.
+    pub(crate) async fn dispatch(
+        &self,
+        body: &Value,
+        deadline: Instant,
+    ) -> ProviderResult<Response> {
+        if deadline <= Instant::now() {
+            return Err(invalid("Gemini dispatch timed out"));
+        }
+        tokio::time::timeout_at(deadline.into(), async {
+            let mut request = self.client.post(&self.endpoint).json(body);
+            match &self.authentication {
+                Authentication::AiStudio(key) => {
+                    request = request.header("x-goog-api-key", key);
+                }
+                Authentication::Vertex(source) => {
+                    let token = source.token(deadline).await?;
+                    let mut value =
+                        reqwest::header::HeaderValue::from_str(&format!("Bearer {token}"))
+                            .map_err(|_| invalid("invalid Vertex access token"))?;
+                    value.set_sensitive(true);
+                    request = request.header(reqwest::header::AUTHORIZATION, value);
+                }
+            }
+            if Instant::now() >= deadline {
+                return Err(invalid("Gemini dispatch timed out"));
+            }
+            let response = request
+                .send()
+                .await
+                .map_err(|_| ProviderError::NetworkError("Gemini request failed".into()))?;
+            if !response.status().is_success() {
+                // Upstream error bodies can contain request text/signatures or credentials.
+                return Err(match response.status().as_u16() {
+                    401 | 403 => {
+                        ProviderError::AuthenticationFailed("Gemini credentials rejected".into())
+                    }
+                    429 => ProviderError::RateLimited("Gemini rate limit exceeded".into()),
+                    500..=599 => ProviderError::ServerError("Gemini upstream unavailable".into()),
+                    _ => invalid(
+                        "Gemini request rejected; verify protocol, endpoint and credentials",
+                    ),
+                });
+            }
+            Ok(response)
+        })
+        .await
+        .map_err(|_| invalid("Gemini dispatch timed out"))?
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn deadline() -> Instant {
+        Instant::now() + Duration::from_secs(3)
+    }
+
+    #[tokio::test]
+    async fn studio_dispatch_uses_key_header_without_bearer_or_query_secret() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/generate")
+            .match_header("x-goog-api-key", "fixture-secret")
+            .match_header("authorization", mockito::Matcher::Missing)
+            .match_body(mockito::Matcher::Json(serde_json::json!({"contents":[]})))
+            .with_body("{}")
+            .create_async()
+            .await;
+        let mut transport = GeminiTransport::ai_studio("gemini-2.5-flash", "fixture-secret", false)
+            .expect("transport");
+        transport.endpoint = format!("{}/generate", server.url());
+        assert!(!format!("{transport:?}").contains("fixture-secret"));
+        assert_eq!(
+            transport
+                .dispatch(&serde_json::json!({"contents":[]}), deadline())
+                .await
+                .expect("response")
+                .status(),
+            200
+        );
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn redirect_does_not_forward_key_and_deadline_prevents_send() {
+        let mut server = mockito::Server::new_async().await;
+        let mut target = mockito::Server::new_async().await;
+        let forbidden = target.mock("POST", "/").expect(0).create_async().await;
+        let redirect = server
+            .mock("POST", "/")
+            .with_status(307)
+            .with_header("Location", &target.url())
+            .with_body("fixture-secret")
+            .expect(1)
+            .create_async()
+            .await;
+        let mut transport =
+            GeminiTransport::ai_studio("model", "fixture-secret", true).expect("transport");
+        transport.endpoint = server.url();
+        assert!(
+            transport
+                .dispatch(&Value::Null, Instant::now() - Duration::from_secs(1))
+                .await
+                .is_err()
+        );
+        let error = transport
+            .dispatch(&Value::Null, deadline())
+            .await
+            .expect_err("redirect");
+        assert!(!error.to_string().contains("fixture-secret"));
+        redirect.assert_async().await;
+        forbidden.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn status_classification_preserves_retry_policy_without_response_secrets() {
+        use crate::retry::{RetryDecision, classify_retry};
+        for status in [400, 401, 403, 429, 500, 503] {
+            let mut server = mockito::Server::new_async().await;
+            let mock = server
+                .mock("POST", "/")
+                .with_status(status)
+                .with_body("fixture-upstream-secret")
+                .create_async()
+                .await;
+            let mut transport =
+                GeminiTransport::ai_studio("model", "fixture-key", false).expect("transport");
+            transport.endpoint = server.url();
+            let error = transport
+                .dispatch(&Value::Null, deadline())
+                .await
+                .expect_err("status");
+            assert!(!error.to_string().contains("fixture-upstream-secret"));
+            assert_eq!(
+                matches!(classify_retry(&error, 0, 2), RetryDecision::Retry { .. }),
+                status == 429 || status >= 500
+            );
+            if status == 401 || status == 403 {
+                assert!(matches!(error, ProviderError::AuthenticationFailed(_)));
+            }
+            mock.assert_async().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn invalid_vertex_destination_is_rejected_before_adc_selection() {
+        let error =
+            GeminiTransport::vertex_adc("project", "evil.invalid", "model", true, true, deadline())
+                .await
+                .expect_err("invalid resource");
+        assert!(error.to_string().contains("resource component"));
+        assert!(GeminiTransport::ai_studio("model", "bad\r\nkey", true).is_err());
+    }
+}

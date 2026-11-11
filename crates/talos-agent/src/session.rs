@@ -137,6 +137,7 @@ pub struct AppServerSession {
     sq_rx: tokio::sync::mpsc::Receiver<SessionOp>,
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     history: Vec<Message>,
+    private_replays: Arc<crate::private_replay::PrivateReplayStore>,
     recovered_source: Option<crate::compaction::HistorySource>,
     post_turn_pressure: crate::checkpoint_progress::PostTurnPressure,
     session_file: Option<PathBuf>,
@@ -191,6 +192,7 @@ impl AppServerSession {
             sq_rx,
             eq_tx,
             history: config.initial_history,
+            private_replays: Default::default(),
             session_file: None,
             session_dir: None,
             persistence: None,
@@ -218,6 +220,7 @@ impl AppServerSession {
     /// Assigns the authoritative generation before this Actor is spawned.
     pub fn set_generation(&mut self, generation: u64) {
         self.session_generation = generation;
+        self.private_replays = Default::default();
         self.post_turn_pressure = Default::default();
         self.background_jobs
             .set_identity(self.session_id.clone(), generation);
@@ -252,6 +255,9 @@ impl AppServerSession {
     }
 
     pub fn set_session_paths(&mut self, file: PathBuf, dir: PathBuf) {
+        if self.session_file.as_ref() != Some(&file) {
+            self.private_replays = Default::default();
+        }
         self.session_file = Some(file);
         self.session_dir = Some(dir);
     }
@@ -264,6 +270,9 @@ impl AppServerSession {
     ) {
         self.pending_store = PendingSubmissionStore::for_session(&session);
         self.recovered_source = None;
+        if self.session_id != session.id.to_string() {
+            self.private_replays = Default::default();
+        }
         self.session_id = session.id.to_string();
         self.background_jobs
             .set_identity(self.session_id.clone(), self.session_generation);
@@ -280,6 +289,9 @@ impl AppServerSession {
         let session_id = session.id().to_string();
         self.pending_store =
             PendingSubmissionStore::for_session_file(session.file_path(), &session_id);
+        if self.session_id != session_id {
+            self.private_replays = Default::default();
+        }
         self.session_id = session_id;
         self.background_jobs
             .set_identity(self.session_id.clone(), self.session_generation);
@@ -1292,6 +1304,7 @@ impl AppServerSession {
                         self.history.len() as u64,
                         self.recovered_source.as_ref(),
                         Some(checkpoint_observer.clone()),
+                        self.private_replays.clone(),
                     )
                     .await
                 {
@@ -1420,6 +1433,7 @@ impl AppServerSession {
                     self.history.len() as u64,
                     self.recovered_source.as_ref(),
                     Some(checkpoint_observer.clone()),
+                    self.private_replays.clone(),
                 ) => result,
             };
             match prepare_result {

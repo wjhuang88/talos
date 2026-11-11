@@ -593,19 +593,23 @@ pub(crate) fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
 
     // Try: entire content is JSON: {"name":"bash","args":{...}}
     if content.starts_with('{') {
-        let obj: serde_json::Value = serde_json::from_str(content).ok()?;
-        let name = obj.get("name")?.as_str()?.to_string();
-        let args = obj.get("args")?.clone();
-        let id = obj
-            .get("id")
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.is_empty())
-            .map(String::from)
+        // Preserve routing integrity before Value can collapse duplicate envelope keys.
+        #[derive(serde::Deserialize)]
+        struct Envelope {
+            name: String,
+            args: serde_json::Value,
+            #[serde(default)]
+            id: Option<String>,
+        }
+        let envelope: Envelope = serde_json::from_str(content).ok()?;
+        let id = envelope
+            .id
+            .filter(|id| !id.is_empty())
             .unwrap_or_else(|| Uuid::new_v4().to_string());
         return Some(ToolCall {
             id,
-            name,
-            input: args,
+            name: envelope.name,
+            input: envelope.args,
         });
     }
 
@@ -628,6 +632,27 @@ pub(crate) fn parse_json_tool_call(content: &str) -> Option<ToolCall> {
 #[cfg(test)]
 mod compatibility_batch_tests {
     use super::parse_text_tool_calls;
+
+    #[test]
+    fn duplicate_envelope_routing_keys_reject_the_whole_batch() {
+        for payload in [
+            r#"{"name":"browser","name":"ordinary","args":{}}"#,
+            r#"{"name":"ordinary","na\u006de":"browser","args":{}}"#,
+            r#"{"name":"browser","id":"a","id":"b","args":{}}"#,
+            r#"{"name":"browser","args":{"text":"secret"},"args":{}}"#,
+        ] {
+            let text = format!(
+                "<tool_call>{{\"name\":\"ordinary\",\"args\":{{}}}}</tool_call><tool_call>{payload}</tool_call>"
+            );
+            assert!(parse_text_tool_calls(&text).is_err());
+        }
+        assert!(
+            super::parse_json_tool_call(
+                r#"{"name":"ordinary","args":{"nested":[1,2]},"extra":true}"#
+            )
+            .is_some()
+        );
+    }
 
     #[test]
     fn complete_mixed_frames_preserve_order_and_reject_partial_batches() {

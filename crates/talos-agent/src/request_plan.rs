@@ -26,6 +26,7 @@ pub(super) struct ProviderRequestPlan {
 
 /// Canonical turn state plus the already sealed initial Provider request.
 pub(crate) struct PreparedSessionTurn {
+    pub(super) private_replays: std::sync::Arc<crate::private_replay::PrivateReplayStore>,
     pub(super) hook_ctx: HookContext,
     pub(super) messages: Vec<Message>,
     pub(super) persist_start: usize,
@@ -187,6 +188,7 @@ impl Agent {
             request_context_limit,
             source,
             None,
+            Default::default(),
         )
         .await
     }
@@ -201,6 +203,7 @@ impl Agent {
         revision: u64,
         recovered: Option<&crate::compaction::HistorySource>,
         checkpoint_observer: Option<crate::checkpoint_progress::CheckpointObserver>,
+        private_replays: std::sync::Arc<crate::private_replay::PrivateReplayStore>,
     ) -> AgentResult<PreparedSessionTurn> {
         let source = crate::compaction::HistorySource::bind_recovered_until(
             generation,
@@ -218,10 +221,12 @@ impl Agent {
             Some(request_context_limit),
             source,
             checkpoint_observer,
+            private_replays,
         )
         .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn prepare_turn_start_with_source(
         &self,
         memory_query: String,
@@ -230,7 +235,14 @@ impl Agent {
         request_context_limit: Option<u32>,
         history_source: Option<crate::compaction::HistorySource>,
         checkpoint_observer: Option<crate::checkpoint_progress::CheckpointObserver>,
+        private_replays: std::sync::Arc<crate::private_replay::PrivateReplayStore>,
     ) -> AgentResult<PreparedSessionTurn> {
+        private_replays.prune(&history)?;
+        private_replays.for_request(
+            &history,
+            self.provider_key.as_deref(),
+            self.model_id.as_deref(),
+        )?;
         let turn_id = TurnId::new();
         let hook_ctx = HookContext::new(turn_id, self.workspace_root.clone());
 
@@ -279,7 +291,8 @@ impl Agent {
                 &active_tool_definitions,
                 &mut continuation_parts,
                 request_context_limit,
-                &PrivateTokens::default(),
+                &private_replays.seed_tokens()?,
+                Some(&private_replays),
                 history_source.as_ref(),
                 checkpoint_observer.as_ref(),
             )
@@ -293,6 +306,7 @@ impl Agent {
         };
 
         Ok(PreparedSessionTurn {
+            private_replays,
             hook_ctx,
             messages,
             persist_start,
@@ -314,8 +328,10 @@ impl Agent {
         tool_definitions: &[ToolDefinition],
         continuation_parts: &mut Vec<ContentPart>,
         private_tokens: &PrivateTokens,
+        private_replays: Option<&crate::private_replay::PrivateReplayStore>,
     ) -> AgentResult<ProviderRequestPlan> {
-        let hook_messages = self.persistence_projection_with_tokens(messages, private_tokens);
+        let hook_messages =
+            self.persistence_projection_with_tokens(messages, private_tokens, private_replays);
         let observed_provider_messages = match self
             .run_hook(
                 hook_ctx,
@@ -335,6 +351,22 @@ impl Agent {
             observed_provider_messages
         };
 
+        talos_core::provider::TransientReplay::validate_hook_projection(
+            messages,
+            provider_messages,
+        )?;
+        if !self.replay_reasoning
+            && messages.iter().any(|message| {
+                !matches!(
+                    talos_core::provider::TransientReplay::marker(message),
+                    Ok(None)
+                )
+            })
+        {
+            return Err(AgentError::ToolError(
+                "private replay cannot be disabled for signed history".into(),
+            ));
+        }
         let mut owned_messages = if self.replay_reasoning {
             provider_messages.to_vec()
         } else {
@@ -392,6 +424,7 @@ impl Agent {
         continuation_parts: &mut Vec<ContentPart>,
         request_context_limit: Option<u32>,
         private_tokens: &PrivateTokens,
+        private_replays: Option<&crate::private_replay::PrivateReplayStore>,
         history_source: Option<&crate::compaction::HistorySource>,
         checkpoint_observer: Option<&crate::checkpoint_progress::CheckpointObserver>,
     ) -> AgentResult<ProviderRequestPlan> {
@@ -402,6 +435,7 @@ impl Agent {
                 tool_definitions,
                 continuation_parts,
                 private_tokens,
+                private_replays,
             )
             .await?;
         self.seal_observed_request_plan(

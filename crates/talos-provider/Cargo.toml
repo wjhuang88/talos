@@ -9,6 +9,7 @@ homepage.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+google-cloud-auth = { version = "=1.18.0", default-features = false, features = ["default-rustls-provider"] }
 async-trait = "0.1.92"
 futures-util = "0.3.34"
 reqwest = { version = "0.13.4", features = ["json", "stream"] }
@@ -25,6 +26,7 @@ tracing = "0.1"
 uuid = { version = "1.26.0", features = ["v4"] }
 
 [dev-dependencies]
+talos-session = { version = "0.10.1", path = "../talos-session" }
 # Exercise authenticated native-wire image/tool rounds through the real Agent and read tool.
 talos-agent = { version = "0.10.1", path = "../talos-agent" }
 talos-permission = { version = "0.10.1", path = "../talos-permission" }

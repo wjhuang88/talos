@@ -145,6 +145,9 @@ mod tests {
                                 calls += 1;
                                 assert_eq!(arguments.fields()["text"], "private-sentinel");
                             }
+                            ProviderInvocationEvent::TransientReplay(_) => {
+                                panic!("unexpected private replay in legacy fixture")
+                            }
                             ProviderInvocationEvent::Legacy(event) => {
                                 assert!(!format!("{event:?}").contains("private-sentinel"));
                                 match event {
@@ -155,6 +158,7 @@ mod tests {
                                     _ => {}
                                 }
                             }
+                            _ => panic!("unsupported invocation event"),
                         }
                     }
                     assert_eq!(calls, usize::from(!malformed));

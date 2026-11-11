@@ -46,8 +46,8 @@ pub use protocol_resolution::{
 };
 pub use store::ConfigStore;
 pub use types::{
-    AutoConfig, Config, ConfigUnsetOutcome, DashboardConfig, HookConfig, HookDeclaration,
-    LogConfig, LogFileConfig, LogFormat, LogRotation, McpConfig, McpServerConfig,
+    AutoConfig, Config, ConfigUnsetOutcome, DashboardConfig, GeminiTransportConfig, HookConfig,
+    HookDeclaration, LogConfig, LogFileConfig, LogFormat, LogRotation, McpConfig, McpServerConfig,
     MemoryPromptConfig, ModelConfig, ProviderConfig, ProviderProtocol, ProviderTimeoutConfig,
     ReasoningEffort, ReasoningOptions, RpcConfig, SearchBackendConfig, SearchConfig, SkillConfig,
 };

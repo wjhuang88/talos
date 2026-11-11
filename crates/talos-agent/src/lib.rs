@@ -70,6 +70,7 @@ pub mod evaluator;
 mod helpers;
 pub mod permission_pipeline;
 mod persistence_snapshot;
+mod private_replay;
 pub mod prompt;
 mod protection_progress;
 mod request_plan;
@@ -951,6 +952,7 @@ impl Agent {
             request_context_limit,
             mut history_source,
             checkpoint_observer,
+            private_replays,
         } = prepared;
         let mut total_tool_calls: usize = 0;
         let mut doom_tracker: HashMap<(String, String), u32> = HashMap::new();
@@ -961,7 +963,10 @@ impl Agent {
         // It cannot become a recursive model/tool loop.
         let mut protocol_recovery_attempts = 0u8;
         let mut protocol_override = None;
-        let mut private_tokens = transient_text::PrivateTokens::default();
+        let mut private_tokens = match private_replays.seed_tokens() {
+            Ok(tokens) => tokens,
+            Err(error) => return (Err(error), Vec::new()),
+        };
         let mut maintenance_plan = None;
 
         if let Some(pipeline) = self.permission_pipeline.as_ref() {
@@ -1001,8 +1006,11 @@ impl Agent {
         }
 
         if let Some(snapshot_tx) = &snapshot_tx {
-            let _ = snapshot_tx
-                .send(self.persistence_snapshot(&messages[persist_start..], &private_tokens));
+            let _ = snapshot_tx.send(self.persistence_snapshot(
+                &messages[persist_start..],
+                &private_tokens,
+                Some(&private_replays),
+            ));
         }
 
         let mut boundary_observed_plan = None;
@@ -1030,6 +1038,7 @@ impl Agent {
                         &active_tool_definitions,
                         &mut pending_continuation_parts,
                         &private_tokens,
+                        Some(&private_replays),
                     )
                     .await
                 };
@@ -1114,13 +1123,22 @@ impl Agent {
                 })
                 .map(|definition| definition.name.clone())
                 .collect();
-            let provider_request = self.provider.stream_with_ephemeral_images(
+            let replay = match private_replays.for_request(
+                &plan.messages,
+                self.provider_key.as_deref(),
+                self.model_id.as_deref(),
+            ) {
+                Ok(replay) => replay,
+                Err(error) => break (Err(error), TurnStatus::Denied),
+            };
+            let provider_request = self.provider.stream_with_replay_context(
                 &plan.messages,
                 &plan.tool_definitions,
                 plan.tool_protocol,
                 progress_tx,
                 &browser_tool_names,
                 std::mem::take(&mut pending_images),
+                replay,
             );
             tokio::pin!(provider_request);
             let provider_result = loop {
@@ -1218,6 +1236,7 @@ impl Agent {
             let mut hook_text_pending = String::new();
             let mut turn_text = String::new();
             let mut turn_reasoning_blocks: Option<Vec<ReasoningBlock>> = None;
+            let mut turn_private_replay = None;
             let mut saw_turn_end = false;
             let mut turn_stop_reason: Option<StopReason> = None;
             let mut usage = talos_core::message::Usage::default();
@@ -1229,6 +1248,59 @@ impl Agent {
                     ProviderInvocationEvent::BrowserToolCall { .. }
                 );
                 let event = match invocation_event {
+                    ProviderInvocationEvent::TransientReplay(replay) => {
+                        if turn_private_replay.is_some() || turn_reasoning_blocks.is_some() {
+                            break 'turn_loop (
+                                Err(AgentError::UnexpectedEvent(
+                                    "duplicate private replay context".into(),
+                                )),
+                                TurnStatus::UnexpectedEvent,
+                            );
+                        }
+                        let Message::Assistant {
+                            reasoning: Some(reasoning),
+                            ..
+                        } = replay.projected_message()
+                        else {
+                            break 'turn_loop (
+                                Err(AgentError::UnexpectedEvent(
+                                    "invalid private replay projection".into(),
+                                )),
+                                TurnStatus::UnexpectedEvent,
+                            );
+                        };
+                        if !private_tokens.extend_private_replay(replay.private_values().flat_map(
+                            |value| {
+                                [
+                                    value.to_owned(),
+                                    value.trim().to_owned(),
+                                    value.trim().replace("..", ""),
+                                ]
+                            },
+                        )) || !private_tokens.admits_private_replay_text(
+                            serde_json::to_vec(replay.projected_message())
+                                .map_or(usize::MAX, |bytes| bytes.len()),
+                        ) {
+                            break 'turn_loop (
+                                Err(AgentError::UnexpectedEvent(
+                                    "private replay filter budget exceeded".into(),
+                                )),
+                                TurnStatus::UnexpectedEvent,
+                            );
+                        }
+                        if matches!(replay.projected_message(), Message::Assistant {tool_calls,..} if tool_calls.iter().any(|call| !private_tokens.permits_routing_fields(call)))
+                        {
+                            break 'turn_loop (
+                                Err(AgentError::UnexpectedEvent(
+                                    "private data in invocation routing fields".into(),
+                                )),
+                                TurnStatus::UnexpectedEvent,
+                            );
+                        }
+                        turn_reasoning_blocks = Some(reasoning.blocks.clone());
+                        turn_private_replay = Some(replay);
+                        continue;
+                    }
                     ProviderInvocationEvent::Legacy(event) => event,
                     ProviderInvocationEvent::BrowserToolCall {
                         id,
@@ -1239,6 +1311,16 @@ impl Agent {
                             break 'turn_loop (
                                 Err(AgentError::UnexpectedEvent(
                                     "browser invocation identity is invalid".into(),
+                                )),
+                                TurnStatus::UnexpectedEvent,
+                            );
+                        }
+                        if turn_private_replay.as_ref().is_some_and(|replay| {
+                            !replay.matches_original_call(&id, &name, &arguments)
+                        }) {
+                            break 'turn_loop (
+                                Err(AgentError::UnexpectedEvent(
+                                    "private browser argument binding mismatch".into(),
                                 )),
                                 TurnStatus::UnexpectedEvent,
                             );
@@ -1254,7 +1336,35 @@ impl Agent {
                             summary_fields: Vec::new(),
                         }
                     }
+                    _ => {
+                        break 'turn_loop (
+                            Err(AgentError::UnexpectedEvent(
+                                "unsupported provider invocation event".into(),
+                            )),
+                            TurnStatus::UnexpectedEvent,
+                        );
+                    }
                 };
+                if turn_private_replay.is_some()
+                    && matches!(&event, AgentEvent::ToolCall {call,..} if !private_tokens.permits_routing_fields(call))
+                {
+                    break 'turn_loop (
+                        Err(AgentError::UnexpectedEvent(
+                            "private data in invocation routing fields".into(),
+                        )),
+                        TurnStatus::UnexpectedEvent,
+                    );
+                }
+                if turn_private_replay.is_some()
+                    && matches!(&event, AgentEvent::TextDelta {delta} | AgentEvent::ThinkingDelta {delta} if !private_tokens.admits_private_replay_text(delta.len()))
+                {
+                    break 'turn_loop (
+                        Err(AgentError::UnexpectedEvent(
+                            "private replay filter budget exceeded".into(),
+                        )),
+                        TurnStatus::UnexpectedEvent,
+                    );
+                }
                 if let AgentEvent::ToolCall { call, .. } = &event
                     && browser_tool_names.contains(&call.name)
                     && !original_event
@@ -1356,8 +1466,13 @@ impl Agent {
                         provenance,
                         ..
                     } => {
-                        call.input =
-                            permission_pipeline::normalize_permission_input(&call.name, call.input);
+                        // Bind the original signed call before the execution pipeline
+                        // normalizes inputs for permissions and tool dispatch.
+                        if turn_private_replay.is_none() {
+                            call.input = permission_pipeline::normalize_permission_input(
+                                &call.name, call.input,
+                            );
+                        }
                         turn_tool_calls.push(PendingToolCall { call, provenance });
                     }
                     AgentEvent::TurnEnd {
@@ -1413,6 +1528,14 @@ impl Agent {
                         break;
                     }
                     AgentEvent::ReasoningComplete { blocks } => {
+                        if turn_private_replay.is_some() {
+                            break 'turn_loop (
+                                Err(AgentError::UnexpectedEvent(
+                                    "mixed durable and private replay context".into(),
+                                )),
+                                TurnStatus::UnexpectedEvent,
+                            );
+                        }
                         turn_reasoning_blocks = Some(blocks);
                     }
                     AgentEvent::TurnStart
@@ -1538,11 +1661,23 @@ impl Agent {
                         model: self.model_id.clone().unwrap_or_default(),
                         blocks,
                     });
-                messages.push(Message::Assistant {
+                let mut assistant = Message::Assistant {
                     content: turn_text.clone(),
                     tool_calls: vec![],
                     reasoning,
-                });
+                };
+                if let Some(replay) = turn_private_replay.take()
+                    && let Err(error) = self.install_private_replay(
+                        &private_replays,
+                        replay,
+                        &mut assistant,
+                        &private_tokens,
+                        &messages,
+                    )
+                {
+                    break 'turn_loop (Err(error), TurnStatus::Denied);
+                }
+                messages.push(assistant);
                 break (Ok(private_tokens.project(&turn_text)), TurnStatus::Success);
             }
 
@@ -1646,11 +1781,22 @@ impl Agent {
                     model: self.model_id.clone().unwrap_or_default(),
                     blocks,
                 });
-            let assistant_msg = Message::Assistant {
+            let mut assistant_msg = Message::Assistant {
                 content: cleaned_turn_text,
                 tool_calls: effective_tool_calls.clone(),
                 reasoning,
             };
+            if let Some(replay) = turn_private_replay.take()
+                && let Err(error) = self.install_private_replay(
+                    &private_replays,
+                    replay,
+                    &mut assistant_msg,
+                    &private_tokens,
+                    &messages,
+                )
+            {
+                break 'turn_loop (Err(error), TurnStatus::Denied);
+            }
             if checkpoint_tools::EXECUTION.try_with(|_| ()).is_ok()
                 && let Some(source) = history_source.as_mut()
             {
@@ -1933,8 +2079,11 @@ impl Agent {
             if let Some(snapshot_tx) = &snapshot_tx {
                 // This is the first safe boundary after a complete tool batch:
                 // the projection excludes private fields and incomplete calls.
-                let _ = snapshot_tx
-                    .send(self.persistence_snapshot(&messages[persist_start..], &private_tokens));
+                let _ = snapshot_tx.send(self.persistence_snapshot(
+                    &messages[persist_start..],
+                    &private_tokens,
+                    Some(&private_replays),
+                ));
             }
             if let Some(boundary_tx) = &boundary_tx {
                 let (response, injected) = tokio::sync::oneshot::channel();
@@ -1983,6 +2132,7 @@ impl Agent {
                                 &active_tool_definitions,
                                 &mut parts,
                                 &private_tokens,
+                                Some(&private_replays),
                             )
                             .await
                         else {
@@ -2090,9 +2240,11 @@ impl Agent {
                     let (_, injected_messages) = Self::structured_session_inputs(&batch.items);
                     messages.extend(injected_messages);
                     if let Some(snapshot_tx) = &snapshot_tx {
-                        let _ = snapshot_tx.send(
-                            self.persistence_snapshot(&messages[persist_start..], &private_tokens),
-                        );
+                        let _ = snapshot_tx.send(self.persistence_snapshot(
+                            &messages[persist_start..],
+                            &private_tokens,
+                            Some(&private_replays),
+                        ));
                     }
                     if let Some(boundary_ack_tx) = &boundary_ack_tx {
                         let (projected, confirmation) = tokio::sync::oneshot::channel();
@@ -2149,7 +2301,11 @@ impl Agent {
         // persist. Incomplete streamed assistant fragments are never pushed to
         // `messages` — only finalized assistant messages with complete tool
         // calls are (SESSION-006 / I135).
-        let final_snapshot = self.persistence_snapshot(&messages[persist_start..], &private_tokens);
+        let final_snapshot = self.persistence_snapshot(
+            &messages[persist_start..],
+            &private_tokens,
+            Some(&private_replays),
+        );
         let partial_messages = final_snapshot.messages.clone();
         if let Some(snapshot_tx) = &snapshot_tx {
             let _ = snapshot_tx.send(final_snapshot);
@@ -2162,12 +2318,12 @@ impl Agent {
             // Retain the last actual request's prompt, schemas, projection and
             // image reserve. Add only finalized output since that dispatch;
             // never rerun hooks or issue a post-turn summarization request.
-            plan.messages.extend(
-                self.persistence_projection_with_tokens(
+            plan.messages
+                .extend(self.persistence_projection_with_tokens(
                     &messages[appended_start..],
                     &private_tokens,
-                ),
-            );
+                    Some(&private_replays),
+                ));
             let estimated = self
                 .estimate_provider_request_tokens(&plan.messages, &plan.tool_definitions)
                 .saturating_add(plan.ephemeral_image_tokens);
@@ -2180,11 +2336,20 @@ impl Agent {
         &self,
         messages: &[Message],
         private_tokens: &transient_text::PrivateTokens,
+        private_replays: Option<&private_replay::PrivateReplayStore>,
     ) -> Vec<Message> {
         let mut tool_names = HashMap::<String, String>::new();
         messages
             .iter()
             .map(|message| match message {
+                Message::Assistant { tool_calls, .. }
+                    if private_replays.is_some_and(|store| store.owns_projection(message)) =>
+                {
+                    for call in tool_calls {
+                        tool_names.insert(call.id.clone(), call.name.clone());
+                    }
+                    message.clone()
+                }
                 Message::Assistant {
                     content,
                     tool_calls,

@@ -122,7 +122,29 @@ pub(crate) fn resolve_model_provider_protocol(
     model: &str,
 ) -> ProtocolResolution<ProviderProtocol> {
     let endpoint = configured_model_endpoint(config, provider, model);
-    let catalog_model = builtin_model_protocol(provider, model, endpoint);
+    // Frozen models.dev 2026-10-27: these exact rows inherit @ai-sdk/google
+    // and @ai-sdk/google-vertex respectively, without a model transport override.
+    // Keep this admission outside the generic gateway-name matching path.
+    let profile = config
+        .providers
+        .get(provider)
+        .and_then(|p| p.gemini.as_ref());
+    let reviewed = model == "gemini-2.5-flash"
+        && endpoint.is_none()
+        && matches!(
+            (provider, profile),
+            ("google", Some(crate::GeminiTransportConfig::AiStudio))
+                | (
+                    "google-vertex",
+                    Some(crate::GeminiTransportConfig::Vertex { .. })
+                )
+        )
+        && crate::catalog_protocol::has_unoverridden_model(provider, model);
+    let catalog_model = if reviewed {
+        Some(ProviderProtocol::GoogleGemini)
+    } else {
+        builtin_model_protocol(provider, model, endpoint)
+    };
     resolve_model_protocol_with_catalog_signal(config, provider, model, catalog_model)
 }
 
@@ -391,5 +413,109 @@ mod tests {
         let resolved = resolve_config_provider_protocol_with_catalog_signal(&config, None);
         assert_eq!(resolved.protocol, ProviderProtocol::OpenAIChat);
         assert_eq!(resolved.source, ProtocolResolutionSource::Default);
+    }
+}
+
+#[cfg(test)]
+mod gemini_catalog_tests {
+    use super::*;
+    use crate::{GeminiTransportConfig, ProviderConfig};
+
+    #[test]
+    fn partner_models_and_custom_gateway_aliases_stay_outside_gemini_catalog() {
+        let mut config = Config::default();
+        for provider in ["google-vertex-anthropic", "custom-gateway"] {
+            config.providers.insert(
+                provider.into(),
+                ProviderConfig {
+                    gemini: Some(GeminiTransportConfig::AiStudio),
+                    ..Default::default()
+                },
+            );
+            for model in [
+                "gemini-2.5-flash",
+                "google/gemini-2.5-flash",
+                "google:gemini-2.5-flash",
+            ] {
+                assert_ne!(
+                    config.resolve_model_protocol(provider, model).protocol,
+                    ProviderProtocol::GoogleGemini
+                );
+            }
+        }
+        for row in crate::model::builtin_models()
+            .into_iter()
+            .filter(|row| row.provider == "google-vertex-anthropic")
+        {
+            assert_ne!(
+                config
+                    .resolve_model_protocol(&row.provider, &row.id)
+                    .protocol,
+                ProviderProtocol::GoogleGemini
+            );
+        }
+    }
+
+    #[test]
+    fn frozen_flash_pair_requires_matching_profile_and_original_endpoint() {
+        for (provider, profile) in [
+            ("google", GeminiTransportConfig::AiStudio),
+            (
+                "google-vertex",
+                GeminiTransportConfig::Vertex {
+                    project: "project-123".into(),
+                    location: "global".into(),
+                    allow_metadata: false,
+                },
+            ),
+        ] {
+            let mut config = Config::default();
+            let model = "gemini-2.5-flash";
+            config
+                .providers
+                .insert(provider.into(), ProviderConfig::default());
+            assert_ne!(
+                config.resolve_model_protocol(provider, model).protocol,
+                ProviderProtocol::GoogleGemini
+            );
+            config.providers.get_mut(provider).expect("provider").gemini = Some(profile);
+            for row in crate::model::builtin_models()
+                .into_iter()
+                .filter(|row| row.provider == provider)
+            {
+                let selected = config.resolve_model_protocol(provider, &row.id);
+                assert_eq!(
+                    selected.protocol == ProviderProtocol::GoogleGemini,
+                    row.id == model,
+                    "{provider}/{}",
+                    row.id
+                );
+            }
+            let resolution = config.resolve_model_protocol(provider, model);
+            assert_eq!(resolution.protocol, ProviderProtocol::GoogleGemini);
+            assert_eq!(resolution.source, ProtocolResolutionSource::CatalogInferred);
+            assert_ne!(
+                config
+                    .resolve_model_protocol(provider, "gemini-2.5-pro")
+                    .protocol,
+                ProviderProtocol::GoogleGemini
+            );
+            config
+                .providers
+                .get_mut(provider)
+                .expect("provider")
+                .protocol = ProviderProtocol::OpenAIChat;
+            assert_eq!(
+                config.resolve_model_protocol(provider, model).source,
+                ProtocolResolutionSource::Configured
+            );
+            let entry = config.providers.get_mut(provider).expect("provider");
+            entry.protocol = ProviderProtocol::Unspecified;
+            entry.base_url = Some("https://gateway.example/v1".into());
+            assert_ne!(
+                config.resolve_model_protocol(provider, model).protocol,
+                ProviderProtocol::GoogleGemini
+            );
+        }
     }
 }
