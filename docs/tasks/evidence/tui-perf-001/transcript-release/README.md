@@ -2,7 +2,7 @@
 
 Three alternating baseline/candidate pairs, 10000 initial history entries,
 one complete short Unicode assistant message per second, 35s with 5s warmup,
-500ms input probes, synthetic 100x30 PTY. See raw manifest for exact environment.
+500ms input probes, synthetic 120x40 PTY. See raw manifest for exact environment.
 Both binaries use the identical fixture; baseline runtime is bytewise verified
 against 15ef42c1, candidate e42b9c9c plus the archived fixture-only patch.
 Build receipts include binary hashes and Cargo artifact/profile records.

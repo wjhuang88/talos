@@ -26,6 +26,11 @@ pub(crate) struct LayoutCache {
 }
 
 impl LayoutCache {
+    #[cfg(test)]
+    pub(crate) fn cached_layout(&self) -> Option<AppLayout> {
+        self.entry.map(|(_, _, _, layout)| layout)
+    }
+
     pub(crate) fn layout(
         &mut self,
         size: Size,

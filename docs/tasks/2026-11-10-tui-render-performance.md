@@ -1111,3 +1111,66 @@ against unchanged P4 runtime source. Test repair committed18e9e117;
 transcript/allocator fixture evidence committed3bedbe23. These are local commits,
 not pushed completion evidence. P4 allocator follow-up, Debug/longrun coverage,
 changed-cell/ANSI/native checks and final remote gates remain open.
+
+### P4 fixed-history repeated replay
+
+Three125s candidate runs(5s warmup),10000fixed history, animation+500ms input
+probes complete. Archive `evidence/tui-perf-001/p4-bounded-longrun/`. First/last30s
+median PSS deltas-3165/-1/+1KiB; no sustained upward trend observed, not a heap
+leak proof. CPU0.2504/0.2593/0.2590%; inputP99upper worst0.503696ms. All steady
+history rebuild/layout/Git counts0. Animation deadline799/800/800samples have
+5/3/1over50ms: P99 passes; individual long tails retained. Resizing/heap/growing
+history/native evidence still needed. Corrected two prior transcript report
+READMEs from erroneous100x30 to sampler's actual120x40 dimensions; raw data unchanged.
+
+### Workstation resource incident and guarded ANSI validation
+
+User reported severe workstation CPU/memory pressure. Kernel logs confirm a
+2026-11-11 global OOM killing rustc and WeChatAppEx; several rustc/linker processes
+were resident. Attribution to this session alone is unproven. Build jobs=2 did
+not bound aggregate host load. All known task processes were confirmed terminal
+before further work; no unguarded build/test or sampling is permitted after this
+incident. Future heavy validation uses a dedicated user systemd service with
+CPUQuota=100%,MemoryHigh=2G,MemoryMax=3G,MemorySwapMax=0,TasksMax=128,Nice=10,
+CARGO_BUILD_JOBS=1,RUST_TEST_THREADS=1. Actual cgroup files verified100000/100000,
+2147483648,3221225472,0,128 respectively. Never increase limits to force a pass.
+Resource-capped execution is validation evidence, not comparable performance data.
+
+Actual terminal submission is now shared with a capturing Crossterm backend.
+Cached and complete planning paths emit identical ANSI bytes across the existing
+28-state transition oracle. Animation cell differences remain inside preview
+across4widths/2modes/63frames; layout/history/cursor remain stable. Unchanged
+frames emit no bytes; an injected write failure still ends synchronized output,
+flushes and propagates the error. This is byte-level evidence, not native pixels.
+
+Initial new idle fixture erroneously omitted text in its second frame, and the
+failure test used an unavailable backend.writer accessor; both corrected.
+Guarded fullTUI test passes682unit+2integration+2doc, exit0,40.067s wall,
+31.198s CPU,~2GiB peak,0swap. Log:/tmp/talos-ansi-guarded-tests.log.
+Current submission extraction remains uncommitted; fresh xwin/fullworkspace
+and independent review still required. P4 allocation/Debug follow-up, heap and
+native terminal acceptance and remote delivery remain open.
+
+### Guarded validation follow-up and static preparation audit
+
+Guarded xwin MSVC check with `--tests --examples` passed (exit0; log
+`/tmp/talos-ansi-guarded-xwin.log`). Fresh project and collaboration validators
+passed with zero warnings; `git diff --check` passed.
+The full preflight passed governance/check/Clippy but was deliberately stopped
+during workspace test compilation: cgroup `memory.events` recorded623556 high
+events, no max/OOM events, while host I/O pressure was elevated. This does not
+prove the service was the sole source of host pressure. Unit is confirmed
+inactive; runtime17min41.417s, CPU17min28.445s, peak2GiB, swap0. Log
+`/tmp/talos-ansi-guarded-preflight.log` records SIGTERM. Wrapper exit0 and service
+success are not evidence that preflight passed. Current full-workspace gate
+remains incomplete; do not raise limits or restart the same expensive command
+without addressing repeated reclaim.
+
+Static inspection of `app/frame.rs` confirms cached splash lines, composer
+natural height, preview plans, layout and history projection are reused.
+Status formatting reads the Git snapshot. Full buffer construction/diff remains
+intentional; tool-preview planning, panel/queue height queries, composer painting
+and cursor calculation can still execute per drawn frame. No claim is made that
+all static component work or frame allocations have been eliminated. Existing
+region/ANSI tests cover observable equivalence; allocation and native evidence
+remain required before closing the task.

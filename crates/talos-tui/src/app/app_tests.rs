@@ -5265,6 +5265,50 @@ fn compressed_away_processing_preview_does_not_request_animation() {
 }
 
 #[test]
+fn animation_diff_cells_stay_inside_preview_and_keep_history_and_cursor_stable() {
+    for width in [7, 20, 80, 120] {
+        for thinking in [false, true] {
+            let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+            tui.first_message_dispatched = true;
+            tui.state.status.is_processing = true;
+            tui.state.input_buffer = "中文 🦀 e\u{301}".into();
+            tui.state.cursor_pos = tui.state.input_buffer.chars().count();
+            tui.state.thinking_preview = thinking.then(|| "thinking 中文\nsecond line".into());
+            for index in 0..40 {
+                tui.transcript
+                    .append(TranscriptBlock::StyledLine(state_line(&format!(
+                        "history {index} 中文 🦀"
+                    ))));
+            }
+            tui.terminal
+                .set_test_size(ratatui::layout::Size::new(width, 24));
+            tui.draw_frame().expect("initial frame");
+            let layout = tui.layout_cache.cached_layout().expect("layout");
+            let preview = layout.preview.expect("visible preview");
+            let cursor = tui.terminal.test_cursor_position();
+            let rebuilds = tui.history_projection_cache.rebuilds();
+            let mut changes = 0;
+            for frame in 1..64 {
+                let previous = tui.terminal.test_rendered_buffer().clone();
+                tui.processing_frame = frame;
+                tui.draw_frame().expect("animation frame");
+                assert_eq!(tui.layout_cache.cached_layout(), Some(layout));
+                assert_eq!(tui.terminal.test_cursor_position(), cursor);
+                assert_eq!(tui.history_projection_cache.rebuilds(), rebuilds);
+                for (x, y, _) in previous.diff_iter(tui.terminal.test_rendered_buffer()) {
+                    assert!(
+                        preview.contains(ratatui::layout::Position::new(x, y)),
+                        "animation changed ({x}, {y}) outside {preview:?}, width={width}, thinking={thinking}"
+                    );
+                    changes += 1;
+                }
+            }
+            assert!(changes > 0, "fixture must exercise visible animation");
+        }
+    }
+}
+
+#[test]
 fn cached_frames_match_fresh_planning_cells_styles_and_cursor_across_state_changes() {
     let mut cached = crate::app::Tui::for_test(TuiState::new(), None);
     let mut fresh = crate::app::Tui::for_test(TuiState::new(), None);
@@ -5320,6 +5364,15 @@ fn cached_frames_match_fresh_planning_cells_styles_and_cursor_across_state_chang
         fresh.preview_layout_cache = Default::default();
         cached.draw_frame().expect("cached frame");
         fresh.draw_frame().expect("freshly planned frame");
+        assert_eq!(
+            cached.terminal.test_frame_ansi(),
+            fresh.terminal.test_frame_ansi(),
+            "actual ANSI bytes at step {step}"
+        );
+        assert!(
+            !cached.terminal.test_frame_ansi().is_empty(),
+            "state transition must submit ANSI"
+        );
         assert_eq!(
             cached.terminal.test_rendered_buffer(),
             fresh.terminal.test_rendered_buffer(),

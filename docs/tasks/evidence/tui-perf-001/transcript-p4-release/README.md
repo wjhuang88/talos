@@ -1,7 +1,7 @@
 # P4 versus P3 transcript commits — Release
 
 Three alternating pairs, 10000 initial history entries, one complete message/s,
-35s with5s warmup,500ms input probes,100x30 synthetic PTY, process-tree sampling.
+35s with5s warmup,500ms input probes,120x40 synthetic PTY, process-tree sampling.
 Both source-bound binaries use e42b9c9c and identical replay fixture/dependencies;
 baseline is P3 plus fixture, candidate adds the archived P4 source patch.
 Receipts contain exact binary/source/patch hashes and Cargo artifact metadata.
