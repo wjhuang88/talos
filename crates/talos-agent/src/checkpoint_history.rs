@@ -117,22 +117,39 @@ enum PreparationStep {
     Expired,
 }
 
+// Dependency failures may contain transcript data or filesystem paths. Only a
+// fixed call-site code is emitted; no Debug/Display bound is placed on the error.
+fn preparation_failure<T>(reason: &'static str) -> Option<T> {
+    tracing::warn!(reason, "history preparation unavailable");
+    None
+}
+
+fn preparation_result<T, E>(result: Result<T, E>, reason: &'static str) -> Option<T> {
+    result.ok().or_else(|| preparation_failure(reason))
+}
+
 impl Preparation {
     fn begin(
         session: &DurableSession,
         cancel: &CancellationToken,
         deadline: Instant,
     ) -> Option<Self> {
-        if cancel.is_cancelled() || Instant::now() >= deadline {
-            return None;
+        if cancel.is_cancelled() {
+            return preparation_failure("linear_preparation_cancelled");
         }
-        let source = session.capture_recovery_source().ok()?;
+        if Instant::now() >= deadline {
+            return preparation_failure("linear_preparation_deadline");
+        }
+        let source = preparation_result(
+            session.capture_recovery_source(),
+            "linear_source_capture_failed",
+        )?;
         if !session.owns_recovery_source(&source) {
-            return None;
+            return preparation_failure("linear_source_owner_mismatch");
         }
-        let scan = source.begin_prefix_seal().ok()?;
-        let path = session.recovery_index_path().ok()?;
-        let index = SessionIndex::new(&path).ok()?;
+        let scan = preparation_result(source.begin_prefix_seal(), "linear_seal_begin_failed")?;
+        let path = preparation_result(session.recovery_index_path(), "linear_index_path_failed")?;
+        let index = preparation_result(SessionIndex::new(&path), "linear_index_open_failed")?;
         let stopped = cancel.clone();
         let budget = RecoveryWorkBudget::with_cancellation_check(
             deadline
@@ -140,7 +157,12 @@ impl Preparation {
                 .min(Duration::from_secs(2)),
             move || stopped.is_cancelled(),
         );
-        index.init_recovery_schema_with_budget(&budget).ok()?;
+        preparation_result(
+            index.init_recovery_schema_with_budget(&budget),
+            "linear_index_schema_failed",
+        )?;
+        // A missing/incompatible continuation is a cache miss: the existing
+        // fresh-source path below must still run, not report unavailable here.
         if let Ok(Some(saved)) = index.recovery_continuation(&session.id().to_string(), &budget)
             && let Some((source, scan)) = source
                 .recovery_prefix_at(saved.prefix.cutoff())
@@ -151,9 +173,10 @@ impl Preparation {
                 })
         {
             #[cfg(any(unix, windows))]
-            let restored = session
-                .restore_recovery_scan_for_source(&source, &budget)
-                .ok()?;
+            let restored = preparation_result(
+                session.restore_recovery_scan_for_source(&source, &budget),
+                "linear_saved_scan_restore_failed",
+            )?;
             #[cfg(any(unix, windows))]
             let (scan, receipt, saved_bytes) = match restored {
                 Some(restored) if restored.scan.verifies_expectation(&saved.prefix) => {
@@ -164,11 +187,11 @@ impl Preparation {
                     // Retire only the exact incompatible record we observed.
                     // Busy/error or a concurrent replacement must be retried,
                     // never treated as permission to overwrite another owner.
-                    if !session
-                        .clear_recovery_scan(&restored.receipt, &budget)
-                        .ok()?
-                    {
-                        return None;
+                    if !preparation_result(
+                        session.clear_recovery_scan(&restored.receipt, &budget),
+                        "linear_saved_scan_clear_failed",
+                    )? {
+                        return preparation_failure("linear_saved_scan_replaced");
                     }
                     (scan, None, 0)
                 }
@@ -207,12 +230,14 @@ impl Preparation {
             None => (scan, None, 0),
         };
         let scope = uuid::Uuid::new_v4().to_string();
-        index
-            .replace_recovery_owner_scope(&session.id().to_string(), &scope, &budget)
-            .ok()?;
-        index
-            .begin_recovery_build(&scope, source.source_end(), &budget)
-            .ok()?;
+        preparation_result(
+            index.replace_recovery_owner_scope(&session.id().to_string(), &scope, &budget),
+            "linear_index_scope_failed",
+        )?;
+        preparation_result(
+            index.begin_recovery_build(&scope, source.source_end(), &budget),
+            "linear_index_build_failed",
+        )?;
         Some(Self {
             #[cfg(any(unix, windows))]
             scan_store: ScanStore {
@@ -245,12 +270,10 @@ impl Preparation {
                     deadline.saturating_duration_since(Instant::now()),
                     move || stopped.is_cancelled(),
                 );
-                self.scan_store.receipt = Some(
-                    self.scan_store
-                        .owner
-                        .save_recovery_scan(scan, &budget)
-                        .ok()?,
-                );
+                self.scan_store.receipt = Some(preparation_result(
+                    self.scan_store.owner.save_recovery_scan(scan, &budget),
+                    "linear_scan_persist_failed",
+                )?);
                 self.scan_store.saved_bytes = scan.completed_bytes();
             }
             return Some(());
@@ -258,16 +281,23 @@ impl Preparation {
         let Some(seal) = &self.seal else {
             return Some(());
         };
-        seal.check_current().ok()?;
+        preparation_result(seal.check_current(), "linear_persist_source_changed")?;
         let stopped = cancel.clone();
         let budget = RecoveryWorkBudget::with_cancellation_check(
             deadline.saturating_duration_since(Instant::now()),
             move || stopped.is_cancelled(),
         );
-        let index = SessionIndex::new(&self.path).ok()?;
-        let cursor = index.recovery_build_cursor(&self.scope, &budget).ok()??;
-        index
-            .save_recovery_continuation(
+        let index = preparation_result(
+            SessionIndex::new(&self.path),
+            "linear_persist_index_open_failed",
+        )?;
+        let cursor = preparation_result(
+            index.recovery_build_cursor(&self.scope, &budget),
+            "linear_persist_cursor_failed",
+        )?
+        .or_else(|| preparation_failure("linear_persist_cursor_missing"))?;
+        preparation_result(
+            index.save_recovery_continuation(
                 &self.source.session_id().to_string(),
                 &talos_session::sqlite::RecoveryContinuation {
                     scope: self.scope.clone(),
@@ -277,9 +307,10 @@ impl Preparation {
                     prefix: seal.expectation(),
                 },
                 &budget,
-            )
-            .ok()?;
-        seal.check_current().ok()?;
+            ),
+            "linear_continuation_persist_failed",
+        )?;
+        preparation_result(seal.check_current(), "linear_persist_source_changed")?;
         Some(())
     }
     fn retire(&self) {
@@ -300,15 +331,31 @@ impl Preparation {
     ) -> Option<PreparationStep> {
         let deadline = operation_deadline.min(Instant::now() + Duration::from_secs(2));
         if cancel.is_cancelled() {
-            return None;
+            return preparation_failure("linear_preparation_cancelled");
         }
-        if self.scan.is_none() && self.seal.as_ref()?.check_current().is_err() {
-            self.scan = Some(self.seal.as_ref()?.begin_verification().ok()?);
+        if self.scan.is_none() {
+            let seal = self
+                .seal
+                .as_ref()
+                .or_else(|| preparation_failure("linear_seal_missing"))?;
+            if seal.check_current().is_err() {
+                self.scan = Some(preparation_result(
+                    seal.begin_verification(),
+                    "linear_seal_revalidation_failed",
+                )?);
+            }
         }
         if let Some(scan) = &mut self.scan {
             return match scan.step(deadline, || cancel.is_cancelled()) {
                 Ok(true) => {
-                    self.seal = Some(self.scan.take()?.finish().ok()?);
+                    let scan = self
+                        .scan
+                        .take()
+                        .or_else(|| preparation_failure("linear_scan_missing"))?;
+                    self.seal = Some(preparation_result(
+                        scan.finish(),
+                        "linear_seal_finish_failed",
+                    )?);
                     Some(PreparationStep::Pending)
                 }
                 Ok(false) => Some(PreparationStep::Pending),
@@ -317,7 +364,7 @@ impl Preparation {
                 {
                     Some(PreparationStep::Expired)
                 }
-                Err(_) => None,
+                Err(_) => preparation_failure("linear_prefix_scan_failed"),
             };
         }
         if self.resolved {
@@ -328,8 +375,11 @@ impl Preparation {
             deadline.saturating_duration_since(Instant::now()),
             move || stopped.is_cancelled(),
         );
-        let mut index = SessionIndex::new(&self.path).ok()?;
-        let retry = || {
+        let mut index = preparation_result(
+            SessionIndex::new(&self.path),
+            "linear_step_index_open_failed",
+        )?;
+        let retry = |reason| {
             (!cancel.is_cancelled()
                 && budget.deadline_interrupted()
                 && self
@@ -337,11 +387,12 @@ impl Preparation {
                     .as_ref()
                     .is_some_and(|seal| seal.check_current().is_ok()))
             .then_some(PreparationStep::Expired)
+            .or_else(|| preparation_failure(reason))
         };
         let cursor = match index.recovery_build_cursor(&self.scope, &budget) {
             Ok(Some(cursor)) => cursor,
-            Ok(None) => return None,
-            Err(_) => return retry(),
+            Ok(None) => return preparation_failure("linear_build_cursor_missing"),
+            Err(_) => return retry("linear_build_cursor_failed"),
         };
         if !cursor.complete() {
             let page = match self
@@ -354,7 +405,7 @@ impl Preparation {
                 {
                     return Some(PreparationStep::Expired);
                 }
-                Err(_) => return None,
+                Err(_) => return preparation_failure("linear_head_page_failed"),
             };
             #[cfg(test)]
             if let Some(hook) = self.after_page_read.take() {
@@ -362,7 +413,13 @@ impl Preparation {
             }
             // Never cache a page read across file versions, even if the original
             // prefix is restored before the next continuation attempt.
-            self.seal.as_ref()?.check_current().ok()?;
+            preparation_result(
+                self.seal
+                    .as_ref()
+                    .or_else(|| preparation_failure("linear_seal_missing"))?
+                    .check_current(),
+                "linear_step_source_changed",
+            )?;
             let mut parent = self.parent.clone();
             for entry in &page.entries {
                 if entry.parent_id != parent {
@@ -399,9 +456,15 @@ impl Preparation {
                 )
                 .is_err()
             {
-                return retry();
+                return retry("linear_index_advance_failed");
             }
-            self.seal.as_ref()?.check_current().ok()?;
+            preparation_result(
+                self.seal
+                    .as_ref()
+                    .or_else(|| preparation_failure("linear_seal_missing"))?
+                    .check_current(),
+                "linear_step_source_changed",
+            )?;
             self.parent = parent;
             return Some(PreparationStep::Pending);
         }
@@ -409,11 +472,17 @@ impl Preparation {
             self.resolved = match index.resolve_recovery_pending(&self.scope, &self.source, &budget)
             {
                 Ok(resolved) => resolved,
-                Err(_) => return retry(),
+                Err(_) => return retry("linear_pending_resolution_failed"),
             };
             // Resolution rereads source records internally. If its transaction
             // committed across a version change, discard this whole preparation.
-            self.seal.as_ref()?.check_current().ok()?;
+            preparation_result(
+                self.seal
+                    .as_ref()
+                    .or_else(|| preparation_failure("linear_seal_missing"))?
+                    .check_current(),
+                "linear_step_source_changed",
+            )?;
             return Some(PreparationStep::Pending);
         }
         Some(PreparationStep::Pending)
@@ -434,9 +503,14 @@ impl History {
         if let Some(history) = Self::prepare_until(session, cancel, pending, deadline).await {
             return Some(history);
         }
-        if cancel.is_cancelled() || Instant::now() >= deadline || pending.try_lock().ok()?.is_some()
-        {
-            return None;
+        if cancel.is_cancelled() {
+            return preparation_failure("history_preparation_cancelled");
+        }
+        if Instant::now() >= deadline {
+            return preparation_failure("history_preparation_deadline");
+        }
+        if preparation_result(pending.try_lock(), "history_preparation_pending_busy")?.is_some() {
+            return preparation_failure("history_preparation_resumable_pending");
         }
         let owner = session.clone();
         let stopped = cancel.clone();
@@ -569,8 +643,8 @@ impl History {
         deadline: Instant,
     ) -> Option<Self> {
         let mut pending = tokio::select! {
-            _ = cancel.cancelled() => return None,
-            result = tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), pending.lock()) => result.ok()?,
+            _ = cancel.cancelled() => return preparation_failure("linear_wait_cancelled"),
+            result = tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), pending.lock()) => preparation_result(result, "linear_wait_deadline")?,
         };
         if pending
             .as_ref()
@@ -584,7 +658,7 @@ impl History {
         loop {
             if cancel.is_cancelled() {
                 work.retire();
-                return None;
+                return preparation_failure("linear_preparation_cancelled");
             }
             if Instant::now() >= deadline {
                 // Windows stamps own a no-write/delete lease. Never retain it
@@ -596,7 +670,7 @@ impl History {
                 }
                 #[cfg(windows)]
                 drop(work);
-                return None;
+                return preparation_failure("linear_preparation_deadline");
             }
             match work.step(cancel, deadline) {
                 Some(PreparationStep::Complete) => {
@@ -620,7 +694,7 @@ impl History {
                     }
                     #[cfg(windows)]
                     drop(work);
-                    return None;
+                    return preparation_failure("linear_preparation_slice_expired");
                 }
                 None => {
                     work.retire();
@@ -633,7 +707,10 @@ impl History {
             scope: work.scope,
             owner: session.id().to_string(),
             cancel: cancel.clone(),
-            seal: Mutex::new(work.seal?),
+            seal: Mutex::new(
+                work.seal
+                    .or_else(|| preparation_failure("linear_completed_seal_missing"))?,
+            ),
             state: Mutex::new(QueryState::default()),
             archive: None,
         })
@@ -919,6 +996,112 @@ impl History {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    #[derive(Clone, Default)]
+    struct PreparationEvents(std::sync::Arc<Mutex<Vec<String>>>);
+
+    impl tracing::Subscriber for PreparationEvents {
+        fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
+            metadata.target().ends_with("checkpoint_history")
+        }
+        fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            tracing::span::Id::from_u64(1)
+        }
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+        fn enter(&self, _: &tracing::span::Id) {}
+        fn exit(&self, _: &tracing::span::Id) {}
+        fn event(&self, event: &tracing::Event<'_>) {
+            struct Fields(String);
+            impl tracing::field::Visit for Fields {
+                fn record_debug(
+                    &mut self,
+                    field: &tracing::field::Field,
+                    value: &dyn std::fmt::Debug,
+                ) {
+                    use std::fmt::Write;
+                    write!(&mut self.0, "{}={value:?};", field.name()).expect("format field");
+                }
+            }
+            let mut fields = Fields(String::new());
+            event.record(&mut fields);
+            self.0.lock().expect("events").push(fields.0);
+        }
+    }
+
+    #[tokio::test]
+    async fn linear_preparation_reports_real_failures_without_source_content() {
+        use std::io::Write;
+        use talos_core::message::Message;
+        let events = PreparationEvents::default();
+        let _subscriber = tracing::subscriber::set_default(events.clone());
+        let root = tempfile::tempdir().expect("root");
+        let owner =
+            DurableSession::open_or_create(root.path(), "private-owner-sentinel").expect("owner");
+        owner
+            .session()
+            .append(&Message::User {
+                content: "private-transcript-sentinel".into(),
+            })
+            .expect("append");
+        // An invalid tail is present before capture, so this exercises actual
+        // decoding, not merely a stale-file stamp or a mocked storage failure.
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(owner.file_path())
+            .expect("fixture file")
+            .write_all(b"private-invalid-tail-sentinel\n")
+            .expect("malformed fixture tail");
+        let bytes = std::fs::read(owner.file_path()).expect("fixture bytes");
+        let cancel = CancellationToken::new();
+        assert!(
+            History::prepare_until(
+                &owner,
+                &cancel,
+                &tokio::sync::Mutex::new(None),
+                Instant::now() + Duration::from_secs(10)
+            )
+            .await
+            .is_none()
+        );
+        assert_eq!(std::fs::read(owner.file_path()).expect("unchanged"), bytes);
+
+        let other_root = tempfile::tempdir().expect("index root");
+        let other = DurableSession::open_or_create(other_root.path(), "private-index-owner")
+            .expect("other owner");
+        std::fs::create_dir(other.recovery_index_path().expect("index path"))
+            .expect("unopenable index");
+        assert!(
+            Preparation::begin(&other, &cancel, Instant::now() + Duration::from_secs(10)).is_none()
+        );
+        assert!(Preparation::begin(&other, &cancel, Instant::now()).is_none());
+        cancel.cancel();
+        assert!(
+            Preparation::begin(&other, &cancel, Instant::now() + Duration::from_secs(10)).is_none()
+        );
+
+        let recorded = events.0.lock().expect("events").join("\n");
+        for reason in [
+            "linear_head_page_failed",
+            "linear_index_open_failed",
+            "linear_preparation_deadline",
+            "linear_preparation_cancelled",
+        ] {
+            assert!(recorded.contains(reason), "missing {reason}: {recorded}");
+        }
+        for forbidden in [
+            "private-",
+            &root.path().to_string_lossy(),
+            &other_root.path().to_string_lossy(),
+            &owner.id().to_string(),
+            &other.id().to_string(),
+        ] {
+            assert!(
+                !recorded.contains(forbidden),
+                "diagnostics disclosed source data"
+            );
+        }
+    }
+
     #[test]
     fn archived_preparation_distinguishes_stopped_and_corrupt_evidence() {
         use talos_core::message::Message;

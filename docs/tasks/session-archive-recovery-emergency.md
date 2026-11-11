@@ -511,3 +511,40 @@ codes do not distinguish every underlying archive parser/provenance cause. Full 
 fork provenance, independent safety/API review, native host acceptance and the remaining
 handoff work stay owned here and in the primary handoff. Review authorization has been
 requested; no unapproved reviewer was started and no merge/deployment occurred.
+
+
+## Linear preparation diagnostic follow-up
+
+The remaining linear preparation aborts now emit fixed stage codes for source
+capture/ownership, seal scanning/revalidation, index creation/cursors/page advancement,
+persisted scans/continuations and pending resolution. The async wait boundary identifies
+cancellation, deadline, retained partial work and lock contention. Optional cached
+continuation misses still follow the original fresh-source path; these are not reported
+as terminal preparation failures. Retry eligibility, source/permission checks, cutoffs
+and model-visible errors are unchanged. Dependency errors are deliberately not formatted.
+
+A real-I/O regression captures tracing events for malformed source bytes, an unopenable
+index, cancellation and deadline expiry, asserts their reason codes, and rejects source
+text, paths and session IDs in all captured fields. It also verifies unchanged transcript
+bytes. On baseline 38c3d6f8 plus the new test, it failed because the actual decoder refusal
+emitted no reason (`/tmp/talos-linear-preparation-diagnostics-before.log`, exit 101).
+The fixed source passed all 21 history preparation tests, log
+`/tmp/talos-linear-preparation-diagnostics-tests.log`; source was restored byte-for-byte
+after the baseline probe. Final combined pinned/locked preflight passed (exit 0), log
+`/tmp/talos-linear-and-fork-final-preflight.log`, including workspace checks, Clippy,
+tests/doctests and both SDK fixtures. No product source edits followed this validation.
+
+Remote run 43041022143 completed: Linux main and native Windows workspace checks passed;
+overall conclusion is cancelled because Linux Desktop dependency installation timed out
+with mirror DNS failures. Run 43046879069 for 38c3d6f8 is now running. Neither run proves
+this follow-up, full archived fork support or running-host acceptance.
+Status stays Partial; independent review and the remaining handoff deliverables are open.
+
+
+The first full preflight for linear diagnostics exited 101 in unchanged
+`i255_plugin_e2e`: the tool result reported its existing 250ms WASM execution timeout,
+so the success assertion failed. Log `/tmp/talos-linear-preparation-diagnostics-preflight.log`.
+An isolated rerun passed both plugin tests in 1.54 seconds,
+`/tmp/talos-linear-plugin-deadline-retry.log`; the original timeout cause remains
+unestablished. No deadline, policy or assertion was relaxed. The final combined
+preflight cited above subsequently passed; the earlier failure remains recorded.
