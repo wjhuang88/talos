@@ -764,7 +764,21 @@ from that same source version and installs without overwriting an existing child
 Dropping an unpublished fork cleans its transcript, sidecar, index and lineage;
 cleanup failures require storage recovery. Filesystems without hard-link support
 fail explicitly. This does not add process-crash atomicity or directory-fsync
-guarantees. Legacy CLI storage still lacks durable model history_search receipts.
+guarantees. The unreleased recovery candidate binds the host-selected CLI TLOG in
+place for permitted user/assistant history_search projections. It retains source seals,
+permission generation and opaque references; old tool results still lack recovery
+receipts and remain unavailable. Exact-overlap archive recovery preserves original
+record IDs and parents, refuses ambiguous or changed sources, and subjects restored
+messages to normal request admission and source-bound checkpoint folding. This does
+not certify real-provider summary quality or native platform acceptance.
+
+Both startup `--fork` and interactive fork reject legacy count-placeholder histories
+before publishing a child. Copying only their current head would lose earlier history
+and introduce another live head with overlapping IDs. Complete child-owned archive
+provenance is not yet implemented. Ordinary non-archived forks retain existing behavior.
+See [ADR-103](../decisions/103-selected-session-history-recovery.md) and the
+[recovery owner](../tasks/session-archive-recovery-emergency.md) for candidate evidence
+and remaining review/deployment gates.
 
 
 ### Unreleased Gemini invocation migration (I310 / ADR-094)
