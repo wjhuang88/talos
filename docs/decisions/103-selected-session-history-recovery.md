@@ -117,3 +117,21 @@ proves multiple summary calls, Applied, continuation with Context and retained r
 originals, and restart preservation; its test model does not prove real-provider summary
 quality. Supporting-source checks also re-enumerate the bounded archive/head inventory;
 new or removed candidate paths revoke previously prepared evidence.
+
+
+### Archived fork compatibility decision still outstanding
+
+ADR-037 section 6 assumes a compacted head is sufficient to make its copied child
+independent. Legacy count placeholders do not satisfy that assumption: original context
+now comes from sibling archives. Both startup and interactive fork therefore refuse
+these histories pending a replacement provenance contract. This is a temporary behavior
+restriction, not complete fork support or a reinterpretation of preserved parent IDs.
+
+The current SQLite fork index records only parent/child IDs, the fork entry ID and a
+timestamp; it contains no content digest or immutable source cutoff. It cannot authorize
+an exception to other-live-head overlap rejection. Moving children into arbitrary nested
+directories would also break SessionManager's existing workspace discovery contract.
+A full implementation must retain workspace discovery, independently owned historical
+bytes after parent deletion, original identities, bounded validation, and unpublished
+child cleanup across every startup/interactive/restart path. Independent review must
+validate the source-ownership evidence before any overlap exception is enabled.
