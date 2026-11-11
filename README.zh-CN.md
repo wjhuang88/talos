@@ -316,8 +316,10 @@ export ANTHROPIC_API_KEY="..."
 ```
 
 
-尚未发布的 Gemini 实现候选（#838）要求显式配置 `google-gemini` 及 AI Studio 或 Vertex
-认证配置。浏览器调用、兼容工具模式和目录激活仍未完成。配置示例、ADC 发现规则及迁移限制见
+尚未发布的 Gemini 实现候选（#838）支持 `google-gemini` 及显式 AI Studio 或 Vertex
+认证配置，已实现 Native、Compat 和 TalosStrict 浏览器工具及仅限存活会话的签名回放。
+仅 `google/gemini-2.5-flash` 与 `google-vertex/gemini-2.5-flash` 两个精确目录组合，
+在认证配置匹配且端点未替换时推断该协议；显式协议配置优先。最终验收仍待完成。配置示例、ADC 发现规则及迁移限制见
 [Gemini 传输说明](docs/reference/PROVIDER-PROTOCOLS.md#explicit-gemini-transports-unreleased-implementation-candidate)。
 
 ## 运行 Talos

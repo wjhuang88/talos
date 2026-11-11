@@ -787,4 +787,14 @@ origin-checked static Bearer transport profile; no OAuth or enterprise routing i
 See [protocol and migration reference](PROVIDER-PROTOCOLS.md),
 [ADR-093](../decisions/093-openai-responses-protocol-boundary.md) and the
 [reviewed catalog ledger](PROVIDER-008-A-CATALOG-PROTOCOLS.md).
-Gemini, Azure and Bedrock remain separately governed, unimplemented sibling families.
+The unreleased Gemini candidate (I310 / #838) adds stateless `streamGenerateContent` encoding
+with distinct AI Studio key and Vertex project/location OAuth transports. Vertex credentials are
+loaded lazily; request previews do not read ADC. Credential destinations and redirects are bounded
+by ADR-094. Native, Compat and TalosStrict browser turns retain signed originals in nonserializable
+live Actor custody, while durable messages contain only privacy projections and opaque markers.
+The sealed request binds those markers before provider encoding restores the signed content.
+Reopen, fork or generation replacement cannot reconstruct custody. When history still contains
+private replay markers, continuation fails before model dispatch.
+Only the two exact Flash catalog/profile pairs documented in PROVIDER-PROTOCOLS infer Gemini;
+explicit protocol overrides and replaced endpoints retain resolver precedence. Full candidate
+acceptance is pending. Azure and Bedrock remain separately governed sibling work.

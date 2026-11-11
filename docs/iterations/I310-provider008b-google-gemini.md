@@ -775,3 +775,27 @@ shell omitted Cargo from PATH (SQLite consumer validation could not launch cargo
 configured standard preflight subsequently passed SQLite17 cases and governance with zero
 warnings. Claims validation passed with zero warnings. Workspace preflight is still in progress;
 these focused results do not establish a workspace or final B acceptance pass.
+
+
+### Rebased candidate validation — 2026-11-11
+
+Implementation candidate 9da0e8a84df400d4cfc4c7f16fc59f3b4fd21758 is based on
+main a320b7a8f27c4206135507d7e006dc5c1a6169aa. CI4045 / run42942828514 completed
+SUCCESS. Local pinned locked Gemini tests passed Config 5 / Provider 83, zero failures.
+Offline locked Cargo metadata, frozen source/catalog audit (zero mismatches), and diff checks
+passed. Prior CI4036 at 82a22a0b failed because the rebased petgraph lock entry lacked the
+indexmap version qualifier. Cargo regenerated only that reference to indexmap 2.14.0; no package
+version changed. Preserve the earlier failed CI and host-limited workspace results.
+
+Independent Agent source review approved protocol/auth/API/privacy surfaces at exact 9da0e8a8
+against a320b7a8. It traced factory/endpoint/lazy ADC/refresh/dispatch, SSE terminal/signature
+association, sealed live custody/restoration/persistence and bounded catalog precedence, with no
+blocking finding. This was source review under a shared repository identity, not a separate human
+GitHub approval or independently rerun tests. Synchronous RSA cannot be preempted, private replay
+requires live custody, and future SDK-only catalog drift requires refreeze review, as documented.
+
+Native/Compat/TalosStrict browser replay, sourced SSE fixtures, UI credential/provenance and
+bounded exact two-pair Flash catalog inference are implemented on the candidate. Architecture,
+SDK, README en/zh and unreleased migration documentation are being synchronized. Full B remains
+Active / Claimed with Completion Commit Pending until final documentation validation/review and
+merge-time CAS. No merge, release, live-vendor success or parent #724 completion is claimed.

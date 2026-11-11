@@ -577,9 +577,11 @@ export ANTHROPIC_API_KEY="..."
 ```
 
 
-The unreleased Gemini implementation candidate (#838) requires explicit `google-gemini` and an
-AI Studio or Vertex authentication profile. Browser calls, compatibility tool modes and catalog
-activation remain pending. Configuration examples, ADC discovery and migration limits are in the
+The unreleased Gemini implementation candidate (#838) supports `google-gemini` with an
+explicit AI Studio or Vertex authentication profile, including Native, Compat and TalosStrict
+browser tools with live-session-only signed replay. Only the exact `google/gemini-2.5-flash` and
+`google-vertex/gemini-2.5-flash` catalog pairs infer this wire with matching profiles and unchanged
+endpoints; explicit protocol overrides win. Final acceptance remains pending. Configuration examples, ADC discovery and migration limits are in the
 [Gemini transport guide](docs/reference/PROVIDER-PROTOCOLS.md#explicit-gemini-transports-unreleased-implementation-candidate).
 
 ## Run Talos

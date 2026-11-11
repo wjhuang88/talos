@@ -185,9 +185,13 @@ activate catalog entries. See ADR-094 for the primary source and current accepta
 
 ## Explicit Gemini transports (unreleased implementation candidate)
 
-Draft #838 / I310 adds `google-gemini` to the adapters listed above. Full B acceptance and
-catalog activation are pending. Selecting a model named Gemini does not enable this candidate;
-configure both the wire and its authentication profile explicitly in `~/.talos/config.toml`.
+Draft #838 / I310 adds `google-gemini` to the adapters listed above. Full B acceptance is pending.
+Configure the wire and its authentication profile explicitly in `~/.talos/config.toml`, as below.
+A bounded catalog alternative infers `google-gemini` only for exact model `gemini-2.5-flash`
+under provider `google` with AI Studio, or `google-vertex` with explicit Vertex project/location.
+Neither provider nor model may replace the endpoint, and the frozen catalog row must have no
+protocol or endpoint override. The source is `CatalogInferred`; explicit model/provider protocols
+still win. Other models, partner providers, aliases and custom gateways gain no Gemini inference.
 
 AI Studio uses the configured API-key source and the official generateContent destination:
 
@@ -244,12 +248,11 @@ Native mode supports the existing permission-gated browser tool. Gemini's signed
 original arguments stay in the running session's memory and are restored when encoding a
 continuation for the same provider and model. The transcript and exports receive a filtered
 projection. A reopened or forked session has no access to the original call. Start a new
-conversation if Talos reports that the private replay context is unavailable. Browser tools
-remain unavailable in textual tool modes.
+conversation if Talos reports that the private replay context is unavailable. Browser tools also support Compat and TalosStrict as described below.
 
 Reasoning controls and their model boundaries are described above. Failures never trigger an
 automatic retry over a different wire.
-There is no live-vendor success claim or packaged Gemini catalog activation in this candidate.
+The bounded catalog inference above is implemented in this candidate; no live-vendor success is claimed.
 
 `ProviderConfig` gains optional `gemini: Option<GeminiTransportConfig>`; downstream exhaustive
 struct literals must supply `gemini: None` or use `..Default::default()`. The protocol and catalog
@@ -274,5 +277,4 @@ Custody is limited to 32 blocks / 16 MiB. With browser tools registered, signed 
 tool responses also use custody to preserve their exact framing; plain no-tool replies without
 private history do not. This limitation applies even if that particular response did not call
 the browser. Browser tool results are only redacted when the tool declares private tokens.
-This remains an unreleased Draft implementation; full Gemini acceptance and catalog activation
-are pending, and mock/SSE fixture success is not a live Google service validation.
+This remains an unreleased Draft implementation; full Gemini acceptance remains pending, and mock/SSE fixture success is not a live Google service validation.

@@ -765,3 +765,22 @@ Dropping an unpublished fork cleans its transcript, sidecar, index and lineage;
 cleanup failures require storage recovery. Filesystems without hard-link support
 fail explicitly. This does not add process-crash atomicity or directory-fsync
 guarantees. Legacy CLI storage still lacks durable model history_search receipts.
+
+
+### Unreleased Gemini invocation migration (I310 / ADR-094)
+
+The next pre-1.0 minor adds `GoogleGemini` protocol variants and optional
+`ProviderConfig::gemini`; exhaustive struct literals must initialize it or use defaults.
+`ProviderInvocationEvent` becomes non-exhaustive and gains `TransientReplay`; downstream
+matches need a catch-all arm. Never serialize, log or persist the private carrier.
+`LanguageModel::stream_with_replay_context` has a default that refuses private attachments
+and delegates ordinary requests. Existing providers need not implement private replay.
+
+The live AppServerSession Actor owns browser signed-history custody across submissions.
+Standalone Agent execution only retains it for that execution. Reopen, durable fork and
+generation replacement do not inherit custody. Missing or modified bindings fail before HTTP;
+callers must start a fresh conversation rather than replay a durable privacy projection as
+original signed content. Native, Compat and TalosStrict share this rule. Browser-registered
+textual routes also retain signed ordinary tool frames, so the same continuity limit applies.
+Custody is bounded to 32 blocks / 16 MiB. This is an unreleased candidate contract, not a patch
+release compatibility claim or live-vendor acceptance. See PROVIDER-PROTOCOLS for configuration.
