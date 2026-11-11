@@ -5217,6 +5217,79 @@ fn compressed_away_processing_preview_does_not_request_animation() {
     assert!(!tui.visible_processing_animation);
 }
 
+#[test]
+fn cached_frames_match_fresh_planning_cells_styles_and_cursor_across_state_changes() {
+    let mut cached = crate::app::Tui::for_test(TuiState::new(), None);
+    let mut fresh = crate::app::Tui::for_test(TuiState::new(), None);
+    for step in 0..28 {
+        for tui in [&mut cached, &mut fresh] {
+            let width = [80, 80, 7, 100, 40, 80, 80][step % 7];
+            let height = [24, 24, 8, 40, 6, 24, 24][step % 7];
+            tui.terminal
+                .set_test_size(ratatui::layout::Size::new(width, height));
+            if step == 2 {
+                tui.first_message_dispatched = true;
+                for n in 0..40 {
+                    tui.transcript
+                        .append(TranscriptBlock::StyledLine(state_line(&format!(
+                            "row {n}: 中文 🦀 e\u{301} zero\u{200b}width\nexplicit newline"
+                        ))));
+                }
+            }
+            tui.state.input_buffer = [
+                "",
+                "中文🦀e\u{301}\nsecond",
+                "long words ".repeat(20).as_str(),
+            ][step % 3]
+                .to_owned();
+            tui.state.cursor_pos = if step % 2 == 0 {
+                0
+            } else {
+                tui.state.input_buffer.chars().count()
+            };
+            tui.state.status.is_processing = step % 4 != 0;
+            tui.processing_frame = step;
+            tui.state.thinking_preview =
+                (step % 4 == 1).then(|| "thinking body 中文\nsecond line".into());
+            if step == 10 {
+                tui.show_approval("write", "{\"path\":\"src/example.rs\"}");
+            }
+            if step == 13 {
+                tui.hide_approval();
+                tui.state.slash_menu.close();
+            }
+            if step == 17 {
+                tui.scroll_frame_history_up(5);
+            }
+            if step == 22 {
+                tui.history_scroll.jump_to_end();
+            }
+        }
+        // This path forces all new caches through their complete planning functions.
+        fresh.history_projection_cache = Default::default();
+        fresh.splash_cache = Default::default();
+        fresh.layout_cache = Default::default();
+        fresh.composer_height_cache = Default::default();
+        fresh.preview_layout_cache = Default::default();
+        cached.draw_frame().expect("cached frame");
+        fresh.draw_frame().expect("freshly planned frame");
+        assert_eq!(
+            cached.terminal.test_rendered_buffer(),
+            fresh.terminal.test_rendered_buffer(),
+            "cells/styles at step {step}"
+        );
+        assert_eq!(
+            cached.terminal.test_cursor_position(),
+            fresh.terminal.test_cursor_position(),
+            "cursor at step {step}"
+        );
+        assert_eq!(
+            cached.terminal.test_cursor_visible(),
+            fresh.terminal.test_cursor_visible()
+        );
+    }
+}
+
 #[tokio::test(start_paused = true)]
 async fn event_loop_without_visible_deadlines_draws_once_during_a_minute_of_idle() {
     let mut tui = crate::app::Tui::for_test(TuiState::new(), None);

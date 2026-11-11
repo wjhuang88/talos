@@ -12,6 +12,27 @@ use crate::theme::semantic;
 /// Left margin applied to every splash row for a consistent left-aligned layout.
 const INDENT: &str = "  ";
 
+#[derive(Default)]
+pub(crate) struct SplashCache {
+    key: Option<(u16, Option<DashboardAvailability>)>,
+    lines: std::sync::Arc<[Line<'static>]>,
+}
+
+impl SplashCache {
+    pub(crate) fn lines(
+        &mut self,
+        width: u16,
+        dashboard: Option<DashboardAvailability>,
+    ) -> std::sync::Arc<[Line<'static>]> {
+        let key = (width, dashboard);
+        if self.key != Some(key) {
+            self.lines = viewport_splash_lines_with_dashboard(width, dashboard.as_ref()).into();
+            self.key = Some(key);
+        }
+        self.lines.clone()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DashboardAvailability {
     address: SocketAddr,
@@ -202,6 +223,28 @@ fn dashboard_lines(width: u16, dashboard: &DashboardAvailability) -> Vec<Line<'s
 #[cfg(test)]
 #[allow(warnings)]
 mod tests {
+    #[test]
+    fn cached_splash_matches_full_render_and_invalidates_for_dashboard_and_width() {
+        let mut cache = super::SplashCache::default();
+        let dashboard =
+            super::DashboardAvailability::new("127.0.0.1:1234".parse().expect("address"), true);
+        for (width, availability) in [
+            (80, None),
+            (80, Some(dashboard)),
+            (40, Some(dashboard)),
+            (120, None),
+        ] {
+            let cached = cache.lines(width, availability);
+            assert_eq!(
+                cached.as_ref(),
+                super::viewport_splash_lines_with_dashboard(width, availability.as_ref())
+            );
+            assert!(std::sync::Arc::ptr_eq(
+                &cached,
+                &cache.lines(width, availability)
+            ));
+        }
+    }
     use super::*;
 
     #[test]

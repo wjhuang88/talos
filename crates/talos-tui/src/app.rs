@@ -19,7 +19,7 @@ use talos_core::message::Message;
 use talos_core::tool_filter::ToolSyntaxFilter;
 use tokio::sync::mpsc;
 
-use crate::app_layout::{ComponentMetrics, compute_app_layout};
+use crate::app_layout::ComponentMetrics;
 use crate::evolution::{self, EvolutionPanel};
 use crate::history_projection::{
     HistoryProjection, HistoryProjectionCache, HistoryScrollState, HistorySelectionPoint,
@@ -139,7 +139,11 @@ pub struct Tui {
     transcript: TranscriptStore,
     history_scroll: HistoryScrollState,
     history_projection_cache: HistoryProjectionCache,
+    splash_cache: crate::splash::SplashCache,
     git_snapshot: crate::scrollback_status_git::GitSnapshot,
+    layout_cache: crate::app_layout::LayoutCache,
+    composer_height_cache: frame::ComposerHeightCache,
+    preview_layout_cache: [crate::scrollback::PreviewLayoutCache; 2],
     last_history_projection: HistoryProjection,
     last_history_viewport_height: u16,
     last_history_area: Option<ratatui::layout::Rect>,
@@ -238,7 +242,11 @@ impl Tui {
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
             history_projection_cache: HistoryProjectionCache::default(),
+            splash_cache: crate::splash::SplashCache::default(),
             git_snapshot: crate::scrollback_status_git::GitSnapshot::default(),
+            layout_cache: crate::app_layout::LayoutCache::default(),
+            composer_height_cache: frame::ComposerHeightCache::default(),
+            preview_layout_cache: Default::default(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
             last_history_area: None,
@@ -289,7 +297,11 @@ impl Tui {
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
             history_projection_cache: HistoryProjectionCache::default(),
+            splash_cache: crate::splash::SplashCache::default(),
             git_snapshot: crate::scrollback_status_git::GitSnapshot::default(),
+            layout_cache: crate::app_layout::LayoutCache::default(),
+            composer_height_cache: frame::ComposerHeightCache::default(),
+            preview_layout_cache: Default::default(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
             last_history_area: None,

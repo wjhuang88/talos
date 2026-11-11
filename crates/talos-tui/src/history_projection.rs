@@ -104,6 +104,26 @@ impl HistoryProjectionCache {
             return HistoryProjection::default();
         }
 
+        self.ensure_projection(transcript, width);
+
+        project_viewport(
+            self.all_rows.clone(),
+            self.logical_lines.clone(),
+            height,
+            scroll,
+        )
+    }
+
+    /// Obtain cached row count without constructing a visible-window projection.
+    pub(crate) fn total_rows(&mut self, transcript: &TranscriptStore, width: u16) -> usize {
+        if width == 0 {
+            return 0;
+        }
+        self.ensure_projection(transcript, width);
+        self.all_rows.len()
+    }
+
+    fn ensure_projection(&mut self, transcript: &TranscriptStore, width: u16) {
         let revision = transcript.revision();
         if self.transcript_revision != Some(revision) || self.width != width {
             let _metric =
@@ -120,13 +140,6 @@ impl HistoryProjectionCache {
         } else {
             crate::render_metrics::count(crate::render_metrics::Stage::HistoryHit);
         }
-
-        project_viewport(
-            self.all_rows.clone(),
-            self.logical_lines.clone(),
-            height,
-            scroll,
-        )
     }
 
     #[cfg(test)]
@@ -1031,6 +1044,31 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn row_count_matches_full_projection_after_width_and_revision_changes() {
+        let mut transcript = TranscriptStore::default();
+        let mut cache = HistoryProjectionCache::default();
+        for text in [
+            "中文 🦀 e\u{301}\nexplicit newline",
+            "second entry with wrapping words",
+        ] {
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                text, None,
+            )));
+            for width in [1, 7, 40, 80] {
+                let expected =
+                    project_history(&transcript, width, 6, &HistoryScrollState::follow_tail());
+                assert_eq!(cache.total_rows(&transcript, width), expected.total_rows);
+                let rebuilds = cache.rebuilds();
+                let visible =
+                    cache.project(&transcript, width, 6, &HistoryScrollState::follow_tail());
+                assert_eq!(visible.rows, expected.rows);
+                assert_eq!(cache.rebuilds(), rebuilds);
+            }
+        }
+        assert_eq!(cache.total_rows(&transcript, 0), 0);
     }
 
     #[test]

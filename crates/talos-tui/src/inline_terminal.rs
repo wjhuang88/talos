@@ -318,6 +318,11 @@ impl TerminalSession {
     }
 
     #[cfg(test)]
+    pub(crate) fn test_rendered_buffer(&self) -> &Buffer {
+        &self.buffers[1 - self.current]
+    }
+
+    #[cfg(test)]
     pub(crate) fn test_rendered_text(&self) -> String {
         let buffer = &self.buffers[1 - self.current];
         let area = buffer.area;

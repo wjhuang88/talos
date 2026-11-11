@@ -4,7 +4,7 @@ use ratatui::layout::{Rect, Size};
 
 use crate::scrollback::BottomPanelPlacement;
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ComponentMetrics {
     pub(crate) preview: u16,
     pub(crate) queue: u16,
@@ -17,6 +17,33 @@ pub(crate) struct ComponentMetrics {
     /// composer sits just below the Logo virtual prefix rather than at the
     /// terminal bottom.
     pub(crate) history_cap: Option<u16>,
+}
+
+/// Single-entry cache bounded independently of terminal resize history.
+#[derive(Default)]
+pub(crate) struct LayoutCache {
+    entry: Option<(Size, ComponentMetrics, BottomPanelPlacement, AppLayout)>,
+}
+
+impl LayoutCache {
+    pub(crate) fn layout(
+        &mut self,
+        size: Size,
+        metrics: ComponentMetrics,
+        placement: BottomPanelPlacement,
+    ) -> AppLayout {
+        if let Some((previous_size, previous_metrics, previous_placement, layout)) = self.entry
+            && previous_size == size
+            && previous_metrics == metrics
+            && previous_placement == placement
+        {
+            return layout;
+        }
+        let _metric = crate::render_metrics::measure(crate::render_metrics::Stage::Layout);
+        let layout = compute_app_layout(size, metrics, placement);
+        self.entry = Some((size, metrics, placement, layout));
+        layout
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -143,6 +170,35 @@ fn place_rects(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn cached_layout_matches_full_planning_across_component_transitions() {
+        let mut cache = super::LayoutCache::default();
+        for size in [
+            super::Size::new(80, 24),
+            super::Size::new(12, 4),
+            super::Size::new(120, 40),
+        ] {
+            for placement in [
+                super::BottomPanelPlacement::AboveInput,
+                super::BottomPanelPlacement::BelowInput,
+            ] {
+                for height in 0..8 {
+                    let metrics = super::ComponentMetrics {
+                        preview: height,
+                        queue: height / 2,
+                        tips: 1,
+                        panel_required: height.min(4),
+                        panel_preferred: height,
+                        composer: height.max(1),
+                        history_cap: Some(12),
+                    };
+                    let expected = super::compute_app_layout(size, metrics, placement);
+                    assert_eq!(cache.layout(size, metrics, placement), expected);
+                    assert_eq!(cache.layout(size, metrics, placement), expected);
+                }
+            }
+        }
+    }
     use super::*;
 
     fn metrics() -> ComponentMetrics {
