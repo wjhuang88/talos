@@ -1,6 +1,6 @@
 # AUTO-HISTORY-001: Session-local rolling approval judgment history
 
-Document status: Planned / Unclaimed; governance draft awaiting PR-number backfill and proposed activation.
+Document status: Active / Claimed proposed via #916; ineffective until this governance record merges to main.
 Deliverable: subsequent approval-model requests include bounded, sanitized previous model judgments
 and attributable eventual human outcomes from the same live session, across every supported review family.
 User-facing documentation: README.md and README.zh-CN.md auto-approval lifecycle and limits.
@@ -10,13 +10,13 @@ Source requirement: [durable intake](../proposals/session-auto-approval-rolling-
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | AUTO-HISTORY-001: bounded live-session model/human judgment history, provider request integration for all supported auto-review families, correlated fallback outcomes, isolation/redaction tests and documentation; excludes permission eligibility expansion, reusable grants, disk persistence, background continuation, archive recovery and unrelated TUI changes |
 | Claimed At | 2026-11-11 |
 | Source Issue | None; explicit session request recorded in durable intake |
-| Governance Claim PR | Not created |
+| Governance Claim PR | #916 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requested completion of session-recovery handoff including this original requirement; independent security/design review required before activation and protected implementation delivery |
 | Implementation PR | Not started |
@@ -76,7 +76,7 @@ This is a separate requirement; it does not replace any published iteration base
 ## Local preparation and residuals
 
 Governance-only isolated worktree; no implementation branch/commit/PR created for this scope.
-Required PR-number backfill, both governance validators, independent design/security review,
+PR-number backfill is recorded. Both governance validators, independent design/security review,
 merge-time main/owner CAS and main merge remain before the claim becomes effective.
 Implementation, tests, native acceptance and delivery commits remain unimplemented.
 Residual destination: this owner. No Completion Commit exists; no Complete claim is made.
