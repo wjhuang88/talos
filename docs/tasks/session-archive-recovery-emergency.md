@@ -477,3 +477,37 @@ Existing checkpoint tool safety suite passes 13 tests in
 `/tmp/talos-checkpoint-reasons-tests.log`, including post-query mutation/reset/cancel.
 The running integration preflight began before this logging-only addition and cannot
 certify the final changed tree; finish collecting it, then validate the final candidate.
+
+
+## Archive preparation diagnostic follow-up
+
+Requested outcome: distinguish archive-history preparation failures without exposing
+source data or weakening provenance gates. Scope: `checkpoint_history.rs` and this
+owner; original dirty worktree, incident sources and retained backups remain preserved.
+The internal archived preparation now returns fixed stage codes for evidence, head
+capture/sealing, source freshness and index operations. Cancellation/deadline and
+blocking-worker failure are distinguishable. Dependency error strings, paths, session
+identities and transcript text are never included in those diagnostic fields.
+
+Two real-I/O regressions distinguish cancellation, expired deadline, corrupt disposable
+archive evidence and an unopenable index; they verify unchanged source bytes and that
+failed evidence does not initialize an index. All 20 checkpoint_history tests pass in
+`/tmp/talos-archive-preparation-diagnostics-tests.log`. Standard pinned/locked preflight
+passed (exit 0) in `/tmp/talos-archive-preparation-diagnostics-preflight.log`, including
+workspace check, Clippy, tests/doctests and both external SDK fixtures. Tests used the
+same serialized, credential-env-cleared configuration as the prior candidate. Both
+governance validators pass with zero warnings. No new source edits followed validation.
+
+Remote CI run 43041022143 validates the previous ae27ee2f head, not this follow-up.
+Its Linux Desktop job 130592601092 was cancelled at the 30-minute job limit during
+native dependency installation: the log records repeated Ubuntu mirror DNS failures.
+Desktop regressions did not run; this is not a passing gate. Evidence:
+`/tmp/talos-ci-linux-desktop-130592601092.log`. Other jobs were still running at the
+last check. A new source head requires fresh exact-head CI and independent review.
+
+Status remains Partial. This closes the archived preparation stage-code gap only;
+ordinary linear preparation still has combined failure paths, and evidence rejection
+codes do not distinguish every underlying archive parser/provenance cause. Full archived
+fork provenance, independent safety/API review, native host acceptance and the remaining
+handoff work stay owned here and in the primary handoff. Review authorization has been
+requested; no unapproved reviewer was started and no merge/deployment occurred.

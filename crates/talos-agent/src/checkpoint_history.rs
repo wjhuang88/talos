@@ -440,52 +440,95 @@ impl History {
         }
         let owner = session.clone();
         let stopped = cancel.clone();
-        tokio::task::spawn_blocking(move || Self::prepare_archived(&owner, &stopped, deadline))
-            .await
-            .ok()?
+        match tokio::task::spawn_blocking(move || {
+            Self::prepare_archived(&owner, &stopped, deadline)
+        })
+        .await
+        {
+            Ok(Ok(history)) => Some(history),
+            Ok(Err(reason)) => {
+                tracing::warn!(reason, "archive history preparation unavailable");
+                None
+            }
+            Err(_) => {
+                tracing::warn!(
+                    reason = "archive_worker_failed",
+                    "archive history preparation unavailable"
+                );
+                None
+            }
+        }
     }
 
     fn prepare_archived(
         session: &DurableSession,
         cancel: &CancellationToken,
         deadline: Instant,
-    ) -> Option<Self> {
+    ) -> Result<Self, &'static str> {
+        // Only fixed stage codes cross this boundary; dependency errors may contain
+        // paths or transcript data and must never become diagnostic fields.
+        let failure = |stage| {
+            if cancel.is_cancelled() {
+                "archive_preparation_cancelled"
+            } else if Instant::now() >= deadline {
+                "archive_preparation_deadline"
+            } else {
+                stage
+            }
+        };
         let evidence = session
             .session()
             .inspect_archive_recovery(deadline, || cancel.is_cancelled())
-            .ok()?;
+            .map_err(|_| failure("archive_evidence_unavailable"))?;
         if evidence.removed_placeholders() == 0 || evidence.sources().len() < 2 {
-            return None;
+            return Err(failure("archive_evidence_not_applicable"));
         }
-        let source = session.capture_recovery_source().ok()?;
-        let mut scan = source.begin_prefix_seal().ok()?;
-        while !scan.step(deadline, || cancel.is_cancelled()).ok()? {}
-        let seal = scan.finish().ok()?;
+        let source = session
+            .capture_recovery_source()
+            .map_err(|_| failure("archive_head_capture_failed"))?;
+        let mut scan = source
+            .begin_prefix_seal()
+            .map_err(|_| failure("archive_head_seal_begin_failed"))?;
+        while !scan
+            .step(deadline, || cancel.is_cancelled())
+            .map_err(|_| failure("archive_head_scan_failed"))?
+        {}
+        let seal = scan
+            .finish()
+            .map_err(|_| failure("archive_head_seal_finish_failed"))?;
         // Reinspection is unnecessary: evidence checks all supporting versions;
         // selected head equality is verified against its captured version below.
-        evidence.check_all_sources(deadline).ok()?;
-        let path = session.recovery_index_path().ok()?;
-        let mut index = SessionIndex::new(&path).ok()?;
+        evidence
+            .check_all_sources(deadline)
+            .map_err(|_| failure("archive_sources_changed"))?;
+        let path = session
+            .recovery_index_path()
+            .map_err(|_| failure("archive_index_path_failed"))?;
+        let mut index =
+            SessionIndex::new(&path).map_err(|_| failure("archive_index_open_failed"))?;
         let stopped = cancel.clone();
         let budget = RecoveryWorkBudget::with_cancellation_check(
             deadline.saturating_duration_since(Instant::now()),
             move || stopped.is_cancelled(),
         );
-        index.init_recovery_schema_with_budget(&budget).ok()?;
+        index
+            .init_recovery_schema_with_budget(&budget)
+            .map_err(|_| failure("archive_index_schema_failed"))?;
         let scope = uuid::Uuid::new_v4().to_string();
         index
             .replace_recovery_owner_scope(&session.id().to_string(), &scope, &budget)
-            .ok()?;
+            .map_err(|_| failure("archive_index_scope_failed"))?;
         let mut cursor = index
             .begin_recovery_build(&scope, source.source_end(), &budget)
-            .ok()?;
+            .map_err(|_| failure("archive_index_build_failed"))?;
         // This scope is the revocation/completion ledger, not an FTS substitute.
         // The evidence corpus owns projected records and their original sources.
         while !cursor.complete() {
             let page = source
                 .read_page(cursor.next_offset(), deadline, || cancel.is_cancelled())
-                .ok()?;
-            seal.check_current().ok()?;
+                .map_err(|_| failure("archive_head_page_failed"))?;
+            seal.check_current()
+                .map_err(|_| failure("archive_head_changed"))?;
             index
                 .advance_recovery_build(
                     &scope,
@@ -497,12 +540,18 @@ impl History {
                     },
                     &budget,
                 )
-                .ok()?;
-            cursor = index.recovery_build_cursor(&scope, &budget).ok()??;
+                .map_err(|_| failure("archive_index_advance_failed"))?;
+            cursor = index
+                .recovery_build_cursor(&scope, &budget)
+                .map_err(|_| failure("archive_index_cursor_failed"))?
+                .ok_or_else(|| failure("archive_index_cursor_missing"))?;
         }
-        evidence.check_all_sources(deadline).ok()?;
-        seal.check_current().ok()?;
-        Some(Self {
+        evidence
+            .check_all_sources(deadline)
+            .map_err(|_| failure("archive_sources_changed"))?;
+        seal.check_current()
+            .map_err(|_| failure("archive_head_changed"))?;
+        Ok(Self {
             path,
             scope,
             owner: session.id().to_string(),
@@ -870,6 +919,116 @@ impl History {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    #[test]
+    fn archived_preparation_distinguishes_stopped_and_corrupt_evidence() {
+        use talos_core::message::Message;
+        let root = tempfile::tempdir().expect("root");
+        let owner =
+            DurableSession::open_or_create(root.path(), "diagnostic-private-owner").expect("owner");
+        for i in 0..12 {
+            owner
+                .session()
+                .append(&Message::User {
+                    content: format!("private diagnostic fixture {i}"),
+                })
+                .expect("append");
+        }
+        owner.session().compact_archived(3).expect("archive");
+        let head = std::fs::read(owner.file_path()).expect("head");
+        let evidence = owner
+            .session()
+            .inspect_archive_recovery(Instant::now() + Duration::from_secs(10), || false)
+            .expect("evidence");
+        let archive = evidence
+            .sources()
+            .iter()
+            .find(|source| source.path != owner.file_path())
+            .expect("archive source")
+            .path
+            .clone();
+        drop(evidence);
+        let archive_bytes = std::fs::read(&archive).expect("archive bytes");
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+        assert_eq!(
+            History::prepare_archived(&owner, &cancel, Instant::now() + Duration::from_secs(10))
+                .err(),
+            Some("archive_preparation_cancelled")
+        );
+        assert_eq!(
+            History::prepare_archived(&owner, &CancellationToken::new(), Instant::now()).err(),
+            Some("archive_preparation_deadline")
+        );
+        assert_eq!(
+            std::fs::read(&archive).expect("preserved archive"),
+            archive_bytes
+        );
+        // Corrupt only this disposable fixture, never an incident source.
+        std::fs::write(&archive, b"private invalid archive payload").expect("corrupt fixture");
+        assert_eq!(
+            History::prepare_archived(
+                &owner,
+                &CancellationToken::new(),
+                Instant::now() + Duration::from_secs(10)
+            )
+            .err(),
+            Some("archive_evidence_unavailable")
+        );
+        assert_eq!(
+            std::fs::read(owner.file_path()).expect("preserved head"),
+            head
+        );
+        assert!(
+            !owner.recovery_index_path().expect("index path").exists(),
+            "failed evidence must not initialize an index"
+        );
+    }
+
+    #[test]
+    fn archived_preparation_distinguishes_index_failure_from_valid_evidence() {
+        use talos_core::message::Message;
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "index-failure").expect("owner");
+        for i in 0..12 {
+            owner
+                .session()
+                .append(&Message::User {
+                    content: format!("archive index fixture {i}"),
+                })
+                .expect("append");
+        }
+        owner.session().compact_archived(3).expect("archive");
+        let evidence = owner
+            .session()
+            .inspect_archive_recovery(Instant::now() + Duration::from_secs(10), || false)
+            .expect("valid evidence");
+        let originals: Vec<_> = evidence
+            .sources()
+            .iter()
+            .map(|source| {
+                (
+                    source.path.clone(),
+                    std::fs::read(&source.path).expect("source"),
+                )
+            })
+            .collect();
+        drop(evidence);
+        std::fs::create_dir(owner.recovery_index_path().expect("index path"))
+            .expect("unopenable database fixture");
+        assert_eq!(
+            History::prepare_archived(
+                &owner,
+                &CancellationToken::new(),
+                Instant::now() + Duration::from_secs(10)
+            )
+            .err(),
+            Some("archive_index_open_failed")
+        );
+        for (path, bytes) in originals {
+            assert_eq!(std::fs::read(path).expect("preserved source"), bytes);
+        }
+    }
+
     #[tokio::test]
     async fn archived_queries_preserve_legacy_parents_page_and_revoke_on_source_or_scope_change() {
         use talos_core::message::Message;
