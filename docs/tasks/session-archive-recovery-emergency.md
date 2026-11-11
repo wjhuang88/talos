@@ -618,3 +618,47 @@ the remote macOS failure. Parallel Agent suite: 683 passed, exit 0, log
 `/tmp/talos-discovery-deadline-agent-tests.log`. Changes also applied as a checked
 patch to the preserved primary worktree without replacing unrelated edits.
 This follow-up remains local pending validation and review; task remains Partial.
+
+
+## Contention reproduction and WAL initializer budget — 2026-11-12
+
+The exact 8300-message discovery regression reproduced on Linux with 32 concurrent
+instances pinned to one CPU: 1/32 failed at the same compactable-snapshot assertion;
+1 and 8 instances passed. A second, temporarily instrumented run failed 2/32, with
+refresh wall times 2.032s and 2.071s versus 58ms for one instance. Evidence:
+`/tmp/talos-history-contention-20261112/summary.json` and `timed-summary.json`.
+This establishes local sensitivity to contention, not macOS causality. Temporary
+instrumentation was restored byte-for-byte; uninstrumented checkpoint tests pass.
+Tokio 1.53.1 `task/yield_now.rs` documents scheduling non-guarantees; no scheduler
+assumption, production budget increase or CI serialization was introduced.
+
+Exact-head remote Windows job 130656602802 failed two tests: Actor checkpoint
+acceptance timed out waiting 10s for a fork; concurrent durable opens returned
+SQLite `locking protocol`. Log: `/tmp/talos-ci-windows-130656602802.log`.
+SQLite documents SQLITE_PROTOCOL as exhausted WAL transaction lock races:
+https://www.sqlite.org/rescode.html#protocol . Do not blindly retry it or claim
+the two failures share a proven cause.
+
+Inspection of pinned rusqlite 0.40.2 `inner_connection.rs` found the default 5000ms
+busy handler. `open_bindings` claimed bounded initialization retries but did not
+disable that handler. A real WAL writer-lock regression failed before the fix
+(`/tmp/talos-wal-init-budget-before.log`): init remained blocked beyond two seconds.
+The initializer now explicitly disables the driver busy handler, retaining the
+20 x 25ms retry sleeps and restoring the existing five-second transaction handler
+after initialization. Native calls/scheduling remain outside a hard wall-clock
+guarantee. No new protocol-error retries and no live database changes.
+
+Session tests passed: 334 unit plus 27 integration tests, exit 0,
+`/tmp/talos-wal-init-budget-session-tests.log`; MSVC all-feature test compilation
+passed, `/tmp/talos-wal-init-budget-xwin.log`. This fixes a reproduced initialization
+budget defect; native Windows protocol/fork failures still require resolution.
+Patch was checked and applied to the preserved primary worktree. Status Partial.
+
+Validation follow-up: standard full `./scripts/release_preflight.sh` passed with
+Rust 1.99.0 and locked dependencies; log `/tmp/talos-wal-init-final-preflight.log`.
+This includes both local follow-ups (discovery diagnostics and WAL init budget),
+workspace checks/Clippy/tests/doc-tests and SDK fixtures. Both primary governance
+validators also passed. Remote Linux Desktop job 130656602835 failed installing
+system dependencies due Ubuntu mirror DNS errors before running Desktop tests;
+log `/tmp/talos-ci-linux-desktop-130656602835.log`. Native Windows failures and
+independent review remain unresolved; no deployment or completion claim.
