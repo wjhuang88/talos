@@ -15,11 +15,7 @@ use crate::{
 /// ExplorationStore. A storage descriptor alone cannot implement this trait.
 pub trait ExplorationPersistence {
     /// Create an authoritative research run.
-    fn create_run(
-        &self,
-        query: &str,
-        plan: Option<&str>,
-    ) -> Result<ResearchRun, ExplorationError>;
+    fn create_run(&self, query: &str, plan: Option<&str>) -> Result<ResearchRun, ExplorationError>;
 
     /// Mark a run complete without altering its citation ownership.
     fn complete_run(&self, run_id: &str) -> Result<(), ExplorationError>;
