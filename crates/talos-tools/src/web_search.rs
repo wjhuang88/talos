@@ -322,6 +322,13 @@ impl WebSearchTool {
         query: &str,
         max_results: u32,
     ) -> Result<Vec<WebResult>, SearchBackendError> {
+        // Exercise the *public* legacy Wikipedia fallback in an isolated test
+        // child without querying DuckDuckGo or changing production routing.
+        #[cfg(test)]
+        if std::env::var_os("TALOS_SEARCH_WIKIPEDIA_PROXY_FALLBACK_CHILD").is_some() {
+            return Err(SearchBackendError::NoResults);
+        }
+
         let results = crate::search_backend::legacy_owned::search(query, &self.duckduckgo_config)
             .await
             .map_err(|error| {
@@ -422,8 +429,20 @@ impl WebSearchTool {
         let url = format!(
             "https://en.wikipedia.org/w/api.php?action=opensearch&search={encoded}&limit={max_results}&namespace=0&format=json"
         );
+        #[cfg(test)]
+        let url = if std::env::var_os("TALOS_SEARCH_WIKIPEDIA_PROXY_FALLBACK_CHILD").is_some() {
+            format!(
+                "http://talos-search-wikipedia.invalid/w/api.php?action=opensearch&search={encoded}&limit={max_results}&namespace=0&format=json"
+            )
+        } else {
+            url
+        };
 
         let client = reqwest::Client::builder()
+            // The old public fallback must NOT inherit system proxy routing
+            // from reqwest's feature-unified CLI dependency. Query text may
+            // only be sent to its pinned Wikipedia destination.
+            .no_proxy()
             .timeout(Duration::from_secs(10))
             .build()
             .map_err(|error| SearchBackendError::RequestFailed(error.to_string()))?;
@@ -794,6 +813,94 @@ mod tests {
         let default_tool = WebSearchTool::default();
         assert!(default_tool.tavily_api_key.is_none());
         assert!(default_tool.searxng_url.is_none());
+    }
+
+    #[test]
+    fn wikipedia_public_fallback_ignores_ambient_system_proxy() {
+        use std::{
+            io::ErrorKind,
+            process::Command,
+            sync::{
+                Arc,
+                atomic::{AtomicBool, Ordering},
+            },
+        };
+
+        const CHILD: &str = "TALOS_SEARCH_WIKIPEDIA_PROXY_FALLBACK_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("fallback runtime");
+            let (rows, source) = runtime
+                .block_on(async {
+                    tokio::time::timeout(
+                        Duration::from_secs(5),
+                        WebSearchTool::new().execute_search("private wikipedia fallback", 1, true),
+                    )
+                    .await
+                })
+                .expect("bounded wikipedia fallback");
+            assert_eq!(source, ResultSource::Wikipedia);
+            assert!(rows.is_empty(), "invalid host has no results");
+            return;
+        }
+
+        // Separate subprocess owns proxy environment: do not mutate the
+        // global environment of parallel Rust tests.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("ambient proxy fixture");
+        listener.set_nonblocking(true).expect("nonblocking fixture");
+        let proxy_address = listener.local_addr().expect("proxy address");
+        let intercepted = Arc::new(AtomicBool::new(false));
+        let finished = Arc::new(AtomicBool::new(false));
+        let observed = Arc::clone(&intercepted);
+        let stop = Arc::clone(&finished);
+        let watchdog = std::thread::spawn(move || {
+            while !stop.load(Ordering::SeqCst) {
+                match listener.accept() {
+                    Ok(_) => {
+                        observed.store(true, Ordering::SeqCst);
+                        break;
+                    }
+                    Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(error) => panic!("proxy fixture accept failed: {error}"),
+                }
+            }
+        });
+
+        let proxy = format!("http://{proxy_address}");
+        let child = Command::new(std::env::current_exe().expect("test executable"))
+            .arg("--exact")
+            .arg("web_search::tests::wikipedia_public_fallback_ignores_ambient_system_proxy")
+            .arg("--nocapture")
+            .env(CHILD, "1")
+            .env("HTTP_PROXY", &proxy)
+            .env("http_proxy", &proxy)
+            .env("HTTPS_PROXY", &proxy)
+            .env("https_proxy", &proxy)
+            .env("ALL_PROXY", &proxy)
+            .env("all_proxy", &proxy)
+            .env_remove("NO_PROXY")
+            .env_remove("no_proxy")
+            .env_remove("TALOS_SEARCH_PARITY_CHILD")
+            .output()
+            .expect("isolated fallback test process");
+
+        finished.store(true, Ordering::SeqCst);
+        watchdog.join().expect("proxy watchdog");
+        assert!(
+            child.status.success()
+                && String::from_utf8_lossy(&child.stdout).contains("1 passed; 0 failed"),
+            "public Wikipedia fallback child did not pass exactly one test: {}{}",
+            String::from_utf8_lossy(&child.stdout),
+            String::from_utf8_lossy(&child.stderr),
+        );
+        assert!(
+            !intercepted.load(Ordering::SeqCst),
+            "Wikipedia fallback disclosed its query to the inherited system proxy",
+        );
     }
 
     #[test]
