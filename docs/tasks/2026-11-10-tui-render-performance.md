@@ -1174,3 +1174,18 @@ and cursor calculation can still execute per drawn frame. No claim is made that
 all static component work or frame allocations have been eliminated. Existing
 region/ANSI tests cover observable equivalence; allocation and native evidence
 remain required before closing the task.
+
+### Projection snapshot lifecycle regression
+
+Added `repeated_reflow_releases_obsolete_snapshots_after_view_is_dropped`:
+128 cycles alternate widths7/80/120/1, expand existing reasoning and append
+history. Every new projection matches the full oracle; weak references verify
+the previous rows/logical-text snapshots survive while a consumer holds them
+and are deallocated after that consumer drops them. The cache retains only its
+current snapshot. This covers ownership retention, not allocator fragmentation
+or whole-process heap stability, and does not replace the remaining heap probe.
+
+Focused locked TUI test passed1/1 (682 filtered) in a dedicated resource guard:
+CPUQuota100%, MemoryHigh2G, MemoryMax3G, swap0, tasks128, jobs1/testthreads1.
+Service exited normally0, runtime15.990s, CPU14.472s, peak2GiB, swap0. No full
+workspace pass is implied; Windows cross-check of this new test remains pending.

@@ -1000,6 +1000,42 @@ mod tests {
     }
 
     #[test]
+    fn repeated_reflow_releases_obsolete_snapshots_after_view_is_dropped() {
+        let mut transcript = TranscriptStore::default();
+        for _ in 0..128 {
+            transcript.append(TranscriptBlock::Reasoning {
+                text: "中文 🦀 e\u{301}\nsecond line".into(),
+                expanded: false,
+            });
+        }
+        let mut cache = HistoryProjectionCache::default();
+        let scroll = HistoryScrollState::follow_tail();
+        for step in 0..128 {
+            let width = [7, 80, 120, 1][step % 4];
+            let view = cache.project(&transcript, width, 12, &scroll);
+            let old_rows = Arc::downgrade(&view.all_rows);
+            let old_lines = Arc::downgrade(&view.logical_lines);
+            let id = transcript.entries()[step].id;
+            assert!(transcript.toggle_expansion(id));
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                format!("new history {step}"),
+                None,
+            )));
+            let next = cache.project(&transcript, width, 12, &scroll);
+            assert_eq!(next, project_history(&transcript, width, 12, &scroll));
+            // Retained views are intentionally valid until their consumer releases them.
+            assert!(old_rows.upgrade().is_some());
+            assert!(old_lines.upgrade().is_some());
+            drop(view);
+            assert!(old_rows.upgrade().is_none(), "obsolete rows at step {step}");
+            assert!(old_lines.upgrade().is_none(), "obsolete text at step {step}");
+            drop(next);
+            assert_eq!(Arc::strong_count(&cache.all_rows), 1);
+            assert_eq!(Arc::strong_count(&cache.logical_lines), 1);
+        }
+    }
+
+    #[test]
     fn append_reuses_owned_prefix_without_cloning_its_text() {
         let mut transcript = TranscriptStore::default();
         for index in 0..100 {
