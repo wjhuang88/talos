@@ -50,6 +50,37 @@ All three must exit 0 before starting work.
 | `cargo test -p talos-{crate}` | Test a specific crate |
 | `cargo test -p talos-{crate} test_name` | Run a specific test |
 
+## Resource limits on a shared Linux workstation
+
+Cargo build jobs only limit compilation concurrency; they do not cap memory,
+linker threads, test threads or concurrent work from other sessions. After an
+OOM/resource-pressure incident, stop the task's heavy work and establish verified
+process-tree limits before resuming. Do not raise limits merely to obtain a pass.
+On a systemd/cgroup-v2 host, run one validation unit at a time, for example:
+
+```sh
+systemd-run --user --wait --pipe --collect \
+  -p CPUQuota=100% -p MemoryHigh=2G -p MemoryMax=3G \
+  -p MemorySwapMax=0 -p TasksMax=128 -p Nice=10 \
+  --working-directory="$PWD" \
+  --setenv=CARGO_BUILD_JOBS=1 --setenv=RUST_TEST_THREADS=1 \
+  /usr/bin/cargo test --locked -p talos-tui
+```
+
+Verify the actual Cargo path, pinned toolchain, writable disk-backed target and
+cgroup controller values first. Pass the selected `CARGO_TARGET_DIR` explicitly
+when the worktree lives on tmpfs. Keep resource peak/exit evidence from systemd;
+if user systemd or controllers are unavailable, do not silently fall back to an
+unrestricted heavy command. These example limits bound this job, not the whole
+workstation. CPU-throttled validation is not an unthrottled performance baseline;
+record caps and throttling when interpreting any measurements.
+Also inspect `memory.events` and host memory/I/O pressure during a long run:
+repeated `high` events can cause reclaim stalls without an OOM. Stop the task
+if it degrades interactive use; a memory cap alone does not prove low impact.
+After an intentional stop, require the command's completion marker and test
+summary before recording a pass. `systemd-run --wait` or service `Result=success`
+can report success for a service terminated by the requested SIGTERM.
+
 ## Windows Cross-Compilation From macOS/Linux
 
 Use `cargo xwin` with the MSVC target for Windows cross-compilation. Run from

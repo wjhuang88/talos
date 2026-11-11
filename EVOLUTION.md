@@ -5,6 +5,16 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-11 - Build concurrency is not a workstation resource limit
+
+- Trigger: user reported CPU/memory exhaustion during TUI performance work.
+- Symptom: kernel global OOM killed rustc and an application helper; several compilers/linkers were resident. Exclusive attribution to this task is unproven.
+- Root cause: jobs=2 did not bound process-tree memory, test threads or other sessions; continuing without a host resource envelope was unsafe for interactive work.
+- Fix: stop heavy jobs, verify dedicated cgroup CPU/memory/swap/task limits, then run one guarded validation with jobs=1 and test threads=1. Guarded TUI tests passed with approximately2GiB peak and zero swap.
+- Prevention: keep guard limits on subsequent validation, report failures instead of silently expanding caps, and distinguish capped validation from comparable performance measurement.
+- Follow-up: guarded workspace validation repeatedly hit MemoryHigh (623556 events at inspection) while host I/O pressure was high. Stopped the unit; no cgroup OOM occurred. Its wrapper exited 0 despite SIGTERM, so this run is interrupted, not passed. Monitor reclaim pressure as well as the hard cap.
+- Promoted to rule/check: `docs/sop/LOCAL-DEV.md`, shared Linux workstation resource-limits section.
+
 ## 2026-11-10 - Host Git discovery is a compatibility boundary
 
 - Trigger: native Windows tests exposed unsupported preflight queries on Git 2.36.1.
