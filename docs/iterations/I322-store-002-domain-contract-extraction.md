@@ -16,7 +16,7 @@
 | Work Slice | STORE-002 I322 C only: extract minimal domain-owned typed persistence/retrieval traits from existing Session/PendingSubmission/Todo, Memory, Evolution and Exploration operations, documenting the seven A/B infrastructure categories, without changing existing concrete stores, SQL/paths/transactions, consumer dispatch, runtime/host composition or new backends |
 | Claimed At | 2026-11-11 |
 | Source Issue | #670 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #911 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User instructed continued #670 implementation; previous A/B #908 claim and #909 implementation merged with exact-head validation and independent API review. Proposed C governance-only activation requires own exact-head CI, both validators, CAS, and no competing claim before any implementation work. No independent approving maintainer on this governance-only candidate; independent public API review is mandatory for the later C implementation PR. |
 | Implementation PR | Not started |
@@ -74,4 +74,4 @@ C5. Object/VectorSearch/Embedding/standalone Rerank: classify as not bound at th
 
 ## Execution / Verification / Completion
 
-Governance claim is a proposal; **no C production code is authorized until its claim PR merges into main**. Track claim PR, exact-head checks, merge commit, implementation PR, independent technical review, and residual D/E/F authorization here as they occur. `I322` is not Complete and #670 stays OPEN until an actual C implementation merge.
+Governance claim #911 is a proposal; **no C production code is authorized until #911 merges into main**. Track claim PR, exact-head checks, merge commit, implementation PR, independent technical review, and residual D/E/F authorization here as they occur. `I322` is not Complete and #670 stays OPEN until an actual C implementation merge.
