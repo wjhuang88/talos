@@ -1,6 +1,6 @@
 # PROVIDER-008: Complete Wire-Protocol Family Coverage And Protocol Mode Configuration
 
-**Status**: Refinement / Unclaimed (child A Complete / Closed; B/C/D unimplemented)
+**Status**: Refinement / Unclaimed (children A/B Complete / Closed; C/D unfinished)
 **Type**: Provider / Config / Model-Catalog Epic (child Stories decompose at claim time)
 **Parent Epic**: None
 **Source Issue**: [#724](https://github.com/wjhuang88/talos/issues/724)
@@ -8,9 +8,9 @@
 
 Children:
 
-- [PROVIDER-008-A](PROVIDER-008-A-openai-responses-protocol.md) / [#748](https://github.com/wjhuang88/talos/issues/748): protocol architecture (enum/factory dispatch/model-level protocol/catalog signals) + OpenAI Responses adapter (ADR-093); I306 / effective governance claim #747; code #749 and catalog #775 merged; Review / Claimed.
-- PROVIDER-008-B: Google Gemini `generateContent` (AI Studio + Vertex auth boundary decision) — unclaimed.
-- PROVIDER-008-C: Azure OpenAI transport conventions + per-model shape routing — unclaimed.
+- [PROVIDER-008-A](PROVIDER-008-A-openai-responses-protocol.md) / [#748](https://github.com/wjhuang88/talos/issues/748): protocol architecture (enum/factory dispatch/model-level protocol/catalog signals) + OpenAI Responses adapter (ADR-093); I306 / effective governance claim #747; Complete / Closed after #806; implementation chain recorded in child owner.
+- [PROVIDER-008-B](PROVIDER-008-B-google-gemini.md) / #810 / I310: Complete / Closed; implementation #838, closeout #913.
+- [PROVIDER-008-C](PROVIDER-008-C-azure-openai.md) / #914 / I323: Azure transport + shape routing; governance proposal, ineffective until merge.
 - PROVIDER-008-D: Amazon Bedrock Converse + SigV4 credential decision — unclaimed.
 
 ## Collaboration Claim
@@ -177,3 +177,10 @@ PR #811 reaches main. #811 proposes I310/ADR-094 and a dedicated child owner;
 that proposal is not yet effective. This registration does not activate, claim,
 change or implement the Gemini/auth scope. After #811 merges, repoint the Issue
 matrix to `docs/backlog/active/PROVIDER-008-B-google-gemini.md`.
+
+## Current child selection — 2026-11-11
+
+A/B are Complete / Closed. B implementation dbcf6163f34d73def923484ad409814fd4a98039 and closure
+55617ad75c84db75718f287d6c05b84cfe55085e are existing evidence. Earlier B/C/D-unimplemented text
+is historical. C / #914 / I323 now proposes independent Azure claim+activation and ADR-103;
+D remains unclaimed. Parent #724 remains open; no #132 closure or release claim.

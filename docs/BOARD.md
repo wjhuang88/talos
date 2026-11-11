@@ -1,3 +1,8 @@
+## Azure C / PROVIDER-008-C
+
+[Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 proposes atomic claim+activation;
+ineffective until governance merge. A/B remain Complete; D and #724 remain unfinished.
+
 # Talos Board
 
 Native Windows follow-up (2026-11-10, source `c065236a`):
