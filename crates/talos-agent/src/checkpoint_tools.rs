@@ -186,6 +186,11 @@ fn unavailable() -> ToolResult {
     ToolResult::error("history/checkpoint execution unavailable")
 }
 
+fn unavailable_reason(reason: &'static str) -> ToolResult {
+    tracing::warn!(reason, "history/checkpoint execution unavailable");
+    unavailable()
+}
+
 #[async_trait]
 impl AgentTool for HistorySearchTool {
     fn name(&self) -> &str {
@@ -211,8 +216,16 @@ impl AgentTool for HistorySearchTool {
             return ToolResult::error("invalid history input");
         };
         let Ok(execution) = EXECUTION.try_with(Clone::clone) else {
-            return unavailable();
+            return unavailable_reason("execution_scope_missing");
         };
+        // CLI persists terminal diagnostics between provider responses. Renew
+        // only the seal for the identical captured prefix, never its cutoff or
+        // index scope. Current-source checks after query still detect races.
+        let _ = crate::checkpoint_history::HISTORY.try_with(|history| {
+            history
+                .as_ref()
+                .and_then(|history| history.refresh_prefix())
+        });
         if matches!(input.mode.as_str(), "search" | "detail") {
             if input
                 .cursor
@@ -365,13 +378,13 @@ impl AgentTool for HistorySearchTool {
                 .ok()
                 .flatten();
             let Some(scope) = ready else {
-                return unavailable();
+                return unavailable_reason("snapshot_missing_and_history_not_ready");
             };
             let Some(permission) = &execution.permission else {
-                return unavailable();
+                return unavailable_reason("permission_state_missing");
             };
             let Ok(permission_snapshot) = permission.state_snapshot() else {
-                return unavailable();
+                return unavailable_reason("permission_snapshot_unavailable");
             };
             let authority = PermissionLease {
                 state: permission.clone(),
@@ -461,7 +474,9 @@ impl AgentTool for CompactContextTool {
         serde_json::to_value(schemars::schema_for!(CompactInput)).unwrap_or_else(|_| json!({}))
     }
     fn permission_profile(&self, _: &Value) -> Vec<ToolPermissionFacet> {
-        vec![ToolPermissionFacet::new(ToolNature::Write)]
+        // Session-owned checkpoint submission, not filesystem write authority.
+        // Execution still requires the live snapshot and Actor installation gates.
+        vec![ToolPermissionFacet::new(ToolNature::Internal)]
     }
     fn family(&self) -> ToolFamily {
         ToolFamily::Extension
@@ -567,6 +582,31 @@ impl AgentTool for CompactContextTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn compact_internal_admission_preserves_execution_scope() {
+        use talos_permission::{
+            PermissionContext, PermissionEngine, PermissionInvocation, PermissionRequest,
+            PermissionSessionState,
+        };
+        let tool = CompactContextTool;
+        let input = json!({});
+        let facets = tool.permission_profile(&input);
+        assert_eq!(facets.len(), 1);
+        assert_eq!(facets[0].nature, ToolNature::Internal);
+        let state = PermissionSessionState::new(PermissionEngine::empty());
+        let request = PermissionRequest::native("compact_context", &facets, &input);
+        assert!(matches!(
+            state
+                .begin_invocation(&request, &PermissionContext::compatibility())
+                .expect("internal admission"),
+            PermissionInvocation::Allow(_)
+        ));
+        assert!(
+            tool.execute(input).await.is_error,
+            "admission does not bypass payload or execution scope validation"
+        );
+    }
 
     #[tokio::test]
     async fn only_applied_terminal_receipts_report_discovery_progress() {
@@ -855,6 +895,82 @@ mod tests {
         let page: Value = serde_json::from_str(&result.content).expect("page");
         assert_eq!(page["sources"].as_array().expect("refs").len(), 20);
         assert_eq!(page["complete"], false);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn mixed_production_writers_reopen_with_discover_and_search() {
+        use crate::checkpoint_history::History;
+        use talos_core::message::{AgentEvent, Message};
+        use talos_session::DurableSession;
+        use tokio_util::sync::CancellationToken;
+        let (execution, _, _) = fixture().await;
+        execution.refresh_cooperative(None, &[]).await;
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "mixed-writers").expect("owner");
+        session
+            .session()
+            .append(&Message::User {
+                content: "initial question".into(),
+            })
+            .expect("append");
+        session
+            .session()
+            .append_event(&AgentEvent::TurnStart)
+            .expect("event");
+        session
+            .commit_turn(
+                "first",
+                &[Message::User {
+                    content: "durable searchable constraint".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        session
+            .session()
+            .append_event(&AgentEvent::TurnStart)
+            .expect("post-commit event");
+        let diagnostic = talos_session::ProviderTerminalDiagnostic::from_agent_event(
+            "first",
+            1,
+            &AgentEvent::Error {
+                message: "transport failed".into(),
+            },
+            None,
+            None,
+        )
+        .expect("diagnostic");
+        session
+            .session()
+            .append_terminal_diagnostic(&diagnostic)
+            .expect("diagnostic append");
+        session
+            .session()
+            .append(&Message::User {
+                content: "next question".into(),
+            })
+            .expect("post-event append");
+        drop(session);
+        let session = DurableSession::open_existing(root.path(), "mixed-writers")
+            .expect("reopen")
+            .expect("existing");
+        let history = History::prepare_cached(
+            &session,
+            &CancellationToken::new(),
+            &tokio::sync::Mutex::new(None),
+        )
+        .await
+        .expect("history available");
+        crate::checkpoint_history::HISTORY.scope(Some(history), EXECUTION.scope(execution, async {
+            let discovery = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+            assert!(!discovery.is_error, "{}", discovery.content);
+            let discovery: Value = serde_json::from_str(&discovery.content).expect("discovery");
+            let search = HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"constraint"})).await;
+            assert!(!search.is_error, "{}", search.content);
+            let result: Value = serde_json::from_str(&search.content).expect("search");
+            assert!(result["results"].as_array().expect("results").iter().any(|item| item["text"].as_str().is_some_and(|text| text.contains("durable searchable constraint"))));
+        })).await;
     }
 
     #[cfg(unix)]

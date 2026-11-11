@@ -6640,8 +6640,26 @@ fn model_checkpoint_enable_reports_collision_without_partial_registration() {
 #[cfg(unix)]
 #[tokio::test]
 async fn durable_actor_history_search_and_detail_reach_real_provider_continuation() {
+    actor_history_search_and_detail(false, false).await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn cli_persistence_history_search_and_detail_reach_real_provider_continuation() {
+    actor_history_search_and_detail(true, false).await;
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn archived_cli_history_search_and_detail_reach_real_provider_continuation() {
+    actor_history_search_and_detail(true, true).await;
+}
+
+#[cfg(unix)]
+async fn actor_history_search_and_detail(cli: bool, archived: bool) {
     struct RecoveryModel {
         step: AtomicUsize,
+        compact: bool,
     }
     #[async_trait]
     impl LanguageModel for RecoveryModel {
@@ -6717,12 +6735,42 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
                         usage: Default::default(),
                     },
                 ]
-            } else {
-                assert_eq!(step, 4);
+            } else if self.compact && step == 4 {
                 assert_eq!(
                     result("recover-3")["text"],
                     "originalfact unique constraint"
                 );
+                let discovery = result("recover-0");
+                let item = serde_json::json!({"text":"originalfact unique constraint", "sources":[discovery["sources"][0]]});
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "archive-compact".into(),
+                            name: "compact_context".into(),
+                            input: serde_json::json!({"snapshot":discovery["snapshot"],"checkpoint":{
+                            "schema_version":1,"summary":item,"goal":item,"next_step":item,
+                            "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                            "facts":[],"assumptions":[],"resources":[],"open_loops":[]}}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else {
+                assert_eq!(step, if self.compact { 5 } else { 4 });
+                if self.compact {
+                    assert_eq!(result("archive-compact")["status"], "Admitted");
+                    assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.contains("originalfact unique constraint"))), "installed source-backed checkpoint is present");
+                } else {
+                    assert_eq!(
+                        result("recover-3")["text"],
+                        "originalfact unique constraint"
+                    );
+                }
                 success_events("recovered and continued")
             };
             let (tx, rx) = mpsc::channel(16);
@@ -6740,7 +6788,7 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             content: if i == 0 {
                 "originalfact unique constraint".into()
             } else {
-                format!("other {i}")
+                format!("other {i} ").repeat(if archived { 80 } else { 1 })
             },
         })
         .collect();
@@ -6777,16 +6825,22 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             },
         },
     ]);
-    durable
-        .commit_turn(
-            "prior",
-            &raw,
-            &talos_session::PersistencePolicy {
-                persist_reasoning: true,
-                persist_raw_tool_output: true,
-            },
-        )
-        .expect("commit");
+    if cli {
+        for message in &raw {
+            durable.session().append(message).expect("CLI append");
+        }
+    } else {
+        durable
+            .commit_turn(
+                "prior",
+                &raw,
+                &talos_session::PersistencePolicy {
+                    persist_reasoning: true,
+                    persist_raw_tool_output: true,
+                },
+            )
+            .expect("commit");
+    }
     durable
         .session()
         .append_with_metadata(
@@ -6804,8 +6858,10 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             .expect("serialized persisted evidence");
     assert!(persisted.contains("originalfact hidden input sentinel"));
     assert!(persisted.contains("originalfact unverified output sentinel"));
-    assert!(!persisted.contains("originalfact credential sentinel"));
-    assert!(persisted.contains("[REDACTED]"));
+    assert_eq!(persisted.contains("originalfact credential sentinel"), cli);
+    if !cli {
+        assert!(persisted.contains("[REDACTED]"));
+    }
     for marker in [
         "originalfact private reasoning sentinel",
         "originalfact opaque signature sentinel",
@@ -6815,6 +6871,20 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
         assert!(
             persisted.contains(marker),
             "private metadata must actually be persisted: {marker}"
+        );
+    }
+    if archived {
+        durable
+            .session()
+            .compact_archived(10)
+            .expect("archive original fact out of head");
+        assert!(
+            !durable
+                .session()
+                .read_entries()
+                .expect("head")
+                .iter()
+                .any(|entry| entry.content == "originalfact unique constraint")
         );
     }
     let mut engine = talos_permission::PermissionEngine::empty();
@@ -6828,6 +6898,7 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(RecoveryModel {
             step: AtomicUsize::new(0),
+            compact: archived,
         }),
         ToolRegistry::new(),
         Some(Arc::new(engine)),
@@ -6845,8 +6916,22 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             model_context_limit: 128_000,
         },
     );
-    actor.set_durable_persistence(durable.clone(), Default::default());
-    actor.set_recovered_history_sources(durable.read_history_snapshot().expect("snapshot"));
+    let original_head = std::fs::read(durable.session().file_path.clone()).expect("head bytes");
+    actor.set_session_paths(
+        durable.session().file_path.clone(),
+        durable
+            .session()
+            .file_path
+            .parent()
+            .expect("directory")
+            .to_path_buf(),
+    );
+    if cli {
+        actor.set_persistence(durable.session().clone(), Default::default());
+    } else {
+        actor.set_durable_persistence(durable.clone(), Default::default());
+        actor.set_recovered_history_sources(durable.read_history_snapshot().expect("snapshot"));
+    }
     let task = tokio::spawn(async move {
         actor.run().await;
         actor
@@ -6868,6 +6953,11 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
         completed_status(event),
         Some(TurnCompletionStatus::Success { .. })
     )));
+    if archived {
+        assert!(events.iter().any(|event| matches!(event,
+            SessionEvent::ModelCheckpointTerminal { outcome: talos_core::session::CompactOutcome::Applied { before, after }, .. } if after < before
+        )), "checkpoint must actually be Applied, not merely admitted");
+    }
     handle
         .sq_tx
         .send(SessionOp::Shutdown)
@@ -6875,6 +6965,12 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
         .expect("shutdown");
     let actor = task.await.expect("actor");
     assert_eq!(&actor.history[..raw.len()], raw.as_slice());
+    assert!(
+        std::fs::read(&durable.session().file_path)
+            .expect("persisted head")
+            .starts_with(&original_head),
+        "turn startup must preserve the original head even with legacy archival paths configured"
+    );
 }
 
 #[cfg(any(unix, windows))]

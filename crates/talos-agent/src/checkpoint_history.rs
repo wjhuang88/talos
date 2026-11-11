@@ -13,8 +13,9 @@ pub(crate) struct History {
     scope: String,
     owner: String,
     cancel: CancellationToken,
-    seal: RecoveryPrefixSeal,
+    seal: Mutex<RecoveryPrefixSeal>,
     state: Mutex<QueryState>,
+    archive: Option<talos_session::ArchiveRecoveryEvidence>,
 }
 struct QueryState {
     secret: [u8; 32],
@@ -365,6 +366,11 @@ impl Preparation {
             let mut parent = self.parent.clone();
             for entry in &page.entries {
                 if entry.parent_id != parent {
+                    tracing::warn!(
+                        reason = "parent_chain_mismatch",
+                        page_ordinal = cursor.next_ordinal(),
+                        "history preparation unavailable"
+                    );
                     return None;
                 }
                 parent = Some(entry.id.clone());
@@ -424,13 +430,87 @@ impl History {
         cancel: &CancellationToken,
         pending: &tokio::sync::Mutex<Option<Preparation>>,
     ) -> Option<Self> {
-        Self::prepare_until(
-            session,
-            cancel,
-            pending,
-            Instant::now() + Duration::from_secs(10),
-        )
-        .await
+        let deadline = Instant::now() + Duration::from_secs(10);
+        if let Some(history) = Self::prepare_until(session, cancel, pending, deadline).await {
+            return Some(history);
+        }
+        if cancel.is_cancelled() || Instant::now() >= deadline || pending.try_lock().ok()?.is_some()
+        {
+            return None;
+        }
+        let owner = session.clone();
+        let stopped = cancel.clone();
+        tokio::task::spawn_blocking(move || Self::prepare_archived(&owner, &stopped, deadline))
+            .await
+            .ok()?
+    }
+
+    fn prepare_archived(
+        session: &DurableSession,
+        cancel: &CancellationToken,
+        deadline: Instant,
+    ) -> Option<Self> {
+        let evidence = session
+            .session()
+            .inspect_archive_recovery(deadline, || cancel.is_cancelled())
+            .ok()?;
+        if evidence.removed_placeholders() == 0 || evidence.sources().len() < 2 {
+            return None;
+        }
+        let source = session.capture_recovery_source().ok()?;
+        let mut scan = source.begin_prefix_seal().ok()?;
+        while !scan.step(deadline, || cancel.is_cancelled()).ok()? {}
+        let seal = scan.finish().ok()?;
+        // Reinspection is unnecessary: evidence checks all supporting versions;
+        // selected head equality is verified against its captured version below.
+        evidence.check_all_sources(deadline).ok()?;
+        let path = session.recovery_index_path().ok()?;
+        let mut index = SessionIndex::new(&path).ok()?;
+        let stopped = cancel.clone();
+        let budget = RecoveryWorkBudget::with_cancellation_check(
+            deadline.saturating_duration_since(Instant::now()),
+            move || stopped.is_cancelled(),
+        );
+        index.init_recovery_schema_with_budget(&budget).ok()?;
+        let scope = uuid::Uuid::new_v4().to_string();
+        index
+            .replace_recovery_owner_scope(&session.id().to_string(), &scope, &budget)
+            .ok()?;
+        let mut cursor = index
+            .begin_recovery_build(&scope, source.source_end(), &budget)
+            .ok()?;
+        // This scope is the revocation/completion ledger, not an FTS substitute.
+        // The evidence corpus owns projected records and their original sources.
+        while !cursor.complete() {
+            let page = source
+                .read_page(cursor.next_offset(), deadline, || cancel.is_cancelled())
+                .ok()?;
+            seal.check_current().ok()?;
+            index
+                .advance_recovery_build(
+                    &scope,
+                    &cursor,
+                    RecoveryBuildPage {
+                        next_offset: page.next_offset,
+                        scanned_entries: page.entries.len() as u64,
+                        sources: &[],
+                    },
+                    &budget,
+                )
+                .ok()?;
+            cursor = index.recovery_build_cursor(&scope, &budget).ok()??;
+        }
+        evidence.check_all_sources(deadline).ok()?;
+        seal.check_current().ok()?;
+        Some(Self {
+            path,
+            scope,
+            owner: session.id().to_string(),
+            cancel: cancel.clone(),
+            seal: Mutex::new(seal),
+            state: Mutex::new(QueryState::default()),
+            archive: Some(evidence),
+        })
     }
 
     async fn prepare_until(
@@ -504,8 +584,9 @@ impl History {
             scope: work.scope,
             owner: session.id().to_string(),
             cancel: cancel.clone(),
-            seal: work.seal?,
+            seal: Mutex::new(work.seal?),
             state: Mutex::new(QueryState::default()),
+            archive: None,
         })
     }
 
@@ -530,8 +611,38 @@ impl History {
         self.cancel.is_cancelled()
     }
 
+    /// Revalidate the original captured prefix after host appends. No appended
+    /// records enter this execution's index. Mutated prefix bytes fail closed.
+    pub(crate) fn refresh_prefix(&self) -> Option<()> {
+        let mut seal = self.seal.lock().ok()?;
+        if self.cancel.is_cancelled() {
+            return None;
+        }
+        if seal.check_current().is_ok() {
+            return Some(());
+        }
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut scan = seal.begin_verification().ok()?;
+        while !scan.step(deadline, || self.cancel.is_cancelled()).ok()? {}
+        let refreshed = scan.finish().ok()?;
+        refreshed.check_current().ok()?;
+        *seal = refreshed;
+        Some(())
+    }
+
     pub(crate) fn current(&self) -> bool {
-        !self.cancel.is_cancelled() && self.seal.check_current().is_ok()
+        if self.archive.as_ref().is_some_and(|evidence| {
+            evidence
+                .check_supporting_sources(Instant::now() + Duration::from_secs(2))
+                .is_err()
+        }) {
+            return false;
+        }
+        !self.cancel.is_cancelled()
+            && self
+                .seal
+                .lock()
+                .is_ok_and(|seal| seal.check_current().is_ok())
     }
 
     pub(crate) fn available(&self) -> bool {
@@ -580,6 +691,13 @@ impl History {
         {
             return None;
         }
+        if let Some(evidence) = &self.archive {
+            let result = self.query_archive(evidence, query, reference, cursor)?;
+            return (self.available() && serde_json::to_vec(&result).ok()?.len() <= 16_384)
+                .then_some(result);
+        }
+        let seal = self.seal.lock().ok()?;
+        seal.check_current().ok()?;
         let mut state = self.state.lock().ok()?;
         let result = if let Some(reference) = reference {
             if cursor.is_some() {
@@ -596,7 +714,7 @@ impl History {
                 .recovery_candidate_text(
                     &self.scope,
                     candidate,
-                    &self.seal,
+                    &seal,
                     talos_session::history_projection::RecoveryTextKind::Detail,
                     &budget,
                 )
@@ -625,7 +743,7 @@ impl History {
                 let text = match index.recovery_candidate_text_with_source_budget(
                     &self.scope,
                     &candidate,
-                    &self.seal,
+                    &seal,
                     talos_session::history_projection::RecoveryTextKind::Snippet,
                     &budget,
                     &mut remaining,
@@ -661,6 +779,7 @@ impl History {
                 .map(|token| (token.clone(), query.to_owned(), last));
             json!({"status":"Ready","results":results,"complete":!incomplete,"next_cursor":next})
         };
+        drop(seal);
         if !self.current()
             || !index
                 .recovery_owner_scope_ready(&self.owner, &self.scope, &budget)
@@ -670,11 +789,237 @@ impl History {
         }
         (serde_json::to_vec(&result).ok()?.len() <= 16_384).then_some(result)
     }
+    fn query_archive(
+        &self,
+        evidence: &talos_session::ArchiveRecoveryEvidence,
+        query: Option<&str>,
+        reference: Option<&str>,
+        cursor: Option<&str>,
+    ) -> Option<Value> {
+        use talos_session::history_projection::{RecoveryTextKind, recovery_response_text};
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut state = self.state.lock().ok()?;
+        if let Some(reference) = reference {
+            if cursor.is_some() {
+                return None;
+            }
+            let ordinal = state.ordinal(reference)?;
+            let entry = evidence.entries().get(usize::try_from(ordinal).ok()?)?;
+            // Legacy archives carry no invented receipt; unverified tools stay unavailable.
+            let text = recovery_response_text(entry, None, RecoveryTextKind::Detail)?;
+            return Some(
+                json!({"status":"Ready","reference":reference,"text":text.text,"truncated":text.truncated}),
+            );
+        }
+        let query = query?;
+        let after = if let Some(cursor) = cursor {
+            let (expected, expected_query, after) = state.cursor.as_ref()?;
+            if expected != cursor || expected_query != query {
+                return None;
+            }
+            *after
+        } else {
+            None
+        };
+        let needle = query.to_lowercase();
+        let mut results = Vec::new();
+        let mut last = after;
+        let mut incomplete = false;
+        for (ordinal, entry) in evidence
+            .entries()
+            .iter()
+            .enumerate()
+            .skip(after.map_or(0, |n| n as usize + 1))
+        {
+            if self.cancel.is_cancelled() || Instant::now() >= deadline {
+                return None;
+            }
+            let Some(text) = talos_session::history_projection::recovery_index_text(entry, None)
+            else {
+                last = Some(ordinal as u64);
+                continue;
+            };
+            if !text.to_lowercase().contains(&needle) {
+                last = Some(ordinal as u64);
+                continue;
+            }
+            if results.len() == 20 {
+                incomplete = true;
+                break;
+            }
+            let text = recovery_response_text(entry, None, RecoveryTextKind::Snippet)?;
+            results.push(json!({"reference":state.reference(ordinal as u64),"text":text.text,"truncated":text.truncated}));
+            if serde_json::to_vec(&results).ok()?.len() > 15_000 {
+                results.pop();
+                incomplete = true;
+                break;
+            }
+            last = Some(ordinal as u64);
+        }
+        if incomplete && last == after {
+            return None;
+        }
+        let next = incomplete.then(|| uuid::Uuid::new_v4().to_string());
+        state.cursor = next
+            .as_ref()
+            .map(|token| (token.clone(), query.to_owned(), last));
+        Some(json!({"status":"Ready","results":results,"complete":!incomplete,"next_cursor":next}))
+    }
 }
 
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn archived_queries_preserve_legacy_parents_page_and_revoke_on_source_or_scope_change() {
+        use talos_core::message::Message;
+        use talos_session::SessionStore;
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "archived-query").expect("owner");
+        for i in 0..65 {
+            owner
+                .session()
+                .append(&Message::User {
+                    content: format!("archivedfact {i}"),
+                })
+                .expect("append");
+        }
+        let mut legacy = owner.session().read_entries().expect("entries");
+        for i in 2..legacy.len() {
+            legacy[i].parent_id = Some(legacy[0].id.clone());
+        }
+        talos_session::CompactTextSessionStore
+            .replace_entries_atomically(owner.file_path(), &legacy)
+            .expect("legacy parent fixture");
+        owner.session().compact_archived(10).expect("archive");
+        let before = owner.session().snapshot_bytes().expect("original head");
+        let cancel = CancellationToken::new();
+        let history = History::prepare(&owner, &cancel)
+            .await
+            .expect("archived history");
+        assert!(history.archive.is_some());
+        let first = history
+            .query(Some("archivedfact"), None, None)
+            .expect("page");
+        assert_eq!(first["results"].as_array().expect("results").len(), 20);
+        assert_eq!(first["results"][0]["text"], "archivedfact 0");
+        let reference = first["results"][0]["reference"]
+            .as_str()
+            .expect("reference");
+        assert_eq!(
+            history.query(None, Some(reference), None).expect("detail")["text"],
+            "archivedfact 0"
+        );
+        let cursor = first["next_cursor"].as_str().expect("cursor");
+        assert!(history.query(Some("changed"), None, Some(cursor)).is_none());
+        let second = history
+            .query(Some("archivedfact"), None, Some(cursor))
+            .expect("next page");
+        assert_eq!(second["results"][0]["text"], "archivedfact 20");
+        assert!(
+            history
+                .query(Some("archivedfact"), None, Some(cursor))
+                .is_none(),
+            "cursor replay"
+        );
+        assert_eq!(
+            owner.session().snapshot_bytes().expect("unchanged head"),
+            before
+        );
+        owner
+            .session()
+            .append(&Message::User {
+                content: "new excluded fact".into(),
+            })
+            .expect("append");
+        history.refresh_prefix().expect("head append verified");
+        assert!(
+            history
+                .query(Some("new excluded"), None, None)
+                .expect("query")["results"]
+                .as_array()
+                .expect("results")
+                .is_empty()
+        );
+        let replacement = History::prepare(&owner, &CancellationToken::new())
+            .await
+            .expect("new scope");
+        assert!(
+            history.query(Some("archivedfact"), None, None).is_none(),
+            "old scope retired"
+        );
+        let archive = replacement
+            .archive
+            .as_ref()
+            .expect("archive corpus")
+            .sources()
+            .iter()
+            .find(|source| source.path != owner.file_path())
+            .expect("archive")
+            .path
+            .clone();
+        std::fs::write(archive, b"changed archive").expect("external mutation");
+        assert!(!replacement.available());
+        assert!(
+            replacement
+                .query(Some("archivedfact"), None, None)
+                .is_none()
+        );
+        cancel.cancel();
+        assert!(history.refresh_prefix().is_none());
+    }
+    #[tokio::test]
+    async fn prefix_refresh_accepts_append_without_extending_scope_and_refuses_mutation() {
+        use talos_core::message::Message;
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "refresh").expect("owner");
+        owner
+            .commit_turn(
+                "first",
+                &[Message::User {
+                    content: "original constraint".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        let history = History::prepare(&owner, &CancellationToken::new())
+            .await
+            .expect("history");
+        let scope = history.scope_identity().to_owned();
+        owner
+            .session()
+            .append(&Message::User {
+                content: "appended excluded".into(),
+            })
+            .expect("append");
+        assert!(!history.current());
+        history.refresh_prefix().expect("same prefix");
+        assert_eq!(history.scope_identity(), scope);
+        assert!(
+            !history
+                .query(Some("constraint"), None, None)
+                .expect("query")["results"]
+                .as_array()
+                .expect("results")
+                .is_empty()
+        );
+        assert!(
+            history.query(Some("excluded"), None, None).expect("query")["results"]
+                .as_array()
+                .expect("results")
+                .is_empty()
+        );
+        let bytes = std::fs::read(owner.file_path()).expect("bytes");
+        let mut changed = bytes.clone();
+        let offset = changed
+            .windows(b"original".len())
+            .position(|part| part == b"original")
+            .expect("original");
+        changed[offset] = b'X';
+        std::fs::write(owner.file_path(), changed).expect("mutate prefix");
+        assert!(history.refresh_prefix().is_none());
+        assert!(history.query(Some("constraint"), None, None).is_none());
+    }
     #[tokio::test]
     async fn cancelled_preparation_task_abort_retires_saved_record() {
         let root = tempfile::tempdir().expect("root");
