@@ -19,7 +19,7 @@
 | Governance Claim PR | #911 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance-only C claim [#911](https://github.com/wjhuang88/talos/pull/911) merged `60da1bbadca00c9bdee6fbcb8f5ad990a4313331` after exact-head CI #4055, both governance validators 0 warnings, no-overlap CAS and documented single-maintainer path. Public C implementation requires independent API/architecture review. |
-| Implementation PR | Pending C review candidate |
+| Implementation PR | #912 (draft; CI and independent API review required) |
 | Last Updated | 2026-11-11 |
 | Handoff / Release Condition | C claim #911 is effective. C implementation needs exact-head platform CI, both governance validators and independent API/architecture review; D/E/F and #897 Host wiring remain separately gated. |
 
