@@ -822,3 +822,36 @@ The isolated candidate's staged diff has been reviewed; primary dirty tree and
 live session files are untouched. Windows native tests and final committed-head
 independent review are the next gates. No merge, deployment, full archived-fork
 completion or default background continuation change is claimed.
+
+
+## 2026-11-12 candidate CI conflict and shared archive deadline
+
+Windows lease/writer corrections were committed and pushed as
+`ad6519cbfa1862c4573050c732a5a6566238a1a5`. Authorized independent read-only
+review bound to that exact head found no new blocking code issue; native Windows
+execution is still required to close both P1s, especially the atomic rename barrier.
+GitHub reported PR #917 CONFLICTING and no checks for that head; earlier successful
+run 43064415263 belongs to 39d2f327 and is not new-head evidence.
+
+Merged origin/main f61a15cd into the isolated candidate as
+`f48ef1d17fdbff2b1f02d07b14b583832a48a808`, preserving reviewed commits. The only
+conflict was Board content: retained recovery entries and main's updated Azure
+status. No primary rebase or source/data overwrite. Both governance validators
+passed; independent review confirmed this merge introduces documentation only.
+
+Follow-up implementation passes the caller deadline into archive search/detail,
+removing the independent fresh scanning budget noted by review. Existing real
+archive evidence regression now verifies expired-budget search and detail refusal;
+23 focused checkpoint_history tests passed in
+`/tmp/talos-recovery-shared-deadline-tests.log`. Independent review found no new
+blocking issue in this uncommitted increment. Full standard preflight is running
+as handle 98545, log `/tmp/talos-recovery-main-deadline-preflight.log`; no result
+claimed yet. Native Windows, final committed-head review and live host/provider
+acceptance remain pending. Full archived fork remains unimplemented; containment
+is not completion. Default background continuation stays off. Status Partial.
+
+
+Follow-up validation: standard preflight handle 98545 exited 0, including locked
+workspace checks, Clippy, tests, doctests and external SDK fixture. Log:
+`/tmp/talos-recovery-main-deadline-preflight.log`. Source stayed unchanged during
+the run. This does not replace Windows native execution or host acceptance.
