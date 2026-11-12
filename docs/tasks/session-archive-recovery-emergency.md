@@ -1341,3 +1341,178 @@ execution.361 Linux session tests, format/diff checks and independent production
 review passed. Saving this bounded increment locally does not complete archived
 fork or the overall task; candidate-wide preflight and remote/native evidence remain
 required. Primary uncommitted changes and all session data remain preserved.
+
+## Shared startup/TUI fork staging increment (uncommitted, tests pending)
+
+Owned-archive implementation saved locally as6483241c. Clean validation worktree is
+now detached at that commit; standard preflight handle99418/log
+`/tmp/talos-owned-archive-preflight.log` remains live. No overlapping heavy test run.
+
+Candidate-only CLI change extracts shared begin/copy/finish staging from TUI and
+routes startup --fork through it. Startup no longer scans one snapshot then copies
+a later unvalidated snapshot, or writes directly over an existing destination.
+Source capture/version validation, exact bytes, create-new staging, sync and
+hard-link publication are shared. Existing destination is never enrolled in rollback;
+after successful install the manager retains sole sidecar/index rollback/error handling.
+Blocking path keeps its10s cooperative deadline through finish checks; async path
+retains per-page2s/cancellation and adds bounded finish checks. Kernel I/O cannot be
+interrupted by those checks.
+
+Independent static review found no new ownership/cleanup blocker and identified
+missing finish deadline checks, now corrected. Actual-file regression added for
+multiline Unicode/tab byte preservation, destination collision, retained publication
+and expired finish cleanup; not run yet. Existing startup index/runtime-identity and
+archive-refusal tests must pass too. Two CLI files remain candidate-only/uncommitted;
+primary unchanged. This unifies two entry paths but does not enable archived fork:
+shared storage receipts/origins, format/incarnation gate, REPL integration and full
+publication/restart/native acceptance remain outstanding.
+
+
+Owned-archive fixed commit6483241c standard `./scripts/release_preflight.sh` completed
+exit0, `/tmp/talos-owned-archive-preflight.log` ends `release preflight: passed`.
+Workspace check/Clippy/tests, governance gates and both external SDK fixture modes
+passed under unchanged resource limits and low-debug/external TMPDIR settings;
+runtime13m46s, peak2GiB/no swap. This validates6483241c only; it does not cover the
+new shared CLI staging increment or primary UI/edit/background changes.
+Shared staging fork-filter CLI tests now run serially as14182 in
+`/tmp/talos-shared-fork-tests.log`. No source reset, remote push, merge or deployment.
+
+
+Shared startup/TUI staging validated: all11 fork-filter tests and all431 CLI binary
+unit tests passed, zero failed/ignored. Logs `/tmp/talos-shared-fork-tests.log` and
+`/tmp/talos-shared-fork-cli.log`. Pinned format and whitespace checks passed.
+Coverage includes source bytes, existing destination protection, expired finish,
+startup runtime identity/index, TUI cancellation during metadata/commit and successful
+retained publication. Static review found no cleanup blocker; finish deadline checks
+were added after its observation. Complete archived fork remains unimplemented.
+
+The two tested CLI files were selectively synced into primary after proving both
+matched6483241c base bytes. Backup `/tmp/talos-shared-fork-primary-backup-20261112-150745/`; all other Rust source hashes unchanged.
+No commit/push/deployment for this new increment; primary full-tree validation and
+final candidate gates remain outstanding. No heavy verification process remains live
+from this increment (99418/14182/85891 all terminal exit0).
+
+### 2026-11-12 REPL default fork compatibility tail (implementation pending execution)
+
+The latest selected-fork CLI run completed successfully:433 passed, zero failed or
+ignored, `/tmp/talos-selected-fork-cli-final.log`. This predates the changes below.
+JSONL direct-store read+append permission migration is now recorded in ADR-104,
+RUNTIME-SDK-CONTRACT and store Rustdoc; no ACL is changed automatically.
+
+Added `default_repl_fork_excludes_incomplete_tail_and_can_append_after_reopen`,
+using actual incomplete TLOG bytes, exact prefix equality, cold append/reopen parent
+link checks and source-byte preservation. REPL now selects the last retained record
+boundary inside the same bounded source scan. No whole-file tip pre-read is used.
+The last-record offset commits only after each page's source/cancellation checks;
+finish reuses the complete/source-current checks. The existing multi-page JSONL/TLOG
+compatibility-tail regression now also checks last-record cutoff versus physical EOF.
+Startup/TUI preserve their existing physical-EOF copying behavior; their incomplete-tail
+continuation limitation remains, and full archived fork receipt/envelope remains absent.
+
+Independent reviewer statically accepted the single-scan implementation, with no new
+blocker; no execution was performed by the reviewer. Format and diff checks passed.
+Both project governance and claim validators passed with zero warnings before this
+append. New Rust regression execution and full candidate gates are pending: another
+worktree's `talos-git-path-preflight.service` was explicitly confirmed active/running
+(MainPID23206), so no competing heavy compilation was started. Do not reuse the old
+433 CLI or6483241c preflight results as verification of this dirty candidate.
+Next: after that service terminates, run CLI binary and session tests under the existing
+CPU100%/2GiB high/3GiB max/no-swap/jobs1/threads1 limits and approved external TMPDIR;
+then MSVC tests and exact candidate standard preflight. Latest candidate changes are
+not synced to primary, committed, pushed or deployed. Overall recovery remains Partial.
+
+### Unified fork tail boundary follow-up (supersedes REPL-only scope above)
+
+The implementation now applies the same last-record cutoff to startup, REPL and
+async TUI staging. Ordinary scan physical-EOF API semantics stay unchanged. The
+REPL-only helper and boolean selection were removed. Valid records, including
+non-message diagnostic/activation records, retain their original bytes; source files
+are untouched, and invalid interior JSONL lines are not cleaned or re-encoded.
+The startup+REPL actual-file regression now checks both entry paths, and a new async
+staging test covers incomplete TLOG and skipped JSONL suffixes, install, cold append,
+reopen and parent identity. This addresses the previously recorded startup/TUI tail
+limitation in code, but execution remains pending. The other worktree preflight was
+again confirmed live, with cargo59240 and active rustc child, so it was not restarted
+or interrupted. Full archived-fork custody/envelope work remains outstanding.
+
+Independent static review accepted unified last-record cutoff: it updates before
+model-message filtering, so valid diagnostic/control SessionEntry tails and metadata
+are retained. Unknown non-entry JSONL trailers are excluded, not all arbitrary
+metadata formats preserved. Async regression now ends its valid prefix with a filtered
+diagnostic record and checks its ID/content, exact prefix, and continuation parent.
+No compile result is available yet; live preflight23206 remains the serial resource wait.
+
+Cancellation follow-up: expanded the existing mid-page retry test across twelve
+callback stop positions using an explicitly selected entry. On stopped pages it
+asserts no offset, selected cutoff, last-record cutoff or message publication, then
+retries and checks the exact original byte boundary, one message and tail identity.
+This locks the new cutoff into the existing transactional page semantics. Format
+and diff checks passed; Rust execution is still pending the confirmed live external
+preflight, not claimed passed. No second heavy job was started.
+
+### Unified tail execution results
+
+The external preflight service terminated (inactive/dead, MainPID0). Its workspace
+tests failed; its evidence does not validate this recovery candidate. A concurrent
+sandbox launch also failed with /tmp disk quota exceeded. No session files or test
+evidence were removed. Recovery validation used the previously approved external
+TMPDIR and unchanged resource limits, with logs on the primary target filesystem.
+
+First CLI run:434 passed, one failed. The older multi-page raw-copy fixture expected
+the invalid JSONL trailer in the child. Updated only child expectations to the exact
+valid prefix; source-byte preservation, collision refusal and cleanup checks remain.
+Final CLI run:435 passed, zero failed/ignored, exit0. Log:
+`/home/wjhuang/WorkSpace/personal/talos/target/recovery-unified-tail-cli-r2.log`.
+Session suite:362 library tests plus27 integration tests passed, zero failed/ignored,
+exit0; doc tests contain zero cases. Log:
+`/home/wjhuang/WorkSpace/personal/talos/target/recovery-unified-tail-session.log`.
+This includes callback-position cancellation, multi-page record cutoff, and original
+byte preservation. Format and diff checks passed after the final test correction.
+MSVC test compilation and full exact-candidate preflight remain outstanding; no
+commit/push/deployment or full archived-fork completion is implied.
+
+Windows follow-up: `cargo xwin check --locked -p talos-session -p talos-cli
+--all-features --tests --target x86_64-pc-windows-msvc` completed exit0 under the
+same resource caps; log `target/recovery-unified-tail-msvc.log` in the primary
+workspace. Existing CLI workspace_root dead-code warning remains. This is build
+compatibility, not native Windows lifecycle acceptance. The standard candidate
+`./scripts/release_preflight.sh` is now running as
+`talos-recovery-unified-tail-preflight.service`, tool session88951, logging to primary
+`target/recovery-unified-tail-preflight.log`. Poll this exact run before restarting
+or launching another heavy check; its result is pending.
+Current source files remain fixed during validation. Final independent read-only
+review found no new production blocker and confirmed the CLI/session logs; it did
+not run compilation. Complete archived fork remains unimplemented.
+
+### Disk-backed candidate and preflight correction
+
+The first unified-tail preflight exited101 on CLI EventLoop.workspace_root dead code,
+left unused by the shared fork refactor. Removed that field, its constructor argument
+and the single production/test initialization; no warning suppression. Format and
+diff checks passed. /tmp quota prevented appending the owner tail, so the complete
+owner was preserved in primary target/recovery-owner-repaired.md and restored.
+Git worktree move failed across filesystems; copied all candidate files and repaired
+worktree registration to /home/wjhuang/WorkSpace/personal/talos/target/session-recovery-integration.
+The old /tmp directory remains a backup, no longer the active registered worktree.
+No session data or dirty primary files were removed. Standard preflight r2 now runs
+on the relocated candidate, tool session78276, unit talos-recovery-unified-tail-preflight-r2,
+primary log target/recovery-unified-tail-preflight-r2.log. Result pending; poll this
+run rather than restart. Recheck MSVC after constructor change; full archived fork
+and remaining handoff requirements remain open.
+
+### Unified-tail final standard validation
+
+Relocated candidate standard preflight r2 completed exit0 (`release preflight: passed`),
+14m7s, peak2GiB/no swap under unchanged caps. Log: primary
+`target/recovery-unified-tail-preflight-r2.log`. Completed test summaries report5359
+passed/0failed/0ignored; external SDK fixture validation passed. This validates the
+current shared fork/cutoff/JSONL candidate including constructor cleanup. Independent
+review separately accepted the constructor cleanup. Migration compared2126 files,
+no missing files; only two intended source cleanup files and this owner differed.
+MSVC needs recheck after constructor cleanup. No full archived fork, primary sync,
+commit/push, native host or native Windows acceptance is claimed.
+
+Final constructor-cleanup MSVC all-features tests check exited0 (4.93s, peak984MiB),
+primary log target/recovery-unified-tail-msvc-final.log; the previous dead-code warning
+is gone. This remains cross-compilation only. Saving this reviewed increment locally
+does not close archived-fork receipt work or authorize deployment.

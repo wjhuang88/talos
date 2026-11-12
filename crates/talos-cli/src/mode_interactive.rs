@@ -217,13 +217,8 @@ pub(crate) async fn run_interactive_mode(cli: Cli) -> Result<()> {
     );
     tokio::spawn(async move { actor.run().await });
 
-    let event_loop = event_loop::EventLoop::new(
-        workspace_root,
-        session,
-        session_manager,
-        handle,
-        terminal_approval_rx,
-    );
+    let event_loop =
+        event_loop::EventLoop::new(session, session_manager, handle, terminal_approval_rx);
     event_loop.run().await
 }
 

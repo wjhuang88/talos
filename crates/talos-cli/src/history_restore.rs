@@ -63,6 +63,96 @@ impl Drop for StagedForkHistory {
     }
 }
 
+fn begin_fork_stage(
+    session: &Session,
+    staged_path: std::path::PathBuf,
+    through_entry: Option<&str>,
+) -> Result<(talos_session::SessionMessageScan, StagedForkHistory)> {
+    let scan = match through_entry {
+        Some(id) => session.begin_message_scan_through(id)?,
+        None => session.begin_message_scan()?,
+    };
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options.open(&staged_path)?;
+    Ok((
+        scan,
+        StagedForkHistory {
+            path: staged_path,
+            file: Some(file),
+            retained: false,
+            child_cleanup: None,
+            extra_path: None,
+        },
+    ))
+}
+
+fn copy_fork_page(
+    scan: &mut talos_session::SessionMessageScan,
+    staged: &mut StagedForkHistory,
+    deadline: std::time::Instant,
+    stop: &CancellationToken,
+) -> Result<bool> {
+    use std::io::Write;
+    let page = scan.copy_next_page(deadline, || stop.is_cancelled())?;
+    let copied = page.is_none();
+    if let Some(page) = page {
+        staged
+            .file
+            .as_mut()
+            .context("fork file closed")?
+            .write_all(&page)?;
+    }
+    let decoded = scan.step(deadline, || stop.is_cancelled())?;
+    Ok(copied && decoded)
+}
+
+fn finish_fork_stage(
+    scan: talos_session::SessionMessageScan,
+    staged: StagedForkHistory,
+    stop: &CancellationToken,
+    deadline: std::time::Instant,
+) -> Result<(StagedForkHistory, Vec<Message>, talos_session::SessionEntry)> {
+    let check = || -> Result<()> {
+        if stop.is_cancelled() || std::time::Instant::now() >= deadline {
+            bail!("fork cancelled or deadline exceeded");
+        }
+        Ok(())
+    };
+    check()?;
+    if scan.has_archive_placeholder() {
+        bail!(
+            "cannot fork archived history: preserving archive provenance in the child is not yet supported; continue the original session"
+        );
+    }
+    let (messages, tail, copy_length) = scan.finish_with_record_copy_length()?;
+    let file = staged.file.as_ref().context("fork file closed")?;
+    file.set_len(copy_length)?;
+    check()?;
+    file.sync_all()?;
+    check()?;
+    let tail = tail.context("cannot fork an empty Session")?;
+    Ok((staged, messages, tail))
+}
+
+/// Startup shares TUI's byte capture, source validation and no-overwrite publication.
+pub(crate) fn stage_fork_history_blocking(
+    session: &Session,
+    staged_path: std::path::PathBuf,
+    through_entry: Option<&str>,
+) -> Result<(StagedForkHistory, Vec<Message>, talos_session::SessionEntry)> {
+    let stop = CancellationToken::new();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let (mut scan, mut staged) = begin_fork_stage(session, staged_path, through_entry)?;
+    while !copy_fork_page(&mut scan, &mut staged, deadline, &stop)? {}
+    finish_fork_stage(scan, staged, &stop, deadline)
+}
+
 pub(crate) async fn stage_fork_history(
     session: &Session,
     staged_path: std::path::PathBuf,
@@ -70,45 +160,16 @@ pub(crate) async fn stage_fork_history(
     let stop = CancellationToken::new();
     let _cancel_on_drop = stop.clone().drop_guard();
     let session = session.clone();
-    let (mut scan, mut staged) = tokio::task::spawn_blocking(move || {
-        let scan = session.begin_message_scan()?;
-        let mut options = std::fs::OpenOptions::new();
-        options.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        let file = options.open(&staged_path)?;
-        Ok::<_, anyhow::Error>((
-            scan,
-            StagedForkHistory {
-                path: staged_path,
-                file: Some(file),
-                retained: false,
-                child_cleanup: None,
-                extra_path: None,
-            },
-        ))
-    })
-    .await
-    .context("fork capture worker failed")??;
+    let (mut scan, mut staged) =
+        tokio::task::spawn_blocking(move || begin_fork_stage(&session, staged_path, None))
+            .await
+            .context("fork capture worker failed")??;
     loop {
         let worker_stop = stop.clone();
         let result = tokio::task::spawn_blocking(move || {
-            use std::io::Write;
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-            let page = scan.copy_next_page(deadline, || worker_stop.is_cancelled())?;
-            let copied = page.is_none();
-            if let Some(page) = page {
-                staged
-                    .file
-                    .as_mut()
-                    .context("fork file closed")?
-                    .write_all(&page)?;
-            }
-            let decoded = scan.step(deadline, || worker_stop.is_cancelled())?;
-            Ok::<_, anyhow::Error>((scan, staged, copied && decoded))
+            let done = copy_fork_page(&mut scan, &mut staged, deadline, &worker_stop)?;
+            Ok::<_, anyhow::Error>((scan, staged, done))
         })
         .await
         .context("fork page worker failed")??;
@@ -118,22 +179,8 @@ pub(crate) async fn stage_fork_history(
         }
     }
     tokio::task::spawn_blocking(move || {
-        if stop.is_cancelled() {
-            bail!("fork cancelled");
-        }
-        if scan.has_archive_placeholder() {
-            bail!(
-                "cannot fork archived history: preserving archive provenance in the child is not yet supported; continue the original session"
-            );
-        }
-        staged
-            .file
-            .as_ref()
-            .context("fork file closed")?
-            .sync_all()?;
-        let (messages, tail) = scan.finish_with_tail()?;
-        let tail = tail.context("cannot fork an empty Session")?;
-        Ok((staged, messages, tail))
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        finish_fork_stage(scan, staged, &stop, deadline)
     })
     .await
     .context("fork finish worker failed")?
@@ -262,6 +309,134 @@ mod tests {
     use tokio::sync::mpsc::{self, Receiver};
 
     struct ObserveHistory(mpsc::UnboundedSender<Vec<Message>>);
+
+    #[test]
+    fn blocking_fork_stage_preserves_bytes_and_refuses_existing_destination() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager.create_session("staging", "").expect("source");
+        source
+            .append(&Message::User {
+                content: "原始\nrecord\tbytes".into(),
+            })
+            .expect("append");
+        let before = source.snapshot_bytes().expect("original");
+        let staging = root.path().join("child.fork-staging");
+        let destination = root.path().join("child.tlog");
+        std::fs::write(&destination, b"existing unrelated child").expect("sentinel");
+        let (mut guard, messages, tail) =
+            stage_fork_history_blocking(&source, staging.clone(), None).expect("stage");
+        assert_eq!(messages.len(), 1);
+        assert_eq!(tail.content, "原始\nrecord\tbytes");
+        assert_eq!(std::fs::read(&staging).expect("staged"), before);
+        assert!(guard.install(&destination).is_err());
+        drop(guard);
+        assert!(!staging.exists());
+        assert_eq!(
+            std::fs::read(&destination).expect("preserved"),
+            b"existing unrelated child"
+        );
+        assert_eq!(source.snapshot_bytes().expect("source unchanged"), before);
+
+        let (mut guard, _, _) =
+            stage_fork_history_blocking(&source, staging, None).expect("restage");
+        let fresh = root.path().join("fresh-child.tlog");
+        guard.install(&fresh).expect("publish");
+        guard.retain();
+        drop(guard);
+        assert_eq!(std::fs::read(fresh).expect("exact published bytes"), before);
+
+        let timed_out = root.path().join("timed-out.fork-staging");
+        let (mut scan, mut guard) =
+            begin_fork_stage(&source, timed_out.clone(), None).expect("capture");
+        let stop = CancellationToken::new();
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !copy_fork_page(&mut scan, &mut guard, deadline, &stop).expect("copy") {}
+        assert!(finish_fork_stage(scan, guard, &stop, std::time::Instant::now()).is_err());
+        assert!(
+            !timed_out.exists(),
+            "expired unpublished copy is cleaned up"
+        );
+        assert_eq!(source.snapshot_bytes().expect("original remains"), before);
+    }
+
+    #[tokio::test]
+    async fn async_fork_stage_excludes_compatibility_tail_before_cold_append() {
+        for extension in ["tlog", "jsonl"] {
+            let root = tempfile::tempdir().expect("root");
+            let id = uuid::Uuid::new_v4();
+            let source = Session::new(
+                id,
+                "staging".into(),
+                String::new(),
+                root.path().join(format!("{id}.{extension}")),
+            );
+            source
+                .append(&Message::User {
+                    content: "original".into(),
+                })
+                .expect("append");
+            let last = source.read_entries().expect("entries").pop().expect("user");
+            let diagnostic = talos_session::SessionEntry {
+                id: "diagnostic-tail".into(),
+                parent_id: Some(last.id),
+                timestamp: last.timestamp,
+                role: "diagnostic".into(),
+                content: "retained control record".into(),
+                metadata: Default::default(),
+            };
+            let store: Box<dyn talos_session::SessionStore> = if extension == "tlog" {
+                Box::new(talos_session::CompactTextSessionStore)
+            } else {
+                Box::new(talos_session::JsonlSessionStore)
+            };
+            store
+                .append_entry(&source.file_path, &diagnostic)
+                .expect("diagnostic append");
+            let prefix = source.snapshot_bytes().expect("valid prefix");
+            let mut before = prefix.clone();
+            before.extend_from_slice(if extension == "tlog" {
+                b"E\t0\t1000\tpartial\t-\t2097153:x"
+            } else {
+                b"invalid legacy suffix\n"
+            });
+            std::fs::write(&source.file_path, &before).expect("compatibility suffix");
+            let child_id = uuid::Uuid::new_v4();
+            let destination = root.path().join(format!("{child_id}.{extension}"));
+            let (mut staged, messages, tail) =
+                stage_fork_history(&source, root.path().join("child.fork-staging"))
+                    .await
+                    .expect("async stage");
+            assert_eq!(messages.len(), 1);
+            assert_eq!(tail.id, diagnostic.id);
+            staged.install(&destination).expect("install");
+            staged.retain();
+            drop(staged);
+            assert_eq!(
+                std::fs::read(&destination).expect("exact valid prefix"),
+                prefix
+            );
+            let child = Session::new(
+                child_id,
+                "staging".into(),
+                String::new(),
+                destination.clone(),
+            );
+            child
+                .append(&Message::User {
+                    content: "continued".into(),
+                })
+                .expect("cold append");
+            let reopened = Session::new(child_id, "staging".into(), String::new(), destination);
+            let entries = reopened.read_entries().expect("reopen");
+            assert_eq!(entries.len(), 3);
+            assert_eq!(entries[1].id, diagnostic.id);
+            assert_eq!(entries[1].content, diagnostic.content);
+            assert_eq!(entries[2].parent_id.as_deref(), Some(tail.id.as_str()));
+            assert_eq!(entries[2].content, "continued");
+            assert_eq!(source.snapshot_bytes().expect("source unchanged"), before);
+        }
+    }
 
     #[tokio::test]
     async fn archived_startup_and_transition_restore_original_history_without_rewriting_head() {
@@ -599,6 +774,7 @@ mod tests {
             bytes.push_str(&serde_json::json!({"type":"message", "data":Message::User { content: format!("{i}:{}", "x".repeat(260)) }}).to_string());
             bytes.push('\n');
         }
+        let valid_end = bytes.len();
         bytes.push_str("invalid trailing record\n");
         std::fs::write(&source.file_path, &bytes).expect("source");
         let stage = root.path().join("staged");
@@ -607,10 +783,7 @@ mod tests {
             .await
             .expect("stage");
         assert_eq!(messages.len(), 8300);
-        assert_eq!(
-            std::fs::read(&stage).expect("staged bytes"),
-            bytes.as_bytes()
-        );
+        assert!(std::fs::read(&stage).expect("staged bytes") == bytes.as_bytes()[..valid_end]);
         std::fs::write(&child, "existing child").expect("collision");
         assert!(guard.install(&child).is_err());
         assert_eq!(
@@ -620,7 +793,7 @@ mod tests {
         let installed = root.path().join("new-child.jsonl");
         guard.install(&installed).expect("install");
         assert!(!stage.exists());
-        assert_eq!(std::fs::read(&installed).expect("child"), bytes.as_bytes());
+        assert!(std::fs::read(&installed).expect("child") == bytes.as_bytes()[..valid_end]);
         drop(guard);
         assert!(!installed.exists(), "unpublished child must be removed");
         assert_eq!(

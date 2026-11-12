@@ -187,6 +187,9 @@ pub trait SessionStore: Send + Sync + std::fmt::Debug {
 ///
 /// This is the default store, preserving backward compatibility with
 /// existing `.jsonl` session files.
+///
+/// Appending requires read and append access to inspect the final record separator.
+/// Legacy final records without a newline receive one before the next entry.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct JsonlSessionStore;
 
@@ -206,8 +209,23 @@ impl SessionStore for JsonlSessionStore {
         }
 
         let mut file = retry_sharing_conflict(|| {
-            OpenOptions::new().create(true).append(true).open(file_path)
+            OpenOptions::new()
+                .create(true)
+                .read(true)
+                .append(true)
+                .open(file_path)
         })?;
+        // Valid legacy JSONL may end immediately after its final JSON value.
+        // Preserve those bytes and separate the next record at the append
+        // boundary, including children copied without re-encoding their prefix.
+        if file.metadata()?.len() > 0 {
+            file.seek(SeekFrom::End(-1))?;
+            let mut last = [0_u8; 1];
+            file.read_exact(&mut last)?;
+            if last[0] != b'\n' {
+                file.write_all(b"\n")?;
+            }
+        }
         writeln!(file, "{line}")?;
 
         Ok(())

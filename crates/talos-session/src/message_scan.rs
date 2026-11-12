@@ -27,9 +27,27 @@ pub struct SessionMessageScan {
     last_entry: Option<crate::SessionEntry>,
     complete: bool,
     archive_placeholder: bool,
+    through_entry: Option<String>,
+    selected_end: Option<u64>,
+    last_entry_end: u64,
 }
 
 impl crate::Session {
+    /// Capture an original-byte prefix ending at one unique decoded entry ID.
+    ///
+    /// The entire captured source is still validated, including duplicate target
+    /// IDs and archive placeholders. Finish returns an error if the ID is absent.
+    /// Copied pages must be truncated to the length returned by
+    /// [`SessionMessageScan::finish_with_copy_length`] before publication.
+    pub fn begin_message_scan_through(
+        &self,
+        entry_id: &str,
+    ) -> Result<SessionMessageScan, HistoryPageError> {
+        let mut scan = self.begin_message_scan()?;
+        scan.through_entry = Some(entry_id.to_owned());
+        Ok(scan)
+    }
+
     /// Start a bounded-page message restore using the configured store encoding.
     ///
     /// Custom stores must opt into a built-in encoding; otherwise this returns
@@ -72,6 +90,9 @@ impl crate::Session {
             last_entry: None,
             complete: false,
             archive_placeholder: false,
+            through_entry: None,
+            selected_end: None,
+            last_entry_end: 0,
         })
     }
 }
@@ -161,21 +182,36 @@ impl SessionMessageScan {
         let page = self
             .buffer
             .read(&self.path, self.offset, deadline, &stopped, &mut counter)?;
-        let last_entry = page.entries.last().cloned();
+        let mut last_entry = None;
+        let mut last_entry_end = self.last_entry_end;
+        let mut selected_end = self.selected_end;
         let mut decoder = self.decoder.clone();
         let mut messages = Vec::new();
         let mut archive_placeholder = self.archive_placeholder;
-        for entry in page.entries {
+        for (entry, range) in page.entries.into_iter().zip(page.record_ranges) {
             check()?;
             archive_placeholder |= crate::archive_recovery::placeholder(&entry);
-            if let Some((_, message)) = decoder.decode(entry) {
-                messages.push(message);
+            let selected = self.through_entry.as_deref() == Some(entry.id.as_str());
+            if selected && selected_end.is_some() {
+                return Err(HistoryPageError::InvalidRecord);
+            }
+            if selected_end.is_none() {
+                last_entry = Some(entry.clone());
+                last_entry_end = range.end;
+                if let Some((_, message)) = decoder.decode(entry) {
+                    messages.push(message);
+                }
+            }
+            if selected {
+                selected_end = Some(range.end);
             }
         }
         self.check_current()?;
         check()?;
         self.messages.extend(messages);
         self.archive_placeholder = archive_placeholder;
+        self.selected_end = selected_end;
+        self.last_entry_end = last_entry_end;
         if last_entry.is_some() {
             self.last_entry = last_entry;
         }
@@ -203,11 +239,44 @@ impl SessionMessageScan {
     pub fn finish_with_tail(
         self,
     ) -> Result<(Vec<Message>, Option<crate::SessionEntry>), HistoryPageError> {
+        self.finish_with_copy_length()
+            .map(|(messages, tail, _)| (messages, tail))
+    }
+
+    /// Finish with the raw-copy cutoff at the last retained decoded entry.
+    ///
+    /// Unlike ordinary physical-EOF copying, this excludes skipped compatibility
+    /// suffixes. The entire captured source is still validated. Empty scans return
+    /// zero; callers must reject empty histories before publishing a fork.
+    /// This grants no provenance or fork authority.
+    pub fn finish_with_record_copy_length(
+        self,
+    ) -> Result<(Vec<Message>, Option<crate::SessionEntry>, u64), HistoryPageError> {
+        let cutoff = self.last_entry_end;
+        self.finish_with_copy_length()
+            .map(|(messages, tail, _)| (messages, tail, cutoff))
+    }
+
+    /// Finish a validated scan and return the exact raw-copy cutoff.
+    ///
+    /// A selected prefix ends immediately after its original record, excluding
+    /// later bytes. An ordinary scan retains the full captured file, including
+    /// compatibility tails. This length grants no provenance or fork authority.
+    pub fn finish_with_copy_length(
+        self,
+    ) -> Result<(Vec<Message>, Option<crate::SessionEntry>, u64), HistoryPageError> {
         if !self.complete {
             return Err(HistoryPageError::Stopped);
         }
+        if self.through_entry.is_some() && self.selected_end.is_none() {
+            return Err(HistoryPageError::InvalidRecord);
+        }
         self.check_current()?;
-        Ok((self.messages, self.last_entry))
+        Ok((
+            self.messages,
+            self.last_entry,
+            self.selected_end.unwrap_or(self.end),
+        ))
     }
 
     fn check_current(&self) -> Result<(), HistoryPageError> {
@@ -239,6 +308,56 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use talos_core::message::{MessageToolResult, ToolCall};
+
+    #[test]
+    fn selected_prefix_tracks_large_original_record_ranges_in_both_formats() {
+        for extension in ["tlog", "jsonl"] {
+            let root = tempfile::tempdir().expect("root");
+            let source = session(root.path().join(format!("source.{extension}")));
+            source
+                .append(&Message::User {
+                    content: "中".repeat(HISTORY_PAGE_BYTES / 3 + 100),
+                })
+                .expect("large first");
+            let prefix = source.snapshot_bytes().expect("prefix");
+            let id = source.read_entries().expect("entries")[0].id.clone();
+            source
+                .append(&Message::User {
+                    content: "excluded suffix".into(),
+                })
+                .expect("suffix");
+            let mut scan = source.begin_message_scan_through(&id).expect("capture");
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while !scan.step(deadline, || false).expect("page") {}
+            let (messages, tail, cutoff) = scan.finish_with_copy_length().expect("finish");
+            assert_eq!(messages.len(), 1);
+            assert_eq!(tail.expect("tail").id, id);
+            assert_eq!(cutoff, prefix.len() as u64);
+
+            let mut missing = source
+                .begin_message_scan_through("missing")
+                .expect("capture");
+            while !missing.step(deadline, || false).expect("page") {}
+            assert!(missing.finish_with_copy_length().is_err());
+            let duplicate = source.read_entries().expect("entries")[0].clone();
+            let store: Arc<dyn SessionStore> = if extension == "tlog" {
+                Arc::new(crate::CompactTextSessionStore)
+            } else {
+                Arc::new(crate::JsonlSessionStore)
+            };
+            store
+                .append_entry(&source.file_path, &duplicate)
+                .expect("duplicate target fixture");
+            let mut duplicate = source.begin_message_scan_through(&id).expect("capture");
+            loop {
+                match duplicate.step(deadline, || false) {
+                    Ok(false) => continue,
+                    Err(HistoryPageError::InvalidRecord) => break,
+                    other => panic!("duplicate target must fail: {other:?}"),
+                }
+            }
+        }
+    }
 
     fn session(path: PathBuf) -> Session {
         Session::new(uuid::Uuid::new_v4(), "test".into(), "test".into(), path)
@@ -463,6 +582,9 @@ mod tests {
                 .store
                 .replace_entries_atomically(&owner.file_path, &entries)
                 .expect("fixture");
+            let valid_length = std::fs::metadata(&owner.file_path)
+                .expect("valid length")
+                .len();
             {
                 let mut file = std::fs::OpenOptions::new()
                     .append(true)
@@ -490,7 +612,20 @@ mod tests {
                 }
             }
             assert!(pages > 1);
-            let (messages, tail) = scan.finish_with_tail().expect("snapshot");
+            let (messages, tail, cutoff) = scan.finish_with_record_copy_length().expect("snapshot");
+            assert_eq!(cutoff, valid_length);
+            let mut physical = owner.begin_message_scan().expect("physical capture");
+            while !physical
+                .step(Instant::now() + Duration::from_secs(10), || false)
+                .expect("physical page")
+            {}
+            assert_eq!(
+                physical
+                    .finish_with_copy_length()
+                    .expect("physical snapshot")
+                    .2,
+                original.len() as u64
+            );
             assert_eq!(messages.len(), 8200);
             assert_eq!(tail.expect("diagnostic tail").id, "activation-tail");
             assert_eq!(
@@ -575,22 +710,39 @@ mod tests {
         crate::JsonlSessionStore
             .replace_entries_atomically(&owner.file_path, &[entry])
             .expect("fixture");
-        let mut scan = owner.begin_message_scan().expect("scan");
-        let calls = std::cell::Cell::new(0);
-        assert!(matches!(
-            scan.step(Instant::now() + Duration::from_secs(5), || {
+        let valid_end = std::fs::metadata(&owner.file_path).expect("length").len();
+        // Exercise cancellation at each callback boundary, including after local
+        // decoding but before the page transaction commits its record cutoff.
+        for stop_at in 1..=12 {
+            let mut scan = owner.begin_message_scan_through("one").expect("scan");
+            let calls = std::cell::Cell::new(0);
+            match scan.step(Instant::now() + Duration::from_secs(5), || {
                 calls.set(calls.get() + 1);
-                calls.get() >= 5
-            }),
-            Err(HistoryPageError::Stopped)
-        ));
-        assert_eq!(scan.offset, 0);
-        assert_eq!(
-            finish(scan),
-            vec![Message::User {
-                content: "kept".into()
-            }]
-        );
+                calls.get() >= stop_at
+            }) {
+                Err(HistoryPageError::Stopped) => {
+                    assert_eq!(scan.offset, 0);
+                    assert_eq!(scan.last_entry_end, 0);
+                    assert!(scan.selected_end.is_none());
+                    assert!(scan.messages.is_empty());
+                }
+                Ok(true) => {}
+                other => panic!("unexpected step: {other:?}"),
+            }
+            while !scan
+                .step(Instant::now() + Duration::from_secs(5), || false)
+                .expect("retry")
+            {}
+            let (messages, tail, cutoff) = scan.finish_with_record_copy_length().expect("finish");
+            assert_eq!(
+                messages,
+                vec![Message::User {
+                    content: "kept".into()
+                }]
+            );
+            assert_eq!(tail.expect("tail").id, "one");
+            assert_eq!(cutoff, valid_end);
+        }
     }
 
     #[test]

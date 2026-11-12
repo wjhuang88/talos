@@ -289,3 +289,21 @@ property is that those appended bytes cannot pass old compaction and become an
 unowned legacy archive. Discovery refusal must remain explicit, never an empty
 successful restoration. Validate exact supported old versions and the complete
 publication lifecycle before enabling this format.
+
+### Legacy JSONL append boundary and migration (unreleased candidate)
+
+Exact raw-prefix forks preserve a valid JSONL final record without a newline.
+Appending serialized JSON directly would join two records and lose them on reopen.
+The built-in JsonlSessionStore therefore inspects the final byte through the same
+read+append handle and inserts a newline only when a nonempty file lacks one.
+It never rewrites the inherited prefix. Read/seek failure propagates before writing;
+a separate read handle or unconditional separator is not a safe substitute.
+
+Compatibility change: direct JsonlSessionStore append callers now require read as
+well as append permission on the file. Normal Session callers already read the tip.
+Before upgrading, direct-store hosts must grant their writer read access or retain
+a custom SessionStore with an explicitly supported append-only contract. Do not
+silently broaden ACLs. This is an unreleased pre-1.0 candidate behavior change;
+release/migration review remains required. Existing write leases still own concurrency.
+If separator insertion succeeds but the subsequent body write fails, the original
+record remains intact with a trailing newline; atomic append is not newly promised.

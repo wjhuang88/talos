@@ -331,23 +331,17 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Ses
     let source = manager
         .resume_session(source_session_id)
         .with_context(|| format!("failed to load source Session {source_session_id}"))?;
+    let child = fork_captured_session(manager, &source, None)?;
+    eprintln!("Forked Session {source_session_id} -> {}", child.id);
+    Ok(child)
+}
 
-    let mut scan = source
-        .begin_message_scan()
-        .context("failed to capture fork source")?;
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-    while !scan.step(deadline, || false)? {}
-    if scan.has_archive_placeholder() {
-        bail!(
-            "cannot fork archived history: preserving archive provenance in the child is not yet supported; continue the original session"
-        );
-    }
-    let (_, tail) = scan.finish_with_tail()?;
-    let fork_entry_id = tail.context("cannot fork an empty Session")?.id;
-    let source_bytes = source
-        .snapshot_bytes()
-        .context("failed to snapshot source Session")?;
-
+pub(crate) fn fork_captured_session(
+    manager: &SessionManager,
+    source: &Session,
+    through_entry: Option<&str>,
+) -> Result<Session> {
+    let source_session_id = source.id;
     let new_id = Uuid::new_v4();
     let project_path = source
         .file_path
@@ -363,14 +357,23 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Ses
         new_file_path.clone(),
     );
 
+    let (mut staged, _, tail) = crate::history_restore::stage_fork_history_blocking(
+        source,
+        new_file_path.with_extension("fork-staging"),
+        through_entry,
+    )
+    .context("failed to stage source Session history")?;
+    let fork_entry_id = tail.id;
+    // Do not enroll an existing destination in rollback ownership if publication fails.
+    staged
+        .install(&new_file_path)
+        .context("failed to install fork history")?;
     let fork_result = (|| -> Result<()> {
-        std::fs::write(&new_file_path, &source_bytes)
-            .context("failed to clone source Session bytes")?;
         child
             .fork(&fork_entry_id)
             .context("failed to create fork branch")?;
 
-        match talos_session::PendingSubmissionStore::for_session(&source)
+        match talos_session::PendingSubmissionStore::for_session(source)
             .runtime_state()
             .context("failed to read source Session runtime identity")?
         {
@@ -391,7 +394,7 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Ses
         }
 
         manager
-            .update_index(&source)
+            .update_index(source)
             .context("failed to index source Session")?;
         manager
             .update_index(&child)
@@ -402,13 +405,11 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Ses
         Ok(())
     })();
 
+    // Publication succeeded; the manager now owns complete sidecar/index rollback
+    // and its error reporting. Do not let the file guard retry a partial cleanup.
+    staged.retain();
     match fork_result {
-        Ok(()) => {
-            eprintln!(
-                "Forked Session {source_session_id} -> {new_id} (from entry {fork_entry_id})"
-            );
-            Ok(child)
-        }
+        Ok(()) => Ok(child),
         Err(primary_error) => match manager.rollback_session_artifacts(&child) {
             Ok(report) => Err(anyhow!(
                 "failed to fork Session {source_session_id} into child {new_id} at {}: {primary_error:#}; rollback removed {} filesystem artifact(s) / {} byte(s), plus binding and index/fork ownership",
@@ -459,6 +460,134 @@ mod fork_tests {
             )
             .expect("source remains recoverable without overlapping child");
         assert_eq!(evidence.entries().len(), 205);
+    }
+
+    #[test]
+    fn default_startup_and_repl_forks_exclude_incomplete_tail_and_can_append_after_reopen() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager.create_session("partial-tail", "").expect("source");
+        source
+            .append(&Message::User {
+                content: "original".into(),
+            })
+            .expect("append");
+        let target = source.read_entries().expect("entries")[0].id.clone();
+        let prefix = source.snapshot_bytes().expect("prefix");
+        let mut before = prefix.clone();
+        before.extend_from_slice(b"E\t0\t1000\tincomplete\t-\t2097153:x");
+        std::fs::write(&source.file_path, &before).expect("incomplete tail");
+        for startup in [false, true] {
+            let child = if startup {
+                fork_session(&manager, &source.id.to_string()).expect("startup fork")
+            } else {
+                fork_captured_session(&manager, &source, None).expect("default REPL fork")
+            };
+            assert_eq!(child.snapshot_bytes().expect("child prefix"), prefix);
+            let reopened = manager.get_session(&child.id).expect("cold reopen");
+            reopened
+                .append(&Message::User {
+                    content: "child continuation".into(),
+                })
+                .expect("cold append");
+            let entries = manager
+                .get_session(&child.id)
+                .expect("reopen again")
+                .read_entries()
+                .expect("entries");
+            assert_eq!(entries.len(), 2);
+            assert_eq!(entries[1].parent_id.as_deref(), Some(target.as_str()));
+            assert_eq!(entries[1].content, "child continuation");
+            assert_eq!(source.snapshot_bytes().expect("source unchanged"), before);
+        }
+    }
+
+    #[test]
+    fn selected_fork_jsonl_without_final_newline_can_append_and_reopen() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let id = Uuid::new_v4();
+        let source = Session::new(
+            id,
+            "legacy".into(),
+            String::new(),
+            manager
+                .sessions_dir()
+                .join("legacy")
+                .join(format!("{id}.jsonl")),
+        );
+        source
+            .append(&Message::User {
+                content: "original legacy message".into(),
+            })
+            .expect("first");
+        let target = source.read_entries().expect("source entries")[0].id.clone();
+        let mut prefix = source.snapshot_bytes().expect("bytes");
+        assert_eq!(prefix.pop(), Some(b'\n'));
+        std::fs::write(&source.file_path, &prefix).expect("legacy no final newline");
+        let child = fork_captured_session(&manager, &source, Some(&target)).expect("fork");
+        assert_eq!(child.snapshot_bytes().expect("unchanged prefix"), prefix);
+        child
+            .append(&Message::User {
+                content: "new child message".into(),
+            })
+            .expect("append");
+        let reopened = manager.get_session(&child.id).expect("reopen");
+        let entries = reopened.read_entries().expect("entries");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].id, target);
+        assert_eq!(entries[1].parent_id.as_deref(), Some(target.as_str()));
+        assert_eq!(entries[1].content, "new child message");
+        assert!(child.snapshot_bytes().expect("child").starts_with(&prefix));
+        assert_eq!(source.snapshot_bytes().expect("source untouched"), prefix);
+    }
+
+    #[test]
+    fn selected_fork_preserves_original_prefix_and_excludes_later_parent_messages() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager.create_session("selected", "").expect("source");
+        source
+            .append(&Message::User {
+                content: "first".into(),
+            })
+            .expect("first");
+        let id = source.read_entries().expect("entries")[0].id.clone();
+        let prefix = String::from_utf8(source.snapshot_bytes().expect("bytes"))
+            .expect("utf8")
+            .replace("\t5:first", "\t05:first")
+            .into_bytes();
+        std::fs::write(&source.file_path, &prefix).expect("noncanonical original length");
+        source
+            .append(&Message::User {
+                content: "later parent only".into(),
+            })
+            .expect("later");
+        let before = source.snapshot_bytes().expect("parent");
+        let child =
+            fork_captured_session(&manager, &source, Some(&id)).expect("fork selected entry");
+        assert_eq!(child.snapshot_bytes().expect("exact prefix"), prefix);
+        assert_eq!(source.snapshot_bytes().expect("parent unchanged"), before);
+        assert_eq!(child.read_entries().expect("child").len(), 1);
+        child
+            .append(&Message::User {
+                content: "child only".into(),
+            })
+            .expect("continue child");
+        let entries = child.read_entries().expect("continued");
+        assert_eq!(entries[1].parent_id.as_deref(), Some(id.as_str()));
+        assert_eq!(
+            source.snapshot_bytes().expect("parent still unchanged"),
+            before
+        );
+        assert!(fork_captured_session(&manager, &source, Some("missing-id")).is_err());
+        assert_eq!(
+            manager
+                .get_forks(&source.id.to_string())
+                .expect("fork index")
+                .len(),
+            1
+        );
     }
 
     #[test]

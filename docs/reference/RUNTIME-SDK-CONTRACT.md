@@ -864,6 +864,15 @@ rechecks all observed ownership. Legacy archive names retain existing proof rule
 This is not inherited fork authority, a power-loss guarantee or compatibility with
 old writers compacting future materialized children; those gates remain pending.
 
+The recovery candidate adds `Session::begin_message_scan_through(entry_id)` and
+`SessionMessageScan::finish_with_copy_length()`. These are host raw-copy helpers,
+not fork receipts or model-search authority. The scan validates its entire captured
+source, rejects absent/duplicate target IDs, and returns the original record-end
+byte offset alongside the selected messages/tail. A publisher must truncate its
+same-snapshot copy to that offset and sync before publication; ordinary scans still
+return the complete captured length. Compaction placeholders remain detectable even
+after the selected cutoff, so this API does not enable inherited archived branches.
+
 ### Unreleased Gemini invocation migration (I310 / ADR-094)
 
 The next pre-1.0 minor adds `GoogleGemini` protocol variants and optional
@@ -881,3 +890,26 @@ original signed content. Native, Compat and TalosStrict share this rule. Browser
 textual routes also retain signed ordinary tool frames, so the same continuity limit applies.
 Custody is bounded to 32 blocks / 16 MiB. This is an unreleased candidate contract, not a patch
 release compatibility claim or live-vendor acceptance. See PROVIDER-PROTOCOLS for configuration.
+
+### Unreleased JSONL direct-store append migration (ADR-104)
+
+JsonlSessionStore::append_entry now opens one read+append handle to inspect the
+final byte. A nonempty legacy file without a final newline receives a separator
+before the new record, preserving its original bytes and making raw-prefix fork
+continuation readable on reopen. Direct-store hosts using append-only file ACLs
+must grant the writer read access before upgrading, or retain an explicitly
+append-only custom SessionStore. Talos does not change ACLs automatically. A read
+or seek failure is returned before writing, with no blind append fallback. Normal
+Session callers already require reads for their parent tip. Existing lease and
+partial-write semantics remain; separator plus record is not an atomic transaction.
+
+`SessionMessageScan::finish_with_record_copy_length()` returns the end of the last
+retained decoded record from the same validated capture. It excludes skipped trailing
+JSONL/incomplete TLOG bytes without a second read or unbounded tip preselection.
+Selected scans still stop at the selected record; an empty scan returns zero and no
+tail. Startup, REPL and TUI fork staging all use this boundary so skipped trailing
+bytes cannot prevent the child from continuing. Original bytes through that boundary
+are retained exactly; the source remains untouched, and invalid interior JSONL lines
+are not rewritten. Ordinary `finish_with_copy_length()` retains physical EOF for
+callers that need a complete captured copy. Neither cutoff grants archive inheritance
+authority.

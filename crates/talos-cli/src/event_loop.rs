@@ -1,6 +1,5 @@
 use std::collections::{HashMap, VecDeque};
 use std::io::{self, Write};
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
@@ -66,7 +65,6 @@ pub(crate) struct EventLoop {
     event_rx: mpsc::UnboundedReceiver<AppEvent>,
     state: AppState,
     first_ctrl_c_time: Option<Instant>,
-    workspace_root: PathBuf,
     session: Session,
     branch_id: Option<String>,
     session_manager: SessionManager,
@@ -80,7 +78,6 @@ pub(crate) struct EventLoop {
 
 impl EventLoop {
     pub(crate) fn new(
-        workspace_root: PathBuf,
         session: Session,
         session_manager: SessionManager,
         handle: talos_core::session::SessionHandle,
@@ -173,7 +170,6 @@ impl EventLoop {
             event_rx,
             state: AppState::WaitingForInput,
             first_ctrl_c_time: None,
-            workspace_root,
             session,
             branch_id: None,
             session_manager,
@@ -508,87 +504,17 @@ impl EventLoop {
     }
 
     fn handle_fork_session(&mut self, entry_id: Option<String>) {
-        use talos_session::SessionIndex;
-
         let session = self.session.clone();
-        let _workspace = self.workspace_root.clone();
+        let manager = self.session_manager.clone();
         let event_tx = self.event_tx.clone();
-        let sessions_dir = self.session_manager.sessions_dir().to_path_buf();
 
         std::thread::spawn(move || {
-            let result = (|| -> anyhow::Result<(String, String)> {
-                let entries = session.read_entries()?;
-                if entries.is_empty() {
-                    anyhow::bail!("cannot fork an empty session");
-                }
-
-                let fork_from_id = match &entry_id {
-                    Some(id) => {
-                        if entries.iter().any(|e| e.id == *id) {
-                            id.clone()
-                        } else {
-                            anyhow::bail!("entry not found: {id}");
-                        }
-                    }
-                    None => entries
-                        .last()
-                        .expect("entries checked non-empty above")
-                        .id
-                        .clone(),
-                };
-
-                let mut forked = session.clone();
-                let branch_id = forked.fork(&fork_from_id)?;
-
-                let project_dir = sessions_dir.join(&forked.project);
-                std::fs::create_dir_all(&project_dir)?;
-
-                let new_id = uuid::Uuid::new_v4();
-                let ext = session.file_extension();
-                let new_file_path = project_dir.join(format!("{new_id}.{ext}"));
-
-                let entries_to_copy = if let Some(branch) = forked.get_branch(&branch_id) {
-                    branch.entries.clone()
-                } else {
-                    entries
-                };
-
-                if ext == "tlog" {
-                    let store = talos_session::CompactTextSessionStore;
-                    use talos_session::SessionStore;
-                    for entry in &entries_to_copy {
-                        store.append_entry(&new_file_path, entry)?;
-                    }
-                } else {
-                    let mut file = std::fs::OpenOptions::new()
-                        .create(true)
-                        .write(true)
-                        .truncate(true)
-                        .open(&new_file_path)?;
-                    for entry in &entries_to_copy {
-                        let line = serde_json::to_string(entry)?;
-                        std::io::Write::write_all(&mut file, line.as_bytes())?;
-                        std::io::Write::write_all(&mut file, b"\n")?;
-                    }
-                }
-
-                if let Ok(mut index) = SessionIndex::new(&sessions_dir.join("index.db")) {
-                    let _ = index.init_schema();
-                    let _ = index.record_fork(
-                        &session.id.to_string(),
-                        &new_id.to_string(),
-                        &fork_from_id,
-                    );
-                    // Re-stamp `forked` with the new identity BEFORE indexing so the
-                    // SQLite FTS5 index points at the fork's id/file_path/branch_id,
-                    // not the source's. Without this, search and list_recent would
-                    // surface the source under the fork's UUID.
-                    forked.with_fork_identity(new_id, new_file_path.clone(), branch_id.clone());
-                    let _ = index.index_session(&forked);
-                }
-
-                Ok((new_id.to_string(), branch_id))
-            })();
+            let result = crate::session_setup::fork_captured_session(
+                &manager,
+                &session,
+                entry_id.as_deref(),
+            )
+            .map(|child| (child.id.to_string(), child.current_branch.clone()));
 
             match result {
                 Ok((new_session_id, branch_id)) => {
@@ -598,7 +524,7 @@ impl EventLoop {
                     });
                 }
                 Err(e) => {
-                    let _ = event_tx.send(AgentError(format!("Fork failed: {e}")));
+                    let _ = event_tx.send(AgentError(format!("Fork failed: {e:#}")));
                 }
             }
         });
@@ -924,7 +850,6 @@ mod archive_fork_tests {
                 event_rx,
                 state: AppState::WaitingForInput,
                 first_ctrl_c_time: None,
-                workspace_root: root.path().to_path_buf(),
                 session: source.clone(),
                 branch_id: None,
                 session_manager: manager.clone(),
