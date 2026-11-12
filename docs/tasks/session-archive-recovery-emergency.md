@@ -662,3 +662,163 @@ validators also passed. Remote Linux Desktop job 130656602835 failed installing
 system dependencies due Ubuntu mirror DNS errors before running Desktop tests;
 log `/tmp/talos-ci-linux-desktop-130656602835.log`. Native Windows failures and
 independent review remain unresolved; no deployment or completion claim.
+
+
+## 2026-11-12 Windows review findings: local implementation in progress
+
+Independent reviewer `/root/independent_review` reviewed exact head
+`39d2f3279888258c39901f4524c230f3b87ab105` and requested changes for two P1s:
+legacy CLI provider diagnostic writes conflict with whole-turn Windows recovery
+leases, and archive evidence retains write-excluding handles on unrelated live
+heads. Previous green CI excluded the new legacy Actor tests on Windows and does
+not disprove these findings. PR #916/#921 governance candidates had no blocking
+findings; their claims remain ineffective until target merge.
+
+The isolated candidate now releases Windows prepared-History leases between
+operations, retains original source/cutoff/digest, and revalidates under bounded
+fresh leases for each use. Same-owner diagnostics are coordinated with the shared
+Session write mutex. Archive evidence retains inert identity plus raw-byte digests
+and revalidates all inspected files/inventory under bounded fresh leases. ADR-104
+and SDK contract document the additive read-lock API and limitations. No native
+unsafe changes, source normalization, weaker metadata-only authority or default
+background continuation were introduced.
+
+Regression additions: existing real multi-response Actor history tests now compile
+on Windows and assert persisted provider diagnostics, final reply and tool exchange
+after reopen; a real paused-provider/two-session Actor regression verifies the other
+session can commit and reopen while History is retained; storage regressions cover
+selected/unrelated appends while evidence stays live, and Windows equal-length
+content mutation despite matching metadata. Windows History tests verify idle
+writes, restrictive active reads, original cutoff, digest mutation refusal and
+cancellation. Linux archive recovery tests and all four focused Actor scenarios
+passed. Latest MSVC all-feature test compilation exited 0 in
+`/tmp/talos-review-scoped-leases-final-xwin.log` (existing dead-code warnings).
+Full standard preflight currently running:
+`/tmp/talos-review-scoped-leases-preflight.log`.
+
+These are uncommitted local changes, not part of the previously tested PR head.
+Windows native execution and fresh independent review remain required; do not mark
+the findings resolved from cross-compilation. Patch backup:
+`/tmp/talos-review-scoped-leases-20261112.patch`. Applying this patch to the preserved
+primary tree failed its dry-run on checkpoint_history.rs because that tree contains
+additional changes; nothing was overwritten or partially applied. Reconcile
+selectively after candidate validation. Full archived fork, live host/provider
+acceptance and the remaining handoff scope are still incomplete. Status Partial.
+
+
+### Same-day follow-up review: sibling-write race remains open
+
+The same authorized independent reviewer inspected the uncommitted correction.
+P1-1's direct mechanism is corrected at code level: idle History owns no Windows
+lease, and synchronous reads hold the selected owner's shared write mutex until
+all restrictive handles are dropped. Native execution is still required.
+
+P1-2 remains open: check_supporting_sources retains fresh restrictive handles for
+all sibling heads during its bounded full-content check. A sibling that starts
+append/commit during that interval can still fail with sharing violation. The
+paused-provider Actor test covers idle lifetime only, not this interval. Next:
+a deterministic barrier with a sibling lease held must race a real independently
+opened writer; writer must wait and succeed or reader relinquish custody. Inspect
+both Session append and DurableSession atomic replace paths. A per-owner mutex
+alone cannot coordinate sibling/independently reopened owners or other processes.
+No metadata-only fallback or digest relaxation is acceptable. Also propagate one
+caller deadline through repeated current/supporting/prefix checks; currently an
+outer expired deadline refuses delivery but does not stop nested fresh budgets.
+No production-complete or fixed-finding claim is made for the uncommitted patch.
+
+
+Resume checkpoint: goal remains Active. Source manifest for the in-flight standard
+preflight is `/tmp/talos-review-scoped-leases-source-manifest-20261112.json`.
+Execution handle `21349` was re-polled and is still live (currently workspace tool
+tests); do not restart it because the observation window elapsed. Log remains
+`/tmp/talos-review-scoped-leases-preflight.log`. No full-preflight result yet.
+No commit, push, native Windows execution, merge or deployment was performed for
+this local correction. The remaining sibling conflict needs an implementation,
+not another status-only review. Evaluate narrow bounded Windows sharing-conflict
+waits at append-open and final atomic-rename acquisition boundaries, without
+retrying bytes already written; test both real append and durable commit under a
+held read lease and a permanent-conflict deadline. This is an unimplemented option,
+not an accepted design or completed repair. Existing primary reconcile artifacts
+are in `/tmp/talos-scoped-leases-primary-reconcile-20261112/`: three file merges
+are clean; checkpoint_history.rs has one unresolved constructor conflict, and none
+have been copied over the primary dirty tree.
+
+
+## 2026-11-12 sibling-writer coordination candidate
+
+Implemented narrow Windows sharing-conflict waiting at built-in JSONL/TLOG append
+open (including first TLOG header acquisition) and final atomic rename. Only
+ERROR_SHARING_VIOLATION retries, with five seconds per acquisition/publication and
+10 ms maximum sleeps. No byte writes, flushes, entire transactions or other errors
+are replayed. This addresses the remaining overlap between sibling recovery reads
+and business persistence without weakening source validation. ADR-104 records the
+bounded-wait tradeoff. Tests synchronize on the actual sharing-error branch, then
+release the real read lease; cover independently reopened append owners in both
+formats, atomic durable commit, unchanged bytes before publication, reopen,
+idempotent replay, permanent conflict bounds and no AccessDenied retries.
+
+Also propagated one deadline through supporting-file, prefix and final freshness
+checks within query/availability operations. Checkpoint focused suite: 92 passed,
+`/tmp/talos-review-writer-waits-checkpoint.log`. Latest MSVC all-feature test check
+exited 0: `/tmp/talos-review-writer-waits-final-xwin.log`. Previous source snapshot
+preflight finished exit 0: `/tmp/talos-review-scoped-leases-preflight.log`; because
+writer waits/deadline changes were added afterward, a new standard preflight is
+running with handle 32909, log `/tmp/talos-review-writer-waits-preflight.log`.
+Source manifest `/tmp/talos-review-writer-waits-source-manifest-20261112.json`;
+patch `/tmp/talos-review-writer-waits-20261112.patch`.
+
+Authorized independent reviewer examined the uncommitted update and found no new
+confirmed blocking defect. The two P1 repair mechanisms are accepted at code level,
+but the findings remain open pending native Windows evidence. In particular,
+atomic-commit barrier must prove pinned Rust fs::rename returns the expected
+sharing-conflict code and succeeds after release. Do not broaden retry codes to
+AccessDenied without evidence. This is not final exact-commit review, native
+acceptance, merged code or deployment. Primary tree reconciliation remains pending;
+its checkpoint_history.rs is older than candidate diagnostics and must not receive
+a blind overwrite. All original data and dirty changes remain preserved; default
+background continuation is still off. Goal Active, owner Partial.
+
+
+## 2026-11-12 delayed header acquisition and final validation attempt
+
+Review found an additional preservation edge in the newly retried first-header
+open: a stale empty-file observation plus truncate(true) could erase an owner that
+initialized during the wait. TLOG header acquisition now uses non-truncating append
+and checks the acquired handle length before writing its header. A Windows barrier
+regression pauses on the actual sharing conflict, initializes through another
+Session, resumes the delayed store append and verifies the complete old-byte prefix
+plus both records. Independent read-only review found no new regression in this
+correction. Its scope is content preservation; it does not prove parent correctness
+or duplicate-header exclusion for arbitrary simultaneous independent writers.
+
+Validation: latest Session suite 336 unit + 27 integration passed
+(`/tmp/talos-review-header-wait-session.log`); MSVC all-feature test compilation
+passed (`/tmp/talos-review-header-wait-xwin.log`). Writer-waits preflight handle
+32909 exited 101 in existing i255_plugin_e2e: actual plugin result was execution
+timed out after 250ms. This same symptom occurred earlier, root cause remains
+unestablished. Isolated package rerun passed 2 tests in
+`/tmp/talos-review-writer-waits-plugin-isolated.log`; its separate package build is
+not an exact replacement for workspace feature-unified validation. No timeout,
+permission rule or test was weakened to force a pass.
+
+Final-source standard preflight now runs as handle 67345, log
+`/tmp/talos-review-header-wait-final-preflight.log`; poll this handle before taking
+any new validation action. Source manifest
+`/tmp/talos-review-header-wait-source-manifest-20261112.json`; source patch
+`/tmp/talos-review-header-wait-20261112.patch`. No final result yet. PR #917 was
+requeried: OPEN Draft, head still 39d2f327, reviews empty. All latest corrections
+remain local/uncommitted; no push/merge/deployment. Native Windows and final
+exact-head review remain mandatory before closing the P1s. Primary dirty tree and
+live session data remain preserved. Goal Active, broader handoff still Partial.
+
+
+## 2026-11-12 final local candidate validation passed
+
+Final-source standard preflight handle 67345 exited 0, including locked workspace
+checks/Clippy/tests, doctests and SDK fixtures. Log:
+`/tmp/talos-review-header-wait-final-preflight.log`. The earlier plugin 250ms
+failure remains recorded; this successful run does not establish its root cause.
+The isolated candidate's staged diff has been reviewed; primary dirty tree and
+live session files are untouched. Windows native tests and final committed-head
+independent review are the next gates. No merge, deployment, full archived-fork
+completion or default background continuation change is claimed.

@@ -783,6 +783,16 @@ See [ADR-104](../decisions/104-selected-session-history-recovery.md) and the
 and remaining review/deployment gates.
 
 
+The unreleased selected-history candidate adds
+`DurableRecoverySource::try_lock_for_recovery_read` for bounded synchronous host
+reads coordinated with writes through the same Session clone family. The guard is
+not content/disclosure authority and must not span provider or tool awaits. Windows
+prepared History releases its restrictive source handles while idle and verifies
+the original prefix digest again for each read. Archive inventory changes still
+revoke evidence. Independently reopened owners and external writers are not covered
+by this mutex; source verification and restrictive handles remain required. See
+ADR-104's Windows live-history lease correction for limits and pending native gates.
+
 ### Unreleased Gemini invocation migration (I310 / ADR-094)
 
 The next pre-1.0 minor adds `GoogleGemini` protocol variants and optional

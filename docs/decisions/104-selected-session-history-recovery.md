@@ -137,3 +137,64 @@ A full implementation must retain workspace discovery, independently owned histo
 bytes after parent deletion, original identities, bounded validation, and unpublished
 child cleanup across every startup/interactive/restart path. Independent review must
 validate the source-ownership evidence before any overlap exception is enabled.
+
+
+### Windows live-history lease correction (independent review follow-up)
+
+The independent review of `39d2f327` found that a whole-turn Windows read lease
+conflicts with CLI provider diagnostics and that retaining all archive inventory
+leases blocks unrelated live sessions. This supersedes the whole-turn retention
+assumption of ADR-096 for prepared History, not its content-stability requirement.
+
+Prepared Windows History retains only the storage-issued source and original
+prefix expectation between operations. Each synchronous query/freshness operation
+recomputes the captured prefix under a fresh restrictive handle. It keeps the
+original cutoff and scope, never includes later diagnostic bytes, and drops the
+lease before returning to provider/tool awaits. A bounded try-lock loop on the
+selected Session's shared write mutex serializes these reads with its diagnostics;
+the read lease is dropped before that mutex. Cancellation or contention exhaustion
+returns unavailable. `DurableRecoverySource::try_lock_for_recovery_read` is an
+additive host API: it grants no disclosure authority and does not coordinate
+independently reopened owners or external writers. Existing no-follow/local-volume,
+permission, digest and generation checks remain mandatory.
+
+Archive inventory evidence stores inert Windows identity plus the exact stored-byte
+SHA-256 of every inspected source, including excluded heads. On reuse it reacquires
+restrictive handles, verifies identity and full content within the existing total
+byte limit/deadline, and rechecks the inventory while those handles remain held.
+Handles live only through validation, not through the model turn. A changed other
+head revokes old evidence; it is not silently accepted as still disjoint. Metadata
+equality without a fresh byte digest is explicitly insufficient, including equal-
+length mutations. Concurrent external access may still make a bounded operation
+unavailable; this is not a claim of cross-process writer scheduling.
+
+Soft tradeoff: Windows queries repeat content verification instead of retaining a
+turn-long lease. This can consume the existing two-second query budget on large
+histories; no deadline increase or permission relaxation is introduced. Native
+Windows multi-response Actor, concurrent-session, mutation and cancellation tests
+and fresh independent review are required before delivery. Local cross-compilation
+alone does not satisfy that gate.
+
+
+Short leases alone do not protect sibling writers: a write can start during
+archive validation. Built-in JSONL/TLOG persistence therefore waits on Windows
+`ERROR_SHARING_VIOLATION` at append-handle acquisition and final atomic rename,
+with a five-second total wait per acquisition/publication operation and at most
+10 ms between attempts. Byte writes, flushes, complete transactions and other I/O
+errors are never replayed. The original parent cache is published only after a
+successful append. This covers independently reopened owners without requiring an
+in-process registry, while retaining restrictive recovery reads. A persistently
+held conflicting handle still returns the original error after the bound; this is
+not an unlimited availability guarantee. Soft tradeoff: persistence can wait up
+to five seconds for an OS sharing conflict, instead of immediately failing.
+
+The native regressions synchronize on an actual sharing-conflict result before
+releasing the recovery handle. They cover both append encodings and durable atomic
+commit, checking unchanged bytes before publication, one resulting record/turn,
+reopen and idempotent retry. Permanent conflicts and non-sharing errors have
+separate bounds. Native Windows execution remains required; compiled tests alone
+do not certify the kernel's rename return behavior.
+
+Source revalidation now carries one deadline through archive supporting-source
+checks, prefix reads, query reads and final availability checks within each query
+or availability operation. Expiry cannot silently start another two-second phase.
