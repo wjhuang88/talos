@@ -334,8 +334,8 @@ measure baseline and freeze budgets before P1.
 | Governance Claim PR | #910 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | #910 merged as d355dd68; exact-head CI 42933711478 success; independent agent review APPROVE at 6c3e23df |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-11 |
+| Implementation PR | #922 (Draft) |
+| Last Updated | 2026-11-12 |
 | Handoff / Release Condition | Full published acceptance including native terminal evidence; incomplete platforms remain Review |
 
 ### P0 execution checkpoint — 2026-11-11
@@ -1300,3 +1300,11 @@ uncommitted runtime/test patch; retained it and raw results under
 `evidence/tui-perf-001/fit-path-evaluation/`. Runtime is back to the source covered
 by the passing full preflight. No new full test run is warranted for this revert
 to that exact source. Resize acceptance remains unresolved; do not claim a fix.
+
+### Draft stage candidate published
+
+Implementation branch pushed through8afbbe4c; draft PR#922:
+https://github.com/wjhuang88/talos/pull/922 . This provides a reviewable stage,
+not completion or merge authorization. Resize-budget misses, growing/resize heap
+acceptance, native terminals and exact-head CI/review remain open. User was asked
+to arrange Ghostty acceptance; no result has been received at this checkpoint.
