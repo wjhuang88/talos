@@ -330,7 +330,7 @@ measure baseline and freeze budgets before P1.
 | Executing Agent | Codex / gpt-6 |
 | Work Slice | TUI-PERF-001 P0 measurements, P1 event scheduling, P2 Git snapshots, P3 dependency caches, evidence-based P4 decision and full acceptance |
 | Claimed At | 2026-11-11 |
-| Source Issue | None |
+| Source Issue | #923 (remaining acceptance) |
 | Governance Claim PR | #910 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim #910 merged as d355dd68; user authorized stage delivery 2026-11-12; exact-head Agent review APPROVE at 14a274ed; code CI43150963692 passed; stage decision recorded in #922 and #923 |

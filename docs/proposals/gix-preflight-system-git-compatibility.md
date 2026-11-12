@@ -3,6 +3,14 @@
 > 日期：2026-11-10。状态：设计提案，尚未实现或激活。
 > 维护者选择：继续支持 Git 2.36，不以要求升级替代兼容性修复。
 
+## Issue reconciliation
+
+Owner ID: GIT-COMPAT-001. Source Issue: #919.
+Status: Proposed / Unclaimed on main. The formal backlog owner and I324 claim
+are proposed in PR #920 and remain ineffective until merge. This existing
+proposal is the interim main-branch reconciliation source, not an activation.
+PR #920 should replace the matrix link with its formal owner when merged.
+
 ## Problem
 
 Talos 最终通过系统 `git.exe` 执行结构化 Git 写入，但在执行前额外发现配置、
