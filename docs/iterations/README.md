@@ -20,9 +20,9 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 
 [I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: #905 claim+activation is effective at `b211e590f6b1180af0679be8b1b03d77b0a19615`; [E0 code-truth evidence](../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) (review PR #906) and E1 non-binding cross-host composition decision are under review. STORE-002/#670 exclusively owns storage contracts, so E2/E3 implementation is blocked; unrelated I319, I318, I310 and active work remain separate.
 
-## I319 / SEARCH-001-L — Active / Claimed proposal (ineffective until #902 merge)
+## I319 / SEARCH-001-L — Complete / Closed (owner-first closeout)
 
-[I319](I319-search-legacy-dependency-retirement.md) / [SEARCH-001-L](../backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) / #901: own legacy `WebSearchTool` without `rust-websearch` build dependency, preserve independent parity and public schema; claim and activation are proposed in #902 and require governance merge. I318/TUI, I310/Gemini and DEPENDENCY-003-A remain independent; E/F/G/I blocked gate unaffected.
+[I319](I319-search-legacy-dependency-retirement.md) / [SEARCH-001-L](../backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) / #901: claim/ADR-085 A1 accepted via #902; frozen upstream oracle #904; code [#907](https://github.com/wjhuang88/talos/pull/907) merged as **`3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970`** after [CI4121](https://github.com/wjhuang88/talos/actions/runs/43195189353) 8/8, final independent no-source-blocker review and exact-head CAS. This docs-only closure is not the code Completion Commit; #901 final remote closure follows owner closeout merge. Protected SearchRouter, I318/TUI, I310/Gemini, other dependency owners and E/F/G/I blocked gates remain independent.
 
 
 ## I318 native key repeat — Review
