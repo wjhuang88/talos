@@ -1022,3 +1022,53 @@ prefix increment (`/tmp/talos-fork-raw-prefix-preflight.log`, handle 13137).
 This includes workspace tests and the external runtime fixture; it validates this
 preparation increment only, not the still-unimplemented fork publication lifecycle.
 Latest native CI remains on ee9bbc06; no new push while that run is active.
+
+## 2026-11-12 raw-prefix durable finalization increment (uncommitted)
+
+A real legacy record with noncanonical valid metadata reproduced old finalize
+rewriting inherited bytes (`/tmp/talos-finalize-raw-prefix-red.log`). The current
+increment copies validated old raw bytes and only encodes new turn records/marker.
+Reopen and idempotent replay preserve the exact prefix; valid blank separators are
+retained, while an incomplete unvalidated tail is refused without rewriting it.
+This is not a tail repair mechanism and does not deliver archived fork receipts.
+
+Independent review and the existing 3MiB-record recovery-scan test caught misuse of
+the model-facing 2MiB record decoder. The increment now uses the host decoder limit,
+as host transcript validation already does. All 340 session unit tests plus session
+integration/doc tests pass (`/tmp/talos-finalize-raw-prefix-green.log`).
+Windows cross-check and full preflight remain pending. No primary sync or push yet.
+
+Limitations: one additional whole-transcript raw buffer is retained during commit;
+no new total-memory bound is claimed. Source-handle version checks are not a path
+CAS against independent outside writers; the host execution lease remains required.
+The Windows read handles are released before publication acquisition. Compaction
+still needs trusted physical-source locator migration and raw retained-record copying;
+receipt ownership must bind the immutable logical inherited prefix across that move.
+The reviewer explicitly rejected permanent compaction refusal as full delivery.
+
+MSVC all-feature tests compilation completed exit 0
+(`/tmp/talos-finalize-raw-prefix-xwin.log`). Independent read-only re-review after
+host decoder/separator corrections found no new blocker. First full preflight
+39318 ended exit 101 at Clippy: Unix FileStamp is non-Drop Metadata. Explicit
+stamp releases are now cfg(windows), preserving Windows lease release. The second
+standard preflight is running as handle 91038 with log
+`/tmp/talos-finalize-raw-prefix-preflight-r2.log`; no source edits while it runs.
+
+## 2026-11-12 exact-head macOS preflight step passed
+
+GitHub job130952412310 on ee9bbc06 reports Release preflight SUCCESS, completed
+2026-11-12T03:48:42Z. Job itself remains live at Optional language Plugin acceptance;
+Windows130952412169 remains live at Test workspace. This is step-level native
+validation of ee9bbc06, not whole-run success, nor proof of the complete cause of
+older timing failures. Preserve final logs when the job reaches terminal state.
+The uncommitted raw-finalize increment is not included in this CI head.
+
+Local preflight91038 remains live in workspace tests. Prepared but did not apply
+`/tmp/talos-finalize-raw-primary.patch`; primary source backups and 730-source hash
+manifest are in `/tmp/talos-finalize-raw-primary-backup-20261112/`. Dry-run passed.
+
+Second full locked standard preflight91038 completed exit0:
+`/tmp/talos-finalize-raw-prefix-preflight-r2.log`. SDK contract now documents raw
+prefix preservation, strict tail refusal and memory/receipt limits. This validates
+the finalize increment only; archived-fork receipt/publication and compaction
+locator lifecycle remain outstanding. No Complete status or deployment claim.

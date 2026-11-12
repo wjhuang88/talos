@@ -134,6 +134,89 @@ impl crate::store::SessionStore for CompactTextSessionStore {
     }
 }
 
+// Durable finalization is append-only even though publication replaces the file.
+// Keep original bytes, including valid noncanonical encodings, for every old
+// record. The caller holds the session write lock and host execution lease.
+pub(crate) fn append_entries_atomically(
+    path: &Path,
+    prior: &[SessionEntry],
+    appended: &[SessionEntry],
+) -> Result<(), SessionError> {
+    let mut source = crate::history_page::open_source(path)
+        .map_err(|_| SessionError::DurableTurn("cannot acquire original transcript".into()))?;
+    let stamp = crate::recovery_stamp::from_file(&source)
+        .map_err(|_| SessionError::DurableTurn("cannot capture original transcript".into()))?;
+    let mut original = Vec::new();
+    source.read_to_end(&mut original)?;
+    let header = existing_creation_header(path)?
+        .ok_or_else(|| SessionError::DurableTurn("missing original transcript header".into()))?;
+    if !original.starts_with(&header) {
+        return Err(SessionError::DurableTurn(
+            "original transcript changed".into(),
+        ));
+    }
+    let mut offset = header.len();
+    for expected in prior {
+        while original
+            .get(offset)
+            .is_some_and(|byte| matches!(byte, b'\n' | b'\r'))
+        {
+            offset += 1;
+        }
+        let (entry, length) =
+            crate::history_page::decode_tlog_record(&original[offset..], usize::MAX)
+                .map_err(|_| SessionError::DurableTurn("invalid original transcript".into()))?
+                .ok_or_else(|| {
+                    SessionError::DurableTurn("incomplete original transcript".into())
+                })?;
+        if encode_entry(&entry) != encode_entry(expected) {
+            return Err(SessionError::DurableTurn(
+                "original transcript changed".into(),
+            ));
+        }
+        offset += length;
+    }
+    while original
+        .get(offset)
+        .is_some_and(|byte| matches!(byte, b'\n' | b'\r'))
+    {
+        offset += 1;
+    }
+    if offset != original.len() {
+        return Err(SessionError::DurableTurn(
+            "unvalidated original transcript tail".into(),
+        ));
+    }
+    let current = crate::recovery_stamp::from_file(&source)
+        .map_err(|_| SessionError::DurableTurn("cannot recheck original transcript".into()))?;
+    if !crate::recovery_seal::same_file_version(&stamp, &current)
+        .map_err(|_| SessionError::DurableTurn("cannot compare original transcript".into()))?
+    {
+        return Err(SessionError::DurableTurn(
+            "original transcript changed".into(),
+        ));
+    }
+    // Windows read leases must be released before acquiring publication access.
+    drop(source);
+    #[cfg(windows)]
+    drop(stamp);
+    #[cfg(windows)]
+    drop(current);
+    let temporary = temporary_sibling(path);
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&temporary)?;
+    file.write_all(&original)?;
+    for entry in appended {
+        file.write_all(encode_entry(entry).as_bytes())?;
+    }
+    file.sync_all()?;
+    drop(file);
+    crate::store::publish_atomic_file(&temporary, path)?;
+    Ok(())
+}
+
 // A format header is tiny; never scan an unbounded malformed first line.
 fn existing_creation_header(path: &Path) -> Result<Option<Vec<u8>>, SessionError> {
     let file = match crate::history_page::open_source(path) {

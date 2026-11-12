@@ -801,6 +801,15 @@ are refused without changing original bytes. Sharing conflicts have a bounded wa
 ordinary access-denied errors are not generally retried. This does not replace host
 single-writer ownership or make multiple source paths an atomic snapshot.
 
+The unreleased candidate preserves the existing TLOG header, record encoding and
+blank separators during durable turn finalization. It validates the existing
+records, copies their original bytes, and encodes only the new turn and terminal
+marker. An incomplete or invalid existing tail fails without replacing the source;
+finalization does not repair that tail. Host-produced records larger than a model
+history page remain supported. This currently adds one full raw-transcript buffer
+alongside decoded history and does not establish a total memory bound. It does not
+implement archived-fork receipts or their migration through compaction.
+
 ### Unreleased Gemini invocation migration (I310 / ADR-094)
 
 The next pre-1.0 minor adds `GoogleGemini` protocol variants and optional
