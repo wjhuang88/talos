@@ -568,7 +568,9 @@ mod tests {
             let headers = format!(
                 "HTTP/1.1 200 OK\r\n{content_encoding}Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
             );
-            stream.write_all(headers.as_bytes()).expect("fixture headers");
+            stream
+                .write_all(headers.as_bytes())
+                .expect("fixture headers");
             for chunk in body.chunks(64 * 1024) {
                 // The client is expected to abort reading an oversized body;
                 // a broken pipe during that rejection is not a fixture error.
@@ -589,8 +591,7 @@ mod tests {
     async fn oversized_wire_body_is_rejected_without_content_length() {
         use std::io::Write;
         let raw = vec![b'A'; MAX_LEGACY_BODY_BYTES + 4096];
-        let mut encoder =
-            flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::none());
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::none());
         encoder.write_all(&raw).expect("gzip wire fixture");
         let compressed_wire = encoder.finish().expect("gzip wire finished");
         assert!(
@@ -602,7 +603,11 @@ mod tests {
             let (url, server) = spawn_chunked_body_fixture(encoding, body);
             let http = client(&LegacyConfig::default(), Duration::from_secs(15), 0)
                 .expect("bounded legacy client");
-            let response = http.get(url).send().await.expect("chunked response headers");
+            let response = http
+                .get(url)
+                .send()
+                .await
+                .expect("chunked response headers");
             let result = tokio::time::timeout(Duration::from_secs(15), successful_body(response))
                 .await
                 .expect("oversize wire body rejection must be bounded");
@@ -617,8 +622,7 @@ mod tests {
     #[tokio::test]
     async fn small_compressed_wire_with_oversized_decoded_body_is_rejected() {
         use std::io::Write;
-        let mut encoder =
-            flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
         encoder
             .write_all(&vec![b'A'; MAX_LEGACY_BODY_BYTES + 4096])
             .expect("compressible bomb fixture");
@@ -628,7 +632,11 @@ mod tests {
         let (url, server) = spawn_chunked_body_fixture(Some("gzip"), compressed_wire);
         let http = client(&LegacyConfig::default(), Duration::from_secs(15), 0)
             .expect("bounded legacy client");
-        let response = http.get(url).send().await.expect("compressed response headers");
+        let response = http
+            .get(url)
+            .send()
+            .await
+            .expect("compressed response headers");
         let result = tokio::time::timeout(Duration::from_secs(15), successful_body(response))
             .await
             .expect("bounded decompression");
