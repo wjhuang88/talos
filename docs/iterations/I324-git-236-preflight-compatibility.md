@@ -1,6 +1,6 @@
 # Iteration I324: GIT-COMPAT-001 gix-Native Preflight Replacing Git CLI
 
-> Document status: Active / Claimed proposed (ineffective until governance PR #920 merges)
+> Document status: Active / Claimed (effective #920 merge `067dd3d4f5fd0fac910ac7f52bd23ee7f8f5bb80`)
 > Published plan date: 2026-11-11
 > Planned objective: replace Git CLI preflight analysis with audited gix-native analysis, including Git 2.36 support without reducing prepared-operation authority.
 > MVP deliverable: structured Checkout and Commit on native Windows Git 2.36.1 pass the admitted preflight and post-approval validation path; tested with older/newer Git.
@@ -18,7 +18,7 @@
 | Governance Claim PR | #920 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of the 2026-11-10 gix design on 2026-11-11 (conversation). Single-maintainer fallback is proposed for documentation-only claim because no separate reviewing maintainer is available; exact-head CI, both governance validators and no-overlap merge-time CAS are mandatory. No source implementation or security acceptance is claimed by this PR. Subsequent implementation requires independent Git authorization/security/API review and native Windows evidence. |
-| Implementation PR | Not started |
+| Implementation PR | T0 branch `feat/i324-gix-native-preflight`; PR pending |
 | Last Updated | 2026-11-12 |
 | Handoff / Release Condition | Exact-head independent Git authorization/security review, both governance validators, native Windows acceptance, no scope overlap; retain Review until actual evidence. |
 
@@ -78,10 +78,13 @@ Cross-check with `cargo xwin` per LOCAL-DEV; native Windows tool tests/CI remain
 
 Update README/README.zh-CN Git compatibility language, this iteration and Story, documentation index, Board, and proposal status only after evidence. Revert this bounded compatibility patch to restore known conservative refusals if review identifies an authority regression; do not touch existing user worktrees.
 
-## Actual execution (not yet active)
+## Actual execution (active — implementation not yet delivered)
 
 - 2026-11-11: requirement intake Issue #919 and governance-only selection baseline. Proposed claim/activation not effective until PR merges. T0 source investigation is read-only; no production implementation, validation pass or Completion Commit.
 
 ## Maintainer scope correction — 2026-11-12 (applies before implementation)
 
 The November 11 baseline mentioned bounded host probes as a possible compatibility bridge. The maintainer clarified the actual desired outcome: **replace Git command-line preflight with gix**, not add host-version conditional paths or command probes. This correction is made to unmerged governance PR #920; its earlier exact-head CI no longer applies after these changes. Use gix/Talos-native planning over previously admitted content; keep file-path discovery separate from exact Read authorization and bind current evidence to final system Git execution. gix itself may spawn Git for installation path discovery: audit and exclude such APIs, rather than silently outsourcing the subprocess. If system Git compiled defaults cannot be proven from allowed sources, fail closed, report an explicit unsupported profile and seek a narrow decision. ADR-089's CLI command wording requires acceptance of the [proposed amendment](../proposals/adr-089-gix-native-preflight-amendment.md) before implementation. No product code or passing native tests are claimed.
+
+- 2026-11-12: claim/activation PR #920 merged to `main` as `067dd3d4f5fd0fac910ac7f52bd23ee7f8f5bb80` after exact-head CI #4123 / run `43248451893`: both governance validators 0 warnings, remote Issue owner reconciliation and Windows installer fixture passed. The earlier planned claim is now effective; the proposed ADR-089 amendment is **not** accepted by this merge.
+- 2026-11-12: T0 [gix/CLI preflight source audit](../reference/GIT-COMPAT-001-I324-GIX-PREFLIGHT-AUDIT.md) published on implementation branch. The host-Git compiled installation profile and complete no-CLI surface are unresolved. This is non-executable analysis, not a native Git 2.36 compatibility fix or an approval to widen access.
