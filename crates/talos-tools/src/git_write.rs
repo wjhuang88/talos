@@ -39,6 +39,11 @@ mod config_state;
 #[path = "git_write/target_config.rs"]
 mod target_config;
 
+// I324: pure gix candidate tests do not activate new discovery authority.
+#[cfg(test)]
+#[path = "git_write/gix_preflight_candidate_tests.rs"]
+mod gix_preflight_candidate_tests;
+
 #[path = "git_write/checkout_state.rs"]
 mod checkout_state;
 
