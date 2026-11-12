@@ -28,9 +28,9 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 [ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [I320](iterations/I320-arch-035-host-composition-baseline.md) / #897: #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615`, activating only E0 code-truth inventory and E1 host API decision review; no E2/E3 implementation is authorized; no E2/E3 code or STORE-002/#670 capability implementation is authorized. ServerHost/#361 remains gated. Parallel Search/TUI/Provider owners are untouched.
 
-## SEARCH-001-L / I319 — dependency retirement (proposed activation)
+## SEARCH-001-L / I319 — Complete / Closed (owner-first closeout)
 
-[SEARCH-001-L](backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) / [I319](iterations/I319-search-legacy-dependency-retirement.md) / #901 proposes an **independently governed** Rust build-graph retirement slice for legacy `WebSearchTool`; proposed Claimed/Active by #902; effective only after atomic claim+activation merge. Do not touch protected SearchRouter or SEARCH-001-I's blocked E/F/G global provider gate. Coordinate any `Cargo.lock` overlap with DEPENDENCY-003-A. No source/code changes are authorized by this proposal.
+[SEARCH-001-L](backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) / [I319](iterations/I319-search-legacy-dependency-retirement.md) / #901: claim/ADR A1 effective via #902, frozen upstream oracle #904, and implementation [#907](https://github.com/wjhuang88/talos/pull/907) merged as **`3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970`**. Exact-head [CI4121](https://github.com/wjhuang88/talos/actions/runs/43195189353) **8/8 SUCCESS**, independent source/API/security review no blockers, expected-head CAS passed. This owner-first documentation closeout precedes the final #901 closure. Protected SearchRouter, parent #624, E/F/G/I gate, release qualification and external dependency owners remain untouched.
 
 
 ## Large approval previews / TUI-APPROVAL-001
