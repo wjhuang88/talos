@@ -888,7 +888,7 @@ impl History {
             return None;
         }
         if let Some(evidence) = &self.archive {
-            let result = self.query_archive(evidence, query, reference, cursor)?;
+            let result = self.query_archive(evidence, query, reference, cursor, deadline)?;
             return (self.available_until(deadline)
                 && serde_json::to_vec(&result).ok()?.len() <= 16_384)
                 .then_some(result);
@@ -992,9 +992,12 @@ impl History {
         query: Option<&str>,
         reference: Option<&str>,
         cursor: Option<&str>,
+        deadline: Instant,
     ) -> Option<Value> {
         use talos_session::history_projection::{RecoveryTextKind, recovery_response_text};
-        let deadline = Instant::now() + Duration::from_secs(2);
+        if self.cancel.is_cancelled() || Instant::now() >= deadline {
+            return None;
+        }
         let mut state = self.state.lock().ok()?;
         if let Some(reference) = reference {
             if cursor.is_some() {
@@ -1340,6 +1343,15 @@ mod tests {
             history.query(None, Some(reference), None).expect("detail")["text"],
             "archivedfact 0"
         );
+        let evidence = history.archive.as_ref().expect("archive evidence");
+        for (query, reference) in [(Some("archivedfact"), None), (None, Some(reference))] {
+            assert!(
+                history
+                    .query_archive(evidence, query, reference, None, Instant::now())
+                    .is_none(),
+                "archive search and detail must honor the exhausted caller budget"
+            );
+        }
         let cursor = first["next_cursor"].as_str().expect("cursor");
         assert!(history.query(Some("changed"), None, Some(cursor)).is_none());
         let second = history
