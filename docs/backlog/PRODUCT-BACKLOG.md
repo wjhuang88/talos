@@ -7,9 +7,9 @@
 
 [ARCH-035](active/ARCH-035-behavior-preserving-host-composition.md) / [I320](../iterations/I320-arch-035-host-composition-baseline.md) / #897: governance PR #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615`, activating a bounded, documentation-only E0 code-truth inventory and E1 host-composition decision review. No implementation or acceptance is implied. E2/E3 cannot begin without accepted STORE-002/#670 contracts and separate authorization; no ServerHost implementation is implied.
 
-## SEARCH-001-L / I319 — proposed legacy dependency retirement
+## SEARCH-001-L / I319 — Complete / Closed (owner-first closeout)
 
-[SEARCH-001-L](active/SEARCH-001-L-legacy-dependency-retirement.md) / [I319](../iterations/I319-search-legacy-dependency-retirement.md) / #901 proposes replacing dormant `WebSearchTool` upstream coupling, freezing independent parity, and removing the `rust-websearch` build package only after claim+activation. The existing SEARCH-001-I global provider gate stays blocked, E/F/G remain unadmitted, and current production search and external dependency owners are unaffected. Proposed governance PR #902 does not establish effective authorization until merge.
+[SEARCH-001-L](active/SEARCH-001-L-legacy-dependency-retirement.md) / [I319](../iterations/I319-search-legacy-dependency-retirement.md) / #901: independent oracle #904 and accepted ADR-085 A1/#902 preceded owned legacy `WebSearchTool` implementation [#907](https://github.com/wjhuang88/talos/pull/907) merged as **`3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970`**, removing `rust-websearch` and reqwest 0.12 from three active locks. [CI4121](https://github.com/wjhuang88/talos/actions/runs/43195189353) succeeded 8/8 on exact head, independent source/security review and merge CAS passed. Close #901 only after this governance closeout merges. Protected production SearchRouter, E/F/G/I admission, parent #624 and unrelated storage/provider owners are unaffected.
 
 
 ## TUI-ELLIPSIS-001 — proposed activation
