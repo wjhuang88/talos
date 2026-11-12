@@ -74,4 +74,3 @@ fn staged_config_roots_start_as_path_only_requests() {
     assert!(requests.contains(&missing_global));
     assert!(sources.captured_paths().next().is_none());
 }
-
