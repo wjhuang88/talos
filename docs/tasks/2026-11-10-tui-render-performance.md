@@ -1308,3 +1308,23 @@ https://github.com/wjhuang88/talos/pull/922 . This provides a reviewable stage,
 not completion or merge authorization. Resize-budget misses, growing/resize heap
 acceptance, native terminals and exact-head CI/review remain open. User was asked
 to arrange Ghostty acceptance; no result has been received at this checkpoint.
+
+### Remote stage gate observation
+
+At draft head8afbbe4c, CI run43134873925 has passed Linux Desktop, Windows
+installer and change classification; Linux workspace and Windows jobs remain
+running at this observation. Remote reconciliation job130907712181 failed because
+`docs/reference/ISSUE-DOC-CODE-STATUS-2026-09-30.md` omits open Issue#919
+(GIT-COMPAT-001, gix-native Git preflight compatibility). This is global Issue
+matrix drift, not a TUI claim failure. Per ADR-071 and collaboration SOP, retain
+it as a governance reconciliation residual owned by that matrix/workflow; do not
+widen this implementation slice to Git compatibility. This does not waive
+exact-head code CI or independent review. No merge is authorized by this note.
+
+Existing P4 heaptrack massif data was summarized without another replay.
+Three candidate growing-history runs show identical24250-byte median live-heap
+increase between elapsed5–10s and25–30s; evidence and reproduction script are in
+`heaptrack-p4-guarded/`. Ongoing history growth and missing exact event alignment
+prevent interpreting the delta as leak/non-leak proof. Repeated-resize heap
+coverage remains absent. Both Linux and Windows Desktop CI jobs have now passed;
+workspace jobs are still running at this observation.

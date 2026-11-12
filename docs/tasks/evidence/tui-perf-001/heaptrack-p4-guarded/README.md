@@ -17,3 +17,11 @@ Service exited normally0, runtime3min50.941s, CPU48.746s, peak453.8M, swap0.
 Capped profiler CPU/latency/PSS are not ordinary performance-budget evidence.
 Finite allocation-volume results do not prove absence of leaks under all loads.
 Raw profiles, stacks, histograms and sampled process data are archived together.
+
+Existing massif snapshots also permit a live-heap comparison without rerunning:
+`python3 summarize_liveheap.py <extracted-raw-directory>`. All three candidate
+runs have median26056220 bytes at elapsed5–10s and26080470 bytes at25–30s,
+a24250-byte increase. The fixture appends history throughout; these fixed
+elapsed windows are not aligned to exact business-event counts. This finite
+consistent change supplies live-heap evidence, not proof of absence of leaks,
+and does not cover repeated resize. See liveheap-windows.json for sample counts.
