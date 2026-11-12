@@ -1,0 +1,27 @@
+{
+  "implementation_commit": "43305a58",
+  "documentation_head": "6c51db7e4b27fe4c71edbae2b474ec1d71928fd9",
+  "command": "./scripts/release_preflight.sh",
+  "exit_code": 0,
+  "log_sha256": "2ec0dfc88ad34fd1dfa9739f7efacfacc2413100da25c65b88e7873f8b3570ae",
+  "locale": "LC_ALL=C LANG=C",
+  "resource_guard": {
+    "CPUQuota": "100%",
+    "CPUAffinity": "0",
+    "MemoryHigh": "2G",
+    "MemoryMax": "3G",
+    "MemorySwapMax": 0,
+    "TasksMax": 128,
+    "Nice": 10,
+    "CARGO_BUILD_JOBS": 1,
+    "RUST_TEST_THREADS": 1
+  },
+  "test_summaries": 148,
+  "tests_passed": 5315,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "wall_seconds": 508.678,
+  "cpu_seconds": 247.841,
+  "reported_memory_peak": "2G",
+  "reported_swap": "0B"
+}

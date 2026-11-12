@@ -1254,3 +1254,19 @@ The exact existing tools test executable passed the failing test1/1 with
 No product behavior or test assertion changed. LOCAL-DEV now pins diagnostic
 locale in its guarded command example. A full rerun is in progress; this focused
 result does not complete the workspace gate.
+
+### Current implementation full local gate passed
+
+`./scripts/release_preflight.sh` completed normally with exit0 and its explicit
+`release preflight: passed` marker. Archive: `evidence/tui-perf-001/local-preflight/`.
+Implementation source43305a58; intervening6c51db7e changes documentation only.
+148 Rust test-result summaries:5315 passed,0 failed,0 ignored; formatting,
+workspace check/Clippy, governance/claims and external Runtime SDK fixture passed.
+Guard: CPU100%/affinity0, memory high2G/max3G, swap0, tasks128, jobs1/testthreads1,
+Nice10, LC_ALL=C/LANG=C. Runtime8min28.678s, CPU4min7.841s, reported peak2G/swap0.
+The previously failing Git diagnostic assertion passed in this full run.
+The earlier plugin timeout remains retained evidence, not a claimed product fix.
+
+This satisfies the current local workspace gate; do not repeat it solely for
+status prose. Remaining performance/native/remote requirements in the delivery
+convergence table still apply. No validation process remains live.

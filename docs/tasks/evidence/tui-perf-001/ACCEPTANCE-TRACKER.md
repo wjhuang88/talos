@@ -20,7 +20,7 @@ its own source receipt; earlier measurements do not automatically cover later ch
 | P4 decision | Repeated transcript commits identified full projection hotspot; P4 implemented in `cabc7a37`, Release comparison archived | P4 Debug follow-up and final-source acceptance remain |
 | Bounded memory | Single-entry caches, fixed-history125s×3 PSS, P4 allocation profiles,128-cycle obsolete-snapshot lifetime test | Growing-history/resize heap stability; finite PSS and ownership checks are not leak proofs |
 | Input latency | Release and corrected Debug paired probes: 36 cases each; all P95/P99 budgets passed | 200Hz output/50ms input: candidate Debug and paired Release budgets pass; Debug baseline timed out; native visible-pixel acceptance remains |
-| Build and tests | Earlier preflight passed; current TUI682+2+2 plus lifecycle test1/1 and xwin passed; subsequent full gate hit250ms plugin timeout | Current full preflight running; exact-head CI and independent review pending |
+| Build and tests | Current implementation full preflight passed:5315 tests,0 failed/ignored; local-preflight receipt and log; MSVC tests/examples passed | Exact-head CI and independent review pending; prior failed attempts retained |
 | Native platforms | User reports no available Windows environment | Linux Wayland+niri+Ghostty, another supported terminal, native Windows; unavailable stays Review |
 | Delivery | Local candidate through `43305a58`; owner convergence table records current gaps | Final evidence/doc commits, stable candidate push/PR, review, owner/Board synchronization |
 
