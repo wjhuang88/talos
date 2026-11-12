@@ -24,6 +24,7 @@ mod benchmark;
 mod entities;
 mod graph;
 mod prompt;
+mod storage_contracts;
 mod store;
 #[cfg(test)]
 mod tests;
@@ -37,6 +38,7 @@ pub use consolidation::{
 pub use entities::extract_entities;
 pub use graph::{AssociationResult, GraphEdge, GraphNode};
 pub use prompt::{MemoryPromptConfig, format_memory_prompt};
+pub use storage_contracts::MemoryPersistence;
 pub use store::MemoryStore;
 pub use types::{
     Entity, EntityKind, EvidenceLink, MemoryItem, MemoryKind, MemoryStatus, MemoryStoreError,

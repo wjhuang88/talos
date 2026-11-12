@@ -4,9 +4,10 @@
 
 [GIT-COMPAT-001](active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](../iterations/I324-git-236-preflight-compatibility.md): **In Progress / Claimed proposed** by [#920](https://github.com/wjhuang88/talos/pull/920), ineffective until target merge. Bounded gix-native preflight replacing Git CLI inspection only. Existing snapshot capacity, ADR-089 authorization and TUI approval owners do not transfer.
 
-## STORE-002 / I322 C — proposed independent domain contracts
+## STORE-002 / I322 C — domain contracts in review
 
-[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I322](../iterations/I322-store-002-domain-contract-extraction.md) / #670: I321 A/B completed in #909 at `a9914b7a62b0873027997c69d9966d17f3fd48ba`, CI #4039 8/8 and independent API review passed. I322 C domain-owned contract extraction is a **new, proposed governance claim #911** with no production code authorized before merge. Existing SQL/TLOG/JSONL/FTS, local composition, future engines, D/E/F, and #897 Host remain unchanged.
+[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I322](../iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B complete via #909 (`a9914b7`), I322 C governance claim #911 merged (`60da1bb`). Candidate adds only domain-owned operational traits and direct existing-store forwarding for Session Pending/Todo, Memory, Evolution, Exploration. CI, independent public API review and merge remain pending; no new engine, SQL/schema/format changes or Host composition. D/E/F and #897 E2/E3 blocked.
+
 ## ARCH-035 / I320 — E0/E1 Review (PR #906)
 
 [ARCH-035](active/ARCH-035-behavior-preserving-host-composition.md) / [I320](../iterations/I320-arch-035-host-composition-baseline.md) / #897: governance PR #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615`, activating a bounded, documentation-only E0 code-truth inventory and E1 host-composition decision review. No implementation or acceptance is implied. E2/E3 cannot begin without accepted STORE-002/#670 contracts and separate authorization; no ServerHost implementation is implied.
