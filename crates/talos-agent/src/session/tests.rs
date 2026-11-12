@@ -6637,25 +6637,142 @@ fn model_checkpoint_enable_reports_collision_without_partial_registration() {
     assert!(agent.tools.get("compact_context").is_none());
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 #[tokio::test]
 async fn durable_actor_history_search_and_detail_reach_real_provider_continuation() {
     actor_history_search_and_detail(false, false).await;
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 #[tokio::test]
 async fn cli_persistence_history_search_and_detail_reach_real_provider_continuation() {
     actor_history_search_and_detail(true, false).await;
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 #[tokio::test]
 async fn archived_cli_history_search_and_detail_reach_real_provider_continuation() {
     actor_history_search_and_detail(true, true).await;
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
+#[tokio::test]
+async fn archived_history_does_not_hold_other_session_writes_during_provider_await() {
+    struct PausedModel {
+        entered: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+    }
+    #[async_trait]
+    impl LanguageModel for PausedModel {
+        async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            assert!(
+                crate::checkpoint_history::HISTORY
+                    .try_with(|history| history.as_ref().is_some_and(|history| history.available()))
+                    .expect("prepared history scope"),
+                "must exercise actual prepared recovery"
+            );
+            self.entered.notify_one();
+            self.release.notified().await;
+            let (tx, rx) = mpsc::channel(16);
+            for event in success_events("continued after concurrent session write") {
+                tx.send(event).await.expect("receiver");
+            }
+            Ok(rx)
+        }
+    }
+    let root = tempfile::tempdir().expect("root");
+    let first = talos_session::DurableSession::open_or_create(root.path(), "first").expect("first");
+    let second =
+        talos_session::DurableSession::open_or_create(root.path(), "second").expect("second");
+    assert_eq!(first.file_path().parent(), second.file_path().parent());
+    for i in 0..205 {
+        first
+            .session()
+            .append(&Message::User {
+                content: format!("original {i}"),
+            })
+            .expect("append");
+    }
+    first.session().compact_archived(50).expect("archive");
+    second
+        .commit_turn(
+            "seed",
+            &[Message::User {
+                content: "independent fact".into(),
+            }],
+            &Default::default(),
+        )
+        .expect("seed second");
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let mut agent = make_agent(PausedModel {
+        entered: entered.clone(),
+        release: release.clone(),
+    });
+    agent
+        .enable_model_checkpoint_tools()
+        .expect("enable recovery preparation");
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            workspace_root: root.path().into(),
+            runtime_policy: RuntimePolicy::interactive(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(first.session().clone(), Default::default());
+    let task = tokio::spawn(async move { actor.run().await });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "continue".into(),
+        })
+        .await
+        .expect("submit");
+    tokio::time::timeout(Duration::from_secs(10), entered.notified())
+        .await
+        .expect("provider paused with prepared history");
+    second
+        .commit_turn(
+            "concurrent",
+            &[Message::User {
+                content: "durable concurrent append".into(),
+            }],
+            &Default::default(),
+        )
+        .expect("other session remains writable while provider awaits");
+    release.notify_one();
+    let events = tokio::time::timeout(
+        Duration::from_secs(10),
+        collect_until_completions(&mut handle.eq_rx, 1),
+    )
+    .await
+    .expect("completion");
+    assert!(events.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    task.await.expect("actor");
+    assert_eq!(
+        first
+            .session()
+            .read_terminal_diagnostics()
+            .expect("diagnostics")
+            .len(),
+        1
+    );
+    let reopened = talos_session::DurableSession::open_or_create(root.path(), "second")
+        .expect("reopen second");
+    assert!(reopened.read_messages().expect("second history").iter().any(|message| matches!(message, Message::User { content } if content == "durable concurrent append")));
+}
+
+#[cfg(any(unix, windows))]
 async fn actor_history_search_and_detail(cli: bool, archived: bool) {
     struct RecoveryModel {
         step: AtomicUsize,
@@ -6964,6 +7081,36 @@ async fn actor_history_search_and_detail(cli: bool, archived: bool) {
         .await
         .expect("shutdown");
     let actor = task.await.expect("actor");
+    if cli {
+        let diagnostics = durable
+            .session()
+            .read_terminal_diagnostics()
+            .expect("persisted diagnostics");
+        assert_eq!(
+            diagnostics.len(),
+            if archived { 6 } else { 5 },
+            "every provider response terminal must survive prepared recovery"
+        );
+        let reopened = talos_session::Session::new(
+            durable.id(),
+            durable.session().project.clone(),
+            String::new(),
+            durable.session().file_path.clone(),
+        );
+        let restored = reopened.read_messages().expect("restart transcript");
+        assert!(
+            restored.iter().any(|message| matches!(message,
+                Message::Assistant { content, .. } if content == "recovered and continued"
+            )),
+            "successful final response must be durable after restart"
+        );
+        assert!(
+            restored.iter().any(|message| matches!(message,
+                Message::Tool { result } if result.tool_use_id == "recover-3" && !result.is_error
+            )),
+            "tool exchange must survive restart"
+        );
+    }
     assert_eq!(&actor.history[..raw.len()], raw.as_slice());
     assert!(
         std::fs::read(&durable.session().file_path)

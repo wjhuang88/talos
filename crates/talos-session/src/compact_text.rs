@@ -56,21 +56,25 @@ impl crate::store::SessionStore for CompactTextSessionStore {
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            let mut file = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(file_path)?;
-            writeln!(
-                file,
-                "{TLOG_MAGIC}\t{TLOG_VERSION}\t{}",
-                Utc::now().timestamp_millis()
-            )?;
-            file.flush()?;
+            let mut file = crate::store::retry_sharing_conflict(|| {
+                OpenOptions::new().create(true).append(true).open(file_path)
+            })?;
+            // Another owner may initialize the file while acquisition waits.
+            // Recheck the acquired handle and never truncate that owner's data.
+            if file.metadata()?.len() == 0 {
+                writeln!(
+                    file,
+                    "{TLOG_MAGIC}\t{TLOG_VERSION}\t{}",
+                    Utc::now().timestamp_millis()
+                )?;
+                file.flush()?;
+            }
         }
 
         let line = encode_entry(entry);
-        let mut file = OpenOptions::new().append(true).open(file_path)?;
+        let mut file = crate::store::retry_sharing_conflict(|| {
+            OpenOptions::new().append(true).open(file_path)
+        })?;
         file.write_all(line.as_bytes())?;
         file.flush()?;
         Ok(())
@@ -105,7 +109,7 @@ impl crate::store::SessionStore for CompactTextSessionStore {
         }
         file.sync_all()?;
         drop(file);
-        fs::rename(&temporary, file_path)?;
+        crate::store::retry_sharing_conflict(|| fs::rename(&temporary, file_path))?;
         Ok(())
     }
 

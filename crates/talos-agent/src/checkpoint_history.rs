@@ -13,7 +13,12 @@ pub(crate) struct History {
     scope: String,
     owner: String,
     cancel: CancellationToken,
+    #[cfg(not(windows))]
     seal: Mutex<RecoveryPrefixSeal>,
+    #[cfg(windows)]
+    source: talos_session::DurableRecoverySource,
+    #[cfg(windows)]
+    expectation: talos_session::RecoveryPrefixExpectation,
     state: Mutex<QueryState>,
     archive: Option<talos_session::ArchiveRecoveryEvidence>,
 }
@@ -630,7 +635,12 @@ impl History {
             scope,
             owner: session.id().to_string(),
             cancel: cancel.clone(),
+            #[cfg(not(windows))]
             seal: Mutex::new(seal),
+            #[cfg(windows)]
+            source,
+            #[cfg(windows)]
+            expectation: seal.expectation(),
             state: Mutex::new(QueryState::default()),
             archive: Some(evidence),
         })
@@ -702,15 +712,20 @@ impl History {
                 }
             }
         }
+        let seal = work
+            .seal
+            .or_else(|| preparation_failure("linear_completed_seal_missing"))?;
         Some(Self {
             path: work.path,
             scope: work.scope,
             owner: session.id().to_string(),
             cancel: cancel.clone(),
-            seal: Mutex::new(
-                work.seal
-                    .or_else(|| preparation_failure("linear_completed_seal_missing"))?,
-            ),
+            #[cfg(not(windows))]
+            seal: Mutex::new(seal),
+            #[cfg(windows)]
+            source: work.source,
+            #[cfg(windows)]
+            expectation: seal.expectation(),
             state: Mutex::new(QueryState::default()),
             archive: None,
         })
@@ -737,8 +752,58 @@ impl History {
         self.cancel.is_cancelled()
     }
 
+    // A Windows source lease must never span a model/tool await. Recreate it
+    // from the original cutoff/digest for each synchronous use. The owner lock
+    // serializes CLI diagnostics with this read, so even a short verification
+    // cannot turn a concurrent host append into a sharing violation.
+    fn with_seal<T>(
+        &self,
+        deadline: Instant,
+        read: impl FnOnce(&RecoveryPrefixSeal) -> Option<T>,
+    ) -> Option<T> {
+        if self.cancel.is_cancelled() || Instant::now() >= deadline {
+            return None;
+        }
+        #[cfg(windows)]
+        {
+            let _owner_guard = loop {
+                if self.cancel.is_cancelled() || Instant::now() >= deadline {
+                    return None;
+                }
+                if let Some(guard) = self.source.try_lock_for_recovery_read() {
+                    break guard;
+                }
+                // A host diagnostic append is synchronous and brief. Wait only
+                // inside this same verification budget, never for a model turn.
+                std::thread::sleep(Duration::from_millis(1));
+            };
+            let mut scan = self
+                .source
+                .verify_prefix_expectation(&self.expectation)
+                .ok()?;
+            while !scan.step(deadline, || self.cancel.is_cancelled()).ok()? {}
+            let seal = scan.finish().ok()?;
+            let result = read(&seal)?;
+            seal.check_current().ok()?;
+            (!self.cancel.is_cancelled() && Instant::now() < deadline).then_some(result)
+        }
+        #[cfg(not(windows))]
+        {
+            let seal = self.seal.lock().ok()?;
+            seal.check_current().ok()?;
+            let result = read(&seal)?;
+            (!self.cancel.is_cancelled() && Instant::now() < deadline).then_some(result)
+        }
+    }
+
     /// Revalidate the original captured prefix after host appends. No appended
     /// records enter this execution's index. Mutated prefix bytes fail closed.
+    #[cfg(windows)]
+    pub(crate) fn refresh_prefix(&self) -> Option<()> {
+        self.with_seal(Instant::now() + Duration::from_secs(2), |_| Some(()))
+    }
+
+    #[cfg(not(windows))]
     pub(crate) fn refresh_prefix(&self) -> Option<()> {
         let mut seal = self.seal.lock().ok()?;
         if self.cancel.is_cancelled() {
@@ -756,19 +821,23 @@ impl History {
         Some(())
     }
 
+    #[cfg(test)]
     pub(crate) fn current(&self) -> bool {
-        if self.archive.as_ref().is_some_and(|evidence| {
-            evidence
-                .check_supporting_sources(Instant::now() + Duration::from_secs(2))
-                .is_err()
-        }) {
+        self.current_until(Instant::now() + Duration::from_secs(2))
+    }
+
+    fn current_until(&self, deadline: Instant) -> bool {
+        if self.cancel.is_cancelled() || Instant::now() >= deadline {
             return false;
         }
-        !self.cancel.is_cancelled()
-            && self
-                .seal
-                .lock()
-                .is_ok_and(|seal| seal.check_current().is_ok())
+        if self
+            .archive
+            .as_ref()
+            .is_some_and(|evidence| evidence.check_supporting_sources(deadline).is_err())
+        {
+            return false;
+        }
+        self.with_seal(deadline, |_| Some(())).is_some()
     }
 
     pub(crate) fn available(&self) -> bool {
@@ -784,7 +853,7 @@ impl History {
             deadline.saturating_duration_since(Instant::now()),
             move || stopped.is_cancelled(),
         );
-        self.current()
+        self.current_until(deadline)
             && SessionIndex::open_read_only(&self.path)
                 .ok()
                 .is_some_and(|index| {
@@ -792,7 +861,7 @@ impl History {
                         .recovery_owner_scope_ready(&self.owner, &self.scope, &budget)
                         .unwrap_or(false)
                 })
-            && self.current()
+            && self.current_until(deadline)
             && Instant::now() < deadline
     }
 
@@ -802,12 +871,13 @@ impl History {
         reference: Option<&str>,
         cursor: Option<&str>,
     ) -> Option<Value> {
+        let deadline = Instant::now() + Duration::from_secs(2);
         let stopped = self.cancel.clone();
         let budget =
             RecoveryWorkBudget::with_cancellation_check(Duration::from_secs(2), move || {
                 stopped.is_cancelled()
             });
-        if !self.current() {
+        if !self.current_until(deadline) {
             return None;
         }
         let index = SessionIndex::open_read_only(&self.path).ok()?;
@@ -819,94 +889,95 @@ impl History {
         }
         if let Some(evidence) = &self.archive {
             let result = self.query_archive(evidence, query, reference, cursor)?;
-            return (self.available() && serde_json::to_vec(&result).ok()?.len() <= 16_384)
+            return (self.available_until(deadline)
+                && serde_json::to_vec(&result).ok()?.len() <= 16_384)
                 .then_some(result);
         }
-        let seal = self.seal.lock().ok()?;
-        seal.check_current().ok()?;
-        let mut state = self.state.lock().ok()?;
-        let result = if let Some(reference) = reference {
-            if cursor.is_some() {
-                return None;
-            }
-            let ordinal = state.ordinal(reference)?;
-            let candidates = index
-                .recovery_candidates(&self.scope, "", ordinal.checked_sub(1), 1, &budget)
-                .ok()?;
-            let candidate = candidates
-                .first()
-                .filter(|candidate| candidate.ordinal == ordinal)?;
-            let text = index
-                .recovery_candidate_text(
-                    &self.scope,
-                    candidate,
-                    &seal,
-                    talos_session::history_projection::RecoveryTextKind::Detail,
-                    &budget,
-                )
-                .ok()??;
-            json!({"status":"Ready","reference":reference,"text":text.text,"truncated":text.truncated})
-        } else {
-            let query = query?;
-            let after = if let Some(cursor) = cursor {
-                let (expected, expected_query, after) = state.cursor.as_ref()?;
-                if cursor != expected || query != expected_query {
+        let result = self.with_seal(deadline, |seal| {
+            let mut state = self.state.lock().ok()?;
+            let result = if let Some(reference) = reference {
+                if cursor.is_some() {
                     return None;
                 }
-                *after
+                let ordinal = state.ordinal(reference)?;
+                let candidates = index
+                    .recovery_candidates(&self.scope, "", ordinal.checked_sub(1), 1, &budget)
+                    .ok()?;
+                let candidate = candidates
+                    .first()
+                    .filter(|candidate| candidate.ordinal == ordinal)?;
+                let text = index
+                    .recovery_candidate_text(
+                        &self.scope,
+                        candidate,
+                        seal,
+                        talos_session::history_projection::RecoveryTextKind::Detail,
+                        &budget,
+                    )
+                    .ok()??;
+                json!({"status":"Ready","reference":reference,"text":text.text,"truncated":text.truncated})
             } else {
-                None
-            };
-            let candidates = index
-                .recovery_candidates(&self.scope, query, after, 20, &budget)
-                .ok()?;
-            let mut incomplete = candidates.len() == 20;
-            let mut results = Vec::new();
-            let mut last = after;
-            // Bound all source/terminal record reads for this query together.
-            let mut remaining = talos_session::history_page::HISTORY_PAGE_BYTES as u64;
-            for candidate in candidates {
-                let text = match index.recovery_candidate_text_with_source_budget(
-                    &self.scope,
-                    &candidate,
-                    &seal,
-                    talos_session::history_projection::RecoveryTextKind::Snippet,
-                    &budget,
-                    &mut remaining,
-                ) {
-                    Ok(Some(text)) => text,
-                    Ok(None) => {
-                        last = Some(candidate.ordinal);
-                        continue;
+                let query = query?;
+                let after = if let Some(cursor) = cursor {
+                    let (expected, expected_query, after) = state.cursor.as_ref()?;
+                    if cursor != expected || query != expected_query {
+                        return None;
                     }
-                    Err(talos_session::sqlite::RecoveryReadError::PageBudgetExhausted) => {
+                    *after
+                } else {
+                    None
+                };
+                let candidates = index
+                    .recovery_candidates(&self.scope, query, after, 20, &budget)
+                    .ok()?;
+                let mut incomplete = candidates.len() == 20;
+                let mut results = Vec::new();
+                let mut last = after;
+                // Bound all source/terminal record reads for this query together.
+                let mut remaining = talos_session::history_page::HISTORY_PAGE_BYTES as u64;
+                for candidate in candidates {
+                    let text = match index.recovery_candidate_text_with_source_budget(
+                        &self.scope,
+                        &candidate,
+                        seal,
+                        talos_session::history_projection::RecoveryTextKind::Snippet,
+                        &budget,
+                        &mut remaining,
+                    ) {
+                        Ok(Some(text)) => text,
+                        Ok(None) => {
+                            last = Some(candidate.ordinal);
+                            continue;
+                        }
+                        Err(talos_session::sqlite::RecoveryReadError::PageBudgetExhausted) => {
+                            incomplete = true;
+                            break;
+                        }
+                        Err(_) => return None,
+                    };
+                    let reference = state.reference(candidate.ordinal);
+                    results.push(
+                        json!({"reference":reference,"text":text.text,"truncated":text.truncated}),
+                    );
+                    if serde_json::to_vec(&results).ok()?.len() > 15_000 {
+                        results.pop();
                         incomplete = true;
                         break;
                     }
-                    Err(_) => return None,
-                };
-                let reference = state.reference(candidate.ordinal);
-                results.push(
-                    json!({"reference":reference,"text":text.text,"truncated":text.truncated}),
-                );
-                if serde_json::to_vec(&results).ok()?.len() > 15_000 {
-                    results.pop();
-                    incomplete = true;
-                    break;
+                    last = Some(candidate.ordinal);
                 }
-                last = Some(candidate.ordinal);
-            }
-            if incomplete && last == after {
-                return None;
-            }
-            let next = incomplete.then(|| uuid::Uuid::new_v4().to_string());
-            state.cursor = next
-                .as_ref()
-                .map(|token| (token.clone(), query.to_owned(), last));
-            json!({"status":"Ready","results":results,"complete":!incomplete,"next_cursor":next})
-        };
-        drop(seal);
-        if !self.current()
+                if incomplete && last == after {
+                    return None;
+                }
+                let next = incomplete.then(|| uuid::Uuid::new_v4().to_string());
+                state.cursor = next
+                    .as_ref()
+                    .map(|token| (token.clone(), query.to_owned(), last));
+                json!({"status":"Ready","results":results,"complete":!incomplete,"next_cursor":next})
+            };
+            Some(result)
+        })?;
+        if !self.current_until(deadline)
             || !index
                 .recovery_owner_scope_ready(&self.owner, &self.scope, &budget)
                 .ok()?
@@ -2274,7 +2345,7 @@ mod windows_lease_tests {
     use super::*;
 
     #[tokio::test]
-    async fn prepared_history_releases_source_before_next_durable_turn() {
+    async fn prepared_history_releases_idle_lease_and_revalidates_original_prefix() {
         let root = tempfile::tempdir().expect("root");
         let session = DurableSession::open_or_create(root.path(), "live-history").expect("session");
         session
@@ -2303,15 +2374,52 @@ mod windows_lease_tests {
                     .as_str()
                     .is_some_and(|text| text.contains("retained original constraint")))
         );
+        // History stays alive across provider work, but owns no idle write lock.
+        session
+            .session()
+            .append(&talos_core::message::Message::User {
+                content: "new suffix outside captured history".into(),
+            })
+            .expect("host append while prepared History remains live");
+        assert!(history.query(Some("constraint"), None, None).is_some());
         assert!(
-            std::fs::OpenOptions::new()
-                .write(true)
-                .open(session.file_path())
-                .is_err()
+            history
+                .query(Some("suffix"), None, None)
+                .expect("query cutoff")["results"]
+                .as_array()
+                .expect("results")
+                .is_empty()
         );
+        history
+            .with_seal(Instant::now() + Duration::from_secs(2), |_| {
+                assert!(
+                    history.source.try_lock_for_recovery_read().is_none(),
+                    "host write lock must cover the restrictive read lease"
+                );
+                assert!(
+                    std::fs::OpenOptions::new()
+                        .write(true)
+                        .open(session.file_path())
+                        .is_err(),
+                    "active read still excludes external writers"
+                );
+                Some(())
+            })
+            .expect("bounded leased query");
+        let original = std::fs::read_to_string(session.file_path()).expect("raw source");
+        let changed = original.replace("constraint", "alteration");
+        assert_ne!(original, changed);
+        assert_eq!(original.len(), changed.len());
+        std::fs::write(session.file_path(), changed)
+            .expect("equal-length edit after lease release");
+        assert!(
+            !history.current(),
+            "released lease requires full prefix digest validation"
+        );
+        assert!(history.query(Some("constraint"), None, None).is_none());
         cancel.cancel();
         assert!(history.query(Some("constraint"), None, None).is_none());
-        // Cancellation revokes queries; dropping the owner releases source custody.
+        // Cancellation also revokes queries; no idle lease survives either outcome.
         drop(history);
         assert!(pending.lock().await.is_none());
         session

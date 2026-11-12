@@ -22,7 +22,32 @@ pub struct ArchiveRecoveryEvidence {
     sources: Vec<ArchiveRecoverySource>,
     excluded_archives: usize,
     removed_placeholders: usize,
-    versions: Vec<(PathBuf, crate::recovery_stamp::FileStamp)>,
+    versions: Vec<(PathBuf, ArchiveFileVersion)>,
+}
+
+// Windows stamps own restrictive read handles. Keep only inert identity and
+// content expectations between recovery operations, never a model-turn lease.
+struct ArchiveFileVersion {
+    #[cfg(not(windows))]
+    stamp: crate::recovery_stamp::FileStamp,
+    #[cfg(windows)]
+    stamp: crate::recovery_stamp::StoredFileVersion,
+    #[cfg(windows)]
+    sha256: String,
+}
+
+impl ArchiveFileVersion {
+    fn from_records(file: FileRecords) -> (PathBuf, Self) {
+        let version = Self {
+            #[cfg(not(windows))]
+            stamp: file.stamp,
+            #[cfg(windows)]
+            stamp: (&file.stamp).into(),
+            #[cfg(windows)]
+            sha256: file.source.sha256,
+        };
+        (file.source.path, version)
+    }
 }
 
 /// A selected source file and the digest of its exact stored bytes.
@@ -78,7 +103,7 @@ impl ArchiveRecoveryEvidence {
 
     fn check_versions<'a>(
         &self,
-        versions: impl Iterator<Item = &'a (PathBuf, crate::recovery_stamp::FileStamp)>,
+        versions: impl Iterator<Item = &'a (PathBuf, ArchiveFileVersion)>,
         deadline: Instant,
         stopped: &impl Fn() -> bool,
     ) -> Result<(), SessionError> {
@@ -105,18 +130,71 @@ impl ArchiveRecoveryEvidence {
         if !expected_paths.is_empty() {
             return Err(invalid("source inventory changed"));
         }
+        // Hold fresh Windows leases only for this bounded validation, so every
+        // checked file stays stable until the inventory has been rechecked.
+        #[cfg(windows)]
+        let mut leases = Vec::new();
+        #[cfg(windows)]
+        let mut remaining = MAX_BYTES;
         for (path, expected) in versions {
             check(deadline, stopped)?;
             let file =
                 crate::history_page::open_source(path).map_err(|e| invalid(&e.to_string()))?;
             let stamp =
                 crate::recovery_stamp::from_file(&file).map_err(|e| invalid(&e.to_string()))?;
-            if !crate::recovery_seal::same_file_version(expected, &stamp)
+            #[cfg(not(windows))]
+            if !crate::recovery_seal::same_file_version(&expected.stamp, &stamp)
                 .map_err(|e| invalid(&e.to_string()))?
             {
                 return Err(invalid("source changed before restoration"));
             }
+            #[cfg(windows)]
+            {
+                if crate::recovery_stamp::StoredFileVersion::from(&stamp) != expected.stamp {
+                    return Err(invalid("source changed before restoration"));
+                }
+                // Metadata equality after releasing a Windows lease is not
+                // content authority (ADR-096). Rehash every stored byte under
+                // the new restrictive handle, including excluded live heads.
+                let mut file = file;
+                let mut digest = Sha256::new();
+                let mut buffer = [0_u8; 64 * 1024];
+                loop {
+                    check(deadline, stopped)?;
+                    let read = file.read(&mut buffer)?;
+                    if read == 0 {
+                        break;
+                    }
+                    remaining = remaining
+                        .checked_sub(read)
+                        .ok_or_else(|| invalid("source byte bound exceeded"))?;
+                    digest.update(&buffer[..read]);
+                }
+                if hex::encode(digest.finalize()) != expected.sha256 {
+                    return Err(invalid("source content changed before restoration"));
+                }
+                leases.push(stamp);
+            }
         }
+        #[cfg(windows)]
+        {
+            let mut remaining_paths: BTreeSet<_> =
+                self.versions.iter().map(|(path, _)| path.clone()).collect();
+            for (index, item) in std::fs::read_dir(directory)?.enumerate() {
+                check(deadline, stopped)?;
+                if index >= MAX_FILES {
+                    return Err(invalid("directory bound exceeded"));
+                }
+                let path = item?.path();
+                if recovery_source_kind(&path).is_some() && !remaining_paths.remove(&path) {
+                    return Err(invalid("source inventory changed"));
+                }
+            }
+            if !remaining_paths.is_empty() {
+                return Err(invalid("source inventory changed"));
+            }
+        }
+        check(deadline, stopped)?;
         Ok(())
     }
     /// Original records in uniquely determined storage order, without synthetic
@@ -362,7 +440,7 @@ impl Session {
             removed_placeholders: placeholders.len(),
             versions: files
                 .into_iter()
-                .map(|file| (file.source.path, file.stamp))
+                .map(ArchiveFileVersion::from_records)
                 .collect(),
         })
     }
@@ -595,6 +673,81 @@ mod tests {
             .collect();
         assert!(messages.iter().any(|(_, message)| matches!(message, Message::Tool { result } if result.tool_use_id == "boundary-call" && result.content == "boundary result")));
         assert_eq!(reopened.snapshot_bytes().expect("after"), before);
+    }
+
+    #[test]
+    fn retained_archive_evidence_does_not_block_unrelated_session_append() {
+        let (_root, manager, session) = fixture();
+        append_users(&session, 0, 205);
+        session.compact_archived(50).expect("archive");
+        let other = manager.create_session("archive", "").expect("other");
+        append_users(&other, 0, 1);
+        let evidence = inspect(&session).expect("prepared recovery");
+        // Keep the evidence alive, just as History does during provider work.
+        // An unrelated live head participates in the ownership inventory but
+        // must not be write-locked for the lifetime of another model turn.
+        append_users(&other, 1, 2);
+        assert_eq!(other.read_entries().expect("other persisted").len(), 2);
+        assert_eq!(evidence.entries().len(), 205);
+        // Changed ownership evidence cannot continue authorizing disclosure.
+        assert!(
+            evidence
+                .check_supporting_sources(Instant::now() + Duration::from_secs(5))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn retained_archive_evidence_allows_selected_head_append_without_extending_history() {
+        let (_root, _manager, session) = fixture();
+        append_users(&session, 0, 205);
+        session.compact_archived(50).expect("archive");
+        let evidence = inspect(&session).expect("prepare");
+        append_users(&session, 205, 206);
+        assert_eq!(evidence.entries().len(), 205);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        evidence
+            .check_supporting_sources(deadline)
+            .expect("unchanged supporting sources");
+        assert!(evidence.check_all_sources(deadline).is_err());
+        assert_eq!(
+            inspect(&session).expect("new evidence").entries().len(),
+            206
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn released_archive_leases_require_content_even_when_metadata_matches() {
+        let (_root, manager, session) = fixture();
+        append_users(&session, 0, 205);
+        session.compact_archived(50).expect("archive");
+        let other = manager.create_session("archive", "").expect("other");
+        append_users(&other, 0, 1);
+        let mut evidence = inspect(&session).expect("prepare");
+        let bytes = std::fs::read(&other.file_path).expect("original other head");
+        let changed = String::from_utf8(bytes)
+            .expect("UTF-8")
+            .replace("fact 0", "fact 9");
+        std::fs::write(&other.file_path, changed).expect("write after lease release");
+        let source = crate::history_page::open_source(&other.file_path).expect("fresh lease");
+        let stamp = crate::recovery_stamp::from_file(&source).expect("fresh stamp");
+        // Native Windows has demonstrated equal metadata after equal-length
+        // writes (ADR-096). Force that equality here so this regression doesn't
+        // depend on filesystem timestamp granularity or scheduling.
+        let (_, expected) = evidence
+            .versions
+            .iter_mut()
+            .find(|(path, _)| path == &other.file_path)
+            .expect("other head inventory");
+        expected.stamp = (&stamp).into();
+        drop(stamp);
+        drop(source);
+        assert!(
+            evidence
+                .check_supporting_sources(Instant::now() + Duration::from_secs(5))
+                .is_err()
+        );
     }
 
     #[test]

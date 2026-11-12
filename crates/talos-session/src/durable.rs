@@ -214,6 +214,7 @@ pub struct DurableRecoverySource {
 }
 
 struct RecoverySourceDescriptor {
+    write_lock: Arc<std::sync::Mutex<()>>,
     owner: Arc<()>,
     session_id: Uuid,
     branch_id: String,
@@ -299,6 +300,16 @@ impl DurableRecoveryRecord {
 }
 
 impl DurableRecoverySource {
+    /// Try to serialize a bounded synchronous recovery read with this owner's
+    /// writes. Returns None on contention or a poisoned lock. This guard grants
+    /// no content or permission authority: verify the original prefix separately.
+    /// Release all source handles before dropping the guard; never hold it across
+    /// provider/tool awaits. Independently reopened owners and external writers
+    /// still require the platform's restrictive source handles and revalidation.
+    pub fn try_lock_for_recovery_read(&self) -> Option<std::sync::MutexGuard<'_, ()>> {
+        self.descriptor.write_lock.try_lock().ok()
+    }
+
     /// Restrict this configured source to an earlier cutoff. This does not verify
     /// bytes or grant branch authority; complete prefix verification is required.
     pub fn recovery_prefix_at(
@@ -1257,6 +1268,7 @@ impl DurableSession {
         }
         Ok(DurableRecoverySource {
             descriptor: Arc::new(RecoverySourceDescriptor {
+                write_lock: self.session.write_lock.clone(),
                 owner: self.recovery_owner.clone(),
                 session_id: self.id(),
                 branch_id: self.session.current_branch.clone(),
@@ -3083,6 +3095,7 @@ mod tests {
     fn composed_recovery_enforces_combined_source_budget_before_io() {
         let source = DurableRecoverySource {
             descriptor: Arc::new(RecoverySourceDescriptor {
+                write_lock: Arc::new(std::sync::Mutex::new(())),
                 owner: Arc::new(()),
                 session_id: Uuid::new_v4(),
                 branch_id: "test".into(),
