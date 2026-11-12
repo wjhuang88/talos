@@ -557,6 +557,9 @@ mod tests {
             stream
                 .set_read_timeout(Some(Duration::from_secs(10)))
                 .expect("fixture timeout");
+            stream
+                .set_write_timeout(Some(Duration::from_secs(5)))
+                .expect("fixture write deadline");
             let mut request = [0_u8; 2048];
             let _ = stream.read(&mut request);
             let content_encoding = encoding
@@ -604,7 +607,7 @@ mod tests {
                 .await
                 .expect("oversize wire body rejection must be bounded");
             assert!(
-                matches!(result, Err(SearchBackendError::Parse)),
+                matches!(result.as_ref(), Err(SearchBackendError::Parse)),
                 "oversize wire body should fail closed for {encoding:?}: {result:?}"
             );
             server.join().expect("chunked fixture thread");
@@ -630,7 +633,7 @@ mod tests {
             .await
             .expect("bounded decompression");
         assert!(
-            matches!(result, Err(SearchBackendError::Parse)),
+            matches!(result.as_ref(), Err(SearchBackendError::Parse)),
             "decompressed output must be bounded: {result:?}"
         );
         server.join().expect("chunked fixture thread");
