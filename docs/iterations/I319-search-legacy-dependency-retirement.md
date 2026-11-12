@@ -103,7 +103,7 @@ dependency-wide upgrade or `rust-websearch` dynamic runtime fallback.
 
 Completion Commit: `3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970` — actual implementation #907; this documentation closeout is not the implementation commit.
 
-- **Implementation Completion Commit:** `3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970` ([PR #907](https://github.com/wjhuang88/talos/pull/907)), merged using expected head `faa4982caed19e3f35b9e5648c47c36184c24f52` after [CI4121 8/8 SUCCESS](https://github.com/wjhuang88/talos/actions/runs/43195189353) and [independent final-head source review](https://github.com/wjhuang88/talos/pull/907#issuecomment-6820413223) with no code blocker. This **docs-only closeout is not** the implementation Completion Commit; close #901 only upon its owner-first governance merge.
+- **Implementation merge and acceptance evidence:** `3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970` ([PR #907](https://github.com/wjhuang88/talos/pull/907)), merged using expected head `faa4982caed19e3f35b9e5648c47c36184c24f52` after [CI4121 8/8 SUCCESS](https://github.com/wjhuang88/talos/actions/runs/43195189353) and [independent final-head source review](https://github.com/wjhuang88/talos/pull/907#issuecomment-6820413223) with no code blocker. This **docs-only closeout is not** the implementation Completion Commit; close #901 only upon its owner-first governance merge.
 
 ## Variance And Residuals
 
