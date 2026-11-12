@@ -28,7 +28,9 @@ pub(crate) fn build_status_text(
 
     let model_name = &status.model_name;
     let provider = status_provider_for_display(model_name, &status.provider);
-    let workspace = &status.workspace_path;
+    let home = std::env::var("HOME").ok();
+    let workspace_label = workspace_path_display(&status.workspace_path, home.as_deref());
+    let workspace = workspace_label.as_str();
     let variant = &status.variant;
 
     let context_label = format_context_label(status.context_limit, status.context_budget);
@@ -274,5 +276,42 @@ fn phase_status_label(status: &talos_conversation::StatusSnapshot) -> Option<Str
         Some(talos_conversation::TurnPhase::Cancelled) => Some("cancelled".to_string()),
         Some(talos_conversation::TurnPhase::RunningTool { name }) => Some(format!("tool: {name}")),
         _ => None,
+    }
+}
+
+// Only the presentation layer abbreviates paths; Git consumes the original path.
+fn workspace_path_display(path: &str, home: Option<&str>) -> String {
+    let Some(home) = home.filter(|home| !home.is_empty()) else {
+        return path.to_owned();
+    };
+    match std::path::Path::new(path).strip_prefix(home) {
+        Ok(relative) if relative.as_os_str().is_empty() => "~".to_owned(),
+        Ok(relative) => format!("~/{}", relative.display()),
+        Err(_) => path.to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod workspace_path_tests {
+    use super::workspace_path_display;
+
+    #[test]
+    fn abbreviation_is_display_only_and_respects_path_boundaries() {
+        let original = "/home/alice/project".to_owned();
+        assert_eq!(
+            workspace_path_display(&original, Some("/home/alice")),
+            "~/project"
+        );
+        assert_eq!(original, "/home/alice/project");
+        assert_eq!(
+            workspace_path_display("/home/alice", Some("/home/alice")),
+            "~"
+        );
+        assert_eq!(
+            workspace_path_display("/home/alice-other/project", Some("/home/alice")),
+            "/home/alice-other/project"
+        );
+        assert_eq!(workspace_path_display(&original, None), original);
+        assert_eq!(workspace_path_display(&original, Some("")), original);
     }
 }

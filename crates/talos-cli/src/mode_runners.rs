@@ -52,7 +52,7 @@ use crate::registry::{
 use crate::runtime_adapter;
 use crate::session_setup::{
     ResumeSelection, canonical_workspace_root, resolve_session_for_workspace,
-    resolve_workspace_root, workspace_display_name, workspace_path_display,
+    resolve_workspace_root, workspace_display_name,
 };
 use crate::session_transition::SessionTransition;
 use crate::skill_runtime::{apply_runtime_skills, discover_runtime_skills};
@@ -669,7 +669,7 @@ pub(crate) async fn run_tui_mode(
     tui.set_user_input_tx(user_input_tx.clone());
     tui.set_model_name(config.model.clone());
     tui.set_provider(config.provider.clone());
-    tui.set_workspace_path(workspace_path_display(&workspace_root));
+    tui.set_workspace_path(workspace_root.to_string_lossy().into_owned());
     tui.set_session_id(session.id.to_string());
 
     let skill_diagnostics = runtime_skills.lock().await.diagnostics();
