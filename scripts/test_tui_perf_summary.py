@@ -4,10 +4,30 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from summarize_tui_perf import animation_budget, observed_tree_usage, percentile_bounds, summarize
+from summarize_tui_perf import animation_budget, observed_tree_usage, percentile_bounds, resize_budget, summarize
 
 
 class SummaryValidation(unittest.TestCase):
+    def test_resize_threshold_uses_rank_and_preserves_legacy_unknown(self):
+        self.assertIsNone(resize_budget({}))
+        metric = {'count': 101, 'total_ns': 101 * 150_000_000,
+                  'max_ns': 150_000_001, 'log2_ns_buckets': [0] * 32,
+                  'over_150ms_count': 5}
+        metric['log2_ns_buckets'][28] = 101
+        table = {'input_to_submit': metric}
+        self.assertTrue(resize_budget(table)['p95_within_150ms'])
+        metric['over_150ms_count'] = 6
+        self.assertFalse(resize_budget(table)['p95_within_150ms'])
+        metric['over_150ms_count'] = 102
+        with self.assertRaisesRegex(ValueError, 'threshold count'):
+            resize_budget(table)
+        metric['over_150ms_count'] = 0
+        with self.assertRaisesRegex(ValueError, 'contradicts maximum'):
+            resize_budget(table)
+        metric.update(count=0, total_ns=0, max_ns=0, over_150ms_count=0,
+                      log2_ns_buckets=[0] * 32)
+        self.assertFalse(resize_budget(table)['p95_within_150ms'])
+
     def test_animation_budget_checks_exact_threshold_without_quantile_guessing(self):
         self.assertIsNone(animation_budget({}))
         metric = {'count': 213, 'total_ns': 213 * 49_000_000,

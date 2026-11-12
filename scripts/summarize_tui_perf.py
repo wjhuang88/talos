@@ -26,6 +26,22 @@ def animation_budget(table):
             'p99_within_50ms': count > 0 and count - over >= rank}
 
 
+def resize_budget(table):
+    """Check the Debug P95 threshold; old reports cannot supply exact counts."""
+    metric = table.get('input_to_submit', {})
+    if 'over_150ms_count' not in metric:
+        return None
+    validate_stage_table(table, ('input_to_submit',))
+    count, over = metric['count'], metric['over_150ms_count']
+    if type(over) is not int or not 0 <= over <= count:
+        raise ValueError('invalid resize threshold count')
+    if (over > 0) != (metric['max_ns'] > 150_000_000):
+        raise ValueError('resize threshold contradicts maximum')
+    rank = (95 * count + 99) // 100
+    return {'count': count, 'over_150ms_count': over,
+            'p95_within_150ms': count > 0 and count - over >= rank}
+
+
 def percentile_bounds(metric, percentile):
     """Return enclosing nanosecond bounds; the last bucket is overflow."""
     if not metric['count']:
@@ -116,6 +132,8 @@ def summarize(directory):
                 stage: {f'p{p}': percentile_bounds(metrics['steady_stages'][stage], p) for p in (95, 99)}
                 for stage in ('input_to_submit', 'deadline_lateness')}
             row['animation_deadline_budget'] = animation_budget(metrics['steady_stages'])
+            if sample['scenario'] == 'resize':
+                row['resize_debug_budget'] = resize_budget(metrics['steady_stages'])
         groups.setdefault(key, []).append(row)
     result = {}
     for key, rows in groups.items():

@@ -259,6 +259,12 @@ exact percentile. Legacy reports retain their conservative mixed-deadline
 histogram check and are labeled accordingly. Neither observation proves visible
 pixel timing or identifies the cause of host scheduling delays.
 
+Metrics also include `over_150ms_count`, a fixed-size counter used by the summary's
+`resize_debug_budget` to evaluate the frozen Debug resize P95 <=150ms threshold.
+It tests nearest-rank membership, not an exact percentile value. Older reports
+return unavailable for this check; their histogram bounds remain valid. This
+does not change the Release budget or replace P99 and native-terminal checks.
+
 For sustained input probes, add `--input-probe-interval-ms 50` to the sampler or
 matrix alongside `--input-probe` (default500ms, allowed10..10000ms). Probes follow
 fixed deadlines and skip overdue slots without catch-up bursts. Reports include

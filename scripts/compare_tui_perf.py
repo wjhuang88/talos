@@ -52,6 +52,9 @@ def compare(directory):
                     latency_budgets_ms = (20, 35) if args['profile'] == 'debug' else (10, 20)
                 for percentile, budget in zip(('p95', 'p99'), latency_budgets_ms, strict=True):
                     checks[f'input_{percentile}'] = all(
+                        row['resize_debug_budget']['p95_within_150ms']
+                        if scenario == 'resize' and args['profile'] == 'debug'
+                        and percentile == 'p95' and row.get('resize_debug_budget') is not None else
                         row['latency_bounds']['input_to_submit'][percentile] is not None
                         and row['latency_bounds']['input_to_submit'][percentile]['upper_ns'] <= budget * 1_000_000
                         for row in candidate['rounds'])
@@ -71,6 +74,11 @@ def compare(directory):
                 'candidate_peak_pss_kib': candidate['aggregate']['peak_pss_kib']['max'],
                 'peak_pss_budget_kib': memory_limit, 'input_p95_p99_budget_ms': latency_budgets_ms,
                 'checks': checks,
+                'resize_p95_evidence': [
+                    '150ms threshold count' if args['profile'] == 'debug'
+                    and row.get('resize_debug_budget') is not None
+                    else 'histogram upper bound'
+                    for row in candidate['rounds']] if scenario == 'resize' else None,
                 'animation_deadline_evidence': [
                     'visible-animation threshold count' if row.get('animation_deadline_budget') is not None
                     else 'legacy mixed-deadline histogram upper bound'

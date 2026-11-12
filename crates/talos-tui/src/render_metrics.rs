@@ -53,6 +53,7 @@ struct Metric {
     total_ns: u64,
     max_ns: u64,
     over_50ms_count: u64,
+    over_150ms_count: u64,
     buckets: [u64; 32],
 }
 struct Metrics {
@@ -69,6 +70,7 @@ const EMPTY: Metric = Metric {
     total_ns: 0,
     max_ns: 0,
     over_50ms_count: 0,
+    over_150ms_count: 0,
     buckets: [0; 32],
 };
 static METRICS: Mutex<Metrics> = Mutex::new(Metrics {
@@ -81,6 +83,7 @@ static METRICS: Mutex<Metrics> = Mutex::new(Metrics {
         total_ns: 0,
         max_ns: 0,
         over_50ms_count: 0,
+        over_150ms_count: 0,
         buckets: [0; 32],
     }; NAMES.len()],
     changed_cells: 0,
@@ -179,6 +182,7 @@ fn stage_json(values: &[Metric; NAMES.len()]) -> serde_json::Map<String, serde_j
                     "count": metric.count, "total_ns": metric.total_ns,
                     "max_ns": metric.max_ns, "log2_ns_buckets": metric.buckets,
                     "over_50ms_count": metric.over_50ms_count,
+                    "over_150ms_count": metric.over_150ms_count,
                 }),
             )
         })
@@ -228,6 +232,9 @@ impl Metric {
         self.max_ns = self.max_ns.max(ns);
         if ns > 50_000_000 {
             self.over_50ms_count = self.over_50ms_count.saturating_add(1);
+        }
+        if ns > 150_000_000 {
+            self.over_150ms_count = self.over_150ms_count.saturating_add(1);
         }
         let bucket = (64 - ns.leading_zeros()).min(31) as usize;
         self.buckets[bucket] = self.buckets[bucket].saturating_add(1);
@@ -290,6 +297,19 @@ mod tests {
         metric.over_50ms_count = u64::MAX;
         metric.observe(50_000_001);
         assert_eq!(metric.over_50ms_count, u64::MAX);
+    }
+
+    #[test]
+    fn resize_budget_counter_distinguishes_the_boundary_within_one_bucket() {
+        let mut metric = Metric::default();
+        for ns in [149_999_999, 150_000_000, 150_000_001] {
+            metric.observe(ns);
+        }
+        assert_eq!(metric.buckets[28], 3);
+        assert_eq!(metric.over_150ms_count, 1);
+        metric.over_150ms_count = u64::MAX;
+        metric.observe(150_000_001);
+        assert_eq!(metric.over_150ms_count, u64::MAX);
     }
 
     #[test]
