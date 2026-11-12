@@ -1,3 +1,8 @@
+## I323 Azure — proposed claim and activation
+
+[I323](I323-provider008c-azure-openai.md) / #914 proposes Azure C after completed A/B.
+Claim and activation have no effect before governance merge; D and parent #724 remain open.
+
 # Iterations
 
 ## I322 / STORE-002 C — proposed independent contract claim
