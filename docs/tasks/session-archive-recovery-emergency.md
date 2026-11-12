@@ -1115,3 +1115,101 @@ no new blocker after compressed coverage and limitation documentation. The seven
 all-feature compaction tests passed (`/tmp/talos-archive-publication-compressed.log`).
 MSVC compilation is not native Windows publication execution evidence; that gate
 remains pending. No receipt/locator/fork completion is claimed.
+
+## Zero-retention source locator implementation (uncommitted, Partial)
+
+Real 205 writes → compact0 → reopen → append regression failed because the new
+record named the synthetic placeholder as parent (`/tmp/talos-keep-zero-red.log`).
+Candidate now privately registers exact marker bytes, archive name/digest and
+logical original tail before head replacement. Only actual first-record markers
+activate locators; bounded archive traversal validates raw bytes, tail commitments,
+acyclic transitions and strict new suffix parents. No keepN tail-to-retained edge
+is added. Cold append resolves a marker tail through full validated source evidence.
+Original IDs and legacy parent values remain untouched. This is not fork authority.
+
+Read-only review identified a deadline/write-initialization bug in the first locator
+reader. Replaced it with READ_ONLY/NOFOLLOW, zero busy timeout, caller-deadline SQLite
+progress guard and bounded field decoding; schema non-initialization, expired/stopped
+calls and oversized-row regressions pass. Cancellation is checked at row boundaries;
+inside one SQL step the deadline guard applies. No immediate-cancellation claim.
+Soft compatibility bounds:256 locators per owner,512 bytes per original tail ID;
+exceeding limits fails before replacing the original head. No locator is synthesized
+for legacy keep0 archives. No UUID reuse/deletion-lifecycle completion claim.
+
+351 session tests plus integration/doc tests passed before adding the process-crash
+fixtures (`/tmp/talos-keep-zero-session-final.log`). Seven focused keep0 tests now
+pass (`/tmp/talos-keep-zero-crash-tests.log`), including genuine subprocess exit42
+immediately after private registration and after head publication. Both restart and
+append with the original logical parent; this is process death, not power-loss proof.
+Additional tests cover repeated no-append compaction, two independent sessions,
+missing receipt/archive, wrong tail, and marker/archive/suffix corruption.
+Full standard preflight and final MSVC checks pending; no commit, primary sync,
+new candidate push, merge or deployment for this increment yet. Archived fork
+receipts/origins, remaining lifecycle gates and original handoff scope stay open.
+
+Validation refinement: preflight60438 ended exit101 at the unchanged talos-config
+`store_unset_builtin_provider_clears_credentials` test, log
+`/tmp/talos-keep-zero-preflight.log`. It passed in isolation
+(`/tmp/talos-keep-zero-config-isolated.log`). Source inspection shows this test
+reads the shared provider environment without ENV_MUTEX while other tests mutate
+it under ENV_MUTEX; this is a plausible parallel interference path, not a proven
+trace of this occurrence. No config source/test changes were mixed into recovery.
+Added missing cancellation checks on locator no-file/no-table returns. The real
+keep0→keep1→keep0→cold append regression passes
+(`/tmp/talos-keep-zero-mixed.log`). Final MSVC tests compilation35688 exited0
+(`/tmp/talos-keep-zero-xwin.log`). Fresh standard preflight will validate the final
+source; do not count the failed run as a pass.
+
+Validation update: second standard preflight94811 exited0, including external SDK
+fixtures (`/tmp/talos-keep-zero-preflight-r2.log`). Remote run43152762505 completed
+successfully at older head0b8ccbe4; it is not CI evidence for uncommitted keep0.
+Added actual History prepare/query/detail/paging/source-revocation keep0 coverage
+using the same legacy-parent fixture as keep10. First test invocation accidentally
+used a fresh target and failed compilation with disk quota exceeded
+(`/tmp/talos-keep-zero-agent-query-tests.log`); retry uses existing candidate target.
+No configuration fix, session cleanup, or background enablement was included.
+
+## Keep0 model-history query correction (uncommitted, Partial)
+
+Actual History prepare/query/detail regression exposed a separate omission: a head
+containing only the count marker passes linear parent adjacency, so archive recovery
+was never selected. Red evidence `/tmp/talos-keep-zero-agent-query-tests-r2.log`.
+SessionEntry now exposes a descriptive marker predicate (no provenance authority);
+linear preparation routes markers to the existing validated archive fallback.
+Keep0 and keep10 share real legacy-parent query/page/detail/source-revocation tests.
+Missing archive cannot become an empty available history.23 checkpoint-history
+tests passed (`/tmp/talos-keep-zero-agent-history-final.log`), under CPU100%,
+MemoryHigh2GiB/Max3GiB, no swap, jobs1/test threads1; reported memory peak2GiB.
+
+Independent review then confirmed old completed continuation cursors bypassed the
+new per-page check. A persisted old-writer index/continuation fixture reproduced
+this (`/tmp/talos-keep-zero-cache-red.log`). Standard preflight35693 was deliberately
+stopped before completion; wrapper exit0 is NOT a validation pass. Preparation now
+rechecks its sealed first page before accepting either fresh or restored completion;
+the classification flag is never persisted. Both archive-present recovery and
+archive-missing refusal are tested. Full history tests and renewed preflight pending.
+No primary source sync, commit, push, deployment or full-fork claim for this increment.
+
+Old-cache regression now passes both archive-present and archive-missing cases.
+Read-only review found no remaining seal/continuation blocker. The first expanded
+24-test run passed23 but exposed a diagnostic compatibility regression: the new
+first-page read emitted linear_marker_page_failed instead of the established
+linear_head_page_failed. Restored the original code rather than weakening the
+real log/privacy regression; final rerun pending44056.
+
+Validation state correction: preflight64218 deliberately stopped at CLI test linking
+after sustained reclaim (>81000 memory.high events) and high host I/O pressure.
+Actual termination was SIGTERM15 after6m29s; wrapper/service success is not a pass.
+Check and Clippy had passed; final workspace tests/external fixtures did not finish.
+No OOM or swap observed. Keep the same CPU/memory limits for future validation;
+reduce debug/link memory cost rather than raising caps. Prior focused24 history
+tests remain valid, but do not substitute for final workspace validation.
+
+24 final history tests passed (`/tmp/talos-keep-zero-cache-final.log`), including old
+completed cursor and fixed diagnostic privacy coverage. Independent read-only
+review confirmed the seal/continuation correction. This bounded increment is being
+saved as a local candidate commit with final workspace validation explicitly
+incomplete. Next fixed-commit standard validation will reduce dev/test debug info
+to0 under unchanged CPU100%, MemoryHigh2GiB/Max3GiB/no-swap caps, with a separate
+disk-backed target; this preserves test assertions and does not raise host limits.
+No merge, deployment or full archived-fork completion is authorized or claimed.

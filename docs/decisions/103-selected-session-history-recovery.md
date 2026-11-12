@@ -230,3 +230,22 @@ it now revokes it. Supporting-source checks still exclude the selected head's ve
 which remains protected by its original prefix seal. This is not a multi-file atomic
 snapshot or a guarantee against changes after return: ownership and disclosure
 before/after checks remain mandatory. All checks share the caller's deadline.
+
+## Zero-retention source bridge and old-index migration (local candidate)
+
+For new UUID TLOG keep0 compactions, a private host locator may replace the overlap
+requirement for the exact first marker: it binds marker raw digest, synced archive
+name/digest and the original logical tail before head replacement. Recovery still
+validates the full bounded source chain, original tail, acyclic marker transitions
+and strict appended suffix. It does not authorize cross-session inheritance. Legacy
+keep0 without this evidence remains unavailable. Physical publication intents and
+full archived-fork lineage are separate outstanding requirements.
+
+History preparation must classify markers even when a persisted old index cursor
+already reports completion. The sealed first page is rechecked in each new
+preparation; the classification flag is not persisted. A marker never constitutes
+an empty complete linear history. Actual query and old-index regression fixtures
+cover archive presence and absence. Source locator limits and cancellation behavior
+are specified in the runtime SDK contract; UUID reuse/deletion lifecycle and native
+Windows crash durability remain pending. This additive classification API and
+locator implementation do not change the ADR's Proposed status.

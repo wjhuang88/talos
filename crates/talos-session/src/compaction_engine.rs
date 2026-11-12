@@ -83,9 +83,27 @@ impl CompactionEngine {
 
         let original_bytes = std::fs::metadata(head_path).map(|m| m.len()).unwrap_or(0);
 
-        let archived_path = self.archive_head(head_path, &archive_path, &compressed_path)?;
-
         let compacted = self.apply_rules(&entries, max_entries);
+        let zero_tail = if max_entries == 0
+            && matches!(
+                self.store.history_encoding(),
+                Some(crate::history_page::HistoryEncoding::Tlog)
+            )
+            && head_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .is_some_and(|s| uuid::Uuid::parse_str(s).is_ok())
+        {
+            Some(crate::compaction_locator::recovered_tail(head_path)?)
+        } else {
+            None
+        };
+        let archived_path = self.archive_head(head_path, &archive_path, &compressed_path)?;
+        if let Some(tail) = zero_tail {
+            crate::compaction_locator::record(head_path, &archived_path, &compacted[0], &tail)?;
+            #[cfg(test)]
+            crate::durable::fork_crash_probe("zero_registered");
+        }
 
         self.store.replace_with_retained_suffix(
             head_path,
@@ -93,6 +111,11 @@ impl CompactionEngine {
             entries.len() - max_entries,
             &compacted[..1],
         )?;
+
+        #[cfg(test)]
+        if max_entries == 0 {
+            crate::durable::fork_crash_probe("zero_published");
+        }
 
         let _record_count = entries.len();
         let archived_bytes = std::fs::metadata(&archived_path)

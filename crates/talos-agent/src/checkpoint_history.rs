@@ -73,6 +73,7 @@ pub(crate) struct Preparation {
     scope: String,
     parent: Option<String>,
     resolved: bool,
+    marker_checked: bool,
     #[cfg(test)]
     after_page_read: Option<Box<dyn FnOnce() + Send>>,
 }
@@ -217,6 +218,7 @@ impl Preparation {
                 scope: saved.scope,
                 parent: saved.parent,
                 resolved: false,
+                marker_checked: false,
                 #[cfg(test)]
                 after_page_read: None,
             });
@@ -258,6 +260,7 @@ impl Preparation {
             scope,
             parent: None,
             resolved: false,
+            marker_checked: false,
             #[cfg(test)]
             after_page_read: None,
         })
@@ -372,6 +375,34 @@ impl Preparation {
                 Err(_) => preparation_failure("linear_prefix_scan_failed"),
             };
         }
+        if !self.marker_checked {
+            // Old persisted cursors may already have indexed the root marker.
+            // A valid byte seal does not attest to the current classification rule.
+            let page = match self.source.read_page(0, deadline, || cancel.is_cancelled()) {
+                Ok(page) => page,
+                Err(talos_session::history_page::HistoryPageError::Stopped)
+                    if !cancel.is_cancelled() =>
+                {
+                    return Some(PreparationStep::Expired);
+                }
+                Err(_) => return preparation_failure("linear_head_page_failed"),
+            };
+            preparation_result(
+                self.seal
+                    .as_ref()
+                    .or_else(|| preparation_failure("linear_seal_missing"))?
+                    .check_current(),
+                "linear_step_source_changed",
+            )?;
+            if page
+                .entries
+                .iter()
+                .any(|entry| entry.is_compaction_placeholder())
+            {
+                return preparation_failure("linear_compaction_placeholder");
+            }
+            self.marker_checked = true;
+        }
         if self.resolved {
             return Some(PreparationStep::Complete);
         }
@@ -427,6 +458,11 @@ impl Preparation {
             )?;
             let mut parent = self.parent.clone();
             for entry in &page.entries {
+                // A keep0 head can contain only a root marker and therefore pass
+                // adjacency validation. It still requires proven archive sources.
+                if entry.is_compaction_placeholder() {
+                    return preparation_failure("linear_compaction_placeholder");
+                }
                 if entry.parent_id != parent {
                     tracing::warn!(
                         reason = "parent_chain_mismatch",
@@ -1305,6 +1341,132 @@ mod tests {
 
     #[tokio::test]
     async fn archived_queries_preserve_legacy_parents_page_and_revoke_on_source_or_scope_change() {
+        assert_archived_queries_preserve_sources(10).await;
+    }
+
+    #[tokio::test]
+    async fn keep_zero_archived_queries_page_detail_and_revoke_on_source_or_scope_change() {
+        assert_archived_queries_preserve_sources(0).await;
+    }
+
+    #[tokio::test]
+    async fn keep_zero_missing_archive_cannot_become_empty_linear_history() {
+        use talos_core::message::Message;
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "missing-zero").expect("owner");
+        owner
+            .session()
+            .append(&Message::User {
+                content: "original fact".into(),
+            })
+            .expect("append");
+        owner.session().compact_archived(0).expect("archive");
+        let before = owner.session().snapshot_bytes().expect("head");
+        let evidence = owner
+            .session()
+            .inspect_archive_recovery(Instant::now() + Duration::from_secs(10), || false)
+            .expect("evidence");
+        for source in evidence.sources() {
+            if source.path != owner.file_path() {
+                std::fs::remove_file(&source.path).expect("remove fixture archive");
+            }
+        }
+        assert!(
+            History::prepare(&owner, &CancellationToken::new())
+                .await
+                .is_none()
+        );
+        assert_eq!(
+            owner.session().snapshot_bytes().expect("unchanged head"),
+            before
+        );
+    }
+
+    #[tokio::test]
+    async fn keep_zero_old_completed_continuation_requires_archive_recovery() {
+        use talos_core::message::Message;
+        for archive_present in [true, false] {
+            let root = tempfile::tempdir().expect("root");
+            let owner =
+                DurableSession::open_or_create(root.path(), "old-zero-cache").expect("owner");
+            owner
+                .session()
+                .append(&Message::User {
+                    content: "original cached fact".into(),
+                })
+                .expect("append");
+            owner.session().compact_archived(0).expect("archive");
+            let cancel = CancellationToken::new();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            let mut work = Preparation::begin(&owner, &cancel, deadline).expect("begin");
+            while work.scan.is_some() {
+                assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
+            }
+            // Reproduce the old writer: index the root marker as a complete
+            // linear page, persist its valid seal, then die before retirement.
+            let page = work.source.read_page(0, deadline, || false).expect("page");
+            assert_eq!(page.entries.len(), 1);
+            assert!(page.entries[0].is_compaction_placeholder());
+            let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
+            let mut index = SessionIndex::new(&work.path).expect("index");
+            let cursor = index
+                .recovery_build_cursor(&work.scope, &budget)
+                .expect("cursor")
+                .expect("build");
+            index
+                .advance_recovery_build(
+                    &work.scope,
+                    &cursor,
+                    RecoveryBuildPage {
+                        next_offset: page.next_offset,
+                        scanned_entries: 1,
+                        sources: &[RecoveryIndexSource {
+                            entry: &page.entries[0],
+                            terminal: None,
+                            ordinal: 0,
+                            record_range: Some(page.record_ranges[0].clone()),
+                        }],
+                    },
+                    &budget,
+                )
+                .expect("old page");
+            work.parent = Some(page.entries[0].id.clone());
+            work.persist(&cancel, deadline).expect("old continuation");
+            drop(work);
+            if !archive_present {
+                let evidence = owner
+                    .session()
+                    .inspect_archive_recovery(deadline, || false)
+                    .expect("evidence");
+                for source in evidence.sources() {
+                    if source.path != owner.file_path() {
+                        std::fs::remove_file(&source.path).expect("remove fixture archive");
+                    }
+                }
+            }
+            let history = History::prepare(&owner, &cancel).await;
+            if archive_present {
+                let history = history.expect("recovered history");
+                assert!(
+                    history.archive.is_some(),
+                    "old complete cursor must not bypass classification"
+                );
+                assert_eq!(
+                    history
+                        .query(Some("original cached fact"), None, None)
+                        .expect("query")["results"][0]["text"],
+                    "original cached fact"
+                );
+            } else {
+                assert!(
+                    history.is_none(),
+                    "missing archive cannot become empty cached history"
+                );
+            }
+        }
+    }
+
+    async fn assert_archived_queries_preserve_sources(keep_recent: usize) {
         use talos_core::message::Message;
         use talos_session::SessionStore;
         let root = tempfile::tempdir().expect("root");
@@ -1324,7 +1486,10 @@ mod tests {
         talos_session::CompactTextSessionStore
             .replace_entries_atomically(owner.file_path(), &legacy)
             .expect("legacy parent fixture");
-        owner.session().compact_archived(10).expect("archive");
+        owner
+            .session()
+            .compact_archived(keep_recent)
+            .expect("archive");
         let before = owner.session().snapshot_bytes().expect("original head");
         let cancel = CancellationToken::new();
         let history = History::prepare(&owner, &cancel)

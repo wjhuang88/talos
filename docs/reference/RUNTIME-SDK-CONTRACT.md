@@ -830,6 +830,32 @@ alias or complete archive for recovery; this is not an archive/head/receipt cras
 recovery protocol or completion of archived-fork support.
 
 
+Zero-retention compaction of a UUID-backed TLOG now records a private source locator
+in `history-bindings.sqlite` after archive sync and before head replacement. It binds
+the exact first placeholder record, original logical tail, and archive name/digest.
+Recovery follows only locators activated by actual first records, validates exact
+source bytes and linear new suffixes, and rejects cycles or changed/missing evidence.
+Cold append validates the complete bounded source chain before using its original
+tail; it never adopts the synthetic placeholder as the new parent. Existing legacy
+zero-retention histories without a locator remain unavailable rather than guessed.
+This does not authorize cross-session inheritance or old tool results.
+`SessionEntry::is_compaction_placeholder` is an additive descriptive predicate,
+not a receipt or ownership check. Host history preparation checks the sealed first
+page even when resuming an old completed index cursor, so keep0 markers cannot
+silently become empty linear history. Search/detail require validated archive
+sources; missing sources leave history unavailable with fixed diagnostic reasons.
+
+Locator reads are read-only/no-follow, use the recovery deadline in SQLite's progress
+handler, and check cancellation before/after queries and between rows. Cancellation
+inside one SQLite step is currently deadline-bounded, not immediate. Each owner has
+at most 256 locators; canonical archive names/digests and a 512-byte original-tail ID
+limit bound values copied into Rust. Exceeding these limits fails before head
+replacement. Compaction still relies on host single-writer ownership. Process-death
+tests cover registration-before-head and published-head restart; power-loss durability
+on Windows, identity reuse/deletion lifecycle and fork inheritance remain unverified
+or unimplemented. The feature is an unreleased recovery candidate, not full fork
+or deployment acceptance.
+
 ### Unreleased Gemini invocation migration (I310 / ADR-094)
 
 The next pre-1.0 minor adds `GoogleGemini` protocol variants and optional

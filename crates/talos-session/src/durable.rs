@@ -1770,7 +1770,7 @@ thread_local! {
     static BINDING_INIT_RETRY_OBSERVER: std::cell::RefCell<Option<Box<dyn FnMut()>>> = const { std::cell::RefCell::new(None) };
 }
 
-fn open_bindings(path: &std::path::Path) -> Result<Connection, SessionError> {
+pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, SessionError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }

@@ -185,8 +185,18 @@ impl Session {
             // The tail may contain multiline or >16 KiB records; the legacy
             // line-based tail probe cannot establish its entry identity.
             *tip = if self.store.history_encoding().is_some() {
-                match crate::history_page::read_host_transcript_tip(&self.file_path) {
-                    Ok(tip) => tip,
+                match crate::history_page::read_host_transcript_tip_with_placeholder(
+                    &self.file_path,
+                ) {
+                    Ok((_, true))
+                        if matches!(
+                            self.store.history_encoding(),
+                            Some(crate::history_page::HistoryEncoding::Tlog)
+                        ) =>
+                    {
+                        Some(crate::compaction_locator::recovered_tail(&self.file_path)?)
+                    }
+                    Ok((tip, _)) => tip,
                     Err(crate::history_page::HistoryPageError::Io(error))
                         if error.kind() == std::io::ErrorKind::NotFound =>
                     {

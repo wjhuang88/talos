@@ -89,6 +89,12 @@ pub(crate) fn validate_host_transcript(path: &Path) -> Result<(), HistoryPageErr
 // The append path needs the exact last decoded record, not a line-shaped string
 // found inside multiline tool output. Retain at most one record plus an I/O page.
 pub(crate) fn read_host_transcript_tip(path: &Path) -> Result<Option<String>, HistoryPageError> {
+    read_host_transcript_tip_with_placeholder(path).map(|(tip, _)| tip)
+}
+
+pub(crate) fn read_host_transcript_tip_with_placeholder(
+    path: &Path,
+) -> Result<(Option<String>, bool), HistoryPageError> {
     let mut file = open_source(path)?;
     let jsonl = path.extension().is_some_and(|ext| ext == "jsonl");
     let deadline = Instant::now() + std::time::Duration::from_secs(5);
@@ -97,6 +103,7 @@ pub(crate) fn read_host_transcript_tip(path: &Path) -> Result<Option<String>, Hi
     let mut counter = 0;
     let mut eof = false;
     let mut tip = None;
+    let mut placeholder = false;
     loop {
         if Instant::now() >= deadline {
             return Err(HistoryPageError::Stopped);
@@ -143,12 +150,14 @@ pub(crate) fn read_host_transcript_tip(path: &Path) -> Result<Option<String>, Hi
                     .map_err(|_| HistoryPageError::InvalidRecord)?;
                 let entry = crate::store::decode_jsonl_history_line(line, &mut counter)
                     .ok_or(HistoryPageError::InvalidRecord)?;
+                placeholder = crate::archive_recovery::placeholder(&entry);
                 tip = Some(entry.id);
                 consumed += end + usize::from(end < remaining.len());
             } else {
                 let Some((entry, length)) = decode_tlog_record(remaining, usize::MAX)? else {
                     break;
                 };
+                placeholder = crate::archive_recovery::placeholder(&entry);
                 tip = Some(entry.id);
                 consumed += length;
             }
@@ -156,7 +165,7 @@ pub(crate) fn read_host_transcript_tip(path: &Path) -> Result<Option<String>, Hi
         bytes.drain(..consumed);
         if eof {
             return if bytes.is_empty() {
-                Ok(tip)
+                Ok((tip, placeholder))
             } else {
                 Err(HistoryPageError::InvalidRecord)
             };

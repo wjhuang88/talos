@@ -70,6 +70,16 @@ pub struct SessionEntry {
     pub metadata: SessionMetadata,
 }
 
+impl SessionEntry {
+    /// Whether this entry matches the legacy synthetic archive count marker.
+    ///
+    /// A match requires archive recovery before treating the head as complete
+    /// history. It does not itself prove archive ownership or authorize omission.
+    pub fn is_compaction_placeholder(&self) -> bool {
+        crate::archive_recovery::placeholder(self)
+    }
+}
+
 /// A linear branch within a session.
 ///
 /// A branch is a sequence of entries sharing a common root. Branches are created

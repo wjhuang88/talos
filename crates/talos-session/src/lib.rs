@@ -35,6 +35,7 @@ mod artifacts;
 pub use archive_recovery::{ArchiveRecoveryEvidence, ArchiveRecoverySource};
 mod compact_text;
 pub mod compaction_engine;
+mod compaction_locator;
 mod compression;
 mod diagnostic;
 mod durable;

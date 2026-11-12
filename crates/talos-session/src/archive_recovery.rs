@@ -382,11 +382,78 @@ impl Session {
                 stopped,
             )?);
         }
+        let locators = crate::compaction_locator::load(&self.file_path, deadline, stopped)?;
+        let mut bridges = BTreeMap::new();
+        for (index, file) in files.iter().enumerate() {
+            let Some((marker, raw)) = file.records.first() else {
+                continue;
+            };
+            if let Some(locator) = locators.iter().find(|locator| locator.marker == marker.id) {
+                if !placeholder(marker)
+                    || crate::compaction_locator::digest(raw) != locator.marker_digest
+                {
+                    return Err(invalid("compaction marker changed"));
+                }
+                let target = files
+                    .iter()
+                    .position(|candidate| {
+                        candidate.archive
+                            && candidate.source.path.file_name().and_then(|s| s.to_str())
+                                == Some(locator.archive.as_str())
+                    })
+                    .ok_or_else(|| invalid("compaction archive missing"))?;
+                if files[target].source.sha256 != locator.archive_digest {
+                    return Err(invalid("compaction archive changed"));
+                }
+                let mut previous = locator.tail.as_str();
+                for (entry, _) in file.records.iter().skip(1) {
+                    check(deadline, stopped)?;
+                    if placeholder(entry) || entry.parent_id.as_deref() != Some(previous) {
+                        return Err(invalid("compaction suffix parent mismatch"));
+                    }
+                    previous = &entry.id;
+                }
+                bridges.insert(index, (target, locator.tail.clone()));
+            }
+        }
+        for (index, (target, tail)) in &bridges {
+            check(deadline, stopped)?;
+            let valid_tail = files[*target].records.last().is_some_and(|(entry, _)| {
+                if placeholder(entry) {
+                    files[*target].records.len() == 1
+                        && bridges
+                            .get(target)
+                            .is_some_and(|(_, prior_tail)| prior_tail == tail)
+                } else {
+                    entry.id == *tail
+                }
+            });
+            if !valid_tail {
+                return Err(invalid("compaction tail commitment mismatch"));
+            }
+            let mut seen = BTreeSet::new();
+            let mut current = *index;
+            while let Some((next, _)) = bridges.get(&current) {
+                check(deadline, stopped)?;
+                if !seen.insert(current) {
+                    return Err(invalid("compaction locator cycle"));
+                }
+                current = *next;
+            }
+        }
         let mut selected = BTreeSet::from([0]);
         let mut known: BTreeMap<String, Vec<u8>> = BTreeMap::new();
         insert_records(&files[0], &mut known)?;
         loop {
             let mut added = false;
+            for index in selected.clone() {
+                if let Some((target, _)) = bridges.get(&index)
+                    && selected.insert(*target)
+                {
+                    insert_records(&files[*target], &mut known)?;
+                    added = true;
+                }
+            }
             for (index, file) in files.iter().enumerate().skip(1) {
                 check(deadline, stopped)?;
                 if selected.contains(&index) || !file.archive {
@@ -420,7 +487,19 @@ impl Session {
         let mut incoming: BTreeMap<String, usize> = BTreeMap::new();
         let mut placeholders = BTreeSet::new();
         for &index in &selected {
-            let mut previous: Option<String> = None;
+            if files[index].records.first().is_some_and(|(entry, _)| {
+                placeholder(entry) && entry.content.ends_with(", 0 recent entries preserved]")
+            }) && !bridges.contains_key(&index)
+            {
+                return Err(invalid("zero-retention compaction receipt missing"));
+            }
+            let mut previous = bridges.get(&index).map(|(_, tail)| tail.clone());
+            if previous
+                .as_ref()
+                .is_some_and(|tail| !known.contains_key(tail))
+            {
+                return Err(invalid("compaction original tail missing"));
+            }
             for (entry, _) in &files[index].records {
                 check(deadline, stopped)?;
                 if placeholder(entry) {
@@ -683,6 +762,261 @@ mod tests {
         let manager = crate::SessionManager::with_dir(root.path().into());
         let session = manager.create_session("archive", "").expect("session");
         (root, manager, session)
+    }
+
+    #[test]
+    fn keep_zero_restart_append_and_repeat_recovers_original_order() {
+        let (_root, manager, session) = fixture();
+        append_users(&session, 0, 205);
+        let originals = session.read_entries().expect("originals");
+        session.compact_archived(0).expect("keep zero");
+        let reopened = manager.get_session(&session.id).expect("restart");
+        append_users(&reopened, 205, 207);
+        let head = reopened.read_entries().expect("head");
+        assert_eq!(
+            head[1].parent_id.as_deref(),
+            Some(originals[204].id.as_str()),
+            "a synthetic placeholder must not become the original history parent"
+        );
+        let recovered = inspect(&reopened).expect("zero-overlap recovery");
+        assert_eq!(recovered.entries().len(), 207);
+        assert_eq!(recovered.entries()[204].id, originals[204].id);
+        reopened.compact_archived(0).expect("second keep zero");
+        let reopened = manager.get_session(&session.id).expect("second restart");
+        append_users(&reopened, 207, 208);
+        let recovered = inspect(&reopened).expect("ordered zero-overlap chain");
+        assert_eq!(recovered.entries().len(), 208);
+        for (i, entry) in recovered.entries().iter().enumerate() {
+            assert_eq!(entry.content, format!("fact {i}"));
+        }
+    }
+
+    #[test]
+    fn keep_zero_missing_receipt_or_archive_prevents_append_without_mutation() {
+        for remove_receipt in [true, false] {
+            let (_root, manager, session) = fixture();
+            append_users(&session, 0, 205);
+            session.compact_archived(0).expect("compact");
+            let locator = crate::compaction_locator::load(
+                &session.file_path,
+                Instant::now() + Duration::from_secs(5),
+                &|| false,
+            )
+            .expect("locators")
+            .remove(0);
+            let directory = session.file_path.parent().expect("directory");
+            if remove_receipt {
+                let connection =
+                    crate::durable::open_bindings(&directory.join("history-bindings.sqlite"))
+                        .expect("db");
+                connection
+                    .execute("DELETE FROM compaction_zero_locators", [])
+                    .expect("remove receipt fixture");
+            } else {
+                std::fs::remove_file(directory.join(locator.archive))
+                    .expect("remove archive fixture");
+            }
+            let before = session.snapshot_bytes().expect("before");
+            let reopened = manager.get_session(&session.id).expect("reopen");
+            assert!(
+                reopened
+                    .append(&Message::User {
+                        content: "must not append".into()
+                    })
+                    .is_err()
+            );
+            assert!(inspect(&reopened).is_err());
+            assert_eq!(before, reopened.snapshot_bytes().expect("unchanged"));
+        }
+    }
+
+    #[test]
+    fn keep_zero_recovery_excludes_unrelated_zero_retention_session() {
+        let (_root, manager, session) = fixture();
+        append_users(&session, 0, 205);
+        session.compact_archived(0).expect("selected compact");
+        let other = manager.create_session("archive", "").expect("other");
+        append_users(&other, 1000, 1205);
+        other.compact_archived(0).expect("other compact");
+        assert_eq!(inspect(&session).expect("selected").entries().len(), 205);
+        assert_eq!(
+            inspect(&other).expect("other").entries()[0].content,
+            "fact 1000"
+        );
+    }
+
+    #[test]
+    fn keep_zero_without_append_preserves_tail_and_rejects_wrong_commitment() {
+        let (_root, manager, session) = fixture();
+        append_users(&session, 0, 205);
+        let original = session.read_entries().expect("original");
+        session.compact_archived(0).expect("first");
+        session.compact_archived(0).expect("no append second");
+        assert_eq!(inspect(&session).expect("recover").entries().len(), 205);
+        let db = session
+            .file_path
+            .parent()
+            .expect("dir")
+            .join("history-bindings.sqlite");
+        let connection = crate::durable::open_bindings(&db).expect("db");
+        connection
+            .execute(
+                "UPDATE compaction_zero_locators SET tail=?1",
+                [&original[0].id],
+            )
+            .expect("wrong tail fixture");
+        let reopened = manager.get_session(&session.id).expect("restart");
+        let before = reopened.snapshot_bytes().expect("before");
+        assert!(inspect(&reopened).is_err());
+        assert!(
+            reopened
+                .append(&Message::User {
+                    content: "no".into()
+                })
+                .is_err()
+        );
+        assert_eq!(before, reopened.snapshot_bytes().expect("unchanged"));
+    }
+
+    #[test]
+    fn keep_zero_marker_archive_and_suffix_tampering_are_rejected() {
+        for corruption in ["marker", "archive", "suffix"] {
+            let (_root, manager, session) = fixture();
+            append_users(&session, 0, 205);
+            session.compact_archived(0).expect("compact");
+            match corruption {
+                "marker" => {
+                    let text = std::fs::read_to_string(&session.file_path).expect("head");
+                    std::fs::write(&session.file_path, text.replace("\t2:{}\n", "\t3:{ }\n"))
+                        .expect("change raw marker");
+                }
+                "archive" => {
+                    let locator = crate::compaction_locator::load(
+                        &session.file_path,
+                        Instant::now() + Duration::from_secs(5),
+                        &|| false,
+                    )
+                    .expect("locator")
+                    .remove(0);
+                    std::fs::write(
+                        session
+                            .file_path
+                            .parent()
+                            .expect("dir")
+                            .join(locator.archive),
+                        b"broken archive",
+                    )
+                    .expect("corrupt archive");
+                }
+                _ => {
+                    let mut entry = session.read_entries().expect("marker").remove(0);
+                    entry.id = uuid::Uuid::new_v4().to_string();
+                    entry.parent_id = None;
+                    entry.role = "user".into();
+                    entry.content = "unrelated suffix".into();
+                    session
+                        .store
+                        .append_entry(&session.file_path, &entry)
+                        .expect("inject wrong suffix");
+                }
+            }
+            let reopened = manager.get_session(&session.id).expect("restart");
+            assert!(inspect(&reopened).is_err(), "{corruption}");
+        }
+    }
+
+    #[test]
+    fn keep_zero_then_keep_one_then_zero_preserves_cold_append_order() {
+        let (_root, manager, session) = fixture();
+        append_users(&session, 0, 205);
+        session.compact_archived(0).expect("first zero");
+        let reopened = manager.get_session(&session.id).expect("restart");
+        append_users(&reopened, 205, 210);
+        reopened.compact_archived(1).expect("retain one");
+        let reopened = manager.get_session(&session.id).expect("restart after one");
+        append_users(&reopened, 210, 212);
+        reopened.compact_archived(0).expect("zero again");
+        let reopened = manager
+            .get_session(&session.id)
+            .expect("restart after zero");
+        append_users(&reopened, 212, 213);
+        let evidence = inspect(&reopened).expect("mixed recovery");
+        assert_eq!(evidence.entries().len(), 213);
+        for (i, entry) in evidence.entries().iter().enumerate() {
+            assert_eq!(entry.content, format!("fact {i}"));
+        }
+    }
+
+    #[test]
+    fn keep_zero_crash_child() {
+        let Some(path) = std::env::var_os("TALOS_TEST_ZERO_HEAD") else {
+            return;
+        };
+        let path = std::path::PathBuf::from(path);
+        let id = uuid::Uuid::parse_str(path.file_stem().expect("stem").to_str().expect("id"))
+            .expect("uuid");
+        let _lease = crate::SessionRuntimeLease::acquire(&path).expect("lease");
+        let session = Session::new(id, "archive".into(), String::new(), path);
+        session
+            .compact_archived(0)
+            .expect("compact reaches crash probe");
+        panic!("expected crash probe did not run");
+    }
+
+    #[test]
+    fn keep_zero_process_crash_before_and_after_head_publication_recovers() {
+        for phase in ["zero_registered", "zero_published"] {
+            let (_root, manager, session) = fixture();
+            append_users(&session, 0, 205);
+            let original_bytes = session.snapshot_bytes().expect("original bytes");
+            let original = session.read_entries().expect("original entries");
+            let mut child =
+                std::process::Command::new(std::env::current_exe().expect("test executable"))
+                    .args(["--exact", "archive_recovery::tests::keep_zero_crash_child"])
+                    .env("TALOS_TEST_ZERO_HEAD", &session.file_path)
+                    .env("TALOS_TEST_FORK_CRASH_PHASE", phase)
+                    .stdout(std::process::Stdio::null())
+                    .spawn()
+                    .expect("spawn child");
+            let deadline = Instant::now() + Duration::from_secs(15);
+            let status = loop {
+                if let Some(status) = child.try_wait().expect("wait") {
+                    break status;
+                }
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("crash child timed out");
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            };
+            assert_eq!(status.code(), Some(42), "{phase}");
+            let reopened = manager.get_session(&session.id).expect("restart");
+            if phase == "zero_registered" {
+                assert_eq!(reopened.snapshot_bytes().expect("old head"), original_bytes);
+            } else {
+                assert_eq!(reopened.read_entries().expect("new head").len(), 1);
+            }
+            let restored = inspect(&reopened).expect("recover after process death");
+            assert_eq!(restored.entries().len(), 205);
+            assert_eq!(
+                restored.entries().last().expect("tail").id,
+                original[204].id
+            );
+            append_users(&reopened, 205, 206);
+            let entries = reopened.read_entries().expect("continued");
+            assert_eq!(
+                entries.last().expect("new").parent_id.as_deref(),
+                Some(original[204].id.as_str())
+            );
+            assert_eq!(
+                inspect(&reopened)
+                    .expect("continued recovery")
+                    .entries()
+                    .len(),
+                206
+            );
+        }
     }
 
     #[test]
