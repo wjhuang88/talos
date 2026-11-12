@@ -1,6 +1,6 @@
 //! Width-dependent projection of application-owned transcript facts.
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -485,7 +485,7 @@ fn project_history_tail(
                 0,
                 true,
                 false,
-                ScrollbackLine::plain(group.summary(expanded), color),
+                Cow::Owned(ScrollbackLine::plain(group.summary(expanded), color)),
             ));
             if expanded {
                 for (offset, detail) in entries[index..index + group.entries].iter().enumerate() {
@@ -501,7 +501,7 @@ fn project_history_tail(
                             line_index + usize::from(offset == 0),
                             false,
                             matches!(block, TranscriptBlock::ToolResult(_)),
-                            line,
+                            Cow::Owned(line),
                         ));
                     }
                 }
@@ -513,16 +513,22 @@ fn project_history_tail(
                 TranscriptBlock::ToolResult(_) => pending_calls = pending_calls.saturating_sub(1),
                 _ => {}
             }
-            for (line_index, line) in logical_lines(&entry.block).into_iter().enumerate() {
-                let header =
-                    matches!(entry.block, TranscriptBlock::Reasoning { .. }) && line_index == 0;
-                projected.push((
-                    entry.id,
-                    line_index,
-                    header,
-                    matches!(entry.block, TranscriptBlock::ToolResult(_)),
-                    line,
-                ));
+            if let TranscriptBlock::StyledLine(line) = &entry.block {
+                // Stored styled lines already are logical lines. Borrow until projection
+                // finishes instead of cloning their text and segments on every resize.
+                projected.push((entry.id, 0, false, false, Cow::Borrowed(line)));
+            } else {
+                for (line_index, line) in logical_lines(&entry.block).into_iter().enumerate() {
+                    let header =
+                        matches!(entry.block, TranscriptBlock::Reasoning { .. }) && line_index == 0;
+                    projected.push((
+                        entry.id,
+                        line_index,
+                        header,
+                        matches!(entry.block, TranscriptBlock::ToolResult(_)),
+                        Cow::Owned(line),
+                    ));
+                }
             }
             index += 1;
         }
@@ -758,7 +764,7 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
     let mut synthetic_prefix = 0usize;
 
     for segment in &line.segments {
-        for ch in segment.text.chars() {
+        for (byte_offset, ch) in segment.text.char_indices() {
             let char_width = UnicodeWidthChar::width(ch).unwrap_or(0);
             // A double-width scalar cannot be represented at width one. This is
             // projection-only; the original scalar remains in TranscriptStore.
@@ -806,11 +812,14 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
             {
                 last.text.push(ch);
             } else {
-                current.push(HistorySegment::styled(
-                    ch.to_string(),
-                    segment.fg,
-                    segment.attrs,
-                ));
+                // Bound speculative capacity to one viewport row and remaining
+                // source bytes. Zero-width runs may grow normally beyond it.
+                let mut text = String::with_capacity(
+                    (segment.text.len() - byte_offset)
+                        .min(capacity.saturating_sub(used).saturating_mul(4)),
+                );
+                text.push(ch);
+                current.push(HistorySegment::styled(text, segment.fg, segment.attrs));
             }
             used = used.saturating_add(char_width);
             logical_offset += 1;
