@@ -93,7 +93,12 @@
 
 | [#897](https://github.com/wjhuang88/talos/issues/897) | Behavior-preserving domain persistence and host composition decoupling (ARCH-035) | [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) | Intake / Unclaimed | Independent cross-host composition prerequisite to #142/#361; consumes #670 capability contracts. Only equivalence migration; no implementation claim, backend switch or Server behavior. |
 
+| [#919](https://github.com/wjhuang88/talos/issues/919) | gix-native Git preflight compatibility | [GIT-COMPAT-001](../proposals/gix-preflight-system-git-compatibility.md) | Proposed / Unclaimed | Interim existing proposal registration; formal owner/claim #920 remains ineffective until merge. |
+| [#923](https://github.com/wjhuang88/talos/issues/923) | TUI performance and native acceptance residual | [TUI-PERF-001](../tasks/2026-11-10-tui-render-performance.md) | Review / Claimed | Stage implementation #922 merged; original performance and native acceptance remain required. |
+
 ## Synchronization Notes
+
+2026-11-12: Reconciled missing #919 and #923 without activating #920 or closing TUI-PERF-001. Existing proposal is the interim #919 source until its formal owner reaches main.
 
 2026-11-10: Registered open Issue #897 as ARCH-035, independent behavior-preserving host/runtime composition owner. SERVER-001/#142 and SERVER-001-C/#361 require its accepted equivalence evidence before production Server integration; STORE-002/#670 continues to own storage capability contracts. Proposed planning documentation PR #896 does not activate implementation or supersede SERVER-002/#360. Earlier dated rows are preserved as historical provenance.
 
