@@ -1448,3 +1448,52 @@ recorded Cargo profiles/features. This does not support blaming the exit fix,
 but does not explain environmental variation. Preserve the correctness fix,
 keep the resize gate open, and investigate the shared reflow path rather than
 repeat an unexplained matrix. All runs and limitations are retained.
+
+### Scope recalibration and projection allocation result (2026-11-12)
+
+The user requested recalibration after excessive validation and workstation
+resource pressure. The deliverable remains responsive, lower-cost TUI behavior:
+no idle redraw, dependency-aware animation, nonblocking Git snapshots and intact
+input/approval/output semantics. P0 measurements support these outcomes; repeated
+matrices are not themselves delivery. No original budget or native gate is waived.
+
+The pending projection patch borrows stored styled lines and bounds initial
+segment capacity to remaining source bytes/viewport cells.41 projection tests
+passed. Corrected profiler runs with57 steady rebuilds each report whole-run
+allocation calls21282134→11422251, rounded peak heap26.37M→26.26M; these are
+allocation observations, not a latency or leak-free claim. Evidence:
+[reserved-lines-evaluation](evidence/tui-perf-001/reserved-lines-evaluation/README.md).
+Its latest ordinary Debug resize P95 upper bounds164.247866/170.772531/160.545278ms
+do not establish the150ms gate; P99 bounds remain below200ms. The patch is not
+covered by the previously passing full preflight and is pending final review.
+
+Converge this bounded change before further optimization. Remaining delivery
+requirements are final-source checks/review/CI, unresolved resize acceptance,
+bounded-heap evidence and native terminal behavior/resources (including currently
+unavailable native Windows), followed by publication and owner synchronization.
+Do not start another identical timing matrix or broaden into a renderer rewrite.
+
+### Resize acceptance measurement precision
+
+Source inspection confirms input latency currently has log2 nanosecond buckets:
+the bucket spanning134.217728–268.435455ms crosses the frozen150ms threshold.
+For the latest rounds, its upper bound is capped at the observed maximum, so
+the recorded P95 bound is not an exact P95 failure. Existing evidence remains
+insufficient; it must not be retroactively passed. A bounded `over_150ms_count`
+now accompanies metrics, and the summary/comparator use its exact nearest-rank
+test only for Debug resize P95. Old reports fall back to conservative bounds;
+Release/P99 budgets are unchanged. Five Python summary tests passed, covering
+rank boundaries, invalid counts and missing evidence. Rust boundary/saturation
+test is added but not yet executed; no new performance replay has been run.
+
+### Frozen candidate local validation and commits
+
+Projection allocation change committed as211ad3b0; precise150ms threshold
+measurement as e7ccb938. Both passed independent incremental static review.
+The final standard preflight passed normally0:5317 Rust tests,0failed/ignored,
+workspace check/Clippy, formatting, governance/claims and external SDK fixture.
+The new Rust boundary/saturation test is included. MSVC cargo-xwin tests/examples
+also passed0. Evidence: [converged-preflight](evidence/tui-perf-001/converged-preflight/README.md).
+No new performance experiment was run. Code is frozen; unresolved resize/heap
+and native acceptance remain open. These local passes do not authorize marking
+the task Complete or replacing final-head remote gates.
