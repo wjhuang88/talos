@@ -29,6 +29,7 @@ pub struct ArchiveRecoveryEvidence {
     excluded_archives: usize,
     removed_placeholders: usize,
     versions: Vec<(PathBuf, ArchiveFileVersion)>,
+    ownership: Vec<crate::archive_publication::Ownership>,
 }
 
 // Windows stamps own restrictive read handles. Keep only inert identity and
@@ -122,6 +123,14 @@ impl ArchiveRecoveryEvidence {
             .0
             .parent()
             .ok_or_else(|| invalid("missing directory"))?;
+        let names: Vec<_> = self
+            .ownership
+            .iter()
+            .map(|record| record.name.clone())
+            .collect();
+        if crate::archive_publication::load(&head.0, &names, deadline, stopped)? != self.ownership {
+            return Err(invalid("archive ownership changed"));
+        }
         let mut expected_paths: BTreeSet<_> =
             self.versions.iter().map(|(path, _)| path.clone()).collect();
         for (index, item) in std::fs::read_dir(directory)?.enumerate() {
@@ -225,6 +234,9 @@ impl ArchiveRecoveryEvidence {
                 return Err(invalid("source changed before restoration"));
             }
         }
+        if crate::archive_publication::load(&head.0, &names, deadline, stopped)? != self.ownership {
+            return Err(invalid("archive ownership changed"));
+        }
         check(deadline, stopped)?;
         Ok(())
     }
@@ -304,13 +316,16 @@ fn check(deadline: Instant, stopped: &impl Fn() -> bool) -> Result<(), SessionEr
 // Classify only formats that can participate in recovery ownership evidence.
 fn recovery_source_kind(path: &Path) -> Option<bool> {
     let name = path.file_name()?.to_str()?;
-    let archive = name
-        .strip_prefix("s-")
-        .and_then(|name| {
-            name.strip_suffix(".tlog.zst")
-                .or_else(|| name.strip_suffix(".tlog"))
-        })
-        .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok());
+    // Reserved owned names cannot silently disappear into the legacy namespace
+    // when malformed or missing their private publication record.
+    let archive = crate::archive_publication::owned(name)
+        || name
+            .strip_prefix("s-")
+            .and_then(|name| {
+                name.strip_suffix(".tlog.zst")
+                    .or_else(|| name.strip_suffix(".tlog"))
+            })
+            .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok());
     let head = name
         .strip_suffix(".tlog")
         .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok());
@@ -382,6 +397,28 @@ impl Session {
                 stopped,
             )?);
         }
+        let names: Vec<_> = files
+            .iter()
+            .filter_map(|file| {
+                let name = file.source.path.file_name()?.to_str()?;
+                crate::archive_publication::owned(name).then(|| name.to_owned())
+            })
+            .collect();
+        let ownership =
+            crate::archive_publication::load(&self.file_path, &names, deadline, stopped)?;
+        let mut foreign = BTreeSet::new();
+        for (index, file) in files.iter().enumerate() {
+            if let Some(record) = ownership.iter().find(|record| {
+                file.source.path.file_name().and_then(|s| s.to_str()) == Some(record.name.as_str())
+            }) {
+                if record.digest != file.source.sha256 {
+                    return Err(invalid("archive ownership digest mismatch"));
+                }
+                if record.owner != self.id.to_string() {
+                    foreign.insert(index);
+                }
+            }
+        }
         let locators = crate::compaction_locator::load(&self.file_path, deadline, stopped)?;
         let mut bridges = BTreeMap::new();
         for (index, file) in files.iter().enumerate() {
@@ -402,6 +439,9 @@ impl Session {
                                 == Some(locator.archive.as_str())
                     })
                     .ok_or_else(|| invalid("compaction archive missing"))?;
+                if foreign.contains(&target) {
+                    return Err(invalid("compaction archive belongs to another owner"));
+                }
                 if files[target].source.sha256 != locator.archive_digest {
                     return Err(invalid("compaction archive changed"));
                 }
@@ -456,7 +496,7 @@ impl Session {
             }
             for (index, file) in files.iter().enumerate().skip(1) {
                 check(deadline, stopped)?;
-                if selected.contains(&index) || !file.archive {
+                if selected.contains(&index) || !file.archive || foreign.contains(&index) {
                     continue;
                 }
                 if file
@@ -583,7 +623,13 @@ impl Session {
                     .ok_or_else(|| invalid("missing original record bytes"))
             })
             .collect::<Result<Vec<_>, _>>()?;
+        if crate::archive_publication::load(&self.file_path, &names, deadline, stopped)?
+            != ownership
+        {
+            return Err(invalid("archive ownership changed"));
+        }
         Ok(ArchiveRecoveryEvidence {
+            ownership,
             entries: ordered,
             raw_records,
             sources: selected.iter().map(|&i| files[i].source.clone()).collect(),
@@ -762,6 +808,169 @@ mod tests {
         let manager = crate::SessionManager::with_dir(root.path().into());
         let session = manager.create_session("archive", "").expect("session");
         (root, manager, session)
+    }
+
+    #[test]
+    fn legacy_noncanonical_uuid_archive_names_keep_existing_recovery_semantics() {
+        for compact_id in [false, true] {
+            let (_root, _manager, session) = fixture();
+            append_users(&session, 0, 205);
+            session.compact_archived(50).expect("archive");
+            let evidence = inspect(&session).expect("owned evidence");
+            let archive = evidence
+                .sources()
+                .iter()
+                .find(|source| source.path != session.file_path)
+                .expect("archive")
+                .path
+                .clone();
+            let id = uuid::Uuid::new_v4();
+            let name = if compact_id {
+                id.simple().to_string()
+            } else {
+                id.to_string().to_uppercase()
+            };
+            let extension = if archive.extension().is_some_and(|s| s == "zst") {
+                "tlog.zst"
+            } else {
+                "tlog"
+            };
+            // Model files written under the historical legacy name acceptance rule.
+            std::fs::rename(
+                &archive,
+                archive.with_file_name(format!("s-{name}.{extension}")),
+            )
+            .expect("legacy fixture");
+            assert_eq!(
+                inspect(&session).expect("legacy recovery").entries().len(),
+                205
+            );
+        }
+    }
+
+    #[test]
+    fn foreign_owned_archive_does_not_extend_parent_after_child_deletion() {
+        let (_root, manager, parent) = fixture();
+        append_users(&parent, 0, 205);
+        let original = parent.snapshot_bytes().expect("parent bytes");
+        parent.compact_archived(50).expect("parent archive");
+        let child_id = uuid::Uuid::new_v4();
+        let child_path = parent
+            .file_path
+            .parent()
+            .expect("dir")
+            .join(format!("{child_id}.tlog"));
+        std::fs::write(&child_path, original).expect("materialized inherited prefix fixture");
+        let child = Session::new(child_id, "archive".into(), String::new(), child_path);
+        append_users(&child, 205, 206);
+        child.compact_archived(1).expect("child archive");
+        manager
+            .delete_session(&child_id)
+            .expect("delete child head through lifecycle");
+        let evidence = inspect(&parent).expect("parent recovery");
+        assert_eq!(evidence.entries().len(), 205);
+        assert_eq!(evidence.entries().last().expect("tail").content, "fact 204");
+        assert_eq!(evidence.excluded_archives(), 1);
+    }
+
+    #[test]
+    fn owned_archive_missing_or_changed_registration_never_falls_back_to_legacy() {
+        for corruption in ["row", "table", "digest"] {
+            let (_root, _manager, session) = fixture();
+            append_users(&session, 0, 205);
+            session.compact_archived(50).expect("archive");
+            let evidence = inspect(&session).expect("evidence");
+            let db = session
+                .file_path
+                .parent()
+                .expect("dir")
+                .join("history-bindings.sqlite");
+            let connection = crate::durable::open_bindings(&db).expect("db");
+            connection
+                .execute_batch(match corruption {
+                    "row" => "DELETE FROM archive_publication_intents",
+                    "table" => "DROP TABLE archive_publication_intents",
+                    _ => "UPDATE archive_publication_intents SET digest=printf('%064d',0)",
+                })
+                .expect("corrupt private fixture");
+            assert!(inspect(&session).is_err(), "{corruption}");
+            assert!(
+                evidence
+                    .check_supporting_sources(Instant::now() + Duration::from_secs(5))
+                    .is_err(),
+                "{corruption}"
+            );
+        }
+    }
+
+    #[test]
+    fn archive_publication_crash_child() {
+        let Some(path) = std::env::var_os("TALOS_TEST_OWNED_ARCHIVE_HEAD") else {
+            return;
+        };
+        let path = PathBuf::from(path);
+        let id = uuid::Uuid::parse_str(path.file_stem().expect("stem").to_str().expect("id"))
+            .expect("uuid");
+        let _lease = crate::SessionRuntimeLease::acquire(&path).expect("lease");
+        Session::new(id, "archive".into(), String::new(), path)
+            .compact_archived(1)
+            .expect("crash phase");
+        panic!("crash hook not reached");
+    }
+
+    #[test]
+    fn foreign_archive_publication_crash_keeps_parent_original_history() {
+        for phase in ["archive_intent", "archive_published"] {
+            let (_root, manager, parent) = fixture();
+            append_users(&parent, 0, 205);
+            let original = parent.snapshot_bytes().expect("parent bytes");
+            parent.compact_archived(50).expect("parent archive");
+            let id = uuid::Uuid::new_v4();
+            let path = parent
+                .file_path
+                .parent()
+                .expect("dir")
+                .join(format!("{id}.tlog"));
+            std::fs::write(&path, original).expect("inherited fixture");
+            let child_session = Session::new(id, "archive".into(), String::new(), path.clone());
+            append_users(&child_session, 205, 206);
+            let before = child_session.snapshot_bytes().expect("child before");
+            let mut process = std::process::Command::new(std::env::current_exe().expect("exe"))
+                .args([
+                    "--exact",
+                    "archive_recovery::tests::archive_publication_crash_child",
+                ])
+                .env("TALOS_TEST_OWNED_ARCHIVE_HEAD", &path)
+                .env("TALOS_TEST_FORK_CRASH_PHASE", phase)
+                .stdout(std::process::Stdio::null())
+                .spawn()
+                .expect("spawn");
+            let deadline = Instant::now() + Duration::from_secs(15);
+            let status = loop {
+                if let Some(status) = process.try_wait().expect("wait") {
+                    break status;
+                }
+                if Instant::now() >= deadline {
+                    let _ = process.kill();
+                    let _ = process.wait();
+                    panic!("crash child timed out");
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            };
+            assert_eq!(status.code(), Some(42));
+            assert_eq!(
+                child_session.snapshot_bytes().expect("unchanged child"),
+                before
+            );
+            manager
+                .delete_session(&id)
+                .expect("delete unpublished child fixture");
+            assert_eq!(
+                inspect(&parent).expect("unpolluted parent").entries().len(),
+                205,
+                "{phase}"
+            );
+        }
     }
 
     #[test]
@@ -1308,9 +1517,10 @@ mod tests {
         let evidence = inspect(&session).expect("prepare");
         let deadline = Instant::now() + std::time::Duration::from_secs(5);
         evidence.check_all_sources(deadline).expect("unchanged");
-        // A database/lock sidecar is not transcript ownership evidence.
+        // An unrelated database/lock sidecar is not transcript ownership evidence.
+        // history-bindings.sqlite now carries immutable publication authority.
         std::fs::write(
-            session.file_path.with_file_name("history-bindings.sqlite"),
+            session.file_path.with_file_name("unrelated.sqlite"),
             b"sidecar",
         )
         .expect("sidecar");

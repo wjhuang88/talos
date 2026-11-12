@@ -91,7 +91,7 @@ pub(crate) fn load(
         }
         // Limit values before SQLite returns them to Rust. A corrupt oversized
         // column becomes NULL and is rejected rather than allocated as a String.
-        let mut query = connection.prepare("SELECT CASE WHEN length(CAST(marker AS BLOB))=36 THEN marker END, CASE WHEN length(CAST(marker_digest AS BLOB))=64 THEN marker_digest END, CASE WHEN length(CAST(archive AS BLOB))<=47 THEN archive END, CASE WHEN length(CAST(archive_digest AS BLOB))=64 THEN archive_digest END, CASE WHEN length(CAST(tail AS BLOB)) BETWEEN 1 AND 512 THEN tail END FROM compaction_zero_locators WHERE owner=?1 LIMIT 257").map_err(|_| invalid())?;
+        let mut query = connection.prepare("SELECT CASE WHEN length(CAST(marker AS BLOB))=36 THEN marker END, CASE WHEN length(CAST(marker_digest AS BLOB))=64 THEN marker_digest END, CASE WHEN length(CAST(archive AS BLOB))<=53 THEN archive END, CASE WHEN length(CAST(archive_digest AS BLOB))=64 THEN archive_digest END, CASE WHEN length(CAST(tail AS BLOB)) BETWEEN 1 AND 512 THEN tail END FROM compaction_zero_locators WHERE owner=?1 LIMIT 257").map_err(|_| invalid())?;
         let mut rows = query.query([id]).map_err(|_| invalid())?;
         let mut result = Vec::new();
         loop {
@@ -107,21 +107,8 @@ pub(crate) fn load(
                 tail: row.get(4).map_err(|_| invalid())?,
             };
             let marker = uuid::Uuid::parse_str(&locator.marker).map_err(|_| invalid())?;
-            let archive_id = locator
-                .archive
-                .strip_prefix("s-")
-                .and_then(|s| {
-                    s.strip_suffix(".tlog.zst")
-                        .or_else(|| s.strip_suffix(".tlog"))
-                })
-                .ok_or_else(invalid)?;
-            let archive_id = uuid::Uuid::parse_str(archive_id).map_err(|_| invalid())?;
             if marker.to_string() != locator.marker
-                || ![
-                    format!("s-{archive_id}.tlog"),
-                    format!("s-{archive_id}.tlog.zst"),
-                ]
-                .contains(&locator.archive)
+                || crate::archive_publication::archive_id(&locator.archive).is_none()
                 || !locator
                     .marker_digest
                     .bytes()

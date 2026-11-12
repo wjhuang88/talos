@@ -1213,3 +1213,131 @@ incomplete. Next fixed-commit standard validation will reduce dev/test debug inf
 to0 under unchanged CPU100%, MemoryHigh2GiB/Max3GiB/no-swap caps, with a separate
 disk-backed target; this preserves test assertions and does not raise host limits.
 No merge, deployment or full archived-fork completion is authorized or claimed.
+
+## Physical owned archive publication increment (Partial, uncommitted)
+
+Keep0 implementation saved locally as f59c9134; not pushed or merged. Independent
+fixed-commit worktree `/tmp/talos-recovery-keep0-validation-20261112` runs standard
+preflight with dev/test debug=0 and unchanged resource caps. First low-debug attempt
+failed C compilation due /tmp quota (`/tmp/talos-keep-zero-lowdebug-preflight.log`),
+not a Rust assertion. Retry uses disk-backed TMPDIR, handle pending in session; log
+`/tmp/talos-keep-zero-lowdebug-preflight-r2.log`. Final whole-workspace evidence remains
+incomplete until that actual command completes.
+
+Candidate now records immutable physical archive intent before hard-link publication,
+uses reserved s-owned names, refuses absent/changed private custody, excludes foreign
+archives and rechecks all observed ownership during evidence validation. This closes
+the reviewed publication-before-registration window without granting fork authority.
+Actual materialized-child fixture/append/compact/delete preserves parent205 records;
+child-process exit42 at prepublication intent and post-hardlink phases also preserves
+parent recovery after child deletion.359 session unit tests passed, log
+`/tmp/talos-owned-archive-session-tests-r2.log`, memory peak1.2GiB/no swap. First run
+passed356/failed2: owned classification included .replacement sidecar, and an old
+fixture overwrote history-bindings.sqlite while calling it unrelated. Classification
+now requires transcript suffix; that fixture uses unrelated.sqlite, with dedicated
+missing/changed-authority tests retaining strict rejection. No existing acceptance
+was removed. Production protocol independent review pending; no primary sync.
+
+Still required: host-issued inherited receipts/origins, materialized child restore
+and query without marker, unified staged startup/TUI/REPL publication, deletion/UUID
+reuse and downgrade-writer gate, full acceptance and original handoff residuals.
+
+Read-only production review found no new cross-owner import hole. It identified an
+unintended legacy filename narrowing; restored the original Uuid::parse_str legacy
+acceptance and added uppercase/simple UUID-name fixtures (execution pending after
+fixed-commit preflight62690). Owned names remain canonical and require custody.
+Foreign files are still fully decoded and charged to the global inventory budget;
+a corrupted foreign file may make recovery unavailable. This protocol is import
+isolation, not complete availability isolation.359-test evidence predates the
+legacy compatibility test/edit; do not count that new test as passed yet.
+
+
+## 2026-11-12 final owned-archive regression and validation environment
+
+Current owned-archive candidate passed all 360 session library tests (zero failed or
+ignored), including legacy uppercase/simple UUID archive-name compatibility, real
+process-death publication cases and materialized-child compact/delete isolation.
+Log: `/tmp/talos-owned-archive-session-final-r2.log`; CPU100%, MemoryHigh2GiB,
+MemoryMax3GiB, no swap, jobs1/threads1; peak226.7MiB. Format check passed.
+This is local candidate evidence, not full fork delivery or native Windows acceptance.
+
+Previous attempt `/tmp/talos-owned-archive-session-final.log` passed351/failed9:
+large-record writes exceeded /tmp quota, including SQLite disk-I/O errors. No tests
+were suppressed. Approved disk-backed `/var/tmp/talos-recovery-tests-wjhuang`
+resolves both quota and repository-parent discovery contamination.
+Fixed f59c9134 preflight r2 terminated101:684 agent tests passed, three empty/missing
+AGENTS fixtures inherited primary repository AGENTS.md because TMPDIR was under it.
+No unrelated context source or tests changed. Standard fixed-commit preflight r3
+now uses this external temp root and unchanged low-debug/resource settings; log
+`/tmp/talos-keep-zero-lowdebug-preflight-r3.log`. Its result remains pending.
+
+Independent downgrade review confirms a TALOS header-version bump is insufficient:
+old parser ignores versions. A receipt-bound binary envelope could prevent old
+compaction before publication, but must survive all rewrites/archives/nested forks.
+It would not prohibit all old direct/cached-tip appends. This is reviewed design,
+not implementation; private fork receipts, UUID incarnation, publication/discovery,
+all CLI integration and acceptance remain outstanding. Background remains default-off.
+
+Independent read-only review of the current owned-archive diff found no new blocker
+for saving this physical-ownership increment: intent precedes discovery and binds
+actual stored bytes; immutable owner and foreign keep0 rejection remain enforced;
+source/ownership revalidation and legacy UUID compatibility are intact. Reviewer
+read the360-test log but did not rerun tests. No full-fork or power-loss acceptance
+follows from this review.
+
+Added actual-file regression `undecodable_child_cannot_publish_archive_even_after_unchecked_append`:
+a direct append can bypass header inspection, but keep0/keep1 compaction and atomic
+replacement must reject an invalid-UTF8 head without publishing any archive/binding
+or changing its bytes. This is a test of the existing decoder/publication boundary,
+not a newly supported fork envelope. Execution waits behind fixed preflight88157;
+360-test evidence predates this additional test. ADR records the reviewed gate
+constraints and remaining permanent-header/receipt requirement.
+
+
+2026-11-12 selective primary synchronization: five owned-archive source files now
+match the reviewed candidate, including the additional (not yet run) undecodable
+child regression. Before copying, all four existing files matched f59c9134 exactly;
+backup `/tmp/talos-owned-archive-primary-backup-20261112-143152/` retains their bytes
+and hashes of all735 pre-copy Rust sources. All731 other existing Rust files are
+unchanged. ADR/SDK physical-ownership and downgrade constraints appended selectively;
+no wholesale doc replacement, no session data or index mutation, no commit/deployment.
+360 passing session tests predate only the additional test, not production changes.
+Primary whole-tree validation is still outstanding; fixed-commit preflight88157 does
+not validate this newer primary or owned-archive candidate.
+
+
+## Fixed keep0 commit standard preflight passed
+
+Fixed worktree at f59c91343857d749f3a3c14bb26de82618d5daac completed the standard
+`./scripts/release_preflight.sh` with exit0, including pinned locked workspace
+check/Clippy/tests, governance and both independently resolved external SDK fixture
+modes. Log `/tmp/talos-keep-zero-lowdebug-preflight-r3.log` ends with `release
+preflight: passed`. Completed test summaries total5346 passed/0 failed/0 ignored.
+Runtime16m29s, peak2GiB/no swap; unchanged resource limits, dev/test debug0 and
+approved external disk TMPDIR. Previous environment failures were not suppressed.
+
+This proves only fixed f59c9134. New owned-archive production changes, its added
+undecodable-child regression and the primary queue/history changes are later work,
+not covered by that exact-commit result. Candidate session tests now running serially
+in `/tmp/talos-owned-archive-session-361.log`; no overlapping heavy jobs. Complete
+archived fork, native acceptance and remaining handoff scope still outstanding.
+
+
+Current owned-archive candidate now passes361 session library tests, including the
+new undecodable-child/direct-append publication refusal fixture. Log
+`/tmp/talos-owned-archive-session-361.log`, exit0, no ignored tests, peak1GiB/no swap.
+Pinned format check and diff whitespace check also passed. Independent production
+review precedes only this additional test/doc change. Primary source copies match
+these five candidate source files; primary TUI transition suite is running separately
+and serially in `/tmp/talos-queue-history-transition-tests.log`. Final candidate
+workspace/MSVC checks and complete archived fork remain open.
+
+
+Owned-archive candidate MSVC cross-check completed exit0 using repository-pinned
+`cargo xwin check --locked -p talos-session -p talos-agent --all-features --tests
+--target x86_64-pc-windows-msvc`. Log `/tmp/talos-owned-archive-msvc.log`; existing
+unused-code warnings remain visible. This is compilation, not native Windows
+execution.361 Linux session tests, format/diff checks and independent production
+review passed. Saving this bounded increment locally does not complete archived
+fork or the overall task; candidate-wide preflight and remote/native evidence remain
+required. Primary uncommitted changes and all session data remain preserved.

@@ -249,3 +249,43 @@ cover archive presence and absence. Source locator limits and cancellation behav
 are specified in the runtime SDK contract; UUID reuse/deletion lifecycle and native
 Windows crash durability remain pending. This additive classification API and
 locator implementation do not change the ADR's Proposed status.
+
+## Physical archive ownership before publication (unreleased candidate)
+
+New built-in UUID TLOG compactions use `s-owned-<UUID>.tlog[.zst]`. Before the archive
+name becomes visible, the host commits an immutable archive-name/owner/digest intent
+to private history bindings. A reserved owned name cannot fall back to legacy when
+its DB/table/row is absent or invalid. Names remain reserved after head deletion;
+intents are not removed by ordinary binding cleanup. This is physical ownership,
+not a fork receipt or authority to import records without overlap/marker proof.
+
+Recovery validates all owned files in the bounded inventory, excludes foreign-owned
+archives from overlap closure, and rechecks both selected and excluded ownership
+before/after evidence validation. Legacy `s-<UUID>` remains on its existing proof
+path. The private DB has the same host custody trust boundary as durable bindings.
+SQLite FULL commit precedes publication; no new power-loss/Windows directory-sync
+guarantee is claimed. Unsupported writers must not be allowed to compact future
+materialized children into unowned legacy archives: a format/version gate is still
+required before complete archived-fork publication can be enabled. UUID incarnation
+and inherited receipt/origin lifecycle remain outstanding.
+
+### Archived-child downgrade constraint (implementation outstanding)
+
+Code inspection and independent review establish that the current legacy whole-file
+TLOG decoder ignores the version in a TALOS header. Raising that version alone is
+therefore not a supported-writer gate. The proposed receipt-bound child format must
+fail that decoder before compaction can publish any legacy archive. A fixed binary
+non-UTF8 envelope is a candidate: the old decoder rejects before reading records,
+while the retained original record bytes remain unchanged. This format is not yet
+implemented or enabled.
+
+Every new-writer atomic finalize, retained-suffix rewrite, archive and nested fork
+must preserve the envelope; stripping it on read and rewriting a v1 head reopens the
+same contamination hole. An envelope is format identification only: acceptance and
+origin exceptions still require the private inheritance receipt and incarnation.
+Direct store append and older cached-tip writers may append without examining the
+header, so the gate cannot be described as rejecting every old write. Its required
+property is that those appended bytes cannot pass old compaction and become an
+unowned legacy archive. Discovery refusal must remain explicit, never an empty
+successful restoration. Validate exact supported old versions and the complete
+publication lifecycle before enabling this format.

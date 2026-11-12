@@ -77,7 +77,18 @@ impl CompactionEngine {
             return Ok(CompactionResult::Skipped);
         }
 
-        let segment_id = format!("s-{}", uuid::Uuid::new_v4());
+        let owned = matches!(
+            self.store.history_encoding(),
+            Some(crate::history_page::HistoryEncoding::Tlog)
+        ) && head_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .is_some_and(|s| uuid::Uuid::parse_str(s).is_ok());
+        let segment_id = format!(
+            "{}{}",
+            if owned { "s-owned-" } else { "s-" },
+            uuid::Uuid::new_v4()
+        );
         let archive_path = session_dir.join(format!("{segment_id}.tlog"));
         let compressed_path = session_dir.join(format!("{segment_id}.tlog.zst"));
 
@@ -159,6 +170,15 @@ impl CompactionEngine {
         // Hard-link publication is create-new: never replace an existing archive
         // (or a symlink at its path). Unsupported filesystems fail before head
         // replacement, leaving the original transcript intact.
+        if destination
+            .file_name()
+            .and_then(|s| s.to_str())
+            .is_some_and(crate::archive_publication::owned)
+        {
+            crate::archive_publication::record(head_path, destination, bytes)?;
+            #[cfg(test)]
+            crate::durable::fork_crash_probe("archive_intent");
+        }
         let temporary = crate::store::temporary_sibling(destination);
         let mut file = std::fs::OpenOptions::new()
             .write(true)
@@ -168,6 +188,8 @@ impl CompactionEngine {
         file.sync_all()?;
         drop(file);
         std::fs::hard_link(&temporary, destination)?;
+        #[cfg(test)]
+        crate::durable::fork_crash_probe("archive_published");
         #[cfg(unix)]
         std::fs::File::open(
             destination
@@ -442,6 +464,54 @@ mod tests {
         assert!(engine.should_compact(&path, 3));
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn undecodable_child_cannot_publish_archive_even_after_unchecked_append() {
+        // A header-version bump is not a downgrade gate: legacy readers skip
+        // TALOS headers without checking the version. Invalid UTF-8 instead
+        // fails before record parsing. Exercise the actual writer boundary,
+        // including a direct append that does not inspect the existing header.
+        let root = tempfile::tempdir().expect("root");
+        let path = root.path().join(format!("{}.tlog", uuid::Uuid::new_v4()));
+        let store = Arc::new(CompactTextSessionStore);
+        let entry = SessionEntry {
+            id: uuid::Uuid::new_v4().to_string(),
+            parent_id: None,
+            timestamp: chrono::Utc::now(),
+            role: "user".into(),
+            content: "inherited original".into(),
+            metadata: crate::SessionMetadata::default(),
+        };
+        store.append_entry(&path, &entry).expect("seed");
+        let original = std::fs::read(&path).expect("original");
+        let mut unsupported = vec![0xff];
+        unsupported.extend_from_slice(&original);
+        std::fs::write(&path, &unsupported).expect("unsupported format");
+        let mut suffix = entry.clone();
+        suffix.id = uuid::Uuid::new_v4().to_string();
+        suffix.parent_id = Some(entry.id.clone());
+        suffix.content = "child-only suffix".into();
+        store
+            .append_entry(&path, &suffix)
+            .expect("unchecked append");
+        let before = std::fs::read(&path).expect("before refusal");
+        assert!(before.starts_with(&unsupported));
+        let engine = CompactionEngine::new(store.clone());
+        for keep in [0, 1] {
+            assert!(engine.compact_segment(&path, root.path(), keep).is_err());
+            assert_eq!(std::fs::read(&path).expect("unchanged"), before);
+            assert_eq!(
+                std::fs::read_dir(root.path()).expect("inventory").count(),
+                1
+            );
+        }
+        assert!(store.replace_entries_atomically(&path, &[entry]).is_err());
+        assert_eq!(std::fs::read(&path).expect("still unchanged"), before);
+        assert_eq!(
+            std::fs::read_dir(root.path()).expect("inventory").count(),
+            1
+        );
     }
 
     #[test]

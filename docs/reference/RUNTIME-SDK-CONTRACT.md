@@ -856,6 +856,14 @@ on Windows, identity reuse/deletion lifecycle and fork inheritance remain unveri
 or unimplemented. The feature is an unreleased recovery candidate, not full fork
 or deployment acceptance.
 
+New UUID TLOG compactions in the next candidate use reserved `s-owned-<UUID>` archive
+names and an immutable private publication intent committed before file visibility.
+Absent ownership is an error for these names, never legacy fallback. Foreign-owned
+archives are excluded even after their owner head is deleted; prepared evidence
+rechecks all observed ownership. Legacy archive names retain existing proof rules.
+This is not inherited fork authority, a power-loss guarantee or compatibility with
+old writers compacting future materialized children; those gates remain pending.
+
 ### Unreleased Gemini invocation migration (I310 / ADR-094)
 
 The next pre-1.0 minor adds `GoogleGemini` protocol variants and optional
