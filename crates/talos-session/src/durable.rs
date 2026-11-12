@@ -4027,24 +4027,45 @@ mod tests {
             .execute_batch("PRAGMA journal_mode=WAL; BEGIN IMMEDIATE; CREATE TABLE held(x);")
             .expect("hold WAL schema writer");
         let (sender, receiver) = std::sync::mpsc::channel();
+        let queued_at = std::time::Instant::now();
         let worker = std::thread::spawn(move || {
+            let started_at = std::time::Instant::now();
+            let retries = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+            let observed = retries.clone();
+            BINDING_INIT_RETRY_OBSERVER.with(|observer| {
+                *observer.borrow_mut() = Some(Box::new(move || {
+                    observed.borrow_mut().push(started_at.elapsed());
+                }));
+            });
             let result = open_bindings(&db_path).map(|_| ());
-            sender.send(result).expect("send init result");
+            BINDING_INIT_RETRY_OBSERVER.with(|observer| {
+                observer.borrow_mut().take();
+            });
+            sender
+                .send((
+                    result,
+                    started_at.duration_since(queued_at),
+                    started_at.elapsed(),
+                    retries.borrow().clone(),
+                ))
+                .expect("send init result");
         });
         // Keep the real write lock past the explicit 500ms retry budget, but
         // release it before joining even if the driver incorrectly waits 5s.
         let bounded = receiver.recv_timeout(std::time::Duration::from_secs(2));
         holder.execute_batch("ROLLBACK").expect("release writer");
         let finished_before_release = bounded.is_ok();
-        let result = bounded.unwrap_or_else(|_| {
-            receiver
-                .recv_timeout(std::time::Duration::from_secs(10))
-                .expect("init completes after releasing writer")
-        });
+        let (result, queue_delay, initialization_time, retry_times) =
+            bounded.unwrap_or_else(|_| {
+                receiver
+                    .recv_timeout(std::time::Duration::from_secs(10))
+                    .expect("init completes after releasing writer")
+            });
         worker.join().expect("worker");
         assert!(
             finished_before_release,
-            "initialization exceeded its retry budget"
+            "initialization exceeded its retry budget: queue={queue_delay:?}, init={initialization_time:?}, retries={retry_times:?}, succeeded={}",
+            result.is_ok()
         );
         assert!(matches!(result, Err(SessionError::DurableTurn(_))));
         // The failed initializer must not damage the database or poison retry.

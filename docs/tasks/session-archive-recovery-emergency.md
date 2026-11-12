@@ -977,3 +977,18 @@ Full locked standard preflight56987 completed exit0, including SDK fixture:
 comment was corrected to say retry deadline rather than total-call bound. Runtime
 logic/tests match the validated source. Native c1630445 CI43145317842 still runs;
 this follow-up will not be pushed while doing so. No claim of full macOS root cause.
+
+## 2026-11-12 repeated macOS WAL timing failure diagnostics
+
+Native c1630445 macOS job130941707853 failed again in the unchanged two-second
+WAL initialization assertion. Log `/tmp/talos-ci-macos-c1630445.log`;336 session
+tests passed,1 failed. Its head predatesa5c30d08's retry-deadline correction.
+Windows job130941708290 still runs; do not cancel it by pushing prematurely.
+
+Added test-only failure diagnostics for queue delay, worker initialization elapsed,
+actual retry timestamps and success boolean. Original timing/result assertions remain;
+no error body/path/history is printed. This measures worker duration (including tiny
+observer setup/cleanup), not an isolated SQLite call. Ten binding tests and MSVC
+all-feature test compilation passed (`/tmp/talos-binding-timing-diagnostics.log`,
+`/tmp/talos-binding-timing-xwin.log`). Independent read-only review found no blocker.
+Production logic is unchanged from full-preflight-validateda5c30d08.
