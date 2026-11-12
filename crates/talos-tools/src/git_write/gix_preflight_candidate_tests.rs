@@ -8,7 +8,6 @@ use super::target_config;
 use gix::bstr::ByteSlice;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
-use std::path::PathBuf;
 
 #[test]
 fn gix_branch_name_validation_requires_no_git_child() {
@@ -76,22 +75,3 @@ fn staged_config_roots_start_as_path_only_requests() {
     assert!(sources.captured_paths().next().is_none());
 }
 
-#[test]
-fn default_installation_sources_require_explicit_evidence_not_a_guess() {
-    // Deliberately refuse to build a synthetic config/attribute/exec-path
-    // profile from the Git executable path. The chosen writer's compiled
-    // defaults are not implied by a parent-directory convention or Git
-    // version, so the replacement planner must await an admitted profile.
-    fn require_installed_profile(
-        roots: Option<(&[PathBuf], &[PathBuf])>,
-    ) -> Result<(), &'static str> {
-        let (configs, attributes) = roots.ok_or("selected Git installation profile not proven")?;
-        if configs.is_empty() || attributes.is_empty() {
-            return Err("selected Git installation profile not proven");
-        }
-        Ok(())
-    }
-
-    assert!(require_installed_profile(None).is_err());
-    assert!(require_installed_profile(Some((&[], &[]))).is_err());
-}
