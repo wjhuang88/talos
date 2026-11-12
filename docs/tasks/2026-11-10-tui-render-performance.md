@@ -1527,3 +1527,40 @@ Resume gate: use #923 against the recorded implementation and integrated runtime
 no further feature expansion or identical benchmark loops. Close this task only
 when original required acceptance is actually satisfied. User main working
 checkout and other active worktrees must not be switched or removed by cleanup.
+
+### Native Ghostty acceptance follow-up — 2026-11-12
+
+Maintainer reports passed: idle display, Chinese/emoji/multiline input, clipboard
+image paste, typing/cancellation during streaming, navigation-key release, window
+resize, drag selection, and natural stream completion. CPU was not measured;
+manual approval was not exercised because automatic approval handled the request.
+Second terminal and native Windows remain untested. Queue preview incompleteness
+is delegated by the maintainer to the existing session backlog work, not closed.
+
+Git status failed: `Git ?` persisted at idle and after editing the composer.
+The CLI abbreviated the workspace as `~/...` before passing it to the TUI, whose
+Git worker interpreted that display string as a filesystem path. The local fix on
+`fix/tui-git-workspace-path` passes the real workspace path and abbreviates only
+in status rendering, with component-aware home-prefix matching.
+
+A standalone read-only probe using the existing gix build read the actual repository
+in approximately 310 ms. The display helper's actual source and regression test,
+compiled in isolation with Rust 1.99.0, passed; formatting and diff checks passed.
+This is not workspace compilation or native acceptance of the fix. Full Cargo
+validation was not started concurrently with another session's running workspace
+tests. Remaining: CLI/TUI locked integration checks, cargo-xwin MSVC cross-check,
+required merge gates, and native retest on the rebuilt CLI. No completion claimed.
+
+### Git path validation results — 2026-11-12
+
+Governance, formatting, locked workspace check and Clippy passed. Standard preflight failed at workspace tests (614 pass/59 fail, temporary-storage I/O errors). After using disk-backed TMPDIR outside the repository and SQLITE_TMPDIR, talos-agent had 667 pass/6 fail, all remaining failures SQLite I/O errors; root cause remains unresolved. Repository-local TMPDIR also polluted ancestor AGENTS.md/Git tests and was corrected.
+
+Actual compiled TUI test binary: 686 passed, zero failed/ignored, exit 0, 14.33 seconds. cargo xwin check --locked -p talos-cli -p talos-tui --tests --target x86_64-pc-windows-msvc: passed, 58.57 seconds. Package-only Cargo tests triggered different feature compilation and were intentionally stopped, not counted as passing. All heavy tasks serial, CPUQuota=100%, MemoryHigh=2G, MemoryMax=3G, swap=0.
+
+Logs are in main workspace target/git-path-{preflight,remaining,final-tests,tui-final,xwin}.log. Full workspace/SDK gates, review/CI and rebuilt CLI native retest remain outstanding. No merge or completion claimed; fix remains uncommitted on fix/tui-git-workspace-path.
+
+### SQLite validation blocker resolved — 2026-11-12
+
+The six remaining tests hard-code workspace_root=/tmp. Their pending databases therefore live in /tmp/.talos/runtime, unaffected by TMPDIR or SQLITE_TMPDIR. The tested Agent/session sources are identical to origin/main. The exact compiled aggregate_queue_limit_counts_running_and_pending_submissions test failed with SQLite extended error 778, then passed immediately after moving this session's retired /tmp/talos-p0-git-fixtures and /tmp/talos-p0-git-fixtures-v2 to the main workspace target/retired-perf-fixtures (approximately 80 MiB freed, files preserved). No source/binary changes between those two runs.
+
+Final locked workspace test rerun: 5318 passed, 0 failed, 0 ignored across 148 summaries. External Runtime SDK fixture passed. Exit 0; 9m15.422s wall, 4m34.288s CPU, peak 2 GiB, zero swap. Log: main workspace target/git-path-unblocked.log. Combined with the earlier successful format/governance/check/Clippy and cargo-xwin checks, local validation gates are satisfied. The initial preflight invocation itself failed and was not relabeled as passing. No storage patch was necessary. Remaining: commit/review/CI/merge and native Git status retest on the rebuilt CLI.
