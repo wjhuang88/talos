@@ -992,3 +992,33 @@ observer setup/cleanup), not an isolated SQLite call. Ten binding tests and MSVC
 all-feature test compilation passed (`/tmp/talos-binding-timing-diagnostics.log`,
 `/tmp/talos-binding-timing-xwin.log`). Independent read-only review found no blocker.
 Production logic is unchanged from full-preflight-validateda5c30d08.
+
+## 2026-11-12 archived-fork raw preparation implementation in progress
+
+Local uncommitted archive_recovery increment retains unique-order original record
+bytes by moving them from the already-validated raw overlap map. New host-only
+original_record_prefix copies through an inclusive entry cutoff under the caller's
+original cancellation/deadline/byte bound and source rechecks before/after copying.
+It creates no file/receipt and grants no inherited overlap or disclosure permission.
+Existing fork guards remain. This is the first preparation primitive for the reviewed
+materialized-child contract, not full fork support.
+
+Real205-write/compact50/append regression preserves noncanonical valid metadata bytes
+exactly, checks archived cutoff and tip, and rejects absent IDs, cancellation, expiry
+and stale source.13 archive tests passed (`/tmp/talos-fork-raw-prefix-tests.log`);
+MSVC all-feature tests compilation passed (`/tmp/talos-fork-raw-prefix-xwin.log`).
+Windows fixture releases its captured original stamp before compaction. Independent
+review requested; increment is uncommitted and not synchronized into primary.
+CI43148646800 remains live at ee9bbc06; do not push and interrupt its native evidence.
+
+Read-only review found no blocker in this preparation increment. Memory limitation:
+64MiB bounds source bytes and each raw prefix copy, not whole-process RSS. Evidence
+now retains both decoded entries and original raw bytes; a prefix request adds a
+bounded raw copy. Publisher header/record-boundary/receipt verification remains
+unimplemented. Do not lift any current fork guard based on this helper alone.
+
+Full pinned-toolchain locked standard preflight completed with exit 0 for the raw
+prefix increment (`/tmp/talos-fork-raw-prefix-preflight.log`, handle 13137).
+This includes workspace tests and the external runtime fixture; it validates this
+preparation increment only, not the still-unimplemented fork publication lifecycle.
+Latest native CI remains on ee9bbc06; no new push while that run is active.

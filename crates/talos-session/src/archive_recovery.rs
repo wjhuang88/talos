@@ -24,6 +24,7 @@ thread_local! {
 /// not a valid linear transcript and must not be passed off as a checkpoint.
 pub struct ArchiveRecoveryEvidence {
     entries: Vec<SessionEntry>,
+    raw_records: Vec<Vec<u8>>,
     sources: Vec<ArchiveRecoverySource>,
     excluded_archives: usize,
     removed_placeholders: usize,
@@ -227,6 +228,42 @@ impl ArchiveRecoveryEvidence {
         check(deadline, stopped)?;
         Ok(())
     }
+    /// Copy original TLOG record bytes through an inclusive host-selected entry.
+    ///
+    /// This is preparation data for host fork publication, not a fork receipt or
+    /// model-disclosure authority. No file or binding is created. The returned
+    /// records omit proven count placeholders, preserve original IDs/parents and
+    /// encoding, and contain no file header. A publisher must add one TLOG header
+    /// and persist its own trusted inheritance receipt before exposing a child.
+    /// All captured sources are checked before and after the bounded copy.
+    pub fn original_record_prefix(
+        &self,
+        through_entry: &str,
+        deadline: Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<Vec<Vec<u8>>, SessionError> {
+        self.check_current(deadline, &stopped)?;
+        let mut prefix = Vec::new();
+        let mut found = false;
+        let mut remaining = MAX_BYTES;
+        for (entry, raw) in self.entries.iter().zip(&self.raw_records) {
+            check(deadline, &stopped)?;
+            remaining = remaining
+                .checked_sub(raw.len())
+                .ok_or_else(|| invalid("prefix byte bound exceeded"))?;
+            prefix.push(raw.clone());
+            if entry.id == through_entry {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Err(SessionError::EntryNotFound(through_entry.into()));
+        }
+        self.check_current(deadline, &stopped)?;
+        Ok(prefix)
+    }
+
     /// Original records in uniquely determined storage order, without synthetic
     /// count placeholders. These are host inspection data, not model disclosure.
     pub fn entries(&self) -> &[SessionEntry] {
@@ -459,8 +496,17 @@ impl Session {
                 return Err(invalid("source changed"));
             }
         }
+        let raw_records = ordered
+            .iter()
+            .map(|entry| {
+                known
+                    .remove(&entry.id)
+                    .ok_or_else(|| invalid("missing original record bytes"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(ArchiveRecoveryEvidence {
             entries: ordered,
+            raw_records,
             sources: selected.iter().map(|&i| files[i].source.clone()).collect(),
             excluded_archives: files
                 .iter()
@@ -738,6 +784,83 @@ mod tests {
         assert_eq!(
             inspect(&session).expect("fresh recovery").entries().len(),
             205
+        );
+    }
+
+    #[test]
+    fn fork_preparation_preserves_original_encoding_and_inclusive_archived_cutoff() {
+        let (_root, _manager, session) = fixture();
+        append_users(&session, 0, 205);
+        // Noncanonical but valid metadata in an old record must survive exactly;
+        // re-encoding a SessionEntry would silently normalize these bytes.
+        let original = std::fs::read_to_string(&session.file_path).expect("original");
+        let altered = original.replacen("\t2:{}\n", "\t3:{ }\n", 1);
+        assert_ne!(
+            altered, original,
+            "fixture changes one raw metadata encoding"
+        );
+        std::fs::write(&session.file_path, altered).expect("legacy encoding");
+        let mut remaining = MAX_BYTES;
+        let mut count = 0;
+        let before = read_file(
+            &session.file_path,
+            false,
+            &mut remaining,
+            &mut count,
+            Instant::now() + Duration::from_secs(5),
+            &|| false,
+        )
+        .expect("original records");
+        let before_records = before.records;
+        drop(before.stamp);
+        session.compact_archived(50).expect("real archive");
+        append_users(&session, 205, 210);
+        let evidence = inspect(&session).expect("recovery");
+        let prefix = evidence
+            .original_record_prefix(
+                &before_records[19].0.id,
+                Instant::now() + Duration::from_secs(5),
+                || false,
+            )
+            .expect("archived cutoff");
+        assert_eq!(prefix.len(), 20);
+        for (raw, (_, original)) in prefix.iter().zip(&before_records) {
+            assert_eq!(raw, original);
+        }
+        assert!(prefix[0].ends_with(b"\t3:{ }\n"));
+        let tail = evidence.entries().last().expect("tail");
+        assert_eq!(
+            evidence
+                .original_record_prefix(&tail.id, Instant::now() + Duration::from_secs(5), || false)
+                .expect("tip")
+                .len(),
+            210
+        );
+        assert!(
+            evidence
+                .original_record_prefix(
+                    "not-an-entry",
+                    Instant::now() + Duration::from_secs(5),
+                    || false
+                )
+                .is_err()
+        );
+        assert!(
+            evidence
+                .original_record_prefix(&tail.id, Instant::now() + Duration::from_secs(5), || true)
+                .is_err()
+        );
+        assert!(
+            evidence
+                .original_record_prefix(&tail.id, Instant::now(), || false)
+                .is_err()
+        );
+        append_users(&session, 210, 211);
+        assert!(
+            evidence
+                .original_record_prefix(&tail.id, Instant::now() + Duration::from_secs(5), || false)
+                .is_err(),
+            "stale capture cannot prepare a fork"
         );
     }
 
