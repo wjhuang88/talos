@@ -1408,3 +1408,24 @@ failed because WORKSPACE_RESULT was cancelled. This is not a successful overall
 Windows gate and does not validate the later exit fix. Do not rerun the old head
 just to obtain green metadata; obtain all required gates for the next stable
 candidate. Linux workspace job was still running at this observation.
+
+### Stable candidate full preflight passed (2026-11-12)
+
+Standard `./scripts/release_preflight.sh` completed normally with exit0 and its
+explicit passed marker for implementation/test source `6f558bf9`. During the run
+only owner documentation changed in `3b7d8b4d`; runtime and test sources stayed
+unchanged.148 Rust summaries:5316 passed,0 failed,0 ignored. Workspace locked
+check, Clippy, tests, governance/claims and external runtime SDK fixture passed.
+Archive: `evidence/tui-perf-001/final-preflight/`, including raw log and SHA receipt.
+Same resource guard:17m7.763s wall,8m53.755s CPU,2GiB peak,swap0. Linking incurred
+memory-high reclaim but progressed; no limit was raised and no restart occurred.
+Do not repeat this gate for subsequent evidence-only changes. Updated MSVC checks,
+final-source performance/heap and native acceptance, exact-head remote gates and
+final delivery remain outstanding; this is not task completion.
+
+Updated pinned-toolchain MSVC cross-check also passed normally0:
+`cargo xwin check --locked -p talos-tui --tests --examples --target x86_64-pc-windows-msvc`.
+Same resource guard;2.019s wall,1.583s CPU,817.3MiB peak,swap0. Log and receipt
+are in `final-preflight/`. This covers the exit-test changes and examples at the
+current implementation source, and does not substitute for native Windows
+terminal execution.
