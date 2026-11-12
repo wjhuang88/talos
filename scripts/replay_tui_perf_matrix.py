@@ -37,6 +37,7 @@ def main():
     parser.add_argument('--workspace', default='')
     parser.add_argument('--alternate-workspace', default='')
     parser.add_argument('--process-tree', action='store_true')
+    parser.add_argument('--cgroup', action='store_true')
     parser.add_argument('--input-probe', action='store_true')
     parser.add_argument('--input-probe-interval-ms', type=int, default=500)
     parser.add_argument('--metrics', choices=['on', 'off'], default='on')
@@ -102,6 +103,8 @@ def main():
                                             str(args.input_probe_interval_ms)])
                         if args.process_tree:
                             command.append('--process-tree')
+                        if args.cgroup:
+                            command.append('--cgroup')
                         subprocess.run(command, env=env, check=True)
                         coverage = validate_sample(args.output/(name+'.json'), args.seconds, args.warmup)
                         if args.metrics == 'on':

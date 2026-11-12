@@ -29,3 +29,14 @@ the misses or that removing them would pass. Any next optimization must retain
 width-dependent wrapping, selection offsets, fill and wide-scalar fallback,
 and use the existing full-output oracles. Do not alter animation/Git policy to
 address this width-reflow measurement.
+
+The sampler and matrix runner now accept optional `--cgroup`. Each 250 ms sample
+records raw leaf-group `cpu.stat` (including throttle counters), `cpu.max`, CPU,
+memory and I/O PSI, memory events and current usage alongside the existing
+elapsed time. Missing files are explicitly unavailable, never zero. Enable it
+for both sides of the next diagnostic comparison under the same limits; retain
+raw counters and compare interval deltas. It is off by default, adds read overhead,
+and covers the entire leaf group, not just the replay process. Ancestor limits
+are not captured. Coincident pressure/throttling can qualify the measurement,
+but does not alone prove the cause of an individual late frame. Previous samples
+cannot be retroactively assigned these observations. No new replay is claimed.

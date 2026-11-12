@@ -4,6 +4,7 @@ import argparse, fcntl, json, os, pty, select, struct, subprocess, termios, time
 from pathlib import Path
 from tui_perf_validation import validate_sample
 from tui_perf_processes import process_tree_snapshot
+from tui_perf_cgroup import cgroup_snapshot
 
 p = argparse.ArgumentParser()
 p.add_argument('binary')
@@ -14,6 +15,7 @@ p.add_argument('--warmup', type=int, default=5)
 p.add_argument('--workspace', default='')
 p.add_argument('--alternate-workspace', default='')
 p.add_argument('--process-tree', action='store_true', help='include bounded procfs tree snapshots; adds sampling overhead')
+p.add_argument('--cgroup', action='store_true', help='record leaf cgroup-v2 throttle/pressure counters; adds sampling overhead')
 p.add_argument('--output', required=True)
 p.add_argument('--input-probe', action='store_true', help='repeatedly type then erase one character')
 p.add_argument('--input-probe-interval-ms', type=int, default=500)
@@ -81,6 +83,8 @@ try:
                                 'threads': int(status['Threads']), 'observed_direct_children': len(children)})
                 if a.process_tree:
                     samples[-1]['process_tree'] = process_tree_snapshot(proc.pid)
+                if a.cgroup:
+                    samples[-1]['cgroup'] = cgroup_snapshot(proc.pid)
             except (FileNotFoundError, ProcessLookupError):
                 pass
             last_sample = now
@@ -123,10 +127,12 @@ result = {'binary_sha256': binary_digest, 'platform': platform.platform(),
           'action_count': action_count, 'input_probe_count': probe_count, 'scenario': a.scenario, 'history': a.history, 'geometry': [120,40],
           'workspace': a.workspace, 'alternate_workspace': a.alternate_workspace,
           'process_tree_enabled': a.process_tree,
+          'cgroup_enabled': a.cgroup,
           'terminal': 'synthetic Linux PTY', 'exit_code': exit_code, 'samples': samples,
           'ready_seconds': ready_at, 'warmup_seconds': a.warmup, 'wall_seconds': time.monotonic()-start,
           'limitations': ['top-level CPU/PSS describe parent only; optional process_tree contains live per-process snapshots',
                          'process tree polling may miss short-lived children/threads; terminal emulator excluded',
+                         'optional cgroup counters cover the whole leaf group; ancestor limits and per-frame causal attribution are not captured',
                          'software input latency requires TALOS_TUI_METRICS; no pixel latency or allocation metrics']}
 if len(steady) >= 2:
     first, last = steady[0], steady[-1]
