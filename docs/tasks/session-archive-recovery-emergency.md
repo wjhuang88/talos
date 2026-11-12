@@ -956,3 +956,24 @@ workspace tests, Clippy and independent SDK fixture:
 new Windows publication probes have only compiled so far. No source was edited
 during that preflight. The SDK paragraph was relocated and the owner appended
 review evidence while validation ran; governance checks are repeated before staging.
+
+## 2026-11-12 SQLite initialization retry deadline regression
+
+A new real-WAL-lock regression injects600ms scheduler delay after the first actual
+busy response. Existing code then consumed20 retry waits; the single executed test
+failed at expected1 vs actual20 (`/tmp/talos-binding-budget-red.log`). The local
+uncommitted correction uses one500ms retry deadline plus the original retry-count
+ceiling, checking before and after sleeps. Ten binding-focused tests passed
+(`/tmp/talos-binding-budget-green.log`), including the unchanged native wall-time
+regression and successful initialization after release. Read-only independent review
+found no blocker, but correctly limits the contract: this is a retry deadline,
+not a hard real-time bound on synchronous SQLite/open/scheduler latency. The macOS
+historical two-second failure's full cause remains unproven. Full preflight56987
+is running at `/tmp/talos-binding-budget-preflight.log`; no source edits during it.
+CI43145317842 for previous candidatec1630445 remains live and is not interrupted.
+
+Full locked standard preflight56987 completed exit0, including SDK fixture:
+`/tmp/talos-binding-budget-preflight.log`. Afterwards only the explanatory source
+comment was corrected to say retry deadline rather than total-call bound. Runtime
+logic/tests match the validated source. Native c1630445 CI43145317842 still runs;
+this follow-up will not be pushed while doing so. No claim of full macOS root cause.
