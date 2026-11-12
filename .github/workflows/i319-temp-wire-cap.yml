@@ -1,0 +1,43 @@
+# Temporary isolated I319 validation. NEVER include this workflow in PR #907.
+name: I319 temporary wire-body streaming limit validation
+on:
+  push:
+    branches:
+      - tmp/i319-wire-cap-validation-20261112
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Rustfmt source and ensure isolated diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          git diff --check
+          changed="$(git diff --name-only)"
+          if [[ -n "$changed" && "$changed" != "crates/talos-tools/src/search_backend/legacy_owned.rs" ]]; then
+            echo "Unexpected rustfmt source modifications: $changed"
+            exit 1
+          fi
+          if [[ -n "$changed" ]]; then
+            git add crates/talos-tools/src/search_backend/legacy_owned.rs
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'style(search): rustfmt bounded legacy HTTP response fixture'
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+      - name: Native feature build, focused streaming and expansion regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check -p talos-tools --features network --locked
+          cargo test -p talos-tools --features network --locked oversized_wire_body_is_rejected_without_content_length -- --nocapture
+          cargo test -p talos-tools --features network --locked small_compressed_wire_with_oversized_decoded_body_is_rejected -- --nocapture
+          cargo test -p talos-tools --features network --locked legacy_client_decompresses_upstream_content_encodings -- --nocapture
