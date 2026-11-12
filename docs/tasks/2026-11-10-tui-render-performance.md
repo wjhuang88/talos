@@ -1328,3 +1328,34 @@ increase between elapsed5–10s and25–30s; evidence and reproduction script ar
 prevent interpreting the delta as leak/non-leak proof. Repeated-resize heap
 coverage remains absent. Both Linux and Windows Desktop CI jobs have now passed;
 workspace jobs are still running at this observation.
+
+### Independent review follow-up: input exit flush (2026-11-12)
+
+Independent Agent review of published `8afbbe4c` against target `f61a15cd`
+requested changes: input EOF and exit-key paths bypassed the final dirty-frame
+submission while stream content was waiting for its coalescing deadline. The
+working candidate routes both paths through the existing `UiOutput::Exit`
+finalization and loop-top submission. A paused-clock regression covers ordered
+and legacy streams, each with input EOF and Ctrl+C at 1 ms before the stream
+frame deadline. This fix is not yet validated or delivered.
+
+The guarded focused test (`cargo test --locked --workspace --lib
+input_exit_submits_coalesced_content_before_restore`) exited 101 before tests:
+the new test omitted the qualification of `std::time::Duration`; corrected
+locally. Runtime 2m18.166s, CPU 1m29.616s, peak 2 GiB, swap 0. During compilation,
+`memory.events high` reached 272811 and host I/O pressure was high. A stop was
+requested, but the service had already exited with that compiler error. No
+successful test result is claimed; no immediate rebuild or raised resource cap.
+The review also explicitly retains Debug resize budget, growing/resize heap,
+and native-terminal acceptance gaps. Shared GitHub identity means independent
+Agent review is not independent human authorization.
+
+Independent Agent follow-up reviewed the working diff against `905a05c9` and
+accepted the input-exit repair statically: both paths finalize legacy/ordered
+streams, then `should_exit` overrides the coalescing deadline for submission.
+The reviewer confirmed the four 1 ms regression scenarios target the original
+defect. This is source review only, not successful test execution or final-head
+review. At the next resource check, host I/O PSI remained high (some avg10 89.81,
+full avg10 81.19); compilation was not restarted. The derived acceptance tracker
+now explicitly separates the old passing implementation from this unvalidated
+fix and records the P4 Debug resize budget misses.

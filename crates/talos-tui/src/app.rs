@@ -632,7 +632,7 @@ impl Tui {
             Git(Option<crate::git_snapshot_worker::ScanResult>),
         }
         let mut output_open = true;
-        'ui: loop {
+        loop {
             dirty |= self.retire_closed_approval();
             if dirty
                 && (self.state.should_exit
@@ -840,14 +840,18 @@ impl Tui {
                             );
                         }
                         if exit {
-                            break 'ui;
+                            self.handle_ui_output(UiOutput::Exit);
+                            break;
                         }
                     }
                     dirty = true;
                     stream_frame_deadline = None;
                 }
                 Wake::Input(Some(Err(error))) => return Err(error),
-                Wake::Input(None) => break,
+                Wake::Input(None) => {
+                    self.handle_ui_output(UiOutput::Exit);
+                    dirty = true;
+                }
                 Wake::Output(None) => output_open = false,
                 Wake::Output(Some(output)) => {
                     git_refresh_requested |= matches!(&output, UiOutput::ToolResult(_));

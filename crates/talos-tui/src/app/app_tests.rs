@@ -5196,6 +5196,62 @@ async fn event_loop_submits_final_ordered_frame_without_end_and_handles_cancel_d
 }
 
 #[tokio::test(start_paused = true)]
+async fn input_exit_submits_coalesced_content_before_restore() {
+    use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+    use futures::StreamExt;
+    use talos_conversation::{ContentOutput, StreamMessage, UiOutput};
+
+    for legacy in [false, true] {
+        for eof in [false, true] {
+            let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+            tui.first_message_dispatched = true;
+            assert!(!tui.state.handle_ctrl_c());
+            let (tx, rx) = mpsc::unbounded_channel();
+            tui.ui_output_rx = Some(rx);
+            if legacy {
+                tx.send(UiOutput::Stream(StreamMessage {
+                    source: MessageSource::Assistant,
+                    stream: Box::pin(
+                        futures::stream::iter(["final-input-token".to_string()])
+                            .chain(futures::stream::pending()),
+                    ),
+                }))
+                .expect("stream");
+            } else {
+                tx.send(UiOutput::Content(ContentOutput::Start {
+                    source: MessageSource::Assistant,
+                }))
+                .expect("start");
+                tx.send(UiOutput::Content(ContentOutput::Delta {
+                    text: "final-input-token".into(),
+                }))
+                .expect("delta");
+            }
+            let exit_at = tokio::time::Instant::now() + std::time::Duration::from_millis(1);
+            let input = futures::stream::once(async move {
+                tokio::time::sleep_until(exit_at).await;
+                (!eof).then_some(Ok(Event::Key(KeyEvent::new(
+                    KeyCode::Char('c'),
+                    KeyModifiers::CONTROL,
+                ))))
+            })
+            .filter_map(futures::future::ready);
+            tui.run_with_events(Box::pin(input)).await.expect("exit");
+            assert_eq!(tokio::time::Instant::now(), exit_at);
+            assert!(tui.pending_transcript.is_empty());
+            assert!(!tui.ordered_content_open);
+            assert!(tui.active_stream.is_none());
+            assert!(
+                tui.terminal
+                    .test_rendered_text()
+                    .contains("final-input-token"),
+                "final frame missing: legacy={legacy}, eof={eof}"
+            );
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
 async fn legacy_stream_eof_submits_last_token_before_any_exit_or_input_event() {
     use talos_conversation::{StreamMessage, UiOutput};
     let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
