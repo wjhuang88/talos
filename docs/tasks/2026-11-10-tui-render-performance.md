@@ -1,9 +1,9 @@
 # TUI-PERF-001：TUI 事件驱动渲染与资源优化
 
-> Document status: Active / Claimed (#910 merged as d355dd68)
+> Document status: Review / Claimed — implementation stage merged; acceptance pending #923
 > Created: 2026-11-10
 > Owner: 本文；Board 仅为派生入口。
-> 本轮交付为开发任务及实施指导。运行时代码尚未修改，性能收益尚未验证。
+> 实现阶段已合并至主分支（#922，71655af8）；完整验收未完成，剩余项跟踪于 #923。下文原计划保留，执行记录见末尾。
 
 ## 1. 目标与交付边界
 
@@ -332,9 +332,9 @@ measure baseline and freeze budgets before P1.
 | Claimed At | 2026-11-11 |
 | Source Issue | None |
 | Governance Claim PR | #910 |
-| Authorization Mode | Independent review |
-| Authorization Evidence | #910 merged as d355dd68; exact-head CI 42933711478 success; independent agent review APPROVE at 6c3e23df |
-| Implementation PR | #922 (Draft) |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Claim #910 merged as d355dd68; user authorized stage delivery 2026-11-12; exact-head Agent review APPROVE at 14a274ed; code CI43150963692 passed; stage decision recorded in #922 and #923 |
+| Implementation PR | #922 (merged as 71655af8; remaining acceptance #923) |
 | Last Updated | 2026-11-12 |
 | Handoff / Release Condition | Full published acceptance including native terminal evidence; incomplete platforms remain Review |
 
@@ -1497,3 +1497,33 @@ also passed0. Evidence: [converged-preflight](evidence/tui-perf-001/converged-pr
 No new performance experiment was run. Code is frozen; unresolved resize/heap
 and native acceptance remain open. These local passes do not authorize marking
 the task Complete or replacing final-head remote gates.
+
+### Authorized stage delivery (2026-11-12)
+
+User/maintainer explicitly requested “进行阶段性交付” after reviewing the remaining
+acceptance gaps. PR #922 merged as `71655af854a680faf2a614646341652211d50ff5`,
+containing candidate `14a274ed52b4859a886a53eafa9f566867646097`.
+Delivery state is Review, not Complete; no whole-task Completion Commit is claimed.
+
+Remaining acceptance owner: this task. Execution tracker:
+https://github.com/wjhuang88/talos/issues/923 . Its checklist preserves Debug
+resize P95/P99 and original budgets, growing-history/resize heap stability,
+Ghostty plus a second terminal, native Windows terminal acceptance, and exact
+source/environment evidence. The maintainer explicitly authorized deferring
+these performance/device rows for stage delivery; this is not a passing result
+or a reduction of the original task. Claim remains Claimed for acceptance follow-up.
+
+Merge authorization used Single-maintainer merge: no independent human reviewer
+was available in this session; independent Agent review approved exact head14a274ed
+against basef61a15cd with shared identity disclosed. No protected permission,
+sandbox or process-hardening files changed. Local preflight5317passed and MSVC
+xwin passed. CI43150963692 passed Linux/Windows workspace, aggregate Windows gate,
+both Desktop jobs and installer fixture. Both governance validators passed.
+Target/claim and overlapping PR inventory were checked immediately before merge.
+Global Issue matrix missing#919 remains a separately owned advisory residual under
+ADR-071. Native-terminal acceptance is not established by Windows CI.
+
+Resume gate: use #923 against the recorded implementation and integrated runtime;
+no further feature expansion or identical benchmark loops. Close this task only
+when original required acceptance is actually satisfied. User main working
+checkout and other active worktrees must not be switched or removed by cleanup.

@@ -37,12 +37,12 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 ## TUI rendering performance / TUI-PERF-001
 
-- Active / Claimed via merged #910: [owner and implementation guide](tasks/2026-11-10-tui-render-performance.md).
+- Review / Claimed: implementation stage merged via #922 (`71655af8`); remaining performance/native acceptance tracked in #923. [Owner and implementation guide](tasks/2026-11-10-tui-render-performance.md).
   Reproducible profiling, event-driven drawing, asynchronous Git snapshots, and layout/component
-  caching and evidence-driven incremental history are published as draft stage candidate #922.
-  Full local preflight passed (5315 tests); performance, ANSI and snapshot lifecycle evidence is
-  recorded in the owner. Resize-budget misses, growing/resize heap coverage, native terminals and
-  exact-head CI/independent review remain open. No completion or merge authorization is claimed.
+  caching and incremental history are delivered. Full local preflight passed (5317 tests),
+  MSVC xwin and exact-head Linux/Windows code CI passed; independent Agent code review approved.
+  Resize-budget acceptance, growing/resize heap stability and native terminals remain open in #923.
+  Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001
 
