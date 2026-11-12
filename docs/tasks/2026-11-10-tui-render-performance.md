@@ -1222,3 +1222,22 @@ No test/profile process remains live at this checkpoint. Keep task Active and
 claim effective; these gaps are not a completion claim or an approved reduction
 of scope. Native unavailability must be reported as pending acceptance rather
 than compensated by more synthetic tests.
+
+### Workspace validation failure diagnosis (2026-11-12)
+
+Single-CPU affinity was added without raising resource limits. The first run
+failed rustfmt on the new snapshot assertion; formatting corrected. The second
+passed formatting/check/Clippy and completed linking, but failed CLI
+`i255_plugin_e2e`: the actual tool message was `execution timed out after 250ms`.
+Full log: `/tmp/talos-preflight-affinity-fixed.log`, exit101. Runtime6min40.189s,
+peak2GiB/swap0; memory.high events still occurred. Affinity is not proof that
+reclaim pressure is solved.
+
+Targeted Cargo retry passed2/2 but rebuilt dependencies due to a different
+feature selection (5min12.284s); do not call this a cache-only retry. Running the
+previous workspace test executable directly then passed2/2 in1.722s, peak69.9M,
+swap0. The CLI binary path can have been overwritten by the targeted build, so
+this is not an immutable exact-binary reproduction of the original failure.
+No runtime timeout, permission rule or assertion was relaxed. Failure is retained
+as an unreproduced timeout, not declared fixed; full workspace gate remains open.
+All three service handles are terminal; attempted stops arrived after completion.

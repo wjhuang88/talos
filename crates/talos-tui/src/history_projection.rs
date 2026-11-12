@@ -1028,7 +1028,10 @@ mod tests {
             assert!(old_lines.upgrade().is_some());
             drop(view);
             assert!(old_rows.upgrade().is_none(), "obsolete rows at step {step}");
-            assert!(old_lines.upgrade().is_none(), "obsolete text at step {step}");
+            assert!(
+                old_lines.upgrade().is_none(),
+                "obsolete text at step {step}"
+            );
             drop(next);
             assert_eq!(Arc::strong_count(&cache.all_rows), 1);
             assert_eq!(Arc::strong_count(&cache.logical_lines), 1);
