@@ -5235,8 +5235,16 @@ async fn input_exit_submits_coalesced_content_before_restore() {
                     KeyModifiers::CONTROL,
                 ))))
             })
-            .filter_map(futures::future::ready);
-            tui.run_with_events(Box::pin(input)).await.expect("exit");
+            .filter_map(futures::future::ready)
+            // Key exit must succeed on its own, without a following EOF rescuing it.
+            .chain(futures::stream::pending().take(usize::from(!eof)));
+            tokio::time::timeout(
+                std::time::Duration::from_millis(100),
+                tui.run_with_events(Box::pin(input)),
+            )
+            .await
+            .expect("input exit must not wait for another event")
+            .expect("exit");
             assert_eq!(tokio::time::Instant::now(), exit_at);
             assert!(tui.pending_transcript.is_empty());
             assert!(!tui.ordered_content_open);
