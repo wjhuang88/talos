@@ -1,0 +1,42 @@
+{
+  "source_commit": "15ef42c178423bfdf40a1bb77b6d4982f0c4f7df",
+  "fixture_patch": "fixture.patch",
+  "fixture_patch_sha256": "50ef21a047a05c062e5b36089139539711c58108750163e1356635cf5a3ded71",
+  "runtime_source_verified_bytewise": true,
+  "binary": "/tmp/talos-stress-baseline-15ef42c1/debug",
+  "sha256": "efa3138c5394143c876607b34d31cc2020afa865d7f019528c5047a7d6b578bf",
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///tmp/talos-perf-stress-baseline-15ef42c1/crates/talos-tui#0.10.1",
+    "manifest_path": "/tmp/talos-perf-stress-baseline-15ef42c1/crates/talos-tui/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "tui_perf_replay",
+      "src_path": "/tmp/talos-perf-stress-baseline-15ef42c1/crates/talos-tui/examples/tui_perf_replay.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/home/wjhuang/WorkSpace/personal/talos/target/debug/examples/tui_perf_replay"
+    ],
+    "executable": "/home/wjhuang/WorkSpace/personal/talos/target/debug/examples/tui_perf_replay",
+    "fresh": false
+  },
+  "profile": "debug",
+  "command": "cargo build --locked -p talos-tui --example tui_perf_replay --message-format=json"
+}

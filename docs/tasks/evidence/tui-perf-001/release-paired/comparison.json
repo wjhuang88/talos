@@ -1,0 +1,329 @@
+{
+  "schema": 1,
+  "source_commits_from_external_receipts_required": true,
+  "matrix": "/tmp/talos-perf-release-paired-539adfd2",
+  "cases": {
+    "idle-100": {
+      "baseline_cpu_median": 0.20215931476719895,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -0.20215931476719895,
+        -0.2339983685135075,
+        -0.2006290851494527
+      ],
+      "candidate_peak_pss_kib": 4663,
+      "peak_pss_budget_kib": 13820.0,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "idle_frames": true
+      }
+    },
+    "idle-1000": {
+      "baseline_cpu_median": 0.26749294923947736,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -0.2695703361018295,
+        -0.26749294923947736,
+        -0.26748327395923843
+      ],
+      "candidate_peak_pss_kib": 7439,
+      "peak_pss_budget_kib": 17084.0,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "idle_frames": true
+      }
+    },
+    "idle-10000": {
+      "baseline_cpu_median": 0.2355657463554518,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -0.2355657463554518,
+        -0.20188470012938098,
+        -0.2691601669106082
+      ],
+      "candidate_peak_pss_kib": 37923,
+      "peak_pss_budget_kib": 54720.799999999996,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "idle_frames": true
+      }
+    },
+    "animation-100": {
+      "baseline_cpu_median": 0.2693555411368537,
+      "candidate_cpu_median": 0.2356916906539477,
+      "cpu_ratio": 0.8750207612554659,
+      "paired_cpu_percentage_point_deltas": [
+        -0.032771784738898274,
+        -0.031848652750756656,
+        -0.033663850482906016
+      ],
+      "candidate_peak_pss_kib": 4796,
+      "peak_pss_budget_kib": 13984.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "stable_layout_history": true,
+        "no_git_without_workspace": true,
+        "animation_deadline_p99": true
+      }
+    },
+    "animation-1000": {
+      "baseline_cpu_median": 0.269360178893338,
+      "candidate_cpu_median": 0.23529287178113986,
+      "cpu_ratio": 0.8735250798682895,
+      "paired_cpu_percentage_point_deltas": [
+        -0.03406730711219816,
+        -0.06519929821439294,
+        0.032811068004349464
+      ],
+      "candidate_peak_pss_kib": 7586,
+      "peak_pss_budget_kib": 17118.8,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "stable_layout_history": true,
+        "no_git_without_workspace": true,
+        "animation_deadline_p99": true
+      }
+    },
+    "animation-10000": {
+      "baseline_cpu_median": 0.27072666472064105,
+      "candidate_cpu_median": 0.2360884820709218,
+      "cpu_ratio": 0.8720547801027952,
+      "paired_cpu_percentage_point_deltas": [
+        -0.06774370891248924,
+        -0.03463818264971924,
+        -0.0009059172990563691
+      ],
+      "candidate_peak_pss_kib": 38243,
+      "peak_pss_budget_kib": 55336.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "stable_layout_history": true,
+        "no_git_without_workspace": true,
+        "animation_deadline_p99": true
+      }
+    },
+    "stream-100": {
+      "baseline_cpu_median": 1.4715432875445118,
+      "candidate_cpu_median": 1.0774264467516232,
+      "cpu_ratio": 0.7321744836670547,
+      "paired_cpu_percentage_point_deltas": [
+        -0.30214498116271793,
+        -0.20952748029891666,
+        -0.39411684079288856
+      ],
+      "candidate_peak_pss_kib": 5076,
+      "peak_pss_budget_kib": 14506.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "stream-1000": {
+      "baseline_cpu_median": 1.478894386449221,
+      "candidate_cpu_median": 1.2395310338704923,
+      "cpu_ratio": 0.838147095038049,
+      "paired_cpu_percentage_point_deltas": [
+        -0.10675136095598692,
+        -0.5057530970759447,
+        -0.2679945957811427
+      ],
+      "candidate_peak_pss_kib": 9799,
+      "peak_pss_budget_kib": 20430.8,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "stream-10000": {
+      "baseline_cpu_median": 1.4395501976105103,
+      "candidate_cpu_median": 1.4912809396939575,
+      "cpu_ratio": 1.0359353513127325,
+      "paired_cpu_percentage_point_deltas": [
+        0.01220080280778002,
+        0.1043785461605089,
+        -0.19225289499619347
+      ],
+      "candidate_peak_pss_kib": 52787,
+      "peak_pss_budget_kib": 81746.0,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "approval-100": {
+      "baseline_cpu_median": 0.16735418182830666,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -0.16735418182830666,
+        -0.16722969115355646,
+        -0.2006403347870252
+      ],
+      "candidate_peak_pss_kib": 4746,
+      "peak_pss_budget_kib": 13906.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "approval_wait_frames": true
+      }
+    },
+    "approval-1000": {
+      "baseline_cpu_median": 0.20063936888267686,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -0.20063936888267686,
+        -0.20062373452952426,
+        -0.20220476297413303
+      ],
+      "candidate_peak_pss_kib": 7645,
+      "peak_pss_budget_kib": 17536.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "approval_wait_frames": true
+      }
+    },
+    "approval-10000": {
+      "baseline_cpu_median": 0.20031378020558435,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -0.20028535644127882,
+        -0.20031378020558435,
+        -0.2017376267883869
+      ],
+      "candidate_peak_pss_kib": 38167,
+      "peak_pss_budget_kib": 53906.0,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "approval_wait_frames": true
+      }
+    },
+    "scroll-100": {
+      "baseline_cpu_median": 0.3368759720699943,
+      "candidate_cpu_median": 0.10100034586625047,
+      "cpu_ratio": 0.29981463280279647,
+      "paired_cpu_percentage_point_deltas": [
+        -0.23572024549847115,
+        -0.2691146804278245,
+        -0.2695418915027662
+      ],
+      "candidate_peak_pss_kib": 4596,
+      "peak_pss_budget_kib": 13818.8,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "scroll-1000": {
+      "baseline_cpu_median": 0.3367250567071067,
+      "candidate_cpu_median": 0.10092847262375464,
+      "cpu_ratio": 0.2997355575814638,
+      "paired_cpu_percentage_point_deltas": [
+        -0.2357144413488832,
+        -0.2667595338102404,
+        -0.20013315760083372
+      ],
+      "candidate_peak_pss_kib": 7511,
+      "peak_pss_budget_kib": 17085.199999999997,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "scroll-10000": {
+      "baseline_cpu_median": 0.4702276165333461,
+      "candidate_cpu_median": 0.16814847189164828,
+      "cpu_ratio": 0.3575895289419354,
+      "paired_cpu_percentage_point_deltas": [
+        -0.33526331676030463,
+        -0.2993515714941443,
+        -0.3019712845808268
+      ],
+      "candidate_peak_pss_kib": 38098,
+      "peak_pss_budget_kib": 54774.799999999996,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "resize-100": {
+      "baseline_cpu_median": 0.3701532487689582,
+      "candidate_cpu_median": 0.13466660663516772,
+      "cpu_ratio": 0.36381311546781464,
+      "paired_cpu_percentage_point_deltas": [
+        -0.2354866421337905,
+        -0.2355153996500764,
+        -0.20175363710316221
+      ],
+      "candidate_peak_pss_kib": 5150,
+      "peak_pss_budget_kib": 14158.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "resize-1000": {
+      "baseline_cpu_median": 0.9700944171000183,
+      "candidate_cpu_median": 0.6365434223856792,
+      "cpu_ratio": 0.6561664629392981,
+      "paired_cpu_percentage_point_deltas": [
+        -0.2672271533125882,
+        -0.33369481738977413,
+        -0.27613718996226955
+      ],
+      "candidate_peak_pss_kib": 10519,
+      "peak_pss_budget_kib": 21054.8,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "resize-10000": {
+      "baseline_cpu_median": 5.735025761795984,
+      "candidate_cpu_median": 5.310241632962823,
+      "cpu_ratio": 0.9259316092940906,
+      "paired_cpu_percentage_point_deltas": [
+        -0.7737618185502955,
+        0.3757568244867411,
+        -0.5291792928671724
+      ],
+      "candidate_peak_pss_kib": 63396,
+      "peak_pss_budget_kib": 87125.59999999999,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    }
+  },
+  "evaluated_checks_pass": true,
+  "limitations": [
+    "Only listed checks are evaluated; this is not whole-task acceptance.",
+    "CPU ratios at zero baseline are unavailable, not zero.",
+    "Native terminal, allocations and long-run heap stability require separate evidence; input latency is checked only with probes and animation lateness only in animation cases.",
+    "Pair deltas follow manifest round order; fixed baseline-first ordering can retain host drift."
+  ]
+}

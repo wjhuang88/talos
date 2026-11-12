@@ -1,6 +1,4 @@
-use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,45 +7,80 @@ pub(crate) struct GitStatusSummary {
     pub dirty: bool,
 }
 
-static CACHE: Mutex<Option<(Instant, String, Option<GitStatusSummary>)>> = Mutex::new(None);
-
-/// Returns the cached or computed git status summary for the given workspace path.
-///
-/// Refresh cadence is bounded to 500ms to avoid executing `gix` operations on every
-/// ~50ms ratatui draw frame, which would degrade performance.
-pub(crate) fn get_git_status(workspace: &str) -> Option<GitStatusSummary> {
-    if workspace.is_empty() {
-        return None;
-    }
-
-    let now = Instant::now();
-    let ttl = Duration::from_millis(500);
-
-    if let Ok(cache) = CACHE.lock()
-        && let Some((ts, cached_workspace, summary)) = cache.as_ref()
-        && cached_workspace == workspace
-        && now.duration_since(*ts) < ttl
-    {
-        return summary.clone();
-    }
-
-    // gix is a native-code dependency (per ADR-010). Project hard constraint #9
-    // (AGENTS.md) requires panic containment at the integration boundary so the
-    // TUI draw loop can never crash on a repository read failure.
-    let summary = catch_unwind(AssertUnwindSafe(|| {
-        compute_git_status(Path::new(workspace))
-    }))
-    .unwrap_or(None);
-
-    if let Ok(mut cache) = CACHE.lock() {
-        *cache = Some((now, workspace.to_string(), summary.clone()));
-    }
-
-    summary
+/// Each TUI owns its displayed snapshot; only worker ownership is process-wide.
+#[derive(Default)]
+pub(crate) struct GitSnapshot {
+    value: Option<(Instant, String, Option<GitStatusSummary>)>,
 }
 
-fn compute_git_status(workspace_root: &Path) -> Option<GitStatusSummary> {
-    let repo = gix::discover(workspace_root).ok()?;
+impl GitSnapshot {
+    /// Read-only lookup; never scans or changes state from the render path.
+    pub(crate) fn get(&self, workspace: &str, now: Instant) -> Option<&GitStatusSummary> {
+        let (collected, cached_workspace, summary) = self.value.as_ref()?;
+        if cached_workspace != workspace || now >= *collected + Duration::from_secs(5) {
+            return None;
+        }
+        if summary.is_some() {
+            crate::render_metrics::snapshot_age(now.saturating_duration_since(*collected));
+        }
+        summary.as_ref()
+    }
+
+    pub(crate) fn publish(
+        &mut self,
+        workspace: String,
+        summary: Option<GitStatusSummary>,
+        now: Instant,
+    ) -> bool {
+        let changed = self
+            .value
+            .as_ref()
+            .is_none_or(|(_, previous_workspace, previous)| {
+                previous_workspace != &workspace || previous != &summary
+            });
+        self.value = Some((now, workspace, summary));
+        changed
+    }
+
+    /// Unknown state has no expiry deadline, avoiding repeated expiry wakes.
+    pub(crate) fn stale_deadline(&self, workspace: &str) -> Option<Instant> {
+        let (collected, cached_workspace, summary) = self.value.as_ref()?;
+        (cached_workspace == workspace && summary.is_some())
+            .then_some(*collected + Duration::from_secs(5))
+    }
+
+    pub(crate) fn expire(&mut self, workspace: &str, now: Instant) -> bool {
+        let Some((collected, cached_workspace, summary)) = self.value.as_mut() else {
+            return false;
+        };
+        if cached_workspace == workspace && now >= *collected + Duration::from_secs(5) {
+            return summary.take().is_some();
+        }
+        false
+    }
+}
+
+pub(crate) fn compute_git_status(workspace_root: &Path) -> Option<GitStatusSummary> {
+    let repo = match gix::discover(workspace_root) {
+        Ok(repo) => repo,
+        Err(error) => {
+            use gix::discover::upwards::Error;
+            return match error.downcast_any_ref::<Error>() {
+                Some(
+                    Error::NoGitRepository { .. }
+                    | Error::NoGitRepositoryWithinCeiling { .. }
+                    | Error::NoGitRepositoryWithinFs { .. },
+                ) => {
+                    // A successful absence check has no Git details to display.
+                    Some(GitStatusSummary {
+                        branch: None,
+                        dirty: false,
+                    })
+                }
+                _ => None,
+            };
+        }
+    };
 
     let branch = repo
         .head_name()
@@ -64,7 +97,11 @@ fn compute_git_status(workspace_root: &Path) -> Option<GitStatusSummary> {
         .into_index_worktree_iter(Vec::<gix::bstr::BString>::new())
         .ok()?;
 
-    let dirty = iter.next().is_some();
+    let dirty = match iter.next() {
+        Some(Ok(_)) => true,
+        Some(Err(_)) => return None,
+        None => false,
+    };
 
     Some(GitStatusSummary { branch, dirty })
 }
@@ -75,10 +112,67 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    fn snapshot_expiration_changes_display_once_and_is_workspace_scoped() {
+        let workspace = "snapshot-expiration-test".to_string();
+        let summary = Some(GitStatusSummary {
+            branch: Some("main".into()),
+            dirty: false,
+        });
+        let mut snapshot = GitSnapshot::default();
+        let now = Instant::now();
+        assert!(snapshot.publish(workspace.clone(), summary.clone(), now));
+        assert!(!snapshot.publish(workspace.clone(), summary, now));
+        let deadline = snapshot
+            .stale_deadline(&workspace)
+            .expect("successful snapshot expires");
+        assert!(!snapshot.expire("another-workspace", deadline));
+        assert!(!snapshot.expire(&workspace, deadline - Duration::from_nanos(1)));
+        assert!(snapshot.expire(&workspace, deadline));
+        assert!(!snapshot.expire(&workspace, deadline));
+        assert!(snapshot.stale_deadline(&workspace).is_none());
+        assert!(snapshot.get(&workspace, deadline).is_none());
+    }
+
+    #[test]
+    fn sessions_do_not_replace_each_others_snapshots_and_refresh_extends_expiry() {
+        let now = Instant::now();
+        let summary = Some(GitStatusSummary {
+            branch: Some("first".into()),
+            dirty: true,
+        });
+        let mut first = GitSnapshot::default();
+        let mut second = GitSnapshot::default();
+        first.publish("same-workspace".into(), summary.clone(), now);
+        second.publish("same-workspace".into(), None, now);
+        assert_eq!(first.get("same-workspace", now), summary.as_ref());
+        assert!(second.get("same-workspace", now).is_none());
+        assert!(first.get("other-workspace", now).is_none());
+        let refresh = now + Duration::from_secs(2);
+        assert!(!first.publish("same-workspace".into(), summary.clone(), refresh));
+        assert_eq!(
+            first.get("same-workspace", now + Duration::from_secs(5)),
+            summary.as_ref()
+        );
+        assert!(
+            first
+                .get("same-workspace", now + Duration::from_secs(7))
+                .is_none()
+        );
+        assert!(first.expire("same-workspace", now + Duration::from_secs(7)));
+        assert!(first.stale_deadline("same-workspace").is_none());
+    }
+
+    #[test]
     fn test_non_git_directory() {
         let td = tempdir().expect("operation should succeed");
-        let summary = get_git_status(td.path().to_str().expect("operation should succeed"));
-        assert_eq!(summary, None);
+        let summary = compute_git_status(td.path());
+        assert_eq!(
+            summary,
+            Some(GitStatusSummary {
+                branch: None,
+                dirty: false
+            })
+        );
     }
 }
 

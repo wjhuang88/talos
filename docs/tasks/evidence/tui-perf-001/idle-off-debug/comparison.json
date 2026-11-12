@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "source_commits_from_external_receipts_required": true,
+  "matrix": "/tmp/talos-perf-idle-off-debug-539adfd2",
+  "cases": {
+    "idle-100": {
+      "baseline_cpu_median": 1.3461811559296832,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -1.3801489355319234,
+        -1.3124324880809033,
+        -1.3461811559296832
+      ],
+      "candidate_peak_pss_kib": 11244,
+      "peak_pss_budget_kib": 21718.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "idle_cpu": true
+      }
+    },
+    "idle-1000": {
+      "baseline_cpu_median": 1.2784897447291264,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -1.3127344949750475,
+        -1.2784897447291264,
+        -1.1774377395528386
+      ],
+      "candidate_peak_pss_kib": 14152,
+      "peak_pss_budget_kib": 25209.2,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "idle_cpu": true
+      }
+    },
+    "idle-10000": {
+      "baseline_cpu_median": 1.2759124256663423,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -1.2098351137599346,
+        -1.3776684422205452,
+        -1.2759124256663423
+      ],
+      "candidate_peak_pss_kib": 44380,
+      "peak_pss_budget_kib": 62414.0,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "idle_cpu": true
+      }
+    }
+  },
+  "evaluated_checks_pass": true,
+  "limitations": [
+    "Only listed checks are evaluated; this is not whole-task acceptance.",
+    "CPU ratios at zero baseline are unavailable, not zero.",
+    "Native terminal, allocations and long-run heap stability require separate evidence; input latency is checked only with probes and animation lateness only in animation cases.",
+    "Pair deltas follow manifest round order; fixed baseline-first ordering can retain host drift."
+  ]
+}

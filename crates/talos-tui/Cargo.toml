@@ -25,6 +25,7 @@ mermaid-text = "0.57"
 talos-text = { version = "0.10.1", path = "../talos-text", features = ["code-intelligence"] }
 
 [dev-dependencies]
+tokio = { version = "1.53.1", features = ["test-util"] }
 tempfile = "3"
 talos-plugin = { version = "0.10.1", path = "../talos-plugin", features = ["wasm", "code-intelligence"] }
 

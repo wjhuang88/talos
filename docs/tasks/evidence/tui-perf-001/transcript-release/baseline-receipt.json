@@ -1,0 +1,40 @@
+{
+  "source_commit": "15ef42c178423bfdf40a1bb77b6d4982f0c4f7df",
+  "runtime_source_verified_bytewise": true,
+  "fixture_patch_sha256": "f689ee7140cac3beb2753c397109100e5d1889e2c8dc94366ec635f7d1bb7f7a",
+  "binary": "/home/wjhuang/WorkSpace/personal/talos/target/tui-perf-artifacts/transcript-baseline-15ef42c1/release",
+  "sha256": "87d17f7f02d55df34a35c3f5a7651a3ce33b25312b80a62bf6856b489e0bbe93",
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///tmp/talos-perf-transcript-baseline-15ef42c1/crates/talos-tui#0.10.1",
+    "manifest_path": "/tmp/talos-perf-transcript-baseline-15ef42c1/crates/talos-tui/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "tui_perf_replay",
+      "src_path": "/tmp/talos-perf-transcript-baseline-15ef42c1/crates/talos-tui/examples/tui_perf_replay.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "3",
+      "debuginfo": 1,
+      "debug_assertions": false,
+      "overflow_checks": false,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/home/wjhuang/WorkSpace/personal/talos/target/release/examples/tui_perf_replay"
+    ],
+    "executable": "/home/wjhuang/WorkSpace/personal/talos/target/release/examples/tui_perf_replay",
+    "fresh": false
+  },
+  "profile": "release-with-symbols"
+}

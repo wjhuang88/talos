@@ -70,6 +70,14 @@ paged restoration; failed resume retains the active session. CLI fork stages
 bounded raw-byte pages from the same captured history, with cleanup on cancellation;
 it requires filesystem hard-link support. See the [startup compatibility limits](docs/reference/RUNTIME-SDK-CONTRACT.md#cli-startup-history-restoration-i313-candidate).
 
+### TUI responsiveness (unreleased)
+
+The TUI waits for input, output or a visible update instead of continuously
+redrawing while idle. Git status refreshes asynchronously; `Git ?` means no fresh
+status is available, including a failed or timed-out scan. A stalled scan does not
+block typing or create additional scan threads. For reproducible CPU, memory and
+input-latency diagnostics, see [local development](docs/sop/LOCAL-DEV.md).
+
 ### TUI tool-result display (unreleased)
 
 Tool-result lines that exceed the available terminal width end with `…` instead of

@@ -1,0 +1,8 @@
+{
+  "source_commit": "15ef42c178423bfdf40a1bb77b6d4982f0c4f7df",
+  "sha256": "0a19d8502f5d8261d8b2d2847a346b22daad8dac6173d63e63760bec5b94805f",
+  "binary": "/tmp/talos-p0-switch-15ef42c1/debug",
+  "build_command": "CARGO_TARGET_DIR=/home/wjhuang/WorkSpace/personal/talos/target cargo build --locked -p talos-tui --example tui_perf_replay",
+  "result": "exit 0",
+  "source_note": "Rust sources unchanged from HEAD; uncommitted developer summary/docs changes only"
+}

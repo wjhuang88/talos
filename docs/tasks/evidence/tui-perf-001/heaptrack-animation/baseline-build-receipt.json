@@ -1,0 +1,23 @@
+{
+  "source_commit": "52263c6279c3fb068332d63edb6a3770081c9ce2",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "binaries": [
+    {
+      "profile": "debug",
+      "binary": "/tmp/talos-p0-binaries-52263c62/debug",
+      "sha256": "687851bb6a3c6a27d0b19f364d4e9f3797b112aa016bc2c3812abc8f693a625c"
+    },
+    {
+      "profile": "release",
+      "binary": "/tmp/talos-p0-binaries-52263c62/release",
+      "sha256": "e3713bfa6c55dfd5ebe0cac539fbe49957b600fdae55cb59ed9ce9ccf4e07c6c"
+    }
+  ],
+  "release_environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_STRIP": "false",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "build_result": "both builds exit 0; source frozen during build",
+  "uncommitted_changes": "developer Python fixture/summary only, outside Rust build inputs"
+}

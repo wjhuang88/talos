@@ -15,6 +15,12 @@ process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing
 on Git 2.36.1; [gix-assisted compatibility](proposals/gix-preflight-system-git-compatibility.md)
 is a proposal, not an activated repair. Owner statuses and manual/native residuals remain unchanged.
 
+Native Windows follow-up (2026-11-10, source `c065236a`):
+[validation evidence](reference/WINDOWS-VALIDATION-2026-11-10.md) records TUI 652,
+process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing
+on Git 2.36.1; [gix-assisted compatibility](proposals/gix-preflight-system-git-compatibility.md)
+is a proposal, not an activated repair. Owner statuses and manual/native residuals remain unchanged.
+
 ## STORE-002 / I322 C — proposed domain-contract activation
 
 [STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I322](iterations/I322-store-002-domain-contract-extraction.md) / #670: I321 A/B **Complete** on implementation #909 merge `a9914b7a62b0873027997c69d9966d17f3fd48ba` ([CI #4039](https://github.com/wjhuang88/talos/actions/runs/42848943669) 8/8, independent API no blockers). New governance C claim #911 is **proposed, ineffective until merge**; C only extracts existing domain-owned interfaces with no runtime binding or consumer migration. D/E/F and #897 E2/E3 still gated; Search/TUI/Git/Windows owners untouched.
@@ -41,10 +47,12 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 ## TUI rendering performance / TUI-PERF-001
 
-- Active / Claimed proposal in #910 (ineffective until merge): [owner and implementation guide](tasks/2026-11-10-tui-render-performance.md).
+- Review / Claimed: implementation stage merged via #922 (`71655af8`); remaining performance/native acceptance tracked in #923. [Owner and implementation guide](tasks/2026-11-10-tui-render-performance.md).
   Reproducible profiling, event-driven drawing, asynchronous Git snapshots, and layout/component
-  caching; history incrementality is evidence-dependent. Documentation only so far; runtime
-  implementation and performance/terminal acceptance remain pending.
+  caching and incremental history are delivered. Full local preflight passed (5317 tests),
+  MSVC xwin and exact-head Linux/Windows code CI passed; independent Agent code review approved.
+  Resize-budget acceptance, growing/resize heap stability and native terminals remain open in #923.
+  Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001
 

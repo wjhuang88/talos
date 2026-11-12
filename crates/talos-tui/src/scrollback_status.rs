@@ -16,6 +16,7 @@ use crate::theme::semantic;
 pub(crate) fn build_status_text(
     status: &talos_conversation::StatusSnapshot,
     width: u16,
+    git_summary: Option<&scrollback_status_git::GitStatusSummary>,
 ) -> Text<'static> {
     let dim = Style::default().fg(semantic::DIM_TEXT);
     let accent = Style::default().fg(semantic::TEXT_ACCENT);
@@ -56,7 +57,7 @@ pub(crate) fn build_status_text(
     };
 
     let git_part = if standard && !workspace.is_empty() {
-        if let Some(git_summary) = scrollback_status_git::get_git_status(workspace) {
+        if let Some(git_summary) = git_summary {
             let branch = git_summary.branch.as_deref().unwrap_or("");
             let dirty = if git_summary.dirty { "*" } else { "" };
             if branch.is_empty() && dirty.is_empty() {
@@ -67,7 +68,7 @@ pub(crate) fn build_status_text(
                 format!(" · ⎇ {branch}{dirty}")
             }
         } else {
-            String::new()
+            " · Git ?".to_string()
         }
     } else {
         String::new()

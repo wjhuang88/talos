@@ -1,10 +1,10 @@
 # TUI-PERF-001：TUI 事件驱动渲染与资源优化
 
-> Document status: Active / Claimed (proposed in #910; ineffective until target-branch merge)
+> Document status: Review / Claimed — implementation stage merged; acceptance pending #923
 > Created: 2026-11-10
 > Owner: 本文；Board 仅为派生入口。
-> Acceptance follow-up Issue: #923 (existing Review owner; status and original Source Issue unchanged).
-> 本轮交付为开发任务及实施指导。运行时代码尚未修改，性能收益尚未验证。
+> Acceptance follow-up Issue: #923 (existing Review owner; original Source Issue and delivery status unchanged).
+> 实现阶段已合并至主分支（#922，71655af8）；完整验收未完成，剩余项跟踪于 #923。下文原计划保留，执行记录见末尾。
 
 ## 1. 目标与交付边界
 
@@ -333,8 +333,1198 @@ measure baseline and freeze budgets before P1.
 | Claimed At | 2026-11-11 |
 | Source Issue | None |
 | Governance Claim PR | #910 |
-| Authorization Mode | Independent review |
-| Authorization Evidence | Proposed only; target-branch merge and independent review pending |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-11 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Claim #910 merged as d355dd68; user authorized stage delivery 2026-11-12; exact-head Agent review APPROVE at 14a274ed; code CI43150963692 passed; stage decision recorded in #922 and #923 |
+| Implementation PR | #922 (merged as 71655af8; remaining acceptance #923) |
+| Last Updated | 2026-11-12 |
 | Handoff / Release Condition | Full published acceptance including native terminal evidence; incomplete platforms remain Review |
+
+### P0 execution checkpoint — 2026-11-11
+
+Claim #910 is effective at `d355dd68bb2892ddcd9f042b4d83fd9b71fb65ae`.
+Implementation branch: `perf/tui-event-render`, isolated from the user's original
+worktree. The initial real-TUI offline replay supports deterministic 100/1000/10000
+message history, idle, animation and 20 Hz streaming. Locked example build passes.
+The Linux synthetic PTY sampler collects process CPU time, PSS and output bytes;
+its explicit ready signal excludes terminal startup from warmup/measurement.
+Python is developer-only measurement tooling, not a Talos runtime dependency.
+Without Linux procfs/PTY this sampler is unavailable; native platform acceptance
+remains independently required. Do not treat smoke tests as the three-round baseline.
+
+Still missing before P0 exit: approval/scroll/resize/Git fixture matrix, stage and
+latency instrumentation, child/terminal accounting, release-symbol builds, repeated
+raw statistics and frozen budgets. No scheduling or caching benefit claimed.
+
+P0 instrumentation checkpoint: opt-in bounded aggregate counters/timers now cover
+draw, layout rectangle planning, history rebuild/hit, Git scan, buffer diff,
+flush and input/output/timer wakes. `cargo test --locked -p talos-tui --lib`
+passed 652 tests; replay build and diagnostic smoke passed. Three-second idle
+smoke observed 23 draws/layouts/diffs, 20 timer wakes, 2 initial history rebuilds
+and 43 history cache hits, with no Git scan. This validates instrumentation and
+the repeated idle-draw path, not a representative performance budget. Reports:
+`/tmp/talos-perf-metrics-smoke.json`, `/tmp/talos-perf-metrics-sampler-smoke.json`.
+These ephemeral reports must be replaced by committed full baseline artifacts
+before P0 exit. Layout timing currently measures rectangle planning, not all
+component height calculations; input events are counts, not latency evidence.
+
+P0 follow-up: software input-to-submit latency and resize/legacy-stream wake
+counters added. Eight synthetic input batches produced eight submitted latency
+samples in the focused PTY smoke; this is not physical display latency. The TUI
+suite now passes 653 tests, including histogram overflow/saturation boundaries.
+Replay scenarios now include display-only approval, alternating PageUp/PageDown
+and alternating 80x30/120x40 resize. Build SHA-256 and OS identity are captured;
+full source/build/environment provenance and repeated baseline matrix still remain.
+
+### Scheduler dependency audit before P1
+
+Source inspection at the P0 candidate found two additional wake dependencies:
+
+- `retire_closed_approval` currently detects a dropped approval receiver only at
+  the next loop iteration. Removing the recurring tick requires explicitly
+  awaiting sender closure; an expired modal must not remain indefinitely.
+- `next_stream_chunk` mutates transcript state on legacy stream EOF, then returns
+  None; the select pattern `Some(chunk)` discards that branch's completion. The
+  timer currently supplies the later draw. P1 must represent EOF as a handled
+  event and submit final content without relying on another input or deadline.
+
+Keep the existing tip expiry, deferred reconnect and drag-edge deadlines as
+separate producers. Add controlled regressions for approval closure and legacy
+EOF as well as canonical FIFO Content::End. These are audit findings, not fixes.
+
+Initial three-round debug idle data and its limitations are retained in
+[evidence/tui-perf-001/initial-idle](evidence/tui-perf-001/initial-idle/README.md).
+CPU median 2.371%, range 2.270–2.404%; steady terminal bytes zero, but all three
+runs made 237 draw/layout/diff calls including startup and 234 timer wakes.
+This confirms repeated computation, not P0 completion or a final budget.
+Perf is unavailable; no sampled flamegraph is claimed.
+
+### Long-task execution contract
+
+Work mode: Standard. Deferred validation tracker: None; native terminal gates
+remain required in this owner. The user authorized full implementation closure;
+#910 established the effective claim. Outcome, scope, exclusions, dependencies,
+ordered P0–P4 items, gates and fallback remain the published sections above.
+
+Worktree `/tmp/talos-tui-perf-claim`, branch `perf/tui-event-render`. Preserve original
+worktree changes. Ordinary source edits, offline tests and requested PR delivery
+are authorized; no system security changes, external messages, destructive cleanup
+or release publication are implied. Raw reports and manifests live under the
+explicit experiment output directory and are retained with the evidence report.
+
+Measurement batches are serial, 35 seconds per scenario including 5-second
+warmup, 3 rounds per case, grouped by history size. Each process has a bounded
+startup/exit timeout; one failure stops the batch and retains successful samples.
+Do not silently resume using a changed binary, overwrite an output directory,
+or run builds/tests during timed samples. Inspect live process handles before
+retrying. No repeated CI submission or speculative benchmark rerun is authorized
+without new changes, a failed check, or an identified unresolved measurement issue.
+All incomplete rows stay here; this contract does not relax native acceptance or
+mark P0 complete. No deadline or token/cost budget was imposed by the maintainer.
+
+P0 independent static review requested changes before baseline acceptance:
+validate actual sample-window duration, parse/validate metrics rather than only
+checking file existence, and distinguish injected actions from actual scroll/size
+changes. Window/schema validators and their two regression tests now pass. Existing
+completed matrix samples pass the retrospective window/schema checks, but old
+schema-1 scroll/resize reports lack actual-state evidence and remain preliminary.
+Schema 2 adds actual history-scroll and observed screen-size counters, and counts
+every consumed input/resize event in a batch. Source edits are not rebuilt while
+the schema-1 batch is running, preserving its sampled binary. Full retest and
+replacement acceptance evidence are pending. Context switches currently describe
+the main thread, not all process threads.
+
+Native-platform constraint confirmed by maintainer: no Windows environment is
+available for physical terminal acceptance (2026-11-11). Keep that row pending;
+xwin and Windows CI are not substitutes for native terminal behavior. Linux
+implementation and independent automated gates continue. Overall Complete remains
+unavailable until the required device evidence exists; no scope waiver was given.
+
+The initial schema-1 debug history100 matrix completed all 18 cases. The corrected
+steady-window/schema-2 fixture smoke passed all six scenarios; actual scroll and
+observed terminal-size counters were nonzero in the corresponding cases. Full
+corrected baseline, release matrix and final gates remain pending.
+
+Steady-window diagnostics and explicit deadline-lateness/frame-preparation timers
+now compile; 653 TUI tests and MSVC xwin tests/examples check pass. Standalone
+and matrix sampling share duration/gap validation, and strict matrix acceptance
+checks steady actions rather than cumulative prewarm activity. Pure idle and
+approval waiting permit zero steady draws by design for the target scheduler.
+
+P0 build checkpoint: both source-bound builds at `52263c6279c3fb068332d63edb6a3770081c9ce2`
+exit 0. Release explicitly uses `CARGO_PROFILE_RELEASE_DEBUG=1` and
+`CARGO_PROFILE_RELEASE_STRIP=false`; `readelf -S` confirms `.debug_info`,
+`.debug_line` and `.symtab`. Binary hashes and build settings are retained in
+[baseline-build/receipt.json](evidence/tui-perf-001/baseline-build/receipt.json).
+The release six-scenario / three-history / three-round matrix is running at
+`/tmp/talos-p0-release-full`; only its final validated manifest can establish
+completion. Do not rebuild or run tests during this measurement. Debug matrix,
+Git cases, input probes, instrumentation overhead and budget freeze remain pending.
+
+Developer Git fixtures now contain a non-repository, a clean one-file repository,
+and a repository with exactly 10,000 untracked files (verified by `git ls-files`).
+The new summary script reports histogram bounds for P95/P99, including overflow,
+rather than treating bucket boundaries as exact latency. Its initial smoke and
+boundary checks passed before measurement began; subsequent identity-validation
+changes and committed regression tests still require execution after sampling.
+P1–P3 remain unimplemented. Native Windows acceptance remains pending because the
+maintainer has no available Windows environment; this does not block Linux work.
+
+### P1 implementation notes from the baseline source audit
+
+The following choices are implementation guidance, not delivered behavior:
+
+- Select into a private event value before mutating `self`. The current
+  `next_stream_chunk(&mut self)` borrows the whole TUI across `select!`; waiting
+  for approval sender closure in the same select requires splitting the stream
+  and pending-response field borrows. Receive legacy chunks without side effects,
+  then handle `None` as an explicit EOF event and finalize outside the select.
+- Use an optional nearest deadline. Tip expiry is `created_at + ttl`, deferred
+  reconnect already carries its own deadline, and animation/drag cadence must
+  advance from their previous deadline rather than reset after every input.
+  Otherwise continuous input postpones animation indefinitely. Missed intervals
+  advance state without submitting catch-up frames.
+- Retain the current bounded input batch and release filtering. Drain business
+  outputs with a separate finite budget; do not drain through an approval barrier.
+  Queued outputs currently flush via an unbounded loop, so removing unconditional
+  draws must also preserve cancellation/input fairness during queue release.
+- Never count layout-cache hits as avoided work while still recomputing all
+  component heights. Cache the preparation inputs/results needed by the published
+  P3 dependency matrix, and keep full-buffer rendering until a retained-buffer
+  design has independent evidence. The current history-cap lookup constructs a
+  viewport solely to read total rows; a count-only cache accessor is a candidate
+  low-complexity improvement, subject to measured P4 justification.
+
+These notes preserve the published P0-before-P1 order. Only the optional
+workspace-switch replay was added during the immutable release baseline run;
+that fixture change has not been built or tested yet and is not part of the
+running binary. The active matrix manifest and build receipt retain the original
+`52263c62` source identity. Follow-up Git-switch measurements need a new build
+receipt rather than relabeling this binary.
+
+### P0 release matrix completed; remaining baseline work
+
+The source-bound release matrix exited 0 with all 54 cases validated. Raw reports,
+per-round metrics and summary are retained in
+[release-baseline](evidence/tui-perf-001/release-baseline/README.md).
+Idle CPU medians range from 0.334% to 0.370%; 10,000-entry resize has a 10.004%
+median (9.770–10.134%). These are pre-optimization measurements, not savings.
+The large-history resize cost requires inspection before the P4 decision.
+
+After sampling ended, all six Python regression tests passed, the TUI library
+suite passed 653 tests, and `cargo xwin check --locked -p talos-tui --tests
+--examples --target x86_64-pc-windows-msvc` passed. Workspace-switch smoke passed
+with five actual steady workspace changes and eight input-submission samples;
+all 27 optional process-tree snapshots were complete. This five-second smoke
+does not replace three-round Git/input measurements. Host Git fixtures now fix
+the branch/template and suppress hooks/signing; regenerated fixtures succeeded.
+
+Still pending before P0 exit: debug matrix, three-round Git/switch and input
+probes, instrumentation overhead, full evidence limitations and frozen budgets.
+Runtime event scheduling, asynchronous Git snapshots and preparation caches
+remain unimplemented. Full local preflight, implementation CI/review and native
+terminal acceptance also remain pending.
+
+### P2 dependency audit: cancellation is not hard termination
+
+Inspected the locally pinned `gix 0.90.0` source before choosing the worker
+lifecycle. Upstream `src/status/iter/types.rs` (Parallel Operation) explicitly
+states that without `parallel`, status is computed in advance and the iterator
+is non-interruptible. `src/status/platform.rs` exposes `should_interrupt_owned`,
+but this does not establish hard cancellation for every execution path.
+`src/status/iter/mod.rs` also documents non-interruptible index work even on the
+parallel path. Primary source: https://github.com/GitoxideLabs/gitoxide/tree/gix-v0.90.0/gix/src/status
+(local Cargo.lock version and registry source were used for this inspection).
+
+The TUI manifest disables default features and does not directly request
+`parallel`; feature unification must be checked for the final CLI build before
+making feature-specific claims. Do not enable dependency parallelism merely to
+claim cancellability. P2 must keep one bounded scan ownership slot occupied until
+the underlying work actually returns, even if its result times out or its
+workspace generation becomes obsolete. Cooperative cancellation can supplement
+this invariant but cannot replace it. Shutdown must document any surviving work
+and avoid joining a stalled scanner on the UI thread. This is a verified upstream
+constraint and design requirement, not an implemented worker or cancellation test.
+
+### Frozen implementation budgets before P1
+
+Both six-scenario/three-history/three-round matrices, 36 input-probe samples,
+18 static Git samples, 24 diagnostic-overhead samples and three debug workspace
+switch samples passed. Raw reports are in `evidence/tui-perf-001/` under
+`debug-baseline`, `release-baseline`, `input-baseline`, `git-baseline`,
+`metrics-overhead`, and `workspace-switch`. The latter uses source `15ef42c1`;
+other baseline binaries use `52263c62`. Measurements justify starting P1 with
+the following fixed acceptance budgets, without claiming full P0 completion:
+
+| Metric | Budget | Basis |
+|---|---|---|
+| No-event idle | Zero steady draw/diff/flush; CPU <=0.10% release, <=0.20% debug without diagnostics | Baselines ~0.33–0.37% release, ~1.44–1.94% debug; zero unnecessary frames is the primary invariant |
+| Input P95/P99, excluding resize | <=10/20 ms release; <=20/35 ms debug | Baseline P99 upper <=1.64 ms release, <=8.74 ms debug; headroom for host scheduling and bounded batching |
+| Resize input P95/P99 at 10000 history | <=100/150 ms release; <=150/200 ms debug | Baseline P99 upper <=70.56/122.69 ms respectively; full width reflow remains required |
+| Animation cadence | 150 ms; P99 deadline lateness <=50 ms except resize; no catch-up frame bursts | Preserve established cadence; explicit bounded delay target for scheduler tests and replay |
+| Git freshness | Refresh every 2 s while visible; old results become explicitly stale/unknown at 5 s; scan timeout 2 s | 59 scans/30 s baseline is wasteful; bounded freshness independent of failed or stalled scans |
+| Active CPU/PSS regressions | No >20% median CPU regression in matching active scenarios; PSS peak <=baseline peak*1.20+8 MiB | Three-round variability and fixed-size caches need headroom; compare interleaved baseline/candidate |
+| Scanner lifetime | At most one actual scan at a time; timeout never frees the slot before worker return | Upstream cancellation limits and published lifecycle requirement |
+
+Remaining measurement limitations stay open: no allocation-volume profiler or
+native-terminal resource/visual evidence; process-tree polling misses short-lived
+work; workspace-switch release profile is not yet sampled; precise Git snapshot
+age only becomes meaningful with P2 snapshots. These residuals remain part of
+overall acceptance, not waived by the budget freeze. P1 implementation may now
+proceed using the measured baselines; P0 is Partial until its remaining evidence
+is resolved or explicitly scoped by the maintainer. Do not relabel P1–P3 complete.
+
+### P1 first local implementation checkpoint (uncommitted)
+
+The loop now selects explicit input/output/stream/approval-close/deadline events,
+draws only when dirty, removes duplicate initial/tool draws, and handles legacy
+stream EOF outside the select. Input batches retain release filtering. Queued
+business events are consumed one per select to preserve FIFO while allowing
+input to compete. Cadence deadlines survive input traffic and skip elapsed frames
+without catch-up renders; a deterministic time-arithmetic test covers this.
+
+The TUI suite passed 654 tests. Six three-second PTY smoke cases passed at
+`/tmp/talos-p1-first-smoke`: steady idle and approval draw/timer counts were zero;
+scroll/resize each drew four frames with zero timer wakes; animation drew 13
+frames with 13 timer wakes in the two-second steady window. These are smoke
+results, not the full comparison or native visual acceptance.
+
+P1 remains Partial: dedicated loop regressions for closed approvals, legacy EOF,
+tip/reconnect/drag deadlines, fairness and final stream frame are still needed;
+bounded stream display coalescing remains pending. Visible processing currently
+uses status.is_processing as a conservative animation trigger. A transitional
+500 ms Git deadline still draws when a workspace/status is visible; P2 must
+replace it with asynchronous snapshot delivery and unchanged-result suppression.
+P3 caches and P4 decision are not implemented. No implementation completion or
+push is claimed by this checkpoint.
+
+### P1–P3 local implementation checkpoint (supersedes earlier pending notes)
+
+All changes below remain uncommitted on `perf/tui-event-render` in the isolated
+`/tmp/talos-tui-perf-claim` worktree. The original project worktree is unchanged.
+
+- P1 now coalesces streaming frames at 33 ms, observes approval closure and legacy
+  EOF explicitly, and submits pending final content before Exit. Ordered 1000-token
+  Exit-without-End regression passes. A 200 Hz PTY smoke observed 802 output events,
+  119 frames and nine input latency samples (maximum 5.99 ms) in its steady window;
+  this does not prove final terminal contents or cancellation fairness.
+- P2 runs Git scanning off the UI thread with a process-wide single actual-worker
+  slot. Timeout/drop suppress publication without releasing ownership before return;
+  panic containment and abandoned-worker ownership tests pass. Workspace generation
+  checks reject obsolete results. Refresh/timeout/staleness are 2/2/5 seconds.
+  Unchanged snapshots do not redraw; a five-second steady smoke observed three
+  scans and zero draw/diff/flush calls. A spawn failure now immediately submits its
+  changed unknown status instead of waiting for another event.
+- P3 caches splash, layout and composer height, and computes history row count
+  without preparing a visible projection. The compressed preview plan is shared
+  between height calculation and drawing for ordinary and tool previews, avoiding
+  duplicate wrapping within a frame. This is not a cross-frame preview cache.
+  Unicode/newline/width/cursor oracle tests cover existing caches.
+
+The TUI suite passed 664 tests after the preview-plan change. MSVC xwin checking
+of TUI tests/examples passed at that checkpoint; the subsequent spawn-failure
+scheduling correction still requires the next checks. Full workspace preflight,
+final-frame/cancellation loop oracles, slow/switch Git integration, cache buffer
+and cursor equivalence, the formal interleaved performance comparison, P4 decision,
+implementation review and remote gates remain outstanding. P1–P3 remain Partial.
+The user explicitly has no native Windows environment; xwin is build evidence
+only and native Windows terminal acceptance remains unavailable, not passed.
+
+### Lifecycle and equivalence follow-up (local, uncommitted)
+
+The display snapshot is now owned by each TUI rather than a process-global cache;
+only actual Git scanner ownership is global. Tests cover two sessions sharing a
+workspace, workspace mismatch, exact expiry and unchanged-result freshness renewal.
+The final CLI dependency graph (`cargo tree --locked -p talos-cli -e features -i gix`)
+confirms gix 0.90 has no `parallel` feature, retaining the cancellation limitation.
+
+The production event loop now accepts a private input-stream seam. An actual-loop
+regression verifies cancellation amid 1000 queued ordered deltas, retention of all
+tokens in order, and submission of the last token to the terminal buffer before
+Exit without End. This strengthens the earlier handler-only evidence; it is not a
+native display or latency measurement. Animation scheduling uses the final visible
+preview rows, with a regression covering compression to a one-row window and
+restoration. A 28-step cache oracle compares full cells/styles/cursor/visibility
+against forced fresh planning across Unicode, explicit newlines, cursor moves,
+approval open/close, scrolling and resize.
+
+The full preflight reached 668 passing TUI unit tests, then failed the I174 source
+layout test because it named the removed `next_stream_chunk` method. That structural
+assertion has been migrated to the private scheduling module and its actual EOF
+wait call, preserving module encapsulation checks. Full preflight must be rerun;
+the failed run is not a passed workspace gate. Latest logs are
+`/tmp/talos-perf-preflight.log`, `/tmp/talos-perf-final-frame.log` and
+`/tmp/talos-perf-frame-oracle.log`. Other acceptance gaps listed above remain open.
+
+### Deterministic scheduling and preview cache checkpoint (local)
+
+P3 now has two single-entry preview geometry caches (natural/compressed height).
+Keys include width, bounded padding width, text, height cap, spinner presence and
+thinking-layout presence. Animated glyph/color/frame changes are excluded from
+geometry; the actual first-row prefix is restored for each frame. Tests compare
+cached plans with the full planner across empty/thinking/long/Unicode text,
+widths 0/1/2/3/7/80, caps 0/1/4/10/11, active/inactive states and animation frames;
+unchanged animation must not rebuild. The full-cell oracle also resets these
+caches on its fresh-planning path. This avoids wrap computation, not all per-frame
+buffer construction or bounded visible-row copies.
+
+The loop now uses Tokio's monotonic clock (converted to the existing Instant type)
+for its deadlines. Test-only Tokio clock control verifies: one initial draw in a
+minute of no-event idle; independent tip expiry and deferred reconnect without
+visible animation; three drag scroll ticks before mouse release and no later
+frames; at most four submitted frames for 1000 ready deltas plus cancellation and
+final Exit. No real sleeps are used to assert these scheduling outcomes.
+
+A controlled blocked-scanner integration test pauses the UI clock after worker
+entry, crosses the two-second timeout, switches workspace/generation, and confirms
+input submission and Exit remain responsive. Refreshes cannot create another
+actual worker; even a following session cannot acquire its slot until the blocked
+worker is explicitly released. Worker completion now supplies the snapshot
+collection timestamp. Optional frame-weighted Git age metrics are documented in
+LOCAL-DEV; no native display freshness claim follows from them.
+
+`cargo test --locked -p talos-tui` passes 673 unit tests, 2 structure integration
+tests and 2 doctests at this checkpoint. Full preflight, current xwin and final
+formal performance comparisons still need to run for this source. Earlier
+limitations concerning native Windows/terminal acceptance and profiling remain.
+
+Validation follow-up: `./scripts/release_preflight.sh` exited 0 on the complete
+local implementation above (`/tmp/talos-perf-preflight2.log`), including locked
+workspace check/Clippy/tests, governance checks and external runtime SDK fixture.
+`cargo xwin check --locked -p talos-tui --tests --examples --target
+x86_64-pc-windows-msvc` also exited 0 (`/tmp/talos-perf-cache-clock-xwin.log`).
+P0 baseline archives and summary-accounting changes are committed locally as
+`97764675`; runtime changes remain uncommitted. Neither local checks nor this
+baseline commit establish final performance/native acceptance or remote gates.
+
+### Local stage commits and candidate measurement boundary
+
+Runtime work is now separated into three reviewable local commits:
+
+- `61f2c322`: P1 event/deadline scheduling and deterministic loop regressions.
+- `1e574cd1`: P2 asynchronous Git worker, per-session snapshots and lifecycle tests.
+- `539adfd2`: P3 bounded layout/preview caches and complete-buffer equivalence tests.
+
+The exact P1 and P2 staged trees were exported without changing the working tree
+and tested independently (`cargo test --locked -p talos-tui`): respectively
+663 and 667 unit tests, plus 2 integration and 2 doc tests each. The final combined
+source matches the previously validated 673-test implementation; strict all-target
+TUI Clippy also passed (`/tmp/talos-perf-stage-clippy.log`). All commits remain
+local, not pushed; no phase is marked Complete on this basis.
+
+Candidate debug/release replay binaries are being built from `539adfd2`, with
+Rust build inputs verified clean against that commit. Release retains debug
+symbols (`CARGO_PROFILE_RELEASE_DEBUG=1`, `CARGO_PROFILE_RELEASE_STRIP=false`),
+with two build jobs. Immutable copies and SHA-256 receipt will live under
+`/tmp/talos-candidate-539adfd2`. Formal paired sampling starts only after both
+builds complete; use the existing source-52263c62 immutable baseline binaries and
+identical replay parameters. Do not compile or run tests during sampling.
+
+### Formal paired release sampling started
+
+Both candidate builds completed successfully at source `539adfd2`; the receipt is
+archived in `evidence/tui-perf-001/candidate-build/receipt.json`. `readelf -S`
+confirmed `.debug_info`, `.debug_line` and `.symtab` in the release binary.
+The formal release matrix is running at `/tmp/talos-perf-release-paired-539adfd2`:
+
+```sh
+python3 scripts/replay_tui_perf_matrix.py \
+  --binary baseline=/tmp/talos-p0-binaries-52263c62/release \
+  --binary candidate=/tmp/talos-candidate-539adfd2/release \
+  --output /tmp/talos-perf-release-paired-539adfd2 \
+  --profile release-with-symbols
+```
+
+Defaults retain six scenarios, histories 100/1000/10000, three rounds and 35-second
+runs including five seconds warmup, totaling 108 alternating samples. No builds
+or tests run during sampling. The first candidate idle/100 sample has zero steady
+draw/diff/flush/timer counts; this is preliminary evidence only, not a completed
+matrix or CPU-budget conclusion. New `compare_tui_perf.py` and its focused budget
+tests are prepared but unvalidated until sampling ends; they evaluate only their
+explicit CPU/PSS/idle/stable-layout checks and cannot close overall acceptance.
+
+### Release paired matrix completed; debug comparison started
+
+All 108 release cases completed with exit 0. Raw reports and validated derived
+summary/comparison are archived under `evidence/tui-perf-001/release-paired/`.
+Twelve Python evidence tests passed. Every explicitly evaluated release check
+passed (CPU/PSS budgets, idle/approval frame suppression, stable animation
+planning and animation deadline P99). Stream/10000 CPU median increased from
+1.440% to 1.491% (~3.5%, within the frozen +20% budget); do not claim universal
+speedup. Input probes were off and workspace empty, so input/Git/native/metrics-off
+budgets remain unverified by this matrix.
+
+The equivalent 108-case debug comparison is now running at
+`/tmp/talos-perf-debug-paired-539adfd2`, using baseline/candidate debug binaries
+from the same source-bound receipt directories and `--profile debug`. No builds
+or tests run during sampling. The task remains Active/Partial pending remaining
+measurement, acceptance and delivery gates.
+
+### Debug paired experiment: failed evidence and provenance investigation
+
+All 108 cases completed, but the stable animation layout gate failed for all
+three history sizes. Reports are preserved in `evidence/tui-perf-001/debug-paired/`.
+Other evaluated CPU/PSS/idle/approval/deadline gates passed; this is not acceptance.
+The captured debug executable lacks LayoutCache implementation symbols while
+containing earlier-stage code; its original build reused the shared target in
+0.27 seconds. The receipt therefore does not sufficiently prove source identity.
+An isolated target rebuild with Cargo JSON artifact paths is in progress.
+Do not attribute the failed comparison to current source until provenance is
+resolved, or use the old debug receipt as verified candidate evidence.
+
+### Debug provenance correction verified
+
+The old executable embeds `/tmp/talos-perf-p2-check`; a forced current library
+rebuild restores P3 cache symbols. A ten-second animation smoke (two-second
+warmup) records 53 steady draws, zero layouts and zero history rebuilds.
+No runtime source change was needed. The corrected receipt is
+`evidence/tui-perf-001/candidate-build/debug-rebuilt-receipt.json`.
+An attempted isolated target under /tmp exhausted tmpfs quota and was removed;
+project-disk shared dependencies were reused with forced current library rebuild
+and Cargo artifact-path verification. Full corrected debug comparison follows.
+
+### Corrected Debug paired comparison completed
+
+All 108 samples completed and all evaluated checks passed; raw and derived
+reports are archived in `evidence/tui-perf-001/debug-paired-rebuilt/`.
+Stream CPU medians fell from 11.249/11.279/11.016% to 7.825/8.260/8.089%
+for histories 100/1000/10000. Idle and approval steady draw/diff/flush counts
+are zero; stable animation layout/history rebuild counts are zero.
+Input probes, Git, metrics-off idle, allocation, long-run and native acceptance
+remain separate outstanding requirements. No whole-task completion is claimed.
+
+### Release input-probe comparison completed
+
+All 36 cases passed evaluated checks; archive: `evidence/tui-perf-001/input-paired-release/`.
+Worst-round ordinary input P99 upper bound is 1.190ms; resize with 10000 history
+entries is 66.975ms, within frozen release budgets. This is synthetic input-to-submit
+evidence, not native pixel latency. Debug input comparison follows with the corrected binary.
+
+### Debug input-probe comparison completed
+
+All 36 cases passed evaluated checks; archive: `evidence/tui-perf-001/input-paired-debug/`.
+Worst ordinary input P99 upper bound4.848ms; resize110.863ms, within frozen
+debug budgets. Uses corrected P3 binary. Native terminal, Git freshness,
+metrics-off idle, allocation and sustained/long-run workloads remain outstanding.
+
+### Release metrics-off idle completed
+
+All18 samples passed CPU/PSS budgets, with measured candidate CPU medians0.000%
+across all history sizes (procfs resolution limited). Archive:
+`evidence/tui-perf-001/idle-off-release/`. Debug metrics-off verification follows.
+
+### Debug metrics-off idle completed
+
+All 18 samples passed CPU/PSS budgets; measured CPU medians 0.000% across
+all history sizes (procfs resolution limited). Archive:
+`evidence/tui-perf-001/idle-off-debug/`. Both profiles now have metrics-off
+idle evidence; Git and native-terminal behavior remain separate gates.
+
+### Release large Git fixture measured
+
+Six paired cases with10000 untracked files pass evaluated gates. CPU median
+2.267%→0.976%;15 scans per30s steady window, max scan20.490ms, observed
+frame-weighted snapshot age max1.994s. Evidence: `evidence/tui-perf-001/git-many-release/`.
+Other fixtures, debug, workspace switch and external-change behavior remain open.
+
+### Debug large Git fixture measured
+
+Six cases passed evaluated gates: CPU median10.404%→4.471%,15 scans per30s,
+max scan66.404ms and observed snapshot age max2.005s. Archive:
+`evidence/tui-perf-001/git-many-debug/`. External-change/switch gates remain open.
+
+### Release clean Git fixture measured
+
+Six paired cases passed evaluated gates; CPU median0.438%→0.337%,15 scans/30s,
+max scan1.150ms and observed age max2.001s. Archive:
+`evidence/tui-perf-001/git-clean-release/`. Debug clean fixture follows.
+
+### Debug clean Git fixture measured
+
+Six paired cases passed evaluated gates: CPU median 1.960% to 1.858%,
+15 scans/30s, max scan 7.364ms and observed age max 2.003s. Archive:
+`evidence/tui-perf-001/git-clean-debug/`. Non-repository and switch coverage follows.
+
+### Release non-repository fixture measured
+
+Six cases passed evaluated gates. CPU median0.304% to0.334% (+10.0%,
+within20% budget; not a speedup). Archive: `evidence/tui-perf-001/git-nonrepo-release/`.
+
+### Debug non-repository gate remains unverified; main rebase
+
+The completed six-case experiment is preserved in
+`evidence/tui-perf-001/git-nonrepo-debug/`. Candidate round 2 fails the
+conservative deadline P99 upper-bound check (62.754 ms maximum); exact P99 and
+late deadline type are unavailable. CPU/PSS/input/stable preparation checks pass.
+Mixed deadline instrumentation requires diagnosis; no favorable rerun supersedes
+this failure. Task remains Active with acceptance incomplete.
+
+Rebased all six local commits onto origin/main `55617ad7`, new tip `5b25d891`.
+`git range-diff d355dd68..539adfd2 origin/main..HEAD` reports all six patches
+unchanged; `git diff --check` and unmerged-path checks pass. Uncommitted evidence
+and docs restored from stash `cf940fc8`; all untracked contents verified bytewise.
+Existing binary receipts and measurements retain their original source SHAs;
+new-baseline build/test and performance evidence are required before delivery.
+
+### Animation deadline diagnostic refinement — local commit df7411d2
+
+Added a separate due-visible-animation observation and bounded >50ms counter.
+The original combined deadline histogram is retained. Summary/comparator tests
+cover exact threshold ranks, no samples, malformed counts, and mixed/specific
+evidence disagreement; all 14 Python evidence tests passed. This refines
+measurement, not the rendering algorithm, and does not resolve the earlier
+failed run or establish new performance acceptance.
+
+Rebase workspace preflight: check and Clippy passed; tests failed with temporary
+filesystem quota errors. Removed only this turn's mistakenly created 1.3GB
+worktree target after approval. Redirecting TMPDIR inside the repository then
+caused the non-repository fixture to discover its ancestor Git repository;
+that isolated environment failure is retained in the test log. Subsequent
+tests use the restored default temporary directory and the disk-backed shared
+Cargo target. Full fresh preflight remains required.
+
+Validation after diagnostic refinement: full `./scripts/release_preflight.sh`
+passed (exit 0; `/tmp/talos-perf-deadline-preflight.log`), including locked
+workspace check/Clippy/tests and SDK fixture. TUI has 674 unit tests plus two
+integration and two doc tests. `cargo xwin check --locked -p talos-tui --tests
+--examples --target x86_64-pc-windows-msvc` passed (exit 0;
+`/tmp/talos-perf-deadline-xwin.log`). Fourteen Python evidence tests passed.
+The old failed experiment remains failed under the updated comparator.
+
+New source-bound Debug candidate: `df7411d2`, binary SHA-256
+`b5ab0cc7176b3b6bc502aec2ff407346d22ead3e03b6dfdf525b46f27d6de41c`.
+Receipt: `/tmp/talos-candidate-df7411d2/receipt.json`. A new non-repository
+three-round paired animation experiment is running in
+`/tmp/talos-perf-nonrepo-deadline-df7411d2`; no results claimed yet.
+
+### Rebased candidate specific animation measurement
+
+The new six-case non-repository Debug matrix completed successfully; all evaluated
+checks pass. Archive: `evidence/tui-perf-001/nonrepo-deadline-df7411d2/`, including
+source-bound binary receipt and raw reports. Across three candidate rounds,
+602 visible-animation observations have zero >50ms samples; maximum 4.399247ms.
+CPU median baseline1.747760% / candidate1.517662%; candidate peakPSS46312KiB.
+Input P95/P99 and zero stable layout/history rebuild checks pass.
+
+This is independent evidence for df7411d2, not a retrospective pass for the old
+failed run. The old delay's cause remains unknown; dependency and host drift
+limit attribution across rebases. Next: workspace-switch matrices, Git external
+freshness/stale completion oracle, high-rate and long-run evidence, P4 decision,
+ANSI/native acceptance, final source-bound CI/review and delivery.
+
+### Debug workspace-switch matrix completed
+
+Six cases at history10000 pass CPU/PSS/input gates; baseline15ef42c1 and
+candidate df7411d2 alternate 10000-untracked and clean workspaces every second.
+CPU medians6.765962% to3.488965%; peak candidatePSS61084KiB. Archive and both
+source receipts: `evidence/tui-perf-001/switch-debug-df7411d2/`. This establishes
+observed switching and latency, not the separate stale-result or freshness
+oracles. Release switch baseline must still be built from its fixture commit.
+
+### Release workspace-switch matrix completed
+
+Six Release cases also pass CPU/PSS/input gates, source-bound baseline15ef42c1
+and candidate df7411d2. CPU medians1.509232% to0.605813%; peak candidatePSS40170KiB.
+Each candidate round observes31 steady workspace changes. Archive:
+`evidence/tui-perf-001/switch-release-df7411d2/`. Both profiles now have formal
+switch measurements; external mutation freshness and stale-result behavior
+remain separate acceptance requirements. Runtime JSON confirms all new metric
+fields despite an inconclusive optimized-binary literal search.
+
+### Evidence recoverability after rebase
+
+`evidence/tui-perf-001/source-history/pre-rebase.bundle` preserves all six original
+commit objects referenced by old binary receipts. `git bundle verify` passes;
+the prerequisite d355dd68 is on main. Export instructions and SHA-256 are
+archived beside the bundle. No additional remote branch was created.
+
+### Actual-loop EOF and Git behavior oracles (local, uncommitted)
+
+Added test-only frame timestamp/observer hooks; no production rendering or
+scheduling changes. Three focused tests passed:
+
+- Legacy EOF: 1000 tokens each appear exactly once in order; final token reaches
+  the submitted buffer before a delayed Exit, with no input or explicit End.
+- External Git freshness: real gix-created repository, external untracked-file
+  creation/removal, submitted clean/dirty/clean frames without input. Each
+  external mutation publishes within the frozen5s freshness limit.
+- Successful obsolete scan: hold old worker until new-workspace frame is
+  submitted, then let it return a successful old branch result. Observe every
+  subsequent submitted frame until new scan publishes; no old branch appears.
+  Exactly two actual scans launch and the new snapshot remains current.
+
+Full TUI suite passes677 unit tests plus2integration/2doc tests; log
+`/tmp/talos-perf-behavior-tests.log`. These are software-buffer and lifecycle
+oracles, not native pixel/IME or long-run evidence. New Windows test cross-check
+and stable-candidate full preflight remain to be recorded before commit.
+
+Behavior-oracle validation follow-up: `cargo xwin check --locked -p talos-tui
+--tests --target x86_64-pc-windows-msvc` passed (exit0,
+`/tmp/talos-perf-behavior-xwin.log`). Full `./scripts/release_preflight.sh`
+passed (exit0, `/tmp/talos-perf-behavior-preflight.log`), including governance,
+locked workspace check/Clippy/tests and SDK fixture. All runtime changes in
+this checkpoint are behind cfg(test); performance candidate df7411d2 remains
+the production source used by the archived measurements.
+
+### Sustained high-rate Debug evidence and failed baseline
+
+Original P0 fixtures are fixed20Hz. Prepared exact15ef42c1 source with an explicit
+fixture-only200Hz rate patch; all TUI runtime sources verified bytewise unchanged.
+Baseline200Hz plus50ms input probes reached65s watchdog at~97.37% CPU and was
+terminated; preserve incomplete evidence in `evidence/tui-perf-001/highrate-baseline-timeout/`.
+No valid CPU/PSS paired comparison exists for this workload yet.
+
+Candidate initially completed two samples but third report write exceeded/tmp
+user quota; archive `evidence/tui-perf-001/highrate-candidate-quota/` includes the
+truncated failure. Moved only this task's six binary-copy directories (~2.8GB)
+to system-disk target/tui-perf-artifacts, retained original symlinks and verified
+all SHA-256 digests. No artifacts were discarded.
+
+Sampler now supports explicit input interval(default500ms), fixed deadlines and
+skipped-probe count; default interval preserved. Final candidate-only three-round
+200Hz/50ms Debug matrix completed, steady output6034/6028/6033 events, no skipped
+input probes, P95/P99 upper bounds15.935096/12.489444/12.259310ms (within20/35ms).
+Total probe counts include drain time, not solely the steady window. Archive:
+`evidence/tui-perf-001/highrate-candidate-debug/`. This is absolute input-budget
+evidence, not paired CPU/PSS or final-pixel acceptance. Release highrate, longrun,
+allocation and P4 evidence remain open.
+
+### Release high-rate matrix completed
+
+All six paired cases pass CPU/PSS/input budgets at200Hz configured output and
+50ms fixed-deadline input probes. CPU medians34.657680% ->7.066650%; candidate
+peakPSS53965KiB, worst inputP99 upper5.095588ms. Baseline/candidate each process
+~6010steady output events per round; zero skipped input probe deadlines. Archive
+`evidence/tui-perf-001/highrate-release/` includes fixture-only baseline patch,
+both build receipts and raw reports. Debug baseline timeout is not superseded.
+
+Sixteen Python evidence tests pass, including an actual PTY child test verifying
+20ms probe delivery is not throttled by sampler polling and invalid interval
+rejection before launch. No production Rust changes in this sampling checkpoint.
+Longrun/allocations, repeated transcript commits/P4, ANSI/native and remote gates
+remain open.
+
+### Actual allocator profiling established
+
+Isolated Heaptrack1.5.0 CLI from verified Arch package collected three Release
+animation/history10000 pairs, baseline52263c62 vs candidate df7411d2. Archive:
+`evidence/tui-perf-001/heaptrack-animation/`, including raw profiles, allocator
+histograms, stacks, massif snapshots, exact runner and binary receipts.
+Median whole-run allocation calls851478 ->816698; requested bytes127667737
+->124076306. Both peaks31.32MB (rounded), so peak heap did not improve.
+Histogram counts were checked against profiler totals. Whole-run includes
+initial history construction; stack evidence includes history projection and
+ScrollbackLine cloning but does not isolate steady frame cost. No P4 conclusion
+is made until repeated transcript commits are measured. Profiler overhead and
+shutdown-live memory are explicitly distinguished from ordinary CPU/leaks.
+
+### Latest-main rebase and repeated transcript evidence
+
+Rebased ten local patches onto origin/main6c81390a; range-diff reports all
+unchanged, uncommitted work restored. New local head e42b9c9c; no push yet.
+Added identical transcript-commit fixture to baseline15ef42c1 source export
+and current candidate. Three Release pairs at10000 history/1complete message
+per second pass CPU/PSS/input budgets. Evidence:
+`evidence/tui-perf-001/transcript-release/`. CPU median5.099875% ->2.791949%,
+peak candidatePSS68918KiB, worst inputP99upper0.594405ms. Candidate31history
+rebuilds vs baseline62 per steady window, both94output events.
+
+History rebuild consumes81–82% of candidate draw duration (nested timers),
+so repeated revision changes establish a P4 hotspot despite aggregate budgets
+passing. P4 remains unimplemented; next allocator profile and conservative
+incremental projection design must preserve grouping/tail mutation, anchors,
+selection/logical lines and full-projection oracle. This35s growing workload
+is not long-run bounded-memory acceptance.
+
+Seventeen Python evidence tests and locked TUI replay example check pass after
+rebase. Release fixture binaries built with pinned toolchain and symbols;
+source/patch/binary receipts archived. Native terminal, longrun, ANSI equivalence,
+final full gates, exact-head CI and independent review remain open.
+
+### Transcript revision allocator profile completed
+
+Three Heaptrack Release pairs complete; archive
+`evidence/tui-perf-001/heaptrack-transcript/`. Whole-run median allocation calls
+26139343 ->13386688, requested bytes3793180204 ->1947615179. Histogram totals
+match profiler counts. All peak heap values43.56M rounded, no peak improvement.
+Totals include initialization/teardown and profiler overhead excludes CPU/PSS
+from normal budgets. This corroborates revision-dependent allocation cost;
+P4 implementation/oracles and bounded longrun stability remain outstanding.
+
+### P4 incremental projection — local implementation under validation
+
+Repeated transcript timing and allocator evidence above activates P4. The cache
+now retains a stable prefix and reprojects from the beginning of the final
+projection unit, including its incoming pending-call count. This backtracks over
+an entire final poll group, including a pending poll subsequently completed or
+failed. Width changes and any expansion/reasoning edit conservatively rebuild
+all history. No per-revision journal or second formatting algorithm is added.
+
+Rows/logical lines use Arc<Vec>; live old snapshots remain immutable via COW.
+At frame preparation, the consumed previous hit-map snapshot is released before
+updating the cache, avoiding deep copies of the stable prefix in the normal path.
+Cache capacity follows retained transcript size; this is not a fixed memory cap
+on conversation history. Existing history_rebuild metrics now count projection
+refreshes (full or tail), not exclusively full-history reconstruction.
+
+The full projection remains the oracle:256 successive state comparisons across
+four widths cover pending/adjacent/parallel polls, terminal observations,
+expansion edits, anchored views, copy text and retained old snapshots. A separate
+prefix-pointer test verifies append refresh does not clone stable text. Full
+TUI679unit+2integration+2doc tests pass; xwin MSVC --tests --examples passes.
+Logs:/tmp/talos-p4-tui-tests.log,/tmp/talos-p4-xwin.log. Release source-bound
+before/after measurement is next; no speedup or P4 acceptance claimed yet.
+
+### P4 Release paired result
+
+Three paired P3/P4 runs with identical fixture/dependencies pass listed
+CPU/PSS/input gates; archive `evidence/tui-perf-001/transcript-p4-release/`.
+CPU median2.828760% ->0.067683%,candidate peakPSS33532KiB. Three steady history
+refresh totals0.232/0.276/0.291ms, draw33.953/23.139/24.173ms; both process94
+output events. Worst candidate inputP99upper10.413224ms in first round, within
+20ms budget but retained as an unexplained long tail; remaining rounds<0.45ms.
+No pixel, longrun or whole-task acceptance claim. Full workspace preflight is
+running; evidence archives contain complete binary receipts and source patches.
+
+### Full-gate fixture failure and bounded repair
+
+First P4 preflight exited101 in talos-config's existing
+store_unset_builtin_provider_clears_credentials (272passed/1failed), with
+"builtin provider must not have resurrected credential". Source inspection
+shows an unlocked environment-reading api_key assertion while other tests set
+ANTHROPIC_API_KEY under ENV_MUTEX. Persisted removal does not prohibit host
+credential fallback, so the assertion tested the wrong boundary.
+
+Bounded test-only repair checks active_provider_config.api_key absence and
+removal of the last-key credentials file, without changing runtime behavior.
+SOP collaboration local-test-fix/bounded-fixture rules apply; keep this logical
+change separate in commits. The first attempted exact filter ran zero tests
+and is not evidence; a subsequent file-read assertion failed because last-key
+removal deletes the file. Corrected fully qualified isolated test executes1and
+passes. Logs:/tmp/talos-p4-preflight.log,/tmp/talos-p4-config-isolated-fixed2.log.
+Fresh fullpreflight follows in /tmp/talos-p4-preflight-fixed.log; failed evidence
+is retained. Evolution lesson3 updated with the persisted/environment boundary.
+
+Full P4 preflight after the test-only repair passed(exit0), including locked
+workspace check/Clippy/tests and external SDK fixtures:
+/tmp/talos-p4-preflight-fixed.log. Config Windows test cross-check also passes
+/tmp/talos-p4-config-xwin.log. TUI Windows --tests --examples passed earlier
+against unchanged P4 runtime source. Test repair committed18e9e117;
+transcript/allocator fixture evidence committed3bedbe23. These are local commits,
+not pushed completion evidence. P4 allocator follow-up, Debug/longrun coverage,
+changed-cell/ANSI/native checks and final remote gates remain open.
+
+### P4 fixed-history repeated replay
+
+Three125s candidate runs(5s warmup),10000fixed history, animation+500ms input
+probes complete. Archive `evidence/tui-perf-001/p4-bounded-longrun/`. First/last30s
+median PSS deltas-3165/-1/+1KiB; no sustained upward trend observed, not a heap
+leak proof. CPU0.2504/0.2593/0.2590%; inputP99upper worst0.503696ms. All steady
+history rebuild/layout/Git counts0. Animation deadline799/800/800samples have
+5/3/1over50ms: P99 passes; individual long tails retained. Resizing/heap/growing
+history/native evidence still needed. Corrected two prior transcript report
+READMEs from erroneous100x30 to sampler's actual120x40 dimensions; raw data unchanged.
+
+### Workstation resource incident and guarded ANSI validation
+
+User reported severe workstation CPU/memory pressure. Kernel logs confirm a
+2026-11-11 global OOM killing rustc and WeChatAppEx; several rustc/linker processes
+were resident. Attribution to this session alone is unproven. Build jobs=2 did
+not bound aggregate host load. All known task processes were confirmed terminal
+before further work; no unguarded build/test or sampling is permitted after this
+incident. Future heavy validation uses a dedicated user systemd service with
+CPUQuota=100%,MemoryHigh=2G,MemoryMax=3G,MemorySwapMax=0,TasksMax=128,Nice=10,
+CARGO_BUILD_JOBS=1,RUST_TEST_THREADS=1. Actual cgroup files verified100000/100000,
+2147483648,3221225472,0,128 respectively. Never increase limits to force a pass.
+Resource-capped execution is validation evidence, not comparable performance data.
+
+Actual terminal submission is now shared with a capturing Crossterm backend.
+Cached and complete planning paths emit identical ANSI bytes across the existing
+28-state transition oracle. Animation cell differences remain inside preview
+across4widths/2modes/63frames; layout/history/cursor remain stable. Unchanged
+frames emit no bytes; an injected write failure still ends synchronized output,
+flushes and propagates the error. This is byte-level evidence, not native pixels.
+
+Initial new idle fixture erroneously omitted text in its second frame, and the
+failure test used an unavailable backend.writer accessor; both corrected.
+Guarded fullTUI test passes682unit+2integration+2doc, exit0,40.067s wall,
+31.198s CPU,~2GiB peak,0swap. Log:/tmp/talos-ansi-guarded-tests.log.
+Current submission extraction remains uncommitted; fresh xwin/fullworkspace
+and independent review still required. P4 allocation/Debug follow-up, heap and
+native terminal acceptance and remote delivery remain open.
+
+### Guarded validation follow-up and static preparation audit
+
+Guarded xwin MSVC check with `--tests --examples` passed (exit0; log
+`/tmp/talos-ansi-guarded-xwin.log`). Fresh project and collaboration validators
+passed with zero warnings; `git diff --check` passed.
+The full preflight passed governance/check/Clippy but was deliberately stopped
+during workspace test compilation: cgroup `memory.events` recorded623556 high
+events, no max/OOM events, while host I/O pressure was elevated. This does not
+prove the service was the sole source of host pressure. Unit is confirmed
+inactive; runtime17min41.417s, CPU17min28.445s, peak2GiB, swap0. Log
+`/tmp/talos-ansi-guarded-preflight.log` records SIGTERM. Wrapper exit0 and service
+success are not evidence that preflight passed. Current full-workspace gate
+remains incomplete; do not raise limits or restart the same expensive command
+without addressing repeated reclaim.
+
+Static inspection of `app/frame.rs` confirms cached splash lines, composer
+natural height, preview plans, layout and history projection are reused.
+Status formatting reads the Git snapshot. Full buffer construction/diff remains
+intentional; tool-preview planning, panel/queue height queries, composer painting
+and cursor calculation can still execute per drawn frame. No claim is made that
+all static component work or frame allocations have been eliminated. Existing
+region/ANSI tests cover observable equivalence; allocation and native evidence
+remain required before closing the task.
+
+### Projection snapshot lifecycle regression
+
+Added `repeated_reflow_releases_obsolete_snapshots_after_view_is_dropped`:
+128 cycles alternate widths7/80/120/1, expand existing reasoning and append
+history. Every new projection matches the full oracle; weak references verify
+the previous rows/logical-text snapshots survive while a consumer holds them
+and are deallocated after that consumer drops them. The cache retains only its
+current snapshot. This covers ownership retention, not allocator fragmentation
+or whole-process heap stability, and does not replace the remaining heap probe.
+
+Focused locked TUI test passed1/1 (682 filtered) in a dedicated resource guard:
+CPUQuota100%, MemoryHigh2G, MemoryMax3G, swap0, tasks128, jobs1/testthreads1.
+Service exited normally0, runtime15.990s, CPU14.472s, peak2GiB, swap0. No full
+workspace pass is implied; Windows cross-check of this new test remains pending.
+
+### Delivery convergence checkpoint (supersedes pending statements above)
+
+Current implementation tip: `a04ab9e0` (local, not pushed). New snapshot test MSVC
+`cargo xwin check --locked -p talos-tui --tests --examples --target x86_64-pc-windows-msvc`
+passed under the same guard: normal exit0,2.202s, peak837.2M, swap0.
+
+P4 allocation follow-up is now recorded in
+[heaptrack-p4-guarded](evidence/tui-perf-001/heaptrack-p4-guarded/README.md).
+Three serial alternating P3/P4 pairs: median allocation calls13386688→765612;
+reported peak heap43.56M→26.11M. Six normal exits0, total3min50.941s, guard peak
+453.8M/swap0. These whole-run capped profiler observations are not CPU/latency
+comparisons or leak proofs. The sampled output window differs by one update in
+two P3 cases; exact business-event counts were not captured. Source receipts bind
+the binaries, with P4 preceding the shared ANSI submission extraction.
+
+The user identified excessive validation time. Consolidate remaining work into
+the following delivery gates; do not add experiments without an uncovered
+requirement, regression, or review finding. Reuse existing evidence within its
+actual source/platform/workload scope; do not erase the original acceptance.
+
+| Gate | Existing evidence | Remaining action |
+| --- | --- | --- |
+| Runtime implementation P1–P4 | Local commits, scheduling/Git/projection oracles, ANSI equivalence and snapshot lifecycle tests | Independent review of final candidate; repair findings only |
+| Performance and memory | Debug/Release P0–P3 pairs, P4 Release transcript pairs, capped P4 allocation comparison, fixed-history repeated replay | P4 Debug follow-up and growing-history/resize heap stability remain unverified; combine required coverage instead of expanding matrix |
+| Current-source local checks | Full TUI682+2+2 before test-only addition, new test1/1, current MSVC tests/examples, check/Clippy before test-only addition | Full workspace preflight was interrupted during linking; solve bounded resource execution, then one final preflight |
+| Native terminal behavior/resources | Byte/cell oracles and synthetic PTY only | Ghostty on Wayland+niri plus another supported terminal; native Windows unavailable; emulator accounting, IME/clipboard/modal/input acceptance remain open |
+| Documentation/delivery | README responsiveness entry and LOCAL-DEV profiling/resource instructions; this owner and evidence archives | Push stable candidate, implementation PR, exact-head CI/independent review, then owner/Board/Issue synchronization; never mark Complete without required gates |
+
+No test/profile process remains live at this checkpoint. Keep task Active and
+claim effective; these gaps are not a completion claim or an approved reduction
+of scope. Native unavailability must be reported as pending acceptance rather
+than compensated by more synthetic tests.
+
+### Workspace validation failure diagnosis (2026-11-12)
+
+Single-CPU affinity was added without raising resource limits. The first run
+failed rustfmt on the new snapshot assertion; formatting corrected. The second
+passed formatting/check/Clippy and completed linking, but failed CLI
+`i255_plugin_e2e`: the actual tool message was `execution timed out after 250ms`.
+Full log: `/tmp/talos-preflight-affinity-fixed.log`, exit101. Runtime6min40.189s,
+peak2GiB/swap0; memory.high events still occurred. Affinity is not proof that
+reclaim pressure is solved.
+
+Targeted Cargo retry passed2/2 but rebuilt dependencies due to a different
+feature selection (5min12.284s); do not call this a cache-only retry. Running the
+previous workspace test executable directly then passed2/2 in1.722s, peak69.9M,
+swap0. The CLI binary path can have been overwritten by the targeted build, so
+this is not an immutable exact-binary reproduction of the original failure.
+No runtime timeout, permission rule or assertion was relaxed. Failure is retained
+as an unreproduced timeout, not declared fixed; full workspace gate remains open.
+All three service handles are terminal; attempted stops arrived after completion.
+
+### Service locale correction
+
+Full preflight on `43305a58` exited101 after8min13.525s. Tools1146/1147 passed;
+`hasconfig_non_path_key_still_triggers_url_prohibition` expected English Git
+stderr while the user service manager supplied `LANG=zh_CN.utf8`. A minimal
+native Git2.56.0 reproduction rejected the same config in both languages, but
+Chinese diagnostics did not contain the English assertion substring.
+The exact existing tools test executable passed the failing test1/1 with
+`LC_ALL=C LANG=C` under the unchanged resource limits (46ms, peak4.9M, swap0).
+No product behavior or test assertion changed. LOCAL-DEV now pins diagnostic
+locale in its guarded command example. A full rerun is in progress; this focused
+result does not complete the workspace gate.
+
+### Current implementation full local gate passed
+
+`./scripts/release_preflight.sh` completed normally with exit0 and its explicit
+`release preflight: passed` marker. Archive: `evidence/tui-perf-001/local-preflight/`.
+Implementation source43305a58; intervening6c51db7e changes documentation only.
+148 Rust test-result summaries:5315 passed,0 failed,0 ignored; formatting,
+workspace check/Clippy, governance/claims and external Runtime SDK fixture passed.
+Guard: CPU100%/affinity0, memory high2G/max3G, swap0, tasks128, jobs1/testthreads1,
+Nice10, LC_ALL=C/LANG=C. Runtime8min28.678s, CPU4min7.841s, reported peak2G/swap0.
+The previously failing Git diagnostic assertion passed in this full run.
+The earlier plugin timeout remains retained evidence, not a claimed product fix.
+
+This satisfies the current local workspace gate; do not repeat it solely for
+status prose. Remaining performance/native/remote requirements in the delivery
+convergence table still apply. No validation process remains live.
+
+### Current-source guarded Debug result
+
+Archive `evidence/tui-perf-001/p4-debug-guarded/` binds source57603793 and its
+Debug binary. Six serial transcript/resize runs completed normally; no other
+heavy task ran. Transcript input P99 upper worst9.295705ms fits Debug budget.
+Resize round1 P99 upper202.267295ms exceeds200ms; round2 P95 upper176.078983ms
+exceeds150ms. Retain failures; CPU-capped candidate-only data cannot isolate a
+runtime regression from scheduling. Debug follow-up is measured but resize
+acceptance remains unproven. Do not rerun until a specific diagnostic question
+and comparable conditions are established. Growth/resize heap proof, native
+terminals and remote delivery still remain. No live processes at checkpoint.
+
+Existing-data resize attribution narrows the issue to full-width history reflow:
+about97% of nested draw wall time is history rebuild, versus0.07–0.11ms layout
+per round. `p4-debug-guarded/resize-attribution.json` records the calculation.
+This is wall-time attribution, not evidence separating scheduling from CPU.
+Keep width reflow correctness and existing oracles; further work should target
+that path rather than unrelated animation/Git scheduling. No new run was needed.
+
+### Rejected fitting-line fast path
+
+A bounded single-segment/no-fill fast path passed42 projection tests, but three
+same-cap alternating Debug resize pairs did not demonstrate benefit: median
+history rebuild7430.947→8033.446ms; candidate P95 upper169.451–180.064ms still
+misses150ms. Baseline misses too, and host/order limitations remain. Removed the
+uncommitted runtime/test patch; retained it and raw results under
+`evidence/tui-perf-001/fit-path-evaluation/`. Runtime is back to the source covered
+by the passing full preflight. No new full test run is warranted for this revert
+to that exact source. Resize acceptance remains unresolved; do not claim a fix.
+
+### Draft stage candidate published
+
+Implementation branch pushed through8afbbe4c; draft PR#922:
+https://github.com/wjhuang88/talos/pull/922 . This provides a reviewable stage,
+not completion or merge authorization. Resize-budget misses, growing/resize heap
+acceptance, native terminals and exact-head CI/review remain open. User was asked
+to arrange Ghostty acceptance; no result has been received at this checkpoint.
+
+### Remote stage gate observation
+
+At draft head8afbbe4c, CI run43134873925 has passed Linux Desktop, Windows
+installer and change classification; Linux workspace and Windows jobs remain
+running at this observation. Remote reconciliation job130907712181 failed because
+`docs/reference/ISSUE-DOC-CODE-STATUS-2026-09-30.md` omits open Issue#919
+(GIT-COMPAT-001, gix-native Git preflight compatibility). This is global Issue
+matrix drift, not a TUI claim failure. Per ADR-071 and collaboration SOP, retain
+it as a governance reconciliation residual owned by that matrix/workflow; do not
+widen this implementation slice to Git compatibility. This does not waive
+exact-head code CI or independent review. No merge is authorized by this note.
+
+Existing P4 heaptrack massif data was summarized without another replay.
+Three candidate growing-history runs show identical24250-byte median live-heap
+increase between elapsed5–10s and25–30s; evidence and reproduction script are in
+`heaptrack-p4-guarded/`. Ongoing history growth and missing exact event alignment
+prevent interpreting the delta as leak/non-leak proof. Repeated-resize heap
+coverage remains absent. Both Linux and Windows Desktop CI jobs have now passed;
+workspace jobs are still running at this observation.
+
+### Independent review follow-up: input exit flush (2026-11-12)
+
+Independent Agent review of published `8afbbe4c` against target `f61a15cd`
+requested changes: input EOF and exit-key paths bypassed the final dirty-frame
+submission while stream content was waiting for its coalescing deadline. The
+working candidate routes both paths through the existing `UiOutput::Exit`
+finalization and loop-top submission. A paused-clock regression covers ordered
+and legacy streams, each with input EOF and Ctrl+C at 1 ms before the stream
+frame deadline. This fix is not yet validated or delivered.
+
+The guarded focused test (`cargo test --locked --workspace --lib
+input_exit_submits_coalesced_content_before_restore`) exited 101 before tests:
+the new test omitted the qualification of `std::time::Duration`; corrected
+locally. Runtime 2m18.166s, CPU 1m29.616s, peak 2 GiB, swap 0. During compilation,
+`memory.events high` reached 272811 and host I/O pressure was high. A stop was
+requested, but the service had already exited with that compiler error. No
+successful test result is claimed; no immediate rebuild or raised resource cap.
+The review also explicitly retains Debug resize budget, growing/resize heap,
+and native-terminal acceptance gaps. Shared GitHub identity means independent
+Agent review is not independent human authorization.
+
+Independent Agent follow-up reviewed the working diff against `905a05c9` and
+accepted the input-exit repair statically: both paths finalize legacy/ordered
+streams, then `should_exit` overrides the coalescing deadline for submission.
+The reviewer confirmed the four 1 ms regression scenarios target the original
+defect. This is source review only, not successful test execution or final-head
+review. At the next resource check, host I/O PSI remained high (some avg10 89.81,
+full avg10 81.19); compilation was not restarted. The derived acceptance tracker
+now explicitly separates the old passing implementation from this unvalidated
+fix and records the P4 Debug resize budget misses.
+
+### Input exit regression passed (2026-11-12)
+
+Source `18965ba2` strengthens key-exit isolation: input stays open after Ctrl+C,
+so EOF cannot rescue a broken key path; a 100 ms paused-clock timeout guards
+liveness. The guarded focused command above then completed normally with exit 0:
+`app::app_tests::input_exit_submits_coalesced_content_before_restore` passed,
+covering all four ordered/legacy × EOF/key cases in 0.02 s (683 TUI tests filtered).
+Total service runtime 3m53.166s, CPU 2m26.339s, peak 2 GiB, swap 0. Compilation
+also rebuilt provider/MCP library test targets despite the name filter. Memory
+high events rose from 9927 to 55773; a stop was requested, but the service had
+already completed normally before it arrived. This result proves the focused
+regression only, not the full workspace suite or final performance budgets.
+No immediate repeat is needed. Keep the stable-batch full gate and MSVC checks
+outstanding for changed code; native acceptance and resize/heap gaps remain.
+
+### Resize diagnosis with resource counters (2026-11-12)
+
+Sampler `8994abc7` adds opt-in leaf cgroup-v2 observations with unavailable-data
+handling; three fixture tests and two PTY probe tests passed. Developer usage,
+overhead, path privacy and attribution limits are documented in LOCAL-DEV.
+A single existing-binary run is archived in `resize-cgroup-diagnostic/`: Debug
+source57603793, normal exit0,37.953s runtime,5.221s CPU,424.7MiB peak/no swap.
+No sampled leaf throttling, memory-high events or I/O pressure increase; maximum
+input-to-submit82.538561ms. The earlier150/200ms misses were not reproduced in
+this same binary. This does not identify their cause or satisfy final-source,
+repeated-round acceptance. Preserve previous failures; no speculative additional
+runtime optimization is justified by this observation alone.
+
+### Independent incremental review and remote Windows disposition
+
+Independent Agent reviewed exact head
+`6f558bf9807322e0b03ea7a9f3721dafb6708dd4` against target
+`f61a15cd3f0be81489e69f92d374fc8ee41eddec`: incremental APPROVE, whole delivery
+REQUEST CHANGES because final-source performance, growing/resize heap stability
+and native-terminal acceptance remain open. The review found no new blocker in
+the exit repair, isolated key-exit regression or optional cgroup sampler. Special
+cgroup/mount namespaces may not map proc membership to the mounted hierarchy;
+missing observations remain unavailable. This was read-only source review,
+not independent human approval or execution evidence.
+
+Remote run43134873925 still covers older published `8afbbe4c`. Windows job
+130907772405 completed workspace tests, check, Clippy, focused native checks,
+governance, dependency audit, claims and CLI smoke successfully, according to
+its step API. Its final rust-cache save was cancelled; aggregate job130924641006
+failed because WORKSPACE_RESULT was cancelled. This is not a successful overall
+Windows gate and does not validate the later exit fix. Do not rerun the old head
+just to obtain green metadata; obtain all required gates for the next stable
+candidate. Linux workspace job was still running at this observation.
+
+### Stable candidate full preflight passed (2026-11-12)
+
+Standard `./scripts/release_preflight.sh` completed normally with exit0 and its
+explicit passed marker for implementation/test source `6f558bf9`. During the run
+only owner documentation changed in `3b7d8b4d`; runtime and test sources stayed
+unchanged.148 Rust summaries:5316 passed,0 failed,0 ignored. Workspace locked
+check, Clippy, tests, governance/claims and external runtime SDK fixture passed.
+Archive: `evidence/tui-perf-001/final-preflight/`, including raw log and SHA receipt.
+Same resource guard:17m7.763s wall,8m53.755s CPU,2GiB peak,swap0. Linking incurred
+memory-high reclaim but progressed; no limit was raised and no restart occurred.
+Do not repeat this gate for subsequent evidence-only changes. Updated MSVC checks,
+final-source performance/heap and native acceptance, exact-head remote gates and
+final delivery remain outstanding; this is not task completion.
+
+Updated pinned-toolchain MSVC cross-check also passed normally0:
+`cargo xwin check --locked -p talos-tui --tests --examples --target x86_64-pc-windows-msvc`.
+Same resource guard;2.019s wall,1.583s CPU,817.3MiB peak,swap0. Log and receipt
+are in `final-preflight/`. This covers the exit-test changes and examples at the
+current implementation source, and does not substitute for native Windows
+terminal execution.
+
+### Final Debug follow-up and adjacent-binary diagnosis
+
+Current-source Debug artifact `fec7a2e9` is bound by Cargo artifact receipt and
+SHA in `final-debug/`. Six guarded serial runs completed normally0: transcript
+P95 upper4.194303ms in all rounds, worst P99 upper5.539786ms passes20/35ms.
+Resize P95 uppers176.769150/179.034760/176.834676ms fail the conservative150ms
+upper-bound gate; P99 uppers stay below200ms. These histogram bounds do not
+prove the exact P95 exceeds150ms, but cannot establish required acceptance.
+No sampled leaf throttling was observed; PSS does not establish heap stability.
+
+The adjacent fixed-binary pair in `resize-same-window-pair/` then found old/current
+history rebuild totals9300.575/9155.894ms and P95 uppers173.459/175.079ms. The old
+binary also slowed relative to its earlier82ms single run. Runtime diffs only
+change exit finalization; history projection and replay sources match, as do
+recorded Cargo profiles/features. This does not support blaming the exit fix,
+but does not explain environmental variation. Preserve the correctness fix,
+keep the resize gate open, and investigate the shared reflow path rather than
+repeat an unexplained matrix. All runs and limitations are retained.
+
+### Scope recalibration and projection allocation result (2026-11-12)
+
+The user requested recalibration after excessive validation and workstation
+resource pressure. The deliverable remains responsive, lower-cost TUI behavior:
+no idle redraw, dependency-aware animation, nonblocking Git snapshots and intact
+input/approval/output semantics. P0 measurements support these outcomes; repeated
+matrices are not themselves delivery. No original budget or native gate is waived.
+
+The pending projection patch borrows stored styled lines and bounds initial
+segment capacity to remaining source bytes/viewport cells.41 projection tests
+passed. Corrected profiler runs with57 steady rebuilds each report whole-run
+allocation calls21282134→11422251, rounded peak heap26.37M→26.26M; these are
+allocation observations, not a latency or leak-free claim. Evidence:
+[reserved-lines-evaluation](evidence/tui-perf-001/reserved-lines-evaluation/README.md).
+Its latest ordinary Debug resize P95 upper bounds164.247866/170.772531/160.545278ms
+do not establish the150ms gate; P99 bounds remain below200ms. The patch is not
+covered by the previously passing full preflight and is pending final review.
+
+Converge this bounded change before further optimization. Remaining delivery
+requirements are final-source checks/review/CI, unresolved resize acceptance,
+bounded-heap evidence and native terminal behavior/resources (including currently
+unavailable native Windows), followed by publication and owner synchronization.
+Do not start another identical timing matrix or broaden into a renderer rewrite.
+
+### Resize acceptance measurement precision
+
+Source inspection confirms input latency currently has log2 nanosecond buckets:
+the bucket spanning134.217728–268.435455ms crosses the frozen150ms threshold.
+For the latest rounds, its upper bound is capped at the observed maximum, so
+the recorded P95 bound is not an exact P95 failure. Existing evidence remains
+insufficient; it must not be retroactively passed. A bounded `over_150ms_count`
+now accompanies metrics, and the summary/comparator use its exact nearest-rank
+test only for Debug resize P95. Old reports fall back to conservative bounds;
+Release/P99 budgets are unchanged. Five Python summary tests passed, covering
+rank boundaries, invalid counts and missing evidence. Rust boundary/saturation
+test is added but not yet executed; no new performance replay has been run.
+
+### Frozen candidate local validation and commits
+
+Projection allocation change committed as211ad3b0; precise150ms threshold
+measurement as e7ccb938. Both passed independent incremental static review.
+The final standard preflight passed normally0:5317 Rust tests,0failed/ignored,
+workspace check/Clippy, formatting, governance/claims and external SDK fixture.
+The new Rust boundary/saturation test is included. MSVC cargo-xwin tests/examples
+also passed0. Evidence: [converged-preflight](evidence/tui-perf-001/converged-preflight/README.md).
+No new performance experiment was run. Code is frozen; unresolved resize/heap
+and native acceptance remain open. These local passes do not authorize marking
+the task Complete or replacing final-head remote gates.
+
+### Authorized stage delivery (2026-11-12)
+
+User/maintainer explicitly requested “进行阶段性交付” after reviewing the remaining
+acceptance gaps. PR #922 merged as `71655af854a680faf2a614646341652211d50ff5`,
+containing candidate `14a274ed52b4859a886a53eafa9f566867646097`.
+Delivery state is Review, not Complete; no whole-task Completion Commit is claimed.
+
+Remaining acceptance owner: this task. Execution tracker:
+https://github.com/wjhuang88/talos/issues/923 . Its checklist preserves Debug
+resize P95/P99 and original budgets, growing-history/resize heap stability,
+Ghostty plus a second terminal, native Windows terminal acceptance, and exact
+source/environment evidence. The maintainer explicitly authorized deferring
+these performance/device rows for stage delivery; this is not a passing result
+or a reduction of the original task. Claim remains Claimed for acceptance follow-up.
+
+Merge authorization used Single-maintainer merge: no independent human reviewer
+was available in this session; independent Agent review approved exact head14a274ed
+against basef61a15cd with shared identity disclosed. No protected permission,
+sandbox or process-hardening files changed. Local preflight5317passed and MSVC
+xwin passed. CI43150963692 passed Linux/Windows workspace, aggregate Windows gate,
+both Desktop jobs and installer fixture. Both governance validators passed.
+Target/claim and overlapping PR inventory were checked immediately before merge.
+Global Issue matrix missing#919 remains a separately owned advisory residual under
+ADR-071. Native-terminal acceptance is not established by Windows CI.
+
+Resume gate: use #923 against the recorded implementation and integrated runtime;
+no further feature expansion or identical benchmark loops. Close this task only
+when original required acceptance is actually satisfied. User main working
+checkout and other active worktrees must not be switched or removed by cleanup.

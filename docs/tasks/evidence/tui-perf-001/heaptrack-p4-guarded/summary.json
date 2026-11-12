@@ -1,0 +1,44 @@
+[
+  {
+    "case": "baseline-r1",
+    "allocation_calls": 13386688,
+    "peak_heap": "43.56M",
+    "exit_code": 0,
+    "steady_output_bytes": 5655
+  },
+  {
+    "case": "baseline-r2",
+    "allocation_calls": 13386687,
+    "peak_heap": "43.56M",
+    "exit_code": 0,
+    "steady_output_bytes": 5655
+  },
+  {
+    "case": "baseline-r3",
+    "allocation_calls": 13386688,
+    "peak_heap": "43.56M",
+    "exit_code": 0,
+    "steady_output_bytes": 5351
+  },
+  {
+    "case": "candidate-r1",
+    "allocation_calls": 765612,
+    "peak_heap": "26.11M",
+    "exit_code": 0,
+    "steady_output_bytes": 5351
+  },
+  {
+    "case": "candidate-r2",
+    "allocation_calls": 765612,
+    "peak_heap": "26.11M",
+    "exit_code": 0,
+    "steady_output_bytes": 5351
+  },
+  {
+    "case": "candidate-r3",
+    "allocation_calls": 765612,
+    "peak_heap": "26.11M",
+    "exit_code": 0,
+    "steady_output_bytes": 5351
+  }
+]

@@ -1,0 +1,79 @@
+{
+  "source_commit": "df7411d2752cc1d541a6f5c91295313efa11b4a0",
+  "binary": "/tmp/talos-candidate-df7411d2/release",
+  "sha256": "be4fc2ff1a3201273810220cea6f94af47ab3fbf98b8c02adcff3238ddb08050",
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///tmp/talos-tui-perf-claim/crates/talos-tui#0.10.1",
+    "manifest_path": "/tmp/talos-tui-perf-claim/crates/talos-tui/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "tui_perf_replay",
+      "src_path": "/tmp/talos-tui-perf-claim/crates/talos-tui/examples/tui_perf_replay.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "3",
+      "debuginfo": 1,
+      "debug_assertions": false,
+      "overflow_checks": false,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/home/wjhuang/WorkSpace/personal/talos/target/release/examples/tui_perf_replay"
+    ],
+    "executable": "/home/wjhuang/WorkSpace/personal/talos/target/release/examples/tui_perf_replay",
+    "fresh": false
+  },
+  "library_artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///tmp/talos-tui-perf-claim/crates/talos-tui#0.10.1",
+    "manifest_path": "/tmp/talos-tui-perf-claim/crates/talos-tui/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "talos_tui",
+      "src_path": "/tmp/talos-tui-perf-claim/crates/talos-tui/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "3",
+      "debuginfo": 1,
+      "debug_assertions": false,
+      "overflow_checks": false,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/home/wjhuang/WorkSpace/personal/talos/target/release/deps/libtalos_tui-d8867f5902fb4864.rlib",
+      "/home/wjhuang/WorkSpace/personal/talos/target/release/deps/libtalos_tui-d8867f5902fb4864.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  "profile": "release-with-symbols",
+  "release_environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_STRIP": "false"
+  },
+  "command": "cargo build --locked -p talos-tui --example tui_perf_replay --release --message-format=json",
+  "debug_info_verified": true,
+  "animation_stage_string_verified": true,
+  "threshold_counter_runtime_validation": "pending; literal byte search absent in optimized binary is not a runtime schema check"
+}
