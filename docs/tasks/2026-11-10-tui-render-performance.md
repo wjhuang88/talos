@@ -1270,3 +1270,22 @@ The earlier plugin timeout remains retained evidence, not a claimed product fix.
 This satisfies the current local workspace gate; do not repeat it solely for
 status prose. Remaining performance/native/remote requirements in the delivery
 convergence table still apply. No validation process remains live.
+
+### Current-source guarded Debug result
+
+Archive `evidence/tui-perf-001/p4-debug-guarded/` binds source57603793 and its
+Debug binary. Six serial transcript/resize runs completed normally; no other
+heavy task ran. Transcript input P99 upper worst9.295705ms fits Debug budget.
+Resize round1 P99 upper202.267295ms exceeds200ms; round2 P95 upper176.078983ms
+exceeds150ms. Retain failures; CPU-capped candidate-only data cannot isolate a
+runtime regression from scheduling. Debug follow-up is measured but resize
+acceptance remains unproven. Do not rerun until a specific diagnostic question
+and comparable conditions are established. Growth/resize heap proof, native
+terminals and remote delivery still remain. No live processes at checkpoint.
+
+Existing-data resize attribution narrows the issue to full-width history reflow:
+about97% of nested draw wall time is history rebuild, versus0.07–0.11ms layout
+per round. `p4-debug-guarded/resize-attribution.json` records the calculation.
+This is wall-time attribution, not evidence separating scheduling from CPU.
+Keep width reflow correctness and existing oracles; further work should target
+that path rather than unrelated animation/Git scheduling. No new run was needed.

@@ -1,0 +1,26 @@
+[
+  {
+    "round": 1,
+    "draw_ms": 4168.540785,
+    "history_rebuild_ms": 4043.59988,
+    "history_wall_fraction": 0.9700276640090496,
+    "layout_ms": 0.072057,
+    "history_rebuild_count": 58
+  },
+  {
+    "round": 2,
+    "draw_ms": 7687.392291,
+    "history_rebuild_ms": 7513.015227,
+    "history_wall_fraction": 0.9773164868658841,
+    "layout_ms": 0.108679,
+    "history_rebuild_count": 58
+  },
+  {
+    "round": 3,
+    "draw_ms": 4219.937537,
+    "history_rebuild_ms": 4073.516721,
+    "history_wall_fraction": 0.965302610591698,
+    "layout_ms": 0.10111,
+    "history_rebuild_count": 58
+  }
+]
