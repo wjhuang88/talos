@@ -209,9 +209,13 @@ async fn query_protocol(
     Err(SearchBackendError::NoResults)
 }
 
+// Bound both compressed wire bytes and decompressed output in the historical
+// standalone Tool. The protected SearchRouter has its own body-budget policy.
+const MAX_LEGACY_BODY_BYTES: usize = 8 * 1024 * 1024;
+
 // Reject non-success status at header time; never buffer a stalled or large
 // 403/429/503 body before falling back to the next fixed search destination.
-async fn successful_body(response: reqwest::Response) -> Result<Vec<u8>, SearchBackendError> {
+async fn successful_body(mut response: reqwest::Response) -> Result<Vec<u8>, SearchBackendError> {
     let status = response.status();
     if !status.is_success() {
         return Err(SearchBackendError::HttpStatus(status.as_u16()));
@@ -223,17 +227,33 @@ async fn successful_body(response: reqwest::Response) -> Result<Vec<u8>, SearchB
         .unwrap_or_default()
         .trim()
         .to_ascii_lowercase();
-    let wire = response
-        .bytes()
+    // Reject an advertised oversize body before allocating or reading it.
+    // Chunked/no-Content-Length transfers are independently bounded below.
+    if response
+        .content_length()
+        .is_some_and(|len| len > MAX_LEGACY_BODY_BYTES as u64)
+    {
+        return Err(SearchBackendError::Parse);
+    }
+    let mut wire = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
         .await
-        .map_err(|_| SearchBackendError::Parse)?;
+        .map_err(|_| SearchBackendError::Parse)?
+    {
+        // Do not append an oversized chunk: even a compressed bomb must
+        // never make the raw wire buffer grow without bound.
+        if chunk.len() > MAX_LEGACY_BODY_BYTES - wire.len() {
+            return Err(SearchBackendError::Parse);
+        }
+        wire.extend_from_slice(&chunk);
+    }
     decode_legacy_content(&encoding, &wire)
 }
 
 // Decode ONLY this historical Tool's response bytes. Never enable reqwest's
 // shared gzip/br/deflate feature flags, which would change SearchRouter.
 fn decode_legacy_content(encoding: &str, body: &[u8]) -> Result<Vec<u8>, SearchBackendError> {
-    const MAX_DECOMPRESSED_BYTES: u64 = 8 * 1024 * 1024;
     let reader: Box<dyn Read + '_> = match encoding {
         "gzip" => Box::new(flate2::read::GzDecoder::new(body)),
         "deflate" => Box::new(flate2::read::ZlibDecoder::new(body)),
@@ -244,10 +264,10 @@ fn decode_legacy_content(encoding: &str, body: &[u8]) -> Result<Vec<u8>, SearchB
     };
     let mut decoded = Vec::new();
     reader
-        .take(MAX_DECOMPRESSED_BYTES + 1)
+        .take(MAX_LEGACY_BODY_BYTES as u64 + 1)
         .read_to_end(&mut decoded)
         .map_err(|_| SearchBackendError::Parse)?;
-    if decoded.len() as u64 > MAX_DECOMPRESSED_BYTES {
+    if decoded.len() > MAX_LEGACY_BODY_BYTES {
         return Err(SearchBackendError::Parse);
     }
     Ok(decoded)
@@ -520,6 +540,100 @@ mod tests {
             assert_eq!(decoded, b"legacy compressed fixture", "{encoding}");
             server.join().expect("fixture thread");
         }
+    }
+
+    // Chunked fixtures intentionally omit Content-Length so the streaming
+    // limit is tested independently of the early advertised-length guard.
+    fn spawn_chunked_body_fixture(
+        encoding: Option<&'static str>,
+        body: Vec<u8>,
+    ) -> (String, std::thread::JoinHandle<()>) {
+        use std::io::{Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("chunked fixture");
+        let url = format!("http://{}", listener.local_addr().expect("fixture address"));
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("fixture accept");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(10)))
+                .expect("fixture timeout");
+            let mut request = [0_u8; 2048];
+            let _ = stream.read(&mut request);
+            let content_encoding = encoding
+                .map(|value| format!("Content-Encoding: {value}\r\n"))
+                .unwrap_or_default();
+            let headers = format!(
+                "HTTP/1.1 200 OK\r\n{content_encoding}Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+            );
+            stream.write_all(headers.as_bytes()).expect("fixture headers");
+            for chunk in body.chunks(64 * 1024) {
+                // The client is expected to abort reading an oversized body;
+                // a broken pipe during that rejection is not a fixture error.
+                let framed = format!("{:x}\r\n", chunk.len());
+                if stream.write_all(framed.as_bytes()).is_err()
+                    || stream.write_all(chunk).is_err()
+                    || stream.write_all(b"\r\n").is_err()
+                {
+                    return;
+                }
+            }
+            let _ = stream.write_all(b"0\r\n\r\n");
+        });
+        (url, server)
+    }
+
+    #[tokio::test]
+    async fn oversized_wire_body_is_rejected_without_content_length() {
+        use std::io::Write;
+        let raw = vec![b'A'; MAX_LEGACY_BODY_BYTES + 4096];
+        let mut encoder =
+            flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::none());
+        encoder.write_all(&raw).expect("gzip wire fixture");
+        let compressed_wire = encoder.finish().expect("gzip wire finished");
+        assert!(
+            compressed_wire.len() > MAX_LEGACY_BODY_BYTES,
+            "the test must exercise the compressed wire byte cap"
+        );
+
+        for (encoding, body) in [(None, raw), (Some("gzip"), compressed_wire)] {
+            let (url, server) = spawn_chunked_body_fixture(encoding, body);
+            let http = client(&LegacyConfig::default(), Duration::from_secs(15), 0)
+                .expect("bounded legacy client");
+            let response = http.get(url).send().await.expect("chunked response headers");
+            let result = tokio::time::timeout(Duration::from_secs(15), successful_body(response))
+                .await
+                .expect("oversize wire body rejection must be bounded");
+            assert!(
+                matches!(result, Err(SearchBackendError::Parse)),
+                "oversize wire body should fail closed for {encoding:?}: {result:?}"
+            );
+            server.join().expect("chunked fixture thread");
+        }
+    }
+
+    #[tokio::test]
+    async fn small_compressed_wire_with_oversized_decoded_body_is_rejected() {
+        use std::io::Write;
+        let mut encoder =
+            flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        encoder
+            .write_all(&vec![b'A'; MAX_LEGACY_BODY_BYTES + 4096])
+            .expect("compressible bomb fixture");
+        let compressed_wire = encoder.finish().expect("gzip bomb finished");
+        assert!(compressed_wire.len() < MAX_LEGACY_BODY_BYTES);
+
+        let (url, server) = spawn_chunked_body_fixture(Some("gzip"), compressed_wire);
+        let http = client(&LegacyConfig::default(), Duration::from_secs(15), 0)
+            .expect("bounded legacy client");
+        let response = http.get(url).send().await.expect("compressed response headers");
+        let result = tokio::time::timeout(Duration::from_secs(15), successful_body(response))
+            .await
+            .expect("bounded decompression");
+        assert!(
+            matches!(result, Err(SearchBackendError::Parse)),
+            "decompressed output must be bounded: {result:?}"
+        );
+        server.join().expect("chunked fixture thread");
     }
 
     #[test]
