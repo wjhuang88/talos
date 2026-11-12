@@ -1241,3 +1241,16 @@ this is not an immutable exact-binary reproduction of the original failure.
 No runtime timeout, permission rule or assertion was relaxed. Failure is retained
 as an unreproduced timeout, not declared fixed; full workspace gate remains open.
 All three service handles are terminal; attempted stops arrived after completion.
+
+### Service locale correction
+
+Full preflight on `43305a58` exited101 after8min13.525s. Tools1146/1147 passed;
+`hasconfig_non_path_key_still_triggers_url_prohibition` expected English Git
+stderr while the user service manager supplied `LANG=zh_CN.utf8`. A minimal
+native Git2.56.0 reproduction rejected the same config in both languages, but
+Chinese diagnostics did not contain the English assertion substring.
+The exact existing tools test executable passed the failing test1/1 with
+`LC_ALL=C LANG=C` under the unchanged resource limits (46ms, peak4.9M, swap0).
+No product behavior or test assertion changed. LOCAL-DEV now pins diagnostic
+locale in its guarded command example. A full rerun is in progress; this focused
+result does not complete the workspace gate.

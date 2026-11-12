@@ -4,25 +4,25 @@ This is a derived evidence checklist. The owner remains
 [`2026-11-10-tui-render-performance.md`](../../2026-11-10-tui-render-performance.md).
 No row below closes that owner or substitutes for missing platform evidence.
 Measured runtime source: `539adfd2`; candidate build receipt: `candidate-build/receipt.json`.
-Current source: `df7411d2` on main `55617ad7`; old measurements are not
-new-baseline acceptance. Six rebased patches are unchanged according to range-diff.
+Current implementation source: `43305a58` on base `6c81390a`. Each archive retains
+its own source receipt; earlier measurements do not automatically cover later changes.
 
 | Requirement | Current evidence | Remaining verification |
 |---|---|---|
-| P0 reproducible debug/release baseline | Baseline archives, SHA receipts, six scenarios × three histories × three rounds | Allocation volume and terminal emulator resources; release switch baseline now source-bound in switch-release-df7411d2 |
+| P0 reproducible debug/release baseline | Baseline archives, SHA receipts, six scenarios × three histories × three rounds | Allocation profiles now archived for animation, transcript and P4; terminal emulator resources remain missing |
 | Idle does not poll rendering | Paused-clock minute-idle loop test; release paired matrix passes zero steady frame checks across three rounds | Release and Debug metrics-off CPU/PSS passed; native terminal pending |
-| Visible animation only | Tiny-window hide/restore test; release matrix passes zero layout/history rebuild and deadline P99 budget | Changed-cell/ANSI coverage |
+| Visible animation only | Tiny-window hide/restore test; release matrix passes zero layout/history rebuild and deadline P99 budget | Changed-cell bounds and shared-submission ANSI oracle passed; native display pending |
 | Tip/reconnect/drag deadlines | Actual-loop paused-clock tests; drag stops after release | Native terminal behavior |
 | Ordered output and cancellation | 1000-delta actual-loop test retains every token and submits final token; cancellation and <=4 draws | High-rate candidate Debug absolute input and Release paired gates pass; native cancellation remains separate |
 | Async Git ownership | Controlled blocked worker crosses timeout and workspace switch; input/Exit responsive; global slot survives observer drop | Git fixture and Debug/Release switch matrices pass; new local actual-loop tests cover external clean/dirty/clean publication and successful obsolete scan suppression |
 | Git unknown/freshness | Per-session snapshot tests, exact expiry, unchanged refresh, worker completion timestamp | Frame-weighted age distributions recorded for clean/large fixtures; external-change freshness and native status display remain |
-| Cache correctness | Full-plan preview oracle and 28-step full-cell/style/cursor comparison; width/revision tests | Native terminal/ANSI equivalence; inspect remaining static preparation after measurements |
-| P4 decision | Baseline resize dominated by width reflow; stream fixture has few transcript commits | Candidate comparison and repeated transcript-commit evidence before deciding |
-| Bounded memory | Single-entry caches and one actual scan slot by construction | Long repeated replay/PSS stability; allocation evidence |
+| Cache correctness | Full-plan preview oracle and 28-step full-cell/style/cursor comparison; width/revision tests | ANSI equivalence and static preparation audit recorded in owner; native terminal remains |
+| P4 decision | Repeated transcript commits identified full projection hotspot; P4 implemented in `cabc7a37`, Release comparison archived | P4 Debug follow-up and final-source acceptance remain |
+| Bounded memory | Single-entry caches, fixed-history125s×3 PSS, P4 allocation profiles,128-cycle obsolete-snapshot lifetime test | Growing-history/resize heap stability; finite PSS and ownership checks are not leak proofs |
 | Input latency | Release and corrected Debug paired probes: 36 cases each; all P95/P99 budgets passed | 200Hz output/50ms input: candidate Debug and paired Release budgets pass; Debug baseline timed out; native visible-pixel acceptance remains |
-| Build and tests | Full locked preflight passed after local behavior-oracle additions; 677 TUI unit tests, integration/doc tests; xwin MSVC tests/examples passed | Fresh exact-head CI and prescribed independent review |
+| Build and tests | Earlier preflight passed; current TUI682+2+2 plus lifecycle test1/1 and xwin passed; subsequent full gate hit250ms plugin timeout | Current full preflight running; exact-head CI and independent review pending |
 | Native platforms | User reports no available Windows environment | Linux Wayland+niri+Ghostty, another supported terminal, native Windows; unavailable stays Review |
-| Delivery | Rebased P1 `9065db99`, P2 `3835fbd4`, P3 `5b25d891`; diagnostics `df7411d2` | Final evidence/doc commits, stable candidate push/PR, review, owner/Board synchronization |
+| Delivery | Local candidate through `43305a58`; owner convergence table records current gaps | Final evidence/doc commits, stable candidate push/PR, review, owner/Board synchronization |
 
 The paired release experiment completed all 108 cases; validated reports are in
 `release-paired/`. The equivalent debug matrix completed but failed its stable-animation gate;

@@ -64,6 +64,7 @@ systemd-run --user --wait --pipe --collect \
   -p MemorySwapMax=0 -p TasksMax=128 -p Nice=10 \
   --working-directory="$PWD" \
   --setenv=CARGO_BUILD_JOBS=1 --setenv=RUST_TEST_THREADS=1 \
+  --setenv=LC_ALL=C --setenv=LANG=C \
   /usr/bin/cargo test --locked -p talos-tui
 ```
 
@@ -80,6 +81,9 @@ if it degrades interactive use; a memory cap alone does not prove low impact.
 After an intentional stop, require the command's completion marker and test
 summary before recording a pass. `systemd-run --wait` or service `Result=success`
 can report success for a service terminated by the requested SIGTERM.
+The user service manager can inherit a different locale from the invoking
+shell. Pin diagnostic locale as above for tests that compare host-tool messages;
+this does not replace separate localized UI acceptance.
 
 ## Windows Cross-Compilation From macOS/Linux
 
