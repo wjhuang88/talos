@@ -818,6 +818,18 @@ stores keep their own encoding and write behavior. This prevents re-encoding fro
 creating conflicting IDs between retained records and archives, but does not yet
 provide archive/head/receipt crash recovery or trusted discovery after `keep0`.
 
+Archive publication writes a create-new temporary sibling, syncs its contents, then
+publishes the final archive name with a no-overwrite hard link before replacing
+the head. On Unix the containing directory is synced after publication. Existing
+archive destinations are never replaced. Soft compatibility constraint: the
+archive filesystem must support hard links; otherwise compaction fails while the
+original head remains intact. Replacement trigger: a reviewed portable no-replace
+publication primitive with equivalent durability tests. Windows currently has
+file-content sync but no proven directory durability. Failure can leave a temporary
+alias or complete archive for recovery; this is not an archive/head/receipt crash
+recovery protocol or completion of archived-fork support.
+
+
 ### Unreleased Gemini invocation migration (I310 / ADR-094)
 
 The next pre-1.0 minor adds `GoogleGemini` protocol variants and optional

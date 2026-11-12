@@ -1093,3 +1093,25 @@ Compaction increment MSVC all-feature tests compilation73414 exited0. Standard
 full locked preflight84691 exited0 (`/tmp/talos-compaction-raw-preflight.log`).
 Staged source and SDK diff reviewed. Scope remains raw retained-record preservation
 and atomic head publication; trusted archive/receipt lifecycle is still outstanding.
+
+## Archive no-overwrite publication increment (Partial)
+
+Archive publication now stages and syncs complete bytes before hard-linking a final
+name, refusing existing destinations. Unix syncs the directory before head
+replacement. Soft constraint: hard-link support in the archive filesystem; an
+unsupported filesystem fails before head replacement. Replace this dependency only
+with a reviewed no-replace publication primitive and equivalent durability tests.
+Windows directory durability remains unproven. Failure may retain temporary aliases
+or complete archives; no cleanup of session evidence is attempted. This increment
+does not implement receipt/locator intent recovery or complete archived forks.
+Real raw and zstd tests cover existing-destination preservation and fresh exact-byte
+publication. Focused all-feature tests and MSVC compilation passed; full preflight
+is pending. No deployment or completion claim.
+
+Validation update: standard full preflight exited 0, including locked workspace
+check, Clippy, tests and external SDK fixtures; log
+`/tmp/talos-archive-publication-preflight.log`. Read-only independent re-review found
+no new blocker after compressed coverage and limitation documentation. The seven
+all-feature compaction tests passed (`/tmp/talos-archive-publication-compressed.log`).
+MSVC compilation is not native Windows publication execution evidence; that gate
+remains pending. No receipt/locator/fork completion is claimed.

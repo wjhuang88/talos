@@ -9,6 +9,7 @@ use crate::compression::ZstdCompressor;
 use crate::segment_chain::{ChainMetadata, SegmentMeta, SegmentStatus, chain_path};
 use crate::store::SessionStore;
 use crate::{SessionEntry, SessionError};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -126,13 +127,33 @@ impl CompactionEngine {
             .compressor
             .compress(&raw)
             .map_err(|e| SessionError::ParseError(e.to_string()))?;
-        if self.compressor.format_tag() == "none" {
-            std::fs::write(archive_path, &raw)?;
-            Ok(archive_path.to_path_buf())
+        let (destination, bytes) = if self.compressor.format_tag() == "none" {
+            (archive_path, &raw)
         } else {
-            std::fs::write(compressed_path, &compressed)?;
-            Ok(compressed_path.to_path_buf())
-        }
+            (compressed_path, &compressed)
+        };
+        // Only complete, synced bytes receive a discoverable archive name.
+        // Hard-link publication is create-new: never replace an existing archive
+        // (or a symlink at its path). Unsupported filesystems fail before head
+        // replacement, leaving the original transcript intact.
+        let temporary = crate::store::temporary_sibling(destination);
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::hard_link(&temporary, destination)?;
+        #[cfg(unix)]
+        std::fs::File::open(
+            destination
+                .parent()
+                .ok_or_else(|| SessionError::ParseError("archive directory missing".into()))?,
+        )?
+        .sync_all()?;
+        std::fs::remove_file(&temporary)?;
+        Ok(destination.to_path_buf())
     }
 
     fn apply_rules(&self, entries: &[SessionEntry], keep_recent: usize) -> Vec<SessionEntry> {
@@ -229,6 +250,59 @@ pub enum CompactionResult {
 mod tests {
     use super::*;
     use crate::{CompactTextSessionStore, SessionStore};
+
+    #[test]
+    #[cfg(feature = "archive-compress-zstd")]
+    fn compressed_archive_publication_preserves_existing_destination() {
+        let root = tempfile::tempdir().expect("root");
+        let head = root.path().join("head.tlog");
+        let archive = root.path().join("s-test.tlog");
+        let compressed = root.path().join("s-test.tlog.zst");
+        std::fs::write(&head, b"original compressed source").expect("head");
+        std::fs::write(&compressed, b"existing archive").expect("destination");
+        let engine = CompactionEngine::new(Arc::new(CompactTextSessionStore));
+        assert!(engine.archive_head(&head, &archive, &compressed).is_err());
+        assert_eq!(
+            std::fs::read(&compressed).expect("preserved"),
+            b"existing archive"
+        );
+        let fresh = root.path().join("s-fresh.tlog.zst");
+        engine
+            .archive_head(&head, &archive, &fresh)
+            .expect("publish");
+        let bytes = std::fs::read(fresh).expect("compressed bytes");
+        assert_eq!(
+            engine.compressor.decompress(&bytes).expect("decode"),
+            b"original compressed source"
+        );
+        assert_eq!(
+            std::fs::read(head).expect("source"),
+            b"original compressed source"
+        );
+    }
+
+    #[test]
+    fn archive_publication_never_overwrites_existing_destination() {
+        let root = tempfile::tempdir().expect("root");
+        let head = root.path().join("head.tlog");
+        let archive = root.path().join("s-existing.tlog");
+        let compressed = root.path().join("s-existing.tlog.zst");
+        std::fs::write(&head, b"original source").expect("head");
+        std::fs::write(&archive, b"existing archive").expect("archive");
+        let engine = CompactionEngine::new(Arc::new(CompactTextSessionStore))
+            .with_compressor(Box::new(crate::compression::NoCompressor));
+        assert!(engine.archive_head(&head, &archive, &compressed).is_err());
+        assert_eq!(
+            std::fs::read(&archive).expect("preserved"),
+            b"existing archive"
+        );
+        assert_eq!(std::fs::read(&head).expect("source"), b"original source");
+        let fresh = root.path().join("s-fresh.tlog");
+        engine
+            .archive_head(&head, &fresh, &compressed)
+            .expect("publish");
+        assert_eq!(std::fs::read(fresh).expect("published"), b"original source");
+    }
 
     #[derive(Debug)]
     struct CustomTlogExtensionStore(crate::JsonlSessionStore);
