@@ -1359,3 +1359,18 @@ review. At the next resource check, host I/O PSI remained high (some avg10 89.81
 full avg10 81.19); compilation was not restarted. The derived acceptance tracker
 now explicitly separates the old passing implementation from this unvalidated
 fix and records the P4 Debug resize budget misses.
+
+### Input exit regression passed (2026-11-12)
+
+Source `18965ba2` strengthens key-exit isolation: input stays open after Ctrl+C,
+so EOF cannot rescue a broken key path; a 100 ms paused-clock timeout guards
+liveness. The guarded focused command above then completed normally with exit 0:
+`app::app_tests::input_exit_submits_coalesced_content_before_restore` passed,
+covering all four ordered/legacy × EOF/key cases in 0.02 s (683 TUI tests filtered).
+Total service runtime 3m53.166s, CPU 2m26.339s, peak 2 GiB, swap 0. Compilation
+also rebuilt provider/MCP library test targets despite the name filter. Memory
+high events rose from 9927 to 55773; a stop was requested, but the service had
+already completed normally before it arrived. This result proves the focused
+regression only, not the full workspace suite or final performance budgets.
+No immediate repeat is needed. Keep the stable-batch full gate and MSVC checks
+outstanding for changed code; native acceptance and resize/heap gaps remain.
