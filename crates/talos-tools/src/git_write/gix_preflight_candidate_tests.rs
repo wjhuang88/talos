@@ -7,7 +7,7 @@
 use super::target_config;
 use gix::bstr::ByteSlice;
 use std::collections::BTreeMap;
-use std::ffi::{OsString};
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 #[test]
@@ -22,7 +22,14 @@ fn gix_branch_name_validation_requires_no_git_child() {
         );
     }
 
-    for name in ["", "topic..bad", "topic.lock", "bad name", "topic/", "topic@{bad"] {
+    for name in [
+        "",
+        "topic..bad",
+        "topic.lock",
+        "bad name",
+        "topic/",
+        "topic@{bad",
+    ] {
         assert!(
             gix::validate::reference::branch_name(name.as_bytes().as_bstr()).is_err(),
             "unsupported branch must not be admitted: {name}"
@@ -43,7 +50,10 @@ fn gix_config_include_frontier_is_lexical_and_preserves_missing_files() {
     assert!(parsed.iter().any(|record| record.key == b"include.path"));
     let named = target_config::declared_paths(bytes, &origin, &environment, None)
         .expect("pure gix-backed include path analysis");
-    assert_eq!(named, vec![origin.parent().expect("parent").join("never-created.conf")]);
+    assert_eq!(
+        named,
+        vec![origin.parent().expect("parent").join("never-created.conf")]
+    );
 }
 
 #[test]
@@ -56,7 +66,10 @@ fn staged_config_roots_start_as_path_only_requests() {
     let missing_global = root.join("global-config");
     let roots = [missing_system.clone(), missing_global.clone()];
     let sources = target_config::Sources::new(None, roots).expect("path-only source registration");
-    assert!(!sources.complete(), "unread/absent candidates must not be silently elided");
+    assert!(
+        !sources.complete(),
+        "unread/absent candidates must not be silently elided"
+    );
     let requests = sources.paths();
     assert!(requests.contains(&missing_system));
     assert!(requests.contains(&missing_global));
