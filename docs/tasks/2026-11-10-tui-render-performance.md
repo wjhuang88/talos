@@ -3,6 +3,7 @@
 > Document status: Active / Claimed (proposed in #910; ineffective until target-branch merge)
 > Created: 2026-11-10
 > Owner: 本文；Board 仅为派生入口。
+> Acceptance follow-up Issue: #923 (existing Review owner; status and original Source Issue unchanged).
 > 本轮交付为开发任务及实施指导。运行时代码尚未修改，性能收益尚未验证。
 
 ## 1. 目标与交付边界
