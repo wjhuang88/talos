@@ -14,6 +14,11 @@ const MAX_FILES: usize = 256;
 const MAX_BYTES: usize = 64 * 1024 * 1024;
 const MAX_ENTRIES: usize = 100_000;
 
+#[cfg(test)]
+thread_local! {
+    static VALIDATION_FINISH_OBSERVER: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+}
+
 /// Original records joined by exact identity/content overlap and unique order.
 /// Parent IDs are preserved, including legacy writer defects. This evidence is
 /// not a valid linear transcript and must not be passed off as a checkpoint.
@@ -107,6 +112,7 @@ impl ArchiveRecoveryEvidence {
         deadline: Instant,
         stopped: &impl Fn() -> bool,
     ) -> Result<(), SessionError> {
+        let versions: Vec<_> = versions.collect();
         let head = self
             .versions
             .first()
@@ -136,7 +142,7 @@ impl ArchiveRecoveryEvidence {
         let mut leases = Vec::new();
         #[cfg(windows)]
         let mut remaining = MAX_BYTES;
-        for (path, expected) in versions {
+        for (path, expected) in &versions {
             check(deadline, stopped)?;
             let file =
                 crate::history_page::open_source(path).map_err(|e| invalid(&e.to_string()))?;
@@ -176,7 +182,12 @@ impl ArchiveRecoveryEvidence {
                 leases.push(stamp);
             }
         }
-        #[cfg(windows)]
+        #[cfg(test)]
+        VALIDATION_FINISH_OBSERVER.with(|observer| {
+            if let Some(observer) = observer.borrow_mut().take() {
+                observer();
+            }
+        });
         {
             let mut remaining_paths: BTreeSet<_> =
                 self.versions.iter().map(|(path, _)| path.clone()).collect();
@@ -192,6 +203,25 @@ impl ArchiveRecoveryEvidence {
             }
             if !remaining_paths.is_empty() {
                 return Err(invalid("source inventory changed"));
+            }
+        }
+        // An open handle stabilizes its object, not necessarily its pathname:
+        // atomic replacement can publish another object at the same name.
+        // Rebind every checked path after all source reads and inventory checks.
+        for (path, expected) in versions {
+            check(deadline, stopped)?;
+            let file =
+                crate::history_page::open_source(path).map_err(|e| invalid(&e.to_string()))?;
+            let current =
+                crate::recovery_stamp::from_file(&file).map_err(|e| invalid(&e.to_string()))?;
+            #[cfg(not(windows))]
+            let unchanged = crate::recovery_seal::same_file_version(&expected.stamp, &current)
+                .map_err(|e| invalid(&e.to_string()))?;
+            #[cfg(windows)]
+            let unchanged =
+                crate::recovery_stamp::StoredFileVersion::from(&current) == expected.stamp;
+            if !unchanged {
+                return Err(invalid("source changed before restoration"));
             }
         }
         check(deadline, stopped)?;
@@ -673,6 +703,42 @@ mod tests {
             .collect();
         assert!(messages.iter().any(|(_, message)| matches!(message, Message::Tool { result } if result.tool_use_id == "boundary-call" && result.content == "boundary result")));
         assert_eq!(reopened.snapshot_bytes().expect("after"), before);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn atomic_archive_replacement_during_validation_revokes_evidence() {
+        let (_root, _manager, session) = fixture();
+        append_users(&session, 0, 205);
+        session.compact_archived(50).expect("archive");
+        let evidence = inspect(&session).expect("prepared recovery");
+        let archive = evidence
+            .sources
+            .iter()
+            .find(|source| source.path != session.file_path)
+            .expect("selected archive")
+            .path
+            .clone();
+        let bytes = std::fs::read(&archive).expect("original bytes");
+        let replacement = archive.with_extension("replacement");
+        std::fs::write(&replacement, &bytes).expect("replacement bytes");
+        VALIDATION_FINISH_OBSERVER.with(|observer| {
+            *observer.borrow_mut() = Some(Box::new(move || {
+                // Identical contents do not preserve the captured file identity.
+                // The replacement occurs after source reads, before publication.
+                std::fs::rename(replacement, archive).expect("atomic replacement");
+            }));
+        });
+        assert!(
+            evidence
+                .check_supporting_sources(Instant::now() + Duration::from_secs(5))
+                .is_err(),
+            "a replaced source must revoke the captured evidence"
+        );
+        assert_eq!(
+            inspect(&session).expect("fresh recovery").entries().len(),
+            205
+        );
     }
 
     #[test]

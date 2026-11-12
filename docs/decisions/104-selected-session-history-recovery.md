@@ -198,3 +198,35 @@ do not certify the kernel's rename return behavior.
 Source revalidation now carries one deadline through archive supporting-source
 checks, prefix reads, query reads and final availability checks within each query
 or availability operation. Expiry cannot silently start another two-second phase.
+
+### Atomic publication acquisition and final path binding
+
+Native Windows run 43141073000 at 32e4d227 returned OS code 5 from the
+held-lease durable publication regression. Sharing-only rename retry therefore
+cannot coordinate this operation. Built-in atomic TLOG/JSONL publication now
+acquires an existing target's write handle without creating, truncating or writing
+it, under the same bounded sharing-conflict retry. It rejects final reparse points,
+nonregular objects and nonlocal storage. Default delete sharing lets publication
+retain this handle through rename and excludes newly acquired recovery leases.
+If a target appears after an initial NotFound, a failed access-denied rename may
+retry only after acquiring that target, within the original retry deadline.
+General AccessDenied errors are not made transient; transactions and byte writes
+are never replayed. Host single-writer ownership remains required.
+
+Soft compatibility restriction: on Windows, replacing an existing transcript now
+requires write access to that file even when directory delete/replace permissions
+alone would have permitted rename. Readonly/write-denied targets fail conservatively
+with their original bytes and unpublished temporary retained. This restriction avoids
+new unsafe Windows publication code and broad permission-error retries. A future
+reviewed native publication primitive may replace it if directory-only replacement
+must be supported. Native held-lease acquisition, publication, readonly refusal and
+durable reopen/idempotency regressions are required; MSVC compilation alone is not
+native acceptance.
+
+Archive validation also rechecks inventory and each selected path's captured file
+version after all source reads. A Unix real-compaction regression first demonstrated
+that identical-byte atomic replacement in that window incorrectly retained evidence;
+it now revokes it. Supporting-source checks still exclude the selected head's version,
+which remains protected by its original prefix seal. This is not a multi-file atomic
+snapshot or a guarantee against changes after return: ownership and disclosure
+before/after checks remain mandatory. All checks share the caller's deadline.
