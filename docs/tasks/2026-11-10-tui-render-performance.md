@@ -1374,3 +1374,16 @@ already completed normally before it arrived. This result proves the focused
 regression only, not the full workspace suite or final performance budgets.
 No immediate repeat is needed. Keep the stable-batch full gate and MSVC checks
 outstanding for changed code; native acceptance and resize/heap gaps remain.
+
+### Resize diagnosis with resource counters (2026-11-12)
+
+Sampler `8994abc7` adds opt-in leaf cgroup-v2 observations with unavailable-data
+handling; three fixture tests and two PTY probe tests passed. Developer usage,
+overhead, path privacy and attribution limits are documented in LOCAL-DEV.
+A single existing-binary run is archived in `resize-cgroup-diagnostic/`: Debug
+source57603793, normal exit0,37.953s runtime,5.221s CPU,424.7MiB peak/no swap.
+No sampled leaf throttling, memory-high events or I/O pressure increase; maximum
+input-to-submit82.538561ms. The earlier150/200ms misses were not reproduced in
+this same binary. This does not identify their cause or satisfy final-source,
+repeated-round acceptance. Preserve previous failures; no speculative additional
+runtime optimization is justified by this observation alone.

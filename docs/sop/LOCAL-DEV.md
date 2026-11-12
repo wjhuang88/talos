@@ -212,7 +212,14 @@ by default, so setting debug information alone is insufficient.
 `--scenarios workspace-switch --workspace /fixture/one --alternate-workspace
 /fixture/two` alternates the displayed workspace every second. Its metrics must
 contain actual `workspace_change` events; sending status updates alone is not
-acceptance evidence. `--process-tree` optionally records bounded live process-tree
+acceptance evidence. `--cgroup` optionally records leaf cgroup-v2 CPU throttling,
+CPU/memory/I/O pressure and memory events at each sample. Both the sampler and
+matrix runner accept it; default is off. It adds procfs/cgroup reads and includes
+the local cgroup path in the report, so review paths before sharing. Missing
+observations are marked unavailable. Counters cover the whole leaf group, not
+individual frames; ancestor limits are not captured. Use matching options for
+baseline/candidate and do not infer causality from coincident pressure alone.
+`--process-tree` optionally records bounded live process-tree
 snapshots (up to 256 processes), gathering children from every live thread and
 identifying processes by PID and start ticks. Missing/racing reads and truncation
 are explicit. This adds sampler overhead and must be identical on both sides of
