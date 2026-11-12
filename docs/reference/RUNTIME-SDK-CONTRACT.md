@@ -810,6 +810,14 @@ history page remain supported. This currently adds one full raw-transcript buffe
 alongside decoded history and does not establish a total memory bound. It does not
 implement archived-fork receipts or their migration through compaction.
 
+`SessionStore::replace_with_retained_suffix` is an additive extension point with
+a default implementation using the store's own atomic replacement. Built-in TLOG
+compaction overrides it to preserve retained record bytes and atomically publish
+the new head. A `.tlog` extension alone does not select that implementation; custom
+stores keep their own encoding and write behavior. This prevents re-encoding from
+creating conflicting IDs between retained records and archives, but does not yet
+provide archive/head/receipt crash recovery or trusted discovery after `keep0`.
+
 ### Unreleased Gemini invocation migration (I310 / ADR-094)
 
 The next pre-1.0 minor adds `GoogleGemini` protocol variants and optional

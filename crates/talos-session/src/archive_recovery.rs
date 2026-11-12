@@ -788,6 +788,31 @@ mod tests {
     }
 
     #[test]
+    fn compaction_preserves_noncanonical_retained_record_bytes() {
+        let (_root, _manager, session) = fixture();
+        append_users(&session, 0, 205);
+        let original = std::fs::read_to_string(&session.file_path).expect("original");
+        let altered = original.replace("\t2:{}\n", "\t3:{ }\n");
+        assert_ne!(original, altered);
+        std::fs::write(&session.file_path, &altered).expect("legacy encoding");
+        session.compact_archived(50).expect("real compaction");
+        let evidence = inspect(&session).expect("raw overlap remains valid");
+        assert_eq!(evidence.entries().len(), 205);
+        assert!(
+            evidence
+                .raw_records
+                .iter()
+                .all(|raw| raw.ends_with(b"\t3:{ }\n"))
+        );
+        append_users(&session, 205, 210);
+        session.compact_archived(50).expect("repeat compaction");
+        assert_eq!(
+            inspect(&session).expect("repeated overlap").entries().len(),
+            210
+        );
+    }
+
+    #[test]
     fn fork_preparation_preserves_original_encoding_and_inclusive_archived_cutoff() {
         let (_root, _manager, session) = fixture();
         append_users(&session, 0, 205);

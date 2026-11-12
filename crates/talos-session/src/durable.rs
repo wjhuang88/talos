@@ -1552,9 +1552,11 @@ impl DurableSession {
             .last_entry_id
             .lock()
             .map_err(|_| SessionError::LockPoisoned)?;
-        crate::compact_text::append_entries_atomically(
+        crate::compact_text::rewrite_preserving_records(
             &self.session.file_path,
             &existing[..entry_start],
+            0,
+            &[],
             &existing[entry_start..],
         )?;
         *tip = existing.last().map(|entry| entry.id.clone());
