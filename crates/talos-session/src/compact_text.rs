@@ -109,7 +109,7 @@ impl crate::store::SessionStore for CompactTextSessionStore {
         }
         file.sync_all()?;
         drop(file);
-        crate::store::retry_sharing_conflict(|| fs::rename(&temporary, file_path))?;
+        crate::store::publish_atomic_file(&temporary, file_path)?;
         Ok(())
     }
 

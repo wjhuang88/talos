@@ -793,6 +793,14 @@ revoke evidence. Independently reopened owners and external writers are not cove
 by this mutex; source verification and restrictive handles remain required. See
 ADR-104's Windows live-history lease correction for limits and pending native gates.
 
+Windows built-in atomic transcript replacement coordinates with recovery reads by
+acquiring nontruncating write access to an existing target through publication.
+It therefore requires target-file write permission, even if directory replacement
+permission alone would permit rename. Readonly/write-denied or reparse targets
+are refused without changing original bytes. Sharing conflicts have a bounded wait;
+ordinary access-denied errors are not generally retried. This does not replace host
+single-writer ownership or make multiple source paths an atomic snapshot.
+
 ### Unreleased Gemini invocation migration (I310 / ADR-094)
 
 The next pre-1.0 minor adds `GoogleGemini` protocol variants and optional

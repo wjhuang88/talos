@@ -914,3 +914,45 @@ assertion prints terminal metadata only. These are test/diagnostic changes, not
 an atomic-publication fix. MSVC all-feature tests check passed, log
 `/tmp/talos-native-failure-diagnostics-xwin.log`. Primary source is unchanged during
 its still-running preflight71089. Do not synchronize test edits until it ends.
+
+## 2026-11-12 native diagnostic results and local publication correction
+
+Exact-head CI43141073000 (32e4d227) completed with failures. Windows atomic commit
+returned `IoError` OS5 PermissionDenied; logs `/tmp/talos-ci-windows-32e4d227.log`
+and `-clean.log`. It was not an observed sharing conflict. macOS Actor checkpoint
+Applied regression passed this run, but prior missing-checkpoint failure remains
+unexplained. New macOS failure is the WAL schema initialization budget regression
+at durable.rs:4021; log `/tmp/talos-ci-macos-32e4d227.log`. No rerun is treated as
+root-cause closure. Unrelated issue reconciliation remains separately owned.
+
+Local candidate now coordinates Windows atomic publication at nontruncating,
+no-follow target write acquisition, with bounded sharing-only retry, retained
+write handle through rename, and conservative file-write ACL requirement documented
+in ADR104/SDK. A new native probe checks direct rename under lease, write acquisition,
+exclusion of new recovery reads, publication and readonly refusal. Existing real
+durable commit/reopen/idempotency regression remains unchanged. Native execution
+of this correction is pending; MSVC all-features tests compilation passed at
+`/tmp/talos-atomic-acquisition-xwin.log`.
+
+Independent review also identified an end-of-validation pathname gap. A real Unix
+archive regression failed before the fix (one executed failure, log
+`/tmp/talos-archive-replacement-red.log`), then all12 archive tests passed after
+final inventory/path-version rechecks (`/tmp/talos-archive-replacement-green.log`).
+An earlier unqualified --exact invocation selected no tests and is not evidence.
+Read-only review found no new blocker in this archive increment, with the explicit
+limit that this is not a multi-path atomic snapshot. Primary mixed tree has not yet
+received these new source changes. Full preflight, exact-head review/native CI,
+archived fork and running-host acceptance remain pending; status remains Partial.
+
+Read-only independent review of the full publication/path-binding increment found
+no new blocking code issue. SDK compatibility paragraph relocated to selected-history
+section per review. The readonly probe covers the Windows readonly attribute, not
+an exhaustive DACL permission matrix. Full preflight is still running; no completion
+or native acceptance claim is made.
+
+Full standard locked preflight completed exit0 after the source changes, including
+workspace tests, Clippy and independent SDK fixture:
+`/tmp/talos-publication-path-binding-preflight.log`. This is local Linux evidence;
+new Windows publication probes have only compiled so far. No source was edited
+during that preflight. The SDK paragraph was relocated and the owner appended
+review evidence while validation ran; governance checks are repeated before staging.
