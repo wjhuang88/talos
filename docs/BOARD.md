@@ -1,3 +1,8 @@
+## Azure C / PROVIDER-008-C
+
+[Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 proposes atomic claim+activation;
+ineffective until governance merge. A/B remain Complete; D and #724 remain unfinished.
+
 # Talos Board
 
 ## Session recovery integration
@@ -11,13 +16,6 @@
 
 - Partial / Emergency override: [isolated storage candidate](tasks/session-recovery-storage-candidate.md).
   Parent repair and bounded archive evidence only; integration, independent review and delivery remain pending.
-
-## PROVIDER-008-C / #914 — Azure transport intake only
-
-[PROVIDER-008-C](backlog/active/PROVIDER-008-C-azure-openai.md) / [#914](https://github.com/wjhuang88/talos/issues/914):
-**Intake / Unclaimed**. I323 / ADR-103 remain unaccepted proposals; no provider
-transport implementation or implicit credential discovery is authorized.
-Parent #724 stays open; unrelated SEARCH-001-L / #901 retains its own authority.
 
 Native Windows follow-up (2026-11-10, source `c065236a`):
 [validation evidence](reference/WINDOWS-VALIDATION-2026-11-10.md) records TUI 652,
@@ -365,3 +363,7 @@ to [WORKTREE-SANDBOX-001](tasks/2026-11-08-sandbox-owned-worktrees.md)
 Implementation validation is in progress for explicit native clipboard image paste
 into pending TUI attachments, focused on Linux Wayland+niri+Ghostty, following Codex
 interaction logic while retaining Talos ingestion and permission boundaries.
+
+## Prior intake registration
+
+#915 registered this same owner before #918; no competing implementation claim.

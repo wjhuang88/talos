@@ -28,6 +28,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
+| [103: Azure OpenAI transport](103-azure-openai-transport-boundary.md) | Accepted on reviewed #918 merge | I323 / #914 atomic claim; Chat/Responses reuse, deployment/v1 paths and explicit credential boundary. |
 | [102: Operation approval presentation](102-operation-approval-presentation.md) | Proposed | Typed operation summary, single-use decisions and in-process UI event migration. |
 | [101: Default background completion continuation](101-background-completion-continuation.md) | Proposed atomic acceptance in #893 | BG-CONTINUE-001; independent exact-head review and target-branch merge required; no current implementation authority. |
 | [100: Native clipboard image input](100-native-clipboard-image-input.md) | Proposed | Explicit host acquisition, OS ABI isolation, attachment retention and public UI event migration. |
