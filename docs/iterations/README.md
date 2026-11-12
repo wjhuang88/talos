@@ -5,6 +5,10 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 
 # Iterations
 
+## I324 / GIT-COMPAT-001 — proposed Git 2.36 preflight claim
+
+[I324](I324-git-236-preflight-compatibility.md) / [GIT-COMPAT-001](../backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): governance-only proposed [claim #920](https://github.com/wjhuang88/talos/pull/920), ineffective until merge. Native Windows Git 2.36 compatibility and independently reviewed unchanged prepared authorization are required; GIT-SNAPSHOT-001 and other Review/Active owners remain separate.
+
 ## I322 / STORE-002 C — proposed independent contract claim
 
 [I322](I322-store-002-domain-contract-extraction.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: C proposes existing-domain operational trait interfaces across Session, Todo/PendingSubmission, Memory, Evolution and Exploration only; governance claim #911 **ineffective until merge**. No SQL/schema/caller/host changes, no generic `Bound<T>`. I321 A/B [Complete](I321-store-002-capability-contract-foundation.md) at #909 merge `a9914b7a62b0873027997c69d9966d17f3fd48ba` (CI #4039 8/8, independent API no blockers); D/E/F and #897 E2/E3 remain gated.
