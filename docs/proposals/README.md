@@ -43,8 +43,10 @@ docs/proposals/
 
 ## Current Proposals
 
+- [ADR-089 amendment: gix-native Git preflight](adr-089-gix-native-preflight-amendment.md) —
+  **Proposed / not accepted**: replace fixed Git CLI preflight commands with authorized gix-native analysis; security decision required before I324 code.
 - [gix Preflight / System Git Compatibility](gix-preflight-system-git-compatibility.md) —
-  proposed safe gix-assisted discovery with continued Git 2.36 support; no implementation activation.
+  updated 2026-11-12 to gix-native, no Git CLI preflight or hardcoded Git version/installation exceptions; #919/I324 claim proposed, no implementation activation.
 - [I300 Native Pull Command Authorization](i300-native-pull-command-authorization.md) — accepted Bash-granularity command approval; implementation and activation tracked by I300 / ADR-089.
 - [Autonomous Validation Loop](autonomous-validation-loop.md) — proposed Phase 1/2/3 boundary for
   self-bootstrap validation planning, evidence, and no-hidden-pass rules.

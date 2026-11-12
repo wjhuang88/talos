@@ -93,7 +93,7 @@
 
 | [#897](https://github.com/wjhuang88/talos/issues/897) | Behavior-preserving domain persistence and host composition decoupling (ARCH-035) | [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) | Intake / Unclaimed | Independent cross-host composition prerequisite to #142/#361; consumes #670 capability contracts. Only equivalence migration; no implementation claim, backend switch or Server behavior. |
 
-| [#919](https://github.com/wjhuang88/talos/issues/919) | gix-native Git preflight compatibility | [GIT-COMPAT-001](../proposals/gix-preflight-system-git-compatibility.md) | Proposed / Unclaimed | Interim existing proposal registration; formal owner/claim #920 remains ineffective until merge. |
+| [#919](https://github.com/wjhuang88/talos/issues/919) | Git 2.36 prepared preflight and gix compatibility | [GIT-COMPAT-001](../backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) | Active / Claimed proposed (ineffective until #920 merge) | I324 / #920 proposes exact Git 2.36 compatibility ownership without changing ADR-089 admissions; native Windows tests and independent security review required before implementation closure. |
 | [#923](https://github.com/wjhuang88/talos/issues/923) | TUI performance and native acceptance residual | [TUI-PERF-001](../tasks/2026-11-10-tui-render-performance.md) | Review / Claimed | Stage implementation #922 merged; original performance and native acceptance remain required. |
 
 ## Synchronization Notes
