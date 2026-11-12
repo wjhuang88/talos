@@ -11,9 +11,10 @@ process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing
 on Git 2.36.1; [gix-assisted compatibility](proposals/gix-preflight-system-git-compatibility.md)
 is a proposal, not an activated repair. Owner statuses and manual/native residuals remain unchanged.
 
-## STORE-002 / I322 C — proposed domain-contract activation
+## STORE-002 / I322 C — domain contract implementation Review / Claimed
 
-[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I322](iterations/I322-store-002-domain-contract-extraction.md) / #670: I321 A/B **Complete** on implementation #909 merge `a9914b7a62b0873027997c69d9966d17f3fd48ba` ([CI #4039](https://github.com/wjhuang88/talos/actions/runs/42848943669) 8/8, independent API no blockers). New governance C claim #911 is **proposed, ineffective until merge**; C only extracts existing domain-owned interfaces with no runtime binding or consumer migration. D/E/F and #897 E2/E3 still gated; Search/TUI/Git/Windows owners untouched.
+[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I322](iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed via #909 merge `a9914b7a62b0873027997c69d9966d17f3fd48ba`. I322 C claim #911 merged `60da1bbadca00c9bdee6fbcb8f5ad990a4313331`; a bounded Rust candidate extracts domain-owned Session Pending/Todo, Memory, Evolution and Exploration traits with existing concrete delegation and no runtime consumer migration. **C implementation pending exact-head CI and independent API review**; D/E/F and #897 E2/E3 remain gated. Search/TUI/Git/Windows owners untouched.
+
 ## ARCH-035 / I320 — E0/E1 Review (PR #906)
 
 [ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [I320](iterations/I320-arch-035-host-composition-baseline.md) / #897: #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615`, activating only E0 code-truth inventory and E1 host API decision review; no E2/E3 implementation is authorized; no E2/E3 code or STORE-002/#670 capability implementation is authorized. ServerHost/#361 remains gated. Parallel Search/TUI/Provider owners are untouched.
