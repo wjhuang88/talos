@@ -17,9 +17,9 @@ use talos_conversation::{
 use talos_core::ApprovalChoice;
 use talos_core::message::Message;
 use talos_core::tool_filter::ToolSyntaxFilter;
-use tokio::{sync::mpsc, time::MissedTickBehavior};
+use tokio::sync::mpsc;
 
-use crate::app_layout::{ComponentMetrics, compute_app_layout};
+use crate::app_layout::ComponentMetrics;
 use crate::evolution::{self, EvolutionPanel};
 use crate::history_projection::{
     HistoryProjection, HistoryProjectionCache, HistoryScrollState, HistorySelectionPoint,
@@ -35,6 +35,7 @@ pub(crate) use crate::app_stream::{SPINNER_FRAMES, ScrollbackLine, StreamRenderS
 mod frame;
 mod input;
 mod output;
+mod scheduling;
 mod tool_activity;
 
 fn history_line(row: &crate::history_projection::RenderedHistoryRow) -> Line<'static> {
@@ -138,6 +139,11 @@ pub struct Tui {
     transcript: TranscriptStore,
     history_scroll: HistoryScrollState,
     history_projection_cache: HistoryProjectionCache,
+    splash_cache: crate::splash::SplashCache,
+    git_snapshot: crate::scrollback_status_git::GitSnapshot,
+    layout_cache: crate::app_layout::LayoutCache,
+    composer_height_cache: frame::ComposerHeightCache,
+    preview_layout_cache: [crate::scrollback::PreviewLayoutCache; 2],
     last_history_projection: HistoryProjection,
     last_history_viewport_height: u16,
     last_history_area: Option<ratatui::layout::Rect>,
@@ -155,6 +161,7 @@ pub struct Tui {
     tool_activities: tool_activity::ToolActivities,
     text_filter: ToolSyntaxFilter,
     processing_frame: usize,
+    visible_processing_animation: bool,
     stream_count: usize,
     session_id: Option<String>,
     last_char_time: Option<Instant>,
@@ -235,6 +242,11 @@ impl Tui {
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
             history_projection_cache: HistoryProjectionCache::default(),
+            splash_cache: crate::splash::SplashCache::default(),
+            git_snapshot: crate::scrollback_status_git::GitSnapshot::default(),
+            layout_cache: crate::app_layout::LayoutCache::default(),
+            composer_height_cache: frame::ComposerHeightCache::default(),
+            preview_layout_cache: Default::default(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
             last_history_area: None,
@@ -252,6 +264,7 @@ impl Tui {
             tool_activities: tool_activity::ToolActivities::default(),
             text_filter: ToolSyntaxFilter::new(),
             processing_frame: 0,
+            visible_processing_animation: false,
             stream_count: 0,
             session_id: None,
             last_char_time: None,
@@ -284,6 +297,11 @@ impl Tui {
             transcript: TranscriptStore::default(),
             history_scroll: HistoryScrollState::follow_tail(),
             history_projection_cache: HistoryProjectionCache::default(),
+            splash_cache: crate::splash::SplashCache::default(),
+            git_snapshot: crate::scrollback_status_git::GitSnapshot::default(),
+            layout_cache: crate::app_layout::LayoutCache::default(),
+            composer_height_cache: frame::ComposerHeightCache::default(),
+            preview_layout_cache: Default::default(),
             last_history_projection: HistoryProjection::default(),
             last_history_viewport_height: 0,
             last_history_area: None,
@@ -301,6 +319,7 @@ impl Tui {
             tool_activities: tool_activity::ToolActivities::default(),
             text_filter: ToolSyntaxFilter::default(),
             processing_frame: 0,
+            visible_processing_animation: false,
             stream_count: 0,
             session_id: None,
             last_char_time: None,
@@ -571,76 +590,313 @@ impl Tui {
     }
 
     pub async fn run(&mut self) -> io::Result<()> {
-        let session_start = Instant::now();
-        let mut event_stream = EventStream::new();
-        let mut render_interval = tokio::time::interval(PROCESSING_FRAME_INTERVAL);
-        render_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        self.run_with_events(EventStream::new()).await
+    }
+
+    async fn run_with_events(
+        &mut self,
+        event_stream: impl Stream<Item = io::Result<Event>> + Unpin,
+    ) -> io::Result<()> {
+        self.run_with_scanner(event_stream, crate::git_snapshot_worker::Scan::start)
+            .await
+    }
+
+    async fn run_with_scanner(
+        &mut self,
+        mut event_stream: impl Stream<Item = io::Result<Event>> + Unpin,
+        mut start_scan: impl FnMut(String, u64) -> io::Result<Option<crate::git_snapshot_worker::Scan>>,
+    ) -> io::Result<()> {
+        let _metrics_report = crate::render_metrics::ReportOnExit::new();
+        let session_start = scheduling::now();
+        let mut pending_input_metric = None;
+        let mut cadence = scheduling::Cadence::default();
+        let mut git_cadence = scheduling::Cadence::default();
+        let mut git_scan: Option<crate::git_snapshot_worker::Scan> = None;
+        let mut git_scan_deadline = None;
+        let mut git_workspace = String::new();
+        let mut git_generation = 0u64;
+        let mut git_refresh_requested = false;
+        let mut git_was_visible = false;
         let mut ui_output_rx = self.ui_output_rx.take().expect("ui_output_rx not set");
+        let mut dirty = true;
+        let mut stream_frame_deadline = None;
+        let mut last_frame_at = scheduling::now();
 
-        self.draw_frame()?;
-
-        'ui: loop {
-            self.retire_closed_approval();
-            if matches!(self.state.approval_state, ApprovalState::Hidden)
-                && !self.queued_outputs.is_empty()
+        enum Wake {
+            Deadline,
+            Input(Option<io::Result<Event>>),
+            Output(Option<UiOutput>),
+            Stream(Option<String>),
+            ApprovalClosed,
+            Queued,
+            Git(Option<crate::git_snapshot_worker::ScanResult>),
+        }
+        let mut output_open = true;
+        loop {
+            dirty |= self.retire_closed_approval();
+            if dirty
+                && (self.state.should_exit
+                    || stream_frame_deadline.is_none_or(|deadline| scheduling::now() >= deadline))
             {
-                while !self.queued_outputs.is_empty()
-                    && matches!(self.state.approval_state, ApprovalState::Hidden)
-                {
-                    let output = self.queued_outputs.remove(0);
-                    let is_tool = matches!(
-                        &output,
-                        UiOutput::ToolCall(_) | UiOutput::ToolApprovalRequest { .. }
-                    );
-                    if self.handle_ui_output(output) {
-                        self.state.should_exit = true;
-                        break;
-                    }
-                    if is_tool {
-                        self.commit_pending_transcript()?;
-                        self.draw_frame()?;
-                    }
+                self.commit_pending_transcript()?;
+                self.draw_frame()?;
+                if let Some(start) = pending_input_metric.take() {
+                    crate::render_metrics::submitted(start);
                 }
+                dirty = false;
+                stream_frame_deadline = None;
+                last_frame_at = scheduling::now();
             }
             if self.state.should_exit {
                 break;
             }
-            self.state.expire_tip();
-            self.commit_pending_transcript()?;
-            self.draw_frame()?;
-
-            tokio::select! {
-                _ = render_interval.tick() => self.advance_processing_frame(),
-                Some(Ok(event)) = event_stream.next() => {
-                    // Drain ready events before rendering so Release can invalidate
-                    // queued repeats. Bound work to keep output/shutdown responsive.
-                    for event in input::ready_input_batch(event, &mut event_stream).await {
-                        if self.handle_input_event(&event) {
-                            break 'ui;
+            let now = scheduling::now();
+            let drag = self.selection.is_some_and(|selection| {
+                selection.dragging
+                    && selection.edge != 0
+                    && selection.history_anchor.is_some()
+                    && self.last_history_viewport_height > 0
+            });
+            cadence.update(
+                self.visible_processing_animation || drag,
+                now,
+                PROCESSING_FRAME_INTERVAL,
+            );
+            let git_visible =
+                !self.state.status.workspace_path.is_empty() && self.terminal.size()?.width >= 80;
+            if git_workspace != self.state.status.workspace_path {
+                git_workspace.clone_from(&self.state.status.workspace_path);
+                git_generation = git_generation.wrapping_add(1);
+                git_scan = None;
+                git_scan_deadline = None;
+                git_cadence.update(false, now, Duration::from_secs(2));
+                git_refresh_requested = true;
+            }
+            if git_visible && !git_was_visible {
+                git_refresh_requested = true;
+            }
+            git_was_visible = git_visible;
+            if git_refresh_requested && git_visible && git_scan.is_none() {
+                match start_scan(git_workspace.clone(), git_generation) {
+                    Ok(Some(scan)) => {
+                        git_scan = Some(scan);
+                        git_scan_deadline = Some(now + Duration::from_secs(2));
+                        git_refresh_requested = false;
+                    }
+                    Ok(None) => {}
+                    Err(_) => {
+                        let changed = self.git_snapshot.publish(
+                            git_workspace.clone(),
+                            None,
+                            scheduling::now(),
+                        );
+                        git_refresh_requested = false;
+                        if changed {
+                            // This failure occurs after the draw phase. Submit the
+                            // unknown status before waiting for another UI event.
+                            dirty = true;
+                            stream_frame_deadline = None;
+                            continue;
                         }
                     }
                 }
-                Some(output) = ui_output_rx.recv() => {
+            }
+            if !git_visible {
+                git_scan = None;
+                git_scan_deadline = None;
+            }
+            git_cadence.update(git_visible, now, Duration::from_secs(2));
+            let deadline = [
+                stream_frame_deadline,
+                git_scan_deadline,
+                if git_visible {
+                    self.git_snapshot.stale_deadline(&git_workspace)
+                } else {
+                    None
+                },
+                cadence.deadline(),
+                git_cadence.deadline(),
+                self.state.tip.as_ref().map(|tip| tip.created_at + tip.ttl),
+                self.deferred_reconnecting_status
+                    .as_ref()
+                    .map(|(_, deadline)| *deadline),
+            ]
+            .into_iter()
+            .flatten()
+            .min();
+            let queued = matches!(self.state.approval_state, ApprovalState::Hidden)
+                && !self.queued_outputs.is_empty();
+            // Split field borrows: stream EOF and receiver closure are explicit events.
+            let stream = &mut self.active_stream;
+            let approval = &mut self.state.pending_approval_response;
+            let wake = tokio::select! {
+                result = async {
+                    match git_scan.as_mut() {
+                        Some(scan) => scan.result().await,
+                        None => std::future::pending().await,
+                    }
+                } => Wake::Git(result),
+                _ = scheduling::wait_until(deadline) => Wake::Deadline,
+                event = event_stream.next() => Wake::Input(event),
+                output = ui_output_rx.recv(), if output_open && !queued => Wake::Output(output),
+                chunk = scheduling::stream_event(stream) => Wake::Stream(chunk),
+                _ = scheduling::approval_closed(approval) => Wake::ApprovalClosed,
+                _ = std::future::ready(()), if queued => Wake::Queued,
+            };
+            match wake {
+                Wake::Git(result) => {
+                    git_scan = None;
+                    git_scan_deadline = None;
+                    if let Some(result) = result
+                        && result.workspace == git_workspace
+                        && result.generation == git_generation
+                    {
+                        dirty |= self.git_snapshot.publish(
+                            result.workspace,
+                            result.summary,
+                            result.collected_at,
+                        );
+                    }
+                }
+                Wake::Deadline => {
+                    if let Some(deadline) = deadline {
+                        crate::render_metrics::deadline(
+                            crate::render_metrics::Stage::DeadlineLateness,
+                            deadline.into(),
+                        );
+                    }
+                    crate::render_metrics::count(crate::render_metrics::Stage::Timer);
+                    let now = scheduling::now();
+                    dirty |= self.git_snapshot.expire(&git_workspace, now);
+                    // The shared timer also serves Git, stream and expiry work.
+                    // Observe animation only when its own visible cadence is due.
+                    if self.visible_processing_animation
+                        && let Some(deadline) = cadence.deadline().filter(|d| *d <= now)
+                    {
+                        crate::render_metrics::deadline(
+                            crate::render_metrics::Stage::AnimationDeadlineLateness,
+                            deadline.into(),
+                        );
+                    }
+                    let steps = cadence.consume(now, PROCESSING_FRAME_INTERVAL);
+                    if steps > 0 {
+                        self.processing_frame = self.processing_frame.wrapping_add(steps - 1);
+                        self.advance_processing_frame();
+                        dirty = true;
+                    }
+                    if git_scan_deadline.is_some_and(|deadline| deadline <= now) {
+                        git_scan = None;
+                        git_scan_deadline = None;
+                        dirty |= self.git_snapshot.publish(
+                            git_workspace.clone(),
+                            None,
+                            scheduling::now(),
+                        );
+                    }
+                    if git_cadence.consume(now, Duration::from_secs(2)) > 0 {
+                        git_refresh_requested = true;
+                    }
+
+                    if self
+                        .deferred_reconnecting_status
+                        .as_ref()
+                        .is_some_and(|(_, d)| *d <= now)
+                    {
+                        self.release_deferred_reconnecting_status(now);
+                        stream_frame_deadline = None;
+                        dirty = true;
+                    }
+                    if self
+                        .state
+                        .tip
+                        .as_ref()
+                        .is_some_and(|tip| tip.created_at + tip.ttl <= now)
+                    {
+                        self.state.expire_tip(now);
+                        stream_frame_deadline = None;
+                        dirty = true;
+                    }
+                }
+                Wake::Input(Some(Ok(event))) => {
+                    if pending_input_metric.is_none() {
+                        pending_input_metric = crate::render_metrics::start();
+                    }
+                    for event in input::ready_input_batch(event, &mut event_stream).await {
+                        crate::render_metrics::count(crate::render_metrics::Stage::Input);
+                        if matches!(event, Event::Resize(..)) {
+                            crate::render_metrics::count(crate::render_metrics::Stage::Resize);
+                        }
+                        let previous_scroll = pending_input_metric
+                            .as_ref()
+                            .map(|_| self.history_scroll.clone());
+                        git_refresh_requested |= matches!(event, Event::FocusGained);
+                        let exit = self.handle_input_event(&event);
+                        if previous_scroll
+                            .as_ref()
+                            .is_some_and(|previous| *previous != self.history_scroll)
+                        {
+                            crate::render_metrics::count(
+                                crate::render_metrics::Stage::HistoryScroll,
+                            );
+                        }
+                        if exit {
+                            self.handle_ui_output(UiOutput::Exit);
+                            break;
+                        }
+                    }
+                    dirty = true;
+                    stream_frame_deadline = None;
+                }
+                Wake::Input(Some(Err(error))) => return Err(error),
+                Wake::Input(None) => {
+                    self.handle_ui_output(UiOutput::Exit);
+                    dirty = true;
+                }
+                Wake::Output(None) => output_open = false,
+                Wake::Output(Some(output)) => {
+                    git_refresh_requested |= matches!(&output, UiOutput::ToolResult(_));
+                    crate::render_metrics::count(crate::render_metrics::Stage::Output);
                     if !matches!(self.state.approval_state, ApprovalState::Hidden) {
                         self.queued_outputs.push(output);
                     } else {
-                        let is_tool = matches!(&output, UiOutput::ToolCall(_) | UiOutput::ToolApprovalRequest { .. });
-                        if self.handle_ui_output(output) {
-                            break;
-                        }
-                        if is_tool {
-                            self.commit_pending_transcript()?;
-                            self.draw_frame()?;
-                        }
+                        let delta =
+                            matches!(&output, UiOutput::Content(ContentOutput::Delta { .. }));
+                        self.state.should_exit |= self.handle_ui_output(output);
+                        dirty |= !self.state.should_exit || !self.pending_transcript.is_empty();
+                        stream_frame_deadline = if delta {
+                            Some(scheduling::stream_deadline(last_frame_at))
+                        } else {
+                            None
+                        };
                     }
                 }
-                Some(chunk) = self.next_stream_chunk() => {
-                    self.consume_stream_chunk(&chunk);
+                Wake::Queued => {
+                    // One queued business event per select preserves FIFO and lets input compete.
+                    let output = self.queued_outputs.remove(0);
+                    git_refresh_requested |= matches!(&output, UiOutput::ToolResult(_));
+                    stream_frame_deadline = None;
+                    self.state.should_exit |= self.handle_ui_output(output);
+                    dirty |= !self.state.should_exit || !self.pending_transcript.is_empty();
                 }
-            }
-
-            if self.state.should_exit {
-                break;
+                Wake::Stream(chunk) => {
+                    crate::render_metrics::count(crate::render_metrics::Stage::Stream);
+                    match chunk {
+                        Some(chunk) => {
+                            self.consume_stream_chunk(&chunk);
+                            stream_frame_deadline =
+                                Some(scheduling::stream_deadline(last_frame_at));
+                        }
+                        None => {
+                            self.finalize_active_stream();
+                            stream_frame_deadline = None;
+                        }
+                    }
+                    dirty = true;
+                }
+                Wake::ApprovalClosed => {
+                    dirty |= self.retire_closed_approval();
+                    stream_frame_deadline = None;
+                }
             }
         }
 

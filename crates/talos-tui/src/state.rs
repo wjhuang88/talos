@@ -717,9 +717,9 @@ impl TuiState {
         }
     }
 
-    pub(crate) fn expire_tip(&mut self) {
+    pub(crate) fn expire_tip(&mut self, now: Instant) {
         if let Some(ref tip) = self.tip
-            && Instant::now().duration_since(tip.created_at) >= tip.ttl
+            && now.saturating_duration_since(tip.created_at) >= tip.ttl
         {
             self.tip = None;
         }

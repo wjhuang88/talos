@@ -1,6 +1,6 @@
 //! Width-dependent projection of application-owned transcript facts.
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -78,16 +78,29 @@ pub(crate) struct HistoryProjection {
     pub(crate) rows: Vec<RenderedHistoryRow>,
     pub(crate) total_rows: usize,
     pub(crate) visible_start: usize,
-    all_rows: Arc<[RenderedHistoryRow]>,
-    logical_lines: Arc<[(TranscriptEntryId, usize, String)]>,
+    all_rows: Arc<Vec<RenderedHistoryRow>>,
+    logical_lines: Arc<Vec<(TranscriptEntryId, usize, String)>>,
+}
+
+/// Beginning of the final projection unit, including pairing state before it.
+/// Appends may extend this whole poll group or complete its pending call.
+#[derive(Clone, Copy, Debug, Default)]
+struct ProjectionTail {
+    entry: usize,
+    pending_calls: usize,
+    rows: usize,
+    logical_lines: usize,
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct HistoryProjectionCache {
     transcript_revision: Option<u64>,
+    edit_revision: u64,
+    entry_count: usize,
+    tail: ProjectionTail,
     width: u16,
-    all_rows: Arc<[RenderedHistoryRow]>,
-    logical_lines: Arc<[(TranscriptEntryId, usize, String)]>,
+    all_rows: Arc<Vec<RenderedHistoryRow>>,
+    logical_lines: Arc<Vec<(TranscriptEntryId, usize, String)>>,
     #[cfg(test)]
     rebuilds: usize,
 }
@@ -104,18 +117,7 @@ impl HistoryProjectionCache {
             return HistoryProjection::default();
         }
 
-        let revision = transcript.revision();
-        if self.transcript_revision != Some(revision) || self.width != width {
-            let (all_rows, logical_lines) = project_all_history(transcript, width);
-            self.transcript_revision = Some(revision);
-            self.width = width;
-            self.all_rows = all_rows.into();
-            self.logical_lines = logical_lines.into();
-            #[cfg(test)]
-            {
-                self.rebuilds = self.rebuilds.saturating_add(1);
-            }
-        }
+        self.ensure_projection(transcript, width);
 
         project_viewport(
             self.all_rows.clone(),
@@ -123,6 +125,54 @@ impl HistoryProjectionCache {
             height,
             scroll,
         )
+    }
+
+    /// Obtain cached row count without constructing a visible-window projection.
+    pub(crate) fn total_rows(&mut self, transcript: &TranscriptStore, width: u16) -> usize {
+        if width == 0 {
+            return 0;
+        }
+        self.ensure_projection(transcript, width);
+        self.all_rows.len()
+    }
+
+    pub(crate) fn needs_update(&self, transcript: &TranscriptStore, width: u16) -> bool {
+        self.transcript_revision != Some(transcript.revision()) || self.width != width
+    }
+
+    fn ensure_projection(&mut self, transcript: &TranscriptStore, width: u16) {
+        let revision = transcript.revision();
+        if self.needs_update(transcript, width) {
+            let _metric =
+                crate::render_metrics::measure(crate::render_metrics::Stage::HistoryRebuild);
+            let append_only = self.transcript_revision.is_some()
+                && self.width == width
+                && self.edit_revision == transcript.edit_revision()
+                && self.entry_count < transcript.entries().len();
+            if !append_only {
+                // Replace instead of cloning an obsolete snapshot for a full reflow.
+                self.all_rows = Arc::default();
+                self.logical_lines = Arc::default();
+                self.tail = ProjectionTail::default();
+            }
+            self.tail = project_history_tail(
+                transcript,
+                width,
+                self.tail,
+                Arc::make_mut(&mut self.all_rows),
+                Arc::make_mut(&mut self.logical_lines),
+            );
+            self.transcript_revision = Some(revision);
+            self.edit_revision = transcript.edit_revision();
+            self.entry_count = transcript.entries().len();
+            self.width = width;
+            #[cfg(test)]
+            {
+                self.rebuilds = self.rebuilds.saturating_add(1);
+            }
+        } else {
+            crate::render_metrics::count(crate::render_metrics::Stage::HistoryHit);
+        }
     }
 
     #[cfg(test)]
@@ -397,20 +447,26 @@ pub(crate) fn project_history(
     HistoryProjectionCache::default().project(transcript, width, height, scroll)
 }
 
-fn project_all_history(
+fn project_history_tail(
     transcript: &TranscriptStore,
     width: u16,
-) -> (
-    Vec<RenderedHistoryRow>,
-    Vec<(TranscriptEntryId, usize, String)>,
-) {
-    let mut all = Vec::new();
-    let mut projected_logical_lines = Vec::new();
+    mut tail: ProjectionTail,
+    all: &mut Vec<RenderedHistoryRow>,
+    projected_logical_lines: &mut Vec<(TranscriptEntryId, usize, String)>,
+) -> ProjectionTail {
+    all.truncate(tail.rows);
+    projected_logical_lines.truncate(tail.logical_lines);
     let mut projected = Vec::new();
     let entries = transcript.entries();
-    let mut index = 0;
-    let mut pending_calls = 0usize;
+    let mut index = tail.entry;
+    let mut pending_calls = tail.pending_calls;
     while index < entries.len() {
+        tail = ProjectionTail {
+            entry: index,
+            pending_calls,
+            rows: all.len(),
+            logical_lines: projected_logical_lines.len(),
+        };
         let entry = &entries[index];
         // Display events have no call IDs: never infer pairing inside a parallel batch.
         if pending_calls == 0
@@ -429,7 +485,7 @@ fn project_all_history(
                 0,
                 true,
                 false,
-                ScrollbackLine::plain(group.summary(expanded), color),
+                Cow::Owned(ScrollbackLine::plain(group.summary(expanded), color)),
             ));
             if expanded {
                 for (offset, detail) in entries[index..index + group.entries].iter().enumerate() {
@@ -445,7 +501,7 @@ fn project_all_history(
                             line_index + usize::from(offset == 0),
                             false,
                             matches!(block, TranscriptBlock::ToolResult(_)),
-                            line,
+                            Cow::Owned(line),
                         ));
                     }
                 }
@@ -457,70 +513,76 @@ fn project_all_history(
                 TranscriptBlock::ToolResult(_) => pending_calls = pending_calls.saturating_sub(1),
                 _ => {}
             }
-            for (line_index, line) in logical_lines(&entry.block).into_iter().enumerate() {
-                let header =
-                    matches!(entry.block, TranscriptBlock::Reasoning { .. }) && line_index == 0;
-                projected.push((
-                    entry.id,
-                    line_index,
-                    header,
-                    matches!(entry.block, TranscriptBlock::ToolResult(_)),
-                    line,
-                ));
+            if let TranscriptBlock::StyledLine(line) = &entry.block {
+                // Stored styled lines already are logical lines. Borrow until projection
+                // finishes instead of cloning their text and segments on every resize.
+                projected.push((entry.id, 0, false, false, Cow::Borrowed(line)));
+            } else {
+                for (line_index, line) in logical_lines(&entry.block).into_iter().enumerate() {
+                    let header =
+                        matches!(entry.block, TranscriptBlock::Reasoning { .. }) && line_index == 0;
+                    projected.push((
+                        entry.id,
+                        line_index,
+                        header,
+                        matches!(entry.block, TranscriptBlock::ToolResult(_)),
+                        Cow::Owned(line),
+                    ));
+                }
             }
             index += 1;
         }
-    }
-    for (entry_id, logical_line, expandable_header, clip, line) in projected {
-        projected_logical_lines.push((
-            entry_id,
-            logical_line,
-            line.segments
-                .iter()
-                .map(|segment| segment.text.as_str())
-                .collect(),
-        ));
-        let mut chunks = if clip {
-            project_result_line(&line, width)
-        } else {
-            project_line_chunks(&line, width)
-        };
-        // A collapsed entry remains one hit target even in a narrow viewport.
-        // Keep the full semantic title above so resizing can restore it.
-        if expandable_header {
-            chunks.truncate(1);
+        for (entry_id, logical_line, expandable_header, clip, line) in projected.drain(..) {
+            projected_logical_lines.push((
+                entry_id,
+                logical_line,
+                line.segments
+                    .iter()
+                    .map(|segment| segment.text.as_str())
+                    .collect(),
+            ));
+            let mut chunks = if clip {
+                project_result_line(&line, width)
+            } else {
+                project_line_chunks(&line, width)
+            };
+            // A collapsed entry remains one hit target even in a narrow viewport.
+            // Keep the full semantic title above so resizing can restore it.
+            if expandable_header {
+                chunks.truncate(1);
+            }
+            let last = chunks.len().saturating_sub(1);
+            all.extend(
+                chunks
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, chunk)| RenderedHistoryRow {
+                        expandable_header,
+                        clipped_logical_length: clip.then(|| line.text.chars().count()),
+                        synthetic_prefix: chunk.synthetic_prefix,
+                        start_anchor: LogicalContentAnchor {
+                            entry_id,
+                            logical_line,
+                            scalar_offset: chunk.logical_start,
+                        },
+                        end_anchor: LogicalContentAnchor {
+                            entry_id,
+                            logical_line,
+                            scalar_offset: chunk.logical_end,
+                        },
+                        is_last_row_of_logical_line: index == last,
+                        is_empty_logical_line: line.text.is_empty(),
+                        line: chunk.line,
+                    }),
+            );
         }
-        let last = chunks.len().saturating_sub(1);
-        all.extend(
-            chunks
-                .into_iter()
-                .enumerate()
-                .map(|(index, chunk)| RenderedHistoryRow {
-                    expandable_header,
-                    clipped_logical_length: clip.then(|| line.text.chars().count()),
-                    synthetic_prefix: chunk.synthetic_prefix,
-                    start_anchor: LogicalContentAnchor {
-                        entry_id,
-                        logical_line,
-                        scalar_offset: chunk.logical_start,
-                    },
-                    end_anchor: LogicalContentAnchor {
-                        entry_id,
-                        logical_line,
-                        scalar_offset: chunk.logical_end,
-                    },
-                    is_last_row_of_logical_line: index == last,
-                    is_empty_logical_line: line.text.is_empty(),
-                    line: chunk.line,
-                }),
-        );
     }
-    (all, projected_logical_lines)
+    tail
 }
 
 fn project_viewport(
-    all: Arc<[RenderedHistoryRow]>,
-    logical_lines: Arc<[(TranscriptEntryId, usize, String)]>,
+    all: Arc<Vec<RenderedHistoryRow>>,
+    logical_lines: Arc<Vec<(TranscriptEntryId, usize, String)>>,
     height: u16,
     scroll: &HistoryScrollState,
 ) -> HistoryProjection {
@@ -702,7 +764,7 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
     let mut synthetic_prefix = 0usize;
 
     for segment in &line.segments {
-        for ch in segment.text.chars() {
+        for (byte_offset, ch) in segment.text.char_indices() {
             let char_width = UnicodeWidthChar::width(ch).unwrap_or(0);
             // A double-width scalar cannot be represented at width one. This is
             // projection-only; the original scalar remains in TranscriptStore.
@@ -750,11 +812,14 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
             {
                 last.text.push(ch);
             } else {
-                current.push(HistorySegment::styled(
-                    ch.to_string(),
-                    segment.fg,
-                    segment.attrs,
-                ));
+                // Bound speculative capacity to one viewport row and remaining
+                // source bytes. Zero-width runs may grow normally beyond it.
+                let mut text = String::with_capacity(
+                    (segment.text.len() - byte_offset)
+                        .min(capacity.saturating_sub(used).saturating_mul(4)),
+                );
+                text.push(ch);
+                current.push(HistorySegment::styled(text, segment.fg, segment.attrs));
             }
             used = used.saturating_add(char_width);
             logical_offset += 1;
@@ -856,6 +921,158 @@ fn project_fill_segment(fill: &HistorySegment, available_cells: usize) -> Option
 mod tests {
     use super::*;
     use crate::inline_terminal::HistoryAttrs;
+
+    #[test]
+    fn incremental_tail_matches_full_projection_for_grouping_edits_and_anchors() {
+        let mut fixture = TranscriptStore::default();
+        for (job, action, state) in [
+            ("a", "read", "running"),
+            ("a", "status", "running"),
+            ("a", "read", "completed"),
+            ("b", "read", "running"),
+        ] {
+            crate::process_poll::tests::append_poll(&mut fixture, job, action, state);
+        }
+        let blocks: Vec<_> = fixture
+            .entries()
+            .iter()
+            .map(|entry| entry.block.clone())
+            .collect();
+        // Adjacent polls, pending tails, parallel calls, out-of-order results,
+        // terminal observations, ordinary lines and expandable reasoning.
+        let order = [0, 1, 2, 3, 0, 1, 4, 5, 6, 7, 0, 2, 3, 1, 7, 0, 1];
+        for initial_width in [1, 7, 40, 120] {
+            let mut transcript = TranscriptStore::default();
+            let mut cache = HistoryProjectionCache::default();
+            let mut retained = Vec::new();
+            for step in 0..64 {
+                let block = if step % 11 == 0 {
+                    TranscriptBlock::Reasoning {
+                        text: "中文 🦀 e\u{301}\nsecond".into(),
+                        expanded: false,
+                    }
+                } else if step % 7 == 0 {
+                    TranscriptBlock::StyledLine(ScrollbackLine::plain("ordinary 中文\nnext", None))
+                } else {
+                    blocks[order[step % order.len()]].clone()
+                };
+                transcript.append(block);
+                // Toggle an old entry, not just the tail; edits require full reflow.
+                if step % 9 == 0 {
+                    let id = transcript.entries()[0].id;
+                    transcript.toggle_expansion(id);
+                }
+                if step % 13 == 0 {
+                    let ids: Vec<_> = transcript.entries().iter().map(|entry| entry.id).collect();
+                    for id in ids {
+                        transcript.toggle_expansion(id);
+                    }
+                }
+                let width = if step % 5 == 0 {
+                    initial_width + 1
+                } else {
+                    initial_width
+                };
+                let scroll = if step % 3 == 0 {
+                    HistoryScrollState {
+                        mode: HistoryScrollMode::Anchored {
+                            anchor: LogicalContentAnchor {
+                                entry_id: transcript.entries()[0].id,
+                                logical_line: 0,
+                                scalar_offset: 0,
+                            },
+                            screen_row: 2,
+                        },
+                    }
+                } else {
+                    HistoryScrollState::follow_tail()
+                };
+                let full = project_history(&transcript, width, 8, &scroll);
+                let actual = cache.project(&transcript, width, 8, &scroll);
+                assert_eq!(actual, full, "width {width}, step {step}");
+                if let (Some(start), Some(end)) = (
+                    actual.selection_point(0, 0),
+                    actual.selection_point(actual.total_rows.saturating_sub(1), 0),
+                ) {
+                    assert_eq!(
+                        actual.selected_text(start, end),
+                        full.selected_text(start, end)
+                    );
+                }
+                for (previous, expected) in &retained {
+                    assert_eq!(previous, expected);
+                }
+                // Live older views must not change when the cache appends or regroups.
+                retained.push((actual, full));
+            }
+        }
+    }
+
+    #[test]
+    fn repeated_reflow_releases_obsolete_snapshots_after_view_is_dropped() {
+        let mut transcript = TranscriptStore::default();
+        for _ in 0..128 {
+            transcript.append(TranscriptBlock::Reasoning {
+                text: "中文 🦀 e\u{301}\nsecond line".into(),
+                expanded: false,
+            });
+        }
+        let mut cache = HistoryProjectionCache::default();
+        let scroll = HistoryScrollState::follow_tail();
+        for step in 0..128 {
+            let width = [7, 80, 120, 1][step % 4];
+            let view = cache.project(&transcript, width, 12, &scroll);
+            let old_rows = Arc::downgrade(&view.all_rows);
+            let old_lines = Arc::downgrade(&view.logical_lines);
+            let id = transcript.entries()[step].id;
+            assert!(transcript.toggle_expansion(id));
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                format!("new history {step}"),
+                None,
+            )));
+            let next = cache.project(&transcript, width, 12, &scroll);
+            assert_eq!(next, project_history(&transcript, width, 12, &scroll));
+            // Retained views are intentionally valid until their consumer releases them.
+            assert!(old_rows.upgrade().is_some());
+            assert!(old_lines.upgrade().is_some());
+            drop(view);
+            assert!(old_rows.upgrade().is_none(), "obsolete rows at step {step}");
+            assert!(
+                old_lines.upgrade().is_none(),
+                "obsolete text at step {step}"
+            );
+            drop(next);
+            assert_eq!(Arc::strong_count(&cache.all_rows), 1);
+            assert_eq!(Arc::strong_count(&cache.logical_lines), 1);
+        }
+    }
+
+    #[test]
+    fn append_reuses_owned_prefix_without_cloning_its_text() {
+        let mut transcript = TranscriptStore::default();
+        for index in 0..100 {
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                format!("stable {index}"),
+                None,
+            )));
+        }
+        let mut cache = HistoryProjectionCache::default();
+        cache.total_rows(&transcript, 80);
+        let text = cache.all_rows[0].line.text.as_ptr();
+        let logical = cache.logical_lines[0].2.as_ptr();
+        for _ in 0..30 {
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                "new tail", None,
+            )));
+            cache.total_rows(&transcript, 80);
+            assert_eq!(cache.all_rows[0].line.text.as_ptr(), text);
+            assert_eq!(cache.logical_lines[0].2.as_ptr(), logical);
+            assert_eq!(
+                cache.project(&transcript, 80, 8, &HistoryScrollState::follow_tail()),
+                project_history(&transcript, 80, 8, &HistoryScrollState::follow_tail())
+            );
+        }
+    }
 
     #[test]
     fn parallel_calls_are_not_guessed_into_poll_pairs() {
@@ -1027,6 +1244,31 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn row_count_matches_full_projection_after_width_and_revision_changes() {
+        let mut transcript = TranscriptStore::default();
+        let mut cache = HistoryProjectionCache::default();
+        for text in [
+            "中文 🦀 e\u{301}\nexplicit newline",
+            "second entry with wrapping words",
+        ] {
+            transcript.append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                text, None,
+            )));
+            for width in [1, 7, 40, 80] {
+                let expected =
+                    project_history(&transcript, width, 6, &HistoryScrollState::follow_tail());
+                assert_eq!(cache.total_rows(&transcript, width), expected.total_rows);
+                let rebuilds = cache.rebuilds();
+                let visible =
+                    cache.project(&transcript, width, 6, &HistoryScrollState::follow_tail());
+                assert_eq!(visible.rows, expected.rows);
+                assert_eq!(cache.rebuilds(), rebuilds);
+            }
+        }
+        assert_eq!(cache.total_rows(&transcript, 0), 0);
     }
 
     #[test]

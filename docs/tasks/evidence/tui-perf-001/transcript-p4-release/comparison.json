@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "source_commits_from_external_receipts_required": true,
+  "matrix": "/tmp/talos-perf-transcript-p4-release",
+  "cases": {
+    "transcript-commit-10000": {
+      "baseline_cpu_median": 2.8287603390269607,
+      "candidate_cpu_median": 0.06768273588445799,
+      "cpu_ratio": 0.023926641981886508,
+      "paired_cpu_percentage_point_deltas": [
+        -2.790677842819325,
+        -2.421574592677511,
+        -2.7614261815469447
+      ],
+      "candidate_peak_pss_kib": 33532,
+      "peak_pss_budget_kib": 86386.4,
+      "input_p95_p99_budget_ms": [
+        10,
+        20
+      ],
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "input_p95": true,
+        "input_p99": true
+      },
+      "animation_deadline_evidence": null
+    }
+  },
+  "evaluated_checks_pass": true,
+  "limitations": [
+    "Only listed checks are evaluated; this is not whole-task acceptance.",
+    "CPU ratios at zero baseline are unavailable, not zero.",
+    "Native terminal, allocations and long-run heap stability require separate evidence; input latency is checked only with probes and animation lateness only in animation cases.",
+    "Pair deltas follow manifest round order; fixed baseline-first ordering can retain host drift."
+  ]
+}

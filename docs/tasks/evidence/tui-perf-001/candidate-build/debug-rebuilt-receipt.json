@@ -1,0 +1,38 @@
+{
+  "source_commit": "539adfd2e6e24353e936e13c1c001415a5e55982",
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///tmp/talos-tui-perf-claim/crates/talos-tui#0.10.1",
+    "manifest_path": "/tmp/talos-tui-perf-claim/crates/talos-tui/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "tui_perf_replay",
+      "src_path": "/tmp/talos-tui-perf-claim/crates/talos-tui/examples/tui_perf_replay.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/home/wjhuang/WorkSpace/personal/talos/target/debug/examples/tui_perf_replay"
+    ],
+    "executable": "/home/wjhuang/WorkSpace/personal/talos/target/debug/examples/tui_perf_replay",
+    "fresh": false
+  },
+  "sha256": "a44af33e0ebc4ba6456f56c4163d1c61cf81d4160e31e83843ee882d6d668651",
+  "binary": "/tmp/talos-candidate-539adfd2-rebuilt/debug",
+  "method": "Forced current talos-tui library rebuild via source timestamp; Cargo JSON artifact; verified P3 cache symbols; no Rust content changes."
+}

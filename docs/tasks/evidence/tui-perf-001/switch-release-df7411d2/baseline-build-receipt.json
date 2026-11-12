@@ -1,0 +1,45 @@
+{
+  "source_commit": "15ef42c178423bfdf40a1bb77b6d4982f0c4f7df",
+  "source_export": "git archive of exact commit, no edits",
+  "binary": "/tmp/talos-p0-switch-15ef42c1/release",
+  "sha256": "1e1c6792780cf3fac325c1ea6dc7c767e1b483958f5c325ec62d14a5b2761d8c",
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///tmp/talos-perf-switch-baseline-15ef42c1/crates/talos-tui#0.10.1",
+    "manifest_path": "/tmp/talos-perf-switch-baseline-15ef42c1/crates/talos-tui/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "tui_perf_replay",
+      "src_path": "/tmp/talos-perf-switch-baseline-15ef42c1/crates/talos-tui/examples/tui_perf_replay.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "3",
+      "debuginfo": 1,
+      "debug_assertions": false,
+      "overflow_checks": false,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/home/wjhuang/WorkSpace/personal/talos/target/release/examples/tui_perf_replay"
+    ],
+    "executable": "/home/wjhuang/WorkSpace/personal/talos/target/release/examples/tui_perf_replay",
+    "fresh": false
+  },
+  "profile": "release-with-symbols",
+  "release_environment": {
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_PROFILE_RELEASE_STRIP": "false"
+  },
+  "command": "cargo build --locked -p talos-tui --example tui_perf_replay --release --message-format=json",
+  "debug_info_verified": true
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "case": "candidate-r1-massif",
+    "samples": 3701,
+    "first_window_count": 495,
+    "last_window_count": 495,
+    "first_window_median_bytes": 26056220,
+    "last_window_median_bytes": 26080470,
+    "delta_bytes": 24250
+  },
+  {
+    "case": "candidate-r2-massif",
+    "samples": 3698,
+    "first_window_count": 496,
+    "last_window_count": 495,
+    "first_window_median_bytes": 26056220.0,
+    "last_window_median_bytes": 26080470,
+    "delta_bytes": 24250.0
+  },
+  {
+    "case": "candidate-r3-massif",
+    "samples": 3677,
+    "first_window_count": 496,
+    "last_window_count": 496,
+    "first_window_median_bytes": 26056220.0,
+    "last_window_median_bytes": 26080470.0,
+    "delta_bytes": 24250.0
+  }
+]

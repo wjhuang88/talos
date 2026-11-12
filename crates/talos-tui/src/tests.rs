@@ -317,7 +317,7 @@ mod tests {
             ttl: Duration::from_millis(1),
             created_at: Instant::now() - Duration::from_secs(1),
         });
-        state.expire_tip();
+        state.expire_tip(std::time::Instant::now());
         assert!(state.tip.is_none());
     }
 
@@ -330,7 +330,7 @@ mod tests {
             ttl: Duration::from_secs(10),
             created_at: Instant::now(),
         });
-        state.expire_tip();
+        state.expire_tip(std::time::Instant::now());
         assert!(state.tip.is_some());
     }
 
@@ -407,7 +407,7 @@ mod tests {
             is_processing: false,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(!content.contains("S:"));
         assert!(!content.contains("F:"));
@@ -427,7 +427,7 @@ mod tests {
             is_processing: false,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(content.contains("3 queued"));
     }
@@ -442,8 +442,8 @@ mod tests {
             ..Default::default()
         };
 
-        let wide = format!("{:?}", build_status_text(&status, 120));
-        let narrow = format!("{:?}", build_status_text(&status, 60));
+        let wide = format!("{:?}", build_status_text(&status, 120, None));
+        let narrow = format!("{:?}", build_status_text(&status, 60, None));
         assert!(wide.contains("2 images"));
         assert!(narrow.contains("2 images"));
 
@@ -451,7 +451,7 @@ mod tests {
             attachment_count: 0,
             ..status
         };
-        assert!(!format!("{:?}", build_status_text(&empty, 120)).contains("image"));
+        assert!(!format!("{:?}", build_status_text(&empty, 120, None)).contains("image"));
     }
 
     #[test]
@@ -1669,7 +1669,7 @@ mod tests {
             is_processing: false,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(content.contains("⬡ claude-sonnet-4"));
     }
@@ -1687,7 +1687,7 @@ mod tests {
             is_processing: true,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(!content.contains("◷"));
         assert!(!content.contains("processing"));
@@ -1706,7 +1706,7 @@ mod tests {
             is_processing: false,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(!content.contains("processing"));
     }
@@ -1744,10 +1744,12 @@ mod tests {
             ..base
         };
 
-        assert!(format!("{:?}", build_status_text(&timed_out, 120)).contains("timed out"));
-        assert!(format!("{:?}", build_status_text(&failed, 120)).contains("failed"));
-        assert!(format!("{:?}", build_status_text(&cancelled, 120)).contains("cancelled"));
-        assert!(format!("{:?}", build_status_text(&running_tool, 120)).contains("tool: bash"));
+        assert!(format!("{:?}", build_status_text(&timed_out, 120, None)).contains("timed out"));
+        assert!(format!("{:?}", build_status_text(&failed, 120, None)).contains("failed"));
+        assert!(format!("{:?}", build_status_text(&cancelled, 120, None)).contains("cancelled"));
+        assert!(
+            format!("{:?}", build_status_text(&running_tool, 120, None)).contains("tool: bash")
+        );
     }
 
     #[test]
@@ -1767,7 +1769,7 @@ mod tests {
             is_processing: false,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(content.contains("8.9k out"));
         assert!(!content.contains("21245 tokens"));
@@ -1792,7 +1794,7 @@ mod tests {
             ..Default::default()
         };
 
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(content.contains("8.9k out"));
         assert!(content.contains("(1.2k thinking)"));
@@ -1812,7 +1814,7 @@ mod tests {
             is_processing: false,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(content.contains("1M ctx"));
         assert!(!content.contains("1000k ctx"));
@@ -1821,7 +1823,8 @@ mod tests {
             context_limit: Some(2_000_000),
             ..status
         };
-        let two_million_content = format!("{:?}", build_status_text(&two_million_status, 120));
+        let two_million_content =
+            format!("{:?}", build_status_text(&two_million_status, 120, None));
         assert!(two_million_content.contains("2M ctx"));
         assert!(!two_million_content.contains("2000k ctx"));
     }
@@ -1849,9 +1852,9 @@ mod tests {
             ..raw_status.clone()
         };
 
-        let raw_content = format!("{:?}", build_status_text(&raw_status, 120));
-        let kilo_content = format!("{:?}", build_status_text(&kilo_status, 120));
-        let missing_content = format!("{:?}", build_status_text(&missing_status, 120));
+        let raw_content = format!("{:?}", build_status_text(&raw_status, 120, None));
+        let kilo_content = format!("{:?}", build_status_text(&kilo_status, 120, None));
+        let missing_content = format!("{:?}", build_status_text(&missing_status, 120, None));
 
         assert!(raw_content.contains("999 ctx"));
         assert!(kilo_content.contains("200k ctx"));
@@ -1881,7 +1884,7 @@ mod tests {
             is_processing: false,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(content.contains("200k ctx"));
         assert!(content.contains("~40%"));
@@ -1911,7 +1914,7 @@ mod tests {
             is_processing: false,
             ..Default::default()
         };
-        let text = build_status_text(&status, 60);
+        let text = build_status_text(&status, 60, None);
         let content = format!("{:?}", text);
         assert!(content.contains("100k ctx"));
         assert!(content.contains("65%"));
@@ -1934,8 +1937,8 @@ mod tests {
             is_processing: true,
             ..Default::default()
         };
-        let wide = build_status_text(&status, 120);
-        let narrow = build_status_text(&status, 60);
+        let wide = build_status_text(&status, 120, None);
+        let narrow = build_status_text(&status, 60, None);
         let wide_text = format!("{:?}", wide);
         let narrow_text = format!("{:?}", narrow);
         assert!(!wide_text.contains("processing"));
@@ -1978,8 +1981,8 @@ mod tests {
             ..base.clone()
         };
 
-        let short = build_status_text(&base, 120);
-        let wide = build_status_text(&unicode, 120);
+        let short = build_status_text(&base, 120, None);
+        let wide = build_status_text(&unicode, 120, None);
         let short_model = short.lines[0].spans[1].content.as_ref();
         let wide_model = wide.lines[0].spans[1].content.as_ref();
 
@@ -2013,7 +2016,7 @@ mod tests {
             is_processing: false,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(
             content.contains("talos"),
@@ -2035,7 +2038,7 @@ mod tests {
             ..Default::default()
         };
 
-        let text = build_status_text(&status, 100);
+        let text = build_status_text(&status, 100, None);
         let content = format!("{:?}", text);
 
         assert!(content.contains("zhipu-coding-plan/glm"));
@@ -2057,7 +2060,7 @@ mod tests {
             is_processing: false,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(!content.contains("  t") || content.contains("test"));
     }
@@ -2076,7 +2079,7 @@ mod tests {
             context_limit: Some(200_000),
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(
             content.contains("200k ctx"),
@@ -2098,7 +2101,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let content = format!("{:?}", build_status_text(&status, 120));
+        let content = format!("{:?}", build_status_text(&status, 120, None));
         assert!(content.contains("100k ctx"));
         assert!(content.contains("~150%"));
     }
@@ -2117,7 +2120,7 @@ mod tests {
             context_limit: None,
             ..Default::default()
         };
-        let text = build_status_text(&status, 120);
+        let text = build_status_text(&status, 120, None);
         let content = format!("{:?}", text);
         assert!(
             !content.contains("ctx"),

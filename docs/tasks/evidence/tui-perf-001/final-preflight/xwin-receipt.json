@@ -1,0 +1,13 @@
+{
+  "implementation_source": "6f558bf9807322e0b03ea7a9f3721dafb6708dd4",
+  "command": "cargo xwin check --locked -p talos-tui --tests --examples --target x86_64-pc-windows-msvc",
+  "exit_code": 0,
+  "log_sha256": "71285633b5a881f2fde4362b6320386ab51c7ddb6725dfeb53f93c130d2efe06",
+  "service_runtime": "2.019s",
+  "cpu_time": "1.583s",
+  "memory_peak": "817.3M",
+  "swap": "0B",
+  "limitations": [
+    "Cross-check only; native Windows terminal acceptance remains unavailable."
+  ]
+}

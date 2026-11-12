@@ -1,4 +1,4 @@
-use std::io::{self, Stdout};
+use std::io::{self, Stdout, Write};
 
 use crossterm::{
     cursor::{Hide, MoveTo, SetCursorStyle, Show},
@@ -16,7 +16,7 @@ use crossterm::{
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
-    buffer::Buffer,
+    buffer::{Buffer, Cell},
     layout::{Position, Rect, Size},
     widgets::{StatefulWidget, Widget},
 };
@@ -143,6 +143,48 @@ impl<'a> ComponentStack<'a> {
     }
 }
 
+/// One submission path for the real terminal and byte-capturing test backend.
+fn submit_frame_diff<W: Write>(
+    backend: &mut CrosstermBackend<W>,
+    cells: Vec<(u16, u16, &Cell)>,
+    clear: Option<Rect>,
+    move_cursor: Option<Position>,
+    visibility: Option<bool>,
+) -> io::Result<()> {
+    let dirty = clear.is_some() || !cells.is_empty();
+    if dirty || move_cursor.is_some() || visibility.is_some() {
+        queue!(backend, BeginSynchronizedUpdate)?;
+        let result = (|| -> io::Result<()> {
+            if let Some(area) = clear {
+                for y in area.y..area.bottom() {
+                    queue!(backend, MoveTo(0, y), Clear(ClearType::UntilNewLine))?;
+                }
+            }
+            if dirty {
+                backend.draw(cells.into_iter())?;
+            }
+            if let Some(position) = move_cursor {
+                queue!(backend, MoveTo(position.x, position.y))?;
+            }
+            if let Some(visible) = visibility {
+                if visible {
+                    queue!(backend, Show)?;
+                } else {
+                    queue!(backend, Hide)?;
+                }
+            }
+            Ok(())
+        })();
+        // Always end synchronization and attempt flushing, including error paths.
+        let end = queue!(backend, EndSynchronizedUpdate);
+        let flush_metric = crate::render_metrics::measure(crate::render_metrics::Stage::Flush);
+        let flush = Backend::flush(backend);
+        drop(flush_metric);
+        result.and(end).and(flush)?;
+    }
+    Ok(())
+}
+
 pub struct TerminalSession {
     backend: CrosstermBackend<Stdout>,
     buffers: [Buffer; 2],
@@ -158,6 +200,14 @@ pub struct TerminalSession {
     cursor_commands: usize,
     #[cfg(test)]
     test_cursor_position: Option<Position>,
+    #[cfg(test)]
+    test_draw_count: usize,
+    #[cfg(test)]
+    test_frame_ansi: Vec<u8>,
+    #[cfg(test)]
+    test_last_draw_at: Option<tokio::time::Instant>,
+    #[cfg(test)]
+    test_frame_observer: Option<tokio::sync::mpsc::UnboundedSender<String>>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -266,6 +316,14 @@ impl TerminalSession {
             cursor_commands: 0,
             #[cfg(test)]
             test_cursor_position: None,
+            #[cfg(test)]
+            test_draw_count: 0,
+            #[cfg(test)]
+            test_frame_ansi: Vec::new(),
+            #[cfg(test)]
+            test_last_draw_at: None,
+            #[cfg(test)]
+            test_frame_observer: None,
         })
     }
 
@@ -288,6 +346,12 @@ impl TerminalSession {
             cursor_visible: false,
             cursor_commands: 0,
             test_cursor_position: None,
+            #[cfg(test)]
+            test_draw_count: 0,
+            #[cfg(test)]
+            test_frame_ansi: Vec::new(),
+            test_last_draw_at: None,
+            test_frame_observer: None,
         }
     }
 
@@ -304,6 +368,33 @@ impl TerminalSession {
     #[cfg(test)]
     pub(crate) const fn test_cursor_position(&self) -> Option<Position> {
         self.test_cursor_position
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_draw_count(&self) -> usize {
+        self.test_draw_count
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_last_draw_at(&self) -> Option<tokio::time::Instant> {
+        self.test_last_draw_at
+    }
+
+    #[cfg(test)]
+    pub(crate) fn observe_test_frames(&mut self) -> tokio::sync::mpsc::UnboundedReceiver<String> {
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        self.test_frame_observer = Some(sender);
+        receiver
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_frame_ansi(&self) -> &[u8] {
+        &self.test_frame_ansi
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_rendered_buffer(&self) -> &Buffer {
+        &self.buffers[1 - self.current]
     }
 
     #[cfg(test)]
@@ -399,7 +490,10 @@ impl TerminalSession {
 
         let blank = force_clear.then(|| Buffer::empty(area));
         let previous = blank.as_ref().unwrap_or(&self.buffers[prev_idx]);
+        let diff_metric = crate::render_metrics::measure(crate::render_metrics::Stage::Diff);
         let cells: Vec<_> = previous.diff_iter(&self.buffers[self.current]).collect();
+        drop(diff_metric);
+        crate::render_metrics::cells(cells.len());
         let dirty = force_clear || !cells.is_empty();
         let cursor = cursor.and_then(|position| clamp_cursor(position, self.screen_size));
         let move_cursor = cursor.filter(|position| {
@@ -409,6 +503,16 @@ impl TerminalSession {
 
         #[cfg(test)]
         if self.test_mode {
+            self.test_frame_ansi.clear();
+            submit_frame_diff(
+                &mut CrosstermBackend::new(&mut self.test_frame_ansi),
+                cells,
+                force_clear.then_some(area),
+                move_cursor,
+                visibility_changed.then_some(cursor.is_some()),
+            )?;
+            self.test_draw_count += 1;
+            self.test_last_draw_at = Some(tokio::time::Instant::now());
             self.cursor_commands +=
                 usize::from(move_cursor.is_some()) + usize::from(visibility_changed);
             self.cursor_visible = cursor.is_some();
@@ -417,39 +521,19 @@ impl TerminalSession {
                 self.last_known_cursor_pos = position;
             }
             self.current = prev_idx;
+            if let Some(observer) = &self.test_frame_observer {
+                let _ = observer.send(self.test_rendered_text());
+            }
             return Ok(());
         }
 
-        if dirty || move_cursor.is_some() || visibility_changed {
-            // Ghostty and other supporting terminals present only the final frame/cursor.
-            // Unsupported terminals ignore these standard synchronized-output markers.
-            queue!(self.backend, BeginSynchronizedUpdate)?;
-            let result = (|| -> io::Result<()> {
-                if force_clear {
-                    for y in area.y..area.bottom() {
-                        queue!(self.backend, MoveTo(0, y), Clear(ClearType::UntilNewLine))?;
-                    }
-                }
-                if dirty {
-                    self.backend.draw(cells.into_iter())?;
-                }
-                if let Some(position) = move_cursor {
-                    queue!(self.backend, MoveTo(position.x, position.y))?;
-                }
-                if visibility_changed {
-                    if cursor.is_some() {
-                        queue!(self.backend, Show)?;
-                    } else {
-                        queue!(self.backend, Hide)?;
-                    }
-                }
-                Ok(())
-            })();
-            // End synchronization even when drawing fails; never leave the display frozen.
-            let end = queue!(self.backend, EndSynchronizedUpdate);
-            let flush = Backend::flush(&mut self.backend);
-            result.and(end).and(flush)?;
-        }
+        submit_frame_diff(
+            &mut self.backend,
+            cells,
+            force_clear.then_some(area),
+            move_cursor,
+            visibility_changed.then_some(cursor.is_some()),
+        )?;
         self.cursor_visible = cursor.is_some();
         if let Some(position) = cursor {
             self.last_known_cursor_pos = position;
@@ -901,6 +985,70 @@ mod tests {
             .draw_with_cursor(size, None, |_| {})
             .expect("modal repaint");
         assert_eq!(session.cursor_commands, hidden, "hidden remains hidden");
+    }
+
+    #[test]
+    fn unchanged_frames_submit_no_ansi_bytes() {
+        let mut session = TerminalSession::test_instance();
+        let size = Size::new(20, 10);
+        session
+            .draw_with_cursor(size, Some(Position::new(2, 5)), |frame| {
+                frame.render_widget(
+                    ratatui::widgets::Paragraph::new("stable"),
+                    Rect::new(0, 0, 10, 1),
+                );
+            })
+            .expect("initial frame");
+        session
+            .draw_with_cursor(size, Some(Position::new(2, 5)), |frame| {
+                frame.render_widget(
+                    ratatui::widgets::Paragraph::new("stable"),
+                    Rect::new(0, 0, 10, 1),
+                );
+            })
+            .expect("unchanged frame");
+        assert!(session.test_frame_ansi().is_empty());
+    }
+
+    #[test]
+    fn failed_frame_write_still_ends_synchronization_and_flushes() {
+        #[derive(Default)]
+        struct FailOnce {
+            bytes: Vec<u8>,
+            failed: bool,
+            flushed: bool,
+        }
+        impl Write for FailOnce {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                // Fail after synchronization begins, then permit recovery commands.
+                if !self.failed && self.bytes.ends_with(b"\x1b[?2026h") {
+                    self.failed = true;
+                    return Err(io::Error::other("injected frame write failure"));
+                }
+                self.bytes.extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                self.flushed = true;
+                Ok(())
+            }
+        }
+        let mut writer = FailOnce::default();
+        let mut backend = CrosstermBackend::new(&mut writer);
+        let error = submit_frame_diff(
+            &mut backend,
+            Vec::new(),
+            None,
+            Some(Position::new(2, 3)),
+            None,
+        )
+        .expect_err("injected error must propagate");
+        assert_eq!(error.kind(), io::ErrorKind::Other);
+        drop(backend);
+        assert!(writer.failed);
+        assert!(writer.flushed);
+        assert!(writer.bytes.starts_with(b"\x1b[?2026h"));
+        assert!(writer.bytes.ends_with(b"\x1b[?2026l"));
     }
 
     #[test]
