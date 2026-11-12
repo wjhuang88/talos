@@ -1,8 +1,8 @@
-# Iteration I324: GIT-COMPAT-001 System-Git 2.36 Preflight Compatibility
+# Iteration I324: GIT-COMPAT-001 gix-Native Preflight Replacing Git CLI
 
 > Document status: Active / Claimed proposed (ineffective until governance PR #920 merges)
 > Published plan date: 2026-11-11
-> Planned objective: implement the accepted gix-assisted Git 2.36 compatibility proposal without reducing prepared-operation authority.
+> Planned objective: replace Git CLI preflight analysis with audited gix-native analysis, including Git 2.36 support without reducing prepared-operation authority.
 > MVP deliverable: structured Checkout and Commit on native Windows Git 2.36.1 pass the admitted preflight and post-approval validation path; tested with older/newer Git.
 
 ## Collaboration Claim
@@ -12,14 +12,14 @@
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
-| Work Slice | GIT-COMPAT-001 / #919 I324 only: safe preflight discovery of config/attribute paths and controlled environment compatibility on Git 2.36 using audited gix 0.90.0 and bound host probes; preserve prepared Read/executable/facet/revalidation and system-Git execution; no snapshot digest/aux budget or TUI/other operations |
+| Work Slice | GIT-COMPAT-001 / #919 I324 only: safe preflight discovery of config/attribute paths and controlled environment compatibility on Git 2.36 using audited gix 0.90.0 without Git CLI preflight subprocesses; preserve prepared Read/executable/facet/revalidation and system-Git execution; no snapshot digest/aux budget or TUI/other operations |
 | Claimed At | 2026-11-11 |
 | Source Issue | #919 |
 | Governance Claim PR | #920 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of the 2026-11-10 gix design on 2026-11-11 (conversation). Single-maintainer fallback is proposed for documentation-only claim because no separate reviewing maintainer is available; exact-head CI, both governance validators and no-overlap merge-time CAS are mandatory. No source implementation or security acceptance is claimed by this PR. Subsequent implementation requires independent Git authorization/security/API review and native Windows evidence. |
 | Implementation PR | Not started |
-| Last Updated | 2026-11-11 |
+| Last Updated | 2026-11-12 |
 | Handoff / Release Condition | Exact-head independent Git authorization/security review, both governance validators, native Windows acceptance, no scope overlap; retain Review until actual evidence. |
 
 ## Selection inventory and non-overlap (2026-11-11)
@@ -36,7 +36,7 @@
 
 **Hard constraints:** system Git still executes; resource discovery is path-only until exact Read admission; executable/cwd/env and configuration evidence remain bound and revalidated; unsupported behavior fails closed. No extra unsafe, no Cargo.lock/dependency changes, no permission-facet expansion, no network or hook/transport execution without authority.
 
-**Soft constraint:** prefer audited pure gix 0.90.0 path/config primitives, using the existing bounded Git host bridge for installation-specific paths not derivable safely. Preserve Git 2.36 support without assuming one machine's installation layout.
+**Required direction (maintainer clarification 2026-11-12):** use audited gix-native parsing/planning for preflight on *all* Git versions, with frozen per-invocation inputs and staged exact Read admission. **Do not** invoke Git CLI during preflight, directly or through gix helpers, nor introduce hardcoded Git-version, Scoop, Windows or installation-prefix compatibility heuristics. Unknown installation-compiled defaults must produce an explicit safe refusal, not an unsafe guess. System Git remains the final authorized writer.
 
 **Unverified assumption:** compatibility failures primarily arise from the unsupported `git var` queries; Windows log also contains URL rewrite/tracking mismatches. Distinguish root causes in tests.
 
@@ -44,10 +44,10 @@
 
 | Stage | Deliverable | Gate |
 |---|---|---|
-| T0 | Enumerate exact current discovery/inspection command and executable binding; audit gix APIs for hidden processes, path source and global cache | Source-backed decision; if authorized command surface changes, amend/accept ADR-089 first |
-| T1 | Git 2.36-compatible system/global config + attributes path discovery with zero new unauthorized reads | Red/green 2.36 tests, path/absence/env/executable identity tests |
-| T2 | Narrow Scoop `GIT_INSTALL_ROOT` compatibility (only if experimentally proven inert), preserving dangerous environment refusal | Security differential and original environment native test |
-| T3 | Config includeIf/URL rewrite/tracking/attribute and large checkout/commit conformance; newer Git regression | Prepared-plan mutation/staleness tests and explicit unresolved matrix |
+| T0 | Enumerate all CLI preflight call sites and their permission bounds; audit gix APIs for hidden Git subprocesses, unauthorized file reads and global caches; draft ADR-089 amendment | Source-backed decision; if authorized command surface changes, amend/accept ADR-089 first |
+| T1 | gix-native config, includes, attributes and effect source analysis for all versions; no preflight CLI and zero unauthorized reads | Red/green 2.36 tests, path/absence/env/executable identity tests |
+| T2 | Characterize `GIT_INSTALL_ROOT` for selected final writer without hardcoded path/version exceptions; preserve dangerous environment refusal | Security differential and original environment native test |
+| T3 | gix-native config/includeIf/URL rewrite/tracking/attribute and large checkout/commit conformance against 2.36/newer; instrumented no-subprocess preflight | Prepared-plan mutation/staleness tests and explicit unresolved matrix |
 | T4 | Readme/docs and owner evidence, native Windows acceptance, locked full preflight, independent security/API review, exact-head CI, CAS | No Complete without implementation SHA and all required gates |
 
 ### Acceptance
@@ -55,7 +55,7 @@
 - On the supported native Git 2.36.1 host, structured Checkout create/switch and Commit no longer fail solely due to unsupported attribute path queries or inert Scoop installation env.
 - The original system Git effects, binding and all staging/permission/Read frontiers are preserved. No plan can be reused after configuration, executable, path or relevant source changes.
 - Include/includeIf, HOME/XDG, alternate installation layouts, missing/empty global paths, Unicode/spaces and both Git 2.36/current Git are covered by source-backed tests.
-- Tests distinguish Git-version interface failures from real config/URL/tracking differences; unsupported cases remain visibly unsupported rather than silently passing.
+- Tests prove *no Git CLI subprocess in any preflight stage* (including hidden gix calls), and compare gix-native plans with selected system Git's actual post-approval behavior on Git 2.36/newer; unsupported cases remain visibly unsupported, not silently allowed.
 - All relevant locked Rust + governance gates, exact-head Windows CI and independent security/API review succeed before implementation merge.
 
 ### Non-goals
@@ -81,3 +81,7 @@ Update README/README.zh-CN Git compatibility language, this iteration and Story,
 ## Actual execution (not yet active)
 
 - 2026-11-11: requirement intake Issue #919 and governance-only selection baseline. Proposed claim/activation not effective until PR merges. T0 source investigation is read-only; no production implementation, validation pass or Completion Commit.
+
+## Maintainer scope correction — 2026-11-12 (applies before implementation)
+
+The November 11 baseline mentioned bounded host probes as a possible compatibility bridge. The maintainer clarified the actual desired outcome: **replace Git command-line preflight with gix**, not add host-version conditional paths or command probes. This correction is made to unmerged governance PR #920; its earlier exact-head CI no longer applies after these changes. Use gix/Talos-native planning over previously admitted content; keep file-path discovery separate from exact Read authorization and bind current evidence to final system Git execution. gix itself may spawn Git for installation path discovery: audit and exclude such APIs, rather than silently outsourcing the subprocess. If system Git compiled defaults cannot be proven from allowed sources, fail closed, report an explicit unsupported profile and seek a narrow decision. ADR-089's CLI command wording requires a reviewed amendment before implementation. No product code or passing native tests are claimed.
