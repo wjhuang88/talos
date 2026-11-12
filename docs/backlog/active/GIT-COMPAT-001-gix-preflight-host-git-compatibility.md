@@ -50,7 +50,7 @@ Replace Git CLI preflight discovery/interpretation with auditable gix-native ana
 | Governance Claim PR | #920 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim PR #920 merged as `067dd3d4f5fd0fac910ac7f52bd23ee7f8f5bb80` after exact-head CI #4123 (`43248451893`) passed remote owner reconciliation and both governance validators (0 warnings). Single-maintainer documentation-only claim; **no** source implementation, accepted ADR amendment or independent Git security/API review is implied. |
-| Implementation PR | T0 branch `feat/i324-gix-native-preflight`; PR pending |
+| Implementation PR | Draft #928 (T0 source/API audit only; no production implementation yet) |
 | Last Updated | 2026-11-12 |
 | Handoff / Release Condition | Independent security/API review and native Windows acceptance before delivery; exact-head CI and governance CAS for claim/implementation. |
 
