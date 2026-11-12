@@ -113,6 +113,10 @@ impl Execution {
             for (index, message) in messages[..end].iter().enumerate() {
                 tokio::task::yield_now().await;
                 if tokio::time::Instant::now() >= deadline {
+                    tracing::warn!(
+                        reason = "discovery_reference_deadline",
+                        "history/checkpoint preparation unavailable"
+                    );
                     return None;
                 }
                 if matches!(message, Message::System { .. }) {
@@ -127,11 +131,19 @@ impl Execution {
                 }
             }
             if tokio::time::Instant::now() >= deadline {
+                tracing::warn!(
+                    reason = "discovery_scan_deadline",
+                    "history/checkpoint preparation unavailable"
+                );
                 return None;
             }
             // Cloning metadata is synchronous and O(history), not hard real-time.
             let source = source.clone();
             if tokio::time::Instant::now() >= deadline {
+                tracing::warn!(
+                    reason = "discovery_clone_deadline",
+                    "history/checkpoint preparation unavailable"
+                );
                 return None;
             }
             (!refs.is_empty()).then(|| Snapshot {
@@ -186,6 +198,11 @@ fn unavailable() -> ToolResult {
     ToolResult::error("history/checkpoint execution unavailable")
 }
 
+fn unavailable_reason(reason: &'static str) -> ToolResult {
+    tracing::warn!(reason, "history/checkpoint execution unavailable");
+    unavailable()
+}
+
 #[async_trait]
 impl AgentTool for HistorySearchTool {
     fn name(&self) -> &str {
@@ -211,8 +228,16 @@ impl AgentTool for HistorySearchTool {
             return ToolResult::error("invalid history input");
         };
         let Ok(execution) = EXECUTION.try_with(Clone::clone) else {
-            return unavailable();
+            return unavailable_reason("execution_scope_missing");
         };
+        // CLI persists terminal diagnostics between provider responses. Renew
+        // only the seal for the identical captured prefix, never its cutoff or
+        // index scope. Current-source checks after query still detect races.
+        let _ = crate::checkpoint_history::HISTORY.try_with(|history| {
+            history
+                .as_ref()
+                .and_then(|history| history.refresh_prefix())
+        });
         if matches!(input.mode.as_str(), "search" | "detail") {
             if input
                 .cursor
@@ -233,7 +258,7 @@ impl AgentTool for HistorySearchTool {
             }
             let authority = {
                 let Ok(state) = execution.state.lock() else {
-                    return unavailable();
+                    return unavailable_reason("execution_state_poisoned");
                 };
                 if let Some((token, scope, authority)) = &state.recovery {
                     let same_scope = crate::checkpoint_history::HISTORY
@@ -249,10 +274,10 @@ impl AgentTool for HistorySearchTool {
                     authority.clone()
                 } else {
                     let Some(snapshot) = &state.issued else {
-                        return unavailable();
+                        return unavailable_reason("issued_snapshot_missing");
                     };
                     let Some(current) = &state.current else {
-                        return unavailable();
+                        return unavailable_reason("current_snapshot_missing");
                     };
                     if input.snapshot.as_deref() != Some(snapshot.token.as_str())
                         || current.end < snapshot.end
@@ -265,7 +290,7 @@ impl AgentTool for HistorySearchTool {
                 }
             };
             if !authority.valid() {
-                return unavailable();
+                return unavailable_reason("permission_lease_revoked");
             }
             let delivery_deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
             let result = crate::checkpoint_history::HISTORY
@@ -293,7 +318,7 @@ impl AgentTool for HistorySearchTool {
             // through permission commit, using the same state -> permission lock
             // order as discovery. Filesystem/SQLite checks stay outside that lock.
             let Ok(state) = execution.state.lock() else {
-                return unavailable();
+                return unavailable_reason("execution_state_poisoned");
             };
             let snapshot_current = if let Some((token, scope, _)) = &state.recovery {
                 input.snapshot.as_deref() == Some(token.as_str())
@@ -320,7 +345,7 @@ impl AgentTool for HistorySearchTool {
                     })
                     .unwrap_or(false)
             {
-                return unavailable();
+                return unavailable_reason("delivery_source_or_snapshot_unavailable");
             }
             return authority
                 .commit(|| {
@@ -331,13 +356,13 @@ impl AgentTool for HistorySearchTool {
                             })
                             .unwrap_or(false)
                     {
-                        return unavailable();
+                        return unavailable_reason("delivery_cancelled_or_expired");
                     }
                     result
                         .map(|result| ToolResult::success(result.to_string()))
                         .unwrap_or_else(|| ToolResult::error("history recovery Unavailable"))
                 })
-                .unwrap_or_else(unavailable);
+                .unwrap_or_else(|| unavailable_reason("permission_commit_rejected"));
         }
         if input.mode != "discover"
             || input.query.is_some()
@@ -347,7 +372,7 @@ impl AgentTool for HistorySearchTool {
             return ToolResult::error("invalid discovery input");
         }
         let Ok(mut state) = execution.state.lock() else {
-            return unavailable();
+            return unavailable_reason("execution_state_poisoned");
         };
         let rediscover = input.cursor.is_none();
         // Durable recovery does not require a materialized compaction source.
@@ -365,13 +390,13 @@ impl AgentTool for HistorySearchTool {
                 .ok()
                 .flatten();
             let Some(scope) = ready else {
-                return unavailable();
+                return unavailable_reason("snapshot_missing_and_history_not_ready");
             };
             let Some(permission) = &execution.permission else {
-                return unavailable();
+                return unavailable_reason("permission_state_missing");
             };
             let Ok(permission_snapshot) = permission.state_snapshot() else {
-                return unavailable();
+                return unavailable_reason("permission_snapshot_unavailable");
             };
             let authority = PermissionLease {
                 state: permission.clone(),
@@ -389,7 +414,9 @@ impl AgentTool for HistorySearchTool {
             state.issued = None;
             state.cursor = None;
             state.recovery = Some((token, scope, authority.clone()));
-            return authority.commit(|| result).unwrap_or_else(unavailable);
+            return authority
+                .commit(|| result)
+                .unwrap_or_else(|| unavailable_reason("permission_commit_rejected"));
         }
         state.recovery = None;
         let (snapshot, start) = if let Some(cursor) = input.cursor {
@@ -400,10 +427,10 @@ impl AgentTool for HistorySearchTool {
                 return ToolResult::error("stale discovery cursor");
             }
             let Some(snapshot) = state.issued.clone() else {
-                return unavailable();
+                return unavailable_reason("issued_snapshot_missing");
             };
             let Some(current) = &state.current else {
-                return unavailable();
+                return unavailable_reason("current_snapshot_missing");
             };
             if current.end < snapshot.end
                 || !(0..snapshot.end).all(|i| snapshot.source.same_entry(&current.source, i))
@@ -413,12 +440,12 @@ impl AgentTool for HistorySearchTool {
             (snapshot, *start)
         } else {
             let Some(snapshot) = state.current.clone() else {
-                return unavailable();
+                return unavailable_reason("current_snapshot_missing");
             };
             (snapshot, 0)
         };
         if !snapshot.authority.valid() {
-            return unavailable();
+            return unavailable_reason("permission_lease_revoked");
         }
         if rediscover {
             let reset = crate::checkpoint_history::HISTORY
@@ -426,7 +453,7 @@ impl AgentTool for HistorySearchTool {
                 .ok()
                 .flatten();
             if matches!(reset, Some(None)) {
-                return unavailable();
+                return unavailable_reason("query_state_reset_failed");
             }
         }
         let refs: Vec<_> = snapshot
@@ -461,7 +488,9 @@ impl AgentTool for CompactContextTool {
         serde_json::to_value(schemars::schema_for!(CompactInput)).unwrap_or_else(|_| json!({}))
     }
     fn permission_profile(&self, _: &Value) -> Vec<ToolPermissionFacet> {
-        vec![ToolPermissionFacet::new(ToolNature::Write)]
+        // Session-owned checkpoint submission, not filesystem write authority.
+        // Execution still requires the live snapshot and Actor installation gates.
+        vec![ToolPermissionFacet::new(ToolNature::Internal)]
     }
     fn family(&self) -> ToolFamily {
         ToolFamily::Extension
@@ -477,11 +506,11 @@ impl AgentTool for CompactContextTool {
             return ToolResult::error("invalid checkpoint input");
         };
         let Ok(execution) = EXECUTION.try_with(Clone::clone) else {
-            return unavailable();
+            return unavailable_reason("execution_scope_missing");
         };
         let snapshot = {
             let Ok(mut state) = execution.state.lock() else {
-                return unavailable();
+                return unavailable_reason("execution_state_poisoned");
             };
             if state.receipt.is_some() {
                 return ToolResult::error("checkpoint operation busy");
@@ -494,7 +523,7 @@ impl AgentTool for CompactContextTool {
                 return ToolResult::error("stale checkpoint snapshot");
             };
             let Some(current) = &state.current else {
-                return unavailable();
+                return unavailable_reason("current_snapshot_missing");
             };
             if !issued.authority.valid()
                 || current.end < issued.end
@@ -549,12 +578,12 @@ impl AgentTool for CompactContextTool {
             })
             .is_err()
         {
-            return unavailable();
+            return unavailable_reason("checkpoint_actor_channel_closed");
         }
         match tokio::time::timeout(std::time::Duration::from_secs(2), admitted).await {
             Ok(Ok(Ok(id))) => {
                 let Ok(mut state) = execution.state.lock() else {
-                    return unavailable();
+                    return unavailable_reason("execution_state_poisoned");
                 };
                 state.receipt = Some((id, terminal));
                 ToolResult::success(json!({"status":"Admitted","operation_id":id}).to_string())
@@ -567,6 +596,31 @@ impl AgentTool for CompactContextTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn compact_internal_admission_preserves_execution_scope() {
+        use talos_permission::{
+            PermissionContext, PermissionEngine, PermissionInvocation, PermissionRequest,
+            PermissionSessionState,
+        };
+        let tool = CompactContextTool;
+        let input = json!({});
+        let facets = tool.permission_profile(&input);
+        assert_eq!(facets.len(), 1);
+        assert_eq!(facets[0].nature, ToolNature::Internal);
+        let state = PermissionSessionState::new(PermissionEngine::empty());
+        let request = PermissionRequest::native("compact_context", &facets, &input);
+        assert!(matches!(
+            state
+                .begin_invocation(&request, &PermissionContext::compatibility())
+                .expect("internal admission"),
+            PermissionInvocation::Allow(_)
+        ));
+        assert!(
+            tool.execute(input).await.is_error,
+            "admission does not bypass payload or execution scope validation"
+        );
+    }
 
     #[tokio::test]
     async fn only_applied_terminal_receipts_report_discovery_progress() {
@@ -818,6 +872,48 @@ mod tests {
         );
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn expired_discovery_withdraws_authority_and_fresh_attempt_recovers() {
+        let (execution, _, raw) = fixture().await;
+        let source = HistorySource::bind(
+            0,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
+        )
+        .expect("source");
+        assert!(execution.state.lock().expect("state").current.is_some());
+        {
+            let refresh = execution.refresh_cooperative(Some(&source), &raw);
+            tokio::pin!(refresh);
+            // Poll through several records so expiry discards a partial scan.
+            for _ in 0..3 {
+                tokio::select! { biased;
+                    _ = &mut refresh => panic!("refresh must yield before publication"),
+                    _ = std::future::ready(()) => {},
+                }
+            }
+            tokio::time::advance(std::time::Duration::from_secs(2)).await;
+            refresh.await;
+        }
+        assert!(execution.state.lock().expect("state").current.is_none());
+        let unavailable = EXECUTION
+            .scope(
+                execution.clone(),
+                HistorySearchTool.execute(json!({"mode":"discover"})),
+            )
+            .await;
+        assert!(unavailable.is_error, "expired authority must not escape");
+        execution.refresh_cooperative(Some(&source), &raw).await;
+        let recovered = EXECUTION
+            .scope(
+                execution,
+                HistorySearchTool.execute(json!({"mode":"discover"})),
+            )
+            .await;
+        assert!(!recovered.is_error, "{}", recovered.content);
+    }
+
     #[tokio::test]
     async fn cooperative_discovery_accepts_long_bound_history() {
         let (execution, _, _) = fixture().await;
@@ -855,6 +951,82 @@ mod tests {
         let page: Value = serde_json::from_str(&result.content).expect("page");
         assert_eq!(page["sources"].as_array().expect("refs").len(), 20);
         assert_eq!(page["complete"], false);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn mixed_production_writers_reopen_with_discover_and_search() {
+        use crate::checkpoint_history::History;
+        use talos_core::message::{AgentEvent, Message};
+        use talos_session::DurableSession;
+        use tokio_util::sync::CancellationToken;
+        let (execution, _, _) = fixture().await;
+        execution.refresh_cooperative(None, &[]).await;
+        let root = tempfile::tempdir().expect("root");
+        let session = DurableSession::open_or_create(root.path(), "mixed-writers").expect("owner");
+        session
+            .session()
+            .append(&Message::User {
+                content: "initial question".into(),
+            })
+            .expect("append");
+        session
+            .session()
+            .append_event(&AgentEvent::TurnStart)
+            .expect("event");
+        session
+            .commit_turn(
+                "first",
+                &[Message::User {
+                    content: "durable searchable constraint".into(),
+                }],
+                &Default::default(),
+            )
+            .expect("commit");
+        session
+            .session()
+            .append_event(&AgentEvent::TurnStart)
+            .expect("post-commit event");
+        let diagnostic = talos_session::ProviderTerminalDiagnostic::from_agent_event(
+            "first",
+            1,
+            &AgentEvent::Error {
+                message: "transport failed".into(),
+            },
+            None,
+            None,
+        )
+        .expect("diagnostic");
+        session
+            .session()
+            .append_terminal_diagnostic(&diagnostic)
+            .expect("diagnostic append");
+        session
+            .session()
+            .append(&Message::User {
+                content: "next question".into(),
+            })
+            .expect("post-event append");
+        drop(session);
+        let session = DurableSession::open_existing(root.path(), "mixed-writers")
+            .expect("reopen")
+            .expect("existing");
+        let history = History::prepare_cached(
+            &session,
+            &CancellationToken::new(),
+            &tokio::sync::Mutex::new(None),
+        )
+        .await
+        .expect("history available");
+        crate::checkpoint_history::HISTORY.scope(Some(history), EXECUTION.scope(execution, async {
+            let discovery = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+            assert!(!discovery.is_error, "{}", discovery.content);
+            let discovery: Value = serde_json::from_str(&discovery.content).expect("discovery");
+            let search = HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"constraint"})).await;
+            assert!(!search.is_error, "{}", search.content);
+            let result: Value = serde_json::from_str(&search.content).expect("search");
+            assert!(result["results"].as_array().expect("results").iter().any(|item| item["text"].as_str().is_some_and(|text| text.contains("durable searchable constraint"))));
+        })).await;
     }
 
     #[cfg(unix)]

@@ -17,6 +17,9 @@ use crate::{Agent, PreparedSessionTurn, SteeringBoundaryAcknowledgement};
 pub(super) struct TurnPersistence {
     pub(super) session: talos_session::Session,
     pub(super) metadata: talos_session::SessionMetadata,
+    pub(super) history_owner: Arc<tokio::sync::Mutex<Option<talos_session::DurableSession>>>,
+    pub(super) recovery_preparation:
+        Arc<tokio::sync::Mutex<Option<crate::checkpoint_history::Preparation>>>,
 }
 
 #[derive(Clone)]
@@ -191,6 +194,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         .as_ref()
         .and_then(|sandbox| sandbox.cleanup_receipt());
     let history_owner = durable_persistence.clone();
+    let legacy_history = persistence.clone();
     let history_cancel = cancel_token.clone();
     let agent_lease = runtime_lease.clone();
     let mut agent_task = tokio::spawn(async move {
@@ -203,7 +207,39 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     &owner.recovery_preparation,
                 )
                 .await
+            } else if let Some(legacy) = legacy_history {
+                let mut binding = legacy.history_owner.lock().await;
+                if binding.is_none() {
+                    let session = legacy.session.clone();
+                    match tokio::task::spawn_blocking(move || {
+                        talos_session::DurableSession::bind_existing_history(session)
+                    })
+                    .await
+                    {
+                        Ok(Ok(owner)) => *binding = Some(owner),
+                        _ => tracing::warn!(
+                            reason = "selected_session_history_binding_failed",
+                            "history preparation unavailable"
+                        ),
+                    }
+                }
+                let owner = binding.clone();
+                drop(binding);
+                if let Some(owner) = owner {
+                    crate::checkpoint_history::History::prepare_cached(
+                        &owner,
+                        &history_cancel,
+                        &legacy.recovery_preparation,
+                    )
+                    .await
+                } else {
+                    None
+                }
             } else {
+                tracing::warn!(
+                    reason = "durable_history_owner_not_configured",
+                    "history preparation unavailable"
+                );
                 None
             }
         } else {

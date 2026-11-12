@@ -30,7 +30,9 @@
 //! Entries without `id` or `parent_id` fields (from older JSONL files) are treated
 //! as part of a single linear branch. They are assigned synthetic IDs on load.
 
+mod archive_recovery;
 mod artifacts;
+pub use archive_recovery::{ArchiveRecoveryEvidence, ArchiveRecoverySource};
 mod compact_text;
 pub mod compaction_engine;
 mod compression;

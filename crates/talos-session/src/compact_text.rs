@@ -56,21 +56,25 @@ impl crate::store::SessionStore for CompactTextSessionStore {
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            let mut file = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(file_path)?;
-            writeln!(
-                file,
-                "{TLOG_MAGIC}\t{TLOG_VERSION}\t{}",
-                Utc::now().timestamp_millis()
-            )?;
-            file.flush()?;
+            let mut file = crate::store::retry_sharing_conflict(|| {
+                OpenOptions::new().create(true).append(true).open(file_path)
+            })?;
+            // Another owner may initialize the file while acquisition waits.
+            // Recheck the acquired handle and never truncate that owner's data.
+            if file.metadata()?.len() == 0 {
+                writeln!(
+                    file,
+                    "{TLOG_MAGIC}\t{TLOG_VERSION}\t{}",
+                    Utc::now().timestamp_millis()
+                )?;
+                file.flush()?;
+            }
         }
 
         let line = encode_entry(entry);
-        let mut file = OpenOptions::new().append(true).open(file_path)?;
+        let mut file = crate::store::retry_sharing_conflict(|| {
+            OpenOptions::new().append(true).open(file_path)
+        })?;
         file.write_all(line.as_bytes())?;
         file.flush()?;
         Ok(())
@@ -105,8 +109,18 @@ impl crate::store::SessionStore for CompactTextSessionStore {
         }
         file.sync_all()?;
         drop(file);
-        fs::rename(&temporary, file_path)?;
+        crate::store::publish_atomic_file(&temporary, file_path)?;
         Ok(())
+    }
+
+    fn replace_with_retained_suffix(
+        &self,
+        file_path: &Path,
+        original: &[SessionEntry],
+        retain_from: usize,
+        prepended: &[SessionEntry],
+    ) -> Result<(), SessionError> {
+        rewrite_preserving_records(file_path, original, retain_from, prepended, &[])
     }
 
     fn read_last_entry_id(&self, file_path: &Path) -> Option<String> {
@@ -128,6 +142,108 @@ impl crate::store::SessionStore for CompactTextSessionStore {
     fn file_extension(&self) -> &'static str {
         "tlog"
     }
+}
+
+// Preserve a validated suffix of original records when finalizing or compacting.
+// Only newly prepended/appended records are encoded. The caller holds the session
+// write lock and host execution lease. This does not publish archive custody.
+pub(crate) fn rewrite_preserving_records(
+    path: &Path,
+    prior: &[SessionEntry],
+    retain_from: usize,
+    prepended: &[SessionEntry],
+    appended: &[SessionEntry],
+) -> Result<(), SessionError> {
+    if retain_from > prior.len() {
+        return Err(SessionError::DurableTurn(
+            "invalid retained record cutoff".into(),
+        ));
+    }
+    let mut source = crate::history_page::open_source(path)
+        .map_err(|_| SessionError::DurableTurn("cannot acquire original transcript".into()))?;
+    let stamp = crate::recovery_stamp::from_file(&source)
+        .map_err(|_| SessionError::DurableTurn("cannot capture original transcript".into()))?;
+    let mut original = Vec::new();
+    source.read_to_end(&mut original)?;
+    let header = existing_creation_header(path)?
+        .ok_or_else(|| SessionError::DurableTurn("missing original transcript header".into()))?;
+    if !original.starts_with(&header) {
+        return Err(SessionError::DurableTurn(
+            "original transcript changed".into(),
+        ));
+    }
+    let mut offset = header.len();
+    let mut retained_offset = if retain_from == 0 {
+        offset
+    } else {
+        original.len()
+    };
+    for (index, expected) in prior.iter().enumerate() {
+        if index == retain_from {
+            retained_offset = offset;
+        }
+        while original
+            .get(offset)
+            .is_some_and(|byte| matches!(byte, b'\n' | b'\r'))
+        {
+            offset += 1;
+        }
+        let (entry, length) =
+            crate::history_page::decode_tlog_record(&original[offset..], usize::MAX)
+                .map_err(|_| SessionError::DurableTurn("invalid original transcript".into()))?
+                .ok_or_else(|| {
+                    SessionError::DurableTurn("incomplete original transcript".into())
+                })?;
+        if encode_entry(&entry) != encode_entry(expected) {
+            return Err(SessionError::DurableTurn(
+                "original transcript changed".into(),
+            ));
+        }
+        offset += length;
+    }
+    while original
+        .get(offset)
+        .is_some_and(|byte| matches!(byte, b'\n' | b'\r'))
+    {
+        offset += 1;
+    }
+    if offset != original.len() {
+        return Err(SessionError::DurableTurn(
+            "unvalidated original transcript tail".into(),
+        ));
+    }
+    let current = crate::recovery_stamp::from_file(&source)
+        .map_err(|_| SessionError::DurableTurn("cannot recheck original transcript".into()))?;
+    if !crate::recovery_seal::same_file_version(&stamp, &current)
+        .map_err(|_| SessionError::DurableTurn("cannot compare original transcript".into()))?
+    {
+        return Err(SessionError::DurableTurn(
+            "original transcript changed".into(),
+        ));
+    }
+    // Windows read leases must be released before acquiring publication access.
+    drop(source);
+    #[cfg(windows)]
+    drop(stamp);
+    #[cfg(windows)]
+    drop(current);
+    let temporary = temporary_sibling(path);
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&temporary)?;
+    file.write_all(&header)?;
+    for entry in prepended {
+        file.write_all(encode_entry(entry).as_bytes())?;
+    }
+    file.write_all(&original[retained_offset..])?;
+    for entry in appended {
+        file.write_all(encode_entry(entry).as_bytes())?;
+    }
+    file.sync_all()?;
+    drop(file);
+    crate::store::publish_atomic_file(&temporary, path)?;
+    Ok(())
 }
 
 // A format header is tiny; never scan an unbounded malformed first line.

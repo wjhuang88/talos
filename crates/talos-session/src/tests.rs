@@ -716,6 +716,160 @@ fn session_with_tool_result() {
 // === Branching Tests ===
 
 #[test]
+fn persisted_mixed_appends_keep_parent_chain_after_reopen() {
+    let dir = tempfile::tempdir().expect("directory");
+    let manager = SessionManager::with_dir(dir.path().to_path_buf());
+    let session = manager
+        .create_session("parent-regression", "")
+        .expect("session");
+    for round in 0..2 {
+        let session = if round == 0 {
+            session.clone()
+        } else {
+            manager.get_session(&session.id).expect("reopen")
+        };
+        session
+            .append(&Message::User {
+                content: format!("question {round}"),
+            })
+            .expect("user");
+        session.append_event(&AgentEvent::TurnStart).expect("event");
+        session
+            .append(&Message::Assistant {
+                content: "answer".into(),
+                tool_calls: vec![],
+                reasoning: None,
+            })
+            .expect("assistant");
+    }
+    let entries = manager
+        .get_session(&session.id)
+        .expect("restart")
+        .read_entries()
+        .expect("persisted entries");
+    assert_eq!(entries.len(), 6);
+    assert_eq!(entries[0].parent_id, None);
+    for pair in entries.windows(2) {
+        assert_eq!(pair[1].parent_id.as_deref(), Some(pair[0].id.as_str()));
+    }
+}
+
+#[test]
+fn direct_session_first_append_creates_each_supported_store_and_reopens_linearly() {
+    let dir = tempfile::tempdir().expect("directory");
+    for extension in ["tlog", "jsonl"] {
+        let id = uuid::Uuid::new_v4();
+        let path = dir.path().join(format!("{id}.{extension}"));
+        let session = Session::new(id, "direct".into(), String::new(), path.clone());
+        assert!(!path.exists());
+        session
+            .append(&Message::User {
+                content: "first".into(),
+            })
+            .expect("first write");
+        let reopened = Session::new(id, "direct".into(), String::new(), path);
+        reopened
+            .append_event(&AgentEvent::TurnStart)
+            .expect("reopened write");
+        let entries = reopened.read_entries().expect("entries");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].parent_id, None);
+        assert_eq!(
+            entries[1].parent_id.as_deref(),
+            Some(entries[0].id.as_str())
+        );
+    }
+}
+
+#[test]
+fn reopened_long_multiline_tail_and_concurrent_clones_keep_parent_chain() {
+    let dir = tempfile::tempdir().expect("directory");
+    let manager = SessionManager::with_dir(dir.path().to_path_buf());
+    let session = manager.create_session("long-parent", "").expect("session");
+    session
+        .append(&Message::User {
+            content: "line\n".repeat(10_000),
+        })
+        .expect("long record");
+    let session = manager.get_session(&session.id).expect("reopen");
+    std::thread::scope(|scope| {
+        for _ in 0..4 {
+            let session = session.clone();
+            scope.spawn(move || {
+                for _ in 0..20 {
+                    session.append_event(&AgentEvent::TurnStart).expect("event");
+                }
+            });
+        }
+    });
+    let entries = session.read_entries().expect("entries");
+    assert_eq!(entries.len(), 81);
+    for pair in entries.windows(2) {
+        assert_eq!(pair[1].parent_id.as_deref(), Some(pair[0].id.as_str()));
+    }
+}
+
+#[test]
+fn reopened_append_refuses_corrupt_tail_without_modifying_evidence() {
+    let dir = tempfile::tempdir().expect("directory");
+    let manager = SessionManager::with_dir(dir.path().to_path_buf());
+    let session = manager
+        .create_session("corrupt-parent", "")
+        .expect("session");
+    session
+        .append(&Message::User {
+            content: "valid record".into(),
+        })
+        .expect("append");
+    OpenOptions::new()
+        .append(true)
+        .open(&session.file_path)
+        .expect("file")
+        .write_all(b"E\t0\tbroken partial record")
+        .expect("partial write");
+    let before = std::fs::read(&session.file_path).expect("evidence");
+    let reopened = manager.get_session(&session.id).expect("reopen");
+    assert!(
+        reopened
+            .append(&Message::User {
+                content: "must not append".into()
+            })
+            .is_err()
+    );
+    assert_eq!(
+        std::fs::read(&session.file_path).expect("unchanged"),
+        before
+    );
+}
+
+#[test]
+fn archive_reopen_preserves_original_records_but_does_not_recover_older_messages() {
+    let dir = tempfile::tempdir().expect("directory");
+    let manager = SessionManager::with_dir(dir.path().to_path_buf());
+    let session = manager
+        .create_session("archive-regression", "")
+        .expect("session");
+    for i in 0..205 {
+        session
+            .append(&Message::User {
+                content: format!("original fact {i}"),
+            })
+            .expect("append");
+    }
+    let original = session.read_entries().expect("original");
+    session.compact_archived(50).expect("archive");
+    let reopened = manager.get_session(&session.id).expect("reopen");
+    let retained = reopened.read_entries().expect("retained");
+    assert_eq!(retained.len(), 51);
+    assert_eq!(retained[1].id, original[155].id);
+    assert_eq!(retained[1].parent_id, Some(original[154].id.clone()));
+    assert_ne!(retained[1].parent_id, Some(retained[0].id.clone()));
+    assert_eq!(reopened.read_messages().expect("messages").len(), 50);
+    // Explicit known-gap characterization: this must not be interpreted as
+    // archive recovery acceptance or permission to rewrite original parents.
+}
+
+#[test]
 fn session_entry_with_parent_child_relationship() {
     let manager = test_manager();
     let session = manager
@@ -741,6 +895,47 @@ fn session_entry_with_parent_child_relationship() {
     assert!(entries[0].parent_id.is_none());
     // Second entry has parent_id pointing to first
     assert_eq!(entries[1].parent_id, Some(entries[0].id.clone()));
+}
+
+#[test]
+fn archived_fork_refusal_preserves_branches_sources_and_continuation() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = SessionManager::with_dir(root.path().join("sessions"));
+    let mut session = manager.create_session("archive-fork", "").expect("session");
+    for index in 0..205 {
+        session
+            .append(&Message::User {
+                content: format!("original {index}"),
+            })
+            .expect("append");
+    }
+    session.compact_archived(50).expect("archive");
+    let bytes = session.snapshot_bytes().expect("original head");
+    let branches = session.list_branches();
+    let current = session.current_branch.clone();
+    let entries = session.read_entries().expect("head entries");
+    for fork_point in [&entries[0].id, &entries.last().expect("tail").id] {
+        assert!(session.fork(fork_point).is_err());
+        assert_eq!(session.current_branch, current);
+        assert_eq!(session.list_branches(), branches);
+        assert_eq!(session.snapshot_bytes().expect("preserved head"), bytes);
+    }
+    session
+        .append(&Message::User {
+            content: "continued original".into(),
+        })
+        .expect("continue source");
+    let evidence = session
+        .inspect_archive_recovery(
+            std::time::Instant::now() + std::time::Duration::from_secs(5),
+            || false,
+        )
+        .expect("all original records remain recoverable");
+    assert_eq!(evidence.entries().len(), 206);
+    assert_eq!(
+        evidence.entries().last().expect("continued").content,
+        "continued original"
+    );
 }
 
 #[test]

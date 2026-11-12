@@ -158,3 +158,6 @@ All individual ADR documents remain in this directory and are not replaced by th
 
 - [ADR-094: Gemini protocol/authentication](094-google-gemini-protocol-boundary.md) — accepted
   proposal effective only with governance #811; PROVIDER-008-B / I310 / #810.
+
+- [ADR-104: Selected CLI Session History Recovery](104-selected-session-history-recovery.md)
+  — proposed emergency candidate; independent safety/API review pending.

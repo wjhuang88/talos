@@ -764,8 +764,59 @@ from that same source version and installs without overwriting an existing child
 Dropping an unpublished fork cleans its transcript, sidecar, index and lineage;
 cleanup failures require storage recovery. Filesystems without hard-link support
 fail explicitly. This does not add process-crash atomicity or directory-fsync
-guarantees. Legacy CLI storage still lacks durable model history_search receipts.
+guarantees. The unreleased recovery candidate binds the host-selected CLI TLOG in
+place for permitted user/assistant history_search projections. It retains source seals,
+permission generation and opaque references; old tool results still lack recovery
+receipts and remain unavailable. Exact-overlap archive recovery preserves original
+record IDs and parents, refuses ambiguous or changed sources, and subjects restored
+messages to normal request admission and source-bound checkpoint folding. This does
+not certify real-provider summary quality or native platform acceptance.
 
+Startup `--fork`, TUI staging and `Session::fork` (including REPL `/fork` and direct
+API callers) reject legacy count-placeholder histories before publishing a child.
+`Session::fork` returns `SessionError::ParseError` before changing branch state. Copying
+only their current head would lose earlier history and introduce another live head with
+overlapping IDs. Complete child-owned archive
+provenance is not yet implemented. Ordinary non-archived forks retain existing behavior.
+See [ADR-104](../decisions/104-selected-session-history-recovery.md) and the
+[recovery owner](../tasks/session-archive-recovery-emergency.md) for candidate evidence
+and remaining review/deployment gates.
+
+
+The unreleased selected-history candidate adds
+`DurableRecoverySource::try_lock_for_recovery_read` for bounded synchronous host
+reads coordinated with writes through the same Session clone family. The guard is
+not content/disclosure authority and must not span provider or tool awaits. Windows
+prepared History releases its restrictive source handles while idle and verifies
+the original prefix digest again for each read. Archive inventory changes still
+revoke evidence. Independently reopened owners and external writers are not covered
+by this mutex; source verification and restrictive handles remain required. See
+ADR-104's Windows live-history lease correction for limits and pending native gates.
+
+Windows built-in atomic transcript replacement coordinates with recovery reads by
+acquiring nontruncating write access to an existing target through publication.
+It therefore requires target-file write permission, even if directory replacement
+permission alone would permit rename. Readonly/write-denied or reparse targets
+are refused without changing original bytes. Sharing conflicts have a bounded wait;
+ordinary access-denied errors are not generally retried. This does not replace host
+single-writer ownership or make multiple source paths an atomic snapshot.
+
+The unreleased candidate preserves the existing TLOG header, record encoding and
+blank separators during durable turn finalization. It validates the existing
+records, copies their original bytes, and encodes only the new turn and terminal
+marker. An incomplete or invalid existing tail fails without replacing the source;
+finalization does not repair that tail. Host-produced records larger than a model
+history page remain supported. This currently adds one full raw-transcript buffer
+alongside decoded history and does not establish a total memory bound. It does not
+implement archived-fork receipts or their migration through compaction.
+
+`SessionStore::replace_with_retained_suffix` is an additive extension point with
+a default implementation using the store's own atomic replacement. Built-in TLOG
+compaction overrides it to preserve retained record bytes and atomically publish
+the new head. A `.tlog` extension alone does not select that implementation; custom
+stores keep their own encoding and write behavior. This prevents re-encoding from
+creating conflicting IDs between retained records and archives, but does not yet
+provide archive/head/receipt crash recovery or trusted discovery after `keep0`.
 
 ### Unreleased Gemini invocation migration (I310 / ADR-094)
 

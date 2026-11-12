@@ -343,17 +343,18 @@ fn fork_session(manager: &SessionManager, source_session_id: &str) -> Result<Ses
         .resume_session(source_session_id)
         .with_context(|| format!("failed to load source Session {source_session_id}"))?;
 
-    let entries = source
-        .read_entries()
-        .context("failed to read source entries")?;
-    if entries.is_empty() {
-        bail!("cannot fork an empty Session");
+    let mut scan = source
+        .begin_message_scan()
+        .context("failed to capture fork source")?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !scan.step(deadline, || false)? {}
+    if scan.has_archive_placeholder() {
+        bail!(
+            "cannot fork archived history: preserving archive provenance in the child is not yet supported; continue the original session"
+        );
     }
-    let fork_entry_id = entries
-        .last()
-        .expect("entries checked non-empty above")
-        .id
-        .clone();
+    let (_, tail) = scan.finish_with_tail()?;
+    let fork_entry_id = tail.context("cannot fork an empty Session")?.id;
     let source_bytes = source
         .snapshot_bytes()
         .context("failed to snapshot source Session")?;
@@ -439,6 +440,37 @@ mod fork_tests {
     use super::*;
     use clap::Parser;
     use talos_core::message::Message;
+
+    #[test]
+    fn startup_fork_refuses_archive_without_publishing_overlapping_child() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager.create_session("archive", "").expect("source");
+        for index in 0..205 {
+            source
+                .append(&Message::User {
+                    content: format!("fact {index}"),
+                })
+                .expect("append");
+        }
+        source.compact_archived(50).expect("archive");
+        let before = source.snapshot_bytes().expect("before");
+        assert!(fork_session(&manager, &source.id.to_string()).is_err());
+        assert!(
+            manager
+                .get_forks(&source.id.to_string())
+                .expect("forks")
+                .is_empty()
+        );
+        assert_eq!(source.snapshot_bytes().expect("preserved"), before);
+        let evidence = source
+            .inspect_archive_recovery(
+                std::time::Instant::now() + std::time::Duration::from_secs(5),
+                || false,
+            )
+            .expect("source remains recoverable without overlapping child");
+        assert_eq!(evidence.entries().len(), 205);
+    }
 
     #[test]
     fn cli_fork_copies_tlog_history_runtime_identity_and_index() {

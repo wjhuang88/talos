@@ -805,21 +805,13 @@ async fn forward_session_events(
                     },
                 ..
             } = &session_event
+                && let Err(e) = session_manager.update_index(&owning_session)
             {
-                if let Err(e) = session_manager.update_index(&owning_session) {
-                    eprintln!("Warning: failed to update session index: {e}");
-                }
-                // Keep on-disk session logs bounded after persistence. The session owns
-                // the write lock, so archival cannot race an append from this bridge.
-                if owning_session
-                    .read_entries()
-                    .map(|entries| entries.len() > 200)
-                    .unwrap_or(false)
-                    && let Err(e) = owning_session.compact_archived(50)
-                {
-                    eprintln!("Warning: failed to archive session: {e}");
-                }
+                eprintln!("Warning: failed to update session index: {e}");
             }
+            // Keep original history in the durable head. Legacy archive recovery
+            // is bounded and can refuse ambiguous provenance; it is not a reason
+            // to resume automatic destructive trimming after successful turns.
             dashboard_activity
                 .project_session_event(&owning_session.id.to_string(), &session_event);
             let _ = bridge_tx.send(session_event);

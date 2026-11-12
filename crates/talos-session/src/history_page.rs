@@ -83,6 +83,12 @@ pub fn read_history_page(
 // Host crash reconciliation must accept writer-produced records larger than a
 // model-facing page. Unlike compatibility restoration, every byte must decode.
 pub(crate) fn validate_host_transcript(path: &Path) -> Result<(), HistoryPageError> {
+    read_host_transcript_tip(path).map(|_| ())
+}
+
+// The append path needs the exact last decoded record, not a line-shaped string
+// found inside multiline tool output. Retain at most one record plus an I/O page.
+pub(crate) fn read_host_transcript_tip(path: &Path) -> Result<Option<String>, HistoryPageError> {
     let mut file = open_source(path)?;
     let jsonl = path.extension().is_some_and(|ext| ext == "jsonl");
     let deadline = Instant::now() + std::time::Duration::from_secs(5);
@@ -90,6 +96,7 @@ pub(crate) fn validate_host_transcript(path: &Path) -> Result<(), HistoryPageErr
     let mut first = !jsonl;
     let mut counter = 0;
     let mut eof = false;
+    let mut tip = None;
     loop {
         if Instant::now() >= deadline {
             return Err(HistoryPageError::Stopped);
@@ -134,20 +141,22 @@ pub(crate) fn validate_host_transcript(path: &Path) -> Result<(), HistoryPageErr
                 };
                 let line = std::str::from_utf8(&remaining[..end])
                     .map_err(|_| HistoryPageError::InvalidRecord)?;
-                crate::store::decode_jsonl_history_line(line, &mut counter)
+                let entry = crate::store::decode_jsonl_history_line(line, &mut counter)
                     .ok_or(HistoryPageError::InvalidRecord)?;
+                tip = Some(entry.id);
                 consumed += end + usize::from(end < remaining.len());
             } else {
-                let Some((_, length)) = decode_tlog_record(remaining, usize::MAX)? else {
+                let Some((entry, length)) = decode_tlog_record(remaining, usize::MAX)? else {
                     break;
                 };
+                tip = Some(entry.id);
                 consumed += length;
             }
         }
         bytes.drain(..consumed);
         if eof {
             return if bytes.is_empty() {
-                Ok(())
+                Ok(tip)
             } else {
                 Err(HistoryPageError::InvalidRecord)
             };
@@ -525,7 +534,7 @@ pub(crate) fn tlog_record(bytes: &[u8]) -> Result<Option<(SessionEntry, usize)>,
     decode_tlog_record(bytes, HISTORY_PAGE_BYTES)
 }
 
-fn decode_tlog_record(
+pub(crate) fn decode_tlog_record(
     bytes: &[u8],
     limit: usize,
 ) -> Result<Option<(SessionEntry, usize)>, HistoryPageError> {

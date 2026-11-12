@@ -172,6 +172,13 @@ impl Session {
         let dir = self.file_path.parent().ok_or_else(|| {
             SessionError::ParseError("session file has no parent directory".into())
         })?;
+        let mut tip = self
+            .last_entry_id
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
+        // Compaction can replace the entire head (including when keeping zero
+        // entries), or fail after a partial rewrite. Never retain a stale tip.
+        *tip = None;
         engine.compact_segment(&self.file_path, dir, max_entries)
     }
     /// Create a new session with a single empty root branch.
@@ -270,6 +277,8 @@ impl Session {
     /// # Errors
     ///
     /// Returns [`SessionError::EntryNotFound`] if the entry ID doesn't exist.
+    /// Returns [`SessionError::ParseError`] for a legacy archive count placeholder:
+    /// copying that head cannot preserve the child's complete source history.
     pub fn fork(&mut self, from_entry_id: &str) -> Result<String, SessionError> {
         let all_entries = self.read_entries()?;
 
@@ -277,6 +286,14 @@ impl Session {
             .iter()
             .position(|e| e.id == from_entry_id)
             .ok_or_else(|| SessionError::EntryNotFound(from_entry_id.to_string()))?;
+
+        // Enforce this at the shared storage boundary, including REPL and SDK
+        // callers that do not pass through CLI startup/TUI staging guards.
+        if all_entries.iter().any(crate::archive_recovery::placeholder) {
+            return Err(SessionError::ParseError(
+                "cannot fork archived history: preserving archive provenance in the child is not yet supported; continue the original session".into(),
+            ));
+        }
 
         let entries_up_to_fork: Vec<SessionEntry> = all_entries[..=pos].to_vec();
 
@@ -314,6 +331,9 @@ impl Session {
         self.id = new_id;
         self.file_path = new_file_path;
         self.current_branch = branch_id;
+        // A fork has a different persisted tip. Do not share its cache with
+        // handles that continue appending to the original session.
+        self.last_entry_id = Arc::new(Mutex::new(None));
     }
 
     /// Get a reference to a branch by its ID.
