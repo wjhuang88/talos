@@ -1289,3 +1289,14 @@ per round. `p4-debug-guarded/resize-attribution.json` records the calculation.
 This is wall-time attribution, not evidence separating scheduling from CPU.
 Keep width reflow correctness and existing oracles; further work should target
 that path rather than unrelated animation/Git scheduling. No new run was needed.
+
+### Rejected fitting-line fast path
+
+A bounded single-segment/no-fill fast path passed42 projection tests, but three
+same-cap alternating Debug resize pairs did not demonstrate benefit: median
+history rebuild7430.947→8033.446ms; candidate P95 upper169.451–180.064ms still
+misses150ms. Baseline misses too, and host/order limitations remain. Removed the
+uncommitted runtime/test patch; retained it and raw results under
+`evidence/tui-perf-001/fit-path-evaluation/`. Runtime is back to the source covered
+by the passing full preflight. No new full test run is warranted for this revert
+to that exact source. Resize acceptance remains unresolved; do not claim a fix.
