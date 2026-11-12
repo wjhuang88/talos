@@ -534,7 +534,7 @@ pub(crate) fn tlog_record(bytes: &[u8]) -> Result<Option<(SessionEntry, usize)>,
     decode_tlog_record(bytes, HISTORY_PAGE_BYTES)
 }
 
-fn decode_tlog_record(
+pub(crate) fn decode_tlog_record(
     bytes: &[u8],
     limit: usize,
 ) -> Result<Option<(SessionEntry, usize)>, HistoryPageError> {

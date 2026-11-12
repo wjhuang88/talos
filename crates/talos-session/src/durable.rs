@@ -1552,9 +1552,11 @@ impl DurableSession {
             .last_entry_id
             .lock()
             .map_err(|_| SessionError::LockPoisoned)?;
-        self.session
-            .store
-            .replace_entries_atomically(&self.session.file_path, &existing)?;
+        crate::compact_text::append_entries_atomically(
+            &self.session.file_path,
+            &existing[..entry_start],
+            &existing[entry_start..],
+        )?;
         *tip = existing.last().map(|entry| entry.id.clone());
         Ok(TurnCommit {
             entry_ids,
@@ -3521,6 +3523,54 @@ mod tests {
                 "turn-1",
                 TurnTranscriptOutcome::Success,
             )]
+        );
+    }
+
+    #[test]
+    fn finalize_preserves_original_noncanonical_history_bytes() {
+        let directory = tempfile::tempdir().expect("directory");
+        let session = create_or_open(directory.path(), "raw-prefix").expect("session");
+        session
+            .session()
+            .append(&Message::User {
+                content: "legacy".into(),
+            })
+            .expect("legacy entry");
+        let original = fs::read_to_string(session.file_path()).expect("original");
+        let altered = format!("{}\n", original.replacen("\t2:{}\n", "\t3:{ }\n", 1));
+        assert_ne!(original, altered);
+        fs::write(session.file_path(), &altered).expect("legacy encoding");
+        let messages = vec![Message::User {
+            content: "next".into(),
+        }];
+        let policy = PersistencePolicy::default();
+        session
+            .finalize_turn("next", &messages, &policy, TurnTranscriptOutcome::Success)
+            .expect("commit");
+        let committed = fs::read(session.file_path()).expect("committed");
+        assert!(
+            committed.starts_with(altered.as_bytes()),
+            "finalization changed inherited raw bytes"
+        );
+        let reopened = get_by_external_id(directory.path(), "raw-prefix")
+            .expect("lookup")
+            .expect("reopen");
+        let replay = reopened
+            .finalize_turn("next", &messages, &policy, TurnTranscriptOutcome::Success)
+            .expect("replay");
+        assert!(!replay.newly_committed);
+        assert_eq!(fs::read(reopened.file_path()).expect("bytes"), committed);
+        let mut damaged = committed;
+        damaged.extend_from_slice(b"E\t0\tbroken");
+        fs::write(reopened.file_path(), &damaged).expect("incomplete tail");
+        assert!(
+            reopened
+                .finalize_turn("later", &messages, &policy, TurnTranscriptOutcome::Success)
+                .is_err()
+        );
+        assert_eq!(
+            fs::read(reopened.file_path()).expect("preserved damage"),
+            damaged
         );
     }
 
