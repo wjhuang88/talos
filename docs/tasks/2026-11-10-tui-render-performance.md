@@ -1387,3 +1387,24 @@ input-to-submit82.538561ms. The earlier150/200ms misses were not reproduced in
 this same binary. This does not identify their cause or satisfy final-source,
 repeated-round acceptance. Preserve previous failures; no speculative additional
 runtime optimization is justified by this observation alone.
+
+### Independent incremental review and remote Windows disposition
+
+Independent Agent reviewed exact head
+`6f558bf9807322e0b03ea7a9f3721dafb6708dd4` against target
+`f61a15cd3f0be81489e69f92d374fc8ee41eddec`: incremental APPROVE, whole delivery
+REQUEST CHANGES because final-source performance, growing/resize heap stability
+and native-terminal acceptance remain open. The review found no new blocker in
+the exit repair, isolated key-exit regression or optional cgroup sampler. Special
+cgroup/mount namespaces may not map proc membership to the mounted hierarchy;
+missing observations remain unavailable. This was read-only source review,
+not independent human approval or execution evidence.
+
+Remote run43134873925 still covers older published `8afbbe4c`. Windows job
+130907772405 completed workspace tests, check, Clippy, focused native checks,
+governance, dependency audit, claims and CLI smoke successfully, according to
+its step API. Its final rust-cache save was cancelled; aggregate job130924641006
+failed because WORKSPACE_RESULT was cancelled. This is not a successful overall
+Windows gate and does not validate the later exit fix. Do not rerun the old head
+just to obtain green metadata; obtain all required gates for the next stable
+candidate. Linux workspace job was still running at this observation.
