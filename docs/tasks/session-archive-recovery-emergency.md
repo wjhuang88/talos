@@ -1072,3 +1072,24 @@ Second full locked standard preflight91038 completed exit0:
 prefix preservation, strict tail refusal and memory/receipt limits. This validates
 the finalize increment only; archived-fork receipt/publication and compaction
 locator lifecycle remain outstanding. No Complete status or deployment claim.
+
+## 2026-11-12 compaction retained raw bytes increment (uncommitted)
+
+Real205-write/noncanonical-metadata/compact50/inspect regression failed on the
+previous implementation with conflicting stable record ID:
+`/tmp/talos-compaction-raw-red.log`. Compaction now uses validated original retained
+record bytes and atomic head publication instead of truncating/re-encoding the head.
+The shared raw helper also retains finalize's whole-prefix behavior. Repeated
+compact50+append recovery succeeds. Custom store dispatch uses additive default
+SessionStore::replace_with_retained_suffix; only built-in TLOG promises raw encoding
+preservation. A real JSONL-encoded custom store with .tlog extension and keep0 verifies
+that extension names cannot bypass the custom writer. Independent review found no
+new blocker after this dispatch correction.342 session unit tests and integration/
+doc tests passed (`/tmp/talos-compaction-raw-green.log`); MSVC check pending73414.
+This remains candidate-only, uncommitted, not primary-synced. Archive syncing,
+trusted receipt locator migration, keep0 recovery and fork publication remain open.
+
+Compaction increment MSVC all-feature tests compilation73414 exited0. Standard
+full locked preflight84691 exited0 (`/tmp/talos-compaction-raw-preflight.log`).
+Staged source and SDK diff reviewed. Scope remains raw retained-record preservation
+and atomic head publication; trusted archive/receipt lifecycle is still outstanding.

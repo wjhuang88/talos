@@ -86,10 +86,12 @@ impl CompactionEngine {
 
         let compacted = self.apply_rules(&entries, max_entries);
 
-        std::fs::write(head_path, b"")?;
-        for entry in &compacted {
-            self.store.append_entry(head_path, entry)?;
-        }
+        self.store.replace_with_retained_suffix(
+            head_path,
+            &entries,
+            entries.len() - max_entries,
+            &compacted[..1],
+        )?;
 
         let _record_count = entries.len();
         let archived_bytes = std::fs::metadata(&archived_path)
@@ -227,6 +229,69 @@ pub enum CompactionResult {
 mod tests {
     use super::*;
     use crate::{CompactTextSessionStore, SessionStore};
+
+    #[derive(Debug)]
+    struct CustomTlogExtensionStore(crate::JsonlSessionStore);
+
+    impl SessionStore for CustomTlogExtensionStore {
+        fn read_entries(&self, p: &Path) -> Result<Vec<SessionEntry>, SessionError> {
+            self.0.read_entries(p)
+        }
+        fn append_entry(&self, p: &Path, e: &SessionEntry) -> Result<(), SessionError> {
+            self.0.append_entry(p, e)
+        }
+        fn replace_entries_atomically(
+            &self,
+            p: &Path,
+            e: &[SessionEntry],
+        ) -> Result<(), SessionError> {
+            self.0.replace_entries_atomically(p, e)
+        }
+        fn read_last_entry_id(&self, p: &Path) -> Option<String> {
+            self.0.read_last_entry_id(p)
+        }
+        fn scan_file(&self, p: &Path) -> Result<crate::SessionInfo, SessionError> {
+            self.0.scan_file(p)
+        }
+        fn read_bytes(&self, p: &Path) -> Result<Vec<u8>, SessionError> {
+            self.0.read_bytes(p)
+        }
+        fn file_extension(&self) -> &'static str {
+            "tlog"
+        }
+    }
+
+    #[test]
+    fn compaction_dispatches_custom_store_and_handles_zero_retention() {
+        let root = tempfile::tempdir().expect("root");
+        let store = Arc::new(CustomTlogExtensionStore(crate::JsonlSessionStore));
+        let path = root.path().join("head.tlog");
+        store
+            .append_entry(
+                &path,
+                &SessionEntry {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    parent_id: None,
+                    timestamp: chrono::Utc::now(),
+                    role: "user".into(),
+                    content: "original".into(),
+                    metadata: Default::default(),
+                },
+            )
+            .expect("custom write");
+        let engine = CompactionEngine::new(store.clone());
+        engine
+            .compact_segment(&path, root.path(), 0)
+            .expect("custom compaction");
+        let entries = store.read_entries(&path).expect("custom read");
+        assert_eq!(entries.len(), 1);
+        assert!(crate::archive_recovery::placeholder(&entries[0]));
+        assert!(
+            std::fs::read(&path)
+                .expect("custom encoding")
+                .starts_with(b"{")
+        );
+    }
 
     #[test]
     fn should_compact_returns_false_under_threshold() {

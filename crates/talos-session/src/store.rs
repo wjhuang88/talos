@@ -145,6 +145,25 @@ pub trait SessionStore: Send + Sync + std::fmt::Debug {
         entries: &[SessionEntry],
     ) -> Result<(), SessionError>;
 
+    /// Atomically replace a transcript with new entries followed by a retained
+    /// suffix of the caller's original snapshot. The caller owns the write lease.
+    /// Custom stores retain their normal atomic replacement behavior; the built-in
+    /// TLOG store additionally preserves the retained records' original encoding.
+    fn replace_with_retained_suffix(
+        &self,
+        file_path: &Path,
+        original: &[SessionEntry],
+        retain_from: usize,
+        prepended: &[SessionEntry],
+    ) -> Result<(), SessionError> {
+        let suffix = original
+            .get(retain_from..)
+            .ok_or_else(|| SessionError::ParseError("invalid retained record cutoff".into()))?;
+        let mut replacement = prepended.to_vec();
+        replacement.extend_from_slice(suffix);
+        self.replace_entries_atomically(file_path, &replacement)
+    }
+
     /// Read the ID of the last entry in the file.
     fn read_last_entry_id(&self, file_path: &Path) -> Option<String>;
 

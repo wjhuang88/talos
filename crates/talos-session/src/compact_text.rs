@@ -113,6 +113,16 @@ impl crate::store::SessionStore for CompactTextSessionStore {
         Ok(())
     }
 
+    fn replace_with_retained_suffix(
+        &self,
+        file_path: &Path,
+        original: &[SessionEntry],
+        retain_from: usize,
+        prepended: &[SessionEntry],
+    ) -> Result<(), SessionError> {
+        rewrite_preserving_records(file_path, original, retain_from, prepended, &[])
+    }
+
     fn read_last_entry_id(&self, file_path: &Path) -> Option<String> {
         read_last_entry_id_tlog(file_path)
     }
@@ -134,14 +144,21 @@ impl crate::store::SessionStore for CompactTextSessionStore {
     }
 }
 
-// Durable finalization is append-only even though publication replaces the file.
-// Keep original bytes, including valid noncanonical encodings, for every old
-// record. The caller holds the session write lock and host execution lease.
-pub(crate) fn append_entries_atomically(
+// Preserve a validated suffix of original records when finalizing or compacting.
+// Only newly prepended/appended records are encoded. The caller holds the session
+// write lock and host execution lease. This does not publish archive custody.
+pub(crate) fn rewrite_preserving_records(
     path: &Path,
     prior: &[SessionEntry],
+    retain_from: usize,
+    prepended: &[SessionEntry],
     appended: &[SessionEntry],
 ) -> Result<(), SessionError> {
+    if retain_from > prior.len() {
+        return Err(SessionError::DurableTurn(
+            "invalid retained record cutoff".into(),
+        ));
+    }
     let mut source = crate::history_page::open_source(path)
         .map_err(|_| SessionError::DurableTurn("cannot acquire original transcript".into()))?;
     let stamp = crate::recovery_stamp::from_file(&source)
@@ -156,7 +173,15 @@ pub(crate) fn append_entries_atomically(
         ));
     }
     let mut offset = header.len();
-    for expected in prior {
+    let mut retained_offset = if retain_from == 0 {
+        offset
+    } else {
+        original.len()
+    };
+    for (index, expected) in prior.iter().enumerate() {
+        if index == retain_from {
+            retained_offset = offset;
+        }
         while original
             .get(offset)
             .is_some_and(|byte| matches!(byte, b'\n' | b'\r'))
@@ -207,7 +232,11 @@ pub(crate) fn append_entries_atomically(
         .create_new(true)
         .write(true)
         .open(&temporary)?;
-    file.write_all(&original)?;
+    file.write_all(&header)?;
+    for entry in prepended {
+        file.write_all(encode_entry(entry).as_bytes())?;
+    }
+    file.write_all(&original[retained_offset..])?;
     for entry in appended {
         file.write_all(encode_entry(entry).as_bytes())?;
     }
