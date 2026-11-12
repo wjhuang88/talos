@@ -8,6 +8,37 @@ import unittest
 
 
 class ProbeSampling(unittest.TestCase):
+    def test_resize_reaches_child_behind_profiler_launcher(self):
+        sampler = Path(__file__).with_name('measure_tui_perf.py')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            child = root / 'child.py'
+            child.write_text('''
+import os, pathlib, signal, time
+count = 0
+def resized(*args):
+    global count
+    count += 1
+signal.signal(signal.SIGWINCH, resized)
+pathlib.Path(os.environ['TALOS_REPLAY_READY']).write_text('ready')
+time.sleep(2.2)
+pathlib.Path(__file__).with_name('resizes').write_text(str(count))
+''')
+            launcher = root / 'launcher'
+            launcher.write_text(f'#!{sys.executable}\n' + '''
+import pathlib, subprocess, sys
+raise SystemExit(subprocess.call([sys.executable, str(pathlib.Path(__file__).with_name('child.py'))]))
+''')
+            launcher.chmod(0o700)
+            result = subprocess.run([sys.executable, str(sampler), str(launcher),
+                '--scenario', 'resize', '--seconds', '2', '--warmup', '0',
+                '--output', str(root / 'sample.json')],
+                capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            sample = json.loads((root / 'sample.json').read_text())
+            self.assertGreaterEqual(int((root / 'resizes').read_text()), 3)
+            self.assertGreaterEqual(sample['action_count'], 3)
+
     def test_fast_input_is_delivered_without_sleep_interval_drift(self):
         sampler = Path(__file__).with_name('measure_tui_perf.py')
         with tempfile.TemporaryDirectory() as folder:

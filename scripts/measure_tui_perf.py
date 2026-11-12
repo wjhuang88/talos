@@ -60,7 +60,9 @@ try:
             else:
                 rows, columns = (30, 80) if action_count % 2 == 0 else (40, 120)
                 fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', rows, columns, 0, 0))
-                os.kill(proc.pid, signal.SIGWINCH)
+                # start_new_session gives this replay a private process group.
+                # Profilers may keep a launcher process above the actual TUI.
+                os.killpg(proc.pid, signal.SIGWINCH)
             action_count += 1
             last_action = now
         if next_probe is not None and now >= next_probe:
