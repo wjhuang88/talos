@@ -320,7 +320,7 @@ mod recovery_writer_wait_tests {
 
     // The notification comes from the actual OS sharing-conflict branch, not
     // a sleep intended to guess when the writer has reached the protected file.
-    fn wait_for_conflict<T: Send + 'static>(
+    fn wait_for_conflict<T: Send + std::fmt::Debug + 'static>(
         operation: impl FnOnce() -> T + Send + 'static,
     ) -> (std::thread::JoinHandle<()>, mpsc::Receiver<T>) {
         let (conflict_tx, conflict_rx) = mpsc::channel();
@@ -333,9 +333,10 @@ mod recovery_writer_wait_tests {
             });
             let _ = result_tx.send(operation());
         });
-        conflict_rx
-            .recv_timeout(Duration::from_secs(3))
-            .expect("real sharing conflict reached");
+        if let Err(error) = conflict_rx.recv_timeout(Duration::from_secs(3)) {
+            let result = result_rx.recv_timeout(Duration::from_secs(1));
+            panic!("real sharing conflict not reached: {error:?}; writer result: {result:?}");
+        }
         assert!(
             matches!(result_rx.try_recv(), Err(mpsc::TryRecvError::Empty)),
             "writer must wait instead of returning a persistence failure"

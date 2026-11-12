@@ -390,7 +390,7 @@ fn structured_submission_rejects_unbounded_image_metadata() {
 
 #[cfg(windows)]
 #[tokio::test]
-async fn actor_interrupt_and_shutdown_release_recovery_source_before_persistence() {
+async fn actor_idle_recovery_allows_writes_and_cancellation_persists() {
     struct HeldModel(Arc<tokio::sync::Notify>);
     #[async_trait]
     impl LanguageModel for HeldModel {
@@ -445,8 +445,8 @@ async fn actor_interrupt_and_shutdown_release_recovery_source_before_persistence
             std::fs::OpenOptions::new()
                 .write(true)
                 .open(durable.file_path())
-                .is_err(),
-            "live recovery must retain source"
+                .is_ok(),
+            "provider await must not retain a write-excluding recovery lease"
         );
         handle
             .sq_tx
@@ -5542,7 +5542,27 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                             }),
                         _ => None,
                     })
-                    .expect("installed checkpoint in actual provider request");
+                    .unwrap_or_else(|| {
+                        let outcomes: Vec<_> = messages
+                            .iter()
+                            .filter_map(|message| match message {
+                                Message::Multimodal { parts } => Some(parts),
+                                _ => None,
+                            })
+                            .flatten()
+                            .filter_map(|part| match part {
+                                talos_core::message::ContentPart::Text { text } => {
+                                    serde_json::from_str::<serde_json::Value>(text)
+                                        .ok()
+                                        .filter(|value| value.get("checkpoint_operation").is_some())
+                                }
+                                _ => None,
+                            })
+                            .collect();
+                        panic!(
+                            "installed checkpoint missing in provider step {step}; terminal outcomes: {outcomes:?}"
+                        );
+                    });
                 assert_task_state(&checkpoint);
             }
             let events = match step {

@@ -855,3 +855,62 @@ Follow-up validation: standard preflight handle 98545 exited 0, including locked
 workspace checks, Clippy, tests, doctests and external SDK fixture. Log:
 `/tmp/talos-recovery-main-deadline-preflight.log`. Source stayed unchanged during
 the run. This does not replace Windows native execution or host acceptance.
+
+
+## 2026-11-12 native failure investigation (not resolved)
+
+Exact-head dec7f5ec macOS job 130918904400 failed in the real Actor regression
+registered_model_checkpoint_discovers_admits_and_applies_through_actor: provider
+step expected an installed checkpoint but found none. Agent suite: 683 passed,
+1 failed. Log `/tmp/talos-ci-macos-dec7f5ec.log`. The old assertion did not report
+checkpoint terminal outcome, so timeout/cancellation/preparation/installation
+cause is not established. Keep this as a recovery gate failure, not a CI-only flake.
+
+Isolated candidate now has a test-only diagnostic enhancement: missing projection
+prints checkpoint operation terminal metadata and provider step, never raw history.
+Success assertions unchanged. Correctly selected exact test passed once (13.76s)
+and all 684 Agent library tests passed in parallel (19.05s), logs
+`/tmp/talos-recovery-dec7-checkpoint-repro.log` and
+`/tmp/talos-recovery-dec7-agent-parallel.log`. An initial mistyped exact filter ran
+zero tests and was corrected; zero-test execution is not evidence. Linux success
+does not explain or resolve the macOS failure. Windows job remains in progress;
+do not cancel/restart its run solely for this diagnostic increment.
+
+Archived fork contract review draft is retained at
+`/tmp/talos-archived-fork-contract-review-20261112.md`. Independent reviewer found
+ordinary manifest+digest insufficient to authorize live-head overlap: a copied
+prefix plus a self-consistent forged parent/cutoff manifest passes content checks
+without a host fork publication. Full implementation must use host-issued private
+custody receipt binding UUIDs/branch/cutoff/initial prefix/bundle digests, staged
+intent then durable bytes then transactional publication, independent child bytes
+and receipts surviving parent deletion, and exact inherited-prefix restrictions.
+Existing durable_fork_lineage lacks content digests and is not sufficient as-is.
+Nested forks require bounded materialized proof. Full copied parent sources may
+contain post-cutoff records; those cannot enter the child's inherited corpus.
+No overlap exception or incomplete fork implementation was introduced.
+
+
+## 2026-11-12 Windows native evidence and unresolved atomic publication
+
+Run43138294146 finished. Windows job130918904373 has two failures: Agent
+actor_interrupt_and_shutdown_release_recovery_source_before_persistence still
+asserted the superseded whole-turn write-excluding lease; Session atomic commit
+wait regression did not reach ERROR_SHARING_VIOLATION observer (channel disconnected).
+The latter hides its commit result, so actual OS error is not established. No
+AccessDenied retry or other widening is authorized by this observation.
+
+Native successes explicitly confirmed in `/tmp/talos-ci-windows-dec7f5ec.log`:
+real CLI/archived Actor search/detail, paused-provider sibling write, Windows idle
+lease/original cutoff verification, equal-metadata mutation refusal, independent
+JSONL/TLOG append waits, bounded permanent sharing failure, and delayed header
+preservation. The 8300-record Actor Applied test also passed on Windows; macOS
+failure remains unexplained. Both P1s are not globally closed, atomic publication
+still fails its required native gate.
+
+Candidate corrections preserve cancellation/persistence assertions while changing
+the stale Actor expectation to permit idle writes. Atomic waiter now prints its
+actual writer Result if no sharing-conflict barrier occurs. Missing checkpoint
+assertion prints terminal metadata only. These are test/diagnostic changes, not
+an atomic-publication fix. MSVC all-feature tests check passed, log
+`/tmp/talos-native-failure-diagnostics-xwin.log`. Primary source is unchanged during
+its still-running preflight71089. Do not synchronize test edits until it ends.
