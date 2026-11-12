@@ -5,6 +5,16 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 # Talos Board
 
+## GIT-COMPAT-001 / I324 — gix-native Git preflight (claim proposed)
+
+[GIT-COMPAT-001](backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](iterations/I324-git-236-preflight-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): proposed governance-only [claim #920](https://github.com/wjhuang88/talos/pull/920) and activation, **ineffective until merge**. The November 10 design is not implementation. No change to ADR-089 permission admission or to GIT-SNAPSHOT-001 / TUI-APPROVAL-001 Review status; Git 2.36 Windows validation and independent security review remain mandatory.
+
+Native Windows follow-up (2026-11-10, source `c065236a`):
+[validation evidence](reference/WINDOWS-VALIDATION-2026-11-10.md) records TUI 652,
+process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing
+on Git 2.36.1; [gix-assisted compatibility](proposals/gix-preflight-system-git-compatibility.md)
+is a proposal, not an activated repair. Owner statuses and manual/native residuals remain unchanged.
+
 Native Windows follow-up (2026-11-10, source `c065236a`):
 [validation evidence](reference/WINDOWS-VALIDATION-2026-11-10.md) records TUI 652,
 process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing

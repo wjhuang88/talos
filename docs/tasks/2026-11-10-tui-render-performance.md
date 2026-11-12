@@ -3,6 +3,7 @@
 > Document status: Review / Claimed — implementation stage merged; acceptance pending #923
 > Created: 2026-11-10
 > Owner: 本文；Board 仅为派生入口。
+> Acceptance follow-up Issue: #923 (existing Review owner; original Source Issue and delivery status unchanged).
 > 实现阶段已合并至主分支（#922，71655af8）；完整验收未完成，剩余项跟踪于 #923。下文原计划保留，执行记录见末尾。
 
 ## 1. 目标与交付边界
