@@ -1429,3 +1429,22 @@ Same resource guard;2.019s wall,1.583s CPU,817.3MiB peak,swap0. Log and receipt
 are in `final-preflight/`. This covers the exit-test changes and examples at the
 current implementation source, and does not substitute for native Windows
 terminal execution.
+
+### Final Debug follow-up and adjacent-binary diagnosis
+
+Current-source Debug artifact `fec7a2e9` is bound by Cargo artifact receipt and
+SHA in `final-debug/`. Six guarded serial runs completed normally0: transcript
+P95 upper4.194303ms in all rounds, worst P99 upper5.539786ms passes20/35ms.
+Resize P95 uppers176.769150/179.034760/176.834676ms fail the conservative150ms
+upper-bound gate; P99 uppers stay below200ms. These histogram bounds do not
+prove the exact P95 exceeds150ms, but cannot establish required acceptance.
+No sampled leaf throttling was observed; PSS does not establish heap stability.
+
+The adjacent fixed-binary pair in `resize-same-window-pair/` then found old/current
+history rebuild totals9300.575/9155.894ms and P95 uppers173.459/175.079ms. The old
+binary also slowed relative to its earlier82ms single run. Runtime diffs only
+change exit finalization; history projection and replay sources match, as do
+recorded Cargo profiles/features. This does not support blaming the exit fix,
+but does not explain environmental variation. Preserve the correctness fix,
+keep the resize gate open, and investigate the shared reflow path rather than
+repeat an unexplained matrix. All runs and limitations are retained.
