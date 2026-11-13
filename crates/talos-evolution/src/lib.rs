@@ -10,9 +10,11 @@ pub mod adapter;
 pub mod extractor;
 pub mod hook;
 pub mod observer;
+pub mod storage_contracts;
 pub mod store;
 
 pub use hook::EvolutionHookHandler;
+pub use storage_contracts::KnowledgePersistence;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
