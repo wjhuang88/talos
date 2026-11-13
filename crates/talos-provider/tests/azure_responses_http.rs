@@ -348,7 +348,7 @@ async fn semantic_terminal_closes_stream_without_waiting_for_http_eof() {
         assert_eq!(received.len(), 1);
         if failed {
             assert!(
-                matches!(&received[0], AgentEvent::Error { message } if message.contains("fixture failure"))
+                matches!(&received[0], AgentEvent::Error { message } if message == "Azure response stream failed")
             );
         } else {
             assert!(

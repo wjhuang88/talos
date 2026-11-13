@@ -182,3 +182,9 @@ Added Chat HTTP matrix across v1/deployment and Native/Compat/TalosStrict, asser
 exclusive api-key header, deployment model and terminal event. Added Responses redirect/no-forward
 and success-status SSE error redaction regressions. Dependency compilation remains in progress;
 these authored tests have no pass receipt yet. Preserve remotely before further recovery risk.
+
+HTTP receipt: initial restored Responses suite failed its inherited error-text assertion (4 pass,
+1 fail): Azure deliberately redacts the server message. Corrected only the expected error text;
+kept bounded semantic-terminal/HTTP-EOF assertions. Rerun passed Chat matrix (1 test, six cases)
+and all 7 Responses tests, including redirect and SSE error safety. Full Agent/native CI remains
+pending; this is focused local evidence, not complete C acceptance.
