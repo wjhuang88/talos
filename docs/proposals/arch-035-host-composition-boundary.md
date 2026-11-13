@@ -90,3 +90,7 @@ The proposed direction is intentionally **conditional**, rather than naming a sp
 - Which negative-path, replay/restart, SDK fixture and native CI results must be frozen as before/after evidence for a future E2/E4 claim?
 
 **Disposition at this checkpoint:** E1 stays Proposed, no ADR allocated, and the cross-host API choice stays open. I322 C supplies real domain contracts, but #932 supplies **authorization for D**, not its passing implementation. E2/E3 remain blocked on accepted usable upstream composition and an independent governed ARCH-035 implementation claim.
+
+## Formal decision candidate cross-reference — 2026-11-13
+
+[ADR-104](../decisions/104-host-composition-ownership-boundary.md) is now a **Proposed** E1 ownership and host-composition placement decision. This original proposal and I320 E0 source inventory remain review evidence; they do not by themselves accept ADR-104 or approve a concrete RuntimeBuilder host injection signature. E2/E3 stay gated on #670's separately accepted D/E operational outputs and a separately effective implementation claim.
