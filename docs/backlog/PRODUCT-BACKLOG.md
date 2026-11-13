@@ -1,5 +1,9 @@
 # Product Backlog
 
+## SEARCH-001-D3-T2 / #947 — explicit Bing sponsored-ancestor correction (claim proposed)
+
+[Owner](active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](../iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Ready / Proposed / Unclaimed** pending an atomic claim/activation PR. Narrow correction for hand-authored T1/#941 synthetic `b_ad` ancestor false-positive in existing Bing CN HTML parser, with parser-local tests only after effective claim. No live Bing requests, `www.bing.com`/`bing.cn` host admission, permission/default/source/schema/dependency change, real-world ad classifier qualification or E/F/G/I activation. D3/#937 and Epic/#624 remain Open.
+
 ## SEARCH-001-D3-T1 / #941 — Bing synthetic negative conformance (owner-first closeout)
 
 [Owner](active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](../iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): **Complete / Closed upon owner-first closeout merge**, claim #943 merged `2f43e7d7`, and five synthetic-only negative fixtures/evidence implemented in [#944](https://github.com/wjhuang88/talos/pull/944) Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606`. Exact-head [CI43428872719](https://github.com/wjhuang88/talos/actions/runs/43428872719) 8/8 SUCCESS, independent no-blocker review, CAS merge. Known parser sponsored-row misclassification remains **unfixed**; new Bing hosts, live automated Bing usage, regional/provider admission and E/F/G/I remain blocked; parent #624 Open. Close #941 after owner-first docs merge.
