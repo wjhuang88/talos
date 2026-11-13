@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Review / Claimed — E0/E1 code-truth and E1 proposed architecture in PR #906; E2/E3 blocked |
+| Status | Review / Claimed — E0 source truth published; E1 placement-only ADR-104 acceptance candidate #936; E2/E3 blocked |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
 | Selected Iteration | [I320](../../iterations/I320-arch-035-host-composition-baseline.md) — E0/E1 active via claim #905 merge `b211e590f6b1180af0679be8b1b03d77b0a19615` |
@@ -114,7 +114,7 @@ This is a continuation of the **existing effective I320 E0/E1 documentation clai
 - STORE-002 / #670 I321 A/B capability *metadata* foundation is accepted via implementation PR #909 (`a9914b7a62b0873027997c69d9966d17f3fd48ba`). The metadata registry is **not** evidence of a bound operational backend.
 - I322 C domain-owned contracts and existing-store direct forwarding are accepted via implementation PR #912 (**`3df409ef9ed707756350f2c7d4b2c8819f157222`**), with bounded closeout PR #930 merged (`a07b466d5aa2a03fb841cdcb918cd4968c778942`). These contracts are available for architecture review but have **not** rewired current production host constructors.
 - I325 D *claim/activation*, not D implementation, became effective on governance PR #932 merge (`e49ccde70556403a9d7b66551565e2b6c81ad32d`). D owns proof of local operational delegation; #670 E owns local default composition; F owns broad storage equivalence. ARCH-035 must not absorb those slices.
-- The [E1 proposal](../../proposals/arch-035-host-composition-boundary.md) now carries a contract-aware no-duplication review matrix and explicit acceptance conditions. It remains **Proposed / non-binding**, with no independently accepted public runtime injection signature, no new ADR number and no production source change.
+- **Historical 2026-11-13 pre-ADR-104 dependency-reconciliation checkpoint:** the [E1 proposal](../../proposals/arch-035-host-composition-boundary.md) carried a contract-aware no-duplication review matrix and explicit acceptance conditions. **At that earlier point**, no ADR had yet been allocated and the proposal was non-binding. **Subsequently ADR-104 was allocated in #936**; even if its placement-only rule is accepted on reviewed merge, no concrete public runtime injection signature, production change or E2/E3 implementation is accepted.
 
 **Next ARCH-035 gate:** independently review E1 ownership/API placement against I322 C and the eventual accepted I325 D / STORE-002 E host-facing composition, then record a defensible accepted decision or no-op integration disposition. E2/E3 require their own effective claim after usable accepted upstream integration evidence. No `talos-server` behavior or SQLite-free binary is implied by this checkpoint.
 
