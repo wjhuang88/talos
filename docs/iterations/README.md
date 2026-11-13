@@ -7,7 +7,7 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 
 ## I326 / SEARCH-001-D3.2 — proposed Bing synthetic-only characterization
 
-[I326](I326-search-bing-synthetic-characterization.md) / [SEARCH-001-D3](../backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) / [#937](https://github.com/wjhuang88/talos/issues/937): **Planned / Unclaimed**; proposes atomic D3.2 offline-test-only activation after D3.1/#938 documentary acceptance. Existing `bing_parser/tests.rs` covers most baseline parity; fill only independently proven synthetic negative gaps and record test outcomes without real provider responses or production search/permissions changes. This governance proposal is ineffective until exact-head validation and merge. D/#644 ZERO-ADMISSION and D2/#848 remain separate, E/F/G/I blocked, #624 Open. Concurrent iterations/claims retain independent scope.
+[I326](I326-search-bing-synthetic-characterization.md) / [SEARCH-001-D3](../backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) / [#937](https://github.com/wjhuang88/talos/issues/937): **Active / Claimed proposed via #942; ineffective until governance merge**; proposes atomic D3.2 offline-test-only activation after D3.1/#938 documentary acceptance. Existing `bing_parser/tests.rs` covers most baseline parity; fill only independently proven synthetic negative gaps and record test outcomes without real provider responses or production search/permissions changes. This governance proposal is ineffective until exact-head validation and merge. D/#644 ZERO-ADMISSION and D2/#848 remain separate, E/F/G/I blocked, #624 Open. Concurrent iterations/claims retain independent scope.
 
 ## I324 / GIT-COMPAT-001 — proposed Git 2.36 preflight claim
 
