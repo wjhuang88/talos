@@ -1,25 +1,25 @@
 # SEARCH-001-D3-T2: Reject Explicit Sponsored Ancestors in Existing Bing Parser
 
-**Status**: Ready / proposed In Progress — *ineffective until governance PR merges*
+**Status**: In Progress / Claimed proposed through Draft #948 — *ineffective until governance PR merges*
 **Type**: Narrow search compatibility parser hardening / regression
 **Source Issue**: [#947](https://github.com/wjhuang88/talos/issues/947)
 **Parent**: [SEARCH-001-D3 / #937](SEARCH-001-D3-bing-direct-html-feasibility.md), [SEARCH-001 Epic / #624](SEARCH-001-zero-config-global-search.md)
-**Selected Iteration**: [I327](../../iterations/I327-search-bing-sponsored-ancestor-rejection.md) — proposed only
+**Selected Iteration**: [I327](../../iterations/I327-search-bing-sponsored-ancestor-rejection.md) — Active proposed through #948; ineffective until merge
 **Predecessor**: [SEARCH-001-D3-T1 / #941](SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) Complete / Closed, implementation [#944](https://github.com/wjhuang88/talos/pull/944) Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606`, closeout [#946](https://github.com/wjhuang88/talos/pull/946) merged `73ec650b6ef9804d0c9c42a6f1c5e7c9d9f0baa7`.
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed — proposed Claimed, ineffective until governance merge |
-| Responsible Actor | @wjhuang88 (proposed) |
-| Executing Agent | ChatGPT / GPT-6 (proposed) |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | Only existing `bing_parser.rs` response-body filtering of `li.b_algo` beneath explicit `b_ad` ancestor class + targeted `bing_parser/tests.rs` synthetic regression; optional dated narrow evidence receipt. No new host, transport/Network/default/API/Cargo changes or live Bing. |
-| Claimed At | 2026-11-14 (proposed, no effective claim yet) |
+| Claimed At | 2026-11-14 |
 | Source Issue | #947 |
-| Governance Claim PR | Pending — backfill proposed PR number |
-| Authorization Mode | Single-maintainer merge (proposed; requires exact-head CI, independent applicable review, CAS) |
-| Authorization Evidence | User-directed continuation of completed #941; separate #947 issue. Proposed branch has no authority until governance review/CI and target-branch merge. |
+| Governance Claim PR | #948 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User-directed continuation after completed #941; separate #947 issue; #948 documents the proposed atomic claim. Required exact-head CI, independent review and target-branch CAS merge remain pending and no effective authority exists before merge. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-14 |
 | Handoff / Release Condition | Claim effective only upon governing PR merge; separately reviewed code/tests and exact-head native CI before implementation merge; owner-first completion thereafter. |
