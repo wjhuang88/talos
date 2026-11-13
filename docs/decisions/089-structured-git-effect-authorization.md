@@ -889,3 +889,128 @@ remaining blocker after correcting the rebound invocation/canonical distinction.
 MSVC xwin checking and the host Unix shell regression pass. This candidate does
 not prove DLL loading, MSYS startup effects or real Windows prepared Push;
 these runtime/trust limitations remain activation prerequisites.
+
+
+## I324 gix-native discovery amendment — **PROPOSED, NOT ACCEPTED (2026-11-13)**
+
+**Review status:** An explicit, separate approval is required. All previously
+accepted ADR-089 provisions remain in force. This section is a proposed change
+request only; placing this text in a branch or a merged document does **not**
+replace the existing fixed-command grant, permit new file reads or authorize
+production switching. [Source Issue #919](https://github.com/wjhuang88/talos/issues/919),
+[active claim I324](../iterations/I324-git-236-preflight-compatibility.md),
+[security inventory](../reference/GIT-COMPAT-001-I324-GIX-PREFLIGHT-AUDIT.md),
+and [decision proposal](../proposals/adr-089-gix-native-preflight-amendment.md).
+
+### Proposed authority delta (requires independent security and maintainer acceptance)
+
+1. **New stage contract, not a generic grant.** Retire direct use of
+   Read(Remote `git:configuration-chain`) to authorize **new** Git CLI
+   discovery; replace fixed-command `git var`, `git config`,
+   `git check-attr`, `git --exec-path`, ref/branch and child-repository
+   preflight inspection with pure gix/Talos-native planning. No higher-level
+   gix helper may invoke Git, inspect undisclosed paths, or rely on unbound
+   ambient environment/process-global cache. Previously accepted source
+   authorization is not converted into general Read(Path), Execute(Command),
+   traversal, symlink resolution or network access.
+2. **Path-only names before bytes.** Sources from the frozen invocation
+   environment, repository metadata already approved for the specific
+   operation, and a **verified selected-writer installation profile**
+   may be lexically named as candidate paths. This phase performs no open,
+   stat, readlink or child execution for newly discovered paths. Each file,
+   ancestor identity, link metadata and newly named include/attribute path
+   requires its existing appropriate exact Path Read/metadata admission
+   before content or identity capture. Missing/empty roots are retained
+   as negative identity evidence for post-approval revalidation.
+3. **No guessed system defaults.** The chosen system Git executable is
+   identity-bound to the final writer. A path guessed from the executable's
+   parent directory, a Git version number, a Windows/Scoop convention, PATH
+   search, or gix's own installation discovery is **not** proof that the
+   selected writer has the same compiled system/configuration/attribute/
+   maintenance defaults. The installation profile's authoritative
+   provenance, exact set of roots and executable binding are a **blocking
+   review item**. In its absence return an explicit Unsupported verdict
+   before mutation. A separately authorized, documented provisioner can
+   be proposed later, but this ADR does not authorize one now.
+4. **No hidden command escape.** For the entire preflight, including
+   revalidation and submodule/push receiver/target branches, no
+   `std::process::Command`, `tokio::process::Command`, gix-internal
+   executable launch or unconstrained repository-open/config-file loader
+   may access the host on an unadmitted basis. Normal mutations still run
+   the chosen system Git **after** all existing facets/one-use admission;
+   no Git-version dispatch, fallback command or transparent retries.
+5. **Preserved effects and budgets.** No silent removal of hooks, filters,
+   signing, auto-maintenance, transport shells, URL rewrites, tracking,
+   includeIf/hasconfig, submodules, external stores, file identities or
+   complete operation evidence. Carry the existing cumulative evidence,
+   output, traversal, execution deadline and source-size bounds into the
+   native planner. Keep all exact Path Read, Write, Execute and Remote
+   facets, denial precedence, one-use approval tokens, cancellation,
+   partial-effect reporting and stale-plan refusal.
+6. **Security-specific acceptance evidence.** Independently review the
+   pinned gix 0.90.0 and gix-path call graph for subprocesses/ambient
+   I/O/global caches. Use a recording fake Git executable as a sentinel:
+   **zero Git child launches in preflight**, and the bound writer for
+   final mutation only. Test separately against **native Windows Git
+   2.36.1** and newer Git, including config roots, absent/appearing paths,
+   HOME/XDG and path Unicode, filters, includeIf, target refs, native
+   compatibility and deliberately malicious changes between approval and
+   mutation. No Git 2.36 "success" declaration on CI alone.
+
+### Current blocking review questions
+
+- Which independently verifiable evidence can bind **compiled installation
+  defaults** to the selected writer without executing Git during preflight?
+  A developer-configured guessed path or versioned whitelist does not suffice.
+- Does replacement of `git:configuration-chain` require a new dedicated
+  metadata authority carrier to *name* roots on less common installations?
+  If so, the owner must return a concrete carrier proposal and migration plan
+  before implementation can request it. There is no implied all-filesystem
+  access.
+- Can the gix attribute/index/tree and ref stack preserve *all* current
+  configured filter and symbolic checkout semantics under existing exact
+  permissions and budget limits? Unsupported parts must be listed explicitly
+  and fail closed rather than use Git CLI for those cases.
+
+**Acceptance gate:** This amendment remains **PROPOSED / NOT ACCEPTED**
+until there is an explicit independent security/API review receipt,
+maintainer decision naming the accepted scope, source-backed proof of any
+required installation profile, and a separate target-branch governance
+publication. The existing October 2026 ADR-089 contract remains
+authoritative throughout. No implementation PR or native Windows evidence
+is accepted merely by approving this review-only document.
+
+
+### I324 acceptance ledger (pending review)
+
+This ledger specifies evidence a reviewer must verify. It grants **no**
+authority; a passing CI or a test-only gix candidate is not acceptance.
+
+| Source / effect class | Evidence before access | Failure disposition |
+|---|---|---|
+| Invocation and lexical candidate roots | Frozen cwd, selected executable identity, repository context and approved environment; no stat/open/execute of candidate paths | Reject unbound names before source reads |
+| System/global/attribute/exec installation roots | Independently verified installation profile bound to the *selected* writer and its compiled defaults, with an accepted provenance and revalidation story | **Unsupported installation profile**; never guess from version, PATH, parent folder or gix defaults |
+| Config/include/includeIf/hasconfig | Individual exact Path Read and ancestor/link identity or missing-source evidence; cumulative budgets; parse admitted bytes only | Deny/stale refusal, including newly created previously missing paths |
+| Index/tree/worktree/global/system attributes | Explicit admitted bytes/index/tree for all sources in precedence order; complete macro and filter-effect interpretation | Reject unsupported or malformed syntax, not silent omission |
+| Refs/branches/reflog and receiver/child state | Admitted repository/object/ref evidence and frozen branch context; separate lexical branch check from context-dependent `@{-1}` | Unresolved/symbolic/ambiguous state fails closed without Git CLI |
+| Hooks/filters/maintenance/transport | Every possible child executable and source under already admitted exact Command/Path/Remote effects | Refuse unrepresented effects; no new generic Execute or Read |
+| Final mutation | One-use approval, stale revalidation and selected system Git writer | No mutation when evidence changes or provenance is missing |
+
+**Pinned feature and parser review:** I324 locks `gix 0.90.0` and
+`gix-attributes 0.37.1`. Talos uses gix `default-features = false` and
+does not explicitly enable `gix/attributes`; a transitive lockfile package
+does not prove `gix::attrs` APIs are enabled. Audit the effective locked
+feature graph before selecting an adapter. Upstream attribute search paths
+may skip malformed pattern lines, whereas security effect prediction must
+validate each admitted source conservatively and refuse unsupported syntax.
+
+**Conformance split:** Native `git check-ref-format --branch` as a *test
+oracle* proves only lexical parity on tested Git versions; `@{-1}` requires
+separate admitted reflog semantics. Memory-only gix config parsing does not
+establish the chosen system Git writer's compiled installation defaults.
+Windows Git 2.36.1, newer-version differentials, zero-preflight-child
+instrumentation, and explicit independent security/API review remain gates.
+
+Until these rows receive source-backed evidence and an independent reviewer
+and maintainer accept the authority model, the accepted ADR-089 fixed-command
+contract remains binding and I324 production wiring stays disabled.
