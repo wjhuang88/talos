@@ -1,6 +1,6 @@
 # Iteration I326: Bing Synthetic Negative Conformance (SEARCH-001-D3-T1)
 
-> Document status: Planned — proposed Active, ineffective until atomic governance claim merges
+> Document status: Active / proposed activation via #943, ineffective until atomic governance claim merges
 > Published plan date: 2026-11-13
 > Baseline: SEARCH-001-D3/#937 documentary source packet accepted via #938 (`8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`).
 > Planned objective: native offline regression characterization for existing Bing HTML parser and unadmitted host/redirect authority, **without production or network behavior change**.
@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed — proposed Claimed; ineffective until governance merge |
+| Claim State | Claimed (proposed in Draft #943; ineffective until merge) |
 | Responsible Actor | @wjhuang88 (proposed) |
 | Executing Agent | ChatGPT / GPT-6 (proposed) |
 | Work Slice | SEARCH-001-D3-T1/#941: bounded synthetic parser and host/permission *test-only* assertions and evidence receipt; no live Bing, new endpoint or production changes |
 | Claimed At | 2026-11-13 (proposed) |
 | Source Issue | #941 |
-| Governance Claim PR | Pending — backfill Draft number |
+| Governance Claim PR | #943 (Draft; ineffective until merge) |
 | Authorization Mode | Single-maintainer merge (proposed) |
-| Authorization Evidence | User continuation of D3 after accepted #938; pending exact-head CI, independent review and merge-time CAS |
+| Authorization Evidence | User-directed D3 continuation after #938; #943 proposed atomic claim, pending exact-head CI, independent review and merge-time CAS |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-13 |
 | Handoff / Release Condition | Effective only after governance merge; revert/leave unclaimed if blocked by overlapping claim or validation. |
