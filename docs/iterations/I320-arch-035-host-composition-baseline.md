@@ -1,6 +1,6 @@
 # Iteration I320: ARCH-035 E0/E1 Host Composition Baseline
 
-> Document status: Review / Claimed (effective claim #905; E0/E1 review candidate #906; no E2/E3 authorization)
+> Document status: Complete / Closed — **E0/E1 documentation and ADR-104 placement only**, not ARCH-035 #897 or E2/E3
 > Published plan date: 2026-11-10
 > Planned objective: reproducibly inventory current cross-host persistence composition and propose a behavior-preserving architecture decision without competing with STORE-002.
 > Baseline rule: this bounded E0/E1 documentation and architecture-review slice does not authorize production code, storage contract/adapters, dependency or default behavior changes.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Released — bounded E0/E1 review accepted via #936; effective on I320 closeout merge |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | ARCH-035 I320 E0 source inventory and E1 host-composition architecture review only; exclude production code, STORE-002 contracts/adapters, ServerHost and E2/E3 |
@@ -19,7 +19,7 @@
 | Governance Claim PR | #905 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim #905 merged as `b211e590f6b1180af0679be8b1b03d77b0a19615` after exact-head CI3992 passed, both governance validators reported 0 warnings and single-maintainer documentation-only fallback was recorded in PR comments; CAS confirmed no competing owner or branch lag. |
-| Implementation PR | #906 |
+| Implementation PR | #906 E0/E1 review; #934 C contract reconciliation; #936 ADR-104 decision |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | The claim takes effect only after #905 merge. E0/E1 decision acceptance remains independently reviewable; E2/E3 require accepted #670 seams and separate activation. |
 
@@ -134,3 +134,11 @@ After the reviewed E1 dependency reconciliation PR #934 merged `d92aabaad4570d79
 ### E1 placement-acceptance candidate — #936 final-head gate
 
 Independent [initial proposed-head ADR review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843456241) found the ownership/placement decision acceptable in principle, but blocked on a contradictory historical proposal sentence. The candidate corrects that sentence, clarifies that the runtime-facing composition **layer** is not a currently unified callable API, and scopes ADR-104 as **Accepted on reviewed #936 merge for placement/ownership only**. The historical [CI #4164](https://github.com/wjhuang88/talos/actions/runs/43362479834) succeeded on the prior head; final-head CI, validators, independent review, owner/overlap/CAS and single-maintainer authorization are mandatory before merge. Even after ADR acceptance, I320/ARCH-035 E2/E3 implementation, any runtime API, upstream STORE-002 D/E operational readiness, E4 parity and #897 closure remain **not delivered**.
+
+## I320 bounded final acceptance — documentation only (2026-11-13)
+
+**I320 E0/E1 Complete / Closed** upon reviewed merge of this owner-first closeout, using the pre-existing E1 [ADR-104 PR #936](https://github.com/wjhuang88/talos/pull/936) merge **`07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`** as its **Completion Commit**. The earlier #905 governance claim activated E0/E1, #906 published the E0 code-truth and non-binding proposal, and #934 reconciled accepted STORE-002 I322 C contracts. ADR-104 fixes the architectural **ownership and composition layer** without naming a public API, changing runtime behavior or duplicating #670 providers.
+
+Final #936 exact-head `3fd1b7176901832717b692202512dadb7364391f`; [CI #4173](https://github.com/wjhuang88/talos/actions/runs/43365335816) overall success, both required **governance validators 0 warnings**, [independent read-only technical review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843928194) no blockers, and [recorded single-maintainer CAS/authorization](https://github.com/wjhuang88/talos/pull/936#issuecomment-6852726331). The **unrelated global remote Issue/owner synchronization job was unsuccessful** due to new #937; that drift has separate [#938](https://github.com/wjhuang88/talos/pull/938) owner and was explicitly recorded before #936 merge. Do **not** claim every job or any Rust/native/SDK/behavior-conformance test passed for this slice.
+
+The E0/E1 bounded claim is **released**; #897 remains Open and **Blocked / Unclaimed** for E2/E3 until STORE-002 D operational delegation and E local default composition are independently accepted, followed by a new ARCH-035 implementation claim. E4 full equivalence and ServerHost/#361 remain unfulfilled. Do not use this I320 Completion Commit as #897 completion evidence.
