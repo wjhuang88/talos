@@ -150,6 +150,7 @@ fn gix_preflight_refuses_unadmitted_config_sources() {
         "pure adapter cannot turn incomplete frontiers into evidence"
     );
 }
+
 #[test]
 fn gix_admitted_host_output_matches_native_config_values_and_stales() {
     // Git CLI is a fixture oracle ONLY. Runtime preflight must not call it.
