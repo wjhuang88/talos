@@ -767,14 +767,20 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
         // Most history segments fit on the current row. Keep scalar-width
         // semantics (including combining marks), but copy their UTF-8 bytes
         // once instead of repeatedly checking style and pushing each scalar.
-        let fits = segment
-            .text
-            .chars()
-            .try_fold((used, 0usize), |(cells, scalars), ch| {
-                let width = UnicodeWidthChar::width(ch).unwrap_or(0);
-                let next = cells.saturating_add(width);
-                (width <= capacity && next <= capacity).then_some((next, scalars + 1))
-            });
+        // Bound the speculative scan by bytes as well as cells: a long
+        // zero-width prefix could otherwise be scanned twice before wrapping.
+        let fits = if segment.text.len() <= capacity.saturating_mul(4) {
+            segment
+                .text
+                .chars()
+                .try_fold((used, 0usize), |(cells, scalars), ch| {
+                    let width = UnicodeWidthChar::width(ch).unwrap_or(0);
+                    let next = cells.saturating_add(width);
+                    (width <= capacity && next <= capacity).then_some((next, scalars + 1))
+                })
+        } else {
+            None
+        };
         if let Some((cells, scalars)) = fits
             && scalars > 0
         {
@@ -958,6 +964,8 @@ mod tests {
             "a\u{200d}🦀",
             "",
             "\u{301}\u{301}",
+            "\u{301}\u{301}\u{301}\u{301}", // 8 bytes: width-two scan limit.
+            "\u{301}\u{301}\u{301}\u{301}x", // One byte beyond the limit.
         ] {
             let mut line = ScrollbackLine::styled_with_fill(
                 vec![
@@ -2069,6 +2077,40 @@ mod tests {
         )));
         let redrawn = project_history(&transcript, 20, 10, &HistoryScrollState::follow_tail());
         assert_eq!(redrawn.selected_text(start, end), "selected");
+    }
+
+    #[test]
+    fn long_zero_width_prefix_preserves_wrapping_style_and_offsets() {
+        let prefix = "\u{301}".repeat(32_768);
+        let text = format!("{prefix}{}", "x".repeat(161));
+        let attrs = HistoryAttrs {
+            bold: true,
+            ..Default::default()
+        };
+        let line = ScrollbackLine::styled(
+            vec![HistorySegment::styled(text.clone(), None, attrs)],
+            None,
+        );
+        let rows = project_line_chunks(&line, 80);
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].line.text, format!("{prefix}{}", "x".repeat(80)));
+        assert_eq!(rows[1].line.text, "x".repeat(80));
+        assert_eq!(rows[2].line.text, "x");
+        assert_eq!(rows[0].logical_start, 0);
+        assert_eq!(rows[0].logical_end, 32_848);
+        assert_eq!(rows[1].logical_start, 32_848);
+        assert_eq!(rows[1].logical_end, 32_928);
+        assert_eq!(rows[2].logical_start, 32_928);
+        assert_eq!(rows[2].logical_end, text.chars().count());
+        for row in rows {
+            assert_eq!(row.synthetic_prefix, 0);
+            assert!(
+                row.line
+                    .segments
+                    .iter()
+                    .all(|segment| segment.attrs == attrs)
+            );
+        }
     }
 
     #[test]
