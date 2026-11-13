@@ -9,6 +9,7 @@
 
 | Issue | Summary | Owner | Owner Status | Disposition |
 |---|---|---|---|---|
+| [#947](https://github.com/wjhuang88/talos/issues/947) | Explicit sponsored ancestor rejection in existing Bing response parser | [SEARCH-001-D3-T2](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) | Ready / Proposed / Unclaimed | Proposed separate I327 parser-local source fix after T1/#941 completion; no effective claim/code until reviewed governance merge; no Bing new endpoint or provider admission. |
 | [#941](https://github.com/wjhuang88/talos/issues/941) | Bing synthetic HTML and unadmitted-host test-only conformance | [SEARCH-001-D3-T1](../backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) | Complete / Closed on owner-first closeout merge | I326 claim #943 merged; #944 implementation Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606` (CI43428872719 8/8, independent review, CAS). Source Issue closes after docs merge; parent D3/#937 and Epic/#624 remain Open. |
 | [#937](https://github.com/wjhuang88/talos/issues/937) | Bing same-family direct-HTML multi-endpoint research | [SEARCH-001-D3](../backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) | Intake / Proposed / Unclaimed | Source/authority-only feasibility; 2026 Microsoft Bing/MSN product-use rights BLOCKED, live endpoint/region UNKNOWN; no executable claim, new default, or provider admission. Parent #624 Open. |
 | [#901](https://github.com/wjhuang88/talos/issues/901) | Eliminate legacy rust-websearch build dependency without admitting providers | [SEARCH-001-L](../backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) | Complete / Closed | I319 claim/ADR-085 A1 via #902, independent oracle #904, implementation #907 merged `3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970` after exact-head CI4121 8/8 and independent review/CAS. Documentation closeout is pending acceptance; parent #624 and E/F/G/I remain separate. |
@@ -100,6 +101,9 @@
 | [#923](https://github.com/wjhuang88/talos/issues/923) | TUI performance and native acceptance residual | [TUI-PERF-001](../tasks/2026-11-10-tui-render-performance.md) | Review / Claimed | Stage implementation #922 merged; original performance and native acceptance remain required. |
 
 ## Synchronization Notes
+
+2026-11-14: Registered separate #947 D3-T2 owner/I327 proposal to correct a T1 synthetic `b_ad` ancestor misclassification. Proposed only; new Bing query recipients and SEARCH-001 provider admission remain unauthorized.
+
 
 2026-11-13 I326 closeout: #943 claim activation and #944 test implementation both merged, Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606`, accepted exact-head CI43428872719 all 8 jobs and independent no-blocker review. Owner-first closeout proposed; #941 remains open until closeout merge. D3/#937 live use rights / #624 provider gates not changed.
 
