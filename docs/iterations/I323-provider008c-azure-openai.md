@@ -153,3 +153,8 @@ has the same tree as local 143dc9c1. Rebased configuration onto main f2e30d99 wi
 conflicts. Restored model body/deployment resolution, endpoint-override refusal and token-env
 name validation. `cargo test --locked -p talos-config azure`: 4 passed, 273 library tests
 filtered; all integration suites filtered to zero. This does not validate runtime transport.
+
+Transport recovery: restored private AzureConnection request/header/deployment construction,
+redacted previews and endpoint/deployment identity hashing, with a focused unit test authored.
+Not yet wired into adapters/factory; redirect policy, replay binding and stream redaction remain
+required integration work. Locked provider compilation started; no current test pass claimed.
