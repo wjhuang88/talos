@@ -3,7 +3,7 @@
 > Document status: Review / Claimed — implementation stage merged; acceptance pending #923
 > Created: 2026-11-10
 > Owner: 本文；Board 仅为派生入口。
-> 实现阶段已合并至主分支（#922，71655af8）；完整验收未完成，剩余项跟踪于 #923。下文原计划保留，执行记录见末尾。
+> 实现阶段及性能跟进已合并至主分支（#922，71655af8；#929，a8dc7fb0）；完整验收未完成，剩余项跟踪于 #923。下文原计划保留，执行记录见末尾。
 
 ## 1. 目标与交付边界
 
@@ -334,8 +334,8 @@ measure baseline and freeze budgets before P1.
 | Governance Claim PR | #910 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim #910 merged as d355dd68; user authorized stage delivery 2026-11-12; exact-head Agent review APPROVE at 14a274ed; code CI43150963692 passed; stage decision recorded in #922 and #923 |
-| Implementation PR | #922 (merged as 71655af8); #929 (follow-up candidate; remaining acceptance #923) |
-| Last Updated | 2026-11-12 |
+| Implementation PR | #922 (merged as 71655af8); #929 (merged as a8dc7fb0; remaining acceptance #923) |
+| Last Updated | 2026-11-13 |
 | Handoff / Release Condition | Full published acceptance including native terminal evidence; incomplete platforms remain Review |
 
 ### P0 execution checkpoint — 2026-11-11
@@ -1820,3 +1820,38 @@ keep the unreproduced479ms issue and native/platform gates in Review.
 
 Independent Agent evidence review approved this diagnostic increment; both
 governance validators passed with0warnings (19.094s,17.745s CPU,216.4MiB,swap0).
+
+### Follow-up stage delivered — 2026-11-13
+
+PR #929 merged as `a8dc7fb0fe5aed11d8c7410d6f3362526926c3db`, candidate
+`4d9e5cfc388aab436be6d9970a6c6712919802a0`. Exact-head CI `43360750041`
+completed successfully: primary preflight/CLI/plugin/dependency/Desktop checks,
+Windows workspace/aggregate, Linux/Windows Desktop and installer passed. Global
+reconciliation only reports closed#901 matrix drift; separately owned advisory
+under ADR-071. Earlier macOS binding failure is retained as history; the later
+pass does not establish its root cause or a production fix.
+
+Independent Agent technical/evidence review approved the exact head; shared
+maintainer identity is disclosed. Existing single-maintainer stage authorization
+was applied. Final CAS checked targetd92aabaa, unchanged effective claim#910,
+MERGEABLE candidate and open-PR overlap. New independent storage traits and
+ARCH-035 documents did not affect this implementation. PR#917 shares source
+filenames but not the diagnostic hunks; its work was preserved. Authorization
+and CAS record: https://github.com/wjhuang88/talos/pull/929#issuecomment-6843838192 .
+
+Delivered: bounded fitting-segment projection, sampler cutoff correction and
+reviewed finite heap/diagnostic evidence. No release tag or whole-task completion.
+Owner remains Review/Claimed, with #923 open. Remaining required acceptance:
+
+- Original Debug transcript479ms input tail remains unexplained. No diagnostic
+  reproduced that event; one GDB33ms/major-fault interval is only a lead.
+- Native Ghostty exact source/binary/environment and process/emulator resource
+  evidence; deferred approval, external Git and workspace-switch operations.
+- Another supported terminal and native Windows execution (user has no Windows
+  environment). Cross-checks/CI are not substitutes.
+
+Basic native acceptance already reported by the maintainer is preserved. Current
+host inventory shows Ghostty/niri but no process namedtalos, so no candidate
+native resource sample was taken. All local heavy tasks and the CI watcher have
+ended. Resume from the remaining acceptance rows; do not repeat unchanged
+matrices, waive budgets, or reinterpret stage merge as Complete.
