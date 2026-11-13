@@ -42,7 +42,7 @@ Record an exact-source-path matrix for host constructors and Runtime/Session/Mem
 
 ## Execution gates
 
-Decision review artifact: [ARCH-035 host-composition proposal](../proposals/arch-035-host-composition-boundary.md) (non-binding, no ADR number reserved).
+Historical 2026-11-10 decision review artifact: [ARCH-035 host-composition proposal](../proposals/arch-035-host-composition-boundary.md) (at that time non-binding with no ADR number reserved; **subsequently superseded for ownership/placement by accepted ADR-104**).
 
 - E0: inspect runtime builder, session manager/store, CLI host, TUI renderer, Desktop and SDK call sites; classify persistence authority and compiled SQLite dependency; record baseline tests and negative/recovery invariants.
 - E1: review ADR for local default host profile, domain ownership, builder source compatibility and the #670 no-duplication matrix.
@@ -117,7 +117,7 @@ I319 search legacy dependency retirement has a separate proposed claim; I318 TUI
 ### Review and residuals
 
 - The E0 evidence doc enumerates existing tests and missing fault-injection/ABI/native evidence; E2/E4 require before/after runs against real code changes.
-- Required architecture/API review and maintainer acceptance for E1 are pending. Do not treat docs-only CI as runtime behavior conformance.
+- **Historical 2026-11-10 pending-review note:** E1 architecture/API review and maintainer acceptance were then pending. Placement-only E1 decision was subsequently accepted via #936, while docs-only CI remains **not** runtime behavior-conformance evidence.
 - STORE-002/#670 remains the sole contract owner and has not published accepted implementation seams at this checkpoint.
 - No Completion Commit is claimed for #897. I320 may close only for its independently accepted documentation slice; #897 remains open through E2/E4.
 
@@ -127,13 +127,13 @@ Within the existing effective I320 E0/E1 claim #905, source-truth was rechecked 
 
 **Historical dependency-recheck disposition, before ADR-104 existed:** the E1 placement proposal was **Proposed**, awaiting architecture/API review. This did **not** mean STORE-002 D/E implementation was necessary to accept the narrow **ownership/placement rule**; D/E operational evidence gates the *future concrete host API, local composition, E2/E3 code and E4 parity*. Subsequent ADR-104 in PR #936 proposes that placement-only acceptance independently, conditional on final-head review/CI and guarded merge. The E0 baseline's original source-date and unexecuted-test qualifications are preserved. No runtime, public API, default SQLite/TLOG/JSONL/FTS5 implementation, migration or permission behavior changes; the ARCH-035 Story remains Review / Claimed and **E2/E3 remain unauthorized**. A future implementation claim must be independently established.
 
-## E1 formal ADR candidate — 2026-11-13
+## Historical E1 formal ADR candidate — before #936 merge (2026-11-13)
 
-After the reviewed E1 dependency reconciliation PR #934 merged `d92aabaad4570d799c6e04d75c87abbb36a2b004` (exact-head docs [CI #4159](https://github.com/wjhuang88/talos/actions/runs/43359366292), both validators 0 warnings, [read-only technical no-blocker review](https://github.com/wjhuang88/talos/pull/934#issuecomment-6843004742)), [ADR-104](../decisions/104-host-composition-ownership-boundary.md) was drafted as a *separate proposed* ownership/host-placement decision in the same authorized E1 scope. It is not yet accepted. The ADR deliberately defers any public injection signature, runtime implementation, local profile binding and behavior-equivalence result until STORE-002 D/E and a separately governed ARCH-035 E2 claim. This I320 review remains open pending exact-head ADR review, CI and owner-first acceptance record; parent #897 stays Open.
+After the reviewed E1 dependency reconciliation PR #934 merged `d92aabaad4570d799c6e04d75c87abbb36a2b004` (exact-head docs [CI #4159](https://github.com/wjhuang88/talos/actions/runs/43359366292), both validators 0 warnings, [read-only technical no-blocker review](https://github.com/wjhuang88/talos/pull/934#issuecomment-6843004742)), [ADR-104](../decisions/104-host-composition-ownership-boundary.md) was drafted as a *separate proposed* ownership/host-placement decision in the same authorized E1 scope. At this pre-merge checkpoint it had not yet been accepted; #936 subsequently accepted placement/ownership only. The ADR deliberately defers any public injection signature, runtime implementation, local profile binding and behavior-equivalence result until STORE-002 D/E and a separately governed ARCH-035 E2 claim. This I320 review remains open pending exact-head ADR review, CI and owner-first acceptance record; parent #897 stays Open.
 
-### E1 placement-acceptance candidate — #936 final-head gate
+### Historical E1 placement-acceptance candidate — subsequently fulfilled by #936 merge
 
-Independent [initial proposed-head ADR review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843456241) found the ownership/placement decision acceptable in principle, but blocked on a contradictory historical proposal sentence. The candidate corrects that sentence, clarifies that the runtime-facing composition **layer** is not a currently unified callable API, and scopes ADR-104 as **Accepted on reviewed #936 merge for placement/ownership only**. The historical [CI #4164](https://github.com/wjhuang88/talos/actions/runs/43362479834) succeeded on the prior head; final-head CI, validators, independent review, owner/overlap/CAS and single-maintainer authorization are mandatory before merge. Even after ADR acceptance, I320/ARCH-035 E2/E3 implementation, any runtime API, upstream STORE-002 D/E operational readiness, E4 parity and #897 closure remain **not delivered**.
+Independent [initial proposed-head ADR review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843456241) found the ownership/placement decision acceptable in principle, but blocked on a contradictory historical proposal sentence. The candidate corrects that sentence, clarifies that the runtime-facing composition **layer** is not a currently unified callable API, and scopes ADR-104 as **Accepted on reviewed #936 merge for placement/ownership only**. The historical [CI #4164](https://github.com/wjhuang88/talos/actions/runs/43362479834) succeeded on the prior head; **at this pre-merge checkpoint** final-head CI, validators, independent review, owner/overlap/CAS and single-maintainer authorization remained mandatory. Their later disposition, including the unrelated remote-matrix residual, is documented in the final I320 closeout below. Even after ADR acceptance, I320/ARCH-035 E2/E3 implementation, any runtime API, upstream STORE-002 D/E operational readiness, E4 parity and #897 closure remain **not delivered**.
 
 ## I320 bounded final acceptance — documentation only (2026-11-13)
 
