@@ -1682,3 +1682,88 @@ not confirmed root cause. Global matrix drift for closed#901 is a separate advis
 Windows workspace job was still running at observation. Long wrapped/zero-width
 segments, final-source heap attribution and native/platform gaps remain in
 RESIDUALS.md and #923. Whole task remains Review; no completion claim.
+
+### Long-segment regression correction — 2026-11-13
+
+Independent extracted-function probes found a60–75% extra cost for a32K zero-width
+prefix followed by wrapped ASCII in f725b74b. A local correction limits the
+speculative fit scan to4*viewport-width bytes, retaining ordinary scalar fallback
+and short-segment copying. All six fixture median costs are within20% of old
+projection in this microbenchmark; this is not full-workload resource acceptance.
+43 focused tests passed; independent static review approves. New Debug resize/input
+three rounds pass150/200ms with0/115,3/115,0/111 events over150ms and P99 upper
+148.640179/155.596768/149.782736ms. Evidence: [bounded-segment](evidence/tui-perf-001/bounded-segment/README.md).
+Runtime correction is committed locally as293ce0a2; validation results follow.
+CI43341349202 ended: Windows workspace passed; macOS long-history source-binding
+failure still blocks merge. Isolated contention probes have not reproduced that
+failure; source-binding runtime is unchanged. Existing platform/heap gaps persist.
+
+Boundary fixtures also pass43 projection tests; publication remains outstanding.
+
+Final correction293ce0a2 Release replay passed all three100/150ms budget rounds:
+P95/P99 upper32.705288/29.491502/29.130585ms. Each round61 keyboard probes,
+zero skipped; coverage and actual resize validation passed. Build43.97s; combined
+build+measurement service156.117s,CPU46.274s,peak2GiB,swap0. Same fixed guard.
+These results close only synthetic resize/input timing for this correction.
+Final preflight and xwin results follow; CI failure, active-workload comparisons,
+final-source heap attribution and native/platform residuals remain open.
+
+Final-source standard preflight exit0, 5320 tests passed,0failed/ignored
+across148 summaries,1118.070s. Includes formatting, governance, locked
+workspace check/Clippy/test and external SDK fixture. MSVC cargo-xwin --tests exit0,
+1.542s. Combined1119.686s wall,561.342s CPU,peak2GiB,swap0. Prior failed preflight
+and macOS CI remain historical failures; this local pass does not erase them.
+
+### Interleaved transcript workload follow-up
+
+Twelve valid35s samples (5s warmup), previousf725b74b versus bounded293ce0a2,
+three alternating pairs each Debug/Release,10,000 history,one committed message/s,
+500ms input probes. CPU median ratios0.881Debug/0.667Release pass<=1.20;
+candidate peak PSS38,787/33,130KiB passes baseline*1.20+8MiB. Low Release CPU
+uses coarse procfs ticks; this is regression evidence, not a precise speedup.
+Release input all passes10/20ms, worstP99upper0.489082ms. Debug first bounded
+round FAILS35ms P99:479.239045ms; later rounds3.422221/3.461222ms pass. No probes
+skipped. Validated coverage does not erase the failed latency budget.
+Frame-preparation max476.541768ms while history-rebuild max0.065496ms; IO pressure
+observed, but causality remains unproven. See long-tail-diagnosis.md.gz; further
+unchanged matrices are not the next diagnostic. Runtime source remains unchanged.
+Service449.876s,CPU10.448s,peak810.4MiB (whole measurement service),swap0.
+Final-source heap profiling is separate; profiler latency is not acceptance.
+
+Final-source heap attempt exited1 at resize coverage validation:571 driver actions,
+569 actual steady resize/rebuild events (required>=570),300.172s steady duration.
+Replay itself exited0. The sample is retained for limited diagnostic analysis,
+not passed full coverage. Transcript profile was not started. Service309.409s,
+CPU126.427s,peak624.4MiB,swap0. No repeat or relaxed threshold was applied.
+
+CI source-binding diagnosis adds test-only failure metadata and distinguishes
+not-attempted from refused binding. Independent review approves privacy and cfg
+boundary; diagnostic test results follow. Production2s budget and
+return behavior unchanged. Expiry observed after refusal alone is not proof of
+which internal branch returnedNone. Required macOS failure remains unresolved.
+
+Diagnostic commit34328646 passed the exact long-history Agent test (1pass,
+0fail/ignored; test0.68s,build+test192.928s). Independent review APPROVE; production
+code remains unaffected by cfg(test). Prior5320-test preflight precedes this test-only
+change, so final-head remote validation is still required. This is not a macOS fix.
+
+Existing failed-coverage resize heap analysis completed: all nine30s windows
+(t30..300) have identical median25,883,809bytes,delta0; peak26,159,584bytes.
+569 actual resize/rebuild events were observed. This supports finite fixed-history
+heap stability only, while coverage remains failed. Raw profile and detailed massif
+are retained. Analysis5.410s,CPU5.373s,peak62.7MiB,swap0. The previously unexecuted
+transcript heap scenario ran independently with a separate manifest.
+
+Final-source transcript heap profile passed coverage:301 actual steady history
+updates,300.012s. Nine30s heap-median windows increase by exactly25,020bytes/window,
+about834bytes per fixture message; first-to-last delta200,160bytes. No accelerating
+growth observed in this finite run. Service308.391s,CPU12.553s,peak488.6MiB
+(includes profiler),swap0. Detailed massif tree children incorrectly expose zero
+bytes despite nonzero totals, so object/category attribution is NOT established.
+Raw profile, text stacks, totals and exporter limitation are archived. All local
+heavy jobs are terminal; no extra unchanged timing matrices are scheduled.
+
+Remaining blockers: Debug transcript input long-tail479ms not diagnosed; previous
+macOS CI source binding failed (test-only diagnostic34328646 now available);
+resize heap coverage mismatch569/571; heap category attribution; exact native
+resources/deferred operations and second terminal/native Windows. Task staysReview.
