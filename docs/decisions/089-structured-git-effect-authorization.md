@@ -195,7 +195,7 @@ cover both the supported path and pre-mutation refusal.
 > The claim was activated by governance PR #920 at `067dd3d4f5fd0fac910ac7f52bd23ee7f8f5bb80`.
 > That merge **did not** amend the accepted execution or permission contract.
 > See the [technical proposal](../proposals/adr-089-gix-native-preflight-amendment.md)
-> and [T0 source audit](../reference/GIT-COMPAT-001-I324-GIX-PREFLIGHT-AUDIT.md).
+> and the [T0 source audit in Draft PR #928](https://github.com/wjhuang88/talos/blob/feat/i324-gix-native-preflight/docs/reference/GIT-COMPAT-001-I324-GIX-PREFLIGHT-AUDIT.md).
 > This section is a **review candidate** and does not supersede any accepted
 > fixed-command rules until separately accepted with independent security review.
 
