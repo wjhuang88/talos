@@ -6,7 +6,11 @@
 
 ## STORE-002 / I322 C — Complete / Closed; D/E/F pending
 
-[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I322](../iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed in #909; C [implementation #912](https://github.com/wjhuang88/talos/pull/912) merged `3df409ef9ed707756350f2c7d4b2c8819f157222`, exact-head [CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) applicable checks and both validators passed, independent API/doc review and CAS no blockers. Existing Session Pending/Todo, Memory, Evolution, Exploration implementations now expose minimal domain-owned contracts by direct forwarding, without provider readiness or consumer/SQL/schema/format changes. C claim released; D/E/F and #897 Host remain separately gated. Global closed #901 reconciliation is an ADR-071 residual. Parent #670 remains Open.
+[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I322](../iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed in #909; C [implementation #912](https://github.com/wjhuang88/talos/pull/912) merged `3df409ef9ed707756350f2c7d4b2c8819f157222`, exact-head [CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) applicable checks and both validators passed, independent API/doc review and CAS no blockers. Existing Session Pending/Todo, Memory, Evolution, Exploration implementations now expose minimal domain-owned contracts by direct forwarding, without provider readiness or consumer/SQL/schema/format changes. C claim released; D has a separately proposed I325/#932 governance claim (ineffective until merge); E/F and #897 Host remain gated. Global closed #901 reconciliation is an ADR-071 residual. Parent #670 remains Open.
+
+## STORE-002 / I325 D — existing-local-delegation claim proposed
+
+[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I325](../iterations/I325-store-002-local-delegation.md) / #670: after merged #912 code and #930 bounded C closure, governance Draft [#932](https://github.com/wjhuang88/talos/pull/932) selects D (no implementation before claim merges). Existing domain `impl Trait for Store` and `SessionStore` are already present from C; D verifies actual local SQLite/FTS5/TLOG/JSONL delegation through accepted interfaces, without duplicate provider contracts, SQL/schema/format/transaction/production caller changes. E local profile, F broad conformance and #897 Host wiring remain separate.
 
 ## ARCH-035 / I320 — E0/E1 Review (PR #906)
 

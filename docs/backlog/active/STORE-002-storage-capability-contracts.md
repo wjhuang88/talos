@@ -1,6 +1,6 @@
 # STORE-002: Storage And Retrieval Capability Contracts
 
-**Status**: Active / Released — I321 A/B and I322 C accepted; D/E/F unclaimed
+**Status**: Active / Claimed — I321 A/B and I322 C accepted; I325 D proposed activation; E/F unclaimed
 
 **Type**: Architecture / Contract Convergence
 
@@ -31,18 +31,18 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 
 | Field | Value |
 |---|---|
-| Claim State | Released |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
-| Work Slice | STORE-002 I322 C only: extract domain-owned persistence/retrieval operational traits from existing Session/PendingSubmission/Todo, Memory, Evolution and Exploration data/error methods; no concrete storage, SQL/transactions/formats/paths, consumer/default/Host/Server change or new engine |
-| Claimed At | 2026-11-11 |
+| Work Slice | STORE-002 I325 D only: use accepted I322 domain traits with existing SQLite/FTS5/TLOG/JSONL implementations for narrow, real, trait-directed local operational delegation/conformance; only strictly necessary domain-local glue, without reimplementing C traits/forwarders, changing concrete stores/SQL/schema/transaction/file formats, production call sites or Host/E composition, F broad conformance, new engines or new providers |
+| Claimed At | 2026-11-13 |
 | Source Issue | #670 |
-| Governance Claim PR | #911 |
+| Governance Claim PR | #932 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | I322 C claim #911 merged `60da1bbadca00c9bdee6fbcb8f5ad990a4313331`; implementation [#912](https://github.com/wjhuang88/talos/pull/912) merged `3df409ef9ed707756350f2c7d4b2c8819f157222` after [exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) passed all seven applicable jobs, both governance validators, independent [API/architecture review](https://github.com/wjhuang88/talos/pull/912#issuecomment-6828277614) with no blockers and [merge-time CAS](https://github.com/wjhuang88/talos/pull/912#issuecomment-6840919956). Single-maintainer path with Agent technical review, not a second human approval. |
-| Implementation PR | #912 (merged; Completion Commit `3df409ef9ed707756350f2c7d4b2c8819f157222`) |
+| Authorization Evidence | C completed: implementation [#912](https://github.com/wjhuang88/talos/pull/912) `3df409ef9ed707756350f2c7d4b2c8819f157222`; C owner/iteration closure [#930](https://github.com/wjhuang88/talos/pull/930) `a07b466d5aa2a03fb841cdcb918cd4968c778942`. User authorized continued #670 progress. D proposed independent governance [#932](https://github.com/wjhuang88/talos/pull/932) only; claim ineffective until merged exact-head docs CI, both validators, single-maintainer authorization/no-overlap CAS. C API review accepted existing forwarders; D must not duplicate them. |
+| Implementation PR | Not started |
 | Last Updated | 2026-11-13 |
-| Handoff / Release Condition | C implementation delivered and I322 closed. This bounded claim is released; D/E/F must establish their own effective claim and evidence. #897 Host E2/E3 remains gated. |
+| Handoff / Release Condition | D claim only becomes effective upon reviewed #932 merge. Implement no D code before then. D acceptance requires actual local delegation tests, exact-head native CI and independent API/architecture review; E/F and #897 Host E2/E3 remain separately gated. |
 
 ## Governance
 
@@ -83,3 +83,10 @@ Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim 
 - Independent [Copilot API and governance-diff review](https://github.com/wjhuang88/talos/pull/912#issuecomment-6828277614) found no blockers. This is independent Agent technical review under one maintainer identity, **not independent human approval**. [Final merge-time CAS](https://github.com/wjhuang88/talos/pull/912#issuecomment-6840919956) checked the effective #911 claim, no competing I322 PR, mergeability and exact head before squash merge.
 - Historical macOS Session fork-recovery test `durable.rs:2363` failed on prior CI #4116 and on an unrelated historical #877 attempt, but **passed on final exact-head CI #4127**. Its intermittent cause remains unknown; no recovery/locking assertion, production store, SQL, FTS5, SQLite schema, TLOG/JSONL, transactions, dependencies or caller was changed to force a pass.
 - This closes **only I322 C**; parent #670 remains Open for D existing-implementation delegation, E default local composition and F conformance/recovery evidence. Their separate governance claims are required before implementation. #897 Host E2/E3 is not unblocked by C alone.
+
+## I325 D local delegation claim — 2026-11-13 (proposed until #932 merge)
+
+- [I325](../../iterations/I325-store-002-local-delegation.md) selects the existing-storage **D** work slice after C merged and closed. Governance [#932](https://github.com/wjhuang88/talos/pull/932) proposes new effective ownership; it is **not active until the finalized atomic claim lands on main**.
+- C already implemented direct `impl Trait for Store` forwarding for the five new domain contracts; D must **not repeat or replace those interfaces or forwarders**. Its purpose is to demonstrate real local SQLite/FTS5/TLOG/JSONL operations through the accepted trait surfaces and add narrowly justified domain-local adapter glue only when evidence proves a gap, without moving SQL/transactions/paths or rewriting production callers.
+- Preserve explicit non-operational/unavailable storage category semantics: capability descriptors do not establish runtime/provider readiness. `SessionStore` already handles TLOG/JSONL; SessionIndex/durable-binding coverage needs explicit inventory/disposition rather than blind new APIs.
+- E owns default local composition, F owns full before/after equivalence and crash/recovery characterization, ARCH-035/#897 owns cross-Host consumption; no D claim transfers those work slices. Parent #670 stays Open.
