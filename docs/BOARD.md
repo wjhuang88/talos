@@ -5,9 +5,9 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 # Talos Board
 
-## SEARCH-001-D3-T1 / I326 — proposed offline negative-conformance claim
+## SEARCH-001-D3-T1 / I326 — Complete / Closed upon closeout merge
 
-[SEARCH-001-D3-T1](backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): proposed atomic **test-only** claim after research [#938](https://github.com/wjhuang88/talos/pull/938) merged. **Claimed/Active proposed by Draft #943; ineffective until merge.** Test only uncovered ad/organic, DOM drift and unapproved-host negatives with Talos-authored synthetic fixtures; existing BF parity tests are retained. No live Bing acquisition, search request authority/default changes, provider admission or #624 closure. I324/I325/I320 remain independent.
+[SEARCH-001-D3-T1](backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): claim [#943](https://github.com/wjhuang88/talos/pull/943) merged; bounded test implementation [#944](https://github.com/wjhuang88/talos/pull/944) merged at Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606` after exact-head CI43428872719 8/8, independent review and CAS. Five synthetic-only cases characterize ad/organic false positive, DOM drift, unadmitted new Bing hosts and root-reachability/query-403 distinction. Parser false-positive **not fixed**; new Bing hosts, real regional reachability or provider rights not admitted. #937/#624 remain Open; #941 close only after owner-first record merges.
 
 ## GIT-COMPAT-001 / I324 — gix-native Git preflight (claim proposed)
 
