@@ -1,13 +1,15 @@
-# GitHub Issue / Owner Document Status Reconciliation — 2026-09-30
+# GitHub Issue / Owner Document Status Reconciliation — Rolling Register (origin 2026-09-30)
 
-**Repository baseline**: `main@5bb36663d13f133f8b90d7cc0c692ec876de7954`
-**Purpose**: current open-Issue owner reconciliation on 2026-09-30; retain the historical 2026-08-31 matrix and register new open Issues #623–#625 against existing or proposed intake owners.
+**Original baseline (2026-09-30)**: `main@5bb36663d13f133f8b90d7cc0c692ec876de7954`.
+**Latest registration update**: 2026-11-13 (open-Issue/owner rows are an evolving reconciliation register, **not** a point-in-time 2026-09-30 inventory).
+**Purpose**: preserve the original 2026-09-30 / 2026-08-31 historical provenance while tracking subsequent open-Issue owner relationships for remote CI. The original filename remains stable because governance automation uses it; entries created after September are dated below, not backdated to the initial snapshot.
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
 ## Open Issue Matrix
 
 | Issue | Summary | Owner | Owner Status | Disposition |
 |---|---|---|---|---|
+| [#937](https://github.com/wjhuang88/talos/issues/937) | Bing same-family direct-HTML multi-endpoint research | [SEARCH-001-D3](../backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) | Intake / Proposed / Unclaimed | Source/authority-only feasibility; 2026 Microsoft Bing/MSN product-use rights BLOCKED, live endpoint/region UNKNOWN; no executable claim, new default, or provider admission. Parent #624 Open. |
 | [#901](https://github.com/wjhuang88/talos/issues/901) | Eliminate legacy rust-websearch build dependency without admitting providers | [SEARCH-001-L](../backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) | Complete / Closed | I319 claim/ADR-085 A1 via #902, independent oracle #904, implementation #907 merged `3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970` after exact-head CI4121 8/8 and independent review/CAS. Documentation closeout is pending acceptance; parent #624 and E/F/G/I remain separate. |
 | [#853](https://github.com/wjhuang88/talos/issues/853) | Model-selectable process memory limit (handoff T6) | [PROCESS-001](../backlog/active/PROCESS-001-model-process-memory-limit.md) | In Progress / proposed activation | I316 claim #854 and ADR-098 design reviewed; finalized atomic claim and target merge required before implementation. |
 | [#848](https://github.com/wjhuang88/talos/issues/848) | Hosted keyless MCP admission triage | [SEARCH-001-D2](../backlog/active/SEARCH-001-D2-keyless-mcp-admission.md) | Intake / Unclaimed | Proposed canonical research intake in PR #849; Exa/Parallel BLOCKED, no provider admission, effective claim or implementation authority. |
@@ -98,6 +100,8 @@
 
 ## Synchronization Notes
 
+2026-11-13: Registered new SEARCH-001-D3 / #937 as Intake / Proposed / Unclaimed with canonical owner and source/fixture evidence. This is a *new* registration, not a 2026-09-30 fact, and does not activate or modify native search providers or parent SEARCH-001/#624.
+
 2026-11-12: Reconciled missing #919 and #923 without activating #920 or closing TUI-PERF-001. Existing proposal is the interim #919 source until its formal owner reaches main.
 
 2026-11-10: Registered open Issue #897 as ARCH-035, independent behavior-preserving host/runtime composition owner. SERVER-001/#142 and SERVER-001-C/#361 require its accepted equivalence evidence before production Server integration; STORE-002/#670 continues to own storage capability contracts. Proposed planning documentation PR #896 does not activate implementation or supersede SERVER-002/#360. Earlier dated rows are preserved as historical provenance.
@@ -117,8 +121,7 @@ rows described the proposed #579 claim; implementation #580 merged as
 `52276f552496b160e064fd54ed7471bc84d3f559` and closeout #581 as `f92a99c0`.
 Historical claim and acceptance evidence remain in the owners and I279.
 
-This 2026-09-30 matrix supersedes the 2026-08-31 open-Issue matrix for live reconciliation only;
-previous dated snapshots remain historical evidence and are not modified. Closed Issue #188 remains recorded
+The register originated on 2026-09-30 and superseded the 2026-08-31 open-Issue snapshot at that time; subsequent rows and updates through 2026-11-13 are **rolling CI reconciliation**, not changes to the original 2026-09-30 facts. Earlier dated snapshots remain historical evidence and are not modified. Closed Issue #188 remains recorded
 in PERM-007 and I236 owner documents with completion evidence from I236.
 
 This matrix is a remote-owner reconciliation surface, not an implementation backlog or activation
