@@ -13,9 +13,9 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 
 [I322](I322-store-002-domain-contract-extraction.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance #911 `60da1bb` and [implementation #912](https://github.com/wjhuang88/talos/pull/912) completion commit `3df409ef9ed707756350f2c7d4b2c8819f157222`. [Exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) scoped jobs and both validators passed; independent public API review and CAS no blockers. Old SessionStore reused; Pending/Todo, Memory, Evolution and Exploration domain contracts added with unchanged stores/callers. Advisory remote closed #901 owner-matrix drift retained; no new provider. I322 C closed; D has an independent I325/#932 governance proposal; E/F and #897 Host remain gated and #670 Open.
 
-## I325 / STORE-002 D — Active / Claimed proposed (ineffective until #932 merge)
+## I325 / STORE-002 D — Review / Claimed
 
-[I325](I325-store-002-local-delegation.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: draft governance [#932](https://github.com/wjhuang88/talos/pull/932) selects the **bounded existing-local-delegation D** work after accepted C #912 and closeout #930. Reuse C's operational trait and concrete forwarding, exercise real SQLite/FTS5/TLOG/JSONL operations through accepted typed boundaries, no new engine/provider, SQL/schema/format, Host/SDK or default-profile changes. No implementation until finalized claim reaches main. E/F and #897 remain independently gated.
+[I325](I325-store-002-local-delegation.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance claim [#932](https://github.com/wjhuang88/talos/pull/932) merged at e49ccde70556403a9d7b66551565e2b6c81ad32d. D implementation candidate covers actual TLOG/JSONL SessionStore, Pending/Todo SQLite, Memory FTS+graph, Evolution observations/patterns and Exploration sources/chunks/citations via existing domain traits, with [source-backed inventory](../reference/STORE-002-I325-D-LOCAL-DELEGATION-INVENTORY-2026-11-13.md). No E default profile, F broad equivalence or #897 Host change. Exact-head CI and independent code review pending; D not Complete.
 
 ## I321 / STORE-002 A/B — Complete / Closed (bounded slice)
 

@@ -1,6 +1,6 @@
 # STORE-002: Storage And Retrieval Capability Contracts
 
-**Status**: Active / Claimed — I321 A/B and I322 C accepted; I325 D proposed activation; E/F unclaimed
+**Status**: Review / Claimed — I321 A/B and I322 C accepted; I325 D local-delegation test candidate; E/F unclaimed
 
 **Type**: Architecture / Contract Convergence
 
@@ -39,10 +39,10 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Source Issue | #670 |
 | Governance Claim PR | #932 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | C completed: implementation [#912](https://github.com/wjhuang88/talos/pull/912) `3df409ef9ed707756350f2c7d4b2c8819f157222`; C owner/iteration closure [#930](https://github.com/wjhuang88/talos/pull/930) `a07b466d5aa2a03fb841cdcb918cd4968c778942`. User authorized continued #670 progress. D proposed independent governance [#932](https://github.com/wjhuang88/talos/pull/932) only; claim ineffective until merged exact-head docs CI, both validators, single-maintainer authorization/no-overlap CAS. C API review accepted existing forwarders; D must not duplicate them. |
+| Authorization Evidence | D governance #932 merged `e49ccde70556403a9d7b66551565e2b6c81ad32d` after CI #4151 and independent review; D implementation remains subject to separate exact-head CI and independent technical review. C completed: implementation [#912](https://github.com/wjhuang88/talos/pull/912) `3df409ef9ed707756350f2c7d4b2c8819f157222`; C owner/iteration closure [#930](https://github.com/wjhuang88/talos/pull/930) `a07b466d5aa2a03fb841cdcb918cd4968c778942`. User authorized continued #670 progress. D proposed independent governance [#932](https://github.com/wjhuang88/talos/pull/932) only; claim ineffective until merged exact-head docs CI, both validators, single-maintainer authorization/no-overlap CAS. C API review accepted existing forwarders; D must not duplicate them. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-13 |
-| Handoff / Release Condition | D claim only becomes effective upon reviewed #932 merge. Implement no D code before then. D acceptance requires actual local delegation tests, exact-head native CI and independent API/architecture review; E/F and #897 Host E2/E3 remain separately gated. |
+| Handoff / Release Condition | Claim #932 is effective on main. D Review requires real local delegation tests, exact-head native CI, independent API/architecture review and a future completion commit. E/F and #897 Host E2/E3 remain separately gated. |
 
 ## Governance
 
@@ -84,9 +84,14 @@ Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim 
 - Historical macOS Session fork-recovery test `durable.rs:2363` failed on prior CI #4116 and on an unrelated historical #877 attempt, but **passed on final exact-head CI #4127**. Its intermittent cause remains unknown; no recovery/locking assertion, production store, SQL, FTS5, SQLite schema, TLOG/JSONL, transactions, dependencies or caller was changed to force a pass.
 - This closes **only I322 C**; parent #670 remains Open for D existing-implementation delegation, E default local composition and F conformance/recovery evidence. Their separate governance claims are required before implementation. #897 Host E2/E3 is not unblocked by C alone.
 
-## I325 D local delegation claim — 2026-11-13 (proposed until #932 merge)
+## I325 D local delegation implementation — 2026-11-13 (Review / Claimed)
 
-- [I325](../../iterations/I325-store-002-local-delegation.md) selects the existing-storage **D** work slice after C merged and closed. Governance [#932](https://github.com/wjhuang88/talos/pull/932) proposes new effective ownership; it is **not active until the finalized atomic claim lands on main**.
+- [I325](../../iterations/I325-store-002-local-delegation.md) selects the existing-storage **D** work slice after C merged and closed. Governance [#932](https://github.com/wjhuang88/talos/pull/932) merged `e49ccde70556403a9d7b66551565e2b6c81ad32d`; D ownership is effective, but this implementation candidate is **not Complete**.
 - C already implemented direct `impl Trait for Store` forwarding for the five new domain contracts; D must **not repeat or replace those interfaces or forwarders**. Its purpose is to demonstrate real local SQLite/FTS5/TLOG/JSONL operations through the accepted trait surfaces and add narrowly justified domain-local adapter glue only when evidence proves a gap, without moving SQL/transactions/paths or rewriting production callers.
 - Preserve explicit non-operational/unavailable storage category semantics: capability descriptors do not establish runtime/provider readiness. `SessionStore` already handles TLOG/JSONL; SessionIndex/durable-binding coverage needs explicit inventory/disposition rather than blind new APIs.
 - E owns default local composition, F owns full before/after equivalence and crash/recovery characterization, ARCH-035/#897 owns cross-Host consumption; no D claim transfers those work slices. Parent #670 stays Open.
+
+## I325 D execution checkpoint — 2026-11-13
+
+- [Source-backed local delegation inventory](../../reference/STORE-002-I325-D-LOCAL-DELEGATION-INVENTORY-2026-11-13.md) maps existing domain trait/Store operations and the seven capability categories, including SessionIndex/durable-binding gaps.
+- Proposed tests exercise actual local SQLite/FTS5/TLOG/JSONL through accepted traits; no duplicate C forwarders or production caller changes. Exact-head validation and independent review pending, no Completion Commit. E/F and #897 Host remain gated.

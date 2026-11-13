@@ -193,4 +193,101 @@ mod tests {
         let _: fn(&PendingSubmissionStore) -> &dyn PendingSubmissionPersistence = |store| store;
         let _: fn(&TodoRepository) -> &dyn TodoPersistence = |store| store;
     }
+
+    #[test]
+    fn existing_log_trait_dispatches_tlog_and_jsonl_writes_and_atomic_replace() {
+        let dir = tempfile::tempdir().expect("temporary session root");
+        let entry = crate::SessionEntry {
+            id: "d-entry-1".into(),
+            parent_id: None,
+            timestamp: chrono::Utc::now(),
+            role: "user".into(),
+            content: "original session content".into(),
+            metadata: crate::SessionMetadata::default(),
+        };
+        let stores: [&dyn crate::SessionStore; 2] =
+            [&crate::CompactTextSessionStore, &crate::JsonlSessionStore];
+        for (index, store) in stores.into_iter().enumerate() {
+            let file = dir
+                .path()
+                .join(format!("session-{index}.{}", store.file_extension()));
+            store.append_entry(&file, &entry).expect("append");
+            let loaded = store.read_entries(&file).expect("read appended");
+            assert_eq!(loaded.len(), 1);
+            assert_eq!(loaded[0].content, entry.content);
+            let replacement = crate::SessionEntry {
+                id: "d-entry-2".into(),
+                content: "atomic replacement content".into(),
+                ..entry.clone()
+            };
+            store
+                .replace_entries_atomically(&file, std::slice::from_ref(&replacement))
+                .expect("atomic replace");
+            let replaced = store.read_entries(&file).expect("read replaced");
+            assert_eq!(replaced.len(), 1);
+            assert_eq!(replaced[0].id, replacement.id);
+            assert!(!store.read_bytes(&file).expect("bytes").is_empty());
+        }
+    }
+
+    #[test]
+    fn local_pending_trait_enforces_durable_generation_fence() {
+        let dir = tempfile::tempdir().expect("temporary pending root");
+        let transcript = dir.path().join("session.tlog");
+        let store = PendingSubmissionStore::for_session_file(&transcript, "d-session");
+        let contract: &dyn PendingSubmissionPersistence = &store;
+        assert_eq!(contract.runtime_generation().expect("initial generation"), 0);
+        assert_eq!(contract.advance_runtime_generation(0).expect("advance"), 1);
+        assert_eq!(contract.runtime_generation().expect("persisted generation"), 1);
+        assert!(matches!(
+            contract.advance_runtime_generation(0),
+            Err(PendingSubmissionError::GenerationConflict {
+                expected: 0,
+                actual: 1
+            })
+        ));
+        assert!(contract.recover_running().expect("recover").is_empty());
+    }
+
+    #[test]
+    fn local_todo_trait_delegates_sqlite_revision_updates_and_dependency_graph() {
+        let dir = tempfile::tempdir().expect("temporary todo root");
+        let repo = TodoRepository::new(&dir.path().join("todos.sqlite")).expect("todo store");
+        repo.init_schema().expect("todo schema");
+        let contract: &dyn TodoPersistence = &repo;
+        let session = Uuid::new_v4();
+        let create = |title: &str| CreateTodo {
+            session_id: session,
+            title: title.into(),
+            description: None,
+            priority: crate::TodoPriority::Medium,
+            assigned_to_turn: None,
+            tags: Vec::new(),
+        };
+        let parent = contract.create(create("parent")).expect("parent");
+        let child = contract.create(create("child")).expect("child");
+        assert_eq!(contract.get(session, parent.id).expect("get"), Some(parent.clone()));
+        let updated = contract
+            .update_batch(
+                session,
+                vec![(
+                    parent.id,
+                    TodoUpdate {
+                        title: Some("parent updated".into()),
+                        ..Default::default()
+                    },
+                )],
+            )
+            .expect("atomic update");
+        assert_eq!(updated.len(), 1);
+        assert_eq!(updated[0].title, "parent updated");
+        contract
+            .add_dependency(session, parent.id, child.id)
+            .expect("dependency");
+        contract.load_work_graph(session).expect("work graph");
+        let listed = contract.list(session, TodoQuery::default()).expect("list");
+        assert_eq!(listed.len(), 2);
+    }
+
+
 }
