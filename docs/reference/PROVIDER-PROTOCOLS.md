@@ -278,3 +278,53 @@ tool responses also use custody to preserve their exact framing; plain no-tool r
 private history do not. This limitation applies even if that particular response did not call
 the browser. Browser tool results are only redacted when the tool declares private tokens.
 This remains an unreleased Draft implementation; full Gemini acceptance remains pending, and mock/SSE fixture success is not a live Google service validation.
+
+## Azure OpenAI transport candidate (I323 / ADR-103)
+
+Azure uses the explicit `azure-openai` protocol with an explicit resource origin. It reuses the
+Chat/Responses encoders and parsers. Logical model identity remains separate from wire deployment.
+
+```toml
+provider = "azure-work"
+model = "gpt-5"
+[providers.azure-work]
+protocol = "azure-openai"
+api_key_env = "AZURE_OPENAI_API_KEY"
+[providers.azure-work.azure]
+endpoint = "https://YOUR-RESOURCE.openai.azure.com"
+shape = "responses"
+[providers.azure-work.models.gpt-5]
+azure_deployment = "production"
+# azure_shape = "chat" # model choice overrides provider choice
+```
+
+The default v1 mode sends `/openai/v1/chat/completions` or `/openai/v1/responses` with the deployment
+in body `model`. Model shape overrides provider shape; omission currently defaults to Chat.
+Azure catalog inference has not yet been admitted. A deployment alias defaults to the logical model.
+For explicit dated Chat compatibility, add `[providers.azure-work.azure.api]`, `mode = "deployment"`
+and `api_version = "2024-10-21"`. This routes through
+`/openai/deployments/{deployment}/chat/completions?api-version=...`; Responses is rejected in this mode.
+The example version is not a declaration of the latest Azure service version.
+
+For an externally acquired token, replace the default authentication selection with:
+
+```toml
+[providers.azure-work.azure.authentication]
+kind = "entra-token"
+token_env = "AZURE_OPENAI_ACCESS_TOKEN"
+```
+
+API-key mode sends only `api-key`; supplied-token mode sends only Bearer and never falls back to
+an API key. The named environment value is acquired at dispatch. No login, managed-identity
+lookup, token minting or automatic refresh is implemented here; those remain #132. Changing an
+unrelated shell's environment does not change the running Talos process environment.
+
+Require HTTPS resource origins, with literal loopback HTTP admitted for controlled tests. Reject
+URL credentials, query, fragment, non-root path and generic provider/model endpoint overrides.
+Redirects are disabled. Previews never acquire tokens and mask credential headers; HTTP/stream
+errors do not expose Azure response error bodies. Responses opaque reasoning is bound to the
+resource and deployment: reconfiguration drops mismatched private replay while preserving normal
+history. Chat capability cache identity includes the same binding and the logical model.
+
+This is an unreleased implementation candidate. Full acceptance remains open in I323/#914;
+controlled fixtures are not live Azure service acceptance. No release or completion is implied.

@@ -206,3 +206,9 @@ Added actual Agent Responses native two-round read fixture using PermissionEngin
 asserts tool-call association, deployment body, final answer, successful tool history and absence
 of API key in serialized history. This complements adapter-only tests but does not cover the whole
 published Agent/image/mode matrix. Test queued behind dependency compilation; no pass claimed.
+
+Verification receipt: locked azure_transport unit selection passed 2 tests (292 filtered),
+including actual Responses envelope binding. Isolated Entra HTTP test passed 1 test covering both
+bodies. Actual permission-gated Responses Agent read test passed 1 test (7 HTTP tests filtered).
+These are current local results, not native CI/full matrix acceptance. Added protocol configuration,
+credential limitations and next-minor SDK migration documentation. Full acceptance remains open.

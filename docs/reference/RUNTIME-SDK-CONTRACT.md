@@ -784,3 +784,18 @@ original signed content. Native, Compat and TalosStrict share this rule. Browser
 textual routes also retain signed ordinary tool frames, so the same continuity limit applies.
 Custody is bounded to 32 blocks / 16 MiB. This is an unreleased candidate contract, not a patch
 release compatibility claim or live-vendor acceptance. See PROVIDER-PROTOCOLS for configuration.
+
+### Azure configuration migration candidate (I323 / ADR-103)
+
+`ProviderProtocol::AzureOpenAI`, `ProviderConfig.azure`, and `ModelConfig.azure_deployment` /
+`azure_shape` are source additions for the next pre-1.0 minor release, never a patch release.
+Downstream exhaustive struct literals must initialize absent fields to `None`, or use
+`..Default::default()` where appropriate; retain fallback arms for non-exhaustive enums.
+The new profile types are `AzureTransportConfig`, `AzureApiMode`, `AzureAuthentication`, and
+`AzureBodyShape`. Existing OpenAI constructors retain their behavior; construct Azure through
+`openai_responses::factory::build_configured_provider` with an explicit profile.
+
+For an explicit Entra supplied-token profile, legacy `Config::api_key()` returns an empty string;
+the transport acquires the named environment token at dispatch. This is not an anonymous request
+or API-key fallback. See PROVIDER-PROTOCOLS for configuration and acquisition limitations.
+Implementation acceptance, catalog/UI and full SDK validation remain tracked in I323/#914.
