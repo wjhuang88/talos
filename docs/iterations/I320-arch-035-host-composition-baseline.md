@@ -1,6 +1,6 @@
 # Iteration I320: ARCH-035 E0/E1 Host Composition Baseline
 
-> Document status: Review / Claimed (effective claim #905; E0/E1 review candidate #906; no E2/E3 authorization)
+> Document status: Complete / Closed **for bounded E0/E1 documentary architecture only**; #897 remains Open / Blocked for E2-E4
 > Published plan date: 2026-11-10
 > Planned objective: reproducibly inventory current cross-host persistence composition and propose a behavior-preserving architecture decision without competing with STORE-002.
 > Baseline rule: this bounded E0/E1 documentation and architecture-review slice does not authorize production code, storage contract/adapters, dependency or default behavior changes.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | ARCH-035 I320 E0 source inventory and E1 host-composition architecture review only; exclude production code, STORE-002 contracts/adapters, ServerHost and E2/E3 |
@@ -19,9 +19,9 @@
 | Governance Claim PR | #905 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim #905 merged as `b211e590f6b1180af0679be8b1b03d77b0a19615` after exact-head CI3992 passed, both governance validators reported 0 warnings and single-maintainer documentation-only fallback was recorded in PR comments; CAS confirmed no competing owner or branch lag. |
-| Implementation PR | #906 |
-| Last Updated | 2026-11-10 |
-| Handoff / Release Condition | The claim takes effect only after #905 merge. E0/E1 decision acceptance remains independently reviewable; E2/E3 require accepted #670 seams and separate activation. |
+| Implementation PR | #906, #934, #936 (bounded documentary architecture only) |
+| Last Updated | 2026-11-13 |
+| Handoff / Release Condition | I320 E0/E1 documentation accepted/Closed via pre-existing #936 merged evidence; parent ARCH-035 E2/E3/E4 remain blocked and owner claim is Released until separately authorized. |
 
 ## Published Baseline
 
@@ -134,3 +134,15 @@ After the reviewed E1 dependency reconciliation PR #934 merged `d92aabaad4570d79
 ### E1 placement-acceptance candidate — #936 final-head gate
 
 Independent [initial proposed-head ADR review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843456241) found the ownership/placement decision acceptable in principle, but blocked on a contradictory historical proposal sentence. The candidate corrects that sentence, clarifies that the runtime-facing composition **layer** is not a currently unified callable API, and scopes ADR-104 as **Accepted on reviewed #936 merge for placement/ownership only**. The historical [CI #4164](https://github.com/wjhuang88/talos/actions/runs/43362479834) succeeded on the prior head; final-head CI, validators, independent review, owner/overlap/CAS and single-maintainer authorization are mandatory before merge. Even after ADR acceptance, I320/ARCH-035 E2/E3 implementation, any runtime API, upstream STORE-002 D/E operational readiness, E4 parity and #897 closure remain **not delivered**.
+
+## I320 E0/E1 final acceptance and historical evidence — 2026-11-13
+
+**Scope-limited status: Complete / Closed** for the original I320 *read-only* E0 code-truth inventory and E1 authority/placement ADR only, not ARCH-035 / #897 runtime work. This I320 closeout has a **pre-existing documentation/evidence** commit:
+
+**Completion Commit: `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`** — reviewed [ADR-104 #936](https://github.com/wjhuang88/talos/pull/936) merge, not an executable implementation change or #897 Completion Commit.
+
+Evidence chain: #905 effective scoped claim `b211e590`; [#906](https://github.com/wjhuang88/talos/pull/906) documentary baseline merge `70c0f7cd`; [#934](https://github.com/wjhuang88/talos/pull/934) merged evidence `d92aaba`; [#936](https://github.com/wjhuang88/talos/pull/936) accepted ADR-104 placement rule, exact-head `3fd1b7176901832717b692202512dadb7364391f`. [CI #4173](https://github.com/wjhuang88/talos/actions/runs/43365335816) overall Success: reduced documentation validation, project governance and collaboration-claim validators **0 warnings**, but the separate remote reconciliation job **failed** due to newly opened unrelated #937; this is a recorded not-passing job, not full-job green. That specific global owner mismatch was subsequently registered/reconciled by SEARCH-001-D3 [#938](https://github.com/wjhuang88/talos/pull/938) merge `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4` with passing remote owner validation. The final [Copilot exact-head review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843928194) had no blockers; [documented single-maintainer authorization/CAS](https://github.com/wjhuang88/talos/pull/936#issuecomment-6852726331) used the scoped alternative (not an independent human approval).
+
+**Do not reinterpret this I320 closeout as accepting E2/E3 or runtime parity.** No Rust/native/SDK equivalence tests ran for this doc-only slice; I320's proposed command list is **still a future implementation conformance gate**, not silently green. Accepted placement rule in [ADR-104](../decisions/104-host-composition-ownership-boundary.md) preserves one Session/Agent/permissions authority and ADR-042 builder compatibility, but no callable unified factory or public injection signature. Pending #670 D tests/implementation PR #935, unstarted E default-local composition and F broad parity remain distinct; E2/E3 need their **own** effective ARCH-035 implementation claim and exact-head CI/API/failure/recovery/SDK review. Parent Issue #897 remains **Open / Blocked**, and its E4 Completion Commit does not exist.
+
+**I320 collaboration claim is Closed**, while the parent [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) claim is **Released** with no E2/E3 claimant. Preserve this owner/iteration distinction in Board, product backlog, rolling Issue matrix and remote #897 synchronization.
