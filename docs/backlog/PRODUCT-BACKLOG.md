@@ -1,5 +1,9 @@
 # Product Backlog
 
+## SEARCH-001-D3 / #937 — Bing direct HTML, multi-endpoint feasibility (intake only)
+
+[Owner](active/SEARCH-001-D3-bing-direct-html-feasibility.md) / [source and offline test matrix](../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md): **Intake / Proposed / Unclaimed**. Reuse the existing Bing CN parser and protected request boundary for a *documentary-only* comparison with unverified `www.bing.com` and `bing.cn` candidates. Microsoft 2026-09-30 usage/result rights block new automated distributed-default access; no live SERP acquisition, code/test edits, new endpoint, claim, Auto reorder or independent-provider admission. D/#644 remains BLOCKED/ZERO-ADMISSION, D2/#848 separate, E/F/G/I gated; #624 stays Open.
+
 ## GIT-COMPAT-001 / #919 — Windows Git 2.36 prepared preflight
 
 [GIT-COMPAT-001](active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](../iterations/I324-git-236-preflight-compatibility.md): **In Progress / Claimed proposed** by [#920](https://github.com/wjhuang88/talos/pull/920), ineffective until target merge. Bounded gix-native preflight replacing Git CLI inspection only. Existing snapshot capacity, ADR-089 authorization and TUI approval owners do not transfer.
