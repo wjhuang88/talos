@@ -468,6 +468,7 @@ fn test_model_limits_from_builtin_and_custom_providers() {
         providers: HashMap::from([(
             "dashscope".to_string(),
             ProviderConfig {
+                azure: None,
                 protocol: ProviderProtocol::OpenAIChat,
                 tool_protocol: Default::default(),
                 gemini: None,
@@ -477,6 +478,8 @@ fn test_model_limits_from_builtin_and_custom_providers() {
                 models: HashMap::from([(
                     "glm-5".to_string(),
                     ModelConfig {
+                        azure_deployment: None,
+                        azure_shape: None,
                         base_url: None,
                         context_limit: Some(202_752),
                         output_limit: Some(4096),
@@ -826,6 +829,8 @@ fn test_resolve_model_limits_returns_user_config_when_set() {
                 models: HashMap::from([(
                     "claude-sonnet-4-5".to_string(),
                     ModelConfig {
+                        azure_deployment: None,
+                        azure_shape: None,
                         base_url: None,
                         context_limit: Some(150_000),
                         output_limit: Some(8000),
@@ -911,6 +916,8 @@ fn test_resolve_model_limits_user_config_takes_precedence_over_catalog() {
                 models: HashMap::from([(
                     "claude-sonnet-4-5".to_string(),
                     ModelConfig {
+                        azure_deployment: None,
+                        azure_shape: None,
                         base_url: None,
                         context_limit: Some(100_000),
                         output_limit: None,
@@ -1546,6 +1553,8 @@ fn test_all_models_user_override_matches_by_provider_and_id() {
                 models: HashMap::from([(
                     "glm-5.2".to_string(),
                     ModelConfig {
+                        azure_deployment: None,
+                        azure_shape: None,
                         base_url: None,
                         context_limit: Some(50_000),
                         output_limit: Some(1000),
@@ -1850,6 +1859,8 @@ fn test_all_models_with_catalog_user_config_overrides_catalog() {
             models: HashMap::from([(
                 "m1".to_string(),
                 ModelConfig {
+                    azure_deployment: None,
+                    azure_shape: None,
                     base_url: None,
                     context_limit: Some(42_000),
                     output_limit: Some(4_200),
@@ -1931,6 +1942,8 @@ fn test_resolve_model_limits_with_catalog_user_overrides_catalog() {
             models: HashMap::from([(
                 "tm".to_string(),
                 ModelConfig {
+                    azure_deployment: None,
+                    azure_shape: None,
                     base_url: None,
                     context_limit: Some(111_000),
                     output_limit: Some(11_100),
