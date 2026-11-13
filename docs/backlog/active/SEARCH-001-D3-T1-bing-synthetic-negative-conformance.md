@@ -60,9 +60,14 @@ measured way. Do not copy existing BF fixtures or weaken previously accepted beh
    unknown cross-origin redirects must not be silently promoted to authorized
    query-bearing hosts in the current prepared manifest. Validate via
    existing host/redirect test seams only, never any real Bing request.
-4. **Preserved source family**: the compatibility parser's current compound
+4. **Reachability is not search success**: characterize, only with existing
+   synthetic/loopback probe and query fixture seams, the case where a Bing
+   root HEAD/GET returns HTTP 200 but the query path fails or produces no
+   admitted search result. Report whether this distinction is already tested;
+   do not introduce new probes, health policy or production behavior.
+5. **Preserved source family**: the compatibility parser's current compound
    DuckDuckGo backend ID is not renamed or reinterpreted as two native providers.
-5. Exact-head locked targeted tests and applicable Linux/macOS/Windows
+6. Exact-head locked targeted tests and applicable Linux/macOS/Windows
    CI, independent read-only security/API/test review and CAS merge. No skipped
    failing tests; keep observable blockers and coverage limitations explicit.
 
