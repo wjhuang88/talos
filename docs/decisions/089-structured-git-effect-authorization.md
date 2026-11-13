@@ -979,3 +979,38 @@ required installation profile, and a separate target-branch governance
 publication. The existing October 2026 ADR-089 contract remains
 authoritative throughout. No implementation PR or native Windows evidence
 is accepted merely by approving this review-only document.
+
+
+### I324 acceptance ledger (pending review)
+
+This ledger specifies evidence a reviewer must verify. It grants **no**
+authority; a passing CI or a test-only gix candidate is not acceptance.
+
+| Source / effect class | Evidence before access | Failure disposition |
+|---|---|---|
+| Invocation and lexical candidate roots | Frozen cwd, selected executable identity, repository context and approved environment; no stat/open/execute of candidate paths | Reject unbound names before source reads |
+| System/global/attribute/exec installation roots | Independently verified installation profile bound to the *selected* writer and its compiled defaults, with an accepted provenance and revalidation story | **Unsupported installation profile**; never guess from version, PATH, parent folder or gix defaults |
+| Config/include/includeIf/hasconfig | Individual exact Path Read and ancestor/link identity or missing-source evidence; cumulative budgets; parse admitted bytes only | Deny/stale refusal, including newly created previously missing paths |
+| Index/tree/worktree/global/system attributes | Explicit admitted bytes/index/tree for all sources in precedence order; complete macro and filter-effect interpretation | Reject unsupported or malformed syntax, not silent omission |
+| Refs/branches/reflog and receiver/child state | Admitted repository/object/ref evidence and frozen branch context; separate lexical branch check from context-dependent `@{-1}` | Unresolved/symbolic/ambiguous state fails closed without Git CLI |
+| Hooks/filters/maintenance/transport | Every possible child executable and source under already admitted exact Command/Path/Remote effects | Refuse unrepresented effects; no new generic Execute or Read |
+| Final mutation | One-use approval, stale revalidation and selected system Git writer | No mutation when evidence changes or provenance is missing |
+
+**Pinned feature and parser review:** I324 locks `gix 0.90.0` and
+`gix-attributes 0.37.1`. Talos uses gix `default-features = false` and
+does not explicitly enable `gix/attributes`; a transitive lockfile package
+does not prove `gix::attrs` APIs are enabled. Audit the effective locked
+feature graph before selecting an adapter. Upstream attribute search paths
+may skip malformed pattern lines, whereas security effect prediction must
+validate each admitted source conservatively and refuse unsupported syntax.
+
+**Conformance split:** Native `git check-ref-format --branch` as a *test
+oracle* proves only lexical parity on tested Git versions; `@{-1}` requires
+separate admitted reflog semantics. Memory-only gix config parsing does not
+establish the chosen system Git writer's compiled installation defaults.
+Windows Git 2.36.1, newer-version differentials, zero-preflight-child
+instrumentation, and explicit independent security/API review remain gates.
+
+Until these rows receive source-backed evidence and an independent reviewer
+and maintainer accept the authority model, the accepted ADR-089 fixed-command
+contract remains binding and I324 production wiring stays disabled.
