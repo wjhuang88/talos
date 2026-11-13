@@ -747,6 +747,9 @@ impl Sources {
     /// The caller must still prove that the ordered root paths match the
     /// selected system Git installation before using the output for authority.
     /// Until ADR-089 is amended this is a T1a candidate, not a discovery hook.
+    // The new adapter is intentionally not wired into production until the
+    // ADR-089 permission amendment and installation binding are accepted.
+    #[allow(dead_code)]
     pub(super) fn ordered_host_output(
         &self,
         roots: &[std::path::PathBuf],
