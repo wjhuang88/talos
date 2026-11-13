@@ -177,3 +177,8 @@ Added host regression test and restored five factory-routed Responses HTTP tests
 image continuation, no image repost, semantic terminal and text protocols). Test compilation is
 in progress; no pass claimed at checkpoint. Catalog/UI, further safety/Agent tests and full gates
 remain pending. Remote recovery checkpoints are not merge candidates.
+
+Added Chat HTTP matrix across v1/deployment and Native/Compat/TalosStrict, asserting exact URL,
+exclusive api-key header, deployment model and terminal event. Added Responses redirect/no-forward
+and success-status SSE error redaction regressions. Dependency compilation remains in progress;
+these authored tests have no pass receipt yet. Preserve remotely before further recovery risk.

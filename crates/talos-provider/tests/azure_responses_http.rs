@@ -462,3 +462,57 @@ async fn explicit_text_protocols_dispatch_and_parse_tools_on_responses() {
         mock.assert_async().await;
     }
 }
+
+#[tokio::test]
+async fn azure_redirect_does_not_relocate_credentials() {
+    let mut origin = mockito::Server::new_async().await;
+    let mut destination = mockito::Server::new_async().await;
+    let leak = destination
+        .mock("POST", "/capture")
+        .expect(0)
+        .create_async()
+        .await;
+    let redirect = origin
+        .mock("POST", "/openai/v1/responses")
+        .match_header("api-key", "sk-test")
+        .with_status(307)
+        .with_header("location", &format!("{}/capture", destination.url()))
+        .with_body("sk-test echoed credential")
+        .expect(1)
+        .create_async()
+        .await;
+    let error = responses_provider(origin.url())
+        .stream(&[Message::User {
+            content: "fixture".into(),
+        }])
+        .await
+        .expect_err("redirect refused");
+    assert!(!error.to_string().contains("sk-test"));
+    redirect.assert_async().await;
+    leak.assert_async().await;
+}
+
+#[tokio::test]
+async fn azure_success_status_error_event_is_redacted() {
+    let mut server = mockito::Server::new_async().await;
+    let fixture = server
+        .mock("POST", "/openai/v1/responses")
+        .with_status(200)
+        .with_header("content-type", "text/event-stream")
+        .with_body("data: {\"type\":\"error\",\"message\":\"sk-test echoed credential\"}\n\n")
+        .expect(1)
+        .create_async()
+        .await;
+    let events = collect_events(
+        responses_provider(server.url())
+            .stream(&[Message::User {
+                content: "fixture".into(),
+            }])
+            .await
+            .expect("HTTP response"),
+    )
+    .await;
+    assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { message } if message == "Azure response stream failed")));
+    assert!(!format!("{events:?}").contains("sk-test"));
+    fixture.assert_async().await;
+}
