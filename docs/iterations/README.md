@@ -20,9 +20,9 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 ## I321 / STORE-002 A/B — Complete / Closed (bounded slice)
 
 [I321](I321-store-002-capability-contract-foundation.md): governance #908 and implementation #909 merged; exactly seven typed capability IDs, metadata-only registry requests and authority inventory, no functional provider binding or local storage migration. #670 OPEN for C/D/E/F.
-## I320 / ARCH-035 E0/E1 — Review / Claimed in #906
+## I320 / ARCH-035 E0/E1 — Complete / Closed (documentation only; ADR-104 accepted via #936)
 
-[I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: #905 claim+activation is effective at `b211e590f6b1180af0679be8b1b03d77b0a19615`; [E0 code-truth evidence](../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) (review PR #906) and E1 non-binding cross-host composition decision are under review. STORE-002/#670 exclusively owns storage contracts, so E2/E3 implementation is blocked; unrelated I319, I318, I310 and active work remain separate.
+[I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: E0 code-truth #906 and no-duplication #934 were reviewed; E1 placement-only [ADR-104](../decisions/104-host-composition-ownership-boundary.md) accepted on #936 merge **`07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`** (bounded I320 documentation Completion Commit). CI #4173 applicable docs and both validators 0 warnings; technical no-blocker review and single-maintainer CAS recorded; unrelated remote Issue #937 sync failure belongs to #938. Bounded claim released on closeout. **Parent #897 stays Open / Blocked and E2/E3 remain unclaimed** pending accepted STORE-002 D/E operational composition; no Rust/SDK/native equivalence verified.
 
 ## I319 / SEARCH-001-L — Complete / Closed (owner-first closeout)
 
