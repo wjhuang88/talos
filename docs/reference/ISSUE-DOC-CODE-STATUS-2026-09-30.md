@@ -94,7 +94,7 @@
 
 | [#891](https://github.com/wjhuang88/talos/issues/891) | Browser SERP feasibility intake | [SEARCH-001-BROWSER-SPIKE](../tasks/2026-11-09-browser-search-feasibility-intake.md) | Proposed / Unclaimed | Offline direct mapping rejected; real browser connector dependency #452 blocks reconsideration. Registration only, no claim or implementation. |
 
-| [#897](https://github.com/wjhuang88/talos/issues/897) | Behavior-preserving domain persistence and host composition decoupling (ARCH-035) | [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) | Intake / Unclaimed | Independent cross-host composition prerequisite to #142/#361; consumes #670 capability contracts. Only equivalence migration; no implementation claim, backend switch or Server behavior. |
+| [#897](https://github.com/wjhuang88/talos/issues/897) | Behavior-preserving domain persistence and host composition decoupling (ARCH-035) | [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) | Blocked / Released | I320 E0/E1 documentary slice Complete / Closed via ADR-104 #936 (`07c99a8c`); #897 remains Open / Blocked for #670 D/E integration, independent E2/E3 claim and E4 runtime parity. No production composition or Server behavior accepted. |
 
 | [#919](https://github.com/wjhuang88/talos/issues/919) | Git 2.36 prepared preflight and gix compatibility | [GIT-COMPAT-001](../backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) | Active / Claimed proposed (ineffective until #920 merge) | I324 / #920 proposes exact Git 2.36 compatibility ownership without changing ADR-089 admissions; native Windows tests and independent security review required before implementation closure. |
 | [#923](https://github.com/wjhuang88/talos/issues/923) | TUI performance and native acceptance residual | [TUI-PERF-001](../tasks/2026-11-10-tui-render-performance.md) | Review / Claimed | Stage implementation #922 merged; original performance and native acceptance remain required. |
@@ -102,6 +102,9 @@
 ## Synchronization Notes
 
 2026-11-13: Registered new #941 SEARCH-001-D3-T1 for separate synthetic-only conformance after accepted D3.1/#938. The I326 claim remains proposed/ineffective; parent D3/#937 and default-use rights gate remain unchanged.
+
+
+2026-11-13: #897 ARCH-035 current owner is **Blocked / Released** after bounded I320 E0/E1 documentary acceptance. The earlier 2026-11-10 registration and all historical decision checkpoints remain unchanged. Reference [ADR-104](../decisions/104-host-composition-ownership-boundary.md) acceptance #936 merge `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`; this does not close #897 or provide E2/E3 implementation authority.
 
 
 2026-11-13: Registered new SEARCH-001-D3 / #937 as Intake / Proposed / Unclaimed with canonical owner and source/fixture evidence. This is a *new* registration, not a 2026-09-30 fact, and does not activate or modify native search providers or parent SEARCH-001/#624.

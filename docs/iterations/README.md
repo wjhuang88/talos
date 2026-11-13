@@ -25,9 +25,9 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 ## I321 / STORE-002 A/B — Complete / Closed (bounded slice)
 
 [I321](I321-store-002-capability-contract-foundation.md): governance #908 and implementation #909 merged; exactly seven typed capability IDs, metadata-only registry requests and authority inventory, no functional provider binding or local storage migration. #670 OPEN for C/D/E/F.
-## I320 / ARCH-035 E0/E1 — Review / Claimed in #906
+## I320 / ARCH-035 E0/E1 — Complete / Closed (docs-only)
 
-[I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: #905 claim+activation is effective at `b211e590f6b1180af0679be8b1b03d77b0a19615`; [E0 code-truth evidence](../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) (review PR #906) and E1 non-binding cross-host composition decision are under review. STORE-002/#670 exclusively owns storage contracts, so E2/E3 implementation is blocked; unrelated I319, I318, I310 and active work remain separate.
+[I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: E0 code-truth and E1 owner/placement decision **Complete / Closed for the bounded documentation slice**, claim #905, E0 #906, contract-review #934, accepted [ADR-104](../decisions/104-host-composition-ownership-boundary.md) #936 merge and I320 documentary **Completion Commit `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`**. The parent remains **Open / Blocked / Released** with no E2/E3 effective code claim or runtime parity proof. #670 D/E and #897 E2-E4 remain separately gated.
 
 ## I319 / SEARCH-001-L — Complete / Closed (owner-first closeout)
 
