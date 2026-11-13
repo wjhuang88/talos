@@ -81,6 +81,10 @@ not two independently admitted native providers. The dormant `rust-websearch` pa
 legacy tool and test oracle remain; D/#644 is still ZERO-ADMISSION, E/F/G blocked,
 I unactivated. Parent #624 remains Open and all other parent completion gates unchanged.
 
+## SEARCH-001-D3 research checkpoint — 2026-11-13
+
+[SEARCH-001-D3 / #937](SEARCH-001-D3-bing-direct-html-feasibility.md) is a separately documented **Intake / Proposed / Unclaimed** feasibility Spike, not a new search-provider implementation. Existing `cn.bing.com/search` and `bing_parser.rs` are Talos-owned compatibility; `www.bing.com/search` and `bing.cn` alias/redirect behavior are unverified candidates in **one Bing family**. The [dated source/fixture packet](../../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md) records Microsoft terms effective 2026-09-30 and BLOCKED new distributed-default usage/result-rights, UNKNOWN live and mainland-China observations, and offline-only tests for any separately claimed future scope. It does not reopen completed #901, replace D/#644 ZERO-ADMISSION, admit a provider, activate E/F/G/I or close this Epic.
+
 ## Child Dependency Map
 
 The table is a proposal for child **outcomes**, not blanket implementation authorization. Completed
@@ -93,6 +97,7 @@ accepted claims before executable work.
 | SEARCH-001-B | Domain extraction with current-behavior-compatible adapters | A ADR accepted | [#642](https://github.com/wjhuang88/talos/issues/642), Complete / Claimed; I292; #653/#656 plus closeout evidence merged |
 | SEARCH-001-C | Talos-owned auto router, deadlines, error semantics, #199 integration | B / A | [#643](https://github.com/wjhuang88/talos/issues/643), Complete / Closed; I293; Completion Commit `eb870cdf0a63f45f20d89f1a50eba276f9198643` (#808) |
 | SEARCH-001-D | Provider feasibility and real multi-region (incl. mainland China) evidence gate | A; research may overlap B | [#644](https://github.com/wjhuang88/talos/issues/644), Complete / Closed with **BLOCKED / ZERO-ADMISSION** outcome; I294; #831 merge `bdb98b2b47dbb76111f5b053a226efbb033c6b34` |
+| SEARCH-001-D3 | Direct Bing HTML multi-entry evidence, legal/right-to-use and offline contract plan; **same provider family**, not admission | Existing C/L complete, prior D zero-admission preserved | [#937](https://github.com/wjhuang88/talos/issues/937) / [owner](SEARCH-001-D3-bing-direct-html-feasibility.md) — **Intake / Proposed / Unclaimed**, documentary rights gate BLOCKED; no new endpoint, Auto selection or tests |
 | SEARCH-001-E | First Talos-native zero-key provider with fixtures | C + D admission | **Blocked** — D admission did not occur; no implementation authorization |
 | SEARCH-001-F | Second meaningfully independent native zero-key provider | C + D admission + E interface | **Blocked** — D admission did not occur; no implementation authorization |
 | SEARCH-001-G | Global auto-routing, change recovery, smoke/soak validation | E / F | Blocked on E/F |
