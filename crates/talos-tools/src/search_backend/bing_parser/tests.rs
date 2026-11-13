@@ -381,3 +381,67 @@ fn encoding_and_debug_errors_are_content_free() {
         assert!(!format!("{e:?} {e}").contains("toy-secret"));
     }
 }
+
+#[test]
+fn synthetic_sponsored_containers_without_organic_rows_do_not_yield_results() {
+    // Hand-authored fixtures only: ads outside li.b_algo are not search results.
+    let sponsored = r#"<aside class="b_ad"><h2><a href="https://sponsor.invalid/">Ad</a></h2><p>Sponsored</p></aside>"#;
+    assert_eq!(
+        parse(200, document(sponsored).as_bytes(), 3).expect_err("ads only"),
+        BingParseError::Empty
+    );
+
+    let organic = row(
+        Some("https://organic.invalid/"),
+        "Organic",
+        Some("Only this is a matching result row"),
+    );
+    let mixed = document(&format!("{sponsored}{organic}"));
+    let rows = results(&mixed, 3);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].url, "https://organic.invalid/");
+}
+
+#[test]
+fn synthetic_sponsored_wrapper_with_b_algo_documents_known_false_positive_gap() {
+    // A sponsored wrapper that *also* contains the legacy organic selector is
+    // indistinguishable to the current parser. Preserve and expose this gap,
+    // rather than treating the selected link as qualified organic search.
+    // No Bing response or third-party HTML was acquired for this fixture.
+    let disguised = format!(
+        r#"<aside class="b_ad">{}</aside>"#,
+        row(
+            Some("https://sponsor.invalid/"),
+            "Sponsored",
+            Some("Not proven organic")
+        )
+    );
+    let rows = results(&document(&disguised), 3);
+    assert_eq!(rows.len(), 1, "current selector-only behavior");
+    assert_eq!(rows[0].url, "https://sponsor.invalid/");
+    assert_eq!(rows[0].backend, SearchBackendId::DuckDuckGo);
+}
+
+#[test]
+fn synthetic_locales_do_not_hide_unverified_result_dom_selector_drift() {
+    // Locale labels alone are not evidence of www.bing.com template parity.
+    for locale in ["zh-CN", "en-US"] {
+        let known_shape = document(&format!(
+            r#"<section lang="{locale}">{}</section>"#,
+            row(Some("https://result.invalid/"), "Result", Some("Snippet"))
+        ));
+        let rows = results(&known_shape, 2);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].url, "https://result.invalid/");
+    }
+
+    // A plausible, hand-authored selector change fails closed with Empty.
+    // This is an offline gap characterization, not a claim of a real Bing DOM.
+    let drifted = document(
+        r#"<li class="search-result"><h2><a href="https://result.invalid/">Result</a></h2><div class="caption"><p>Snippet</p></div></li>"#,
+    );
+    assert_eq!(
+        parse(200, drifted.as_bytes(), 2).expect_err("unknown selector"),
+        BingParseError::Empty
+    );
+}
