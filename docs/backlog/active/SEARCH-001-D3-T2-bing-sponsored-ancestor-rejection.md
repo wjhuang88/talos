@@ -15,13 +15,13 @@
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | Only existing `bing_parser.rs` response-body filtering of `li.b_algo` beneath explicit `b_ad` ancestor class + targeted `bing_parser/tests.rs` synthetic regression; optional dated narrow evidence receipt. No new host, transport/Network/default/API/Cargo changes or live Bing. |
-| Claimed At | 2026-11-14 |
+| Claimed At | 2026-11-13 |
 | Source Issue | #947 |
 | Governance Claim PR | #948 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User-directed continuation after completed #941; separate #947 issue; #948 documents the proposed atomic claim. Required exact-head CI, independent review and target-branch CAS merge remain pending and no effective authority exists before merge. |
 | Implementation PR | Not started |
-| Last Updated | 2026-11-14 |
+| Last Updated | 2026-11-13 |
 | Handoff / Release Condition | Claim effective only upon governing PR merge; separately reviewed code/tests and exact-head native CI before implementation merge; owner-first completion thereafter. |
 
 ## Goal and evidence
@@ -72,8 +72,17 @@ admit or qualify a new Bing route.
 
 - D3.1 research #938 and D3-T1 #941 are accepted/Closed.
 - I324/#919 Git preflight, I325/#670 storage, and other open/review owners
-  remain independently claimed; this slice touches only the isolated
-  search parser and its synthetic unit tests. No ownership transfer.
+  remain independently claimed; no owner Work Slice transfer. However,
+  **open stale Draft [PR #861](https://github.com/wjhuang88/talos/pull/861)**
+  also edits `bing_parser.rs` at its legacy `clean_html` import. Its
+  head `eec87383ea14ab62f7b48546f81f437888473a14` is currently
+  unmergeable against the updated main; its K/I317 source work has already
+  been superseded by accepted #860/#870 and L/#901 retirement. This is a
+  **real file-level overlap**, not the same sponsored-ancestor behavior claim.
+  I327 implementation must start from then-current main, refresh #861 state,
+  compare the precise overlapping hunk, avoid reverting/cherry-picking old
+  helpers, and stop for explicit reconciliation/re-review if #861 moves
+  into a conflicting state. No broad file ownership exclusivity is claimed.
 - Review `docs/sop/AGENT-COLLABORATION.md`,
   `START-ITERATION.md`, `CHANGE-CONTROL.md`, ADR-085/090,
   and SearchRouter's existing response/result admission invariants.
