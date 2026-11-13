@@ -1,7 +1,7 @@
 # Iteration I327: Existing Bing Parser Explicit Sponsored Ancestor Rejection
 
 > **Status**: Active / Claimed proposed via Draft #948; ineffective until governance merge
-> Published: 2026-11-14
+> Published: 2026-11-13
 > Source: [SEARCH-001-D3-T2 / #947](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md).
 > Baseline: D3-T1/#941 Complete/Closed, implementation #944 `9cbc615cebb119ead9706a4d00159d7151639606`, owner-first closeout #946 `73ec650b6ef9804d0c9c42a6f1c5e7c9d9f0baa7`.
 
@@ -13,13 +13,13 @@
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | SEARCH-001-D3-T2/#947: strictly bounded response-only `b_ad` ancestor exclusion in existing Bing parser and owned synthetic parser tests; no network/request/route/provider change. |
-| Claimed At | 2026-11-14 |
+| Claimed At | 2026-11-13 |
 | Source Issue | #947 |
 | Governance Claim PR | #948 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User-directed D3 continuation after closed T1 and source Issue #947; #948 is proposed atomic claim with exact-head CI, independent review and CAS pending before code. |
 | Implementation PR | Not started |
-| Last Updated | 2026-11-14 |
+| Last Updated | 2026-11-13 |
 | Handoff / Release Condition | Claim effective only when main incorporates finalized I327 governance. Source completion and owner-first closeout are separately required. |
 
 ## Selected Story and Work Slice
@@ -71,10 +71,19 @@ merge-time CAS required. No actual Bing network request.
 ## Parallel work and ownership
 
 I324 gix-native Git 2.36 preflight, I325 storage delegation, current
-Provider/Desktop/TUI owners and parent D3 research remain separate,
-without overlapping `bing_parser.rs` production work in known open PRs.
-I327 is a bounded and distinct source slice; it does not advance D2/#848,
-D/#644, E/F/G/I or the parent #624 product acceptance.
+Provider/Desktop/TUI owners and parent D3 research remain separate.
+**Open stale Draft [PR #861](https://github.com/wjhuang88/talos/pull/861)
+(I317/K)** is a known file-level overlap: it changes the
+`bing_parser.rs` `clean_html` import on an old, currently unmergeable
+head `eec87383ea14ab62f7b48546f81f437888473a14`. K/#850
+was completed via #860/#870, and L/#901 later retired the legacy dependency.
+The behavioral Work Slices are distinct, but they share a file. **Before
+touching or merging parser source**, refresh main and #861 status, compare
+old and current import hunk, preserve currently accepted helper identity,
+and halt/re-review on any actual implementation conflict or newly active
+same-scope claim. Do not silently override #861 or assert zero overlaps.
+I327 remains a narrow distinct behavior claim, not D2/#848, D/#644,
+E/F/G/I or parent #624 product acceptance.
 
 ## Activation / Completion evidence
 
