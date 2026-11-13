@@ -311,3 +311,31 @@ mod resolution_tests {
         assert!(profile.resolve_model("logical", None).is_ok());
     }
 }
+
+#[cfg(test)]
+mod token_host_tests {
+    use super::*;
+    #[test]
+    fn supplied_token_host_does_not_read_or_fall_back_to_api_key() {
+        let mut config = crate::Config::default();
+        config.provider = "azure-fixture".into();
+        config.model = "logical".into();
+        config.providers.insert(
+            config.provider.clone(),
+            crate::ProviderConfig {
+                protocol: crate::ProviderProtocol::AzureOpenAI,
+                api_key: Some("must-not-be-used".into()),
+                azure: Some(AzureTransportConfig {
+                    endpoint: "https://example.com".into(),
+                    api: AzureApiMode::V1,
+                    shape: None,
+                    authentication: AzureAuthentication::EntraToken {
+                        token_env: "TALOS_AZURE_UNSET_FIXTURE".into(),
+                    },
+                }),
+                ..Default::default()
+            },
+        );
+        assert_eq!(config.api_key().expect("dispatch-owned credential"), "");
+    }
+}

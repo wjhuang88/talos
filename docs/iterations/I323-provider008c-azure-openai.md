@@ -170,3 +170,10 @@ Responses opaque replay to resource/deployment, and redact Azure stream errors o
 original invocation paths. Bounded forwarding closes on consumer cancellation. Locked provider
 compilation rerun; full HTTP/Agent regression, supplied-token host handling, catalog/UI and SDK
 acceptance are still pending. No implementation merge or completion claimed.
+
+Restored supplied-token host handling: Config::api_key returns no API-key credential for explicit
+Azure Entra profiles, leaving acquisition to dispatch; missing API key no longer blocks that mode.
+Added host regression test and restored five factory-routed Responses HTTP tests (tool association,
+image continuation, no image repost, semantic terminal and text protocols). Test compilation is
+in progress; no pass claimed at checkpoint. Catalog/UI, further safety/Agent tests and full gates
+remain pending. Remote recovery checkpoints are not merge candidates.

@@ -223,6 +223,20 @@ impl Config {
             )
     }
 
+    fn uses_azure_supplied_token(&self) -> bool {
+        self.provider_protocol() == ProviderProtocol::AzureOpenAI
+            && self
+                .active_provider_config()
+                .azure
+                .as_ref()
+                .is_some_and(|profile| {
+                    matches!(
+                        profile.authentication,
+                        crate::AzureAuthentication::EntraToken { .. }
+                    )
+                })
+    }
+
     /// Returns the API key for the current provider.
     ///
     /// Resolution order:
@@ -234,11 +248,11 @@ impl Config {
     ///    gateways (DashScope / Bailian / Z.ai / self-hosted). It is checked
     ///    after `OPENAI_API_KEY` so existing setups are unaffected.
     ///
-    /// Explicit Vertex ADC returns an empty string
+    /// Explicit Vertex ADC and Azure supplied-token profiles return an empty string
     /// because its credentials are acquired later by the admitted request transport.
     pub fn api_key(&self) -> Result<String, ConfigError> {
         // Legacy host API: Vertex uses request-owned ADC, so there is no API-key secret.
-        if self.uses_vertex_adc() {
+        if self.uses_vertex_adc() || self.uses_azure_supplied_token() {
             return Ok(String::new());
         }
         let provider = self.active_provider_config();
@@ -526,6 +540,7 @@ impl Config {
         let provider = self.active_provider_config();
         if self.providers.contains_key(&self.provider)
             && !self.uses_vertex_adc()
+            && !self.uses_azure_supplied_token()
             && provider.api_key.is_none()
             && provider.api_key_env.is_none()
         {
