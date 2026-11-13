@@ -188,6 +188,102 @@ itself or treat model approval as authority to bypass the refusal. Ordinary
 configurations remain in scope and must not be disabled wholesale. Tests must
 cover both the supported path and pre-mutation refusal.
 
+## I324 gix-native discovery amendment (Proposed; review required, 2026-11-13)
+
+> **Status: Proposed, NOT Accepted, NOT active.** Work Slice GIT-COMPAT-001 /
+> I324 / [#919](https://github.com/wjhuang88/talos/issues/919).
+> The claim was activated by governance PR #920 at `067dd3d4f5fd0fac910ac7f52bd23ee7f8f5bb80`.
+> That merge **did not** amend the accepted execution or permission contract.
+> See the [technical proposal](../proposals/adr-089-gix-native-preflight-amendment.md)
+> and [T0 source audit](../reference/GIT-COMPAT-001-I324-GIX-PREFLIGHT-AUDIT.md).
+> This section is a **review candidate** and does not supersede any accepted
+> fixed-command rules until separately accepted with independent security review.
+
+### Why the accepted discovery contract needs an explicit change
+
+The 2026-10-12 accepted stage below admits **fixed** read-only host Git
+commands (`git config --show-origin --null --list --includes`,
+`git var GIT_ATTR_SYSTEM/GLOBAL`, and `git var GIT_CONFIG_SYSTEM/GLOBAL`)
+inside a bound `git:configuration-chain` capability. The accepted foreground
+maintenance boundary also uses `git --exec-path`. Git for Windows 2.36
+cannot answer the newer attribute-path queries; replacing them with
+`if old_git { guessed_path }` or a second command-line fallback would not meet
+the maintainer's 2026-11-12 requirement: **gix replaces CLI preflight for all
+versions, while system Git remains the final authorized writer**.
+
+### Candidate replacement authority (not yet granted)
+
+1. **Path planning is not a filesystem Read.** Talos and gix may compute
+   candidate config/attribute/ignore/include/ref/hook/transport paths using
+   *frozen invocation metadata and already-approved evidence only*.
+   No source file bytes, symlink target, directory enumeration, Git subprocess
+   or ambient process environment may be consulted by path-only planning unless
+   a separate existing facet explicitly authorizes that effect.
+2. **Exact source admission remains mandatory.** Each proposed path and its
+   traversal-ancestor identity are checked through the ordinary typed Path Read
+   and identity-admission pipeline **before** opening, statting or parsing
+   source content. Missing/empty files remain concrete negative evidence; a
+   post-approval appearance, replacement or symlink change invalidates the plan.
+   An opaque Remote `git:configuration-chain` token must never be recast as a
+   filesystem-root grant, generic Path Read, generic Execute or implicit network
+   authority. Preserve per-stage authorization, ceilings and one-use proofs.
+3. **Use pure, bounded gix APIs over admitted bytes.** Reuse
+   `target_config::Sources` for ordered include/includeIf/hasconfig expansion,
+   cumulative path/parse limits, root order and revalidation; produce the
+   same typed effects and provenance as accepted host discovery. Parsing
+   `gix::config::File::from_bytes_no_includes` or gix config events from an
+   authorized immutable byte buffer is eligible; `gix::open()`,
+   `gix::config_path()`, and other high-level helpers that perform unbound
+   file reads, spawn Git (including internally), consult ambient PATH/env or
+   cache process-global installation defaults are **not** eligible.
+4. **The selected system Git defines final effects.** Any compiled-in
+   installation default for system/global config, system/global attributes,
+   child execution/maintenance and transport shell must be derived from a
+   **reviewed, verifiable installation evidence source bound to the actual
+   selected executable**, its identity and invocation environment.
+   Neither the binary's directory, Git version, OS, Scoop layout nor a gix
+   library's separate defaults alone prove the equivalence.
+   **Open blocking design question:** there is currently no accepted source
+   and trust scheme for this profile. An unverified root, opaque installed
+   helper or incompatible host profile must refuse explicitly before mutation.
+   Do not accept or enable this amendment until the independent review
+   resolves that proof source and its revocation/staleness rules.
+5. **All pre-mutation Git CLI probes must disappear together.** This
+   includes path/config inspection, `git --exec-path`, refs/reflog and branch
+   normalization, `git check-attr` for current/target/index/child sources,
+   receiver/child configuration and transport/shell discovery. The migration
+   may be staged behind an inert, test-only implementation, but cannot describe
+   the runtime preflight as gix-native while any unapproved Git subprocess
+   remains. Final admitted *mutating* Git execution is intentionally retained.
+6. **No new effective permission by default.** The ADR's ordinary
+   authorization pipeline, Deny priority, bounded resources, exact executable
+   identity, configured helper/filter/hook rejection, cancellation,
+   multi-cursor stale/replay refusal and truthful partial-mutation reporting
+   remain binding. `GIT_INSTALL_ROOT` can only be specially admitted after
+   independent evidence proves it inert for the bound final writer; all other
+   `GIT_*` settings retain existing conservative handling.
+
+### Required acceptance evidence
+
+- Independent Git authorization/security/API review of the exact production
+  call graph, selected gix 0.90.0 feature set and installation evidence trust
+  model; no self-review counted as an independent sign-off.
+- Instrumented fake Git executable confirms **no Git subprocess** runs during
+  every preflight phase (including library internals); final writer must be
+  the precise separately admitted executable.
+- Comparative native Git 2.36.1.windows.1 and newer-Git Checkout/Commit/Push
+  tests covering HOME/XDG, includes/includeIf, missing/empty paths, Unicode/
+  spaces, multiple installed Git binaries, symlink/path replacement, configs,
+  URL rewrite/tracking, `check-attr`, filters, hooks, transport, >16MiB
+  sources, denial and stale approval. Conformance cannot be inferred from
+  `cargo check` or installer-fixture CI.
+- Explicit architecture acceptance, exact-head CI, governance validators,
+  independent implementation security review and merge-time CAS.
+  Until then, the accepted October fixed-command wording **continues to
+  govern production behavior**.
+
+---
+
 ## Separately Admitted Discovery Accepted (2026-10-12)
 
 The maintainer accepted a separately authorized read-only host Git configuration
