@@ -1,6 +1,6 @@
 # ADR-104: Domain-owned persistence and cross-host runtime composition
 
-**Status**: Accepted **only upon reviewed PR #936 merge to main** (placement/ownership rule; no approved injection API, runtime behavior, binding or E2/E3 implementation). Before merge this is a proposed acceptance candidate.
+**Status**: Accepted — placement/ownership rule only, effective with reviewed [PR #936](https://github.com/wjhuang88/talos/pull/936) main merge `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`; no approved injection API, implementation, provider binding or behavioral equivalence.
 **Date**: 2026-11-13
 **Owner**: ARCH-035 / #897, I320 E1, effective documentation/architecture claim #905
 **Existing accepted constraints**: ADR-042 durable embedded Session boundary; STORE-002 / #670 I321 A/B and I322 C
@@ -50,3 +50,7 @@ A separate exact-head independent architecture/API review, docs CI with both gov
 ## Consequences and implementation gate
 
 The system keeps one authoritative runtime semantics path with host-selectable **future** assembly. This may leave existing CLI and embedded construction distinct until E2 proves an exact delegation point; forcing premature unification is rejected. Missing D/E composition or negative-case/SDK conformance remains a deliberate, explicit blocker. A future public API or storage implementation change requires its own reviewed evidence and may amend this ADR when new facts warrant it.
+
+## Acceptance receipt — 2026-11-13
+
+Decision effective on main merge `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b` (PR #936) from exact candidate `3fd1b7176901832717b692202512dadb7364391f`. [CI #4173](https://github.com/wjhuang88/talos/actions/runs/43365335816) passed documentation-scoped checks and both governance validators with **zero warnings**; [read-only Copilot exact-head review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843928194) no blockers, and [single-maintainer authorization plus CAS](https://github.com/wjhuang88/talos/pull/936#issuecomment-6852726331) are recorded. Separate global remote owner synchronization job failed due to unrelated Issue #937 (residual owned by #938); this was explicitly disclosed under SOP remote-batch scope. No Rust/platform/behavioral parity pass is claimed. ADR-104 neither activates E2/E3 nor closes #897.
