@@ -1,6 +1,6 @@
 # SEARCH-001-D3: Bing Direct-HTML Multi-Endpoint Feasibility
 
-**Status**: Active / Claimed — proposed D3.2 test-only claim via governance #942, **ineffective until that PR merges**. D3.1 documentary intake already merged (#938, `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`); live endpoint/provider admission remains blocked.
+**Status**: In Progress / Claimed — proposed D3.2 test-only claim via governance #942, **ineffective until that PR merges**. D3.1 documentary intake already merged (#938, `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`); live endpoint/provider admission remains blocked.
 
 | Field | Value |
 |---|---|
@@ -17,11 +17,11 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed — proposed; ineffective until governance #942 merges |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | D3.2 only: inventory BF-01..BF-13 against existing Bing parser/compatibility tests and add missing *test-only* synthetic HTML and local/loopback negative characterization (organic/ad, valid/empty/challenge, denied redirect, root-vs-query probe, cancellation/permission and source identity); publish evidence; no runtime, new endpoints, real Bing HTTP, permissions or provider admission. |
-| Claimed At | 2026-11-13 (proposed; effective on merge only) |
+| Claimed At | 2026-11-13 |
 | Source Issue | #937 |
 | Governance Claim PR | #942 |
 | Authorization Mode | Single-maintainer merge |
