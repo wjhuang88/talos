@@ -1,8 +1,8 @@
 # Product Backlog
 
-## SEARCH-001-D3 / #937 — Bing direct HTML, multi-endpoint feasibility (intake only)
+## SEARCH-001-D3 / #937 — D3.1 accepted; D3.2 synthetic-only claim proposed
 
-[Owner](active/SEARCH-001-D3-bing-direct-html-feasibility.md) / [source and offline test matrix](../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md): **Intake / Proposed / Unclaimed**. Reuse the existing Bing CN parser and protected request boundary for a *documentary-only* comparison with unverified `www.bing.com` and `bing.cn` candidates. Microsoft 2026-09-30 usage/result rights block new automated distributed-default access; no live SERP acquisition, code/test edits, new endpoint, claim, Auto reorder or independent-provider admission. D/#644 remains BLOCKED/ZERO-ADMISSION, D2/#848 separate, E/F/G/I gated; #624 stays Open.
+[Owner](active/SEARCH-001-D3-bing-direct-html-feasibility.md) / [D3.1 evidence](../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md) / [proposed I326](../iterations/I326-search-bing-synthetic-characterization.md): D3.1 documentary intake accepted in #938 (`8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`); **D3.2 Ready / Unclaimed** pending atomic governance claim. Test-only gap characterization of existing Bing parser, redirect/authority and health negative fixtures; no production code, actual Bing SERP acquisition, endpoint admission or source-order change. Microsoft 2026-09-30 distributed-default rights unresolved; historical D/#644 ZERO-ADMISSION, D2/#848 separate, E/F/G/I blocked and #624 Open.
 
 ## GIT-COMPAT-001 / #919 — Windows Git 2.36 prepared preflight
 
