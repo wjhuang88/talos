@@ -7,7 +7,7 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 ## SEARCH-001-D3-T2 / I327 — proposed explicit sponsored-ancestor correction
 
-[SEARCH-001-D3-T2](backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Ready / Unclaimed (proposed atomic governance activation)** after T1/#941 Complete/Closed. Scope: localized `b_ad` ancestor exclusion in the existing response-only Bing parser, hand-authored synthetic positive/negative regressions; no real Bing, new hosts, network permission, SearchRouter default, provider count or rights assumption. Existing I324/I325 and other owners remain separate. No code until claim effective on main.
+[SEARCH-001-D3-T2](backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **In Progress / Claimed proposed via Draft #948 (ineffective until merge)** after T1/#941 Complete/Closed. Scope: localized `b_ad` ancestor exclusion in the existing response-only Bing parser, hand-authored synthetic positive/negative regressions; no real Bing, new hosts, network permission, SearchRouter default, provider count or rights assumption. Existing I324/I325 and other owners remain separate. No code until claim effective on main.
 
 ## SEARCH-001-D3-T1 / I326 — Complete / Closed upon closeout merge
 
