@@ -109,14 +109,18 @@ claim and explicit rights decision are mandatory before live acquisition.
   [Microsoft Bing SSR](https://blogs.bing.com/search-quality-insights/2022/8/Fast-Front-End-Performance-for-Microsoft-Bing/);
   [Bing API retirement](https://learn.microsoft.com/lifecycle/announcements/bing-search-api-retirement).
 
+## Separate test-only follow-up — SEARCH-001-D3-T1 / #941
+
+D3.1 documentary research [PR #938](https://github.com/wjhuang88/talos/pull/938) merged at `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4` after exact-head CI43424338312 and independent no-blocker review. Proposed [SEARCH-001-D3-T1](SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941) / [I326](../../iterations/I326-search-bing-synthetic-negative-conformance.md) is **separately governed, test-only synthetic characterization** of Bing CN parsing and currently unapproved candidate host boundaries. T1 is not an effective claim until its own governance PR merges. D3 remains **Intake / Proposed / Unclaimed**, with new live Bing rights, redirect and mainland-China qualification still blocked/unproven. No E/F/G/I admission follows.
+
 ## Acceptance (documentary only)
 
 - [x] Existing implementation, historical D3 overlap and rights ambiguity identified,
   without claiming live or Chinese-network proof.
 - [x] Multi-surface same-family design and offline test plan published with source dates.
 - [x] Blocking gate, rollback and negative permissions/default-route implications explicit.
-- [ ] Documentary PR reviewed and exact-head governance CI accepted; no implementation
-  `Completion Commit` claimed for intake publication.
+- [x] Documentary PR #938 reviewed and exact-head CI43424338312 accepted (merge `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`); no implementation
+  `Completion Commit` claimed for research publication.
 - [ ] Any later offline executable tests, authorized live observation or production change
   separately selected, claimed, reviewed and tested. This checkbox does not block
   publishing the intake; it blocks upgrading the technical decision.
