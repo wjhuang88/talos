@@ -201,3 +201,8 @@ changed resource/deployment, preserving normal assistant content while dropping 
 blocks. Locked transport unit and isolated-token HTTP tests started; still compiling at checkpoint.
 Latest fetched main 8e32fcad is not yet rebased into this test checkpoint; final candidate requires
 latest-main integration and all published acceptance. No A/B work reopened.
+
+Added actual Agent Responses native two-round read fixture using PermissionEngine and ReadTool;
+asserts tool-call association, deployment body, final answer, successful tool history and absence
+of API key in serialized history. This complements adapter-only tests but does not cover the whole
+published Agent/image/mode matrix. Test queued behind dependency compilation; no pass claimed.

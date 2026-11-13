@@ -516,3 +516,65 @@ async fn azure_success_status_error_event_is_redacted() {
     assert!(!format!("{events:?}").contains("sk-test"));
     fixture.assert_async().await;
 }
+
+#[tokio::test]
+async fn azure_responses_actual_agent_completes_permission_gated_read() {
+    use talos_core::tool::{ToolProtocol, ToolRegistry};
+    let directory = tempfile::tempdir().expect("workspace");
+    let workspace = directory.path().canonicalize().expect("canonical");
+    std::fs::write(workspace.join("fixture.txt"), "AZURE_AGENT_READ_OK").expect("fixture");
+    let mut server = mockito::Server::new_async().await;
+    let first = server.mock("POST", "/openai/v1/responses")
+        .match_header("api-key", "sk-test")
+        .match_header("authorization", mockito::Matcher::Missing)
+        .match_request(|request| !String::from_utf8_lossy(request.body().expect("body")).contains("function_call_output"))
+        .with_status(200).with_header("content-type", "text/event-stream")
+        .with_body(concat!(
+            "data: {\"type\":\"response.created\"}\n\n",
+            "data: {\"type\":\"response.output_item.added\",\"item\":{\"id\":\"fc_read\",\"type\":\"function_call\",\"call_id\":\"call_read\",\"name\":\"read\",\"arguments\":\"\"}}\n\n",
+            "data: {\"type\":\"response.function_call_arguments.done\",\"item_id\":\"fc_read\",\"arguments\":\"{\\\"path\\\":\\\"fixture.txt\\\"}\"}\n\n",
+            "data: {\"type\":\"response.output_item.done\",\"item\":{\"id\":\"fc_read\",\"type\":\"function_call\",\"call_id\":\"call_read\",\"name\":\"read\",\"arguments\":\"{\\\"path\\\":\\\"fixture.txt\\\"}\"}}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n"
+        )).expect(1).create_async().await;
+    let second = server.mock("POST", "/openai/v1/responses")
+        .match_header("api-key", "sk-test")
+        .match_header("authorization", mockito::Matcher::Missing)
+        .match_request(|request| {
+            let body: Value = serde_json::from_slice(request.body().expect("body")).expect("JSON");
+            body["model"] == "azure-deployment" && body["input"].as_array().expect("input").iter().any(|item|
+                item["type"] == "function_call_output" && item["call_id"] == "call_read" && item["output"].as_str().is_some_and(|s| s.contains("AZURE_AGENT_READ_OK")))
+        }).with_status(200).with_header("content-type", "text/event-stream")
+        .with_body("data: {\"type\":\"response.created\"}\n\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"done\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":8,\"output_tokens\":1}}}\n\n")
+        .expect(1).create_async().await;
+    let mut registry = ToolRegistry::new();
+    registry.register(Arc::new(talos_tools::file_tools::ReadTool::new(
+        workspace.clone(),
+    )));
+    let engine = talos_permission::PermissionEngine::with_workspace_root(workspace.clone());
+    let mut agent = talos_agent::Agent::with_security(
+        responses_provider(server.url()),
+        registry,
+        Some(Arc::new(engine)),
+        None,
+        workspace,
+    )
+    .with_reasoning_identity(Some("azure-fixture".into()), Some("gpt-test".into()), true);
+    agent.set_tool_protocol(ToolProtocol::Native);
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let (answer, history) = tokio::time::timeout(
+        Duration::from_secs(20),
+        agent.run_streaming("Read fixture.txt".into(), vec![], tx),
+    )
+    .await
+    .expect("bounded Agent")
+    .expect("Agent round");
+    assert_eq!(answer, "done");
+    assert!(history.iter().any(|message| matches!(message, Message::Tool { result } if !result.is_error && result.content.contains("AZURE_AGENT_READ_OK"))));
+    assert!(
+        !serde_json::to_string(&history)
+            .expect("history")
+            .contains("sk-test")
+    );
+    first.assert_async().await;
+    second.assert_async().await;
+}
