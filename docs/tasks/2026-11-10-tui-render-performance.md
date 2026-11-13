@@ -1767,3 +1767,38 @@ Remaining blockers: Debug transcript input long-tail479ms not diagnosed; previou
 macOS CI source binding failed (test-only diagnostic34328646 now available);
 resize heap coverage mismatch569/571; heap category attribution; exact native
 resources/deferred operations and second terminal/native Windows. Task staysReview.
+
+### Sampler deadline and allocation-path follow-up (2026-11-13)
+
+Sampler correction `b007a547` stops dispatch at ready+duration, including delayed
+profiler exit; four PTY regression tests and independent review passed. New
+resize profile passes coverage at570/570, nine30s median windows all25,883,811B.
+Service313.857s wall,127.496s CPU,peak721.3MiB,swap0 under unchanged single-core,
+2GiB high/3GiB max/no-swap guards. Previous569/571 failure is retained, not waived.
+
+Existing transcript profile reconstructed from heaptrack v3 allocation/free events:
+all30,362 timestamps reconcile with Massif totals. Net200,160B growth across
+29.997..269.999s maps to history_projection105,360B, StreamRenderState87,120B,
+stream_opening_lines7,680B. This finite stack-path attribution does not prove
+object ownership or universal leak freedom. Independent review verified category grouping and raw coverage, requested removal
+of stale hardcoded569/failure in the analysis script (fixed and rerun).570 counts
+effective screen-size changes; raw resize events589. Full event replay was not independently repeated; reviewer verified grouping,
+raw coverage, archived scripts and all21 archive checksums and approved this
+evidence batch.
+See [archived follow-up](evidence/tui-perf-001/sampler-boundary/README.md).
+
+Status remains Review/Claimed. Debug479ms long-tail, final-head CI and existing
+native/platform residuals remain open. Next diagnostic must add CPU/fault/off-CPU
+evidence rather than repeat unchanged timing matrices. No new baseline or budgets.
+
+One bounded35s thread diagnostic completed with the same immutable Debug binary
+and guards:60probes,0skipped; inputP99 upper4.763355ms; frame-preparation max0.103463ms.
+2,814steady procfs observations, max gap16.662ms; largest per-thread interval
+runqueue wait2.758326ms, observed major faults0. Service37.640s,CPU2.584s,peak166.6MiB,
+swap0.479ms tail did not reproduce; polling changes timing and does not provide
+exact per-frame CPU attribution. Prior failure remains unresolved; do not repeat
+unchanged samples or claim product fix. Diagnostic artifacts are in the follow-up.
+
+Both governance validators passed with0warnings;19.271s wall,17.921s CPU,
+221.8MiB peak,swap0. CI43356421622 remains in progress; completed reconciliation
+log confirms unrelated closed#901 matrix drift. No merge or task completion claim.
