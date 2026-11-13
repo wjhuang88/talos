@@ -1,7 +1,10 @@
 # Native terminal acceptance procedure
 
 Owner: [TUI-PERF-001](../../2026-11-10-tui-render-performance.md).
-Status: **Not executed**. This procedure is not acceptance evidence.
+Status: **Partially executed** in Linux Wayland + niri + Ghostty.
+Maintainer-reported passes and deferred operations are recorded in the owner
+under “Acceptance evidence reconciliation — 2026-11-12”. The procedure itself
+is not evidence; missing exact binary/environment metadata remains open.
 Windows: no native environment available, as confirmed by the user.
 
 Run the same candidate build on Linux Wayland + niri + Ghostty, another supported

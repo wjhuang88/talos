@@ -41,7 +41,11 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
   Reproducible profiling, event-driven drawing, asynchronous Git snapshots, and layout/component
   caching and incremental history are delivered. Full local preflight passed (5317 tests),
   MSVC xwin and exact-head Linux/Windows code CI passed; independent Agent code review approved.
-  Resize-budget acceptance, growing/resize heap stability and native terminals remain open in #923.
+  Focused resize/heap evidence is archived; baseline concurrent-input resize P95 fails.
+  Local fix `f725b74b` passes three Debug budget rounds; final delivery gates,
+  cache attribution and remaining
+  native/resource acceptance stay open in #923. Basic Ghostty operations and Git display
+  passed maintainer retest; missing platforms are not passed.
   Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001

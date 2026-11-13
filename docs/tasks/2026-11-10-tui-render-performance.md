@@ -1564,3 +1564,99 @@ Logs are in main workspace target/git-path-{preflight,remaining,final-tests,tui-
 The six remaining tests hard-code workspace_root=/tmp. Their pending databases therefore live in /tmp/.talos/runtime, unaffected by TMPDIR or SQLITE_TMPDIR. The tested Agent/session sources are identical to origin/main. The exact compiled aggregate_queue_limit_counts_running_and_pending_submissions test failed with SQLite extended error 778, then passed immediately after moving this session's retired /tmp/talos-p0-git-fixtures and /tmp/talos-p0-git-fixtures-v2 to the main workspace target/retired-perf-fixtures (approximately 80 MiB freed, files preserved). No source/binary changes between those two runs.
 
 Final locked workspace test rerun: 5318 passed, 0 failed, 0 ignored across 148 summaries. External Runtime SDK fixture passed. Exit 0; 9m15.422s wall, 4m34.288s CPU, peak 2 GiB, zero swap. Log: main workspace target/git-path-unblocked.log. Combined with the earlier successful format/governance/check/Clippy and cargo-xwin checks, local validation gates are satisfied. The initial preflight invocation itself failed and was not relabeled as passing. No storage patch was necessary. Remaining: commit/review/CI/merge and native Git status retest on the rebuilt CLI.
+
+### Acceptance evidence reconciliation — 2026-11-12
+
+Scope: archive the already-authorized focused measurements and reconcile native
+acceptance facts under the existing #910 claim; no new runtime implementation.
+Preserve published budgets, previous evidence and other sessions' worktrees.
+Owner remains Review / Claimed; #923 remains the residual destination. Validation:
+raw sample/metrics validators, checksums, document links, both governance validators
+and exact-head documentation CI/review. Board mirrors this owner; no manifest,
+backlog activation or completion-state change is required.
+
+Git workspace-path correction is delivered by #925: implementation
+`acb67966d475bb3fa41d62b15f498297b6827b9c`, merge
+`1eabf2964b5a81005f626644bd99053000518fdb`. Local locked workspace tests passed
+5318/0 failed/0 ignored; MSVC xwin and code CI43189763377 passed. Its global
+reconciliation failure was repaired separately by #926 (`b26d9fcb`). Maintainer
+confirmed normal Git display after rebuilding; the previous pending merge/retest
+notes above are historical. Exact running CLI hash was not captured.
+
+Basic Ghostty acceptance was ended by the maintainer after the reported passes.
+Manual approval, external Git refresh, workspace switching, another terminal and
+native Windows remain untested; terminal CPU/PSS was not measured. Queue preview
+is delegated to the other session, not included as a pass for this task.
+
+Focused measurement source is fixed to `1eabf296`; results and raw evidence are
+in [focused-followup](evidence/tui-perf-001/focused-followup/README.md).
+Three resize-only rounds pass sample/metrics checks and Debug event-latency
+thresholds, but did not inject keyboard input. They cannot alone close resize
+input acceptance; a separate three-round keyboard-probe run addresses that gap.
+Five-minute heap profiles passed actual-state/coverage checks: 561 resizes,
+constant 25,943,809-byte median live heap in nine 30-second windows; growing
+history adds 25,050 bytes per 30-second window (835 bytes/message). No superlinear
+growth is observed, but cache-specific retention attribution remains open.
+This finite observation does not establish general leak freedom.
+
+Remaining closure requirements: correct the failed resize-input P95 gate, cache-specific
+boundedness attribution, exact-source native resource/operation records,
+second terminal and native Windows. No original gate is waived or marked Complete.
+
+Concurrent keyboard-probe follow-up: all three valid rounds FAIL Debug resize
+P95<=150ms (22/113,29/113,39/112 samples exceed150ms). P99 bounds remain below200ms.
+The earlier resize-only pass does not close this gate. No probes skipped. Raw
+samples, metrics, runner and validation summaries are archived alongside heap data.
+Next: diagnose width reflow during input using existing profiles and stage counters;
+do not repeat the same matrix before a diagnosed correction. No runtime patch yet.
+
+### Corrective full-segment projection candidate (uncommitted)
+
+Existing stage counters attribute about98% of total draw time in the failed
+concurrent-input resize samples to history rebuild (6447/7859/7957ms versus
+6609/8033/8140ms total draw). This supports targeting history projection rather
+than terminal flush. It is aggregate attribution, not per-function CPU profiling.
+
+Candidate copies a whole styled segment when its scalar-width sum fits the
+current row; otherwise existing per-scalar wrapping remains. No new cache,
+Unicode string-width substitution, selection model or render scheduling change.
+42 focused history-projection tests pass, including added equivalence coverage
+for segment/scalar boundaries, styles, combining/CJK/emoji, width0/1 and fills.
+Guarded build passed; immutable candidate and source patch receipt are stored in
+main target/tui-perf-artifacts/segment-copy-1eabf296. Three input+resize samples
+are pending. No speedup or acceptance claimed before their results; full-source
+checks/review and platform gates remain required if the candidate is retained.
+
+Candidate measurement result: all3 concurrent-input resize rounds pass exact
+Debug P95<=150ms (1/110,0/109,0/112 exceed150ms), P99upper150.102260/149.815583/
+149.082021ms <=200ms. No skipped probes; actual resize/coverage validators pass.
+[Candidate evidence](evidence/tui-perf-001/segment-copy/README.md) binds source
+patch and binary hashes. Retain as a local candidate pending long-segment/Release
+regression validation, full-source gates and review. No claim of an exact causal
+speedup: baseline/candidate samples were not interleaved. No full-task completion.
+
+Independent incremental static review APPROVE at source diff SHA256
+`a431031f0a0c7a2ddb19143aa70518e615c911ea865d7e551feadb87d40f4195`.
+No correctness blocker found. Zero-width prefixes can make the additional fit scan
+long; new segmentation equivalence test is not an independent old-algorithm oracle.
+These limitations are retained in candidate evidence. Serial resource-limited
+standard preflight then cargo-xwin are running; no pass is claimed before exit.
+
+### Final-source validation checkpoint — 2026-11-13
+
+Standard preflight exited101 after2348.771s: governance, format, locked check and
+Clippy passed; test summaries before termination contain4548 passes/1failure.
+Failure: Git prepared-local-push maintenance-cancel test observed live descendant
+state RN after cleanup receipt. Tools/sandbox source is unchanged from1eabf296.
+The exact compiled test passed standalone in4.116s without source changes; this
+is not proof of root cause or permission to erase the failed run. MSVC cargo-xwin
+TUI --tests passed in6.443s. Both ran serial under the existing resource guard.
+Remaining locked workspace tests and SDK fixture are being completed; no final
+pass or merge claim yet. Logs and command receipts retained in segment-copy artifact.
+
+Local implementation checkpoint: `f725b74b` commits the reviewed fitting-segment
+copy optimization and regression test. Source is identical to the measured patch.
+This is neither pushed/merged delivery nor whole-task completion. Workspace/SDK
+validation remains in progress; native and broader performance gaps stay open.
+
+Final local gates completed2026-11-13: locked workspace tests exit0, 5319 passed, 0 failed, 0 ignored across148 summaries; external SDK fixture exit0. Combined service549.510s, CPU273.523s, peak2GiB, swap0. Source unchanged atf725b74b. Together with prior check/Clippy/format/governance/xwin passes, local gates are satisfied. Initial preflight invocation remains failed101 and its Git cleanup observation remains recorded; standalone unchanged test and subsequent full workspace passed. Independent evidence review found no blocker and verified raw hashes/threshold counts; Board now distinguishes baseline failure from candidate pass. Remote gates and residual performance/native acceptance remain open.
