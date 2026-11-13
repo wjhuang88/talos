@@ -11,12 +11,17 @@ use std::ffi::OsString;
 
 #[test]
 fn gix_branch_name_validation_requires_no_git_child() {
-    // The API is a pure, in-memory validation primitive. It is only a
-    // candidate to replace `git check-ref-format --branch`: native Git may
-    // first expand `@{-n}` using reflog history, which must not be guessed.
+    // The gix-validate API takes a *complete* Git ref, not a short
+    // checkout branch name: `branch_name("topic")` correctly fails.
+    // Map the user-facing spelling into refs/heads/ before validating.
+    // This still isn't equivalent to Git's `check-ref-format --branch`:
+    // leading '-' and reflog shorthand need their own lexical/semantic gates.
+    assert!(gix::validate::reference::branch_name(b"topic".as_bstr()).is_err());
+
     for name in ["topic", "feature/topic", "release-1.2"] {
+        let full_ref = format!("refs/heads/{name}");
         assert!(
-            gix::validate::reference::branch_name(name.as_bytes().as_bstr()).is_ok(),
+            gix::validate::reference::branch_name(full_ref.as_bytes().as_bstr()).is_ok(),
             "ordinary branch should be valid: {name}"
         );
     }
@@ -28,10 +33,12 @@ fn gix_branch_name_validation_requires_no_git_child() {
         "bad name",
         "topic/",
         "topic@{bad",
+        "HEAD",
     ] {
+        let full_ref = format!("refs/heads/{name}");
         assert!(
-            gix::validate::reference::branch_name(name.as_bytes().as_bstr()).is_err(),
-            "unsupported branch must not be admitted: {name}"
+            gix::validate::reference::branch_name(full_ref.as_bytes().as_bstr()).is_err(),
+            "invalid or reserved branch must be refused: {name}"
         );
     }
 }
