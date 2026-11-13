@@ -2,7 +2,7 @@
 
 ## I326 / SEARCH-001-D3-T1 — proposed synthetic negative conformance
 
-[I326](I326-search-bing-synthetic-negative-conformance.md) / [owner](../backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): **Planned / Proposed / Unclaimed** until an atomic claim+activation PR is independently reviewed and merged. Native synthetic negative tests only; no Bing live traffic, production search/URI authority changes or provider admission. I324/I325/I320 remain separate active/review owners.
+[I326](I326-search-bing-synthetic-negative-conformance.md) / [owner](../backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): **Active / Claimed proposed by #943 (ineffective until merge)**; atomic claim+activation still needs independent review and merge. Native synthetic negative tests only; no Bing live traffic, production search/URI authority changes or provider admission. I324/I325/I320 remain separate active/review owners.
 
 
 [I323](I323-provider008c-azure-openai.md) / #914 proposes Azure C after completed A/B.
