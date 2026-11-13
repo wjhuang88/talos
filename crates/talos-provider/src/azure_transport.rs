@@ -199,3 +199,70 @@ pub(crate) fn project_stream<T: Send + 'static>(
     });
     rx
 }
+
+#[cfg(test)]
+mod replay_tests {
+    use super::*;
+    use crate::openai_responses_sse::ResponsesStreamOutput;
+    use talos_core::message::{AgentEvent, AssistantReasoning, Message, ReasoningBlock};
+    #[test]
+    fn actual_responses_envelope_is_bound_to_resource_and_deployment() {
+        let source = AzureConnection {
+            endpoint: "https://one.example.com/openai/v1/responses".into(),
+            deployment: "production".into(),
+            authentication: AzureAuthentication::ApiKey,
+        };
+        let item = json!({"type":"reasoning","id":"rs_fixture","summary":[],"encrypted_content":"fixture-ciphertext"});
+        let encoded = crate::openai_responses_reasoning::encode_completed_reasoning_item(&item)
+            .expect("encode")
+            .expect("ciphertext");
+        let mut event = ResponsesStreamOutput::Agent(AgentEvent::ReasoningComplete {
+            blocks: vec![ReasoningBlock::Redacted { data: encoded }],
+        });
+        source.bind_event(&mut event);
+        let ResponsesStreamOutput::Agent(AgentEvent::ReasoningComplete { blocks }) = event else {
+            panic!("reasoning")
+        };
+        let history = vec![Message::Assistant {
+            content: "safe answer".into(),
+            tool_calls: vec![],
+            reasoning: Some(AssistantReasoning {
+                provider: "azure-fixture".into(),
+                model: "logical".into(),
+                blocks,
+            }),
+        }];
+        let mut other_deployment = source.clone();
+        other_deployment.deployment = "other".into();
+        let mut other_resource = source.clone();
+        other_resource.endpoint = "https://two.example.com/openai/v1/responses".into();
+        for (connection, admitted) in [
+            (&source, true),
+            (&other_deployment, false),
+            (&other_resource, false),
+        ] {
+            let mut projected = history.clone();
+            connection.project_replay(&mut projected);
+            let Message::Assistant {
+                content,
+                reasoning: Some(reasoning),
+                ..
+            } = &projected[0]
+            else {
+                panic!("history")
+            };
+            assert_eq!(content, "safe answer");
+            if admitted {
+                let ReasoningBlock::Redacted { data } = &reasoning.blocks[0] else {
+                    panic!("opaque")
+                };
+                assert_eq!(
+                    crate::openai_responses_reasoning::decode_reasoning_item(data).expect("decode"),
+                    item
+                );
+            } else {
+                assert!(reasoning.blocks.is_empty());
+            }
+        }
+    }
+}

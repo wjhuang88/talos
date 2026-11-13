@@ -194,3 +194,10 @@ isolated-child Entra HTTP test for both Chat and Responses, asserting Bearer-onl
 configured API key, dispatch-owned credentials and redacted authentication errors. Test compilation
 started in restored environment; no token-test pass claimed. Latest fetched main is d92aabaa;
 rebase and fresh full validation remain required before any merge candidate.
+
+Resumed remote ffcb2c6a after another workspace reset; missing token logs cannot establish a pass.
+Added real Responses envelope encode/bind/project/decode regression for same destination and
+changed resource/deployment, preserving normal assistant content while dropping foreign opaque
+blocks. Locked transport unit and isolated-token HTTP tests started; still compiling at checkpoint.
+Latest fetched main 8e32fcad is not yet rebased into this test checkpoint; final candidate requires
+latest-main integration and all published acceptance. No A/B work reopened.
