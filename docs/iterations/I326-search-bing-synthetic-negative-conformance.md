@@ -10,14 +10,14 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed (proposed in Draft #943; ineffective until merge) |
-| Responsible Actor | @wjhuang88 (proposed) |
-| Executing Agent | ChatGPT / GPT-6 (proposed) |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | SEARCH-001-D3-T1/#941: bounded synthetic parser and host/permission *test-only* assertions and evidence receipt; no live Bing, new endpoint or production changes |
-| Claimed At | 2026-11-13 (proposed) |
+| Claimed At | 2026-11-13 |
 | Source Issue | #941 |
-| Governance Claim PR | #943 (Draft; ineffective until merge) |
-| Authorization Mode | Single-maintainer merge (proposed) |
+| Governance Claim PR | #943 |
+| Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User-directed D3 continuation after #938; #943 proposed atomic claim, pending exact-head CI, independent review and merge-time CAS |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-13 |
