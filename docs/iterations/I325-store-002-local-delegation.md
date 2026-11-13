@@ -1,6 +1,6 @@
 # Iteration I325: STORE-002 Existing Local Delegation (D)
 
-> Document status: Planned / Unclaimed — governance claim Draft; implementation PROHIBITED until claim merges
+> Document status: Active / Claimed — proposed effective I325 D activation in governance #932; no implementation until merge
 > Selected: 2026-11-13
 > Source: [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / [#670](https://github.com/wjhuang88/talos/issues/670)
 > Baseline: A/B [#909](https://github.com/wjhuang88/talos/pull/909) and C [#912](https://github.com/wjhuang88/talos/pull/912) implemented; C bounded closeout [#930](https://github.com/wjhuang88/talos/pull/930) merged at `a07b466d5aa2a03fb841cdcb918cd4968c778942`. E/F and #897 Host remain gated.
@@ -9,15 +9,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | STORE-002 D only: verify and complete minimal functional local delegation of existing SQLite/FTS5/TLOG/JSONL stores via accepted I322 domain traits; add focused trait-directed conformance tests or narrowly necessary domain-local adapter glue without changing store implementations or production consumers. E local composition, F broad equivalence, ARCH-035/Host wiring and new engines excluded. |
 | Claimed At | 2026-11-13 |
 | Source Issue | #670 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #932 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | C has merged and closed; this is an unclaimed D governance draft. No implementation authority until this claim is finalized, independently checked for overlap and merged into main with exact-head CI, both validators and merge-time CAS. |
+| Authorization Evidence | C implemented in #912 (`3df409ef9ed707756350f2c7d4b2c8819f157222`) and closed in #930 (`a07b466d5aa2a03fb841cdcb918cd4968c778942`). D governance [#932](https://github.com/wjhuang88/talos/pull/932) proposes an independent bounded work slice; source user authorized continued #670. Single-maintainer docs-only route needs exact-head CI, both validators, no-overlap CAS and explicit no-human-reviewer rationale before merge; implementation remains unauthorized on the open branch. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-13 |
 | Handoff / Release Condition | After accepted bounded D delegation and independent API/runtime review, record Completion Commit, release claim, and keep E/F plus #897 independently gated. |
@@ -45,6 +45,6 @@ D makes their existing local delegation demonstrably operational at accepted dom
 
 ## Activation and completion gates
 
-- **Draft-only, no implementation permission** until the finalized claim and activation on this PR have reached `main` with correct PR number, complete claim fields, both governance validators and authorization CAS.
+- **Proposed Claim/Active on this branch is not effective yet**; implementation is prohibited until #932 merges to `main` with exact-head CI, complete claim fields, both governance validators and authorization CAS.
 - Completion requires a future **existing** implementation/evidence merge commit (not a status-only self-reference), exact-head CI, independent review appropriate to actual changed API/runtime scope, owner-first closure, derived index updates and #670 issue synchronization.
 - Parent #670 remains OPEN for D/E/F; later E/default local composition and F/characterization require separate claims, #897 Host remains gated until accepted functional delegation and local profile.
