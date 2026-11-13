@@ -28,6 +28,14 @@ pub struct OpenAIResponsesProvider {
 }
 
 impl OpenAIResponsesProvider {
+    pub(crate) fn with_azure(
+        mut self,
+        azure: crate::azure_transport::AzureConnection,
+    ) -> ProviderResult<Self> {
+        self.client = self.client.with_azure(azure)?;
+        Ok(self)
+    }
+
     /// Create a Responses provider for one model.
     #[must_use]
     pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {

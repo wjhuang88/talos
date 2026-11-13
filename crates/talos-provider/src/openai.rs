@@ -40,6 +40,7 @@ pub struct OpenAIProvider {
     model: String,
     pub(crate) base_url: String,
     client: Client,
+    azure: Option<crate::azure_transport::AzureConnection>,
     copilot_headers: serde_json::Map<String, Value>,
     reasoning: Option<ReasoningOptions>,
     reasoning_disabled: bool,
@@ -101,6 +102,7 @@ impl OpenAIProvider {
             model: model.into(),
             base_url: OPENAI_API_URL.into(),
             client: Client::new(),
+            azure: None,
             copilot_headers: serde_json::Map::new(),
             reasoning: None,
             reasoning_disabled: false,
@@ -170,7 +172,24 @@ impl OpenAIProvider {
 
     /// Compose the chat completions endpoint URL by appending the standard
     /// path to the configured base.
+    pub(crate) fn with_azure(
+        mut self,
+        azure: crate::azure_transport::AzureConnection,
+    ) -> ProviderResult<Self> {
+        self.client = Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|_| {
+                ProviderError::NetworkError("Azure HTTP client initialization failed".into())
+            })?;
+        self.azure = Some(azure);
+        Ok(self)
+    }
+
     pub(crate) fn endpoint_url(&self) -> String {
+        if let Some(azure) = &self.azure {
+            return azure.endpoint.clone();
+        }
         let base = self.base_url.trim_end_matches('/');
         format!("{base}{CHAT_COMPLETIONS_PATH}")
     }
@@ -256,13 +275,16 @@ impl OpenAIProvider {
                     }
                 },
             );
-            let request_fut = self
-                .client
-                .post(self.endpoint_url())
-                .bearer_auth(&self.api_key)
-                .header("Content-Type", "application/json")
-                .json(&body)
-                .send();
+            let builder = if let Some(azure) = &self.azure {
+                azure.request(&self.client, &self.api_key, &body)?
+            } else {
+                self.client
+                    .post(self.endpoint_url())
+                    .bearer_auth(&self.api_key)
+                    .header("Content-Type", "application/json")
+                    .json(&body)
+            };
+            let request_fut = builder.send();
 
             let remaining = deadline
                 .map(|expires| expires.saturating_duration_since(std::time::Instant::now()));
@@ -326,7 +348,11 @@ impl OpenAIProvider {
                 }
                 Ok(resp) => {
                     let status = resp.status();
-                    let body_text = resp.text().await.unwrap_or_default();
+                    let body_text = if self.azure.is_some() {
+                        "Azure request failed".into()
+                    } else {
+                        resp.text().await.unwrap_or_default()
+                    };
                     let body_text = if !self.copilot_headers.is_empty() {
                         crate::copilot::redact_credential(body_text, &self.api_key)
                     } else {
@@ -365,7 +391,11 @@ impl OpenAIProvider {
                     }
                 }
                 Err(e) => {
-                    let error = ProviderError::NetworkError(e.to_string());
+                    let error = ProviderError::NetworkError(if self.azure.is_some() {
+                        "Azure transport failed".into()
+                    } else {
+                        e.to_string()
+                    });
                     match classify_retry_with_backoff(
                         &error,
                         attempt,
@@ -485,6 +515,15 @@ impl LanguageModel for OpenAIProvider {
     }
 
     fn protocol_capability_scope(&self) -> Option<String> {
+        if let Some(azure) = &self.azure {
+            return crate::protocol_scope(
+                &azure.identity(),
+                "https://azure.invalid",
+                &self.model,
+                self.reasoning.as_ref(),
+                self.output_limit,
+            );
+        }
         crate::protocol_scope(
             "openai",
             &self.base_url,
@@ -691,6 +730,9 @@ impl LanguageModel for OpenAIProvider {
                 headers.insert("Authorization".into(), json!("Bearer ***"));
             }
             headers.extend(self.copilot_headers.clone());
+        }
+        if let Some(azure) = &self.azure {
+            azure.preview(&mut preview);
         }
         Some(preview)
     }

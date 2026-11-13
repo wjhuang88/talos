@@ -71,6 +71,12 @@ impl std::fmt::Display for ProviderProtocol {
 /// Per-model runtime limits and capability overrides.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ModelConfig {
+    /// Azure deployment alias; omission uses the selected logical model ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub azure_deployment: Option<String>,
+    /// Explicit Azure body shape, ahead of provider and catalog choices.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub azure_shape: Option<crate::AzureBodyShape>,
     /// Explicit model-specific API root; takes precedence over provider and catalog endpoints.
     ///
     /// This is a connection override, not protocol evidence. Set `protocol` explicitly when
@@ -211,6 +217,9 @@ pub enum GeminiTransportConfig {
 /// Named provider configuration.
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct ProviderConfig {
+    /// Explicit Azure resource and authentication binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub azure: Option<crate::AzureTransportConfig>,
     /// Explicit wire protocol override. Omitted means protocol selection is resolved later.
     #[serde(default, skip_serializing_if = "ProviderProtocol::is_unspecified")]
     pub protocol: ProviderProtocol,
@@ -249,6 +258,7 @@ impl std::fmt::Debug for ProviderConfig {
             .field("protocol", &self.protocol)
             .field("tool_protocol", &self.tool_protocol)
             .field("gemini", &self.gemini)
+            .field("azure", &self.azure)
             .field("base_url", &self.base_url)
             .field("api_key", &self.api_key.as_deref().map(|_| "***"))
             .field("api_key_env", &self.api_key_env)
