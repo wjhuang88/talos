@@ -1,6 +1,6 @@
 # Iteration I326: SEARCH-001-D3.2 Offline Bing Compatibility Characterization
 
-> Document status: Planned / Unclaimed — proposed atomic claim/activation; **no implementation authority before governance merge**
+> Document status: Active / Claimed — proposed atomic I326 claim via #942, **ineffective until merge; no implementation before acceptance**
 > Published plan date: 2026-11-13
 > Objective: fill proven gaps in Talos-owned synthetic **test-only** characterization of existing Bing HTML compatibility handling, without adding hosts, providers, runtime behavior or live automated searches.
 > Baseline: D3.1 research [#938](https://github.com/wjhuang88/talos/pull/938) merged `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`; [CI43424338312](https://github.com/wjhuang88/talos/actions/runs/43424338312) success, independent review no blockers. This is documentary acceptance only.
@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed — proposed activation pending |
+| Claim State | Claimed — proposed, ineffective until #942 merge |
 | Responsible Actor | @wjhuang88 (proposed) |
 | Executing Agent | ChatGPT / GPT-6 (proposed) |
 | Work Slice | D3.2 only: inventory existing Bing parser/prepared compatibility tests against BF-01..BF-13 and add narrowly missing `#[cfg(test)]` synthetic HTML/local-transport characterization for ad/organic confusion, known-vs-unknown redirect authority, 200 empty/challenge differentiation, root-vs-query health caveats, cancellation/permission and preserved compatibility identity. No production edits or live Bing network. |
 | Claimed At | 2026-11-13 (proposed) |
 | Source Issue | #937 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #942 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User requested continued D3 development after already merged D3.1/#938; proposed I326 is independently bounded. Required: exact-head governance CI, both validators, independent no-blocker technical/governance review and final CAS; proposed claim does **not** activate before merge. |
+| Authorization Evidence | User authorized continued D3 after #938; exact scope and single-maintainer rationale recorded in governance #942. Required: exact-head CI, both governance validators, independent no-blocker review, main/claim/overlap and expected-head CAS. Claimed/Active proposal is ineffective until #942 merges. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-13 |
 | Handoff / Release Condition | On accepted test-only stage, record test evidence and review, close this bounded iteration (not the D3 provider/right-to-use gate); retain all unverified live/terms/region questions under Issue #937. |
@@ -65,6 +65,6 @@ Active/Review/Planned inventory retained independently: GIT-COMPAT-001 I324/#919
 
 | Date | Phase | Result |
 |---|---|---|
-| 2026-11-13 | Proposed I326 governance-only selection | Effective only if finalized claim/active record reaches target via a reviewed, exact-head CI-validated PR. No test implementation or provider admission. |
+| 2026-11-13 | Proposed I326 governance claim #942 | Owner and I326 both propose Claimed/Active on this PR; no effective authority until #942 merges after exact-head CI, both governance validators, independent review and CAS. No test implementation or provider admission. |
 
 **Not Complete**: No implementation/Completion Commit yet. D3.1 #938 documentation merge is historical evidence only, not this test iteration's implementation completion. Any later technical test stage must independently pass and leave provider rights/live/regional admission outside I326.
