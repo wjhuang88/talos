@@ -2,7 +2,7 @@
 
 ## SEARCH-001-D3-T2 / #947 — explicit Bing sponsored-ancestor correction (claim proposed)
 
-[Owner](active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](../iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Ready / Proposed / Unclaimed** pending an atomic claim/activation PR. Narrow correction for hand-authored T1/#941 synthetic `b_ad` ancestor false-positive in existing Bing CN HTML parser, with parser-local tests only after effective claim. No live Bing requests, `www.bing.com`/`bing.cn` host admission, permission/default/source/schema/dependency change, real-world ad classifier qualification or E/F/G/I activation. D3/#937 and Epic/#624 remain Open.
+[Owner](active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](../iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **In Progress / Claimed proposed via Draft #948 (ineffective until merge)**, atomic claim/activation still pending. Narrow correction for hand-authored T1/#941 synthetic `b_ad` ancestor false-positive in existing Bing CN HTML parser, with parser-local tests only after effective claim. No live Bing requests, `www.bing.com`/`bing.cn` host admission, permission/default/source/schema/dependency change, real-world ad classifier qualification or E/F/G/I activation. D3/#937 and Epic/#624 remain Open.
 
 ## SEARCH-001-D3-T1 / #941 — Bing synthetic negative conformance (owner-first closeout)
 
