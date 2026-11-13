@@ -9,7 +9,7 @@
 
 | Issue | Summary | Owner | Owner Status | Disposition |
 |---|---|---|---|---|
-| [#937](https://github.com/wjhuang88/talos/issues/937) | Bing same-family direct-HTML multi-endpoint research | [SEARCH-001-D3](../backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) | Intake / Proposed / Unclaimed | Source/authority-only feasibility; 2026 Microsoft Bing/MSN product-use rights BLOCKED, live endpoint/region UNKNOWN; no executable claim, new default, or provider admission. Parent #624 Open. |
+| [#937](https://github.com/wjhuang88/talos/issues/937) | Bing same-family direct-HTML multi-endpoint research | [SEARCH-001-D3](../backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) | Active / Claimed proposed (ineffective until #942 merge) | D3.1 documentary #938 merged `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`; I326 D3.2 bounded *synthetic test-only* governance #942 proposed. Live automated Bing rights and endpoint/region remain BLOCKED/UNKNOWN; no new default, source admission or production code. Parent #624 Open. |
 | [#901](https://github.com/wjhuang88/talos/issues/901) | Eliminate legacy rust-websearch build dependency without admitting providers | [SEARCH-001-L](../backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) | Complete / Closed | I319 claim/ADR-085 A1 via #902, independent oracle #904, implementation #907 merged `3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970` after exact-head CI4121 8/8 and independent review/CAS. Documentation closeout is pending acceptance; parent #624 and E/F/G/I remain separate. |
 | [#853](https://github.com/wjhuang88/talos/issues/853) | Model-selectable process memory limit (handoff T6) | [PROCESS-001](../backlog/active/PROCESS-001-model-process-memory-limit.md) | In Progress / proposed activation | I316 claim #854 and ADR-098 design reviewed; finalized atomic claim and target merge required before implementation. |
 | [#848](https://github.com/wjhuang88/talos/issues/848) | Hosted keyless MCP admission triage | [SEARCH-001-D2](../backlog/active/SEARCH-001-D2-keyless-mcp-admission.md) | Intake / Unclaimed | Proposed canonical research intake in PR #849; Exa/Parallel BLOCKED, no provider admission, effective claim or implementation authority. |
@@ -99,6 +99,8 @@
 | [#923](https://github.com/wjhuang88/talos/issues/923) | TUI performance and native acceptance residual | [TUI-PERF-001](../tasks/2026-11-10-tui-render-performance.md) | Review / Claimed | Stage implementation #922 merged; original performance and native acceptance remain required. |
 
 ## Synchronization Notes
+
+2026-11-13 I326 proposal: D3.1 research intake #938 merged and Issue #937 remains Open. Proposed #942 atomically claims *only* offline synthetic test characterization; this row describes the proposed branch state and gains no authority until governance #942 merges. Preserve prior D3.1 status receipts and all historical D/#644 ZERO-ADMISSION and parent #624 blockers.
 
 2026-11-13: Registered new SEARCH-001-D3 / #937 as Intake / Proposed / Unclaimed with canonical owner and source/fixture evidence. This is a *new* registration, not a 2026-09-30 fact, and does not activate or modify native search providers or parent SEARCH-001/#624.
 
