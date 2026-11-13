@@ -739,6 +739,57 @@ impl Sources {
         Ok(expansion.records)
     }
 
+    /// Adapt a fully admitted, gix-parsed configuration source graph to the
+    /// legacy host-output format consumed by existing effect interpretation.
+    ///
+    /// This function is pure: every byte originates from previously admitted
+    /// `Sources` snapshots, and it never launches Git or accesses the host.
+    /// The caller must still prove that the ordered root paths match the
+    /// selected system Git installation before using the output for authority.
+    /// Until ADR-089 is amended this is a T1a candidate, not a discovery hook.
+    pub(super) fn ordered_host_output(
+        &self,
+        roots: &[std::path::PathBuf],
+        environment: &std::collections::BTreeMap<std::ffi::OsString, std::ffi::OsString>,
+        gitdir: Option<&std::path::Path>,
+    ) -> Result<Vec<u8>, GitToolError> {
+        const MAX_OUTPUT_BYTES: usize = 256 * 1024;
+        let mut output = Vec::new();
+        for (origin, record) in self.ordered_records(roots, environment, gitdir)? {
+            let origin = origin.to_str().ok_or_else(invalid_config)?;
+            if origin.as_bytes().contains(&0) || origin.as_bytes().contains(&b'\n') {
+                return Err(invalid_config());
+            }
+            if record.key.contains(&0) || record.key.contains(&b'\n') {
+                return Err(invalid_config());
+            }
+            let value = record.value.as_deref();
+            if value.is_some_and(|value| value.contains(&0)) {
+                return Err(invalid_config());
+            }
+            let len = b"file:".len()
+                + origin.len()
+                + 1
+                + record.key.len()
+                + usize::from(value.is_some())
+                + value.map_or(0, <[u8]>::len)
+                + 1;
+            if output.len().checked_add(len).is_none_or(|size| size > MAX_OUTPUT_BYTES) {
+                return Err(invalid_config());
+            }
+            output.extend_from_slice(b"file:");
+            output.extend_from_slice(origin.as_bytes());
+            output.push(0);
+            output.extend_from_slice(&record.key);
+            if let Some(value) = value {
+                output.push(b'\n');
+                output.extend_from_slice(value);
+            }
+            output.push(0);
+        }
+        Ok(output)
+    }
+
     fn expand(
         &self,
         path: &std::path::Path,
