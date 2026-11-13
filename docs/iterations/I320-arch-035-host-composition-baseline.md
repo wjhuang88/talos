@@ -120,3 +120,9 @@ I319 search legacy dependency retirement has a separate proposed claim; I318 TUI
 - Required architecture/API review and maintainer acceptance for E1 are pending. Do not treat docs-only CI as runtime behavior conformance.
 - STORE-002/#670 remains the sole contract owner and has not published accepted implementation seams at this checkpoint.
 - No Completion Commit is claimed for #897. I320 may close only for its independently accepted documentation slice; #897 remains open through E2/E4.
+
+## E1 dependency recheck checkpoint — 2026-11-13
+
+Within the existing effective I320 E0/E1 claim #905, source-truth was rechecked after upstream STORE-002 progress. Accepted A/B PR #909 and C PR #912 (`3df409ef9ed707756350f2c7d4b2c8819f157222`) now supply a typed capability taxonomy and domain-owned persistence contracts with existing-store forwarding. I322 C closeout #930 merged as `a07b466d5aa2a03fb841cdcb918cd4968c778942`; governance-only D activation #932 merged as `e49ccde70556403a9d7b66551565e2b6c81ad32d`. Neither D implementation nor E local host composition/F parity is asserted here.
+
+The E1 proposal has been reconciled against these accepted boundaries; its decision remains **Proposed** pending independent architecture/API review and the remaining applicable STORE-002 operational evidence. The E0 baseline's original source-date and unexecuted-test qualifications are preserved. This checkpoint changes no runtime, public API, default SQLite/TLOG/JSONL/FTS5 implementation, migration or permission behavior; the ARCH-035 Story remains Review / Claimed and **E2/E3 remain unauthorized**. A future implementation claim must be independently established.

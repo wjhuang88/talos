@@ -106,3 +106,14 @@ Record acceptance on this Story with exact evidence and update #142/#361/#360 be
 - `docs/backlog/active/SERVER-001-C-standalone-server-host-composition.md`
 - `docs/reference/RUNTIME-SDK-CONTRACT.md`
 - `crates/talos-runtime/src/lib.rs`, `crates/talos-session/src/store.rs`, `crates/talos-session/src/manager.rs`
+
+## E1 contract-dependency reconciliation — 2026-11-13 (review candidate only)
+
+This is a continuation of the **existing effective I320 E0/E1 documentation claim #905**, not an E2/E3 implementation claim or a new architecture decision. It preserves the Story's **Review / Claimed** status and leaves all acceptance checkboxes unclosed.
+
+- STORE-002 / #670 I321 A/B capability *metadata* foundation is accepted via implementation PR #909 (`a9914b7a62b0873027997c69d9966d17f3fd48ba`). The metadata registry is **not** evidence of a bound operational backend.
+- I322 C domain-owned contracts and existing-store direct forwarding are accepted via implementation PR #912 (**`3df409ef9ed707756350f2c7d4b2c8819f157222`**), with bounded closeout PR #930 merged (`a07b466d5aa2a03fb841cdcb918cd4968c778942`). These contracts are available for architecture review but have **not** rewired current production host constructors.
+- I325 D *claim/activation*, not D implementation, became effective on governance PR #932 merge (`e49ccde70556403a9d7b66551565e2b6c81ad32d`). D owns proof of local operational delegation; #670 E owns local default composition; F owns broad storage equivalence. ARCH-035 must not absorb those slices.
+- The [E1 proposal](../../proposals/arch-035-host-composition-boundary.md) now carries a contract-aware no-duplication review matrix and explicit acceptance conditions. It remains **Proposed / non-binding**, with no independently accepted public runtime injection signature, no new ADR number and no production source change.
+
+**Next ARCH-035 gate:** independently review E1 ownership/API placement against I322 C and the eventual accepted I325 D / STORE-002 E host-facing composition, then record a defensible accepted decision or no-op integration disposition. E2/E3 require their own effective claim after usable accepted upstream integration evidence. No `talos-server` behavior or SQLite-free binary is implied by this checkpoint.
