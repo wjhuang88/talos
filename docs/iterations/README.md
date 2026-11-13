@@ -2,7 +2,7 @@
 
 ## I327 / SEARCH-001-D3-T2 — proposed sponsored-ancestor correction
 
-[I327](I327-search-bing-sponsored-ancestor-rejection.md) / [owner](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Planned / Unclaimed** pending atomic claim. Limit to existing Bing CN `b_ad` ancestor filter and synthetic parser regression after T1/#941 completed. No live Bing, endpoint permission, provider identity, or parent #624 acceptance change.
+[I327](I327-search-bing-sponsored-ancestor-rejection.md) / [owner](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Active / Claimed proposed via #948 (ineffective until merge)** pending atomic governance activation. Limit to existing Bing CN `b_ad` ancestor filter and synthetic parser regression after T1/#941 completed. No live Bing, endpoint permission, provider identity, or parent #624 acceptance change.
 
 ## I326 / SEARCH-001-D3-T1 — Complete / Closed upon owner-first closeout
 
