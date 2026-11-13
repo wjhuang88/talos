@@ -1,6 +1,6 @@
 # ADR-104: Domain-owned persistence and cross-host runtime composition
 
-**Status**: Accepted **only upon reviewed PR #936 merge to main** (placement/ownership rule; no approved injection API, runtime behavior, binding or E2/E3 implementation). Before merge this is a proposed acceptance candidate.
+**Status**: Accepted — effective on reviewed [PR #936](https://github.com/wjhuang88/talos/pull/936) merge `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`, **ownership/placement only**; no approved injection API, runtime behavior, binding or E2/E3 implementation.
 **Date**: 2026-11-13
 **Owner**: ARCH-035 / #897, I320 E1, effective documentation/architecture claim #905
 **Existing accepted constraints**: ADR-042 durable embedded Session boundary; STORE-002 / #670 I321 A/B and I322 C
@@ -50,3 +50,9 @@ A separate exact-head independent architecture/API review, docs CI with both gov
 ## Consequences and implementation gate
 
 The system keeps one authoritative runtime semantics path with host-selectable **future** assembly. This may leave existing CLI and embedded construction distinct until E2 proves an exact delegation point; forcing premature unification is rejected. Missing D/E composition or negative-case/SDK conformance remains a deliberate, explicit blocker. A future public API or storage implementation change requires its own reviewed evidence and may amend this ADR when new facts warrant it.
+
+## Acceptance receipt — effective 2026-11-13
+
+The conditional decision above **became Accepted** with merge of [#936](https://github.com/wjhuang88/talos/pull/936), commit `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`. Exact candidate head `3fd1b7176901832717b692202512dadb7364391f`; [CI #4173](https://github.com/wjhuang88/talos/actions/runs/43365335816) overall Success in doc-reduced mode with both governance validators 0 warnings; [Copilot read-only exact-head review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843928194) no architecture/status blockers; [single-maintainer review/CAS record](https://github.com/wjhuang88/talos/pull/936#issuecomment-6852726331) explicitly notes no separate human reviewer. That record separately disclosed one **failed** remote Issue reconciliation job caused by unrelated new #937; the mismatch was later fixed in SEARCH-001-D3 [#938](https://github.com/wjhuang88/talos/pull/938), merge `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`. This is not a retroactive pass of the historical #936 job.
+
+The earlier conditional/proposal review text in this ADR is historical evidence predating #936 merge. Acceptance is **not** an API/runtime/SQLite-free/equivalence acceptance, does not satisfy STORE-002 D/E/F, and does not authorize E2/E3 or #361 ServerHost. I320 E0/E1 documentary work has a separate owner-first closeout; the parent #897 remains open.
