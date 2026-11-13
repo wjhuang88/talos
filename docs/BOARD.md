@@ -5,6 +5,10 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 # Talos Board
 
+## SEARCH-001-D3-T2 / I327 — proposed explicit sponsored-ancestor correction
+
+[SEARCH-001-D3-T2](backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Ready / Unclaimed (proposed atomic governance activation)** after T1/#941 Complete/Closed. Scope: localized `b_ad` ancestor exclusion in the existing response-only Bing parser, hand-authored synthetic positive/negative regressions; no real Bing, new hosts, network permission, SearchRouter default, provider count or rights assumption. Existing I324/I325 and other owners remain separate. No code until claim effective on main.
+
 ## SEARCH-001-D3-T1 / I326 — Complete / Closed upon closeout merge
 
 [SEARCH-001-D3-T1](backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): claim [#943](https://github.com/wjhuang88/talos/pull/943) merged; bounded test implementation [#944](https://github.com/wjhuang88/talos/pull/944) merged at Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606` after exact-head CI43428872719 8/8, independent review and CAS. Five synthetic-only cases characterize ad/organic false positive, DOM drift, unadmitted new Bing hosts and root-reachability/query-403 distinction. Parser false-positive **not fixed**; new Bing hosts, real regional reachability or provider rights not admitted. #937/#624 remain Open; #941 close only after owner-first record merges.
