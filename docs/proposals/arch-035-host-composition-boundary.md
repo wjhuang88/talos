@@ -1,6 +1,6 @@
 # ARCH-035: Proposed host composition decision (I320 E1)
 
-> Status: Non-binding proposal — not accepted; governance claim PR #905. ADR number to be allocated at E1 acceptance, avoiding existing ADR-095.
+> Status: Historical, non-binding E1 proposal from 2026-11-10; formal ownership/placement decision is now tracked as ADR-104 (proposed at this checkpoint). Public injection API remains undecided.
 > Date: 2026-11-10
 > Owner: ARCH-035 / #897
 > Dependency: STORE-002 / #670 (unclaimed at preparation time)
@@ -89,4 +89,8 @@ The proposed direction is intentionally **conditional**, rather than naming a sp
 - Is an **additive** public API genuinely necessary, or can the accepted upstream assembly be reused with no new API? Identify the exact implementation caller and current tests before selecting a signature.
 - Which negative-path, replay/restart, SDK fixture and native CI results must be frozen as before/after evidence for a future E2/E4 claim?
 
-**Disposition at this checkpoint:** E1 stays Proposed, no ADR allocated, and the cross-host API choice stays open. I322 C supplies real domain contracts, but #932 supplies **authorization for D**, not its passing implementation. E2/E3 remain blocked on accepted usable upstream composition and an independent governed ARCH-035 implementation claim.
+**Historical disposition at the 2026-11-13 dependency-recheck checkpoint (before ADR-104 was created):** E1 placement remained Proposed with no ADR allocated *at that time*, and the cross-host API choice stayed open. I322 C supplies real domain contracts, but #932 supplies **authorization for D**, not its passing implementation. E2/E3 remain blocked on accepted usable upstream composition and an independent governed ARCH-035 implementation claim.
+
+## Formal decision candidate cross-reference — 2026-11-13
+
+[ADR-104](../decisions/104-host-composition-ownership-boundary.md) is now a **Proposed** E1 ownership and host-composition placement decision. This original proposal and I320 E0 source inventory remain review evidence; they do not by themselves accept ADR-104 or approve a concrete RuntimeBuilder host injection signature. E2/E3 stay gated on #670's separately accepted D/E operational outputs and a separately effective implementation claim.
