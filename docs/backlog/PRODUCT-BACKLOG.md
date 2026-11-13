@@ -4,9 +4,9 @@
 
 [GIT-COMPAT-001](active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](../iterations/I324-git-236-preflight-compatibility.md): **In Progress / Claimed proposed** by [#920](https://github.com/wjhuang88/talos/pull/920), ineffective until target merge. Bounded gix-native preflight replacing Git CLI inspection only. Existing snapshot capacity, ADR-089 authorization and TUI approval owners do not transfer.
 
-## STORE-002 / I322 C — domain contracts in review
+## STORE-002 / I322 C — Complete / Closed; D/E/F pending
 
-[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I322](../iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B complete via #909 (`a9914b7`), I322 C governance claim #911 merged (`60da1bb`). Candidate adds only domain-owned operational traits and direct existing-store forwarding for Session Pending/Todo, Memory, Evolution, Exploration. CI, independent public API review and merge remain pending; no new engine, SQL/schema/format changes or Host composition. D/E/F and #897 E2/E3 blocked.
+[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I322](../iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed in #909; C [implementation #912](https://github.com/wjhuang88/talos/pull/912) merged `3df409ef9ed707756350f2c7d4b2c8819f157222`, exact-head [CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) applicable checks and both validators passed, independent API/doc review and CAS no blockers. Existing Session Pending/Todo, Memory, Evolution, Exploration implementations now expose minimal domain-owned contracts by direct forwarding, without provider readiness or consumer/SQL/schema/format changes. C claim released; D/E/F and #897 Host remain separately gated. Global closed #901 reconciliation is an ADR-071 residual. Parent #670 remains Open.
 
 ## ARCH-035 / I320 — E0/E1 Review (PR #906)
 
