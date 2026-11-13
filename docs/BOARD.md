@@ -57,13 +57,12 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
   caching and incremental history are delivered. Full local preflight passed (5317 tests),
   MSVC xwin and exact-head Linux/Windows code CI passed; independent Agent code review approved.
   Focused resize/heap evidence is archived; baseline concurrent-input resize P95 fails.
-  Candidate `f725b74b` (PR #929) and local bounded-scan correction `293ce0a2` each pass
-  three Debug and three Release resize/input budget rounds;
-  macOS CI long-history source-binding failure blocks merge. Final delivery gates,
-  Debug transcript 479ms tail and native/resource acceptance stay open in #923.
-  Corrected sampler resize coverage passes570/570; finite heap allocation-path
-  attribution passed independent evidence review (finite observation only). Basic Ghostty operations and Git display
-  passed maintainer retest; missing platforms are not passed.
+  Follow-up PR #929 merged as `a8dc7fb0`, exact candidate `4d9e5cfc`; code CI
+  `43360750041` and independent Agent review passed. Bounded scan passes three
+  Debug and three Release resize/input rounds. Corrected heap coverage570/570
+  and finite allocation-path evidence are archived. Original Debug479ms tail
+  and native/resource/platform acceptance remain open in #923. Basic Ghostty
+  operations and Git display passed maintainer retest; missing platforms are not passed.
   Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001

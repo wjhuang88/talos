@@ -9,24 +9,25 @@ its own source receipt; earlier measurements do not automatically cover later ch
 
 ## Current follow-up checkpoint — 2026-11-13
 
-The historical table below describes earlier candidates. Current local runtime is
-`293ce0a2` (bounded segment scan), following `f725b74b`; remote PR #929 still
-contains `cef024a1`. Original implementation stage #922 is merged. This checkpoint
-supersedes current-state claims below without erasing their historical evidence.
+The historical table below describes earlier candidates. Runtime source is
+`293ce0a2`; published candidate `4d9e5cfc` merged through PR #929 as `a8dc7fb0`.
+This checkpoint supersedes current-state claims below without erasing history.
 
 | Gate | Current authoritative evidence | Still required |
 |---|---|---|
-| Resize/input, 10,000 entries | Three valid Debug rounds pass150/200ms; three Release rounds pass100/150ms for bounded candidate; [raw evidence](bounded-segment/README.md) | Final-source delivery gates |
-| Wrapped/zero-width segments | Independent old-function equality across six widths; three alternating microbenchmark pairs at opt0/3;43 focused tests | Microbenchmark is not whole-workload CPU/PSS proof |
-| Other active workloads | Interleaved final transcript CPU/PSS and Release input pass; Debug first round P99 fails479ms | Diagnose frame-preparation long tail; preserve failure and prior evidence |
-| Cache/heap | Final candidate: fixed-history medians flat (coverage mismatch retained); growing-history834B/message,301 updates | Resolve resize coverage mismatch and transcript/projection byte attribution |
-| Native operations | Maintainer reports Ghostty input/IME/image/long-press/resize/selection/generation/Git display passes | Exact binary/resource metadata; deferred manual approval/Git/workspace operations; second terminal; native Windows unavailable |
-| Local gates | Previous5319-test workspace pass and xwin; new43-test projection pass | Standard preflight passed5320 tests and MSVC xwin passed for293ce0a2; remote gate remains separate |
-| Remote gates | CI43341349202 terminal; Windows workspace and Desktop jobs pass | macOS long-history source-binding assertion failed; diagnosis remains unconfirmed. Separate global matrix#901 drift advisory |
-| Publication | Local commitsc386b362,293ce0a2 and test-diagnostic34328646; independent incremental code review approves bounded scan | Archive/commit stable evidence, final review, push and successful exact-head required gates before merge |
+| Resize/input, 10,000 entries | Three Debug rounds pass150/200ms; three Release rounds pass100/150ms; [raw evidence](bounded-segment/README.md) | Native display acceptance remains separate |
+| Wrapped/zero-width segments | Six-width old-function equality, alternating opt0/3 microbenchmarks,43 focused tests | No whole-workload claim from microbenchmarks |
+| Other workloads | Transcript CPU/PSS and Release input pass; original Debug P99 fails479ms | Cause unresolved; later non-reproduction does not erase it |
+| Cache/heap | Corrected sampler570/570 effective size changes; nine flat heap medians; finite transcript200,160B allocation-path attribution; [evidence](sampler-boundary/README.md) | No universal leak-freedom claim; prior569/571 failure retained |
+| Long-tail diagnosis | Procfs short run and [GDB paired frames](frame-breakpoint/README.md);33ms interval contains1majorfault | Original479ms event not captured; no causal proof or production fix |
+| Native operations | Maintainer reports basic Ghostty passes, including Git display | Exact binary/environment/resources; deferred approval/Git/workspace operations; second terminal; native Windows unavailable |
+| Local gates | Runtime293ce0a2 preflight5320passes and MSVC xwin; later diagnostic/sampler focused tests and governance pass | These do not replace native acceptance |
+| Remote gates | Exact4d9e5cfc CI43360750041 all code jobs passed | Global#901 matrix drift remains separate advisory; old macOS failure cause unproven |
+| Publication | PR929 merged as a8dc7fb0; independent exact-head Agent review and single-maintainer CAS recorded | Owner/#923 remain Review/Claimed until full acceptance |
 
-Owner and #923 remain Review; no Complete claim. Native gaps cannot be replaced by
-synthetic PTY, cross-compilation or CI. Full original scope and frozen budgets remain.
+No Complete claim. Original scope and budgets remain; platform gaps cannot be
+replaced by PTY, cross-compilation or CI. Current host inventory has no process
+namedtalos, so no current candidate native resource sample was taken.
 
 ## Historical candidate matrix
 
