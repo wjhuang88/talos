@@ -81,3 +81,61 @@ fn staged_config_roots_start_as_path_only_requests() {
     assert!(requests.contains(&missing_global));
     assert!(sources.captured_paths().next().is_none());
 }
+
+#[test]
+fn gix_admitted_config_graph_can_emit_host_records_without_git() {
+    // The test fixture acts as a separately admitted source; neither
+    // gix nor the adapter chooses roots, reads arbitrary files or runs Git.
+    let dir = tempfile::tempdir().expect("fixture");
+    let root = dir.path().join("root.conf");
+    let included = dir.path().join("included.conf");
+    std::fs::write(
+        &root,
+        b"[core]\n    bare = false\n[include]\n    path = included.conf\n",
+    )
+    .expect("root fixture");
+    std::fs::write(&included, b"[user]\n    name = Test User\n").expect("include fixture");
+
+    let env = BTreeMap::<OsString, OsString>::new();
+    let mut sources = target_config::Sources::new(None, [root.clone()])
+        .expect("path-only initial plan");
+    for _ in 0..3 {
+        if sources.complete() {
+            break;
+        }
+        let admitted = sources.paths();
+        sources
+            .advance(|path| admitted.contains(path), &env)
+            .expect("test-only exact path admission");
+    }
+    assert!(sources.complete(), "every declared include must be admitted");
+    let serialized = sources
+        .ordered_host_output(&[root], &env, None)
+        .expect("pure gix-backed serialization");
+    let parsed = super::config_state::parse_host(&serialized).expect("existing host parser");
+    assert_eq!(
+        parsed.get(b"core.bare".as_slice()).and_then(|values| values.last()),
+        Some(&Some(b"false".to_vec()))
+    );
+    assert_eq!(
+        parsed.get(b"user.name".as_slice()).and_then(|values| values.last()),
+        Some(&Some(b"Test User".to_vec()))
+    );
+    let origin = format!("file:{}", included.display());
+    assert!(
+        serialized.windows(origin.len()).any(|bytes| bytes == origin.as_bytes()),
+        "included records must retain their physical source"
+    );
+}
+
+#[test]
+fn gix_preflight_refuses_unadmitted_config_sources() {
+    let dir = tempfile::tempdir().expect("fixture");
+    let root = dir.path().join("not-admitted.conf");
+    let env = BTreeMap::<OsString, OsString>::new();
+    let sources = target_config::Sources::new(None, [root.clone()]).expect("source plan");
+    assert!(
+        sources.ordered_host_output(&[root], &env, None).is_err(),
+        "pure adapter cannot turn incomplete frontiers into evidence"
+    );
+}
