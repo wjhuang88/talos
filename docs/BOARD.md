@@ -7,7 +7,7 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 ## SEARCH-001-D3 / I326 — proposed offline Bing synthetic characterization
 
-[SEARCH-001-D3 owner](backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) / [I326](iterations/I326-search-bing-synthetic-characterization.md) / [#937](https://github.com/wjhuang88/talos/issues/937): **Ready / Unclaimed; bounded D3.2 test-only claim proposed, ineffective until governance merge**. D3.1 documentation PR #938 merged `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`. Characterize only missing synthetic Bing parser/authority negative cases, no live Bing HTTP, new query host, parser/runtime behavior, default Auto, additional provider, Cargo or permissions. D/#644 ZERO-ADMISSION, E/F/G/I blocked, #624 Open. Existing concurrent GIT/STORE/ARCH/TUI/PROVIDER claims unaffected.
+[SEARCH-001-D3 owner](backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) / [I326](iterations/I326-search-bing-synthetic-characterization.md) / [#937](https://github.com/wjhuang88/talos/issues/937): **Active / Claimed proposed in governance #942, ineffective until that PR merges**. D3.1 documentation PR #938 merged `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`. Characterize only missing synthetic Bing parser/authority negative cases, no live Bing HTTP, new query host, parser/runtime behavior, default Auto, additional provider, Cargo or permissions. D/#644 ZERO-ADMISSION, E/F/G/I blocked, #624 Open. Existing concurrent GIT/STORE/ARCH/TUI/PROVIDER claims unaffected.
 
 ## GIT-COMPAT-001 / I324 — gix-native Git preflight (claim proposed)
 
