@@ -1,6 +1,6 @@
 # SEARCH-001-D3: Bing Direct-HTML Multi-Endpoint Feasibility
 
-**Status**: Intake / Proposed / Unclaimed — no source, default-route, or provider admission
+**Status**: Ready / Unclaimed — D3.1 documentary intake merged (#938, `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`); D3.2 *synthetic test-only* claim proposed, not effective until separate governance merge. No live endpoint or provider admission.
 
 | Field | Value |
 |---|---|
@@ -10,7 +10,7 @@
 | Source Issue | [#937](https://github.com/wjhuang88/talos/issues/937) |
 | Predecessor | [SEARCH-001-D / #644](SEARCH-001-D-provider-evidence-gate.md), Complete / Closed **BLOCKED / ZERO-ADMISSION** |
 | Sibling | [SEARCH-001-D2 / #848](SEARCH-001-D2-keyless-mcp-admission.md), independent unclaimed Exa/Parallel hosted MCP research |
-| Selected Iteration | None |
+| Selected Iteration | [I326](../../iterations/I326-search-bing-synthetic-characterization.md) — proposed, not effective until governance claim merge |
 | Evidence and acceptance | [D3 Bing direct HTML source/contract packet, 2026-11-13](../../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md) |
 
 ## Collaboration Claim
@@ -23,12 +23,12 @@
 | Work Slice | None — research-only intake, not an implementation claim |
 | Claimed At | Not applicable |
 | Source Issue | #937 |
-| Governance Claim PR | Not applicable — documentation intake only |
+| Governance Claim PR | Pending — D3.2 atomic claim + activation proposal |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
-| Implementation PR | None |
+| Implementation PR | Not started — D3.2 requires effective claim first |
 | Last Updated | 2026-11-13 |
-| Handoff / Release Condition | No live automated Bing SERP acquisition, new endpoint, test code, default-routing or provider admission until appropriate rights and an effective, independently reviewed owner/iteration claim. |
+| Handoff / Release Condition | D3.2 synthetic-only test code starts only after effective governed claim; new live automated Bing SERP acquisition, endpoint additions, default routing or provider admission remain blocked on separately resolved use/output rights, ADR-090 and independent security/API approval. |
 
 ## Identity, goal and user value
 
@@ -115,11 +115,26 @@ claim and explicit rights decision are mandatory before live acquisition.
   without claiming live or Chinese-network proof.
 - [x] Multi-surface same-family design and offline test plan published with source dates.
 - [x] Blocking gate, rollback and negative permissions/default-route implications explicit.
-- [ ] Documentary PR reviewed and exact-head governance CI accepted; no implementation
-  `Completion Commit` claimed for intake publication.
+- [x] Documentary D3.1 [PR #938](https://github.com/wjhuang88/talos/pull/938) merged `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4` after exact-head [CI43424338312](https://github.com/wjhuang88/talos/actions/runs/43424338312) success and independent read-only no-blocker review; no implementation Completion Commit claimed.
 - [ ] Any later offline executable tests, authorized live observation or production change
   separately selected, claimed, reviewed and tested. This checkbox does not block
   publishing the intake; it blocks upgrading the technical decision.
+
+## D3.1 publication checkpoint — 2026-11-13
+
+Documentation-only intake #938 is merged as `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`, with exact-head CI43424338312 successful and no-blocker source/ADR/governance review. This is **not** D3 provider admission, executable test evidence, genuine Bing endpoint observation or mainland-China quality acceptance. Issue #937 remains Open. The D3.1 documentary decision stays BLOCKED for new automated distributed-default service/result use.
+
+## D3.2 proposed bounded work slice — test-only, NOT effective until governance merge
+
+[Iteration I326](../../iterations/I326-search-bing-synthetic-characterization.md) proposes **one independently testable offline characterization increment**, separate from D3.1 and from E/F/G/I. The scope is *only* Talos-authored synthetic responses and in-memory/loopback controlled transport tests against already accepted contracts; **no actual Bing query, contact with `www.bing.com`/`cn.bing.com`/`bing.cn`, or captured upstream markup**.
+
+1. **Inventory first**: compare BF-01..BF-13 against existing tests in `search_backend/bing_parser/tests.rs`, `transport/compatibility` and prepared authority fixtures. Reuse existing selectors/count/status/encoding/limits coverage rather than duplicating it. Publish explicit covered/uncovered/blocked evidence.
+2. **Fill only uncovered negative test gaps**: synthetic ad/navigation decoys that must not be mistaken for organic `li.b_algo` rows, 200 valid-vs-empty-vs-challenge classification, local response and redirect-host denial before permitted send, root-reachable-vs-query-unusable health *as characterization* (without production probes or health routing changes), cancellation and source identity protection.
+3. **Strict boundary**: changes confined to `#[cfg(test)]` modules or test-only fixtures and evidence docs; do not change runtime parser, `SearchRouter`, URL allowlist, manifest, host selection, query order, permissions, remote provider, Cargo, dependencies or model-facing schema. A failing test demonstrating an existing limitation may remain documented/owned; do not silently redesign production behavior to make it pass.
+4. **Validation**: repository-pinned `cargo fmt --all -- --check`, `cargo test -p talos-tools --features network --locked` with focused filters (or current correct Cargo commands), relevant check/Clippy/workspace tests, native applicable CI, governance validators and independent exact-head review. Record exact executed test counts and pre-existing unrelated failures transparently.
+5. **Decision**: publish proof of covered local behavior, unresolved parser false-positive/health-model risks and any future remediation as a separate authorized scope; do not treat synthetic tests as proof of Bing terms, live SERP compatibility, server reachability or a second independent zero-key provider.
+
+**Activation prerequisite:** D3.1 #938 is accepted, but the I326 claim is merely proposed until the governance-only PR containing a complete `Claim State: Claimed`, `Active` iteration and exact PR number merges into `main`. No code/test implementation before then. If the governance claim is rejected, D3 remains Ready/Unclaimed and the existing baseline is unchanged.
 
 ## State/status owners and rollback
 
