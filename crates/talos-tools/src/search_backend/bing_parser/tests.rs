@@ -436,7 +436,10 @@ fn synthetic_nested_sponsored_rows_do_not_consume_result_slots() {
     assert_eq!(rows[0].snippet, "First");
     assert_eq!(rows[1].url, "https://two.invalid/");
     assert_eq!(rows[1].snippet, "Second");
-    assert!(rows.iter().all(|r| r.backend == SearchBackendId::DuckDuckGo));
+    assert!(
+        rows.iter()
+            .all(|r| r.backend == SearchBackendId::DuckDuckGo)
+    );
     assert_eq!(results(&html, 1)[0].url, "https://one.invalid/");
 }
 
