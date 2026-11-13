@@ -9,9 +9,9 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 
 [I324](I324-git-236-preflight-compatibility.md) / [GIT-COMPAT-001](../backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): governance-only proposed [claim #920](https://github.com/wjhuang88/talos/pull/920), ineffective until merge. Native Windows Git 2.36 compatibility and independently reviewed unchanged prepared authorization are required; GIT-SNAPSHOT-001 and other Review/Active owners remain separate.
 
-## I322 / STORE-002 C — Review / Claimed
+## I322 / STORE-002 C — Complete / Closed
 
-[I322](I322-store-002-domain-contract-extraction.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance claim #911 merged as `60da1bbadca00c9bdee6fbcb8f5ad990a4313331`; C implementation candidate declares minimal existing-domain traits for Session Pending/Todo, Memory, Evolution and Exploration, with no caller/SQL/schema/Host changes. **Exact-head CI and independent API review pending**. A/B completed in #909; D/E/F and #897 E2/E3 remain gated.
+[I322](I322-store-002-domain-contract-extraction.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance #911 `60da1bb` and [implementation #912](https://github.com/wjhuang88/talos/pull/912) completion commit `3df409ef9ed707756350f2c7d4b2c8819f157222`. [Exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) scoped jobs and both validators passed; independent public API review and CAS no blockers. Old SessionStore reused; Pending/Todo, Memory, Evolution and Exploration domain contracts added with unchanged stores/callers. Advisory remote closed #901 owner-matrix drift retained; no new provider. I322 C closed; D/E/F and #897 Host remain separately gated and #670 Open.
 
 ## I321 / STORE-002 A/B — Complete / Closed (bounded slice)
 

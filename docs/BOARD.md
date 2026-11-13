@@ -21,9 +21,9 @@ process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing
 on Git 2.36.1; [gix-assisted compatibility](proposals/gix-preflight-system-git-compatibility.md)
 is a proposal, not an activated repair. Owner statuses and manual/native residuals remain unchanged.
 
-## STORE-002 / I322 C — domain contract implementation Review / Claimed
+## STORE-002 / I322 C — Complete / Closed; parent #670 Open
 
-[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I322](iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed via #909 merge `a9914b7a62b0873027997c69d9966d17f3fd48ba`. I322 C claim #911 merged `60da1bbadca00c9bdee6fbcb8f5ad990a4313331`; a bounded Rust candidate extracts domain-owned Session Pending/Todo, Memory, Evolution and Exploration traits with existing concrete delegation and no runtime consumer migration. **C implementation pending exact-head CI and independent API review**; D/E/F and #897 E2/E3 remain gated. Search/TUI/Git/Windows owners untouched.
+[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I322](iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed via #909 `a9914b7`; C claim #911 merged `60da1bb`, implementation [#912](https://github.com/wjhuang88/talos/pull/912) merged `3df409ef9ed707756350f2c7d4b2c8819f157222` after [exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758), both governance validators, independent no-blocker API/doc review and merge CAS. Minimal domain-owned Session Pending/Todo, Memory, Evolution and Exploration traits forward to unchanged stores with no runtime/SQL/schema/Host changes. Global closed #901 Issue-matrix warning is separate ADR-071 advisory, not a passed job. **I322 C complete; D/E/F unclaimed, #897 E2/E3 gated, #670 Open.**
 
 ## ARCH-035 / I320 — E0/E1 Review (PR #906)
 
