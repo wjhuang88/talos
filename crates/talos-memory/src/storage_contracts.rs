@@ -115,4 +115,68 @@ mod tests {
         assert_eq!(contract.count().expect("count"), 0);
         assert!(contract.get("absent").expect("lookup").is_none());
     }
+
+    #[test]
+    fn local_sqlite_trait_delegates_add_only_provenance_fts_and_graph() {
+        let mut store = MemoryStore::open_memory().expect("memory store");
+        let contract: &mut dyn MemoryPersistence = &mut store;
+        let now = chrono::Utc::now();
+        let item = MemoryItem {
+            id: "d-memory-1".into(),
+            kind: crate::MemoryKind::Semantic,
+            key: "delegation".into(),
+            content: "Delegation preserves provenance and evidence".into(),
+            confidence: 0.9,
+            created_at: now,
+            last_reinforced: now,
+            last_accessed: None,
+            contradiction_ref: None,
+        };
+        assert!(contract.insert(item.clone()).expect("insert"));
+        assert!(!contract.insert(item).expect("dedup"));
+        assert_eq!(contract.count().expect("count"), 1);
+        contract
+            .insert_evidence(EvidenceLink {
+                id: "d-evidence".into(),
+                memory_id: "d-memory-1".into(),
+                source_type: "session".into(),
+                source_ref: "d-session".into(),
+                created_at: now,
+            })
+            .expect("evidence");
+        let results = contract.retrieve("delegation provenance", 2).expect("fts");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].item.id, "d-memory-1");
+        assert_eq!(results[0].evidence[0].source_ref, "d-session");
+
+        for id in ["d-node-a", "d-node-b"] {
+            contract
+                .graph_upsert_node(&GraphNode {
+                    id: id.into(),
+                    kind: "entity".into(),
+                    label: id.into(),
+                    impression_strength: 1.0,
+                    weight: 1.0,
+                    created_at: now,
+                    last_accessed_at: now,
+                    access_count: 0,
+                })
+                .expect("graph node");
+        }
+        contract
+            .graph_upsert_edge(&GraphEdge {
+                source_id: "d-node-a".into(),
+                target_id: "d-node-b".into(),
+                relation_type: "related".into(),
+                weight: 0.9,
+                created_at: now,
+                last_reinforced_at: now,
+            })
+            .expect("graph edge");
+        let related = contract
+            .graph_recall(&["d-node-a"], 2, 0.1, 10)
+            .expect("graph recall");
+        assert_eq!(related.len(), 1);
+        assert_eq!(related[0].node.id, "d-node-b");
+    }
 }
