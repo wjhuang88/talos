@@ -5,8 +5,7 @@
 > **Scope: Talos-authored synthetic tests ONLY.**
 > This is a code-to-test inventory, not a real Bing SERP acquisition,
 > production change, China-region measurement or a Microsoft use-rights approval.
-> Results and exact-head CI must be filled from actual validated test executions
-> before acceptance. D/#644 ZERO-ADMISSION and parent #624 remain unchanged.
+> Validated test implementation: [PR #944](https://github.com/wjhuang88/talos/pull/944), Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606`. [Exact-head CI #43428872719](https://github.com/wjhuang88/talos/actions/runs/43428872719) 8/8 SUCCESS; independent [no-blocker review](https://github.com/wjhuang88/talos/pull/944#issuecomment-6853544090). D/#644 ZERO-ADMISSION and parent #624 remain unchanged.
 
 ## Pre-existing code/test truth — do not duplicate
 
@@ -49,5 +48,5 @@
   no Microsoft permission to embed or redistribute snippets or query,
   and no new live automated Bing request.
 - Existing test-only loopback sockets are local fixtures, not service
-  observations. Exact-head CI results, platform coverage, independent
-  review and final status are **pending** at the initial stage.
+  observations. Exact-head CI43428872719 8/8 SUCCESS and independent
+  read-only review apply only to the **synthetic test slice**; no actual Bing endpoint or product rights validation was performed.
