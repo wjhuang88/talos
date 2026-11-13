@@ -403,11 +403,10 @@ fn synthetic_sponsored_containers_without_organic_rows_do_not_yield_results() {
 }
 
 #[test]
-fn synthetic_sponsored_wrapper_with_b_algo_documents_known_false_positive_gap() {
-    // A sponsored wrapper that *also* contains the legacy organic selector is
-    // indistinguishable to the current parser. Preserve and expose this gap,
-    // rather than treating the selected link as qualified organic search.
-    // No Bing response or third-party HTML was acquired for this fixture.
+fn synthetic_sponsored_wrapper_with_b_algo_is_rejected() {
+    // T1's hand-authored false-positive is now rejected only because its
+    // ancestor explicitly carries the b_ad class, not due to URL keywords.
+    // This fixture is not a captured provider response.
     let disguised = format!(
         r#"<aside class="b_ad">{}</aside>"#,
         row(
@@ -416,10 +415,60 @@ fn synthetic_sponsored_wrapper_with_b_algo_documents_known_false_positive_gap() 
             Some("Not proven organic")
         )
     );
-    let rows = results(&document(&disguised), 3);
-    assert_eq!(rows.len(), 1, "current selector-only behavior");
-    assert_eq!(rows[0].url, "https://sponsor.invalid/");
-    assert_eq!(rows[0].backend, SearchBackendId::DuckDuckGo);
+    assert_eq!(
+        parse(200, document(&disguised).as_bytes(), 3).expect_err("explicit sponsored ancestor"),
+        BingParseError::Empty
+    );
+}
+
+#[test]
+fn synthetic_nested_sponsored_rows_do_not_consume_result_slots() {
+    let sponsored = format!(
+        r#"<aside class="banner b_ad active"><section>{}</section></aside>"#,
+        row(Some("https://ad.invalid/"), "Ad", Some("Sponsored"))
+    );
+    let organic_one = row(Some("https://one.invalid/"), "One", Some("First"));
+    let organic_two = row(Some("https://two.invalid/"), "Two", Some("Second"));
+    let html = document(&format!("{sponsored}{organic_one}{organic_two}"));
+    let rows = results(&html, 2);
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].url, "https://one.invalid/");
+    assert_eq!(rows[0].snippet, "First");
+    assert_eq!(rows[1].url, "https://two.invalid/");
+    assert_eq!(rows[1].snippet, "Second");
+    assert!(rows.iter().all(|r| r.backend == SearchBackendId::DuckDuckGo));
+    assert_eq!(results(&html, 1)[0].url, "https://one.invalid/");
+}
+
+#[test]
+fn synthetic_sponsored_class_matching_is_exact_and_ancestor_only() {
+    // Similar class *substrings* and descendant advertisement decorations do
+    // not turn an otherwise ordinary li.b_algo into an excluded candidate.
+    let similar = format!(
+        r#"<aside class="b_advertisement">{}</aside>"#,
+        row(Some("https://similar.invalid/"), "Similar", None)
+    );
+    let descendant = r#"<li class="b_algo"><h2><a href="https://ordinary.invalid/">Ordinary</a></h2><div class="b_ad">nested decoration</div></li>"#;
+    let html = document(&format!("{similar}{descendant}"));
+    let rows = results(&html, 2);
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].url, "https://similar.invalid/");
+    assert_eq!(rows[1].url, "https://ordinary.invalid/");
+}
+
+#[test]
+fn synthetic_sponsored_rows_skip_invalid_fields_before_bounds_check() {
+    // An explicitly excluded ad must not fail the otherwise valid organic
+    // response due to oversized fields that should never be extracted.
+    let oversized_href = "x".repeat(MAX_FIELD_BYTES + 1);
+    let sponsored = format!(
+        r#"<aside class="b_ad">{}</aside>"#,
+        row(Some(&oversized_href), "Ad", None)
+    );
+    let organic = row(Some("https://valid.invalid/"), "Valid", Some("Safe"));
+    let rows = results(&document(&format!("{sponsored}{organic}")), 1);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].url, "https://valid.invalid/");
 }
 
 #[test]
