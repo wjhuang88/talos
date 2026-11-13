@@ -98,8 +98,8 @@ fn gix_admitted_config_graph_can_emit_host_records_without_git() {
     std::fs::write(&included, b"[user]\n    name = Test User\n").expect("include fixture");
 
     let env = BTreeMap::<OsString, OsString>::new();
-    let mut sources = target_config::Sources::new(None, [root.clone()])
-        .expect("path-only initial plan");
+    let mut sources =
+        target_config::Sources::new(None, [root.clone()]).expect("path-only initial plan");
     for _ in 0..3 {
         if sources.complete() {
             break;
@@ -109,22 +109,31 @@ fn gix_admitted_config_graph_can_emit_host_records_without_git() {
             .advance(|path| admitted.contains(path), &env)
             .expect("test-only exact path admission");
     }
-    assert!(sources.complete(), "every declared include must be admitted");
+    assert!(
+        sources.complete(),
+        "every declared include must be admitted"
+    );
     let serialized = sources
         .ordered_host_output(&[root], &env, None)
         .expect("pure gix-backed serialization");
     let parsed = super::config_state::parse_host(&serialized).expect("existing host parser");
     assert_eq!(
-        parsed.get(b"core.bare".as_slice()).and_then(|values| values.last()),
+        parsed
+            .get(b"core.bare".as_slice())
+            .and_then(|values| values.last()),
         Some(&Some(b"false".to_vec()))
     );
     assert_eq!(
-        parsed.get(b"user.name".as_slice()).and_then(|values| values.last()),
+        parsed
+            .get(b"user.name".as_slice())
+            .and_then(|values| values.last()),
         Some(&Some(b"Test User".to_vec()))
     );
     let origin = format!("file:{}", included.display());
     assert!(
-        serialized.windows(origin.len()).any(|bytes| bytes == origin.as_bytes()),
+        serialized
+            .windows(origin.len())
+            .any(|bytes| bytes == origin.as_bytes()),
         "included records must retain their physical source"
     );
 }
