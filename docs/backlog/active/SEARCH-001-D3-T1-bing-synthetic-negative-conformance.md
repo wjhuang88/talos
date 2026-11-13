@@ -1,6 +1,6 @@
 # SEARCH-001-D3-T1: Synthetic Bing HTML and Unadmitted-Host Negative Conformance
 
-**Status**: Ready / proposed In Progress; **ineffective until governance PR merge**
+**Status**: In Progress / proposed activation through #943; **ineffective until governance PR merge**
 **Type**: Technical test-only Story
 **Parent**: [SEARCH-001-D3 / #937](SEARCH-001-D3-bing-direct-html-feasibility.md); [SEARCH-001 Epic / #624](SEARCH-001-zero-config-global-search.md)
 **Source Issue**: [#941](https://github.com/wjhuang88/talos/issues/941)
@@ -11,15 +11,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed — proposed Claimed; ineffective until reviewed governance PR merge |
+| Claim State | Claimed (proposed in Draft #943; ineffective until merge) |
 | Responsible Actor | @wjhuang88 (proposed) |
 | Executing Agent | ChatGPT / GPT-6 (proposed) |
 | Work Slice | Only native deterministic, Talos-authored synthetic Bing HTML and *negative* prepared-host/permission fixtures in `talos-tools`; add evidence/coverage matrix. **No production code, new endpoint or live provider request** |
 | Claimed At | 2026-11-13 (proposed; no effective claim yet) |
 | Source Issue | #941 |
-| Governance Claim PR | Pending — backfill after Draft PR creation |
+| Governance Claim PR | #943 (Draft; ineffective until merge) |
 | Authorization Mode | Single-maintainer merge (proposed; not effective until accepted) |
-| Authorization Evidence | Maintainer instruction to continue D3 after #938 acceptance; exact-head governance CI and independent review required |
+| Authorization Evidence | User-directed D3 continuation after #938; #943 proposed atomic claim. Exact-head governance CI, independent review and single-maintainer merge CAS remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-13 |
 | Handoff / Release Condition | Activate only after governing PR merges; return to Unclaimed if not accepted. Future rights or new endpoint admission remains separate and blocked. |
