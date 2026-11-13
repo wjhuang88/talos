@@ -83,3 +83,55 @@ This is separate from BG-CONTINUE-001 and the pending TUI requests. Do not switc
 away from background continuation merely to implement this intake. Session todo:
 f260436f-82e8-41b7-9349-5bda7fd77ad5. This document is the durable intake reference;
 no implementation, validation or completion evidence is claimed.
+
+## 2026-11-11 recovered requirement and implementation preparation
+
+The exact user request was recovered from preserved original record
+`4aa554e9-45ad-4d82-a595-66107680822a`: retain a few previous judgments and results,
+including results after asking a human, and send that small history to the model as
+judgment material. This resolves the later handoff-summary ambiguity: a UI-only log
+does not meet the requirement. No new user confirmation is necessary for that purpose.
+The low-auto-rate investigation is separately requested in original record
+`7b523388-9993-4603-9b90-61993e7af1b9`.
+
+Proposed concrete lifecycle for the implementation review:
+
+- Eight entries, at most 1024 serialized UTF-8 bytes per entry and 8192 bytes for the
+  complete serialized history envelope. Evict oldest entries before insertion;
+  enforce limits after escaping/serialization, never by Unicode character count alone.
+- Live resolver/session memory only; no disk persistence. A different session, resume
+  into a new resolver, fork or explicit auto reset starts empty. Rebinding must also
+  invalidate pending update tokens, even if an older session ID is later reused.
+- Each admitted review gets a monotonic local correlation token and generation.
+  Capture the prior-history snapshot before inserting the current pending entry.
+  Delayed human results update only that token in that generation; eviction never
+  creates an auxiliary retained pending map or resurrects the entry.
+- Retain a bounded sanitized tool/action description, available public effect summary
+  and decision points, model decision/category, and independently attributed human
+  Pending/Allowed/Denied/Cancelled/Unavailable. Do not retain hidden reasoning, raw
+  provider errors, complete arguments, command output or reusable permission grants.
+- Cancellation/drop must finalize the matching pending human outcome without treating
+  cancellation as denial or permission. Completed model decisions remain attributable
+  if later human work is cancelled. An unavailable lock/history yields no history and
+  retains the existing permission/fallback behavior.
+- Include the envelope as untrusted reference data in every supported auto-review
+  provider request, explicitly saying it is neither instructions nor authorization.
+  Existing exact-current-request digest/revision checks and explicit human checkpoints
+  remain mandatory. History must not add tools, retries or new model authority.
+
+Current integration inventory: resolver entrypoints include ordinary execution context,
+file mutation, built-in invocation, network and prepared command; provider payload builders
+are split across `auto_resolver.rs` and five child modules. Last-report notification alone
+is insufficient: it lacks human outcome correlation and some bypass reports only notify.
+The human result must be observed around the actual fallback future, and model explanations
+must come from validated/sanitized public response fields. A single shell-only patch or
+last-report ring would not satisfy this proposal.
+
+Required regression matrix: each provider request family receives prior bounded history;
+same-ID concurrent requests cannot cross-update; late results after eviction/rebind/reset
+are ignored; cancellation differs from denial; secrets/control characters are excluded;
+oversized/multibyte/JSON-escaped input remains bounded; explicit Ask and Deny retain their
+existing behavior with hostile previous Allow entries; schema/digest/expiry checks remain
+effective. Real fallback oneshots and captured actual provider messages must supplement
+container unit tests. Independent security review and an effective owner claim are still
+required before implementation delivery; this preparation does not claim activation.
