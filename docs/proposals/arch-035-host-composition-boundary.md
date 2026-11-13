@@ -54,3 +54,39 @@ No runtime implementation or test result is asserted by this proposal.
 5. Which operations cannot be transparently injected (e.g., session ownership, migration/reset, generation fencing, cross-resource durability)? **Must be explicitly documented**; no generic CRUD facade or fictional atomicity.
 
 Status remains Proposed until required independent API/architecture review and explicit maintainer acceptance. The nonbinding E0 inventory may be acknowledged separately; it does not unblock E2/E3.
+
+## I320 E1 dependency review update — 2026-11-13 (non-binding)
+
+This is a follow-up within claim #905 / ARCH-035 E0/E1, not an ADR acceptance, approved SDK signature, runnable conformance result or E2/E3 authorization. The original 2026-11-10 read-only E0 inventory remains its **historical baseline**. Subsequent STORE-002 progress must not be retroactively attributed to that inventory.
+
+### Accepted upstream evidence and remaining boundaries
+
+| Concern | Current accepted artifact | ARCH-035 permitted use / remaining gate |
+|---|---|---|
+| Seven capability categories | STORE-002 A/B PR #909, merge `a9914b7a62b0873027997c69d9966d17f3fd48ba` | Classification/registry is metadata, **not** executable storage injection. No second capability registry. |
+| Session transcripts | Existing `talos-session::SessionStore` for TLOG/JSONL | Preserve file-oriented contract, SessionManager authority, durable turn and recovery rules. Do not recast it as a database-neutral repository. |
+| Session custody / Todo | I322 C PR #912, merge `3df409ef9ed707756350f2c7d4b2c8819f157222` | Reuse domain-owned `PendingSubmissionPersistence` and `TodoPersistence` with direct existing-store forwarding; preserve generation fencing, CAS, custody and dependencies. |
+| Memory / Evolution / Exploration | Same accepted I322 C implementation; bounded closeout #930, merge `a07b466d5aa2a03fb841cdcb918cd4968c778942` | Reuse `MemoryPersistence`, `KnowledgePersistence` and `ExplorationPersistence`; no new SQL, FTS ranking, schema, migration or business logic. |
+| Local adapter delegation | STORE-002 I325 D governance #932, merge `e49ccde70556403a9d7b66551565e2b6c81ad32d` | **Only D claim/activation is accepted**, not D implementation at this checkpoint. Do not mark local delegation operational from a governance merge. |
+| Local profile selection / broad parity | STORE-002 E / F (subsequent independently governed stages) | Do not claim a shipped default composition entrypoint, injectable backend, runtime API, or fault/recovery equivalence before evidence exists. |
+| Host integration and SDK | ARCH-035 E2/E3 (not claimed) | Once upstream artifacts are accepted, adapt exactly one existing runtime path by direct delegation; no duplicated store/provider contracts, no Server-private agent/session authority. |
+
+### E1 architecture/API placement under review
+
+The proposed direction is intentionally **conditional**, rather than naming a speculative public `RuntimeBuilder` method:
+
+1. Preserve `RuntimeBuilder::durable_session(DurableSession)` and optional unbound builder behavior under ADR-042. Existing embedders must remain source-compatible.
+2. Keep `talos-cli` as its current host selection/composition root, `talos-tui` as renderer, and `talos-desktop` as a thin runtime adapter; the CLI's `AppServerSession` and Desktop/SDK `RuntimeBuilder` are currently **different construction entrypoints**, not already one shared host factory.
+3. At E2 design time **first inspect** the accepted STORE-002 E default-local composition for a reusable supported entrypoint. If it serves the required host path, adopt it and record a no-op/satisfied disposition rather than inserting a wrapper. Only if a proven gap remains should ARCH-035 propose a *minimal, additive runtime-facing delegator*, with explicit API review, source-compatibility tests and no added persistence rules. A hypothetical API name/signature is not approved here.
+4. Keep Session/Agent/permissions, first-terminal-wins, cancellation, pending custody, restart recovery, redaction and cross-resource ordering inside their current domain/runtime authority. Host selection must never implement those rules, imply global SQLite+TLOG ACID, or change errors/default paths.
+5. Track the physical dependency chain `talos-runtime -> talos-session -> rusqlite (bundled)` as present until independently verified otherwise. An injected Rust trait does not prove an SQLite-free binary.
+
+### Explicit E1 review questions before acceptance
+
+- Is the no-duplication matrix above faithful to the accepted I322 C Rust traits/forwarders, including their real object-safety and typed-error constraints?
+- Which accepted STORE-002 D/E operations truly allow host substitution without violating SessionManager lifecycle, provenance, error ordering or default paths?
+- Can CLI's `AppServerSession` composition and Desktop/embedded `RuntimeBuilder` remain on their current execution authorities without introducing a second host persistence contract?
+- Is an **additive** public API genuinely necessary, or can the accepted upstream assembly be reused with no new API? Identify the exact implementation caller and current tests before selecting a signature.
+- Which negative-path, replay/restart, SDK fixture and native CI results must be frozen as before/after evidence for a future E2/E4 claim?
+
+**Disposition at this checkpoint:** E1 stays Proposed, no ADR allocated, and the cross-host API choice stays open. I322 C supplies real domain contracts, but #932 supplies **authorization for D**, not its passing implementation. E2/E3 remain blocked on accepted usable upstream composition and an independent governed ARCH-035 implementation claim.
