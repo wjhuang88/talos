@@ -777,7 +777,11 @@ impl Sources {
                 + usize::from(value.is_some())
                 + value.map_or(0, <[u8]>::len)
                 + 1;
-            if output.len().checked_add(len).is_none_or(|size| size > MAX_OUTPUT_BYTES) {
+            if output
+                .len()
+                .checked_add(len)
+                .is_none_or(|size| size > MAX_OUTPUT_BYTES)
+            {
                 return Err(invalid_config());
             }
             output.extend_from_slice(b"file:");
