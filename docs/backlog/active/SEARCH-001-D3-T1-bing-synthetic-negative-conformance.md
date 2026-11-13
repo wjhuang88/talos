@@ -11,14 +11,14 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed (proposed in Draft #943; ineffective until merge) |
-| Responsible Actor | @wjhuang88 (proposed) |
-| Executing Agent | ChatGPT / GPT-6 (proposed) |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | Only native deterministic, Talos-authored synthetic Bing HTML and *negative* prepared-host/permission fixtures in `talos-tools`; add evidence/coverage matrix. **No production code, new endpoint or live provider request** |
-| Claimed At | 2026-11-13 (proposed; no effective claim yet) |
+| Claimed At | 2026-11-13 |
 | Source Issue | #941 |
-| Governance Claim PR | #943 (Draft; ineffective until merge) |
-| Authorization Mode | Single-maintainer merge (proposed; not effective until accepted) |
+| Governance Claim PR | #943 |
+| Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User-directed D3 continuation after #938; #943 proposed atomic claim. Exact-head governance CI, independent review and single-maintainer merge CAS remain required. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-13 |
