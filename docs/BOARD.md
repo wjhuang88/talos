@@ -42,7 +42,8 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
   caching and incremental history are delivered. Full local preflight passed (5317 tests),
   MSVC xwin and exact-head Linux/Windows code CI passed; independent Agent code review approved.
   Focused resize/heap evidence is archived; baseline concurrent-input resize P95 fails.
-  Local fix `f725b74b` passes three Debug budget rounds; final delivery gates,
+  Candidate `f725b74b` (PR #929) passes three Debug and three Release resize/input budget rounds;
+  macOS CI long-history source-binding failure blocks merge. Final delivery gates,
   cache attribution and remaining
   native/resource acceptance stay open in #923. Basic Ghostty operations and Git display
   passed maintainer retest; missing platforms are not passed.

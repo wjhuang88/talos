@@ -36,3 +36,25 @@ Full preflight is not labelled passed. Compile/check/Clippy/governance succeeded
 remaining workspace/SDK gates pending. Raw logs and receipts are preserved here.
 
 Final local gates completed2026-11-13: locked workspace tests exit0, 5319 passed, 0 failed, 0 ignored across148 summaries; external SDK fixture exit0. Combined service549.510s, CPU273.523s, peak2GiB, swap0. Source unchanged atf725b74b. Together with prior check/Clippy/format/governance/xwin passes, local gates are satisfied. Initial preflight invocation remains failed101 and its Git cleanup observation remains recorded; standalone unchanged test and subsequent full workspace passed. Independent evidence review found no blocker and verified raw hashes/threshold counts; Board now distinguishes baseline failure from candidate pass. Remote gates and residual performance/native acceptance remain open.
+
+### Release resize/input follow-up — 2026-11-13
+
+Implementation `f725b74b`, checkout `cef024a1`, repository default Release profile.
+Three serial 35s samples (5s warmup), 10,000 history entries, actual resize plus
+keyboard probes all passed coverage and original Release100/150ms budgets.
+P95 upper bounds:8.388607/8.388607/28.624314ms; P99 upper bounds:
+9.940814/9.176460/28.624314ms.57/57/58 resize actions;60/61/61 probes,
+zero skipped. Binary hash, raw metrics/samples and runner archived in segment-copy.
+Service112.076s wall,2.259s CPU,54.9MiB peak,swap0; CPUQuota100%,affinity0,
+MemoryHigh2GiB/Max3GiB,SwapMax0. These are synthetic PTY measurements, not native
+emulator memory or pixel latency. No interleaved reference; no causal speedup claimed.
+Default Release build succeeded under these limits; earlier symbol-enabled build
+was stopped for measured reclaim pressure, not counted as successful profiling.
+
+PR #929 is pushed at cef024a1 with independent exact-head Agent approval.
+CI43341349202 primary macOS job failed long-history committed-source assertion;
+this is a required merge blocker. A2s binding deadline is a diagnostic hypothesis,
+not confirmed root cause. Global matrix drift for closed#901 is a separate advisory.
+Windows workspace job was still running at observation. Long wrapped/zero-width
+segments, final-source heap attribution and native/platform gaps remain in
+RESIDUALS.md and #923. Whole task remains Review; no completion claim.
