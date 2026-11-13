@@ -1,6 +1,6 @@
 # Iteration I327: Existing Bing Parser Explicit Sponsored Ancestor Rejection
 
-> **Status**: Planned — proposed Active/Claimed, ineffective until governance merge
+> **Status**: Active / Claimed proposed via Draft #948; ineffective until governance merge
 > Published: 2026-11-14
 > Source: [SEARCH-001-D3-T2 / #947](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md).
 > Baseline: D3-T1/#941 Complete/Closed, implementation #944 `9cbc615cebb119ead9706a4d00159d7151639606`, owner-first closeout #946 `73ec650b6ef9804d0c9c42a6f1c5e7c9d9f0baa7`.
@@ -9,15 +9,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed — proposed Claimed, ineffective until governance merge |
-| Responsible Actor | @wjhuang88 (proposed) |
-| Executing Agent | ChatGPT / GPT-6 (proposed) |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | SEARCH-001-D3-T2/#947: strictly bounded response-only `b_ad` ancestor exclusion in existing Bing parser and owned synthetic parser tests; no network/request/route/provider change. |
-| Claimed At | 2026-11-14 (proposed) |
+| Claimed At | 2026-11-14 |
 | Source Issue | #947 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Single-maintainer merge (proposed) |
-| Authorization Evidence | User-directed D3 continuation after closed T1; governing PR must pass exact-head CI, independent review and CAS before code. |
+| Governance Claim PR | #948 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User-directed D3 continuation after closed T1 and source Issue #947; #948 is proposed atomic claim with exact-head CI, independent review and CAS pending before code. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-14 |
 | Handoff / Release Condition | Claim effective only when main incorporates finalized I327 governance. Source completion and owner-first closeout are separately required. |
