@@ -270,6 +270,74 @@ fn gix_admitted_host_output_matches_native_config_values_and_stales() {
     assert!(sources.revalidate().is_err(), "stale config was accepted");
 }
 
+
+#[test]
+fn gix_host_candidate_retains_missing_root_and_rejects_later_appearance() {
+    // An absent, separately admitted system root is still security-relevant.
+    // It cannot disappear from evidence just because a later global root has
+    // usable values. If the missing root appears after review, refuse.
+    let dir = tempfile::tempdir().expect("fixture");
+    let fixture = dir.path().canonicalize().expect("canonical fixture");
+    let missing_system = fixture.join("system.conf");
+    let present_global = fixture.join("global.conf");
+    std::fs::write(&present_global, b"[fixture]\n marker=global\n").expect("global fixture");
+
+    let env = BTreeMap::<OsString, OsString>::new();
+    let roots = [missing_system.clone(), present_global.clone()];
+    let mut sources = target_config::Sources::new(None, roots.clone()).expect("path-only roots");
+    let admitted = sources.paths();
+    sources
+        .advance(|path| admitted.contains(path), &env)
+        .expect("all missing and present roots admitted");
+    assert!(sources.complete(), "no unread roots remain");
+    assert!(
+        sources.captured_paths().any(|path| path == &missing_system),
+        "negative root identity must survive capture"
+    );
+
+    let output = sources
+        .ordered_host_output(&roots, &env, None)
+        .expect("serialize admitted root graph only");
+    let records = super::config_state::parse_host(&output).expect("host records");
+    assert_eq!(
+        records
+            .get(b"fixture.marker".as_slice())
+            .and_then(|values| values.last()),
+        Some(&Some(b"global".to_vec()))
+    );
+    std::fs::write(&missing_system, b"[fixture]\n marker=system\n")
+        .expect("root appears after admission");
+    assert!(
+        sources.revalidate().is_err(),
+        "a previously absent system root appeared after approval"
+    );
+}
+
+#[test]
+fn gix_attributes_strict_parse_refuses_malformed_filter_sources() {
+    // The locked gix-attributes parser operates solely on admitted bytes.
+    // A future filter-effect resolver must not use Search's lenient parsing
+    // alone: invalid records may be discarded. Parse every line and
+    // assignment with an explicit error branch before any effect inference.
+    let strict = |bytes: &[u8]| {
+        gix_attributes::parse(bytes).all(|line| {
+            let Ok((_, attributes, _)) = line else {
+                return false;
+            };
+            attributes.into_iter().all(|attribute| attribute.is_ok())
+        })
+    };
+    assert!(strict(b"[attr]binary -diff -merge -text\n*.bin binary\n*.txt -filter\n"));
+    assert!(
+        !strict(b"*.bin filter=lfs\n!*.bad filter=untrusted\n"),
+        "negative attribute patterns must not be silently skipped"
+    );
+    assert!(
+        !strict(b"*.bin filter=lfs invalid$name\n"),
+        "invalid assignment names must not be silently skipped"
+    );
+}
+
 #[test]
 fn gix_config_frontier_denial_prevents_all_content_capture() {
     let dir = tempfile::tempdir().expect("fixture");
