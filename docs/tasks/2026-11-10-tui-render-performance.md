@@ -1802,3 +1802,21 @@ unchanged samples or claim product fix. Diagnostic artifacts are in the follow-u
 Both governance validators passed with0warnings;19.271s wall,17.921s CPU,
 221.8MiB peak,swap0. CI43356421622 remains in progress; completed reconciliation
 log confirms unrelated closed#901 matrix drift. No merge or task completion claim.
+
+### Per-frame diagnostic without a rebuild (2026-11-13)
+
+GDB18.1 on the immutable bounded Debug binary captured132paired frame-preparation
+recorded intervals,0errors/0pending starts at exit (not a lossless-tracing claim). One33.135198ms interval contained1majorfault,
+1.285636ms thread CPU and0.581548ms runqueue wait. Debugger overhead is included;
+remaining wall time is not measured page-fault duration. This yields a fault/off-CPU
+lead, not causal proof of the previous479ms event. No production code changed or
+acceptance budget waived. Debugger input maximum36.756401ms is diagnostic only.
+
+Single-core/2GiB high/3GiB max/no-swap guards retained;40.144s wall,5.779s CPU,
+496.7MiB peak,swap0. All local jobs terminal. Source/commands/raw pairs/metrics
+and limitations are [archived](evidence/tui-perf-001/frame-breakpoint/README.md).
+Next: publish the reviewed stable sampler/evidence batch after existing CI ends;
+keep the unreproduced479ms issue and native/platform gates in Review.
+
+Independent Agent evidence review approved this diagnostic increment; both
+governance validators passed with0warnings (19.094s,17.745s CPU,216.4MiB,swap0).
