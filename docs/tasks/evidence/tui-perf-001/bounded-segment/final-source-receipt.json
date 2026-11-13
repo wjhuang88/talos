@@ -1,0 +1,7 @@
+{
+  "implementation_commit": "293ce0a2e7fc58f1358c49ba1f2c61d41a86dfb0",
+  "runtime_file_sha256": "2a0b400e453bed07e96f53ff2be22848e80eff75882938d7c9314ec660cb2c52",
+  "debug_receipt_boundary": "Debug binary built before the final test-only byte-boundary fixtures; runtime function unchanged. Exact build patch is source.patch.gz.",
+  "release_receipt_boundary": "Release binary built at implementation293ce0a2; immutable binary digest in release-receipt.json.gz.",
+  "review": "Independent quality_claim_review approved bounded scan; optional boundary fixtures added and all43 focused tests passed afterward. Final preflight5320 passed."
+}

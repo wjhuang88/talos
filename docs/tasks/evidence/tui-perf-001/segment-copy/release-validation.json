@@ -1,0 +1,62 @@
+[
+  {
+    "round": 1,
+    "coverage": {
+      "steady_first_seconds": 7.090403783018701,
+      "steady_last_seconds": 36.893986576003954,
+      "steady_covered_seconds": 29.803582792985253,
+      "nominal_steady_seconds": 30
+    },
+    "p95": {
+      "lower_ns": 4194304,
+      "upper_ns": 8388607
+    },
+    "p99": {
+      "lower_ns": 8388608,
+      "upper_ns": 9940814
+    },
+    "pass": true,
+    "probes": 60,
+    "skipped": 0
+  },
+  {
+    "round": 2,
+    "coverage": {
+      "steady_first_seconds": 7.091210349986795,
+      "steady_last_seconds": 36.79147667303914,
+      "steady_covered_seconds": 29.700266323052347,
+      "nominal_steady_seconds": 30
+    },
+    "p95": {
+      "lower_ns": 4194304,
+      "upper_ns": 8388607
+    },
+    "p99": {
+      "lower_ns": 8388608,
+      "upper_ns": 9176460
+    },
+    "pass": true,
+    "probes": 61,
+    "skipped": 0
+  },
+  {
+    "round": 3,
+    "coverage": {
+      "steady_first_seconds": 7.092275845003314,
+      "steady_last_seconds": 36.88666973699583,
+      "steady_covered_seconds": 29.794393891992513,
+      "nominal_steady_seconds": 30
+    },
+    "p95": {
+      "lower_ns": 16777216,
+      "upper_ns": 28624314
+    },
+    "p99": {
+      "lower_ns": 16777216,
+      "upper_ns": 28624314
+    },
+    "pass": true,
+    "probes": 61,
+    "skipped": 0
+  }
+]

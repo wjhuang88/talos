@@ -56,7 +56,14 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
   Reproducible profiling, event-driven drawing, asynchronous Git snapshots, and layout/component
   caching and incremental history are delivered. Full local preflight passed (5317 tests),
   MSVC xwin and exact-head Linux/Windows code CI passed; independent Agent code review approved.
-  Resize-budget acceptance, growing/resize heap stability and native terminals remain open in #923.
+  Focused resize/heap evidence is archived; baseline concurrent-input resize P95 fails.
+  Candidate `f725b74b` (PR #929) and local bounded-scan correction `293ce0a2` each pass
+  three Debug and three Release resize/input budget rounds;
+  macOS CI long-history source-binding failure blocks merge. Final delivery gates,
+  Debug transcript 479ms tail and native/resource acceptance stay open in #923.
+  Corrected sampler resize coverage passes570/570; finite heap allocation-path
+  attribution passed independent evidence review (finite observation only). Basic Ghostty operations and Git display
+  passed maintainer retest; missing platforms are not passed.
   Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001

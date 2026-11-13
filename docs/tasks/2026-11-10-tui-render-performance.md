@@ -334,7 +334,7 @@ measure baseline and freeze budgets before P1.
 | Governance Claim PR | #910 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim #910 merged as d355dd68; user authorized stage delivery 2026-11-12; exact-head Agent review APPROVE at 14a274ed; code CI43150963692 passed; stage decision recorded in #922 and #923 |
-| Implementation PR | #922 (merged as 71655af8; remaining acceptance #923) |
+| Implementation PR | #922 (merged as 71655af8); #929 (follow-up candidate; remaining acceptance #923) |
 | Last Updated | 2026-11-12 |
 | Handoff / Release Condition | Full published acceptance including native terminal evidence; incomplete platforms remain Review |
 
@@ -1564,3 +1564,259 @@ Logs are in main workspace target/git-path-{preflight,remaining,final-tests,tui-
 The six remaining tests hard-code workspace_root=/tmp. Their pending databases therefore live in /tmp/.talos/runtime, unaffected by TMPDIR or SQLITE_TMPDIR. The tested Agent/session sources are identical to origin/main. The exact compiled aggregate_queue_limit_counts_running_and_pending_submissions test failed with SQLite extended error 778, then passed immediately after moving this session's retired /tmp/talos-p0-git-fixtures and /tmp/talos-p0-git-fixtures-v2 to the main workspace target/retired-perf-fixtures (approximately 80 MiB freed, files preserved). No source/binary changes between those two runs.
 
 Final locked workspace test rerun: 5318 passed, 0 failed, 0 ignored across 148 summaries. External Runtime SDK fixture passed. Exit 0; 9m15.422s wall, 4m34.288s CPU, peak 2 GiB, zero swap. Log: main workspace target/git-path-unblocked.log. Combined with the earlier successful format/governance/check/Clippy and cargo-xwin checks, local validation gates are satisfied. The initial preflight invocation itself failed and was not relabeled as passing. No storage patch was necessary. Remaining: commit/review/CI/merge and native Git status retest on the rebuilt CLI.
+
+### Acceptance evidence reconciliation — 2026-11-12
+
+Scope: archive the already-authorized focused measurements and reconcile native
+acceptance facts under the existing #910 claim; no new runtime implementation.
+Preserve published budgets, previous evidence and other sessions' worktrees.
+Owner remains Review / Claimed; #923 remains the residual destination. Validation:
+raw sample/metrics validators, checksums, document links, both governance validators
+and exact-head documentation CI/review. Board mirrors this owner; no manifest,
+backlog activation or completion-state change is required.
+
+Git workspace-path correction is delivered by #925: implementation
+`acb67966d475bb3fa41d62b15f498297b6827b9c`, merge
+`1eabf2964b5a81005f626644bd99053000518fdb`. Local locked workspace tests passed
+5318/0 failed/0 ignored; MSVC xwin and code CI43189763377 passed. Its global
+reconciliation failure was repaired separately by #926 (`b26d9fcb`). Maintainer
+confirmed normal Git display after rebuilding; the previous pending merge/retest
+notes above are historical. Exact running CLI hash was not captured.
+
+Basic Ghostty acceptance was ended by the maintainer after the reported passes.
+Manual approval, external Git refresh, workspace switching, another terminal and
+native Windows remain untested; terminal CPU/PSS was not measured. Queue preview
+is delegated to the other session, not included as a pass for this task.
+
+Focused measurement source is fixed to `1eabf296`; results and raw evidence are
+in [focused-followup](evidence/tui-perf-001/focused-followup/README.md).
+Three resize-only rounds pass sample/metrics checks and Debug event-latency
+thresholds, but did not inject keyboard input. They cannot alone close resize
+input acceptance; a separate three-round keyboard-probe run addresses that gap.
+Five-minute heap profiles passed actual-state/coverage checks: 561 resizes,
+constant 25,943,809-byte median live heap in nine 30-second windows; growing
+history adds 25,050 bytes per 30-second window (835 bytes/message). No superlinear
+growth is observed, but cache-specific retention attribution remains open.
+This finite observation does not establish general leak freedom.
+
+Remaining closure requirements: correct the failed resize-input P95 gate, cache-specific
+boundedness attribution, exact-source native resource/operation records,
+second terminal and native Windows. No original gate is waived or marked Complete.
+
+Concurrent keyboard-probe follow-up: all three valid rounds FAIL Debug resize
+P95<=150ms (22/113,29/113,39/112 samples exceed150ms). P99 bounds remain below200ms.
+The earlier resize-only pass does not close this gate. No probes skipped. Raw
+samples, metrics, runner and validation summaries are archived alongside heap data.
+Next: diagnose width reflow during input using existing profiles and stage counters;
+do not repeat the same matrix before a diagnosed correction. No runtime patch yet.
+
+### Corrective full-segment projection candidate (uncommitted)
+
+Existing stage counters attribute about98% of total draw time in the failed
+concurrent-input resize samples to history rebuild (6447/7859/7957ms versus
+6609/8033/8140ms total draw). This supports targeting history projection rather
+than terminal flush. It is aggregate attribution, not per-function CPU profiling.
+
+Candidate copies a whole styled segment when its scalar-width sum fits the
+current row; otherwise existing per-scalar wrapping remains. No new cache,
+Unicode string-width substitution, selection model or render scheduling change.
+42 focused history-projection tests pass, including added equivalence coverage
+for segment/scalar boundaries, styles, combining/CJK/emoji, width0/1 and fills.
+Guarded build passed; immutable candidate and source patch receipt are stored in
+main target/tui-perf-artifacts/segment-copy-1eabf296. Three input+resize samples
+are pending. No speedup or acceptance claimed before their results; full-source
+checks/review and platform gates remain required if the candidate is retained.
+
+Candidate measurement result: all3 concurrent-input resize rounds pass exact
+Debug P95<=150ms (1/110,0/109,0/112 exceed150ms), P99upper150.102260/149.815583/
+149.082021ms <=200ms. No skipped probes; actual resize/coverage validators pass.
+[Candidate evidence](evidence/tui-perf-001/segment-copy/README.md) binds source
+patch and binary hashes. Retain as a local candidate pending long-segment/Release
+regression validation, full-source gates and review. No claim of an exact causal
+speedup: baseline/candidate samples were not interleaved. No full-task completion.
+
+Independent incremental static review APPROVE at source diff SHA256
+`a431031f0a0c7a2ddb19143aa70518e615c911ea865d7e551feadb87d40f4195`.
+No correctness blocker found. Zero-width prefixes can make the additional fit scan
+long; new segmentation equivalence test is not an independent old-algorithm oracle.
+These limitations are retained in candidate evidence. Serial resource-limited
+standard preflight then cargo-xwin are running; no pass is claimed before exit.
+
+### Final-source validation checkpoint — 2026-11-13
+
+Standard preflight exited101 after2348.771s: governance, format, locked check and
+Clippy passed; test summaries before termination contain4548 passes/1failure.
+Failure: Git prepared-local-push maintenance-cancel test observed live descendant
+state RN after cleanup receipt. Tools/sandbox source is unchanged from1eabf296.
+The exact compiled test passed standalone in4.116s without source changes; this
+is not proof of root cause or permission to erase the failed run. MSVC cargo-xwin
+TUI --tests passed in6.443s. Both ran serial under the existing resource guard.
+Remaining locked workspace tests and SDK fixture are being completed; no final
+pass or merge claim yet. Logs and command receipts retained in segment-copy artifact.
+
+Local implementation checkpoint: `f725b74b` commits the reviewed fitting-segment
+copy optimization and regression test. Source is identical to the measured patch.
+This is neither pushed/merged delivery nor whole-task completion. Workspace/SDK
+validation remains in progress; native and broader performance gaps stay open.
+
+Final local gates completed2026-11-13: locked workspace tests exit0, 5319 passed, 0 failed, 0 ignored across148 summaries; external SDK fixture exit0. Combined service549.510s, CPU273.523s, peak2GiB, swap0. Source unchanged atf725b74b. Together with prior check/Clippy/format/governance/xwin passes, local gates are satisfied. Initial preflight invocation remains failed101 and its Git cleanup observation remains recorded; standalone unchanged test and subsequent full workspace passed. Independent evidence review found no blocker and verified raw hashes/threshold counts; Board now distinguishes baseline failure from candidate pass. Remote gates and residual performance/native acceptance remain open.
+
+### Release resize/input follow-up — 2026-11-13
+
+Implementation `f725b74b`, checkout `cef024a1`, repository default Release profile.
+Three serial 35s samples (5s warmup), 10,000 history entries, actual resize plus
+keyboard probes all passed coverage and original Release100/150ms budgets.
+P95 upper bounds:8.388607/8.388607/28.624314ms; P99 upper bounds:
+9.940814/9.176460/28.624314ms.57/57/58 resize actions;60/61/61 probes,
+zero skipped. Binary hash, raw metrics/samples and runner archived in segment-copy.
+Service112.076s wall,2.259s CPU,54.9MiB peak,swap0; CPUQuota100%,affinity0,
+MemoryHigh2GiB/Max3GiB,SwapMax0. These are synthetic PTY measurements, not native
+emulator memory or pixel latency. No interleaved reference; no causal speedup claimed.
+Default Release build succeeded under these limits; earlier symbol-enabled build
+was stopped for measured reclaim pressure, not counted as successful profiling.
+
+PR #929 is pushed at cef024a1 with independent exact-head Agent approval.
+CI43341349202 primary macOS job failed long-history committed-source assertion;
+this is a required merge blocker. A2s binding deadline is a diagnostic hypothesis,
+not confirmed root cause. Global matrix drift for closed#901 is a separate advisory.
+Windows workspace job was still running at observation. Long wrapped/zero-width
+segments, final-source heap attribution and native/platform gaps remain in
+RESIDUALS.md and #923. Whole task remains Review; no completion claim.
+
+### Long-segment regression correction — 2026-11-13
+
+Independent extracted-function probes found a60–75% extra cost for a32K zero-width
+prefix followed by wrapped ASCII in f725b74b. A local correction limits the
+speculative fit scan to4*viewport-width bytes, retaining ordinary scalar fallback
+and short-segment copying. All six fixture median costs are within20% of old
+projection in this microbenchmark; this is not full-workload resource acceptance.
+43 focused tests passed; independent static review approves. New Debug resize/input
+three rounds pass150/200ms with0/115,3/115,0/111 events over150ms and P99 upper
+148.640179/155.596768/149.782736ms. Evidence: [bounded-segment](evidence/tui-perf-001/bounded-segment/README.md).
+Runtime correction is committed locally as293ce0a2; validation results follow.
+CI43341349202 ended: Windows workspace passed; macOS long-history source-binding
+failure still blocks merge. Isolated contention probes have not reproduced that
+failure; source-binding runtime is unchanged. Existing platform/heap gaps persist.
+
+Boundary fixtures also pass43 projection tests; publication remains outstanding.
+
+Final correction293ce0a2 Release replay passed all three100/150ms budget rounds:
+P95/P99 upper32.705288/29.491502/29.130585ms. Each round61 keyboard probes,
+zero skipped; coverage and actual resize validation passed. Build43.97s; combined
+build+measurement service156.117s,CPU46.274s,peak2GiB,swap0. Same fixed guard.
+These results close only synthetic resize/input timing for this correction.
+Final preflight and xwin results follow; CI failure, active-workload comparisons,
+final-source heap attribution and native/platform residuals remain open.
+
+Final-source standard preflight exit0, 5320 tests passed,0failed/ignored
+across148 summaries,1118.070s. Includes formatting, governance, locked
+workspace check/Clippy/test and external SDK fixture. MSVC cargo-xwin --tests exit0,
+1.542s. Combined1119.686s wall,561.342s CPU,peak2GiB,swap0. Prior failed preflight
+and macOS CI remain historical failures; this local pass does not erase them.
+
+### Interleaved transcript workload follow-up
+
+Twelve valid35s samples (5s warmup), previousf725b74b versus bounded293ce0a2,
+three alternating pairs each Debug/Release,10,000 history,one committed message/s,
+500ms input probes. CPU median ratios0.881Debug/0.667Release pass<=1.20;
+candidate peak PSS38,787/33,130KiB passes baseline*1.20+8MiB. Low Release CPU
+uses coarse procfs ticks; this is regression evidence, not a precise speedup.
+Release input all passes10/20ms, worstP99upper0.489082ms. Debug first bounded
+round FAILS35ms P99:479.239045ms; later rounds3.422221/3.461222ms pass. No probes
+skipped. Validated coverage does not erase the failed latency budget.
+Frame-preparation max476.541768ms while history-rebuild max0.065496ms; IO pressure
+observed, but causality remains unproven. See long-tail-diagnosis.md.gz; further
+unchanged matrices are not the next diagnostic. Runtime source remains unchanged.
+Service449.876s,CPU10.448s,peak810.4MiB (whole measurement service),swap0.
+Final-source heap profiling is separate; profiler latency is not acceptance.
+
+Final-source heap attempt exited1 at resize coverage validation:571 driver actions,
+569 actual steady resize/rebuild events (required>=570),300.172s steady duration.
+Replay itself exited0. The sample is retained for limited diagnostic analysis,
+not passed full coverage. Transcript profile was not started. Service309.409s,
+CPU126.427s,peak624.4MiB,swap0. No repeat or relaxed threshold was applied.
+
+CI source-binding diagnosis adds test-only failure metadata and distinguishes
+not-attempted from refused binding. Independent review approves privacy and cfg
+boundary; diagnostic test results follow. Production2s budget and
+return behavior unchanged. Expiry observed after refusal alone is not proof of
+which internal branch returnedNone. Required macOS failure remains unresolved.
+
+Diagnostic commit34328646 passed the exact long-history Agent test (1pass,
+0fail/ignored; test0.68s,build+test192.928s). Independent review APPROVE; production
+code remains unaffected by cfg(test). Prior5320-test preflight precedes this test-only
+change, so final-head remote validation is still required. This is not a macOS fix.
+
+Existing failed-coverage resize heap analysis completed: all nine30s windows
+(t30..300) have identical median25,883,809bytes,delta0; peak26,159,584bytes.
+569 actual resize/rebuild events were observed. This supports finite fixed-history
+heap stability only, while coverage remains failed. Raw profile and detailed massif
+are retained. Analysis5.410s,CPU5.373s,peak62.7MiB,swap0. The previously unexecuted
+transcript heap scenario ran independently with a separate manifest.
+
+Final-source transcript heap profile passed coverage:301 actual steady history
+updates,300.012s. Nine30s heap-median windows increase by exactly25,020bytes/window,
+about834bytes per fixture message; first-to-last delta200,160bytes. No accelerating
+growth observed in this finite run. Service308.391s,CPU12.553s,peak488.6MiB
+(includes profiler),swap0. Detailed massif tree children incorrectly expose zero
+bytes despite nonzero totals, so object/category attribution is NOT established.
+Raw profile, text stacks, totals and exporter limitation are archived. All local
+heavy jobs are terminal; no extra unchanged timing matrices are scheduled.
+
+Remaining blockers: Debug transcript input long-tail479ms not diagnosed; previous
+macOS CI source binding failed (test-only diagnostic34328646 now available);
+resize heap coverage mismatch569/571; heap category attribution; exact native
+resources/deferred operations and second terminal/native Windows. Task staysReview.
+
+### Sampler deadline and allocation-path follow-up (2026-11-13)
+
+Sampler correction `b007a547` stops dispatch at ready+duration, including delayed
+profiler exit; four PTY regression tests and independent review passed. New
+resize profile passes coverage at570/570, nine30s median windows all25,883,811B.
+Service313.857s wall,127.496s CPU,peak721.3MiB,swap0 under unchanged single-core,
+2GiB high/3GiB max/no-swap guards. Previous569/571 failure is retained, not waived.
+
+Existing transcript profile reconstructed from heaptrack v3 allocation/free events:
+all30,362 timestamps reconcile with Massif totals. Net200,160B growth across
+29.997..269.999s maps to history_projection105,360B, StreamRenderState87,120B,
+stream_opening_lines7,680B. This finite stack-path attribution does not prove
+object ownership or universal leak freedom. Independent review verified category grouping and raw coverage, requested removal
+of stale hardcoded569/failure in the analysis script (fixed and rerun).570 counts
+effective screen-size changes; raw resize events589. Full event replay was not independently repeated; reviewer verified grouping,
+raw coverage, archived scripts and all21 archive checksums and approved this
+evidence batch.
+See [archived follow-up](evidence/tui-perf-001/sampler-boundary/README.md).
+
+Status remains Review/Claimed. Debug479ms long-tail, final-head CI and existing
+native/platform residuals remain open. Next diagnostic must add CPU/fault/off-CPU
+evidence rather than repeat unchanged timing matrices. No new baseline or budgets.
+
+One bounded35s thread diagnostic completed with the same immutable Debug binary
+and guards:60probes,0skipped; inputP99 upper4.763355ms; frame-preparation max0.103463ms.
+2,814steady procfs observations, max gap16.662ms; largest per-thread interval
+runqueue wait2.758326ms, observed major faults0. Service37.640s,CPU2.584s,peak166.6MiB,
+swap0.479ms tail did not reproduce; polling changes timing and does not provide
+exact per-frame CPU attribution. Prior failure remains unresolved; do not repeat
+unchanged samples or claim product fix. Diagnostic artifacts are in the follow-up.
+
+Both governance validators passed with0warnings;19.271s wall,17.921s CPU,
+221.8MiB peak,swap0. CI43356421622 remains in progress; completed reconciliation
+log confirms unrelated closed#901 matrix drift. No merge or task completion claim.
+
+### Per-frame diagnostic without a rebuild (2026-11-13)
+
+GDB18.1 on the immutable bounded Debug binary captured132paired frame-preparation
+recorded intervals,0errors/0pending starts at exit (not a lossless-tracing claim). One33.135198ms interval contained1majorfault,
+1.285636ms thread CPU and0.581548ms runqueue wait. Debugger overhead is included;
+remaining wall time is not measured page-fault duration. This yields a fault/off-CPU
+lead, not causal proof of the previous479ms event. No production code changed or
+acceptance budget waived. Debugger input maximum36.756401ms is diagnostic only.
+
+Single-core/2GiB high/3GiB max/no-swap guards retained;40.144s wall,5.779s CPU,
+496.7MiB peak,swap0. All local jobs terminal. Source/commands/raw pairs/metrics
+and limitations are [archived](evidence/tui-perf-001/frame-breakpoint/README.md).
+Next: publish the reviewed stable sampler/evidence batch after existing CI ends;
+keep the unreproduced479ms issue and native/platform gates in Review.
+
+Independent Agent evidence review approved this diagnostic increment; both
+governance validators passed with0warnings (19.094s,17.745s CPU,216.4MiB,swap0).

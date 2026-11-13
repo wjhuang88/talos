@@ -764,6 +764,38 @@ fn project_line_chunks(line: &ScrollbackLine, width: u16) -> Vec<ProjectedLineCh
     let mut synthetic_prefix = 0usize;
 
     for segment in &line.segments {
+        // Most history segments fit on the current row. Keep scalar-width
+        // semantics (including combining marks), but copy their UTF-8 bytes
+        // once instead of repeatedly checking style and pushing each scalar.
+        // Bound the speculative scan by bytes as well as cells: a long
+        // zero-width prefix could otherwise be scanned twice before wrapping.
+        let fits = if segment.text.len() <= capacity.saturating_mul(4) {
+            segment
+                .text
+                .chars()
+                .try_fold((used, 0usize), |(cells, scalars), ch| {
+                    let width = UnicodeWidthChar::width(ch).unwrap_or(0);
+                    let next = cells.saturating_add(width);
+                    (width <= capacity && next <= capacity).then_some((next, scalars + 1))
+                })
+        } else {
+            None
+        };
+        if let Some((cells, scalars)) = fits
+            && scalars > 0
+        {
+            if let Some(last) = current.last_mut()
+                && last.fg == segment.fg
+                && last.attrs == segment.attrs
+            {
+                last.text.push_str(&segment.text);
+            } else {
+                current.push(segment.clone());
+            }
+            used = cells;
+            logical_offset += scalars;
+            continue;
+        }
         for (byte_offset, ch) in segment.text.char_indices() {
             let char_width = UnicodeWidthChar::width(ch).unwrap_or(0);
             // A double-width scalar cannot be represented at width one. This is
@@ -921,6 +953,58 @@ fn project_fill_segment(fill: &HistorySegment, available_cells: usize) -> Option
 mod tests {
     use super::*;
     use crate::inline_terminal::HistoryAttrs;
+
+    #[test]
+    fn segment_bulk_copy_preserves_scalar_wrapping_and_styles() {
+        // Splitting each styled segment into scalars exercises the same wrapping
+        // contract without allowing a whole multi-scalar segment to be copied.
+        for text in [
+            "ASCII text",
+            "中文 🦀 e\u{301}",
+            "a\u{200d}🦀",
+            "",
+            "\u{301}\u{301}",
+            "\u{301}\u{301}\u{301}\u{301}", // 8 bytes: width-two scan limit.
+            "\u{301}\u{301}\u{301}\u{301}x", // One byte beyond the limit.
+        ] {
+            let mut line = ScrollbackLine::styled_with_fill(
+                vec![
+                    HistorySegment::raw("prefix "),
+                    HistorySegment::styled(
+                        text,
+                        Some(crossterm::style::Color::Blue),
+                        Default::default(),
+                    ),
+                    HistorySegment::raw(" tail"),
+                ],
+                None,
+                Some(HistorySegment::raw(" ")),
+            );
+            line.continuation_indent = 3;
+            let mut split = line.clone();
+            split.segments =
+                line.segments
+                    .iter()
+                    .flat_map(|segment| {
+                        segment.text.chars().map(|ch| {
+                            HistorySegment::styled(ch.to_string(), segment.fg, segment.attrs)
+                        })
+                    })
+                    .collect();
+            for width in [0, 1, 2, 7, 20, 80] {
+                let actual = project_line_chunks(&line, width);
+                let expected = project_line_chunks(&split, width);
+                assert_eq!(actual.len(), expected.len());
+                for (actual, expected) in actual.iter().zip(&expected) {
+                    assert_eq!(actual.line, expected.line);
+                    assert_eq!(actual.line.segments, expected.line.segments);
+                    assert_eq!(actual.synthetic_prefix, expected.synthetic_prefix);
+                    assert_eq!(actual.logical_start, expected.logical_start);
+                    assert_eq!(actual.logical_end, expected.logical_end);
+                }
+            }
+        }
+    }
 
     #[test]
     fn incremental_tail_matches_full_projection_for_grouping_edits_and_anchors() {
@@ -1993,6 +2077,40 @@ mod tests {
         )));
         let redrawn = project_history(&transcript, 20, 10, &HistoryScrollState::follow_tail());
         assert_eq!(redrawn.selected_text(start, end), "selected");
+    }
+
+    #[test]
+    fn long_zero_width_prefix_preserves_wrapping_style_and_offsets() {
+        let prefix = "\u{301}".repeat(32_768);
+        let text = format!("{prefix}{}", "x".repeat(161));
+        let attrs = HistoryAttrs {
+            bold: true,
+            ..Default::default()
+        };
+        let line = ScrollbackLine::styled(
+            vec![HistorySegment::styled(text.clone(), None, attrs)],
+            None,
+        );
+        let rows = project_line_chunks(&line, 80);
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].line.text, format!("{prefix}{}", "x".repeat(80)));
+        assert_eq!(rows[1].line.text, "x".repeat(80));
+        assert_eq!(rows[2].line.text, "x");
+        assert_eq!(rows[0].logical_start, 0);
+        assert_eq!(rows[0].logical_end, 32_848);
+        assert_eq!(rows[1].logical_start, 32_848);
+        assert_eq!(rows[1].logical_end, 32_928);
+        assert_eq!(rows[2].logical_start, 32_928);
+        assert_eq!(rows[2].logical_end, text.chars().count());
+        for row in rows {
+            assert_eq!(row.synthetic_prefix, 0);
+            assert!(
+                row.line
+                    .segments
+                    .iter()
+                    .all(|segment| segment.attrs == attrs)
+            );
+        }
     }
 
     #[test]

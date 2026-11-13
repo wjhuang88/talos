@@ -7,6 +7,29 @@ Measured runtime source: `539adfd2`; candidate build receipt: `candidate-build/r
 Current implementation source: `43305a58` on base `6c81390a`. Each archive retains
 its own source receipt; earlier measurements do not automatically cover later changes.
 
+## Current follow-up checkpoint — 2026-11-13
+
+The historical table below describes earlier candidates. Current local runtime is
+`293ce0a2` (bounded segment scan), following `f725b74b`; remote PR #929 still
+contains `cef024a1`. Original implementation stage #922 is merged. This checkpoint
+supersedes current-state claims below without erasing their historical evidence.
+
+| Gate | Current authoritative evidence | Still required |
+|---|---|---|
+| Resize/input, 10,000 entries | Three valid Debug rounds pass150/200ms; three Release rounds pass100/150ms for bounded candidate; [raw evidence](bounded-segment/README.md) | Final-source delivery gates |
+| Wrapped/zero-width segments | Independent old-function equality across six widths; three alternating microbenchmark pairs at opt0/3;43 focused tests | Microbenchmark is not whole-workload CPU/PSS proof |
+| Other active workloads | Interleaved final transcript CPU/PSS and Release input pass; Debug first round P99 fails479ms | Diagnose frame-preparation long tail; preserve failure and prior evidence |
+| Cache/heap | Final candidate: fixed-history medians flat (coverage mismatch retained); growing-history834B/message,301 updates | Resolve resize coverage mismatch and transcript/projection byte attribution |
+| Native operations | Maintainer reports Ghostty input/IME/image/long-press/resize/selection/generation/Git display passes | Exact binary/resource metadata; deferred manual approval/Git/workspace operations; second terminal; native Windows unavailable |
+| Local gates | Previous5319-test workspace pass and xwin; new43-test projection pass | Standard preflight passed5320 tests and MSVC xwin passed for293ce0a2; remote gate remains separate |
+| Remote gates | CI43341349202 terminal; Windows workspace and Desktop jobs pass | macOS long-history source-binding assertion failed; diagnosis remains unconfirmed. Separate global matrix#901 drift advisory |
+| Publication | Local commitsc386b362,293ce0a2 and test-diagnostic34328646; independent incremental code review approves bounded scan | Archive/commit stable evidence, final review, push and successful exact-head required gates before merge |
+
+Owner and #923 remain Review; no Complete claim. Native gaps cannot be replaced by
+synthetic PTY, cross-compilation or CI. Full original scope and frozen budgets remain.
+
+## Historical candidate matrix
+
 | Requirement | Current evidence | Remaining verification |
 |---|---|---|
 | P0 reproducible debug/release baseline | Baseline archives, SHA receipts, six scenarios × three histories × three rounds | Allocation profiles now archived for animation, transcript and P4; terminal emulator resources remain missing |
