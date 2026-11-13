@@ -5,6 +5,10 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 # Talos Board
 
+## SEARCH-001-D3-T1 / I326 — proposed offline negative-conformance claim
+
+[SEARCH-001-D3-T1](backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): proposed atomic **test-only** claim after research [#938](https://github.com/wjhuang88/talos/pull/938) merged. **Unclaimed until claim PR is reviewed and merged.** Test only uncovered ad/organic, DOM drift and unapproved-host negatives with Talos-authored synthetic fixtures; existing BF parity tests are retained. No live Bing acquisition, search request authority/default changes, provider admission or #624 closure. I324/I325/I320 remain independent.
+
 ## GIT-COMPAT-001 / I324 — gix-native Git preflight (claim proposed)
 
 [GIT-COMPAT-001](backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](iterations/I324-git-236-preflight-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): proposed governance-only [claim #920](https://github.com/wjhuang88/talos/pull/920) and activation, **ineffective until merge**. The November 10 design is not implementation. No change to ADR-089 permission admission or to GIT-SNAPSHOT-001 / TUI-APPROVAL-001 Review status; Git 2.36 Windows validation and independent security review remain mandatory.
