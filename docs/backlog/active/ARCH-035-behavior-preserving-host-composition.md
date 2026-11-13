@@ -4,7 +4,7 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Review / Claimed — E0 source truth published; E1 placement-only ADR-104 acceptance candidate #936; E2/E3 blocked |
+| Status | Blocked / Unclaimed — E0/E1 documentation accepted; ADR-104 placement-only decision effective; E2/E3 gated on STORE-002 D/E and separate claim |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
 | Selected Iteration | [I320](../../iterations/I320-arch-035-host-composition-baseline.md) — E0/E1 active via claim #905 merge `b211e590f6b1180af0679be8b1b03d77b0a19615` |
@@ -12,14 +12,14 @@
 | Depends On | [STORE-002](STORE-002-storage-capability-contracts.md) / #670: accepted capability/domain seam; RUNTIME-001 SDK compatibility |
 | Coordinates | SESSION-009 / #46; SESSION-011 / #612; DATA-002 / #141; SERVER-002 / #360 |
 | Long-task planning | [SERVER-MVP-001](../../tasks/2026-11-10-server-mvp-storage-decoupled.md) proposed in draft PR #896 |
-| E1 review artifact | [Host composition proposal](../../proposals/arch-035-host-composition-boundary.md) — non-binding until reviewed and accepted |
-| E0 audit artifact | [Code-truth and regression inventory](../../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) — review candidate, existing tests not rerun |
+| E1 accepted decision | [ADR-104](../../decisions/104-host-composition-ownership-boundary.md) — placement/ownership only; no selected callable API |
+| E0 source audit | [Code-truth and regression inventory](../../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) — reviewed documentation baseline; listed tests not executed in this slice |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Released — bounded E0/E1 docs slice complete on I320 closeout merge; no E2/E3 claim |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | E0 code-truth inventory and E1 ADR / cross-host composition API placement only; no production code, no STORE-002 capability contracts or adapters |
@@ -28,7 +28,7 @@
 | Governance Claim PR | #905 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615` following exact-head [CI #3992](https://github.com/wjhuang88/talos/actions/runs/42784639228), both governance validators with 0 warnings, recorded single-maintainer documentation-only fallback and passing merge-time CAS; this authorizes E0/E1 only. |
-| Implementation PR | #906 |
+| Implementation PR | #906 (E0/E1 review); #934 (C-contract reconciliation); #936 (accepted ADR-104) |
 | Last Updated | 2026-11-10 |
 | Handoff / Release Condition | E0/E1 only; E2/E3 blocked until accepted STORE-002 seams and separately governed activation; no implementation before effective claim |
 
@@ -125,3 +125,11 @@ This is a continuation of the **existing effective I320 E0/E1 documentation clai
 ### E1 decision acceptance gate — PR #936 (effective only on merge)
 
 ADR-104's **host/domain ownership and composition-layer placement only** may be accepted on reviewed #936 merge after independent technical no-blocker review of the final head, exact-head documentation CI, both governance validators, single-maintainer authorization and merge-time CAS. The prior Copilot [initial review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843456241) found the placement decision supportable but requested correction of the 2026-11-13 historical E1 proposal sentence; this was corrected in the candidate and must be revalidated. The proposed ADR says **no shared callable runtime factory already exists**, no accepted public builder signature, no completed D/E provider binding or conformance results. Even if ADR-104 is accepted, this ARCH-035 owner remains **Review / Claimed**, E2/E3 stay **blocked/unclaimed**, and #897 stays **Open**; no Completion Commit for #897 is asserted.
+
+## I320 E0/E1 bounded closeout and claim release — 2026-11-13
+
+The **I320 documentation/architecture slice only** is accepted on the independently reviewed, authorized [ADR-104 PR #936](https://github.com/wjhuang88/talos/pull/936) merge **`07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`**. This existing main commit is the **E1 decision evidence / I320 documentation Completion Commit**, **not** the overall ARCH-035/#897 completion commit. E0 [source inventory](../../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) entered via #906; E1 accepted #670 C-domain contract/no-duplication cross-check via #934 and architectural decision ADR-104 via #936.
+
+Evidence: final #936 reviewed head `3fd1b7176901832717b692202512dadb7364391f`; [CI #4173](https://github.com/wjhuang88/talos/actions/runs/43365335816) overall success with documentation-scoped checks and both project/collaboration validators **0 warnings**; [independent read-only technical review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843928194) found no blockers; [single-maintainer authorization/CAS](https://github.com/wjhuang88/talos/pull/936#issuecomment-6852726331) recorded. CI's separate **remote Issue/owner reconciliation failed** because unrelated SEARCH-001-D3/#937 was absent from the global rolling matrix; its owner [#938](https://github.com/wjhuang88/talos/pull/938) carries that residual. This does **not** mean all CI jobs passed. No compiled Rust, SDK, native, restart or cross-host equivalence tests were run in this documentation slice.
+
+The E0/E1 Collaboration Claim #905 is **released upon this bounded closeout merge**. #897 stays **Open**, but the current Story is **Blocked / Unclaimed** for E2/E3: it cannot start new production/API work without accepted operational STORE-002 D delegation and E default local composition, then a **new independently effective ARCH-035 implementation claim**. E4 must prove locked cross-host/SDK/native, cancellation, permission, TLOG/JSONL, SQLite/FTS5 and recovery equivalence; SERVER-001-C/#361 remains gated. ADR-104 acceptance does not mean a shared callable factory, SQLite-free binary, remote storage support or full Story completion.
