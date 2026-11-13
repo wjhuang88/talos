@@ -10,11 +10,11 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed — proposed, ineffective until #942 merge |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 (proposed) |
 | Executing Agent | ChatGPT / GPT-6 (proposed) |
 | Work Slice | D3.2 only: inventory existing Bing parser/prepared compatibility tests against BF-01..BF-13 and add narrowly missing `#[cfg(test)]` synthetic HTML/local-transport characterization for ad/organic confusion, known-vs-unknown redirect authority, 200 empty/challenge differentiation, root-vs-query health caveats, cancellation/permission and preserved compatibility identity. No production edits or live Bing network. |
-| Claimed At | 2026-11-13 (proposed) |
+| Claimed At | 2026-11-13 |
 | Source Issue | #937 |
 | Governance Claim PR | #942 |
 | Authorization Mode | Single-maintainer merge |
