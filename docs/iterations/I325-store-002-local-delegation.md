@@ -18,7 +18,7 @@
 | Governance Claim PR | #932 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | D governance claim #932 merged `e49ccde70556403a9d7b66551565e2b6c81ad32d` after CI #4151 and independent claim review; D code requires its own CI and independent technical review. C implemented in #912 (`3df409ef9ed707756350f2c7d4b2c8819f157222`) and closed in #930 (`a07b466d5aa2a03fb841cdcb918cd4968c778942`). D governance [#932](https://github.com/wjhuang88/talos/pull/932) proposes an independent bounded work slice; source user authorized continued #670. Single-maintainer docs-only route needs exact-head CI, both validators, no-overlap CAS and explicit no-human-reviewer rationale before merge; implementation remains unauthorized on the open branch. |
-| Implementation PR | Not started |
+| Implementation PR | #935 |
 | Last Updated | 2026-11-13 |
 | Handoff / Release Condition | After accepted bounded D delegation and independent API/runtime review, record Completion Commit, release claim, and keep E/F plus #897 independently gated. |
 

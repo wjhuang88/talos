@@ -236,9 +236,15 @@ mod tests {
         let transcript = dir.path().join("session.tlog");
         let store = PendingSubmissionStore::for_session_file(&transcript, "d-session");
         let contract: &dyn PendingSubmissionPersistence = &store;
-        assert_eq!(contract.runtime_generation().expect("initial generation"), 0);
+        assert_eq!(
+            contract.runtime_generation().expect("initial generation"),
+            0
+        );
         assert_eq!(contract.advance_runtime_generation(0).expect("advance"), 1);
-        assert_eq!(contract.runtime_generation().expect("persisted generation"), 1);
+        assert_eq!(
+            contract.runtime_generation().expect("persisted generation"),
+            1
+        );
         assert!(matches!(
             contract.advance_runtime_generation(0),
             Err(PendingSubmissionError::GenerationConflict {
@@ -266,7 +272,10 @@ mod tests {
         };
         let parent = contract.create(create("parent")).expect("parent");
         let child = contract.create(create("child")).expect("child");
-        assert_eq!(contract.get(session, parent.id).expect("get"), Some(parent.clone()));
+        assert_eq!(
+            contract.get(session, parent.id).expect("get"),
+            Some(parent.clone())
+        );
         let updated = contract
             .update_batch(
                 session,
@@ -284,10 +293,14 @@ mod tests {
         contract
             .add_dependency(session, parent.id, child.id)
             .expect("dependency");
-        contract.load_work_graph(session).expect("work graph");
+        let graph = contract.load_work_graph(session).expect("work graph");
+        assert_eq!(graph.nodes.len(), 2);
+        assert!(graph.nodes.iter().any(|node| node.identity.id == parent.id));
+        assert!(graph.nodes.iter().any(|node| node.identity.id == child.id));
+        assert_eq!(graph.edges.len(), 1);
+        assert_eq!(graph.edges[0].parent_id, parent.id);
+        assert_eq!(graph.edges[0].child_id, child.id);
         let listed = contract.list(session, TodoQuery::default()).expect("list");
         assert_eq!(listed.len(), 2);
     }
-
-
 }

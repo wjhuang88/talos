@@ -134,7 +134,10 @@ mod tests {
             .insert_source_with_chunks(&source, &[chunk.clone()])
             .expect("atomic source and chunk");
         assert_eq!(contract.count_sources().expect("count"), 1);
-        let persisted = contract.get_source(&source.id).expect("source").expect("exists");
+        let persisted = contract
+            .get_source(&source.id)
+            .expect("source")
+            .expect("exists");
         assert_eq!(persisted.title, source.title);
         let hits = contract.search_chunks("traitforwarding", 2).expect("fts");
         assert_eq!(hits.len(), 1);
@@ -157,6 +160,4 @@ mod tests {
         ));
         contract.complete_run(&run.id).expect("complete run");
     }
-
-
 }

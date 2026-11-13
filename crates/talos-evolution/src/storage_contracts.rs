@@ -107,10 +107,15 @@ mod tests {
         let active = contract.get_active_patterns(0.7).expect("active patterns");
         assert_eq!(active.len(), 1);
         assert_eq!(active[0].id, pattern.id);
-        contract.deactivate_pattern(&pattern.id).expect("deactivate");
-        assert!(contract.get_active_patterns(0.7).expect("inactive").is_empty());
+        contract
+            .deactivate_pattern(&pattern.id)
+            .expect("deactivate");
+        assert!(
+            contract
+                .get_active_patterns(0.7)
+                .expect("inactive")
+                .is_empty()
+        );
         assert_eq!(contract.get_all_patterns().expect("all patterns").len(), 1);
     }
-
-
 }

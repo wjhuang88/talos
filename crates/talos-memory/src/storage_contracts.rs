@@ -179,6 +179,4 @@ mod tests {
         assert_eq!(related.len(), 1);
         assert_eq!(related[0].node.id, "d-node-b");
     }
-
-
 }

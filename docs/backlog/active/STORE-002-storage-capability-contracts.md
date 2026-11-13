@@ -40,7 +40,7 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Governance Claim PR | #932 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | D governance #932 merged `e49ccde70556403a9d7b66551565e2b6c81ad32d` after CI #4151 and independent review; D implementation remains subject to separate exact-head CI and independent technical review. C completed: implementation [#912](https://github.com/wjhuang88/talos/pull/912) `3df409ef9ed707756350f2c7d4b2c8819f157222`; C owner/iteration closure [#930](https://github.com/wjhuang88/talos/pull/930) `a07b466d5aa2a03fb841cdcb918cd4968c778942`. User authorized continued #670 progress. D proposed independent governance [#932](https://github.com/wjhuang88/talos/pull/932) only; claim ineffective until merged exact-head docs CI, both validators, single-maintainer authorization/no-overlap CAS. C API review accepted existing forwarders; D must not duplicate them. |
-| Implementation PR | Not started |
+| Implementation PR | #935 |
 | Last Updated | 2026-11-13 |
 | Handoff / Release Condition | Claim #932 is effective on main. D Review requires real local delegation tests, exact-head native CI, independent API/architecture review and a future completion commit. E/F and #897 Host E2/E3 remain separately gated. |
 
