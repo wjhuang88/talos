@@ -7182,12 +7182,13 @@ async fn cooperative_recovered_sources_bind_long_history_and_refuse_foreign_or_e
         .await
         .unwrap_or_else(|_| panic!("long turn admission"));
     let record = started.handle.await.expect("worker").expect("turn record");
-    assert!(
-        record
-            .committed_source
-            .as_ref()
-            .is_some_and(Option::is_some)
-    );
+    match record.committed_source.as_ref() {
+        None => panic!("completed worker did not attempt source binding"),
+        Some(None) => {
+            panic!("completed source binding refused; inspect test-only binding diagnostics")
+        }
+        Some(Some(_)) => {}
+    }
     actor.commit_turn_record(record);
     let revision = actor.history.len() as u64;
     let source = actor
