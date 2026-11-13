@@ -144,8 +144,7 @@ async fn query_free_bing_reachability_does_not_turn_a_failed_query_into_success(
     // query-bearing response is an offline loopback 403 fixture. No new
     // health policy, live Bing request or host acceptance is introduced.
     let server = Server::new(vec![
-        "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-            .to_owned(),
+        "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
     ]);
     let chain = PreparedCompatibilityChain::prepare(&fixed_manifest(), "toy-query", 1)
         .expect("prepared chain");
