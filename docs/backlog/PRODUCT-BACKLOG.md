@@ -2,7 +2,7 @@
 
 ## SEARCH-001-D3-T1 / #941 — Bing synthetic negative conformance (proposed)
 
-[Owner](active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](../iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): **Ready / Proposed / Unclaimed**, independent test-only synthetic parser and negative host-admission fixtures after D3 research #938. Atomic governance claim is required before committed test code. No live Bing, new URL authority, production changes, provider admission or #624 closure; I324/I325/I320 remain separate.
+[Owner](active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](../iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): **In Progress / Claimed proposed by #943 (ineffective until merge)**, independent test-only synthetic parser and negative host-admission fixtures after D3 research #938. Atomic governance claim is required before committed test code. No live Bing, new URL authority, production changes, provider admission or #624 closure; I324/I325/I320 remain separate.
 
 ## SEARCH-001-D3 / #937 — Bing direct HTML, multi-endpoint feasibility (intake only)
 
