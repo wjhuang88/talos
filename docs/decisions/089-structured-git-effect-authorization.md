@@ -889,3 +889,93 @@ remaining blocker after correcting the rebound invocation/canonical distinction.
 MSVC xwin checking and the host Unix shell regression pass. This candidate does
 not prove DLL loading, MSYS startup effects or real Windows prepared Push;
 these runtime/trust limitations remain activation prerequisites.
+
+
+## I324 gix-native discovery amendment — **PROPOSED, NOT ACCEPTED (2026-11-13)**
+
+**Review status:** An explicit, separate approval is required. All previously
+accepted ADR-089 provisions remain in force. This section is a proposed change
+request only; placing this text in a branch or a merged document does **not**
+replace the existing fixed-command grant, permit new file reads or authorize
+production switching. [Source Issue #919](https://github.com/wjhuang88/talos/issues/919),
+[active claim I324](../iterations/I324-git-236-preflight-compatibility.md),
+[security inventory](../reference/GIT-COMPAT-001-I324-GIX-PREFLIGHT-AUDIT.md),
+and [decision proposal](../proposals/adr-089-gix-native-preflight-amendment.md).
+
+### Proposed authority delta (requires independent security and maintainer acceptance)
+
+1. **New stage contract, not a generic grant.** Retire direct use of
+   Read(Remote `git:configuration-chain`) to authorize **new** Git CLI
+   discovery; replace fixed-command `git var`, `git config`,
+   `git check-attr`, `git --exec-path`, ref/branch and child-repository
+   preflight inspection with pure gix/Talos-native planning. No higher-level
+   gix helper may invoke Git, inspect undisclosed paths, or rely on unbound
+   ambient environment/process-global cache. Previously accepted source
+   authorization is not converted into general Read(Path), Execute(Command),
+   traversal, symlink resolution or network access.
+2. **Path-only names before bytes.** Sources from the frozen invocation
+   environment, repository metadata already approved for the specific
+   operation, and a **verified selected-writer installation profile**
+   may be lexically named as candidate paths. This phase performs no open,
+   stat, readlink or child execution for newly discovered paths. Each file,
+   ancestor identity, link metadata and newly named include/attribute path
+   requires its existing appropriate exact Path Read/metadata admission
+   before content or identity capture. Missing/empty roots are retained
+   as negative identity evidence for post-approval revalidation.
+3. **No guessed system defaults.** The chosen system Git executable is
+   identity-bound to the final writer. A path guessed from the executable's
+   parent directory, a Git version number, a Windows/Scoop convention, PATH
+   search, or gix's own installation discovery is **not** proof that the
+   selected writer has the same compiled system/configuration/attribute/
+   maintenance defaults. The installation profile's authoritative
+   provenance, exact set of roots and executable binding are a **blocking
+   review item**. In its absence return an explicit Unsupported verdict
+   before mutation. A separately authorized, documented provisioner can
+   be proposed later, but this ADR does not authorize one now.
+4. **No hidden command escape.** For the entire preflight, including
+   revalidation and submodule/push receiver/target branches, no
+   `std::process::Command`, `tokio::process::Command`, gix-internal
+   executable launch or unconstrained repository-open/config-file loader
+   may access the host on an unadmitted basis. Normal mutations still run
+   the chosen system Git **after** all existing facets/one-use admission;
+   no Git-version dispatch, fallback command or transparent retries.
+5. **Preserved effects and budgets.** No silent removal of hooks, filters,
+   signing, auto-maintenance, transport shells, URL rewrites, tracking,
+   includeIf/hasconfig, submodules, external stores, file identities or
+   complete operation evidence. Carry the existing cumulative evidence,
+   output, traversal, execution deadline and source-size bounds into the
+   native planner. Keep all exact Path Read, Write, Execute and Remote
+   facets, denial precedence, one-use approval tokens, cancellation,
+   partial-effect reporting and stale-plan refusal.
+6. **Security-specific acceptance evidence.** Independently review the
+   pinned gix 0.90.0 and gix-path call graph for subprocesses/ambient
+   I/O/global caches. Use a recording fake Git executable as a sentinel:
+   **zero Git child launches in preflight**, and the bound writer for
+   final mutation only. Test separately against **native Windows Git
+   2.36.1** and newer Git, including config roots, absent/appearing paths,
+   HOME/XDG and path Unicode, filters, includeIf, target refs, native
+   compatibility and deliberately malicious changes between approval and
+   mutation. No Git 2.36 "success" declaration on CI alone.
+
+### Current blocking review questions
+
+- Which independently verifiable evidence can bind **compiled installation
+  defaults** to the selected writer without executing Git during preflight?
+  A developer-configured guessed path or versioned whitelist does not suffice.
+- Does replacement of `git:configuration-chain` require a new dedicated
+  metadata authority carrier to *name* roots on less common installations?
+  If so, the owner must return a concrete carrier proposal and migration plan
+  before implementation can request it. There is no implied all-filesystem
+  access.
+- Can the gix attribute/index/tree and ref stack preserve *all* current
+  configured filter and symbolic checkout semantics under existing exact
+  permissions and budget limits? Unsupported parts must be listed explicitly
+  and fail closed rather than use Git CLI for those cases.
+
+**Acceptance gate:** This amendment remains **PROPOSED / NOT ACCEPTED**
+until there is an explicit independent security/API review receipt,
+maintainer decision naming the accepted scope, source-backed proof of any
+required installation profile, and a separate target-branch governance
+publication. The existing October 2026 ADR-089 contract remains
+authoritative throughout. No implementation PR or native Windows evidence
+is accepted merely by approving this review-only document.
