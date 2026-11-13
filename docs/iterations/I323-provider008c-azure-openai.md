@@ -188,3 +188,9 @@ HTTP receipt: initial restored Responses suite failed its inherited error-text a
 kept bounded semantic-terminal/HTTP-EOF assertions. Rerun passed Chat matrix (1 test, six cases)
 and all 7 Responses tests, including redirect and SSE error safety. Full Agent/native CI remains
 pending; this is focused local evidence, not complete C acceptance.
+
+Resumed exact remote dda7a60d after local worktree loss; retained old dirty directory. Added
+isolated-child Entra HTTP test for both Chat and Responses, asserting Bearer-only requests despite
+configured API key, dispatch-owned credentials and redacted authentication errors. Test compilation
+started in restored environment; no token-test pass claimed. Latest fetched main is d92aabaa;
+rebase and fresh full validation remain required before any merge candidate.
