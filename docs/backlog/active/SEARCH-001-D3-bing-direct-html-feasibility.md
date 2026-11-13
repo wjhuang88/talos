@@ -1,6 +1,6 @@
 # SEARCH-001-D3: Bing Direct-HTML Multi-Endpoint Feasibility
 
-**Status**: Ready / Unclaimed — D3.1 documentary intake merged (#938, `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`); D3.2 *synthetic test-only* claim proposed, not effective until separate governance merge. No live endpoint or provider admission.
+**Status**: Active / Claimed — proposed D3.2 test-only claim via governance #942, **ineffective until that PR merges**. D3.1 documentary intake already merged (#938, `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`); live endpoint/provider admission remains blocked.
 
 | Field | Value |
 |---|---|
@@ -17,15 +17,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | None — research-only intake, not an implementation claim |
-| Claimed At | Not applicable |
+| Claim State | Claimed — proposed; ineffective until governance #942 merges |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
+| Work Slice | D3.2 only: inventory BF-01..BF-13 against existing Bing parser/compatibility tests and add missing *test-only* synthetic HTML and local/loopback negative characterization (organic/ad, valid/empty/challenge, denied redirect, root-vs-query probe, cancellation/permission and source identity); publish evidence; no runtime, new endpoints, real Bing HTTP, permissions or provider admission. |
+| Claimed At | 2026-11-13 (proposed; effective on merge only) |
 | Source Issue | #937 |
-| Governance Claim PR | Pending — D3.2 atomic claim + activation proposal |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
+| Governance Claim PR | #942 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | User repeatedly requested continuation of D3 development following accepted #938; this test-only, non-overlapping I326 is proposed via #942. Exact-head CI, two governance validators, independent read-only review and final CAS must pass before target-branch claim/activation. |
 | Implementation PR | Not started — D3.2 requires effective claim first |
 | Last Updated | 2026-11-13 |
 | Handoff / Release Condition | D3.2 synthetic-only test code starts only after effective governed claim; new live automated Bing SERP acquisition, endpoint additions, default routing or provider admission remain blocked on separately resolved use/output rights, ADR-090 and independent security/API approval. |
