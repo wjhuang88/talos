@@ -49,6 +49,14 @@ pub struct OpenAIProvider {
 }
 
 impl OpenAIProvider {
+    fn azure_stream(&self, rx: mpsc::Receiver<AgentEvent>) -> mpsc::Receiver<AgentEvent> {
+        if self.azure.is_some() {
+            crate::azure_transport::project_stream(rx, crate::azure_transport::redact_stream_error)
+        } else {
+            rx
+        }
+    }
+
     async fn isolated_decision(
         &self,
         messages: &[Message],
@@ -87,7 +95,7 @@ impl OpenAIProvider {
             Duration::from_secs(self.timeout_config.stream_idle_timeout_secs),
             talos_core::tool::ToolProtocol::Native,
         ));
-        Ok(rx)
+        Ok(self.azure_stream(rx))
     }
 
     /// Create a new OpenAI provider.
@@ -574,7 +582,7 @@ impl LanguageModel for OpenAIProvider {
             Duration::from_secs(timeout_config.stream_idle_timeout_secs),
             protocol,
         ));
-        Ok(rx)
+        Ok(self.azure_stream(rx))
     }
 
     async fn stream_with_invocation_integrity(
@@ -649,6 +657,15 @@ impl LanguageModel for OpenAIProvider {
             Duration::from_secs(self.timeout_config.stream_idle_timeout_secs),
             protocol,
         ));
+        let rx = if self.azure.is_some() {
+            crate::azure_transport::project_stream(rx, |event| {
+                if let talos_core::provider::ProviderInvocationEvent::Legacy(event) = event {
+                    crate::azure_transport::redact_stream_error(event);
+                }
+            })
+        } else {
+            rx
+        };
         Ok(ProviderInvocationStream::original(rx))
     }
 
@@ -662,7 +679,7 @@ impl LanguageModel for OpenAIProvider {
             Duration::from_secs(timeout_config.first_packet_timeout_secs),
             Duration::from_secs(timeout_config.stream_idle_timeout_secs),
         ));
-        Ok(rx)
+        Ok(self.azure_stream(rx))
     }
 
     async fn stream_with_tools(
@@ -679,7 +696,7 @@ impl LanguageModel for OpenAIProvider {
             Duration::from_secs(timeout_config.first_packet_timeout_secs),
             Duration::from_secs(timeout_config.stream_idle_timeout_secs),
         ));
-        Ok(rx)
+        Ok(self.azure_stream(rx))
     }
 
     async fn stream_with_tools_and_progress(
@@ -704,7 +721,7 @@ impl LanguageModel for OpenAIProvider {
             Duration::from_secs(timeout_config.first_packet_timeout_secs),
             Duration::from_secs(timeout_config.stream_idle_timeout_secs),
         ));
-        Ok(rx)
+        Ok(self.azure_stream(rx))
     }
 
     fn request_preview(&self, messages: &[Message]) -> Option<Value> {

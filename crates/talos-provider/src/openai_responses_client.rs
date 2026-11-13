@@ -135,8 +135,11 @@ impl OpenAIResponsesClient {
                 .as_ref()
                 .is_none_or(|reasoning| reasoning.replay);
         let preview_messages = crate::image_io::preview_messages(messages);
-        let messages =
+        let mut messages =
             replay_safe_messages(&self.provider_key, &self.model, replay, &preview_messages);
+        if let Some(azure) = &self.azure {
+            azure.project_replay(&mut messages);
+        }
         let mut body = build_request_body(
             &self.model,
             &messages,
@@ -197,7 +200,10 @@ impl OpenAIResponsesClient {
                 .reasoning
                 .as_ref()
                 .is_none_or(|reasoning| reasoning.replay);
-        let messages = replay_safe_messages(&self.provider_key, &self.model, replay, messages);
+        let mut messages = replay_safe_messages(&self.provider_key, &self.model, replay, messages);
+        if let Some(azure) = &self.azure {
+            azure.project_replay(&mut messages);
+        }
         let mut body = build_request_body(
             &self.model,
             &messages,
@@ -220,7 +226,13 @@ impl OpenAIResponsesClient {
             Duration::from_secs(self.timeout_config.first_packet_timeout_secs),
             Duration::from_secs(self.timeout_config.stream_idle_timeout_secs),
         ));
-        Ok(rx)
+        if let Some(azure) = self.azure.clone() {
+            Ok(crate::azure_transport::project_stream(rx, move |event| {
+                azure.bind_event(event)
+            }))
+        } else {
+            Ok(rx)
+        }
     }
 
     pub(crate) async fn send_request(

@@ -164,3 +164,9 @@ Restored private Chat/Responses Azure dispatch, redirect refusal, HTTP error-bod
 redacted previews and Chat capability identity binding. Factory exposure remains intentionally
 pending replay binding and stream-error safety integration. Compilation is in progress; this is
 an incomplete recovery checkpoint, not a reviewed implementation candidate.
+
+Restored explicit azure-openai factory dispatch for Chat/Responses; private adapters now bind
+Responses opaque replay to resource/deployment, and redact Azure stream errors on legacy and
+original invocation paths. Bounded forwarding closes on consumer cancellation. Locked provider
+compilation rerun; full HTTP/Agent regression, supplied-token host handling, catalog/UI and SDK
+acceptance are still pending. No implementation merge or completion claimed.

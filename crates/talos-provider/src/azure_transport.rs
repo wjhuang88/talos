@@ -12,6 +12,48 @@ pub(crate) struct AzureConnection {
 }
 
 impl AzureConnection {
+    pub(crate) fn project_replay(&self, messages: &mut [talos_core::message::Message]) {
+        use talos_core::message::{Message, ReasoningBlock};
+        let prefix = format!("{}:", self.identity());
+        for message in messages {
+            if let Message::Assistant {
+                reasoning: Some(reasoning),
+                ..
+            } = message
+            {
+                reasoning.blocks.retain_mut(|block| match block {
+                    ReasoningBlock::Redacted { data } => {
+                        if let Some(inner) = data.strip_prefix(&prefix) {
+                            *data = inner.to_owned();
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    _ => true,
+                });
+            }
+        }
+    }
+
+    pub(crate) fn bind_event(
+        &self,
+        output: &mut crate::openai_responses_sse::ResponsesStreamOutput,
+    ) {
+        use talos_core::message::{AgentEvent, ReasoningBlock};
+        if let crate::openai_responses_sse::ResponsesStreamOutput::Agent(event) = output {
+            redact_stream_error(event);
+            if let AgentEvent::ReasoningComplete { blocks } = event {
+                let prefix = format!("{}:", self.identity());
+                for block in blocks {
+                    if let ReasoningBlock::Redacted { data } = block {
+                        *data = format!("{prefix}{data}");
+                    }
+                }
+            }
+        }
+    }
+
     pub(crate) fn new(
         profile: &AzureTransportConfig,
         model: &str,
@@ -130,4 +172,30 @@ mod tests {
                 .is_err()
         );
     }
+}
+
+pub(crate) fn redact_stream_error(event: &mut talos_core::message::AgentEvent) {
+    if let talos_core::message::AgentEvent::Error { message } = event {
+        *message = "Azure response stream failed".into();
+    }
+}
+
+pub(crate) fn project_stream<T: Send + 'static>(
+    mut source: tokio::sync::mpsc::Receiver<T>,
+    project: impl Fn(&mut T) + Send + 'static,
+) -> tokio::sync::mpsc::Receiver<T> {
+    let (tx, rx) = tokio::sync::mpsc::channel(32);
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = tx.closed() => break,
+                event = source.recv() => {
+                    let Some(mut event) = event else { break };
+                    project(&mut event);
+                    if tx.send(event).await.is_err() { break; }
+                }
+            }
+        }
+    });
+    rx
 }

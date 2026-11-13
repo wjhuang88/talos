@@ -102,6 +102,43 @@ fn build_with_connection(
     );
 
     match resolution.protocol {
+        ProviderProtocol::AzureOpenAI => {
+            if original_endpoint.is_some() {
+                return Err(ProviderError::InvalidResponse(
+                    "Azure requires its explicit resource profile without endpoint overrides"
+                        .into(),
+                ));
+            }
+            let profile = provider_config.azure.as_ref().ok_or_else(|| {
+                ProviderError::InvalidResponse("Azure resource profile is required".into())
+            })?;
+            let settings = provider_config.models.get(&config.model);
+            let (shape, _, _) = profile
+                .resolve_model(&config.model, settings)
+                .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
+            let azure =
+                crate::azure_transport::AzureConnection::new(profile, &config.model, settings)?;
+            match shape {
+                talos_config::AzureBodyShape::Chat => Ok(Arc::new(
+                    OpenAIProvider::new(api_key, &config.model)
+                        .with_azure(azure)?
+                        .with_reasoning(reasoning, output_limit)
+                        .with_reasoning_disabled(reasoning_disabled)
+                        .with_timeout_config(timeout),
+                )),
+                talos_config::AzureBodyShape::Responses => Ok(Arc::new(
+                    OpenAIResponsesProvider::new(api_key, &config.model)
+                        .with_provider_key(&config.provider)
+                        .with_azure(azure)?
+                        .with_reasoning(reasoning, output_limit)
+                        .with_reasoning_disabled(reasoning_disabled)
+                        .with_timeout_config(timeout),
+                )),
+                _ => Err(ProviderError::InvalidResponse(
+                    "unsupported Azure body shape".into(),
+                )),
+            }
+        }
         ProviderProtocol::AnthropicMessages => {
             let mut provider = AnthropicProvider::new(api_key, &config.model);
             if let Some(base_url) = base_url {

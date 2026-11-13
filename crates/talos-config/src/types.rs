@@ -46,6 +46,9 @@ pub enum ProviderProtocol {
     /// Google Gemini generateContent wire format.
     #[serde(rename = "google-gemini")]
     GoogleGemini,
+    /// Explicit Azure OpenAI transport.
+    #[serde(rename = "azure-openai")]
+    AzureOpenAI,
 }
 
 impl ProviderProtocol {
@@ -64,6 +67,7 @@ impl std::fmt::Display for ProviderProtocol {
             Self::OpenAIChat => "openai-chat",
             Self::OpenAIResponses => "openai-responses",
             Self::GoogleGemini => "google-gemini",
+            Self::AzureOpenAI => "azure-openai",
         })
     }
 }
