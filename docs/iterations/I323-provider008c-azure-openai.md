@@ -121,3 +121,35 @@ has not begun. Next: address review findings, validate/review the final exact he
 Completion Commit: Pending.
 
 #915 intake registration was inspected at main 6c81390a; it is the same unclaimed owner, not a competing claim. #918 supersedes intake only upon reviewed merge.
+
+## Implementation checkpoint — 2026-11-12
+
+Claim #918 merged f61a15cd3f0be81489e69f92d374fc8ee41eddec. Implementation worktree
+`talos-azure`, branch `feat/provider008c-azure`, starts from main 2f5da14d.
+Initial config types and endpoint/deployment validation are local work in progress; not yet wired
+into ProviderConfig/factory, no delivered Azure runtime. Focused locked tests started; dependency
+index acquisition pending, no test pass claimed. Next: integrate config precedence and shared
+Chat/Responses transport dispatch, complete tests/docs/local convergence before candidate push.
+
+Config checkpoint: ProviderConfig.azure merge and model-local azure_deployment/azure_shape are
+implemented locally. First integration compile failed E0063 on existing exhaustive config literals;
+updated builtins, OpenCode conversion and test fixtures with explicit absent fields. Subsequent
+`cargo test --locked -p talos-config azure` passed 3 tests (273 library tests filtered; integration
+suites filtered to zero). This is focused config evidence only, not workspace/runtime acceptance.
+Runtime/factory routing, catalog activation, SDK migration and full acceptance remain pending.
+
+## Recovery checkpoint — 2026-11-13
+
+Workspace again restored to config-only source at 2f5da14d. Later transport, Agent/HTTP tests,
+security fixes and logs from the previous execution are absent. Historical conversation results
+are not validation of this recovered tree. Preserve this configuration stage as a recovery commit;
+this is not a stable merge candidate or Completion Commit. Restore runtime work only after durable
+checkpointing. Review previously found two required boundaries: Azure Chat capability identity must
+include resource/deployment; Responses opaque replay must be bound to the same identity. Also
+restore stream-error redaction and isolated token/redirect negative tests. C/D and #724 remain open.
+
+Recovery continuation: verified remote backup ef94abf12337a716e83f61eacde8fefa1809416f
+has the same tree as local 143dc9c1. Rebased configuration onto main f2e30d99 without
+conflicts. Restored model body/deployment resolution, endpoint-override refusal and token-env
+name validation. `cargo test --locked -p talos-config azure`: 4 passed, 273 library tests
+filtered; all integration suites filtered to zero. This does not validate runtime transport.

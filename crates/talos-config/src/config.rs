@@ -478,6 +478,9 @@ impl Config {
             if user_config.api_key_env.is_some() {
                 config.api_key_env = user_config.api_key_env.clone();
             }
+            if user_config.azure.is_some() {
+                config.azure = user_config.azure.clone();
+            }
             if user_config.gemini.is_some() {
                 config.gemini = user_config.gemini.clone();
             }

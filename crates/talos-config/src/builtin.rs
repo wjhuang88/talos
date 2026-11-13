@@ -4,6 +4,7 @@ use std::collections::HashMap;
 pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
     match name {
         "anthropic" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::AnthropicMessages,
             tool_protocol: Default::default(),
             gemini: None,
@@ -14,6 +15,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "openai" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -24,6 +26,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "google" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -34,6 +37,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "deepseek" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -44,6 +48,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "qwen" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -54,6 +59,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "zhipuai" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -64,6 +70,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "zhipuai-coding-plan" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -74,6 +81,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "zai" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -84,6 +92,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "zai-coding-plan" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -94,6 +103,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "minimax" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -104,6 +114,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "moonshot" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -114,6 +125,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "openrouter" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
@@ -124,6 +136,7 @@ pub fn builtin_provider_config(name: &str) -> Option<ProviderConfig> {
             timeout: Default::default(),
         }),
         "groq" => Some(ProviderConfig {
+            azure: None,
             protocol: ProviderProtocol::OpenAIChat,
             tool_protocol: Default::default(),
             gemini: None,
