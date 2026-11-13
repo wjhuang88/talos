@@ -87,8 +87,9 @@ fn gix_admitted_config_graph_can_emit_host_records_without_git() {
     // The test fixture acts as a separately admitted source; neither
     // gix nor the adapter chooses roots, reads arbitrary files or runs Git.
     let dir = tempfile::tempdir().expect("fixture");
-    let root = dir.path().join("root.conf");
-    let included = dir.path().join("included.conf");
+    let fixture = dir.path().canonicalize().expect("canonical fixture");
+    let root = fixture.join("root.conf");
+    let included = fixture.join("included.conf");
     std::fs::write(
         &root,
         b"[core]\n    bare = false\n[include]\n    path = included.conf\n",
@@ -131,7 +132,8 @@ fn gix_admitted_config_graph_can_emit_host_records_without_git() {
 #[test]
 fn gix_preflight_refuses_unadmitted_config_sources() {
     let dir = tempfile::tempdir().expect("fixture");
-    let root = dir.path().join("not-admitted.conf");
+    let fixture = dir.path().canonicalize().expect("canonical fixture");
+    let root = fixture.join("not-admitted.conf");
     let env = BTreeMap::<OsString, OsString>::new();
     let sources = target_config::Sources::new(None, [root.clone()]).expect("source plan");
     assert!(
