@@ -1,5 +1,9 @@
 # Product Backlog
 
+## SEARCH-001-D3-T1 / #941 — Bing synthetic negative conformance (proposed)
+
+[Owner](active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](../iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): **Ready / Proposed / Unclaimed**, independent test-only synthetic parser and negative host-admission fixtures after D3 research #938. Atomic governance claim is required before committed test code. No live Bing, new URL authority, production changes, provider admission or #624 closure; I324/I325/I320 remain separate.
+
 ## SEARCH-001-D3 / #937 — Bing direct HTML, multi-endpoint feasibility (intake only)
 
 [Owner](active/SEARCH-001-D3-bing-direct-html-feasibility.md) / [source and offline test matrix](../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md): **Intake / Proposed / Unclaimed**. Reuse the existing Bing CN parser and protected request boundary for a *documentary-only* comparison with unverified `www.bing.com` and `bing.cn` candidates. Microsoft 2026-09-30 usage/result rights block new automated distributed-default access; no live SERP acquisition, code/test edits, new endpoint, claim, Auto reorder or independent-provider admission. D/#644 remains BLOCKED/ZERO-ADMISSION, D2/#848 separate, E/F/G/I gated; #624 stays Open.
