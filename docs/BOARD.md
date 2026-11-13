@@ -29,9 +29,9 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 [STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I322](iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed via #909 `a9914b7`; C claim #911 merged `60da1bb`, implementation [#912](https://github.com/wjhuang88/talos/pull/912) merged `3df409ef9ed707756350f2c7d4b2c8819f157222` after [exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758), both governance validators, independent no-blocker API/doc review and merge CAS. Minimal domain-owned Session Pending/Todo, Memory, Evolution and Exploration traits forward to unchanged stores with no runtime/SQL/schema/Host changes. Global closed #901 Issue-matrix warning is separate ADR-071 advisory, not a passed job. **I322 C complete; D selected for separate I325/#932 governance, E/F unclaimed, #897 E2/E3 gated, #670 Open.**
 
-## STORE-002 / I325 D — proposed local delegation claim #932
+## STORE-002 / I325 D — implementation Review / Claimed
 
-[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I325](iterations/I325-store-002-local-delegation.md) / [#670](https://github.com/wjhuang88/talos/issues/670): C #912 code and #930 closure merged; Draft governance [#932](https://github.com/wjhuang88/talos/pull/932) proposes a bounded D claim (**not effective until merge**). Reuse existing C traits/forwarders and current SQLite/FTS5/TLOG/JSONL storage, prove trait-directed local delegation and exact typed semantics without rewriting SQL, schemas, defaults, production callers or Host. E/F and #897 Host remain unclaimed/gated.
+[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I325](iterations/I325-store-002-local-delegation.md) / [#670](https://github.com/wjhuang88/talos/issues/670): C #912 and C closure #930 accepted; governance [#932](https://github.com/wjhuang88/talos/pull/932) **merged** at e49ccde70556403a9d7b66551565e2b6c81ad32d. The D candidate adds only real trait-directed SQLite/FTS5/TLOG/JSONL tests and [coverage inventory](reference/STORE-002-I325-D-LOCAL-DELEGATION-INVENTORY-2026-11-13.md). No new adapters, SQL/schema, default profile or caller/Host rewiring; independent API review and exact-head CI pending. E/F and #897 remain gated.
 
 ## ARCH-035 / I320 — E0/E1 Complete; parent E2/E3 Blocked
 
