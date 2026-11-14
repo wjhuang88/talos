@@ -106,4 +106,58 @@ mod tests {
         let contract: &dyn ExplorationPersistence = &store;
         assert_eq!(contract.count_sources().expect("count"), 0);
     }
+
+    #[test]
+    fn local_exploration_trait_delegates_atomic_source_fts_and_citation_checks() {
+        let mut store = ExplorationStore::open_memory().expect("exploration store");
+        let contract: &mut dyn ExplorationPersistence = &mut store;
+        let run = contract.create_run("local delegation", None).expect("run");
+        let source = Source {
+            id: uuid::Uuid::new_v4().to_string(),
+            run_id: Some(run.id.clone()),
+            url: Some("https://example.com/delegation".into()),
+            title: "Delegation source".into(),
+            authors: None,
+            publication_date: None,
+            fetched_at: chrono::Utc::now(),
+            license_notes: None,
+            content_hash: "d-source-hash".into(),
+        };
+        let chunk = SourceChunk {
+            id: uuid::Uuid::new_v4().to_string(),
+            source_id: source.id.clone(),
+            chunk_ordinal: 0,
+            text: "traitforwarding preserves citations".into(),
+            token_estimate: Some(5),
+        };
+        contract
+            .insert_source_with_chunks(&source, &[chunk.clone()])
+            .expect("atomic source and chunk");
+        assert_eq!(contract.count_sources().expect("count"), 1);
+        let persisted = contract
+            .get_source(&source.id)
+            .expect("source")
+            .expect("exists");
+        assert_eq!(persisted.title, source.title);
+        let hits = contract.search_chunks("traitforwarding", 2).expect("fts");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].chunk_id, chunk.id);
+        assert_eq!(hits[0].source_id, source.id);
+
+        let invalid = Claim {
+            id: uuid::Uuid::new_v4().to_string(),
+            run_id: Some(run.id.clone()),
+            source_chunk_id: Some("missing-citation-chunk".into()),
+            normalized_text: "Unbacked claim".into(),
+            confidence: 0.8,
+            status: "active".into(),
+            freshness: "current".into(),
+            created_at: chrono::Utc::now(),
+        };
+        assert!(matches!(
+            contract.insert_claim(&invalid),
+            Err(ExplorationError::CitationValidation(_))
+        ));
+        contract.complete_run(&run.id).expect("complete run");
+    }
 }
