@@ -1,8 +1,8 @@
 ## I323 Azure — proposed claim and activation
 
-## I327 / SEARCH-001-D3-T2 — proposed sponsored-ancestor correction
+## I327 / SEARCH-001-D3-T2 — Complete / Closed upon owner-first closeout
 
-[I327](I327-search-bing-sponsored-ancestor-rejection.md) / [owner](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Active / Claimed proposed via #948 (ineffective until merge)** pending atomic governance activation. Limit to existing Bing CN `b_ad` ancestor filter and synthetic parser regression after T1/#941 completed. No live Bing, endpoint permission, provider identity, or parent #624 acceptance change.
+[I327](I327-search-bing-sponsored-ancestor-rejection.md) / [owner](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Complete / Closed upon owner-first closeout merge**. Governance #948 merged `5704bb66aca22919347705a5bff40a84d641c3c9`; implementation [#949](https://github.com/wjhuang88/talos/pull/949) Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99`. Exact-head [CI43465355386](https://github.com/wjhuang88/talos/actions/runs/43465355386) attempt 2 all eight successful and independent source review/CAS. Explicit synthetic `b_ad` ancestor correction only. #947 closes after closeout; #937/#624 stay Open, no new Bing admission.
 
 ## I326 / SEARCH-001-D3-T1 — Complete / Closed upon owner-first closeout
 
