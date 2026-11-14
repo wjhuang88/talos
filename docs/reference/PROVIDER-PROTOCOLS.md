@@ -328,3 +328,9 @@ history. Chat capability cache identity includes the same binding and the logica
 
 This is an unreleased implementation candidate. Full acceptance remains open in I323/#914;
 controlled fixtures are not live Azure service acceptance. No release or completion is implied.
+
+Azure browser rows show the selected body shape and whether it came from model configuration,
+provider configuration or the conservative default. Supplied-token `ready` indicates a valid
+profile selection only: the browser does not read the token or verify authentication. Missing
+or invalid tokens still fail at request dispatch. Conflicting provider/model endpoint overrides
+are invalid profiles and must be removed instead of relocating the profile credential.

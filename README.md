@@ -592,6 +592,15 @@ browser tools with live-session-only signed replay. Only the exact `google/gemin
 endpoints; explicit protocol overrides win. Final acceptance remains pending. Configuration examples, ADC discovery and migration limits are in the
 [Gemini transport guide](docs/reference/PROVIDER-PROTOCOLS.md#explicit-gemini-transports-unreleased-implementation-candidate).
 
+The Azure implementation candidate (I323 / #914) supports explicit `azure-openai` profiles,
+per-model Chat/Responses selection and deployment aliases. V1 supports both bodies; explicit dated
+deployment mode supports Chat only. Choose an API key or a supplied Entra token environment
+variable, read at dispatch without automatic login or refresh. See the
+[protocol guide](docs/reference/PROVIDER-PROTOCOLS.md) and
+[SDK migration contract](docs/reference/RUNTIME-SDK-CONTRACT.md).
+Full acceptance remains pending; no live Azure service validation or release is claimed.
+
+
 ## Run Talos
 
 Start the interactive TUI in the current directory:

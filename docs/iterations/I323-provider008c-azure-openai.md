@@ -234,3 +234,16 @@ round and the UI body-shape/source plus lazy supplied-token configuration displa
 replays onto main 5704bb66. Current rebase testing is in progress; the UI regression has not yet
 completed. The earlier lost Chat Agent matrix and README/architecture/release additions still
 need restoration. No full local preflight, exact-head CI or final review is claimed.
+
+### 2026-11-14 current-main focused validation
+
+On the 5704bb66 main replay, the restored Azure HTTP suites passed: Chat 1 test (six transport/tool
+mode combinations), Responses 9 tests (including ordered-image actual Agent continuation and
+three-mode silent-connection cancellation), and supplied Entra token 1 test (both body shapes).
+This is locked local evidence, not full preflight or native CI. UI review identified a fixture
+that could not appear in the built-in-only browser and missing provider-base-url conflict checks;
+both were corrected, with the UI test using a real Azure catalog model and asserting the conflict.
+UI regression execution and the newly restored six-case actual Chat Agent read test are pending
+at this checkpoint. The Chat Agent test currently covers tools, not ordered images/reasoning.
+README en/zh, architecture and unreleased notes are restored. Browser ready means authentication
+configuration is selected, not that the supplied token has been read or validated.

@@ -798,3 +798,14 @@ private replay markers, continuation fails before model dispatch.
 Only the two exact Flash catalog/profile pairs documented in PROVIDER-PROTOCOLS infer Gemini;
 explicit protocol overrides and replaced endpoints retain resolver precedence. Full candidate
 acceptance is pending. Azure and Bedrock remain separately governed sibling work.
+
+### Azure transport boundary (I323 implementation candidate)
+
+An explicit Azure profile composes the existing Chat or stateless Responses adapter with validated
+resource origin, deployment mapping, API mode and exclusive authentication headers. Logical model
+identity remains available for capability decisions; only the wire model uses the deployment alias.
+The transport disables redirects and rejects endpoint overrides before dispatch. Responses opaque
+reasoning is bound to the full Azure destination/deployment identity before persistence and is
+removed when that identity changes. API keys and supplied Entra tokens never share a request;
+credential acquisition and automatic refresh beyond supplied tokens remain #132. See ADR-103 and
+PROVIDER-PROTOCOLS for configuration and acceptance boundaries. No new parser or cloud SDK is added.

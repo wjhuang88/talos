@@ -659,9 +659,10 @@ impl Config {
                 crate::AzureAuthentication::EntraToken { .. }
             )
         {
-            return profile
-                .resolve_model(model, configured.and_then(|c| c.models.get(model)))
-                .is_ok();
+            return configured.is_some_and(|c| c.base_url.is_none())
+                && profile
+                    .resolve_model(model, configured.and_then(|c| c.models.get(model)))
+                    .is_ok();
         }
         self.provider_authenticated(provider)
             || (protocol == ProviderProtocol::GoogleGemini

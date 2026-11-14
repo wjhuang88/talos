@@ -322,6 +322,14 @@ export ANTHROPIC_API_KEY="..."
 在认证配置匹配且端点未替换时推断该协议；显式协议配置优先。最终验收仍待完成。配置示例、ADC 发现规则及迁移限制见
 [Gemini 传输说明](docs/reference/PROVIDER-PROTOCOLS.md#explicit-gemini-transports-unreleased-implementation-candidate)。
 
+Azure 实现候选（I323 / #914）通过显式 `azure-openai` 配置支持模型级 Chat/Responses
+消息体和 deployment 别名。v1 支持两种消息体，显式日期版本的 deployment 模式仅支持 Chat。
+认证可选择 API key 或指定环境变量中的 Entra token；token 在发请求时读取，不包含自动登录、
+签发或刷新。配置见[协议参考](docs/reference/PROVIDER-PROTOCOLS.md)，迁移见
+[SDK 契约](docs/reference/RUNTIME-SDK-CONTRACT.md)。当前仍待完整验收，未发布，也不代表
+已完成真实 Azure 服务验收。
+
+
 ## 运行 Talos
 
 在当前目录启动交互式 TUI：
