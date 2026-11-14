@@ -339,6 +339,98 @@ fn gix_attributes_strict_parse_refuses_malformed_filter_sources() {
     );
 }
 
+
+#[test]
+fn gix_admitted_filter_attributes_match_native_git_fixture() {
+    // Native Git is a test-only differential oracle, never a preflight probe.
+    // Search consumes only the already validated in-memory .gitattributes
+    // source and must not discover or read ambient Git attribute files.
+    const ATTRIBUTES: &[u8] = b"[attr]myfilter filter=lfs\n*.bin myfilter\n*.txt -filter\n*.jpg filter=photo\n*.md !filter\n";
+    assert!(
+        gix_attributes::parse(ATTRIBUTES).all(|line| {
+            let Ok((_, assignments, _)) = line else {
+                return false;
+            };
+            assignments.into_iter().all(|entry| entry.is_ok())
+        }),
+        "gix search may not silently ignore malformed filter assignments"
+    );
+
+    let dir = tempfile::tempdir().expect("native filter fixture");
+    let attributes_file = dir.path().join(".gitattributes");
+    std::fs::write(&attributes_file, ATTRIBUTES).expect("attribute fixture");
+    let init = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["init", "--quiet"])
+        .output()
+        .expect("native Git test-only init");
+    assert!(init.status.success(), "native fixture initialization failed");
+
+    let mut search = gix_attributes::Search::default();
+    let mut metadata = gix_attributes::search::MetadataCollection::default();
+    search
+        .add_patterns_buffer(
+            ATTRIBUTES,
+            ".gitattributes".into(),
+            None,
+            &mut metadata,
+            true,
+        )
+        .expect("gix in-memory pattern search");
+    for (path, expected) in [
+        ("sample.bin", "filter=lfs"),
+        ("sample.txt", "-filter"),
+        ("sample.jpg", "filter=photo"),
+        ("sample.md", "!filter"),
+    ] {
+        let native = std::process::Command::new("git")
+            .arg("-C")
+            .arg(dir.path())
+            .args(["check-attr", "-z", "filter", "--", path])
+            .env("GIT_ATTR_NOSYSTEM", "1")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", dir.path().join("empty-global-config"))
+            .output()
+            .expect("native attribute fixture oracle");
+        assert!(native.status.success(), "native check-attr failed: {path}");
+        let fields = native.stdout.split(|b| *b == 0).collect::<Vec<_>>();
+        assert_eq!(fields.len(), 4, "expected native NUL attribute triple");
+        assert_eq!(fields[0], path.as_bytes());
+        assert_eq!(fields[1], b"filter");
+        assert!(fields[3].is_empty());
+        let native_value = std::str::from_utf8(fields[2]).expect("ASCII native filter state");
+        let native_assignment = match native_value {
+            "unset" => "-filter".to_owned(),
+            "unspecified" => "!filter".to_owned(),
+            "set" => "filter".to_owned(),
+            value => format!("filter={value}"),
+        };
+        assert_eq!(native_assignment, expected, "unexpected native fixture: {path}");
+
+        let mut outcome = gix_attributes::search::Outcome::default();
+        outcome.initialize_with_selection(&metadata, ["filter"]);
+        assert!(
+            search.pattern_matching_relative_path(
+                path.into(),
+                gix_attributes::glob::pattern::Case::Sensitive,
+                Some(false),
+                &mut outcome,
+            ),
+            "gix did not match the admitted attribute pattern: {path}"
+        );
+        let gix_assignments = outcome
+            .iter_selected()
+            .map(|item| item.assignment.to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            gix_assignments,
+            vec![native_assignment],
+            "filter effect differs between native Git and gix: {path}"
+        );
+    }
+}
+
 #[test]
 fn gix_config_frontier_denial_prevents_all_content_capture() {
     let dir = tempfile::tempdir().expect("fixture");
