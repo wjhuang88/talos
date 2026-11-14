@@ -19,7 +19,14 @@ pub(crate) async fn forward_response_stream(
     mut source: mpsc::Receiver<ResponsesStreamOutput>,
     sink: InvocationSender,
 ) {
-    while let Some(output) = source.recv().await {
+    loop {
+        let output = tokio::select! {
+            _ = sink.closed() => return,
+            output = source.recv() => match output {
+                Some(output) => output,
+                None => return,
+            },
+        };
         let sent = match output {
             ResponsesStreamOutput::Agent(event) => sink.send(event).await,
             ResponsesStreamOutput::FunctionCall {

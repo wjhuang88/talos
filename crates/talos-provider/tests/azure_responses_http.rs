@@ -578,3 +578,68 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
     first.assert_async().await;
     second.assert_async().await;
 }
+
+#[tokio::test]
+async fn azure_cancel_releases_silent_http_connection_in_all_tool_modes() {
+    use talos_core::tool::ToolProtocol;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    for protocol in [
+        ToolProtocol::Native,
+        ToolProtocol::Compat,
+        ToolProtocol::TalosStrict,
+    ] {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener");
+        let address = listener.local_addr().expect("address");
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("connection");
+            let mut request = Vec::new();
+            let mut buffer = [0; 4096];
+            loop {
+                let count = socket.read(&mut buffer).await.expect("request");
+                assert!(count > 0);
+                request.extend_from_slice(&buffer[..count]);
+                assert!(request.len() < 65536);
+                if let Some(end) = request.windows(4).position(|bytes| bytes == b"\r\n\r\n") {
+                    let headers = String::from_utf8_lossy(&request[..end]);
+                    let length: usize = headers
+                        .lines()
+                        .find_map(|line| {
+                            let (key, value) = line.split_once(':')?;
+                            key.eq_ignore_ascii_case("content-length")
+                                .then(|| value.trim().parse().expect("length"))
+                        })
+                        .expect("content length");
+                    if request.len() >= end + 4 + length {
+                        break;
+                    }
+                }
+            }
+            socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n").await.expect("headers");
+            // Keep the body quiet: cancellation must not wait for the five-second timeout.
+            let closed = tokio::time::timeout(Duration::from_secs(2), socket.read(&mut buffer))
+                .await
+                .expect("prompt disconnect");
+            assert!(matches!(closed, Ok(0) | Err(_)));
+        });
+        let provider = responses_provider(format!("http://{address}"));
+        let (progress, _) = tokio::sync::mpsc::unbounded_channel();
+        let receiver = provider
+            .stream_with_protocol(
+                &[Message::User {
+                    content: "cancel".into(),
+                }],
+                &[],
+                protocol,
+                progress,
+            )
+            .await
+            .expect("stream");
+        drop(receiver);
+        tokio::time::timeout(Duration::from_secs(3), server)
+            .await
+            .expect("bounded server")
+            .expect("fixture task");
+    }
+}

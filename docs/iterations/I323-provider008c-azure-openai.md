@@ -212,3 +212,19 @@ including actual Responses envelope binding. Isolated Entra HTTP test passed 1 t
 bodies. Actual permission-gated Responses Agent read test passed 1 test (7 HTTP tests filtered).
 These are current local results, not native CI/full matrix acceptance. Added protocol configuration,
 credential limitations and next-minor SDK migration documentation. Full acceptance remains open.
+
+### 2026-11-14 cancellation review recovery
+
+Independent Agent source review found that dropping an Azure Responses receiver did not stop a
+silent HTTP stream until its first-packet/idle timeout. The parser and both native/text forwarding
+loops now select downstream closure, allowing cancellation to reach and release the response.
+A controlled TCP test covers Native/Compat/TalosStrict, demands disconnect within two seconds,
+and uses a five-second provider timeout. Reviewer source/design recheck found this correction
+addresses the blocker; this is not full candidate approval or natural-person GitHub approval.
+
+Before another environment reset, the local Azure HTTP suite passed Chat 1 / Responses 9 / token 1,
+and config Azure tests passed 5. Those results included a two-image Responses Agent test. The reset
+lost that image extension, pending Chat Agent/UI changes and local logs before remote save. This
+checkpoint restores the cancellation correction/test only on the durable 3b921558 baseline; rerun
+its tests before assigning current-head evidence. Do not treat lost UI/Chat tests as passed or
+claim this checkpoint contains the lost image extension. Remaining acceptance and #724 stay open.

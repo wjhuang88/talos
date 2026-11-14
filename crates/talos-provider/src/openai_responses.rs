@@ -312,7 +312,14 @@ async fn forward_protocol_stream(
         return;
     }
     let mut text = String::new();
-    while let Some(output) = source.recv().await {
+    loop {
+        let output = tokio::select! {
+            _ = sink.closed() => return,
+            output = source.recv() => match output {
+                Some(output) => output,
+                None => return,
+            },
+        };
         match output {
             ResponsesStreamOutput::Agent(AgentEvent::TextDelta { delta }) => {
                 text.push_str(&delta);
