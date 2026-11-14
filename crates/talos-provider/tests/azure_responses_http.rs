@@ -523,11 +523,43 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
     let directory = tempfile::tempdir().expect("workspace");
     let workspace = directory.path().canonicalize().expect("canonical");
     std::fs::write(workspace.join("fixture.txt"), "AZURE_AGENT_READ_OK").expect("fixture");
+    use base64::Engine as _;
+    use sha2::Digest as _;
+    let mut parts = vec![ContentPart::Text {
+        text: "Inspect these images in order".into(),
+    }];
+    let mut urls = Vec::new();
+    for (index, color) in [[255, 0, 0, 255], [0, 0, 255, 255]].into_iter().enumerate() {
+        let path = workspace.join(format!("private-image-{index}.png"));
+        image::RgbaImage::from_pixel(1, 1, image::Rgba(color))
+            .save(&path)
+            .expect("PNG");
+        let bytes = std::fs::read(&path).expect("image bytes");
+        urls.push(format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(&bytes)
+        ));
+        parts.push(ContentPart::Image {
+            path,
+            mime: "image/png".into(),
+            byte_count: bytes.len() as u64,
+            content_digest: ContentDigest::from_raw(sha2::Sha256::digest(&bytes).into()),
+        });
+    }
+    let expected_images = urls.clone();
     let mut server = mockito::Server::new_async().await;
     let first = server.mock("POST", "/openai/v1/responses")
         .match_header("api-key", "sk-test")
         .match_header("authorization", mockito::Matcher::Missing)
-        .match_request(|request| !String::from_utf8_lossy(request.body().expect("body")).contains("function_call_output"))
+        .match_request(move |request| {
+            let raw = String::from_utf8_lossy(request.body().expect("body"));
+            let body: Value = serde_json::from_str(&raw).expect("JSON");
+            let images: Vec<&str> = body["input"].as_array().expect("input").iter()
+                .filter_map(|item| item["content"].as_array()).flatten()
+                .filter(|part| part["type"] == "input_image").filter_map(|part| part["image_url"].as_str()).collect();
+            !raw.contains("function_call_output") && !raw.contains("private-image-")
+                && images == expected_images && body["model"] == "azure-deployment"
+        })
         .with_status(200).with_header("content-type", "text/event-stream")
         .with_body(concat!(
             "data: {\"type\":\"response.created\"}\n\n",
@@ -539,9 +571,12 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
     let second = server.mock("POST", "/openai/v1/responses")
         .match_header("api-key", "sk-test")
         .match_header("authorization", mockito::Matcher::Missing)
-        .match_request(|request| {
+        .match_request(move |request| {
             let body: Value = serde_json::from_slice(request.body().expect("body")).expect("JSON");
-            body["model"] == "azure-deployment" && body["input"].as_array().expect("input").iter().any(|item|
+            let images: Vec<&str> = body["input"].as_array().expect("input").iter()
+                .filter_map(|item| item["content"].as_array()).flatten()
+                .filter(|part| part["type"] == "input_image").filter_map(|part| part["image_url"].as_str()).collect();
+            images == urls && !body.to_string().contains("private-image-") && body["model"] == "azure-deployment" && body["input"].as_array().expect("input").iter().any(|item|
                 item["type"] == "function_call_output" && item["call_id"] == "call_read" && item["output"].as_str().is_some_and(|s| s.contains("AZURE_AGENT_READ_OK")))
         }).with_status(200).with_header("content-type", "text/event-stream")
         .with_body("data: {\"type\":\"response.created\"}\n\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"done\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":8,\"output_tokens\":1}}}\n\n")
@@ -563,7 +598,11 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
     let (answer, history) = tokio::time::timeout(
         Duration::from_secs(20),
-        agent.run_streaming("Read fixture.txt".into(), vec![], tx),
+        agent.run_streaming(
+            "Read fixture.txt".into(),
+            vec![Message::Multimodal { parts }],
+            tx,
+        ),
     )
     .await
     .expect("bounded Agent")

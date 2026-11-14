@@ -588,3 +588,24 @@ async fn caller_abort_or_actual_shared_deadline_disposes_owned_request_without_l
         assert_eq!(effects.dns.load(Ordering::Relaxed), 1);
     }
 }
+
+#[test]
+fn new_bing_host_candidates_are_not_admitted_by_existing_fixed_chain() {
+    // URL construction is purely offline. Candidate hosts must not silently
+    // inherit the existing cn.bing.com prepared query permission.
+    let fixed = manifest();
+    let chain = PreparedCompatibilityChain::prepare(&fixed, "toy-secret", 1)
+        .expect("existing fixed compatibility sources");
+    assert_eq!(chain.sources[3].request.url.host_str(), Some("cn.bing.com"));
+    assert_eq!(chain.sources[3].request.url.path(), "/search");
+    for host in ["www.bing.com", "bing.cn"] {
+        let url = reqwest::Url::parse(&format!("https://{host}/search?q=toy-secret"))
+            .expect("synthetic candidate URI");
+        let endpoint = super::super::super::request_endpoint(&url, &reqwest::Method::GET)
+            .expect("candidate endpoint");
+        assert!(
+            !fixed.scope().contains(&endpoint),
+            "{host} must require a separate, explicitly reviewed Network grant"
+        );
+    }
+}

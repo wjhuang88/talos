@@ -1670,6 +1670,8 @@ impl AppServerSession {
             let start = source_history.len();
             source_history.extend(record.new_messages.iter().cloned());
             let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+            #[cfg(test)]
+            let binding_started = std::time::Instant::now();
             record.committed_source = Some(
                 crate::compaction::HistorySource::bind_committed_until(
                     source_generation,
@@ -1682,6 +1684,37 @@ impl AppServerSession {
                 )
                 .await,
             );
+            #[cfg(test)]
+            if record
+                .committed_source
+                .as_ref()
+                .is_some_and(Option::is_none)
+            {
+                // Diagnose timing versus malformed metadata without logging
+                // message content, source IDs, or the persistence namespace.
+                eprintln!(
+                    "committed binding refused: elapsed_ms={} deadline_expired={} raw_len={} prefix_len={} appended_len={} previous_source_present={} namespace_len={} receipt_count={} receipt_empty_count={} receipt_max_len={}",
+                    binding_started.elapsed().as_millis(),
+                    tokio::time::Instant::now() >= deadline,
+                    source_history.len(),
+                    start,
+                    source_history.len().saturating_sub(start),
+                    previous_source.is_some(),
+                    source_namespace.as_ref().map_or(0, String::len),
+                    record.persisted_entry_ids.len(),
+                    record
+                        .persisted_entry_ids
+                        .iter()
+                        .filter(|id| id.is_empty())
+                        .count(),
+                    record
+                        .persisted_entry_ids
+                        .iter()
+                        .map(String::len)
+                        .max()
+                        .unwrap_or(0),
+                );
+            }
             Some(record)
         });
         Ok(StartedTurn {

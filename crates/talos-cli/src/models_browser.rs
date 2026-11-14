@@ -327,7 +327,42 @@ fn build_browser_rows(config: &Config) -> Vec<CatalogBrowserRow> {
                 pricing,
                 effective_protocol: {
                     let resolved = config.resolve_model_protocol(&provider, &model.id);
-                    format!("{} ({})", resolved.protocol, resolved.source)
+                    let family = format!("{} ({})", resolved.protocol, resolved.source);
+                    if resolved.protocol == talos_config::ProviderProtocol::AzureOpenAI {
+                        if let Some(profile) = config
+                            .providers
+                            .get(&provider)
+                            .and_then(|p| p.azure.as_ref())
+                        {
+                            let model_config = config
+                                .providers
+                                .get(&provider)
+                                .and_then(|p| p.models.get(&model.id));
+                            match profile.resolve_model(&model.id, model_config) {
+                                Ok((shape, _, _)) => {
+                                    let source =
+                                        if model_config.is_some_and(|m| m.azure_shape.is_some()) {
+                                            "model configuration"
+                                        } else if profile.shape.is_some() {
+                                            "provider configuration"
+                                        } else {
+                                            "default"
+                                        };
+                                    let shape = match shape {
+                                        talos_config::AzureBodyShape::Chat => "chat",
+                                        talos_config::AzureBodyShape::Responses => "responses",
+                                        _ => "unknown",
+                                    };
+                                    format!("{family}; {shape} ({source})")
+                                }
+                                Err(_) => format!("{family}; invalid Azure profile"),
+                            }
+                        } else {
+                            format!("{family}; missing Azure profile")
+                        }
+                    } else {
+                        family
+                    }
                 },
                 api_base_url: meta.and_then(|p| p.api_base_url.clone()),
                 env_var: meta.and_then(|p| p.env_var.clone()),
@@ -609,6 +644,63 @@ fn fit(text: &str, width: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn azure_rows_show_shape_source_and_lazy_token_configuration() {
+        use talos_config::{
+            AzureApiMode, AzureAuthentication, AzureBodyShape, AzureTransportConfig, ModelConfig,
+            ProviderConfig, ProviderProtocol,
+        };
+        let mut config = Config::default();
+        config.providers.insert(
+            "azure-fixture".into(),
+            ProviderConfig {
+                protocol: ProviderProtocol::AzureOpenAI,
+                azure: Some(AzureTransportConfig {
+                    endpoint: "https://fixture.openai.azure.com".into(),
+                    api: AzureApiMode::V1,
+                    shape: Some(AzureBodyShape::Responses),
+                    authentication: AzureAuthentication::EntraToken {
+                        token_env: "TALOS_AZURE_UI_LAZY_TOKEN".into(),
+                    },
+                }),
+                models: [("logical".into(), ModelConfig::default())].into(),
+                ..Default::default()
+            },
+        );
+        for (shape, expected) in [
+            (None, "responses (provider configuration)"),
+            (Some(AzureBodyShape::Chat), "chat (model configuration)"),
+        ] {
+            config
+                .providers
+                .get_mut("azure-fixture")
+                .unwrap()
+                .models
+                .get_mut("logical")
+                .unwrap()
+                .azure_shape = shape;
+            let rows = build_browser_rows(&config);
+            let row = rows
+                .iter()
+                .find(|row| row.provider == "azure-fixture" && row.model_id == "logical")
+                .expect("Azure row");
+            assert!(row.authenticated);
+            assert_eq!(
+                row.effective_protocol,
+                format!("azure-openai (Configured); {expected}")
+            );
+        }
+        config
+            .providers
+            .get_mut("azure-fixture")
+            .unwrap()
+            .models
+            .get_mut("logical")
+            .unwrap()
+            .protocol = Some(ProviderProtocol::OpenAIChat);
+        assert!(!config.model_authentication_configured("azure-fixture", "logical"));
+    }
 
     fn sample_rows() -> Vec<CatalogBrowserRow> {
         vec![

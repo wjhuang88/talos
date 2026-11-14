@@ -4,22 +4,22 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Review / Claimed — E0/E1 code-truth and E1 proposed architecture in PR #906; E2/E3 blocked |
+| Status | Blocked / Released — E0/E1 architecture documentation accepted in I320; E2/E3 and E4 still require STORE-002 and separate implementation claim |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
-| Selected Iteration | [I320](../../iterations/I320-arch-035-host-composition-baseline.md) — E0/E1 active via claim #905 merge `b211e590f6b1180af0679be8b1b03d77b0a19615` |
+| Selected Iteration | [I320](../../iterations/I320-arch-035-host-composition-baseline.md) — Complete / Closed **E0/E1 only**, effective #905 and accepted #906/#934/#936; E2/E3 no effective claim |
 | Parent / consumer | [SERVER-001](SERVER-001-serve-connect-protocol-adapters.md) / #142; [SERVER-001-C](SERVER-001-C-standalone-server-host-composition.md) / #361 |
 | Depends On | [STORE-002](STORE-002-storage-capability-contracts.md) / #670: accepted capability/domain seam; RUNTIME-001 SDK compatibility |
 | Coordinates | SESSION-009 / #46; SESSION-011 / #612; DATA-002 / #141; SERVER-002 / #360 |
 | Long-task planning | [SERVER-MVP-001](../../tasks/2026-11-10-server-mvp-storage-decoupled.md) proposed in draft PR #896 |
-| E1 review artifact | [Host composition proposal](../../proposals/arch-035-host-composition-boundary.md) — non-binding until reviewed and accepted |
-| E0 audit artifact | [Code-truth and regression inventory](../../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) — review candidate, existing tests not rerun |
+| E1 review artifact | [ADR-104](../../decisions/104-host-composition-ownership-boundary.md) — Accepted **placement/ownership only** via #936; [E1 proposal](../../proposals/arch-035-host-composition-boundary.md) remains historical evidence |
+| E0 audit artifact | [Code-truth and regression inventory](../../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) — published/accepted as documentary inventory via #906; runtime regression tests not rerun |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | E0 code-truth inventory and E1 ADR / cross-host composition API placement only; no production code, no STORE-002 capability contracts or adapters |
@@ -28,9 +28,9 @@
 | Governance Claim PR | #905 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615` following exact-head [CI #3992](https://github.com/wjhuang88/talos/actions/runs/42784639228), both governance validators with 0 warnings, recorded single-maintainer documentation-only fallback and passing merge-time CAS; this authorizes E0/E1 only. |
-| Implementation PR | #906 |
-| Last Updated | 2026-11-10 |
-| Handoff / Release Condition | E0/E1 only; E2/E3 blocked until accepted STORE-002 seams and separately governed activation; no implementation before effective claim |
+| Implementation PR | #906 (E0/E1 docs), #934 (contract reconciliation), #936 (ADR-104); **no production implementation PR** |
+| Last Updated | 2026-11-13 |
+| Handoff / Release Condition | I320 E0/E1 evidence accepted; **Released 2026-11-13** after #936. Parent #897 remains Open / Blocked. Resume only after STORE-002 D/E accepted operational composition, fresh E2/E3 claim+activation, and exact host call-site/API review. |
 
 ## Requirement and value
 
@@ -106,3 +106,34 @@ Record acceptance on this Story with exact evidence and update #142/#361/#360 be
 - `docs/backlog/active/SERVER-001-C-standalone-server-host-composition.md`
 - `docs/reference/RUNTIME-SDK-CONTRACT.md`
 - `crates/talos-runtime/src/lib.rs`, `crates/talos-session/src/store.rs`, `crates/talos-session/src/manager.rs`
+
+## E1 contract-dependency reconciliation — 2026-11-13 (review candidate only)
+
+This is a continuation of the **existing effective I320 E0/E1 documentation claim #905**, not an E2/E3 implementation claim or a new architecture decision. It preserves the Story's **Review / Claimed** status and leaves all acceptance checkboxes unclosed.
+
+- STORE-002 / #670 I321 A/B capability *metadata* foundation is accepted via implementation PR #909 (`a9914b7a62b0873027997c69d9966d17f3fd48ba`). The metadata registry is **not** evidence of a bound operational backend.
+- I322 C domain-owned contracts and existing-store direct forwarding are accepted via implementation PR #912 (**`3df409ef9ed707756350f2c7d4b2c8819f157222`**), with bounded closeout PR #930 merged (`a07b466d5aa2a03fb841cdcb918cd4968c778942`). These contracts are available for architecture review but have **not** rewired current production host constructors.
+- I325 D *claim/activation*, not D implementation, became effective on governance PR #932 merge (`e49ccde70556403a9d7b66551565e2b6c81ad32d`). D owns proof of local operational delegation; #670 E owns local default composition; F owns broad storage equivalence. ARCH-035 must not absorb those slices.
+- **Historical 2026-11-13 pre-ADR-104 dependency-reconciliation checkpoint:** the [E1 proposal](../../proposals/arch-035-host-composition-boundary.md) carried a contract-aware no-duplication review matrix and explicit acceptance conditions. **At that earlier point**, no ADR had yet been allocated and the proposal was non-binding. **Subsequently ADR-104 was allocated in #936**; even if its placement-only rule is accepted on reviewed merge, no concrete public runtime injection signature, production change or E2/E3 implementation is accepted.
+
+**Next ARCH-035 gate:** independently review E1 ownership/API placement against I322 C and the eventual accepted I325 D / STORE-002 E host-facing composition, then record a defensible accepted decision or no-op integration disposition. E2/E3 require their own effective claim after usable accepted upstream integration evidence. No `talos-server` behavior or SQLite-free binary is implied by this checkpoint.
+
+## E1 ownership decision candidate — 2026-11-13 (historical, before accepted #936 merge)
+
+[ADR-104](../../decisions/104-host-composition-ownership-boundary.md) is proposed under the **existing effective I320 E0/E1 claim #905** to give the reviewed host-vs-domain placement an explicit authoritative ADR. This is **not yet Accepted** and does not alter the existing E1 proposed status or authorize E2/E3. It adds no public RuntimeBuilder signature, new provider, altered local default, production change or Completion Commit. The prior E0 inventory and E1 [proposal](../../proposals/arch-035-host-composition-boundary.md) remain evidence, not a substitute for exact-head independent ADR review, docs CI and guarded merge. Upstream D implementation and E/F acceptance remain separately owned by #670; the Story stays **Open / Review**.
+
+### E1 decision acceptance gate — PR #936 (historical pre-merge checkpoint)
+
+ADR-104's **host/domain ownership and composition-layer placement only** may be accepted on reviewed #936 merge after independent technical no-blocker review of the final head, exact-head documentation CI, both governance validators, single-maintainer authorization and merge-time CAS. The prior Copilot [initial review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843456241) found the placement decision supportable but requested correction of the 2026-11-13 historical E1 proposal sentence; this was corrected in the candidate and must be revalidated. The proposed ADR says **no shared callable runtime factory already exists**, no accepted public builder signature, no completed D/E provider binding or conformance results. Even if ADR-104 is accepted, this ARCH-035 owner remains **Review / Claimed**, E2/E3 stay **blocked/unclaimed**, and #897 stays **Open**; no Completion Commit for #897 is asserted.
+
+## I320 E0/E1 bounded closeout — 2026-11-13 (parent #897 NOT complete)
+
+**Delivery accepted: E0 source-truth inventory and E1 host/domain ownership placement only.** The previously existing evidence is:
+
+- I320 governance/activation [#905](https://github.com/wjhuang88/talos/pull/905) merged `b211e590f6b1180af0679be8b1b03d77b0a19615`; bounded E0 inventory and non-binding E1 proposal [#906](https://github.com/wjhuang88/talos/pull/906) merged `70c0f7cd28d092cbd6ac0d310918fb97410b0cc4`.
+- Accepted STORE-002 C trait boundary reviewed in E1 update [#934](https://github.com/wjhuang88/talos/pull/934) merged `d92aabaad4570d799c6e04d75c87abbb36a2b004`; no duplicate storage capability/provider or implementation.
+- **ADR-104 placement-only acceptance** [#936](https://github.com/wjhuang88/talos/pull/936) merged **`07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`**. Its exact review head `3fd1b7176901832717b692202512dadb7364391f` has [CI #4173](https://github.com/wjhuang88/talos/actions/runs/43365335816) overall success, **reduced documentation validation** and both project/collaboration validators with 0 warnings. Its independent [read-only technical review](https://github.com/wjhuang88/talos/pull/936#issuecomment-6843928194) found no blockers; [single-maintainer authorization and CAS](https://github.com/wjhuang88/talos/pull/936#issuecomment-6852726331) recorded scope, lack of separate human reviewer and exact-head merge gate.
+- A separate **remote Issue/owner reconciliation job failed** on that head because new *unrelated* SEARCH-001-D3 Issue #937 was missing from the global matrix; it is NOT counted as passed. #937's canonical registration and remote reconciliation subsequently merged through separately owned [#938](https://github.com/wjhuang88/talos/pull/938) as `8e32fcadb5698e8a5cf35affd0a064ba8d02daf4`, with that PR's exact-head remote owner job passing. This historical unrelated failure is preserved, not converted to a green check on #936.
+- **I320 documentation slice Completion Commit: `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`** (pre-existing merged evidence for architecture decisions, *not a production implementation or #897 Completion Commit*).
+
+**Residual and next gate:** #670 I325 D [#935](https://github.com/wjhuang88/talos/pull/935) remains independently owned/open at this checkpoint despite an exact-head CI result; #670 E default local composition and F behavior parity are not delivered. No runtime host factory, new `RuntimeBuilder` injection signature, SQLite-free binary or E2/E3/E4 regression result was shipped. **No production E2/E3 work may start** until accepted usable STORE-002 integration evidence, new effective bounded ARCH-035 claim, SDK compatibility review and native before/after baseline. Keep #897 Open / Blocked, #142/#361 ServerHost production blocked; the completed I320 documentation claimant is explicitly **Released**.

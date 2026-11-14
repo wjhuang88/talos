@@ -647,12 +647,25 @@ impl Config {
     }
 
     /// Whether a model has an applicable authentication configuration.
-    /// Vertex ADC is selected lazily; this does not probe or validate credentials.
+    /// Vertex ADC and Azure supplied tokens are selected lazily, without probing credentials.
     pub fn model_authentication_configured(&self, provider: &str, model: &str) -> bool {
+        let protocol = self.resolve_model_protocol(provider, model).protocol;
+        let configured = self.providers.get(provider);
+        // Supplied tokens are resolved at dispatch, without unrelated API-key fallback.
+        if protocol == ProviderProtocol::AzureOpenAI
+            && let Some(profile) = configured.and_then(|config| config.azure.as_ref())
+            && matches!(
+                profile.authentication,
+                crate::AzureAuthentication::EntraToken { .. }
+            )
+        {
+            return profile
+                .resolve_model(model, configured.and_then(|c| c.models.get(model)))
+                .is_ok();
+        }
         self.provider_authenticated(provider)
-            || (self.resolve_model_protocol(provider, model).protocol
-                == ProviderProtocol::GoogleGemini
-                && self.providers.get(provider).is_some_and(|config| {
+            || (protocol == ProviderProtocol::GoogleGemini
+                && configured.is_some_and(|config| {
                     matches!(
                         config.gemini,
                         Some(crate::GeminiTransportConfig::Vertex { .. })

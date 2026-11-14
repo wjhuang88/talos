@@ -228,3 +228,9 @@ lost that image extension, pending Chat Agent/UI changes and local logs before r
 checkpoint restores the cancellation correction/test only on the durable 3b921558 baseline; rerun
 its tests before assigning current-head evidence. Do not treat lost UI/Chat tests as passed or
 claim this checkpoint contains the lost image extension. Remaining acceptance and #724 stay open.
+
+The next recovery checkpoint restores the two ordered images in the actual Responses Agent read
+round and the UI body-shape/source plus lazy supplied-token configuration display/test. It also
+replays onto main 5704bb66. Current rebase testing is in progress; the UI regression has not yet
+completed. The earlier lost Chat Agent matrix and README/architecture/release additions still
+need restoration. No full local preflight, exact-head CI or final review is claimed.

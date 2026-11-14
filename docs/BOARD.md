@@ -5,6 +5,14 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 # Talos Board
 
+## SEARCH-001-D3-T2 / I327 — proposed explicit sponsored-ancestor correction
+
+[SEARCH-001-D3-T2](backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **In Progress / Claimed proposed via Draft #948 (ineffective until merge)** after T1/#941 Complete/Closed. Scope: localized `b_ad` ancestor exclusion in the existing response-only Bing parser, hand-authored synthetic positive/negative regressions; no real Bing, new hosts, network permission, SearchRouter default, provider count or rights assumption. Existing I324/I325 and other owners remain separate. No code until claim effective on main.
+
+## SEARCH-001-D3-T1 / I326 — Complete / Closed upon closeout merge
+
+[SEARCH-001-D3-T1](backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): claim [#943](https://github.com/wjhuang88/talos/pull/943) merged; bounded test implementation [#944](https://github.com/wjhuang88/talos/pull/944) merged at Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606` after exact-head CI43428872719 8/8, independent review and CAS. Five synthetic-only cases characterize ad/organic false positive, DOM drift, unadmitted new Bing hosts and root-reachability/query-403 distinction. Parser false-positive **not fixed**; new Bing hosts, real regional reachability or provider rights not admitted. #937/#624 remain Open; #941 close only after owner-first record merges.
+
 ## GIT-COMPAT-001 / I324 — gix-native Git preflight (claim proposed)
 
 [GIT-COMPAT-001](backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](iterations/I324-git-236-preflight-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): proposed governance-only [claim #920](https://github.com/wjhuang88/talos/pull/920) and activation, **ineffective until merge**. The November 10 design is not implementation. No change to ADR-089 permission admission or to GIT-SNAPSHOT-001 / TUI-APPROVAL-001 Review status; Git 2.36 Windows validation and independent security review remain mandatory.
@@ -23,11 +31,15 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 ## STORE-002 / I322 C — Complete / Closed; parent #670 Open
 
-[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I322](iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed via #909 `a9914b7`; C claim #911 merged `60da1bb`, implementation [#912](https://github.com/wjhuang88/talos/pull/912) merged `3df409ef9ed707756350f2c7d4b2c8819f157222` after [exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758), both governance validators, independent no-blocker API/doc review and merge CAS. Minimal domain-owned Session Pending/Todo, Memory, Evolution and Exploration traits forward to unchanged stores with no runtime/SQL/schema/Host changes. Global closed #901 Issue-matrix warning is separate ADR-071 advisory, not a passed job. **I322 C complete; D/E/F unclaimed, #897 E2/E3 gated, #670 Open.**
+[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I322](iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed via #909 `a9914b7`; C claim #911 merged `60da1bb`, implementation [#912](https://github.com/wjhuang88/talos/pull/912) merged `3df409ef9ed707756350f2c7d4b2c8819f157222` after [exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758), both governance validators, independent no-blocker API/doc review and merge CAS. Minimal domain-owned Session Pending/Todo, Memory, Evolution and Exploration traits forward to unchanged stores with no runtime/SQL/schema/Host changes. Global closed #901 Issue-matrix warning is separate ADR-071 advisory, not a passed job. **I322 C complete; D selected for separate I325/#932 governance, E/F unclaimed, #897 E2/E3 gated, #670 Open.**
 
-## ARCH-035 / I320 — E0/E1 Review (PR #906)
+## STORE-002 / I325 D — proposed local delegation claim #932
 
-[ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [I320](iterations/I320-arch-035-host-composition-baseline.md) / #897: #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615`, activating only E0 code-truth inventory and E1 host API decision review; no E2/E3 implementation is authorized; no E2/E3 code or STORE-002/#670 capability implementation is authorized. ServerHost/#361 remains gated. Parallel Search/TUI/Provider owners are untouched.
+[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I325](iterations/I325-store-002-local-delegation.md) / [#670](https://github.com/wjhuang88/talos/issues/670): C #912 code and #930 closure merged; Draft governance [#932](https://github.com/wjhuang88/talos/pull/932) proposes a bounded D claim (**not effective until merge**). Reuse existing C traits/forwarders and current SQLite/FTS5/TLOG/JSONL storage, prove trait-directed local delegation and exact typed semantics without rewriting SQL, schemas, defaults, production callers or Host. E/F and #897 Host remain unclaimed/gated.
+
+## ARCH-035 / I320 — E0/E1 Complete; parent E2/E3 Blocked
+
+[ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [I320](iterations/I320-arch-035-host-composition-baseline.md) / #897: bounded E0/E1 documentation **Complete / Closed**, claim #905 effective; #906 E0 evidence `70c0f7cd`, #934 domain-contract reconciliation `d92aaba`, ADR-104 **Accepted placement-only** in #936 merge **`07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`** (I320 documentary Completion Commit). Parent #897 is **Open / Blocked / Released**, no E2/E3 claim. #670 D #935 remains separate/open; #670 E profile/F parity, future cross-host SDK/native conformance and ServerHost/#361 remain gated. No new API, executable provider, storage behavior or runtime code was delivered.
 
 ## SEARCH-001-L / I319 — Complete / Closed (owner-first closeout)
 
@@ -52,7 +64,13 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
   Reproducible profiling, event-driven drawing, asynchronous Git snapshots, and layout/component
   caching and incremental history are delivered. Full local preflight passed (5317 tests),
   MSVC xwin and exact-head Linux/Windows code CI passed; independent Agent code review approved.
-  Resize-budget acceptance, growing/resize heap stability and native terminals remain open in #923.
+  Focused resize/heap evidence is archived; baseline concurrent-input resize P95 fails.
+  Follow-up PR #929 merged as `a8dc7fb0`, exact candidate `4d9e5cfc`; code CI
+  `43360750041` and independent Agent review passed. Bounded scan passes three
+  Debug and three Release resize/input rounds. Corrected heap coverage570/570
+  and finite allocation-path evidence are archived. Original Debug479ms tail
+  and native/resource/platform acceptance remain open in #923. Basic Ghostty
+  operations and Git display passed maintainer retest; missing platforms are not passed.
   Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001
@@ -280,7 +298,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 | Steering Follow-up Sequence | P1; I206/TUI-048 Complete / Closed; I207 Complete / Closed; I208 Complete / Closed | [task](tasks/2026-08-17-steering-follow-up-sequence.md) / [TUI-048](backlog/active/TUI-048-steering-esc-activation.md) / [I206](iterations/I206-tui048-steering-esc-activation.md) / [TUI-049](backlog/active/TUI-049-steering-wrap-padding.md) / [TUI-050](backlog/active/TUI-050-steering-insertion-boundary.md) | PR #411 and I207 closeout PR #485 are merged; I208 claim/activation PR #487 merged as `75ca8057`; implementation #489 merged as `442d143b`. Legacy ledger superseded by the 2026-09-04 serial plan. |
 | `/delete` Cleanup-Failure Actionability | P1 Open follow-up | [Issue #136](https://github.com/wjhuang88/talos/issues/136) / [ADR-056](decisions/056-transactional-steering-submission-boundary.md) | Add exact executable retry and maintenance guidance while preserving accepted transcript-last cleanup, retryability and no-false-success behavior. |
 | Storage Topology And Runtime Ownership | P0 Intake | [DATA-002](backlog/active/DATA-002-storage-topology-and-runtime-ownership.md) / [Issue #141](https://github.com/wjhuang88/talos/issues/141) | ADR and ownership/handoff refinement before any implementation selection. |
-| Behavior-Preserving Host Composition | P1 Review / Claimed E0/E1 (#906); E2/E3 blocked | [ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [Issue #897](https://github.com/wjhuang88/talos/issues/897) | Prerequisite to production ServerHost integration: equivalently reuse STORE-002 contracts across CLI/SDK/Desktop/Server without changing existing storage behavior. |
+| Behavior-Preserving Host Composition | P1 Blocked / Released; I320 E0/E1 docs Complete (ADR-104 #936); E2/E4 undelivered | [ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [Issue #897](https://github.com/wjhuang88/talos/issues/897) | Prerequisite to production ServerHost integration: equivalently reuse STORE-002 contracts across CLI/SDK/Desktop/Server without changing existing storage behavior. |
 | Serve/Connect Protocol Adapter Architecture | P1 Intake | [SERVER-001](backlog/active/SERVER-001-serve-connect-protocol-adapters.md) / [Issue #142](https://github.com/wjhuang88/talos/issues/142) | Single-runtime and protocol dependency refinement before implementation selection. |
 | RTK-Derived Semantic Shell Output Filters | P1 Intake | [TOOL-025](backlog/active/TOOL-025-rtk-derived-semantic-output-filters.md) / [Issue #143](https://github.com/wjhuang88/talos/issues/143) | Source/provenance and behavior-boundary review before implementation selection. |
 | Utility Model Role And Bounded Routing | P2 Intake | [MODEL-012](backlog/active/MODEL-012-utility-model-role-and-bounded-routing.md) / [Issue #146](https://github.com/wjhuang88/talos/issues/146) | ADR, compatibility, routing, TUI, and evaluation refinement before implementation selection. |

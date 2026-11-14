@@ -1,0 +1,128 @@
+[
+  {
+    "round": 1,
+    "coverage": {
+      "steady_first_seconds": 7.347793922992423,
+      "steady_last_seconds": 37.210784305993,
+      "steady_covered_seconds": 29.86299038300058,
+      "nominal_steady_seconds": 30
+    },
+    "budget": {
+      "count": 58,
+      "over_150ms_count": 0,
+      "p95_within_150ms": true
+    },
+    "p99": {
+      "lower_ns": 67108864,
+      "upper_ns": 127729724
+    },
+    "sha256": "0dc196e186926af4c0ee52ce56d4ec4174cb574ceffedece292aa7a54d53bf2c",
+    "cpu_percent": 13.729368517407131,
+    "peak_pss_kib": 44259,
+    "actions": 58,
+    "first_cgroup": {
+      "path": "/user.slice/user-1000.slice/user@1000.service/app.slice/talos-perf-resize-acceptance.service",
+      "cpu.stat": "usage_usec 219331\nuser_usec 131135\nsystem_usec 88195\nnice_usec 125420\ncore_sched.force_idle_usec 0\nnr_periods 5\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "100000 100000",
+      "cpu.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=8861\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=8340",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.current": "358383616",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "io.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=36355\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=36355"
+    },
+    "last_cgroup": {
+      "path": "/user.slice/user-1000.slice/user@1000.service/app.slice/talos-perf-resize-acceptance.service",
+      "cpu.stat": "usage_usec 4821680\nuser_usec 4597388\nsystem_usec 224292\nnice_usec 4555772\ncore_sched.force_idle_usec 0\nnr_periods 325\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "100000 100000",
+      "cpu.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=207895\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=72220",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.current": "275324928",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "io.pressure": "some avg10=0.01 avg60=0.05 avg300=0.01 total=82128\nfull avg10=0.01 avg60=0.05 avg300=0.01 total=81524"
+    }
+  },
+  {
+    "round": 2,
+    "coverage": {
+      "steady_first_seconds": 7.4145704919938,
+      "steady_last_seconds": 37.09588896401692,
+      "steady_covered_seconds": 29.681318472023122,
+      "nominal_steady_seconds": 30
+    },
+    "budget": {
+      "count": 58,
+      "over_150ms_count": 2,
+      "p95_within_150ms": true
+    },
+    "p99": {
+      "lower_ns": 134217728,
+      "upper_ns": 160067017
+    },
+    "sha256": "0dc196e186926af4c0ee52ce56d4ec4174cb574ceffedece292aa7a54d53bf2c",
+    "cpu_percent": 14.756756860812905,
+    "peak_pss_kib": 44339,
+    "actions": 58,
+    "first_cgroup": {
+      "path": "/user.slice/user-1000.slice/user@1000.service/app.slice/talos-perf-resize-replacement.service",
+      "cpu.stat": "usage_usec 165032\nuser_usec 121732\nsystem_usec 43299\nnice_usec 118578\ncore_sched.force_idle_usec 0\nnr_periods 4\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "100000 100000",
+      "cpu.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=2324\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=902",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.current": "15564800",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "io.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0"
+    },
+    "last_cgroup": {
+      "path": "/user.slice/user-1000.slice/user@1000.service/app.slice/talos-perf-resize-replacement.service",
+      "cpu.stat": "usage_usec 5197691\nuser_usec 5024954\nsystem_usec 172736\nnice_usec 4997192\ncore_sched.force_idle_usec 0\nnr_periods 329\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "100000 100000",
+      "cpu.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=134595\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=65867",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.current": "47886336",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "io.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0"
+    }
+  },
+  {
+    "round": 3,
+    "coverage": {
+      "steady_first_seconds": 7.416922257980332,
+      "steady_last_seconds": 36.97348513599718,
+      "steady_covered_seconds": 29.556562878016848,
+      "nominal_steady_seconds": 30
+    },
+    "budget": {
+      "count": 57,
+      "over_150ms_count": 2,
+      "p95_within_150ms": true
+    },
+    "p99": {
+      "lower_ns": 134217728,
+      "upper_ns": 155034721
+    },
+    "sha256": "0dc196e186926af4c0ee52ce56d4ec4174cb574ceffedece292aa7a54d53bf2c",
+    "cpu_percent": 18.20238713886945,
+    "peak_pss_kib": 44271,
+    "actions": 57,
+    "first_cgroup": {
+      "path": "/user.slice/user-1000.slice/user@1000.service/app.slice/talos-perf-resize-followup.service",
+      "cpu.stat": "usage_usec 6472096\nuser_usec 6224972\nsystem_usec 247123\nnice_usec 6187305\ncore_sched.force_idle_usec 0\nnr_periods 341\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "100000 100000",
+      "cpu.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=145080\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=63047",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.current": "22159360",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "io.pressure": "some avg10=1.67 avg60=0.45 avg300=0.11 total=385496\nfull avg10=1.67 avg60=0.45 avg300=0.11 total=383751"
+    },
+    "last_cgroup": {
+      "path": "/user.slice/user-1000.slice/user@1000.service/app.slice/talos-perf-resize-followup.service",
+      "cpu.stat": "usage_usec 12491529\nuser_usec 12069234\nsystem_usec 422294\nnice_usec 12029431\ncore_sched.force_idle_usec 0\nnr_periods 664\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "100000 100000",
+      "cpu.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=284802\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=123570",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.current": "54607872",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "io.pressure": "some avg10=0.04 avg60=0.24 avg300=0.09 total=385496\nfull avg10=0.04 avg60=0.24 avg300=0.09 total=383751"
+    }
+  }
+]

@@ -1,5 +1,14 @@
 ## I323 Azure — proposed claim and activation
 
+## I327 / SEARCH-001-D3-T2 — proposed sponsored-ancestor correction
+
+[I327](I327-search-bing-sponsored-ancestor-rejection.md) / [owner](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Active / Claimed proposed via #948 (ineffective until merge)** pending atomic governance activation. Limit to existing Bing CN `b_ad` ancestor filter and synthetic parser regression after T1/#941 completed. No live Bing, endpoint permission, provider identity, or parent #624 acceptance change.
+
+## I326 / SEARCH-001-D3-T1 — Complete / Closed upon owner-first closeout
+
+[I326](I326-search-bing-synthetic-negative-conformance.md) / [owner](../backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): **Complete / Closed upon owner-first closeout publication**; governance #943 merged `2f43e7d7`, synthetic-only implementation [#944](https://github.com/wjhuang88/talos/pull/944) merged Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606`. Exact-head CI43428872719 8/8 and independent no-blocker review/CAS. No production search logic, endpoint, permission, new provider or China evidence. #941 to close after owner-first docs merge; D3/#937 and Epic/#624 remain Open.
+
+
 [I323](I323-provider008c-azure-openai.md) / #914 proposes Azure C after completed A/B.
 Claim and activation have no effect before governance merge; D and parent #724 remain open.
 
@@ -11,14 +20,18 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 
 ## I322 / STORE-002 C — Complete / Closed
 
-[I322](I322-store-002-domain-contract-extraction.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance #911 `60da1bb` and [implementation #912](https://github.com/wjhuang88/talos/pull/912) completion commit `3df409ef9ed707756350f2c7d4b2c8819f157222`. [Exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) scoped jobs and both validators passed; independent public API review and CAS no blockers. Old SessionStore reused; Pending/Todo, Memory, Evolution and Exploration domain contracts added with unchanged stores/callers. Advisory remote closed #901 owner-matrix drift retained; no new provider. I322 C closed; D/E/F and #897 Host remain separately gated and #670 Open.
+[I322](I322-store-002-domain-contract-extraction.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance #911 `60da1bb` and [implementation #912](https://github.com/wjhuang88/talos/pull/912) completion commit `3df409ef9ed707756350f2c7d4b2c8819f157222`. [Exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) scoped jobs and both validators passed; independent public API review and CAS no blockers. Old SessionStore reused; Pending/Todo, Memory, Evolution and Exploration domain contracts added with unchanged stores/callers. Advisory remote closed #901 owner-matrix drift retained; no new provider. I322 C closed; D has an independent I325/#932 governance proposal; E/F and #897 Host remain gated and #670 Open.
+
+## I325 / STORE-002 D — Active / Claimed proposed (ineffective until #932 merge)
+
+[I325](I325-store-002-local-delegation.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: draft governance [#932](https://github.com/wjhuang88/talos/pull/932) selects the **bounded existing-local-delegation D** work after accepted C #912 and closeout #930. Reuse C's operational trait and concrete forwarding, exercise real SQLite/FTS5/TLOG/JSONL operations through accepted typed boundaries, no new engine/provider, SQL/schema/format, Host/SDK or default-profile changes. No implementation until finalized claim reaches main. E/F and #897 remain independently gated.
 
 ## I321 / STORE-002 A/B — Complete / Closed (bounded slice)
 
 [I321](I321-store-002-capability-contract-foundation.md): governance #908 and implementation #909 merged; exactly seven typed capability IDs, metadata-only registry requests and authority inventory, no functional provider binding or local storage migration. #670 OPEN for C/D/E/F.
-## I320 / ARCH-035 E0/E1 — Review / Claimed in #906
+## I320 / ARCH-035 E0/E1 — Complete / Closed (docs-only)
 
-[I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: #905 claim+activation is effective at `b211e590f6b1180af0679be8b1b03d77b0a19615`; [E0 code-truth evidence](../reference/ARCH-035-I320-E0-CODE-TRUTH-2026-11-10.md) (review PR #906) and E1 non-binding cross-host composition decision are under review. STORE-002/#670 exclusively owns storage contracts, so E2/E3 implementation is blocked; unrelated I319, I318, I310 and active work remain separate.
+[I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: E0 code-truth and E1 owner/placement decision **Complete / Closed for the bounded documentation slice**, claim #905, E0 #906, contract-review #934, accepted [ADR-104](../decisions/104-host-composition-ownership-boundary.md) #936 merge and I320 documentary **Completion Commit `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`**. The parent remains **Open / Blocked / Released** with no E2/E3 effective code claim or runtime parity proof. #670 D/E and #897 E2-E4 remain separately gated.
 
 ## I319 / SEARCH-001-L — Complete / Closed (owner-first closeout)
 

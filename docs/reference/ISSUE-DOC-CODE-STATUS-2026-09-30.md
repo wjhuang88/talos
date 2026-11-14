@@ -1,13 +1,17 @@
-# GitHub Issue / Owner Document Status Reconciliation — 2026-09-30
+# GitHub Issue / Owner Document Status Reconciliation — Rolling Register (origin 2026-09-30)
 
-**Repository baseline**: `main@5bb36663d13f133f8b90d7cc0c692ec876de7954`
-**Purpose**: current open-Issue owner reconciliation on 2026-09-30; retain the historical 2026-08-31 matrix and register new open Issues #623–#625 against existing or proposed intake owners.
+**Original baseline (2026-09-30)**: `main@5bb36663d13f133f8b90d7cc0c692ec876de7954`.
+**Latest registration update**: 2026-11-13 (open-Issue/owner rows are an evolving reconciliation register, **not** a point-in-time 2026-09-30 inventory).
+**Purpose**: preserve the original 2026-09-30 / 2026-08-31 historical provenance while tracking subsequent open-Issue owner relationships for remote CI. The original filename remains stable because governance automation uses it; entries created after September are dated below, not backdated to the initial snapshot.
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
 ## Open Issue Matrix
 
 | Issue | Summary | Owner | Owner Status | Disposition |
 |---|---|---|---|---|
+| [#947](https://github.com/wjhuang88/talos/issues/947) | Explicit sponsored ancestor rejection in existing Bing response parser | [SEARCH-001-D3-T2](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) | In Progress / Claimed proposed | Draft governance #948 for I327 parser-local source fix after T1/#941 completion; no effective claim/code until reviewed governance merge. Open stale #861 touches the same parser source file (different import hunk); must compare/reconcile at source gate. No Bing new endpoint or provider admission. |
+| [#941](https://github.com/wjhuang88/talos/issues/941) | Bing synthetic HTML and unadmitted-host test-only conformance | [SEARCH-001-D3-T1](../backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) | Complete / Closed on owner-first closeout merge | I326 claim #943 merged; #944 implementation Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606` (CI43428872719 8/8, independent review, CAS). Source Issue closes after docs merge; parent D3/#937 and Epic/#624 remain Open. |
+| [#937](https://github.com/wjhuang88/talos/issues/937) | Bing same-family direct-HTML multi-endpoint research | [SEARCH-001-D3](../backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) | Intake / Proposed / Unclaimed | Source/authority-only feasibility; 2026 Microsoft Bing/MSN product-use rights BLOCKED, live endpoint/region UNKNOWN; no executable claim, new default, or provider admission. Parent #624 Open. |
 | [#901](https://github.com/wjhuang88/talos/issues/901) | Eliminate legacy rust-websearch build dependency without admitting providers | [SEARCH-001-L](../backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) | Complete / Closed | I319 claim/ADR-085 A1 via #902, independent oracle #904, implementation #907 merged `3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970` after exact-head CI4121 8/8 and independent review/CAS. Documentation closeout is pending acceptance; parent #624 and E/F/G/I remain separate. |
 | [#853](https://github.com/wjhuang88/talos/issues/853) | Model-selectable process memory limit (handoff T6) | [PROCESS-001](../backlog/active/PROCESS-001-model-process-memory-limit.md) | In Progress / proposed activation | I316 claim #854 and ADR-098 design reviewed; finalized atomic claim and target merge required before implementation. |
 | [#848](https://github.com/wjhuang88/talos/issues/848) | Hosted keyless MCP admission triage | [SEARCH-001-D2](../backlog/active/SEARCH-001-D2-keyless-mcp-admission.md) | Intake / Unclaimed | Proposed canonical research intake in PR #849; Exa/Parallel BLOCKED, no provider admission, effective claim or implementation authority. |
@@ -91,12 +95,25 @@
 
 | [#891](https://github.com/wjhuang88/talos/issues/891) | Browser SERP feasibility intake | [SEARCH-001-BROWSER-SPIKE](../tasks/2026-11-09-browser-search-feasibility-intake.md) | Proposed / Unclaimed | Offline direct mapping rejected; real browser connector dependency #452 blocks reconsideration. Registration only, no claim or implementation. |
 
-| [#897](https://github.com/wjhuang88/talos/issues/897) | Behavior-preserving domain persistence and host composition decoupling (ARCH-035) | [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) | Intake / Unclaimed | Independent cross-host composition prerequisite to #142/#361; consumes #670 capability contracts. Only equivalence migration; no implementation claim, backend switch or Server behavior. |
+| [#897](https://github.com/wjhuang88/talos/issues/897) | Behavior-preserving domain persistence and host composition decoupling (ARCH-035) | [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) | Blocked / Released | I320 E0/E1 documentary slice Complete / Closed via ADR-104 #936 (`07c99a8c`); #897 remains Open / Blocked for #670 D/E integration, independent E2/E3 claim and E4 runtime parity. No production composition or Server behavior accepted. |
 
 | [#919](https://github.com/wjhuang88/talos/issues/919) | Git 2.36 prepared preflight and gix compatibility | [GIT-COMPAT-001](../backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) | Active / Claimed proposed (ineffective until #920 merge) | I324 / #920 proposes exact Git 2.36 compatibility ownership without changing ADR-089 admissions; native Windows tests and independent security review required before implementation closure. |
 | [#923](https://github.com/wjhuang88/talos/issues/923) | TUI performance and native acceptance residual | [TUI-PERF-001](../tasks/2026-11-10-tui-render-performance.md) | Review / Claimed | Stage implementation #922 merged; original performance and native acceptance remain required. |
 
 ## Synchronization Notes
+
+2026-11-13: Registered separate #947 D3-T2 owner/I327 proposal to correct a T1 synthetic `b_ad` ancestor misclassification. Proposed only; new Bing query recipients and SEARCH-001 provider admission remain unauthorized.
+
+
+2026-11-13 I326 closeout: #943 claim activation and #944 test implementation both merged, Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606`, accepted exact-head CI43428872719 all 8 jobs and independent no-blocker review. Owner-first closeout proposed; #941 remains open until closeout merge. D3/#937 live use rights / #624 provider gates not changed.
+
+2026-11-13: Registered new #941 SEARCH-001-D3-T1 for separate synthetic-only conformance after accepted D3.1/#938. The I326 claim remains proposed/ineffective; parent D3/#937 and default-use rights gate remain unchanged.
+
+
+2026-11-13: #897 ARCH-035 current owner is **Blocked / Released** after bounded I320 E0/E1 documentary acceptance. The earlier 2026-11-10 registration and all historical decision checkpoints remain unchanged. Reference [ADR-104](../decisions/104-host-composition-ownership-boundary.md) acceptance #936 merge `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`; this does not close #897 or provide E2/E3 implementation authority.
+
+
+2026-11-13: Registered new SEARCH-001-D3 / #937 as Intake / Proposed / Unclaimed with canonical owner and source/fixture evidence. This is a *new* registration, not a 2026-09-30 fact, and does not activate or modify native search providers or parent SEARCH-001/#624.
 
 2026-11-12: Reconciled missing #919 and #923 without activating #920 or closing TUI-PERF-001. Existing proposal is the interim #919 source until its formal owner reaches main.
 
@@ -117,8 +134,7 @@ rows described the proposed #579 claim; implementation #580 merged as
 `52276f552496b160e064fd54ed7471bc84d3f559` and closeout #581 as `f92a99c0`.
 Historical claim and acceptance evidence remain in the owners and I279.
 
-This 2026-09-30 matrix supersedes the 2026-08-31 open-Issue matrix for live reconciliation only;
-previous dated snapshots remain historical evidence and are not modified. Closed Issue #188 remains recorded
+The register originated on 2026-09-30 and superseded the 2026-08-31 open-Issue snapshot at that time; subsequent rows and updates through 2026-11-13 are **rolling CI reconciliation**, not changes to the original 2026-09-30 facts. Earlier dated snapshots remain historical evidence and are not modified. Closed Issue #188 remains recorded
 in PERM-007 and I236 owner documents with completion evidence from I236.
 
 This matrix is a remote-owner reconciliation surface, not an implementation backlog or activation
