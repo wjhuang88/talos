@@ -132,9 +132,12 @@ mod tests {
             last_accessed: None,
             contradiction_ref: None,
         };
-        assert!(contract.insert(item.clone()).expect("insert"));
-        assert!(!contract.insert(item).expect("dedup"));
+        let mut duplicate = item.clone();
+        duplicate.id = "d-memory-2".into();
+        assert!(contract.insert(item).expect("insert"));
+        assert!(!contract.insert(duplicate).expect("dedup"));
         assert_eq!(contract.count().expect("count"), 1);
+        assert!(contract.get("d-memory-2").expect("dedup lookup").is_none());
         contract
             .insert_evidence(EvidenceLink {
                 id: "d-evidence".into(),
