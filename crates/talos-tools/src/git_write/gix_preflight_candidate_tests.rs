@@ -270,7 +270,6 @@ fn gix_admitted_host_output_matches_native_config_values_and_stales() {
     assert!(sources.revalidate().is_err(), "stale config was accepted");
 }
 
-
 #[test]
 fn gix_host_candidate_retains_missing_root_and_rejects_later_appearance() {
     // An absent, separately admitted system root is still security-relevant.
@@ -327,7 +326,9 @@ fn gix_attributes_strict_parse_refuses_malformed_filter_sources() {
             attributes.into_iter().all(|attribute| attribute.is_ok())
         })
     };
-    assert!(strict(b"[attr]binary -diff -merge -text\n*.bin binary\n*.txt -filter\n"));
+    assert!(strict(
+        b"[attr]binary -diff -merge -text\n*.bin binary\n*.txt -filter\n"
+    ));
     assert!(
         !strict(b"*.bin filter=lfs\n!*.bad filter=untrusted\n"),
         "negative attribute patterns must not be silently skipped"
