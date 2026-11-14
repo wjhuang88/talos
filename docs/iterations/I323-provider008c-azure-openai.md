@@ -247,3 +247,12 @@ UI regression execution and the newly restored six-case actual Chat Agent read t
 at this checkpoint. The Chat Agent test currently covers tools, not ordered images/reasoning.
 README en/zh, architecture and unreleased notes are restored. Browser ready means authentication
 configuration is selected, not that the supplied token has been read or validated.
+
+The actual Chat Agent test subsequently passed all six combinations (one matrix test), checking
+permission-gated read execution, native tool-call association and returned output on the second
+request. The UI test initially could not compile because mode_runners_tests.rs contained an old
+exhaustive ModelConfig literal (E0063); adding azure_deployment/azure_shape=None preserves that
+fixture's old behavior. The retry passed the Azure browser test (1 passed / 422 filtered).
+Governance's first invocation failed because cargo was absent from PATH; the fixed-toolchain retry
+is tracked separately. Collaboration-claim validation passed with one existing SEARCH-001-D3
+Unclaimed documentation-intake warning. These local results do not replace exact-head native CI.
