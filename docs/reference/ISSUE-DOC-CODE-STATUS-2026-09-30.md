@@ -1,7 +1,7 @@
 # GitHub Issue / Owner Document Status Reconciliation — Rolling Register (origin 2026-09-30)
 
 **Original baseline (2026-09-30)**: `main@5bb36663d13f133f8b90d7cc0c692ec876de7954`.
-**Latest registration update**: 2026-11-13 (open-Issue/owner rows are an evolving reconciliation register, **not** a point-in-time 2026-09-30 inventory).
+**Latest registration update**: 2026-11-14 (open-Issue/owner rows are an evolving reconciliation register, **not** a point-in-time 2026-09-30 inventory).
 **Purpose**: preserve the original 2026-09-30 / 2026-08-31 historical provenance while tracking subsequent open-Issue owner relationships for remote CI. The original filename remains stable because governance automation uses it; entries created after September are dated below, not backdated to the initial snapshot.
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
 
@@ -10,7 +10,6 @@
 | Issue | Summary | Owner | Owner Status | Disposition |
 |---|---|---|---|---|
 | [#947](https://github.com/wjhuang88/talos/issues/947) | Explicit sponsored ancestor rejection in existing Bing response parser | [SEARCH-001-D3-T2](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) | In Progress / Claimed proposed | Draft governance #948 for I327 parser-local source fix after T1/#941 completion; no effective claim/code until reviewed governance merge. Open stale #861 touches the same parser source file (different import hunk); must compare/reconcile at source gate. No Bing new endpoint or provider admission. |
-| [#941](https://github.com/wjhuang88/talos/issues/941) | Bing synthetic HTML and unadmitted-host test-only conformance | [SEARCH-001-D3-T1](../backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) | Complete / Closed on owner-first closeout merge | I326 claim #943 merged; #944 implementation Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606` (CI43428872719 8/8, independent review, CAS). Source Issue closes after docs merge; parent D3/#937 and Epic/#624 remain Open. |
 | [#937](https://github.com/wjhuang88/talos/issues/937) | Bing same-family direct-HTML multi-endpoint research | [SEARCH-001-D3](../backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) | Intake / Proposed / Unclaimed | Source/authority-only feasibility; 2026 Microsoft Bing/MSN product-use rights BLOCKED, live endpoint/region UNKNOWN; no executable claim, new default, or provider admission. Parent #624 Open. |
 | [#901](https://github.com/wjhuang88/talos/issues/901) | Eliminate legacy rust-websearch build dependency without admitting providers | [SEARCH-001-L](../backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) | Complete / Closed | I319 claim/ADR-085 A1 via #902, independent oracle #904, implementation #907 merged `3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970` after exact-head CI4121 8/8 and independent review/CAS. Documentation closeout is pending acceptance; parent #624 and E/F/G/I remain separate. |
 | [#853](https://github.com/wjhuang88/talos/issues/853) | Model-selectable process memory limit (handoff T6) | [PROCESS-001](../backlog/active/PROCESS-001-model-process-memory-limit.md) | In Progress / proposed activation | I316 claim #854 and ADR-098 design reviewed; finalized atomic claim and target merge required before implementation. |
@@ -140,3 +139,5 @@ in PERM-007 and I236 owner documents with completion evidence from I236.
 This matrix is a remote-owner reconciliation surface, not an implementation backlog or activation
 mechanism. Historical claim PR #440 merged as `3f6f036d`; that unrelated WORK-001 fact transfers no
 authority to newly opened Issues #466/#467 or to I244.
+
+2026-11-14 governance register reconciliation: remove already-closed #941 from the **Open Issue Matrix** after I326 owner-first closeout. Open #947 had already been registered on main; its owner and claim remain unchanged. This separate global register repair does not turn the historical failed remote validation job on #935 into a passing check.
