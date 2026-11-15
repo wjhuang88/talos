@@ -61,12 +61,20 @@ impl IdentityLease {
                     return Err(invalid());
                 }
             }
+            #[cfg(test)]
+            custody_stage(if exclusive {
+                "exclusive-lock"
+            } else {
+                "shared-lock"
+            });
             if exclusive {
                 file.try_lock()
             } else {
                 file.try_lock_shared()
             }
             .map_err(|_| invalid())?;
+            #[cfg(test)]
+            custody_stage("lock-acquired");
             Ok(Self {
                 _file: Some(std::sync::Arc::new(file)),
                 key: Some(key),
@@ -108,6 +116,43 @@ impl IdentityLease {
         }
         Ok(())
     }
+}
+
+#[cfg(test)]
+type CustodyTrace = (std::time::Instant, Vec<(&'static str, u128)>);
+
+#[cfg(test)]
+thread_local! {
+    static CUSTODY_TRACE: std::cell::RefCell<Option<CustodyTrace>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+pub(crate) fn start_custody_trace() {
+    CUSTODY_TRACE.with(|trace| {
+        *trace.borrow_mut() = Some((std::time::Instant::now(), Vec::new()));
+    });
+}
+
+#[cfg(test)]
+pub(crate) fn custody_stage(stage: &'static str) {
+    CUSTODY_TRACE.with(|trace| {
+        if let Some((start, events)) = trace.borrow_mut().as_mut()
+            && events.len() < 64
+        {
+            events.push((stage, start.elapsed().as_micros()));
+        }
+    });
+}
+
+#[cfg(test)]
+pub(crate) fn finish_custody_trace() -> Vec<(&'static str, u128)> {
+    CUSTODY_TRACE.with(|trace| {
+        trace
+            .borrow_mut()
+            .take()
+            .map(|(_, events)| events)
+            .unwrap_or_default()
+    })
 }
 
 fn invalid() -> SessionError {
@@ -525,17 +570,25 @@ pub(crate) fn require_active_session_identity_until(
     deadline: std::time::Instant,
 ) -> Result<(), SessionError> {
     boundary(|| {
+        #[cfg(test)]
+        custody_stage("active-deadline");
         if std::time::Instant::now() >= deadline {
             return Err(invalid());
         }
+        #[cfg(test)]
+        custody_stage("active-metadata");
         if !std::fs::symlink_metadata(database)?.file_type().is_file() {
             return Err(invalid());
         }
+        #[cfg(test)]
+        custody_stage("active-open");
         let connection = crate::durable::open_binding_connection_with_flags(
             database,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
         .map_err(|_| invalid())?;
+        #[cfg(test)]
+        custody_stage("active-busy-config");
         connection
             .busy_timeout(std::time::Duration::ZERO)
             .map_err(|_| invalid())?;
@@ -544,22 +597,36 @@ pub(crate) fn require_active_session_identity_until(
                 .saturating_duration_since(std::time::Instant::now())
                 .min(std::time::Duration::from_secs(1)),
         );
+        #[cfg(test)]
+        custody_stage("active-budget-install");
         let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        #[cfg(test)]
+        custody_stage("active-prepare");
         let mut query = connection
             .prepare("SELECT CASE WHEN length(CAST(incarnation AS BLOB))=36 THEN incarnation END,retired FROM session_identity_custody WHERE session_id=?1 LIMIT 2")
             .map_err(|_| invalid())?;
+        #[cfg(test)]
+        custody_stage("active-query");
         let mut rows = query
             .query([session_id.to_string()])
             .map_err(|_| invalid())?;
+        #[cfg(test)]
+        custody_stage("active-row");
         let row = rows.next().map_err(|_| invalid())?.ok_or_else(invalid)?;
+        #[cfg(test)]
+        custody_stage("active-decode");
         let stored: String = row.get(0).map_err(|_| invalid())?;
         let retired: i64 = row.get(1).map_err(|_| invalid())?;
+        #[cfg(test)]
+        custody_stage("active-validate");
         if stored != incarnation.to_string()
             || retired != 0
             || rows.next().map_err(|_| invalid())?.is_some()
         {
             return Err(invalid());
         }
+        #[cfg(test)]
+        custody_stage("active-budget-final");
         budget.check().map_err(|_| invalid())
     })
 }

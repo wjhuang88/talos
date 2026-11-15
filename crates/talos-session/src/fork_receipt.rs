@@ -727,17 +727,23 @@ impl Receipt {
             check(deadline)?;
             self.validate()?;
             let db = database(head, self.child)?;
+            #[cfg(test)]
+            crate::identity_custody::custody_stage("intent-child");
             let _lease = crate::identity_custody::lock_reserved_identity(
                 head,
                 self.child_incarnation,
                 deadline,
             )?;
+            #[cfg(test)]
+            crate::identity_custody::custody_stage("intent-parent");
             crate::identity_custody::require_active_session_identity_until(
                 &db,
                 self.parent,
                 self.parent_incarnation,
                 deadline,
             )?;
+            #[cfg(test)]
+            crate::identity_custody::custody_stage("intent-identities-verified");
             let payload = serde_json::to_string(self).map_err(|_| invalid())?;
             if payload.len() > MAX_PAYLOAD {
                 return Err(invalid());
@@ -1110,9 +1116,11 @@ mod tests {
             load(&head, deadline()).is_err(),
             "reservation alone is not a receipt"
         );
-        receipt
-            .record_intent(&head, deadline())
-            .expect("intent before artifacts");
+        start_custody_trace();
+        let intent = receipt.record_intent(&head, deadline());
+        let trace = finish_custody_trace();
+        eprintln!("fork-intent ok={} stages={trace:?}", intent.is_ok());
+        intent.expect("intent before artifacts");
         assert!(!head.exists());
         write_synced(&head, &bytes);
         assert!(
