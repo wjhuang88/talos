@@ -1155,13 +1155,14 @@ async fn test_multi_turn() {
 
 #[tokio::test]
 async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1230,13 +1231,14 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
 
 #[tokio::test]
 async fn duplicate_submission_reconciles_and_executes_at_most_once() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1292,13 +1294,14 @@ async fn duplicate_submission_reconciles_and_executes_at_most_once() {
 
 #[tokio::test]
 async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1357,13 +1360,14 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
 
 #[tokio::test]
 async fn context_budget_terminalizes_before_submission_started() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 64,
     };
@@ -1486,13 +1490,14 @@ async fn context_budget_terminalizes_before_submission_started() {
 
 #[tokio::test]
 async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let agent = make_agent(SlowModel {
         delay: Duration::from_secs(30),
         events: success_events("too late"),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1560,6 +1565,7 @@ async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
 
 #[tokio::test]
 async fn paused_user_submission_runs_before_retained_scheduler_work() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let responses = Arc::new(Mutex::new(VecDeque::from(vec![
         vec![AgentEvent::Error {
@@ -1574,7 +1580,7 @@ async fn paused_user_submission_runs_before_retained_scheduler_work() {
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
