@@ -1,6 +1,6 @@
 # Iteration I327: Existing Bing Parser Explicit Sponsored Ancestor Rejection
 
-> **Status**: Complete / Closed upon owner-first closeout merge; source PR #949 already merged
+> Document status: Complete / Closed upon owner-first closeout merge; source PR #949 already merged
 > Published: 2026-11-13
 > Source: [SEARCH-001-D3-T2 / #947](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md).
 > Baseline: D3-T1/#941 Complete/Closed, implementation #944 `9cbc615cebb119ead9706a4d00159d7151639606`, owner-first closeout #946 `73ec650b6ef9804d0c9c42a6f1c5e7c9d9f0baa7`.
