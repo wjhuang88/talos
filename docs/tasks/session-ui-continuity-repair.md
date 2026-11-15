@@ -1,6 +1,6 @@
 # SESSION-UI-001 — Queue visibility and user-history continuity repair
 
-Status: Refinement / Unclaimed — governance preparation only.
+Status: Active / Claimed proposed via #952; ineffective until this governance record merges to main.
 Owner: this document. Source: the maintainer's existing session-recovery handoff and
 reported missing queued text / missing blank row after user input.
 Primary-worktree source: `docs/tasks/2026-11-11-session-recovery-handoff.md`,
@@ -26,14 +26,14 @@ this task does not reopen them or borrow their closed claims.
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | SESSION-UI-001: accepted queue presentation, queue row allocation, external user-block separator, terminal lifecycle regressions and docs |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-15 |
 | Source Issue | None |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
+| Governance Claim PR | #952 |
+| Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer requested completion of the existing handoff; effective target-branch claim required before committed implementation |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-15 |
@@ -101,7 +101,7 @@ Requested outcome: close these existing UI handoff defects with runtime evidence
 Artifacts: this owner and derived Board entry; implementation and both READMEs later.
 Preserve: existing owners, claims, dirty code, original session data and patch artifacts.
 Validate governance with both repository validators, link/whitespace checks and independent
-scope review. Propose claim/activation in a governance-only PR, backfill its actual number,
+scope review. PR #952 proposes claim/activation atomically with its actual number recorded;
 then require target-branch merge before implementation branch/commits. No merge authority
 is inferred from this document. All incomplete SESSION-UI-001 work remains owned here;
 no Complete or implementation commit is asserted.
