@@ -340,3 +340,22 @@ target/background-selected-corrected-manifest.json and
 target/background-preparation-{red,green}.log. Remote/native CI, dependency merge,
 source merge and installed-host acceptance remain open. Production default
 continuation is not delivered or enabled; this owner remains Partial.
+
+
+## 2026-11-16 user-driven retry regression and native results — Partial
+
+The actual Actor preparation-failure regression now covers both shutdown and
+user-driven recovery. After one hook denial it verifies retained Pending and no
+automatic retry; a user submission then completes first, followed by the original
+completion as Context, with two successful turns and zero retained slots. Both
+focused cases passed with locked dependencies (2passed,0failed/ignored), log
+`target/background-resume-regression.log` in the primary workspace. No production
+source or activation changed. The 5527-test full gate above predates this additional
+test and must not be presented as exact-head validation of the new test candidate.
+
+Native run43731413997 atd50be167 finished FAILURE: macOS passed, while Windows
+workspace failed the six-thread first-open binding regression with database locked.
+Raw logs are `target/background-d50be167-{windows-failed,macos}.log`; terminal
+run snapshot is `target/background-d50be167-ci-final.json`. Global Issue ownership
+reconciliation also failed for existing937/947 drift. Recovery PR917 diagnostic
+commit9b38f8e3 is undergoing native validation; cause and fix remain unproven.

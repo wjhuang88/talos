@@ -200,6 +200,15 @@ async fn background_completion_entry_preserves_context_in_worker_record() {
 
 #[tokio::test]
 async fn background_preparation_failure_keeps_pending_until_shutdown() {
+    check_background_preparation_failure(false).await;
+}
+
+#[tokio::test]
+async fn background_preparation_failure_retries_after_user_input() {
+    check_background_preparation_failure(true).await;
+}
+
+async fn check_background_preparation_failure(resume: bool) {
     struct RejectPreparation(Arc<AtomicUsize>);
     #[async_trait]
     impl talos_plugin::HookHandler for RejectPreparation {
@@ -214,20 +223,27 @@ async fn background_preparation_failure_keeps_pending_until_shutdown() {
             _: &talos_plugin::HookContext,
             _: &mut talos_plugin::HookEvent<'_>,
         ) -> talos_plugin::HookResult {
-            self.0.fetch_add(1, Ordering::SeqCst);
-            talos_plugin::HookResult::Deny {
-                reason: "preparation regression".into(),
+            if self.0.fetch_add(1, Ordering::SeqCst) == 0 {
+                talos_plugin::HookResult::Deny {
+                    reason: "preparation regression".into(),
+                }
+            } else {
+                talos_plugin::HookResult::Continue
             }
         }
     }
     let attempts = Arc::new(AtomicUsize::new(0));
-    let calls = Arc::new(AtomicUsize::new(0));
+    let captured = Arc::new(Mutex::new(Vec::new()));
     let mut hooks = talos_plugin::HookRegistry::new();
     hooks.register(Arc::new(RejectPreparation(attempts.clone())));
     let root = tempfile::tempdir().expect("workspace");
     let agent = Agent::with_security_and_hooks(
-        Arc::new(CountingModel {
-            calls: calls.clone(),
+        Arc::new(CapturingSequenceModel {
+            captured: captured.clone(),
+            responses: Arc::new(Mutex::new(VecDeque::from(vec![
+                success_events("user response"),
+                success_events("completion response"),
+            ]))),
         }),
         ToolRegistry::new(),
         None,
@@ -266,12 +282,46 @@ async fn background_preparation_failure_keeps_pending_until_shutdown() {
         id
     );
     assert_eq!(supervisor.completion_count_for_test(), 1);
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert!(captured.lock().expect("capture").is_empty());
     // Give the Actor opportunities to dispatch; pause must prevent automatic retry.
     for _ in 0..32 {
         tokio::task::yield_now().await;
     }
     assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    if resume {
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "resume after preparation failure".into(),
+            })
+            .await
+            .expect("user input");
+        let events = tokio::time::timeout(
+            Duration::from_secs(5),
+            collect_until_completions(&mut handle.eq_rx, 2),
+        )
+        .await
+        .expect("user and retained completion finish");
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| matches!(
+                    completed_status(event),
+                    Some(TurnCompletionStatus::Success { .. })
+                ))
+                .count(),
+            2
+        );
+        let requests = captured.lock().expect("capture");
+        assert_eq!(requests.len(), 2);
+        assert!(matches!(requests[0].last(), Some(Message::User { content })
+            if content == "resume after preparation failure"));
+        assert!(
+            matches!(requests[1].last(), Some(Message::Context { content })
+            if content.contains("job_preparation_failure"))
+        );
+        assert_eq!(supervisor.completion_count_for_test(), 0);
+    }
     handle
         .sq_tx
         .send(SessionOp::Shutdown)
@@ -282,8 +332,11 @@ async fn background_preparation_failure_keeps_pending_until_shutdown() {
         .expect("shutdown deadline")
         .expect("actor");
     assert_eq!(supervisor.completion_count_for_test(), 0);
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
-    assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        captured.lock().expect("capture").len(),
+        if resume { 2 } else { 0 }
+    );
+    assert_eq!(attempts.load(Ordering::SeqCst), if resume { 3 } else { 1 });
     while let Ok(event) = handle.eq_rx.try_recv() {
         assert!(!matches!(
             event,
