@@ -329,6 +329,8 @@ fn invalid_json_lines_are_skipped() {
         .open(&session.file_path)
         .expect("operation should succeed");
     writeln!(file, "this is not json").expect("operation should succeed");
+    // End the external write before acquiring the recovery reader's file lease.
+    drop(file);
 
     // Append another valid message
     session

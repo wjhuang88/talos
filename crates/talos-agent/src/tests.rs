@@ -3533,6 +3533,7 @@ async fn test_tool_result_events_broadcast() {
 #[tokio::test]
 #[allow(deprecated)]
 async fn model_private_projection_reaches_model_but_not_events_or_returned_history() {
+    let workspace = tempfile::tempdir().expect("fixture workspace");
     let responses = vec![
         vec![
             AgentEvent::TurnStart,
@@ -3616,10 +3617,10 @@ async fn model_private_projection_reaches_model_but_not_events_or_returned_histo
         Arc::new(model),
         registry,
         Some(Arc::new(PermissionEngine::with_workspace_root(
-            PathBuf::from("/tmp"),
+            workspace.path().to_path_buf(),
         ))),
         None,
-        PathBuf::from("/tmp"),
+        workspace.path().to_path_buf(),
         Arc::new(hooks),
     );
     let (tx, mut rx) = mpsc::unbounded_channel();
@@ -4619,6 +4620,7 @@ async fn final_permission_hook_skip_executes_zero_tools() {
 
 #[tokio::test]
 async fn test_sandbox_execution_for_bash_tool() {
+    let workspace = tempfile::tempdir().expect("fixture workspace");
     let sandbox_result = SandboxResult {
         stdout: "sandboxed output".into(),
         stderr: String::new(),
@@ -4670,7 +4672,7 @@ async fn test_sandbox_execution_for_bash_tool() {
         registry,
         None,
         Some(Box::new(sandbox)),
-        PathBuf::from("/tmp"),
+        workspace.path().to_path_buf(),
     );
 
     let result = agent.run("Test".into()).await;
@@ -5964,6 +5966,7 @@ fn text_done_events(text: &str) -> Vec<AgentEvent> {
 
 #[tokio::test]
 async fn continuation_image_appears_once_in_next_provider_request() {
+    let workspace = tempfile::tempdir().expect("fixture workspace");
     let (model, captured) = CapturingMockModel::new(vec![
         image_continuation_events(),
         text_done_events("described the image"),
@@ -5974,10 +5977,10 @@ async fn continuation_image_appears_once_in_next_provider_request() {
         Arc::new(model),
         registry,
         Some(Arc::new(PermissionEngine::with_workspace_root(
-            PathBuf::from("/tmp"),
+            workspace.path().to_path_buf(),
         ))),
         None,
-        PathBuf::from("/tmp"),
+        workspace.path().to_path_buf(),
         Arc::new(HookRegistry::new()),
     );
     agent.set_image_input_supported(true);
@@ -6012,6 +6015,7 @@ async fn continuation_image_appears_once_in_next_provider_request() {
 
 #[tokio::test]
 async fn continuation_image_consumed_after_second_call() {
+    let workspace = tempfile::tempdir().expect("fixture workspace");
     let read_tool_call = vec![
         AgentEvent::ToolCall {
             call: ToolCall {
@@ -6046,10 +6050,10 @@ async fn continuation_image_consumed_after_second_call() {
         Arc::new(model),
         registry,
         Some(Arc::new(PermissionEngine::with_workspace_root(
-            PathBuf::from("/tmp"),
+            workspace.path().to_path_buf(),
         ))),
         None,
-        PathBuf::from("/tmp"),
+        workspace.path().to_path_buf(),
         Arc::new(HookRegistry::new()),
     );
     agent.set_image_input_supported(true);
@@ -6297,6 +6301,7 @@ fn ephemeral_image_budget_is_admitted_before_dispatch() {
 
 #[tokio::test]
 async fn batch_limit_rejects_second_read_image_before_execution() {
+    let workspace = tempfile::tempdir().expect("fixture workspace");
     let two_read_image_events = vec![
         AgentEvent::ToolCall {
             call: ToolCall {
@@ -6330,10 +6335,10 @@ async fn batch_limit_rejects_second_read_image_before_execution() {
         Arc::new(model),
         registry,
         Some(Arc::new(PermissionEngine::with_workspace_root(
-            PathBuf::from("/tmp"),
+            workspace.path().to_path_buf(),
         ))),
         None,
-        PathBuf::from("/tmp"),
+        workspace.path().to_path_buf(),
         Arc::new(HookRegistry::new()),
     );
     agent.set_image_input_supported(true);
@@ -6373,6 +6378,7 @@ async fn batch_limit_rejects_second_read_image_before_execution() {
 
 #[tokio::test]
 async fn continuation_image_not_in_persisted_messages() {
+    let workspace = tempfile::tempdir().expect("fixture workspace");
     let (model, _captured) =
         CapturingMockModel::new(vec![image_continuation_events(), text_done_events("done")]);
     let mut registry = ToolRegistry::new();
@@ -6381,10 +6387,10 @@ async fn continuation_image_not_in_persisted_messages() {
         Arc::new(model),
         registry,
         Some(Arc::new(PermissionEngine::with_workspace_root(
-            PathBuf::from("/tmp"),
+            workspace.path().to_path_buf(),
         ))),
         None,
-        PathBuf::from("/tmp"),
+        workspace.path().to_path_buf(),
         Arc::new(HookRegistry::new()),
     );
     agent.set_image_input_supported(true);
@@ -6405,6 +6411,7 @@ async fn continuation_image_not_in_persisted_messages() {
 
 #[tokio::test]
 async fn continuation_image_safe_summary_persisted_in_tool_result() {
+    let workspace = tempfile::tempdir().expect("fixture workspace");
     let (model, _captured) =
         CapturingMockModel::new(vec![image_continuation_events(), text_done_events("done")]);
     let mut registry = ToolRegistry::new();
@@ -6413,10 +6420,10 @@ async fn continuation_image_safe_summary_persisted_in_tool_result() {
         Arc::new(model),
         registry,
         Some(Arc::new(PermissionEngine::with_workspace_root(
-            PathBuf::from("/tmp"),
+            workspace.path().to_path_buf(),
         ))),
         None,
-        PathBuf::from("/tmp"),
+        workspace.path().to_path_buf(),
         Arc::new(HookRegistry::new()),
     );
     agent.set_image_input_supported(true);
@@ -6494,6 +6501,7 @@ impl LanguageModel for CapturingFailModel {
 
 #[tokio::test]
 async fn continuation_image_consumed_on_provider_failure() {
+    let workspace = tempfile::tempdir().expect("fixture workspace");
     let (model, captured) = CapturingFailModel::new(image_continuation_events());
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(TestReadImageTool));
@@ -6501,10 +6509,10 @@ async fn continuation_image_consumed_on_provider_failure() {
         Arc::new(model),
         registry,
         Some(Arc::new(PermissionEngine::with_workspace_root(
-            PathBuf::from("/tmp"),
+            workspace.path().to_path_buf(),
         ))),
         None,
-        PathBuf::from("/tmp"),
+        workspace.path().to_path_buf(),
         Arc::new(HookRegistry::new()),
     );
     agent.set_image_input_supported(true);
