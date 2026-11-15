@@ -1801,6 +1801,7 @@ struct BindingOpenTrace {
     started: std::time::Instant,
     stage: &'static str,
     stage_elapsed_us: u128,
+    milestones: Vec<(&'static str, u128)>,
     init_attempts: u32,
     sqlite_codes: Option<(i32, i32)>,
 }
@@ -1816,6 +1817,7 @@ fn binding_open_stage(stage: &'static str) {
         if let Some(trace) = trace.borrow_mut().as_mut() {
             trace.stage = stage;
             trace.stage_elapsed_us = trace.started.elapsed().as_micros();
+            trace.milestones.push((stage, trace.stage_elapsed_us));
         }
     });
 }
@@ -4046,6 +4048,7 @@ mod tests {
                             started: std::time::Instant::now(),
                             stage: "start",
                             stage_elapsed_us: 0,
+                            milestones: Vec::new(),
                             init_attempts: 0,
                             sqlite_codes: None,
                         });
@@ -4054,9 +4057,10 @@ mod tests {
                     let trace = BINDING_OPEN_TRACE.with(|trace| trace.borrow_mut().take())
                         .expect("worker trace");
                     let diagnostic = format!(
-                        "worker={worker} ok={} stage={} stage_enter_us={} elapsed_us={} init_attempts={} sqlite_codes={:?}",
+                        "worker={worker} ok={} stage={} stage_enter_us={} elapsed_us={} init_attempts={} sqlite_codes={:?} milestones={:?}",
                         result.is_ok(), trace.stage, trace.stage_elapsed_us,
                         trace.started.elapsed().as_micros(), trace.init_attempts, trace.sqlite_codes,
+                        trace.milestones,
                     );
                     (result.map_err(|_| ()), diagnostic)
                 })
