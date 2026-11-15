@@ -5,6 +5,13 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 # Talos Board
 
+## SESSION-UI-001 — session UI continuity repair preparation
+
+[Owner](tasks/session-ui-continuity-repair.md): Refinement / Unclaimed. Existing handoff
+queue visibility, external user-background separator and terminal-animation evidence
+only; governance preparation, no effective claim or committed implementation. Recovery
+PR #917, approval history, edit locations and background work retain separate owners.
+
 ## SEARCH-001-D3-T2 / I327 — proposed explicit sponsored-ancestor correction
 
 [SEARCH-001-D3-T2](backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **In Progress / Claimed proposed via Draft #948 (ineffective until merge)** after T1/#941 Complete/Closed. Scope: localized `b_ad` ancestor exclusion in the existing response-only Bing parser, hand-authored synthetic positive/negative regressions; no real Bing, new hosts, network permission, SearchRouter default, provider count or rights assumption. Existing I324/I325 and other owners remain separate. No code until claim effective on main.
