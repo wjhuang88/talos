@@ -359,3 +359,18 @@ Raw logs are `target/background-d50be167-{windows-failed,macos}.log`; terminal
 run snapshot is `target/background-d50be167-ci-final.json`. Global Issue ownership
 reconciliation also failed for existing937/947 drift. Recovery PR917 diagnostic
 commit9b38f8e3 is undergoing native validation; cause and fix remain unproven.
+
+
+## 2026-11-16 exact retry-candidate full local gate — Partial
+
+Implementation/test candidate `3a7f1a7c11b79939d33d61f88e19fd610fd408d6` passed
+the standard locked release preflight:5528 tests/doctests,0failed/ignored,and both
+external SDK fixture modes. All2447 committed files matched the validated worktree.
+Evidence in primary workspace: target/background-resume-preflight.log and
+target/background-resume-preflight-result.json. Service exit0, runtime15min26.074s,
+peak2G,swap0. Independent review of the retry test found no blocker and confirmed
+shutdown coverage was preserved. This supersedes the local full-gate limitation
+above for3a7f1a7c; this evidence paragraph itself is a later documentation-only edit.
+
+Recovery diagnostic run43734019253 is still live. The recurring Windows binding
+lock failure is unresolved; no merge, installation or default activation occurred.
