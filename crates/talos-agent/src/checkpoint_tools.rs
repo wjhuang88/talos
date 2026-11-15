@@ -316,7 +316,19 @@ impl AgentTool for HistorySearchTool {
             }
             // Revalidate after query construction. Keep execution state stable
             // through permission commit, using the same state -> permission lock
-            // order as discovery. Filesystem/SQLite checks stay outside that lock.
+            // order as discovery. Acquire identity custody before the state lock;
+            // the final availability check below still runs under the state lock.
+            let Some(_identity) = crate::checkpoint_history::HISTORY
+                .try_with(|history| {
+                    history
+                        .as_ref()?
+                        .lock_identity_for_delivery(delivery_deadline)
+                })
+                .ok()
+                .flatten()
+            else {
+                return unavailable_reason("delivery_source_or_snapshot_unavailable");
+            };
             let Ok(state) = execution.state.lock() else {
                 return unavailable_reason("execution_state_poisoned");
             };
@@ -693,6 +705,7 @@ mod tests {
                 "generation",
                 "permission",
                 "cancel",
+                "retire",
                 "append",
             ] {
                 let (execution, _, mut raw) = fixture().await;
@@ -750,6 +763,10 @@ mod tests {
                         }
                         "permission" => current_execution.permission.as_ref().expect("permission").clear().expect("reset"),
                         "cancel" => cancelled.cancel(),
+                        "retire" => {
+                            let id = uuid::Uuid::parse_str(path.file_stem().expect("stem").to_str().expect("uuid")).expect("id");
+                            talos_session::retire_session_identity(&path.parent().expect("parent").join("history-bindings.sqlite"), id).expect("retire after query");
+                        }
                         _ => unreachable!(),
                     }
                 })));

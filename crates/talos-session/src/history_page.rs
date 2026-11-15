@@ -98,6 +98,30 @@ pub(crate) fn read_host_transcript_tip_with_placeholder(
     let mut file = open_source(path)?;
     let jsonl = path.extension().is_some_and(|ext| ext == "jsonl");
     let deadline = Instant::now() + std::time::Duration::from_secs(5);
+    if !jsonl {
+        let mut marker = Vec::new();
+        (&mut file)
+            .take(crate::fork_receipt::ENVELOPE.len() as u64)
+            .read_to_end(&mut marker)?;
+        file.seek(SeekFrom::Start(0))?;
+        if marker == crate::fork_receipt::ENVELOPE {
+            let mut bytes = Vec::new();
+            (&mut file)
+                .take(64 * 1024 * 1024 + 1)
+                .read_to_end(&mut bytes)?;
+            let receipt = crate::fork_receipt::load(path, deadline)
+                .map_err(|_| HistoryPageError::UnsupportedSource)?;
+            let records = receipt
+                .current_records(path, &bytes, deadline)
+                .map_err(|_| HistoryPageError::UnsupportedSource)?;
+            let raw = records.last().ok_or(HistoryPageError::InvalidRecord)?;
+            let (tail, _) = decode_tlog_record(raw, 64 * 1024 * 1024)?
+                .ok_or(HistoryPageError::InvalidRecord)?;
+            // A validated logical tail already crosses a keep0 marker. It must
+            // never become the synthetic marker's ID when a cold host appends.
+            return Ok((Some(tail.id), false));
+        }
+    }
     let mut bytes = Vec::new();
     let mut first = !jsonl;
     let mut counter = 0;
@@ -244,7 +268,7 @@ impl MessagePageBuffer {
             .checked_add(self.bytes.len() as u64)
             .filter(|start| *start <= self.source_end)
             .ok_or(HistoryPageError::Stale)?;
-        let mut file = open_source(path)?;
+        let mut file = open_source_until(path, deadline)?;
         if file.metadata()?.len() < self.source_end {
             return Err(HistoryPageError::Stale);
         }
@@ -303,7 +327,7 @@ fn read_page_impl(
         }
     };
     check()?;
-    let mut file = open_source(path)?;
+    let mut file = open_source_until(path, deadline)?;
     if offset > source_end || file.metadata()?.len() < source_end {
         return Err(HistoryPageError::Stale);
     }
@@ -453,33 +477,62 @@ pub fn read_history_record(
 
 /// A source handle constructed only after all platform source checks succeed.
 /// No conversion from arbitrary File or mutable access to the handle is exposed.
-pub(crate) struct SourceFile(std::fs::File);
+pub(crate) struct SourceFile {
+    file: std::fs::File,
+    _identity: crate::identity_custody::IdentityLease,
+}
 
 impl SourceFile {
     pub(crate) fn metadata(&self) -> std::io::Result<std::fs::Metadata> {
-        self.0.metadata()
+        self.file.metadata()
     }
 
     // Duplicating an existing handle preserves its sharing constraints.
     #[cfg(windows)]
     pub(crate) fn clone_lease(&self) -> std::io::Result<std::fs::File> {
-        self.0.try_clone()
+        self.file.try_clone()
     }
 }
 
 impl Read for SourceFile {
     fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
-        self.0.read(bytes)
+        self.file.read(bytes)
     }
 }
 
 impl Seek for SourceFile {
     fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
-        self.0.seek(position)
+        self.file.seek(position)
     }
 }
 
 pub(crate) fn open_source(path: &Path) -> Result<SourceFile, HistoryPageError> {
+    open_source_until(path, Instant::now() + std::time::Duration::from_secs(1))
+}
+
+pub(crate) fn open_source_until(
+    path: &Path,
+    deadline: Instant,
+) -> Result<SourceFile, HistoryPageError> {
+    if Instant::now() >= deadline {
+        return Err(HistoryPageError::Stopped);
+    }
+    let identity = crate::identity_custody::require_not_retired_until(path, deadline)
+        .map_err(|_| HistoryPageError::UnsupportedSource)?;
+    if Instant::now() >= deadline {
+        return Err(HistoryPageError::Stopped);
+    }
+    open_source_under_identity(path, &identity)
+}
+
+// Reuse an operation's existing guard, never reacquire a nested file lock.
+pub(crate) fn open_source_under_identity(
+    path: &Path,
+    identity: &crate::identity_custody::IdentityLease,
+) -> Result<SourceFile, HistoryPageError> {
+    identity
+        .check_path(path)
+        .map_err(|_| HistoryPageError::UnsupportedSource)?;
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
@@ -521,7 +574,10 @@ pub(crate) fn open_source(path: &Path) -> Result<SourceFile, HistoryPageError> {
     if !metadata.is_file() {
         return Err(HistoryPageError::UnsupportedSource);
     }
-    Ok(SourceFile(file))
+    Ok(SourceFile {
+        file,
+        _identity: identity.clone(),
+    })
 }
 
 fn json_record(

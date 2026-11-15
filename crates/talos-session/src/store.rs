@@ -195,10 +195,12 @@ pub struct JsonlSessionStore;
 
 impl SessionStore for JsonlSessionStore {
     fn read_entries(&self, file_path: &Path) -> Result<Vec<SessionEntry>, SessionError> {
+        let _identity = crate::identity_custody::require_not_retired(file_path)?;
         read_entries_from_path(file_path)
     }
 
     fn append_entry(&self, file_path: &Path, entry: &SessionEntry) -> Result<(), SessionError> {
+        let _identity = crate::identity_custody::require_not_retired(file_path)?;
         let line =
             serde_json::to_string(entry).map_err(|e| SessionError::InvalidJson(e.to_string()))?;
 
@@ -236,6 +238,7 @@ impl SessionStore for JsonlSessionStore {
         file_path: &Path,
         entries: &[SessionEntry],
     ) -> Result<(), SessionError> {
+        let _identity = crate::identity_custody::require_not_retired(file_path)?;
         let parent = file_path.parent().ok_or_else(|| {
             SessionError::ParseError("session file has no parent directory".into())
         })?;
@@ -257,10 +260,12 @@ impl SessionStore for JsonlSessionStore {
     }
 
     fn read_last_entry_id(&self, file_path: &Path) -> Option<String> {
+        let _identity = crate::identity_custody::require_not_retired(file_path).ok()?;
         read_last_entry_id(file_path)
     }
 
     fn scan_file(&self, file_path: &Path) -> Result<SessionInfo, SessionError> {
+        let _identity = crate::identity_custody::require_not_retired(file_path)?;
         let file = fs::File::open(file_path)?;
         let metadata = file.metadata()?;
         let timestamp = metadata
@@ -313,6 +318,7 @@ impl SessionStore for JsonlSessionStore {
     }
 
     fn read_bytes(&self, file_path: &Path) -> Result<Vec<u8>, SessionError> {
+        let _identity = crate::identity_custody::require_not_retired(file_path)?;
         std::fs::read(file_path).map_err(SessionError::IoError)
     }
 

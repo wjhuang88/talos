@@ -341,6 +341,37 @@ pub(crate) fn fork_captured_session(
     source: &Session,
     through_entry: Option<&str>,
 ) -> Result<Session> {
+    let source_lease = talos_session::SessionRuntimeLease::acquire(&source.file_path)
+        .context("fork requires idle source runtime ownership")?;
+    fork_captured_session_using(manager, source, through_entry, |child| {
+        let tail = source.publish_history_fork(
+            child,
+            &source_lease,
+            through_entry,
+            std::time::Instant::now() + std::time::Duration::from_secs(30),
+            || false,
+        )?;
+        Ok(tail.id)
+    })
+}
+
+/// Share metadata registration while letting an active Actor retain source ownership.
+pub(crate) fn fork_captured_session_using(
+    manager: &SessionManager,
+    source: &Session,
+    through_entry: Option<&str>,
+    publish: impl FnOnce(&Session) -> Result<String>,
+) -> Result<Session> {
+    fork_session_from_snapshot(manager, source, through_entry, None, publish)
+}
+
+pub(crate) fn fork_session_from_snapshot(
+    manager: &SessionManager,
+    source: &Session,
+    through_entry: Option<&str>,
+    snapshot: Option<talos_core::session::OrdinaryForkCapture>,
+    publish: impl FnOnce(&Session) -> Result<String>,
+) -> Result<Session> {
     let source_session_id = source.id;
     let new_id = Uuid::new_v4();
     let project_path = source
@@ -357,40 +388,89 @@ pub(crate) fn fork_captured_session(
         new_file_path.clone(),
     );
 
-    let (mut staged, _, tail) = crate::history_restore::stage_fork_history_blocking(
-        source,
-        new_file_path.with_extension("fork-staging"),
-        through_entry,
-    )
-    .context("failed to stage source Session history")?;
-    let fork_entry_id = tail.id;
-    // Do not enroll an existing destination in rollback ownership if publication fails.
-    staged
-        .install(&new_file_path)
-        .context("failed to install fork history")?;
+    let receipt_required =
+        snapshot.is_none() && crate::history_restore::requires_fork_receipt(source)?;
+    let _child_runtime_lease = if receipt_required {
+        Some(
+            talos_session::SessionRuntimeLease::acquire(&child.file_path)
+                .context("cannot acquire fork child runtime ownership")?,
+        )
+    } else {
+        None
+    };
+    let mut staged = None;
+    let fork_entry_id = if receipt_required {
+        publish(&child).with_context(|| format!(
+            "fork publication did not complete for child {new_id} at {}; preserve any artifacts for reconciliation",
+            new_file_path.display(),
+        ))?
+    } else if let Some(snapshot) = &snapshot {
+        staged = Some(crate::history_restore::stage_captured_fork_history(
+            &child, snapshot,
+        )?);
+        snapshot.tail_id.clone()
+    } else {
+        let (mut guard, _, tail) = crate::history_restore::stage_fork_history_blocking(
+            source,
+            new_file_path.with_extension("fork-staging"),
+            through_entry,
+        )
+        .context("failed to stage source Session history")?;
+        guard
+            .acquire_child_ownership(&child)
+            .context("cannot acquire legacy fork child runtime ownership")?;
+        guard
+            .install(&new_file_path)
+            .context("failed to install fork history")?;
+        staged = Some(guard);
+        tail.id
+    };
     let fork_result = (|| -> Result<()> {
-        child
-            .fork(&fork_entry_id)
-            .context("failed to create fork branch")?;
+        if !receipt_required {
+            child
+                .fork(&fork_entry_id)
+                .context("failed to create fork branch")?;
+        }
 
-        match talos_session::PendingSubmissionStore::for_session(source)
-            .runtime_state()
-            .context("failed to read source Session runtime identity")?
-        {
-            Some(state)
-                if state.status == talos_session::SessionRuntimeActivationStatus::Committed =>
-            {
+        if receipt_required {
+            child
+                .restore_history_fork_runtime(
+                    _child_runtime_lease
+                        .as_ref()
+                        .context("missing fork child ownership")?,
+                    std::time::Instant::now() + std::time::Duration::from_secs(30),
+                )
+                .context("failed to restore captured fork runtime identity")?;
+        } else if let Some(snapshot) = &snapshot {
+            if let Some((provider, model, variant)) = &snapshot.runtime_identity {
                 talos_session::PendingSubmissionStore::for_session(&child)
-                    .initialize_runtime_identity(state.activation.target)
-                    .context("failed to initialize fork runtime identity")?;
+                    .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+                        provider,
+                        model,
+                        variant.as_deref(),
+                    ))
+                    .context("failed to initialize captured fork runtime identity")?;
             }
-            Some(state) => {
-                bail!(
-                    "source Session activation {} is not committed",
-                    state.activation.activation_id
-                );
+        } else {
+            match talos_session::PendingSubmissionStore::for_session(source)
+                .runtime_state()
+                .context("failed to read source Session runtime identity")?
+            {
+                Some(state)
+                    if state.status == talos_session::SessionRuntimeActivationStatus::Committed =>
+                {
+                    talos_session::PendingSubmissionStore::for_session(&child)
+                        .initialize_runtime_identity(state.activation.target)
+                        .context("failed to initialize fork runtime identity")?;
+                }
+                Some(state) => {
+                    bail!(
+                        "source Session activation {} is not committed",
+                        state.activation.activation_id
+                    );
+                }
+                None => {}
             }
-            None => {}
         }
 
         manager
@@ -407,7 +487,20 @@ pub(crate) fn fork_captured_session(
 
     // Publication succeeded; the manager now owns complete sidecar/index rollback
     // and its error reporting. Do not let the file guard retry a partial cleanup.
-    staged.retain();
+    if let Some(staged) = &mut staged {
+        staged.retain();
+    }
+    if receipt_required && fork_result.is_err() {
+        return Err(fork_result.expect_err("checked error").context(format!(
+            "fork history was published for child {new_id} at {}; retain artifacts for metadata reconciliation",
+            new_file_path.display(),
+        )));
+    }
+    if fork_result.is_err()
+        && let Some(staged) = &mut staged
+    {
+        staged.release_child_ownership();
+    }
     match fork_result {
         Ok(()) => Ok(child),
         Err(primary_error) => match manager.rollback_session_artifacts(&child) {
@@ -432,7 +525,153 @@ mod fork_tests {
     use talos_core::message::Message;
 
     #[test]
-    fn startup_fork_refuses_archive_without_publishing_overlapping_child() {
+    fn ordinary_host_publishes_captured_bytes_and_absence_after_parent_changes() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager.create_session("source", "").expect("source");
+        source
+            .append(&Message::User {
+                content: "captured".into(),
+            })
+            .expect("append");
+        let lease =
+            talos_session::SessionRuntimeLease::acquire(&source.file_path).expect("ownership");
+        let capture = source
+            .capture_ordinary_fork(
+                &lease,
+                None,
+                std::time::Instant::now() + std::time::Duration::from_secs(5),
+                || false,
+            )
+            .expect("capture");
+        source
+            .append(&Message::User {
+                content: "later".into(),
+            })
+            .expect("later append");
+        talos_session::PendingSubmissionStore::for_session(&source)
+            .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+                "later", "model", None,
+            ))
+            .expect("later identity");
+        let child = fork_session_from_snapshot(
+            &manager,
+            &source,
+            None,
+            Some(talos_core::session::OrdinaryForkCapture {
+                bytes: capture.bytes,
+                tail_id: capture.tail.id,
+                runtime_identity: None,
+            }),
+            |_| anyhow::bail!("receipt publisher must not run"),
+        )
+        .expect("publish captured snapshot");
+        assert_eq!(child.read_entries().expect("child history").len(), 1);
+        assert_eq!(
+            child.read_entries().expect("child history")[0].content,
+            "captured"
+        );
+        assert!(
+            talos_session::PendingSubmissionStore::for_session(&child)
+                .runtime_state()
+                .expect("identity")
+                .is_none()
+        );
+        assert_eq!(source.read_entries().expect("parent history").len(), 2);
+    }
+
+    #[test]
+    fn receipt_fork_metadata_preparation_holds_child_ownership() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager.create_session("source", "").expect("source");
+        source
+            .append(&Message::User {
+                content: "preserved original".into(),
+            })
+            .expect("append");
+        source.compact_archived(0).expect("archive");
+        let source_lease =
+            talos_session::SessionRuntimeLease::acquire(&source.file_path).expect("source lease");
+        let child = fork_captured_session_using(&manager, &source, None, |child| {
+            assert!(
+                talos_session::SessionRuntimeLease::acquire(&child.file_path).is_err(),
+                "host excludes competing child runtime before publication"
+            );
+            let tail = source.publish_history_fork(
+                child,
+                &source_lease,
+                None,
+                std::time::Instant::now() + std::time::Duration::from_secs(30),
+                || false,
+            )?;
+            assert!(
+                talos_session::SessionRuntimeLease::acquire(&child.file_path).is_err(),
+                "ownership remains after publication"
+            );
+            Ok(tail.id)
+        })
+        .expect("publish and register metadata");
+        talos_session::SessionRuntimeLease::acquire(&child.file_path)
+            .expect("metadata completion releases ownership");
+        assert_eq!(
+            manager
+                .get_forks(&source.id.to_string())
+                .expect("lineage")
+                .len(),
+            1
+        );
+        assert!(child.file_path.exists());
+    }
+
+    #[test]
+    fn receipt_host_keeps_captured_absence_when_parent_identity_appears_after_publication() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager.create_session("source", "").expect("source");
+        source
+            .append(&Message::User {
+                content: "captured history".into(),
+            })
+            .expect("append");
+        source.compact_archived(0).expect("archive");
+        let lease = talos_session::SessionRuntimeLease::acquire(&source.file_path)
+            .expect("source ownership");
+        let child = fork_captured_session_using(&manager, &source, None, |child| {
+            let tail = source.publish_history_fork(
+                child,
+                &lease,
+                None,
+                std::time::Instant::now() + std::time::Duration::from_secs(30),
+                || false,
+            )?;
+            talos_session::PendingSubmissionStore::for_session(&source)
+                .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(
+                    "later-provider",
+                    "later-model",
+                    None,
+                ))?;
+            Ok(tail.id)
+        })
+        .expect("host registers captured metadata");
+        assert!(
+            talos_session::PendingSubmissionStore::for_session(&source)
+                .runtime_state()
+                .expect("parent state")
+                .is_some()
+        );
+        assert!(
+            talos_session::PendingSubmissionStore::for_session(&child)
+                .runtime_state()
+                .expect("child state")
+                .is_none(),
+            "publication-time absence must not become the parent's later identity"
+        );
+        assert_eq!(child.read_entries().expect("captured history").len(), 1);
+    }
+
+    #[test]
+    fn startup_fork_restores_archive_and_publishes_independent_child() {
         let root = tempfile::tempdir().expect("root");
         let manager = SessionManager::with_dir(root.path().join("sessions"));
         let source = manager.create_session("archive", "").expect("source");
@@ -445,13 +684,25 @@ mod fork_tests {
         }
         source.compact_archived(50).expect("archive");
         let before = source.snapshot_bytes().expect("before");
-        assert!(fork_session(&manager, &source.id.to_string()).is_err());
-        assert!(
+        let child = fork_session(&manager, &source.id.to_string()).expect("archived startup fork");
+        assert_eq!(child.read_entries().expect("child originals").len(), 205);
+        assert_eq!(
             manager
                 .get_forks(&source.id.to_string())
                 .expect("forks")
-                .is_empty()
+                .len(),
+            1
         );
+        child
+            .append(&Message::User {
+                content: "child continuation".into(),
+            })
+            .expect("append child");
+        let reopened = manager.get_session(&child.id).expect("reopen child");
+        let mut scan = reopened.begin_message_scan().expect("restore child");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !scan.step(deadline, || false).expect("page") {}
+        assert_eq!(scan.finish().expect("child history").len(), 206);
         assert_eq!(source.snapshot_bytes().expect("preserved"), before);
         let evidence = source
             .inspect_archive_recovery(
@@ -460,6 +711,78 @@ mod fork_tests {
             )
             .expect("source remains recoverable without overlapping child");
         assert_eq!(evidence.entries().len(), 205);
+    }
+
+    #[test]
+    fn startup_nested_archived_fork_survives_parent_removal() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager
+            .create_session("nested-archive", "")
+            .expect("source");
+        for i in 0..12 {
+            source
+                .append(&Message::User {
+                    content: format!("original {i}"),
+                })
+                .expect("append");
+        }
+        source.compact_archived(0).expect("keep0");
+        let child = fork_session(&manager, &source.id.to_string()).expect("first fork");
+        child
+            .append(&Message::User {
+                content: "child addition".into(),
+            })
+            .expect("child append");
+        child.compact_archived(1).expect("child keep1");
+        let grandchild = fork_session(&manager, &child.id.to_string()).expect("nested fork");
+        manager
+            .rollback_session_artifacts(&child)
+            .expect("remove disposable child");
+        manager
+            .rollback_session_artifacts(&source)
+            .expect("remove disposable parent");
+        let reopened = manager
+            .get_session(&grandchild.id)
+            .expect("reopen grandchild");
+        let mut scan = reopened.begin_message_scan().expect("capture");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !scan.step(deadline, || false).expect("page") {}
+        assert_eq!(scan.finish().expect("inherited history").len(), 13);
+        reopened
+            .append(&Message::User {
+                content: "grandchild addition".into(),
+            })
+            .expect("continue");
+        assert_eq!(reopened.read_entries().expect("entries").len(), 14);
+    }
+
+    #[test]
+    fn ordinary_startup_fork_requires_source_ownership_and_retries_after_release() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager.create_session("source", "").expect("source");
+        source
+            .append(&Message::User {
+                content: "preserve me".into(),
+            })
+            .expect("append");
+        let before = source.snapshot_bytes().expect("source bytes");
+        let lease =
+            talos_session::SessionRuntimeLease::acquire(&source.file_path).expect("active owner");
+        let error = fork_session(&manager, &source.id.to_string()).expect_err("busy source");
+        assert!(error.to_string().contains("source runtime ownership"));
+        assert_eq!(manager.list_sessions().expect("sessions").len(), 1);
+        assert!(
+            manager
+                .get_forks(&source.id.to_string())
+                .expect("lineage")
+                .is_empty()
+        );
+        assert_eq!(source.snapshot_bytes().expect("source preserved"), before);
+        drop(lease);
+        let child = fork_session(&manager, &source.id.to_string()).expect("retry fork");
+        assert_eq!(child.snapshot_bytes().expect("inherited bytes"), before);
     }
 
     #[test]

@@ -7475,3 +7475,395 @@ async fn cooperative_recovered_sources_bind_long_history_and_refuse_foreign_or_e
         Some(last_id.as_str())
     );
 }
+
+#[tokio::test]
+async fn idle_actor_publishes_archived_history_under_its_runtime_lease() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+    let source = manager.create_session("actor-fork", "").expect("source");
+    for i in 0..8 {
+        source
+            .append(&Message::User {
+                content: format!("fact {i}"),
+            })
+            .expect("append");
+    }
+    source.compact_archived(0).expect("compact");
+    let (handle, mut actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: Arc::new(AtomicUsize::new(0)),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(source.clone(), Default::default());
+    let task = tokio::spawn(async move { actor.run().await });
+    let child = uuid::Uuid::new_v4();
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkHistory {
+            child_id: child.to_string(),
+            child_branch: uuid::Uuid::new_v4().to_string(),
+            through_entry: None,
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("request");
+    let tail = tokio::time::timeout(Duration::from_secs(10), result.recv())
+        .await
+        .expect("deadline")
+        .expect("receipt")
+        .expect("published");
+    let child_session = talos_session::Session::new(
+        child,
+        String::new(),
+        String::new(),
+        source
+            .file_path
+            .parent()
+            .expect("directory")
+            .join(format!("{child}.tlog")),
+    );
+    let entries = child_session.read_entries().expect("child history");
+    assert_eq!(entries.len(), 8);
+    assert_eq!(entries.last().expect("tail").id, tail);
+    assert!(talos_session::SessionRuntimeLease::acquire(&source.file_path).is_err());
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("joined")
+        .expect("actor");
+}
+
+#[tokio::test]
+async fn history_fork_worker_interrupt_preserves_source_and_allows_retry() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+    let source = manager.create_session("actor-fork", "").expect("source");
+    for i in 0..8 {
+        source
+            .append(&Message::User {
+                content: format!("fact {i}"),
+            })
+            .expect("append");
+    }
+    source.compact_archived(0).expect("compact");
+    let (mut handle, mut actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: Arc::new(AtomicUsize::new(0)),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(source.clone(), Default::default());
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    actor.fork_worker_gate = Some((reached.clone(), release.clone()));
+    let task = tokio::spawn(async move { actor.run().await });
+    let child = uuid::Uuid::new_v4();
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkHistory {
+            child_id: child.to_string(),
+            child_branch: uuid::Uuid::new_v4().to_string(),
+            through_entry: None,
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("request");
+    tokio::time::timeout(Duration::from_secs(2), reached.notified())
+        .await
+        .expect("worker entered");
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 913,
+        })
+        .await
+        .expect("compact");
+    let event = tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+        .await
+        .expect("event")
+        .expect("status");
+    assert!(matches!(
+        event,
+        SessionEvent::CompactStatus {
+            operation_id: 913,
+            state: talos_core::session::CompactState::Busy,
+            ..
+        }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("interrupt");
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), result.recv())
+            .await
+            .expect("cancelled")
+            .expect("receipt")
+            .is_err()
+    );
+    assert!(
+        !source
+            .file_path
+            .parent()
+            .expect("directory")
+            .join(format!("{child}.tlog"))
+            .exists()
+    );
+    assert_eq!(
+        source
+            .inspect_archive_recovery(std::time::Instant::now() + Duration::from_secs(5), || false)
+            .expect("source intact")
+            .entries()
+            .len(),
+        8
+    );
+    release.store(true, Ordering::SeqCst);
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkHistory {
+            child_id: child.to_string(),
+            child_branch: uuid::Uuid::new_v4().to_string(),
+            through_entry: None,
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("retry");
+    let tail = tokio::time::timeout(Duration::from_secs(10), result.recv())
+        .await
+        .expect("deadline")
+        .expect("receipt")
+        .expect("published");
+    let child_session = talos_session::Session::new(
+        child,
+        String::new(),
+        String::new(),
+        source
+            .file_path
+            .parent()
+            .expect("directory")
+            .join(format!("{child}.tlog")),
+    );
+    let entries = child_session.read_entries().expect("child history");
+    assert_eq!(entries.len(), 8);
+    assert_eq!(entries.last().expect("tail").id, tail);
+    assert!(talos_session::SessionRuntimeLease::acquire(&source.file_path).is_err());
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("joined")
+        .expect("actor");
+}
+
+#[tokio::test]
+async fn prepared_runtime_lease_handoff_preserves_exclusion_and_rejects_mismatch() {
+    for matching in [true, false] {
+        let temp = tempfile::tempdir().expect("temp");
+        let manager = talos_session::SessionManager::with_dir(temp.path().to_path_buf());
+        let session = manager.create_session("handoff", "").expect("session");
+        let other = manager.create_session("other", "").expect("other");
+        let leased = if matching { &session } else { &other };
+        let lease =
+            talos_session::SessionRuntimeLease::acquire(&leased.file_path).expect("host lease");
+        assert!(talos_session::SessionRuntimeLease::acquire(&leased.file_path).is_err());
+        let agent = make_agent(MockModel::new(vec![success_events("handoff response")]));
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: temp.path().to_path_buf(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_persistence(session.clone(), talos_session::SessionMetadata::default());
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "handoff request".into(),
+            })
+            .await
+            .expect("submit");
+        let task = if matching {
+            actor
+                .adopt_runtime_lease(lease)
+                .expect("adopt prepared ownership");
+            assert!(talos_session::SessionRuntimeLease::acquire(&session.file_path).is_err());
+            tokio::spawn(async move { actor.run().await })
+        } else {
+            tokio::spawn(async move { actor.run_with_runtime_lease(lease).await })
+        };
+        if matching {
+            let events = collect_until_completions(&mut handle.eq_rx, 1).await;
+            assert!(events.iter().any(is_turn_started));
+            assert!(talos_session::SessionRuntimeLease::acquire(&session.file_path).is_err());
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+        }
+        tokio::time::timeout(std::time::Duration::from_secs(10), task)
+            .await
+            .expect("actor exits")
+            .expect("join");
+        let entries = session.read_entries().expect("entries");
+        assert_eq!(
+            entries
+                .iter()
+                .any(|entry| entry.content == "handoff response"),
+            matching
+        );
+        talos_session::SessionRuntimeLease::acquire(&leased.file_path)
+            .expect("released after exit");
+    }
+}
+
+#[tokio::test]
+async fn ordinary_fork_capture_excludes_turns_and_compaction_and_can_retry_cancel() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+    let source = manager.create_session("ordinary", "").expect("source");
+    source
+        .append(&Message::User {
+            content: "original".into(),
+        })
+        .expect("append");
+    let before = std::fs::read(&source.file_path).expect("bytes");
+    let identity = talos_session::SessionRuntimeIdentity::new("provider", "model", Some("variant"));
+    talos_session::PendingSubmissionStore::for_session(&source)
+        .initialize_runtime_identity(identity.clone())
+        .expect("identity");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let (mut handle, mut actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: calls.clone(),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(source.clone(), Default::default());
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    actor.fork_worker_gate = Some((reached.clone(), release.clone()));
+    let task = tokio::spawn(async move { actor.run().await });
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::CaptureOrdinaryFork {
+            through_entry: None,
+            receipt_tx: Some(tx),
+        })
+        .await
+        .expect("capture");
+    tokio::time::timeout(Duration::from_secs(2), reached.notified())
+        .await
+        .expect("capture running");
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "must not start".into(),
+        })
+        .await
+        .expect("submit");
+    assert!(matches!(
+        tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+            .await
+            .expect("event")
+            .expect("busy"),
+        SessionEvent::Error { .. }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 914,
+        })
+        .await
+        .expect("compact");
+    assert!(matches!(
+        tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+            .await
+            .expect("event")
+            .expect("busy"),
+        SessionEvent::CompactStatus {
+            operation_id: 914,
+            state: talos_core::session::CompactState::Busy,
+            ..
+        }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("interrupt");
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .expect("deadline")
+            .expect("receipt")
+            .is_err()
+    );
+    release.store(true, Ordering::SeqCst);
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::CaptureOrdinaryFork {
+            through_entry: None,
+            receipt_tx: Some(tx),
+        })
+        .await
+        .expect("retry");
+    let snapshot = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+        .await
+        .expect("deadline")
+        .expect("receipt")
+        .expect("capture");
+    assert_eq!(snapshot.bytes, before);
+    assert_eq!(
+        snapshot.runtime_identity,
+        Some((identity.provider, identity.model, identity.variant))
+    );
+    assert_eq!(
+        snapshot.tail_id,
+        source.read_entries().expect("entries")[0].id
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_eq!(std::fs::read(&source.file_path).expect("unchanged"), before);
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("joined")
+        .expect("actor");
+}

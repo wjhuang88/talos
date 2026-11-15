@@ -11,11 +11,16 @@ use crate::recovery_stamp::FileStamp;
 
 /// A paged restore of a Session's messages, including legacy JSONL envelopes.
 ///
-/// Each step reads at most the history page byte/entry bounds. The final message
+/// Legacy sources use bounded page reads. Receipt-bound forks first validate a
+/// shared bounded archive inventory, then decode at most one entry page per step.
+/// The final message
 /// vector still occupies memory proportional to history. This is not a durable
 /// provenance receipt and cannot authorize history search or model disclosure.
 pub struct SessionMessageScan {
     path: PathBuf,
+    fork_bound: bool,
+    fork_evidence: Option<crate::ArchiveRecoveryEvidence>,
+    fork_cursor: usize,
     buffer: MessagePageBuffer,
     stamp: Option<FileStamp>,
     end: u64,
@@ -44,6 +49,9 @@ impl crate::Session {
         entry_id: &str,
     ) -> Result<SessionMessageScan, HistoryPageError> {
         let mut scan = self.begin_message_scan()?;
+        if scan.fork_bound {
+            return Err(HistoryPageError::UnsupportedSource);
+        }
         scan.through_entry = Some(entry_id.to_owned());
         Ok(scan)
     }
@@ -62,8 +70,20 @@ impl crate::Session {
         }))
         .map_err(|_| HistoryPageError::UnsupportedSource)?
         .ok_or(HistoryPageError::UnsupportedSource)?;
+        let mut fork_bound = false;
         let stamp = match open_source(&self.file_path) {
-            Ok(file) => Some(crate::recovery_stamp::from_file(&file)?),
+            Ok(mut file) => {
+                use std::io::Read;
+                let stamp = crate::recovery_stamp::from_file(&file)?;
+                if matches!(encoding, crate::history_page::HistoryEncoding::Tlog) {
+                    let mut marker = Vec::new();
+                    (&mut file)
+                        .take(crate::fork_receipt::ENVELOPE.len() as u64)
+                        .read_to_end(&mut marker)?;
+                    fork_bound = marker == crate::fork_receipt::ENVELOPE;
+                }
+                Some(stamp)
+            }
             Err(HistoryPageError::Io(error))
                 if error.kind() == std::io::ErrorKind::NotFound && !self.persisted =>
             {
@@ -79,6 +99,9 @@ impl crate::Session {
         };
         Ok(SessionMessageScan {
             path: self.file_path.clone(),
+            fork_bound,
+            fork_evidence: None,
+            fork_cursor: 0,
             buffer: MessagePageBuffer::new(encoding, end),
             stamp,
             end,
@@ -117,6 +140,11 @@ impl SessionMessageScan {
     ) -> Result<Option<Vec<u8>>, HistoryPageError> {
         use std::io::{Read, Seek, SeekFrom};
 
+        // A receipt belongs to the original UUID. Blind byte copying cannot
+        // publish a child; that needs a separately issued child receipt.
+        if self.fork_bound {
+            return Err(HistoryPageError::UnsupportedSource);
+        }
         let check = || {
             if stopped() || Instant::now() >= deadline {
                 Err(HistoryPageError::Stopped)
@@ -178,6 +206,9 @@ impl SessionMessageScan {
             self.complete = true;
             return Ok(true);
         }
+        if self.fork_bound {
+            return self.step_fork(deadline, stopped);
+        }
         let mut counter = self.synthetic_counter;
         let page = self
             .buffer
@@ -224,6 +255,59 @@ impl SessionMessageScan {
         Ok(self.complete)
     }
 
+    fn step_fork(
+        &mut self,
+        deadline: Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<bool, HistoryPageError> {
+        if self.fork_evidence.is_none() {
+            let id = self
+                .path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .and_then(|s| uuid::Uuid::parse_str(s).ok())
+                .ok_or(HistoryPageError::UnsupportedSource)?;
+            let session = crate::Session::new(id, String::new(), String::new(), self.path.clone());
+            let evidence = session
+                .inspect_archive_recovery(deadline, &stopped)
+                .map_err(|_| {
+                    if stopped() || Instant::now() >= deadline {
+                        HistoryPageError::Stopped
+                    } else {
+                        HistoryPageError::UnsupportedSource
+                    }
+                })?;
+            self.check_current()?;
+            self.fork_evidence = Some(evidence);
+        }
+        let evidence = self
+            .fork_evidence
+            .as_ref()
+            .ok_or(HistoryPageError::UnsupportedSource)?;
+        let end = (self.fork_cursor + crate::history_page::HISTORY_PAGE_ENTRIES)
+            .min(evidence.entries().len());
+        let mut decoder = self.decoder.clone();
+        let mut messages = Vec::new();
+        for entry in &evidence.entries()[self.fork_cursor..end] {
+            if stopped() || Instant::now() >= deadline {
+                return Err(HistoryPageError::Stopped);
+            }
+            if let Some((_, message)) = decoder.decode(entry.clone()) {
+                messages.push(message);
+            }
+        }
+        self.check_current()?;
+        if stopped() || Instant::now() >= deadline {
+            return Err(HistoryPageError::Stopped);
+        }
+        self.last_entry = evidence.entries().get(end.saturating_sub(1)).cloned();
+        self.messages.extend(messages);
+        self.decoder = decoder;
+        self.fork_cursor = end;
+        self.complete = end == evidence.entries().len();
+        Ok(self.complete)
+    }
+
     /// Return only a complete restore after checking source identity again.
     /// Completing or dropping the scan releases its retained source lease.
     pub fn finish(self) -> Result<Vec<Message>, HistoryPageError> {
@@ -239,8 +323,21 @@ impl SessionMessageScan {
     pub fn finish_with_tail(
         self,
     ) -> Result<(Vec<Message>, Option<crate::SessionEntry>), HistoryPageError> {
-        self.finish_with_copy_length()
-            .map(|(messages, tail, _)| (messages, tail))
+        self.finish_with_tail_cancellable(
+            Instant::now() + std::time::Duration::from_secs(5),
+            || false,
+        )
+    }
+
+    /// Finish restoration within the caller's deadline and cancellation budget.
+    /// Receipt-bound sources are revalidated before any messages are returned.
+    pub fn finish_with_tail_cancellable(
+        self,
+        deadline: Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<(Vec<Message>, Option<crate::SessionEntry>), HistoryPageError> {
+        self.validate_finish_until(deadline, &stopped)?;
+        Ok((self.messages, self.last_entry))
     }
 
     /// Finish with the raw-copy cutoff at the last retained decoded entry.
@@ -257,6 +354,20 @@ impl SessionMessageScan {
             .map(|(messages, tail, _)| (messages, tail, cutoff))
     }
 
+    /// Finish the last-record prefix with the caller's shared deadline and cancellation.
+    /// Receipt-bound sources cannot be copied into ordinary children.
+    pub fn finish_with_record_copy_length_cancellable(
+        self,
+        deadline: Instant,
+        stopped: impl Fn() -> bool,
+    ) -> Result<(Vec<Message>, Option<crate::SessionEntry>, u64), HistoryPageError> {
+        if self.fork_bound {
+            return Err(HistoryPageError::UnsupportedSource);
+        }
+        self.validate_finish_until(deadline, &stopped)?;
+        Ok((self.messages, self.last_entry, self.last_entry_end))
+    }
+
     /// Finish a validated scan and return the exact raw-copy cutoff.
     ///
     /// A selected prefix ends immediately after its original record, excluding
@@ -265,18 +376,51 @@ impl SessionMessageScan {
     pub fn finish_with_copy_length(
         self,
     ) -> Result<(Vec<Message>, Option<crate::SessionEntry>, u64), HistoryPageError> {
-        if !self.complete {
-            return Err(HistoryPageError::Stopped);
+        if self.fork_bound {
+            return Err(HistoryPageError::UnsupportedSource);
         }
-        if self.through_entry.is_some() && self.selected_end.is_none() {
-            return Err(HistoryPageError::InvalidRecord);
-        }
-        self.check_current()?;
+        self.validate_finish()?;
         Ok((
             self.messages,
             self.last_entry,
             self.selected_end.unwrap_or(self.end),
         ))
+    }
+
+    fn validate_finish(&self) -> Result<(), HistoryPageError> {
+        self.validate_finish_until(Instant::now() + std::time::Duration::from_secs(5), &|| {
+            false
+        })
+    }
+
+    fn validate_finish_until(
+        &self,
+        deadline: Instant,
+        stopped: &impl Fn() -> bool,
+    ) -> Result<(), HistoryPageError> {
+        if stopped() || Instant::now() >= deadline {
+            return Err(HistoryPageError::Stopped);
+        }
+        if !self.complete {
+            return Err(HistoryPageError::Stopped);
+        }
+        if let Some(evidence) = &self.fork_evidence {
+            evidence.check_current(deadline, stopped).map_err(|_| {
+                if stopped() || Instant::now() >= deadline {
+                    HistoryPageError::Stopped
+                } else {
+                    HistoryPageError::Stale
+                }
+            })?;
+        }
+        if self.through_entry.is_some() && self.selected_end.is_none() {
+            return Err(HistoryPageError::InvalidRecord);
+        }
+        self.check_current()?;
+        if stopped() || Instant::now() >= deadline {
+            return Err(HistoryPageError::Stopped);
+        }
+        Ok(())
     }
 
     fn check_current(&self) -> Result<(), HistoryPageError> {

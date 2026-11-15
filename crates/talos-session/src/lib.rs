@@ -42,14 +42,22 @@ mod diagnostic;
 mod durable;
 mod durable_recovery;
 mod error;
+mod fork_origins;
+mod fork_receipt;
 pub mod history_page;
 pub mod history_projection;
 mod history_receipt;
+mod identity_custody;
 pub use history_receipt::{HistoryRecoveryReceipt, RecoveryProjection};
+pub use identity_custody::{
+    require_active_session_identity, reserve_session_identity, retire_session_identity,
+};
 mod jsonl;
 mod manager;
 mod message_scan;
+mod ordinary_fork;
 pub use message_scan::SessionMessageScan;
+pub use ordinary_fork::OrdinaryForkSnapshot;
 mod pending_submission;
 mod recovery_seal;
 mod recovery_stamp;

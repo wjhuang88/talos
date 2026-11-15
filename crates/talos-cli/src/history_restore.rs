@@ -5,6 +5,24 @@ use talos_core::message::Message;
 use talos_session::Session;
 use tokio_util::sync::CancellationToken;
 
+pub(crate) fn requires_fork_receipt(source: &Session) -> Result<bool> {
+    Ok(if source.file_extension() == "tlog" {
+        let entries = source
+            .read_entries()
+            .context("failed to inspect fork source")?;
+        let has_placeholder = entries.iter().any(|entry| {
+            entry.role == "system" && entry.content.starts_with("[Compaction summary:")
+        });
+        use std::io::Read;
+        let mut marker = [0u8; 1];
+        let mut file = std::fs::File::open(&source.file_path)?;
+        let length = file.read(&mut marker)?;
+        has_placeholder || (length == 1 && marker[0] == 0xff)
+    } else {
+        false
+    })
+}
+
 /// Unpublished fork file. The worker owns cleanup while I/O is in flight, so
 /// dropping the caller cannot race cleanup against an unfinished write.
 pub(crate) struct StagedForkHistory {
@@ -13,9 +31,23 @@ pub(crate) struct StagedForkHistory {
     retained: bool,
     child_cleanup: Option<(talos_session::SessionManager, Session)>,
     extra_path: Option<std::path::PathBuf>,
+    runtime_lease: Option<talos_session::SessionRuntimeLease>,
 }
 
 impl StagedForkHistory {
+    // Receipt commit has succeeded. Caller cancellation must preserve this file;
+    // subsequent explicit metadata rollback remains a separate host operation.
+    pub(crate) fn published_receipt(path: std::path::PathBuf) -> Self {
+        Self {
+            path,
+            file: None,
+            retained: true,
+            child_cleanup: None,
+            extra_path: None,
+            runtime_lease: None,
+        }
+    }
+
     pub(crate) fn install(&mut self, destination: &std::path::Path) -> Result<()> {
         drop(self.file.take());
         // Unlike rename, hard_link cannot overwrite an existing destination.
@@ -26,6 +58,24 @@ impl StagedForkHistory {
             return Err(error.into());
         }
         Ok(())
+    }
+
+    pub(crate) fn acquire_child_ownership(&mut self, child: &Session) -> Result<()> {
+        if self.runtime_lease.is_some() {
+            anyhow::bail!("fork staging already owns a runtime lease");
+        }
+        self.runtime_lease = Some(talos_session::SessionRuntimeLease::acquire(
+            &child.file_path,
+        )?);
+        Ok(())
+    }
+
+    pub(crate) fn take_child_ownership(&mut self) -> Option<talos_session::SessionRuntimeLease> {
+        self.runtime_lease.take()
+    }
+
+    pub(crate) fn release_child_ownership(&mut self) {
+        self.runtime_lease = None;
     }
 
     pub(crate) fn retain(&mut self) {
@@ -49,8 +99,9 @@ impl Drop for StagedForkHistory {
         {
             tracing::warn!(%error, "failed to remove fork staging alias");
         }
-        if let Some((manager, child)) = &self.child_cleanup {
-            if let Err(error) = manager.rollback_session_artifacts(child) {
+        if let Some((manager, child)) = self.child_cleanup.take() {
+            self.release_child_ownership();
+            if let Err(error) = manager.rollback_session_artifacts(&child) {
                 tracing::warn!(%error, session_id = %child.id, "failed to roll back unpublished fork artifacts; storage reconciliation required");
             }
             return;
@@ -61,6 +112,37 @@ impl Drop for StagedForkHistory {
             tracing::warn!(%error, "failed to remove unpublished fork history");
         }
     }
+}
+
+/// Install a fixed Actor capture without consulting the mutable parent transcript.
+pub(crate) fn stage_captured_fork_history(
+    child: &Session,
+    snapshot: &talos_core::session::OrdinaryForkCapture,
+) -> Result<StagedForkHistory> {
+    use std::io::Write;
+    let path = child.file_path.with_extension("fork-staging");
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options.open(&path)?;
+    let mut guard = StagedForkHistory {
+        path,
+        file: Some(file),
+        retained: false,
+        child_cleanup: None,
+        extra_path: None,
+        runtime_lease: None,
+    };
+    guard.acquire_child_ownership(child)?;
+    let file = guard.file.as_mut().context("missing staging file")?;
+    file.write_all(&snapshot.bytes)?;
+    file.sync_all()?;
+    guard.install(&child.file_path)?;
+    Ok(guard)
 }
 
 fn begin_fork_stage(
@@ -88,6 +170,7 @@ fn begin_fork_stage(
             retained: false,
             child_cleanup: None,
             extra_path: None,
+            runtime_lease: None,
         },
     ))
 }
@@ -153,6 +236,7 @@ pub(crate) fn stage_fork_history_blocking(
     finish_fork_stage(scan, staged, &stop, deadline)
 }
 
+#[cfg(test)]
 pub(crate) async fn stage_fork_history(
     session: &Session,
     staged_path: std::path::PathBuf,
@@ -184,6 +268,25 @@ pub(crate) async fn stage_fork_history(
     })
     .await
     .context("fork finish worker failed")?
+}
+
+/// Restore under host startup ownership without reacquiring the same OS lock.
+pub(crate) async fn read_session_history_owned(
+    session: &Session,
+    lease: &talos_session::SessionRuntimeLease,
+) -> Result<Vec<Message>> {
+    lease.check_transcript(&session.file_path)?;
+    let cancellation = CancellationToken::new();
+    tokio::select! {
+        biased;
+        signal = tokio::signal::ctrl_c() => {
+            signal.context("failed to observe startup interruption")?;
+            cancellation.cancel();
+            bail!("session history startup cancelled");
+        }
+        result = read_session_snapshot_cancellable(session.clone(), cancellation.clone(), false) =>
+            result.map(|(messages, _)| messages),
+    }
 }
 
 pub(crate) async fn read_session_history(session: &Session) -> Result<Vec<Message>> {
@@ -250,7 +353,7 @@ async fn read_session_snapshot_cancellable(
     };
     loop {
         let stop = worker_cancellation.clone();
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
         let page = tokio::task::spawn_blocking(move || {
             let complete = scan.step(deadline, || stop.is_cancelled())?;
             Ok::<_, talos_session::history_page::HistoryPageError>((scan, complete))
@@ -268,7 +371,9 @@ async fn read_session_snapshot_cancellable(
     }
     let finish = tokio::task::spawn_blocking(move || -> Result<_> {
         let archived = scan.has_archive_placeholder();
-        let head = scan.finish_with_tail()?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let head =
+            scan.finish_with_tail_cancellable(deadline, || worker_cancellation.is_cancelled())?;
         if !archived {
             return Ok(head);
         }
@@ -309,6 +414,34 @@ mod tests {
     use tokio::sync::mpsc::{self, Receiver};
 
     struct ObserveHistory(mpsc::UnboundedSender<Vec<Message>>);
+
+    #[tokio::test]
+    async fn owned_startup_restores_keep_zero_without_reacquiring_runtime_lock() {
+        let temp = tempfile::tempdir().expect("temp");
+        let manager = talos_session::SessionManager::with_dir(temp.path().to_path_buf());
+        let session = manager
+            .create_session("owned startup", "")
+            .expect("session");
+        for i in 0..12 {
+            session
+                .append(&Message::User {
+                    content: format!("original {i}"),
+                })
+                .expect("append");
+        }
+        session.compact_archived(0).expect("keep0");
+        let before = std::fs::read(&session.file_path).expect("head");
+        let lease =
+            talos_session::SessionRuntimeLease::acquire(&session.file_path).expect("host lease");
+        let history = read_session_history_owned(&session, &lease)
+            .await
+            .expect("restore under host lease");
+        assert_eq!(history.len(), 12);
+        assert!(talos_session::SessionRuntimeLease::acquire(&session.file_path).is_err());
+        assert_eq!(std::fs::read(&session.file_path).expect("head"), before);
+        let other = manager.create_session("other", "").expect("other");
+        assert!(read_session_history_owned(&other, &lease).await.is_err());
+    }
 
     #[test]
     fn blocking_fork_stage_preserves_bytes_and_refuses_existing_destination() {
@@ -803,6 +936,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn unpublished_fork_direct_cleanup_releases_ownership_after_removal() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager
+            .create_session("source", "workspace")
+            .expect("source");
+        source
+            .append(&Message::User {
+                content: "original".into(),
+            })
+            .expect("append");
+        let original = std::fs::read(&source.file_path).expect("source bytes");
+        let child = manager
+            .defer_create_session("child", "workspace")
+            .expect("child");
+        let (mut staged, _, _) =
+            stage_fork_history(&source, child.file_path.with_extension("staging"))
+                .await
+                .expect("stage");
+        staged
+            .acquire_child_ownership(&child)
+            .expect("ownership before install");
+        staged.install(&child.file_path).expect("install");
+        assert!(talos_session::SessionRuntimeLease::acquire(&child.file_path).is_err());
+        // No manager cleanup is registered on the shared startup path.
+        drop(staged);
+        assert!(!child.file_path.exists());
+        let _next_owner = talos_session::SessionRuntimeLease::acquire(&child.file_path)
+            .expect("ownership released after cleanup");
+        assert_eq!(
+            std::fs::read(&source.file_path).expect("source preserved"),
+            original
+        );
+    }
+
+    #[tokio::test]
     async fn cancelled_fork_owner_removes_runtime_index_and_lineage() {
         let root = tempfile::tempdir().expect("root");
         let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
@@ -822,6 +991,10 @@ mod tests {
                 .await
                 .expect("stage");
         staged.install(&child.file_path).expect("install");
+        staged
+            .acquire_child_ownership(&child)
+            .expect("child ownership");
+        assert!(talos_session::SessionRuntimeLease::acquire(&child.file_path).is_err());
         staged.own_child(manager.clone(), child.clone());
         talos_session::PendingSubmissionStore::for_session(&child)
             .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(

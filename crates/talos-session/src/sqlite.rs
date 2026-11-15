@@ -138,6 +138,43 @@ impl SessionIndex {
         })
     }
 
+    /// Open and initialize a host recovery index under a shared work budget.
+    /// Database locks fail immediately. Errors may leave a partially initialized
+    /// index; preserve it and retry. Existing files are never replaced.
+    pub fn open_for_recovery(path: &Path, budget: &RecoveryWorkBudget) -> Result<Self, IndexError> {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            budget.check()?;
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let conn = Connection::open_with_flags(
+                path,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+                    | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+                    | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+            )?;
+            conn.busy_timeout(std::time::Duration::ZERO)?;
+            let index = Self {
+                conn,
+                db_path: path.to_path_buf(),
+            };
+            {
+                let _progress = install_budget(&index.conn, budget)?;
+                index
+                    .conn
+                    .execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")?;
+                index.init_schema()?;
+                budget.check()?;
+            }
+            Ok(index)
+        }))
+        .unwrap_or_else(|_| {
+            Err(IndexError::Store(IndexStoreError::Database(
+                "recovery index initialization panicked".into(),
+            )))
+        })
+    }
+
     /// Open an existing index for model-query reads without creating the database,
     /// changing journal mode, initializing schema or running host maintenance.
     /// Missing files fail to open; corrupt indexes fail at opening or querying.
@@ -198,12 +235,16 @@ impl SessionIndex {
             "#,
         )?;
 
-        // Migration: add workspace_root column to existing databases.
-        self.conn
-            .execute_batch(
+        // Do not swallow lock/deadline errors as if migration already existed.
+        let has_workspace_root: bool = self.conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('sessions') WHERE name='workspace_root')",
+            [], |row| row.get(0),
+        )?;
+        if !has_workspace_root {
+            self.conn.execute_batch(
                 "ALTER TABLE sessions ADD COLUMN workspace_root TEXT NOT NULL DEFAULT '';",
-            )
-            .ok();
+            )?;
+        }
 
         Ok(())
     }
@@ -503,6 +544,8 @@ impl SessionIndex {
     ///
     /// # Errors
     ///
+    /// Identical retries retain the original timestamp. A different parent or
+    /// cutoff for an existing child is rejected without overwriting ownership.
     /// Returns an error if the fork relationship cannot be recorded.
     pub fn record_fork(
         &mut self,
@@ -510,14 +553,44 @@ impl SessionIndex {
         forked_session_id: &str,
         fork_entry_id: &str,
     ) -> Result<(), IndexError> {
-        let forked_at = Utc::now().to_rfc3339();
+        self.record_fork_with_budget(
+            source_session_id,
+            forked_session_id,
+            fork_entry_id,
+            &RecoveryWorkBudget::new(std::time::Duration::from_secs(10)),
+        )
+    }
 
-        self.conn.execute(
-            "INSERT INTO forks (source_session_id, forked_session_id, fork_entry_id, forked_at) VALUES (?1, ?2, ?3, ?4)",
-            params![source_session_id, forked_session_id, fork_entry_id, forked_at],
-        )?;
-
-        Ok(())
+    /// Register lineage with the caller's shared cancellation/deadline budget.
+    /// Busy locks fail immediately; exact retries preserve existing ownership.
+    pub fn record_fork_with_budget(
+        &self,
+        source_session_id: &str,
+        forked_session_id: &str,
+        fork_entry_id: &str,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<(), IndexError> {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _progress = install_budget(&self.conn, budget)?;
+            let transaction = rusqlite::Transaction::new_unchecked(&self.conn, rusqlite::TransactionBehavior::Immediate)?;
+            let existing: Option<(String, String)> = transaction.query_row(
+                "SELECT source_session_id, fork_entry_id FROM forks WHERE forked_session_id=?1",
+                [forked_session_id], |row| Ok((row.get(0)?, row.get(1)?)),
+            ).optional()?;
+            if let Some((parent, entry)) = existing {
+                if parent != source_session_id || entry != fork_entry_id {
+                    return Err(IndexError::Store(IndexStoreError::Database("fork relationship conflicts with recorded ownership".into())));
+                }
+            } else {
+                transaction.execute(
+                    "INSERT INTO forks (source_session_id, forked_session_id, fork_entry_id, forked_at) VALUES (?1, ?2, ?3, ?4)",
+                    params![source_session_id, forked_session_id, fork_entry_id, Utc::now().to_rfc3339()],
+                )?;
+            }
+            budget.check()?;
+            transaction.commit()?;
+            Ok(())
+        })).unwrap_or_else(|_| Err(IndexError::Store(IndexStoreError::Database("fork relationship transaction panicked".into()))))
     }
 
     /// Get all forks originating from a specific session.
@@ -1101,6 +1174,135 @@ mod tests {
             .expect("operation should succeed");
 
         assert_eq!(count, 1, "One fork relationship should be recorded");
+    }
+
+    #[test]
+    fn recovery_index_open_obeys_budget_and_preserves_busy_database() {
+        use std::time::{Duration, Instant};
+        let root = tempfile::tempdir().expect("root");
+        let path = root.path().join("nested/index.db");
+        assert!(
+            SessionIndex::open_for_recovery(&path, &RecoveryWorkBudget::new(Duration::ZERO))
+                .is_err()
+        );
+        assert!(!path.parent().expect("parent").exists());
+        std::fs::create_dir(path.parent().expect("parent")).expect("directory");
+        let blocker = Connection::open(&path).expect("fixture database");
+        blocker.execute_batch("CREATE TABLE sentinel(value TEXT); INSERT INTO sentinel VALUES('preserve'); BEGIN EXCLUSIVE;").expect("locked database");
+        let start = Instant::now();
+        assert!(
+            SessionIndex::open_for_recovery(
+                &path,
+                &RecoveryWorkBudget::new(Duration::from_millis(100))
+            )
+            .is_err()
+        );
+        assert!(start.elapsed() < Duration::from_secs(1));
+        blocker.execute_batch("ROLLBACK").expect("unlock");
+        let index = SessionIndex::open_for_recovery(
+            &path,
+            &RecoveryWorkBudget::new(Duration::from_secs(1)),
+        )
+        .expect("retry initialization");
+        let sentinel: String = index
+            .conn
+            .query_row("SELECT value FROM sentinel", [], |row| row.get(0))
+            .expect("preserved");
+        assert_eq!(sentinel, "preserve");
+        index
+            .record_fork_with_budget(
+                "parent",
+                "child",
+                "tail",
+                &RecoveryWorkBudget::new(Duration::from_secs(1)),
+            )
+            .expect("schema ready");
+        assert_eq!(index.get_forks("parent").expect("lineage").len(), 1);
+    }
+
+    #[test]
+    fn fork_lineage_shared_budget_rejects_expired_and_busy_without_writes() {
+        use std::time::{Duration, Instant};
+        let (index, _dir) = temp_index();
+        let expired = RecoveryWorkBudget::new(Duration::ZERO);
+        assert!(
+            index
+                .record_fork_with_budget("parent", "child", "tail", &expired)
+                .is_err()
+        );
+        let blocker = Connection::open(&index.db_path).expect("blocker");
+        blocker.execute_batch("BEGIN IMMEDIATE").expect("lock");
+        let start = Instant::now();
+        assert!(
+            index
+                .record_fork_with_budget(
+                    "parent",
+                    "child",
+                    "tail",
+                    &RecoveryWorkBudget::new(Duration::from_millis(100))
+                )
+                .is_err()
+        );
+        assert!(start.elapsed() < Duration::from_secs(1));
+        blocker.execute_batch("ROLLBACK").expect("unlock");
+        assert!(
+            index
+                .get_forks("parent")
+                .expect("no partial row")
+                .is_empty()
+        );
+        index
+            .record_fork_with_budget(
+                "parent",
+                "child",
+                "tail",
+                &RecoveryWorkBudget::new(Duration::from_secs(1)),
+            )
+            .expect("retry");
+        assert_eq!(index.get_forks("parent").expect("lineage").len(), 1);
+    }
+
+    #[test]
+    fn fork_registration_retries_after_reopen_and_refuses_conflicting_ownership() {
+        let (mut index, dir) = temp_index();
+        index
+            .record_fork("parent", "child", "tail")
+            .expect("first commit");
+        let original = index.get_forks("parent").expect("lineage")[0].forked_at;
+        let path: String = index
+            .conn
+            .query_row(
+                "SELECT file FROM pragma_database_list WHERE name='main'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("path");
+        drop(index);
+        let mut reopened = SessionIndex::new(Path::new(&path)).expect("reopen");
+        reopened
+            .record_fork("parent", "child", "tail")
+            .expect("retry");
+        assert!(
+            reopened
+                .record_fork("other-parent", "child", "tail")
+                .is_err()
+        );
+        assert!(
+            reopened
+                .record_fork("parent", "child", "other-tail")
+                .is_err()
+        );
+        let rows = reopened.get_forks("parent").expect("lineage");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].fork_entry_id, "tail");
+        assert_eq!(rows[0].forked_at, original);
+        assert!(
+            reopened
+                .get_forks("other-parent")
+                .expect("other lineage")
+                .is_empty()
+        );
+        drop(dir);
     }
 
     #[test]

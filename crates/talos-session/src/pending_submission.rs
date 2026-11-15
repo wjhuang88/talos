@@ -162,6 +162,75 @@ impl PendingSubmissionStore {
         load_runtime_state(&connection)
     }
 
+    // Fork recovery must not restart the ordinary five-second SQLite wait at
+    // every metadata operation. Keep the guard, VM budget and transaction local.
+    pub(crate) fn fork_runtime_with_budget(
+        &self,
+        deadline: std::time::Instant,
+        restore: Option<&SessionRuntimeIdentity>,
+    ) -> Result<(Option<SessionRuntimeState>, bool), PendingSubmissionError> {
+        let stopped = || {
+            PendingSubmissionError::InvalidRuntimeActivation(
+                "fork recovery stopped or unavailable".into(),
+            )
+        };
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let budget = crate::sqlite::RecoveryWorkBudget::new(deadline.saturating_duration_since(std::time::Instant::now()));
+            budget.check().map_err(|_| stopped())?;
+            let _lock = self.lock.try_lock().map_err(|_| stopped())?;
+            if restore.is_none() && !self.sidecar_exists()? { return Ok((None, false)); }
+            if !std::fs::symlink_metadata(self.session_file.as_ref())?.file_type().is_file() {
+                return Err(stopped());
+            }
+            let flags = if restore.is_some() {
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+            } else { rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY };
+            let connection = Connection::open_with_flags(self.path.as_ref(), flags | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW)?;
+            connection.busy_timeout(std::time::Duration::ZERO)?;
+            let _progress = crate::sqlite::install_budget(&connection, &budget).map_err(|_| stopped())?;
+            if restore.is_none() {
+                let transaction = connection.unchecked_transaction()?;
+                let exists: bool = transaction.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='session_runtime_state')", [], |row| row.get(0))?;
+                let state = if exists { load_runtime_state(&transaction)? } else { None };
+                let meta_exists: bool = transaction.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='pending_journal_meta')", [], |row| row.get(0))?;
+                let generation: Option<i64> = if meta_exists {
+                    transaction.query_row("SELECT value FROM pending_journal_meta WHERE key=?1", [RUNTIME_GENERATION_KEY], |row| row.get(0)).optional()?
+                } else { None };
+                let generation = u64::try_from(generation.unwrap_or(0)).map_err(|_| stopped())?;
+                if state.as_ref().map_or(generation != 0, |state| state.activation.generation != generation) {
+                    return Err(stopped());
+                }
+                budget.check().map_err(|_| stopped())?;
+                transaction.commit()?;
+                return Ok((state, false));
+            }
+            connection.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")?;
+            let transaction = connection.unchecked_transaction()?;
+            ensure_schema(&transaction)?;
+            let generation = load_or_initialize_runtime_generation(&transaction)?;
+            let identity = restore.ok_or_else(stopped)?;
+            if let Some(state) = load_runtime_state(&transaction)? {
+                if state.activation.generation != generation || (generation == 0
+                    && (state.status != SessionRuntimeActivationStatus::Committed
+                        || state.activation.target != *identity || state.activation.previous != *identity)) {
+                    return Err(stopped());
+                }
+                budget.check().map_err(|_| stopped())?;
+                transaction.commit()?;
+                return Ok((Some(state), false));
+            }
+            if generation != 0 { return Err(stopped()); }
+            let state = SessionRuntimeState {
+                activation: SessionRuntimeActivation::new(0, identity.clone(), identity.clone()),
+                status: SessionRuntimeActivationStatus::Committed,
+            };
+            write_runtime_state(&transaction, &state)?;
+            budget.check().map_err(|_| stopped())?;
+            transaction.commit()?;
+            Ok((Some(state), true))
+        })).unwrap_or_else(|_| Err(stopped()))
+    }
+
     /// Returns whether this Session still owns accepted, paused, or running work.
     pub fn has_nonterminal_submissions(&self) -> Result<bool, PendingSubmissionError> {
         if !self.path.exists() {

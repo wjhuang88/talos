@@ -23,6 +23,10 @@ thread_local! {
 /// Parent IDs are preserved, including legacy writer defects. This evidence is
 /// not a valid linear transcript and must not be passed off as a checkpoint.
 pub struct ArchiveRecoveryEvidence {
+    input_bytes: usize,
+    input_records: usize,
+    directory_entries: usize,
+    head_records: usize,
     entries: Vec<SessionEntry>,
     raw_records: Vec<Vec<u8>>,
     sources: Vec<ArchiveRecoverySource>,
@@ -30,6 +34,7 @@ pub struct ArchiveRecoveryEvidence {
     removed_placeholders: usize,
     versions: Vec<(PathBuf, ArchiveFileVersion)>,
     ownership: Vec<crate::archive_publication::Ownership>,
+    receipts: Vec<(PathBuf, crate::fork_receipt::Receipt)>,
 }
 
 // Windows stamps own restrictive read handles. Keep only inert identity and
@@ -67,6 +72,24 @@ pub struct ArchiveRecoverySource {
 }
 
 impl ArchiveRecoveryEvidence {
+    // Reserve the crash window where both the original head and new archive
+    // are visible. Recovery charges compressed input and decoded bytes together.
+    pub(crate) fn check_archive_addition(
+        &self,
+        stored_bytes: usize,
+        decoded_bytes: usize,
+    ) -> Result<(), SessionError> {
+        if self.input_bytes.checked_add(stored_bytes)
+            .and_then(|n| n.checked_add(decoded_bytes)).is_none_or(|n| n > MAX_BYTES)
+            || self.input_records.checked_add(self.head_records).is_none_or(|n| n > MAX_ENTRIES)
+            // Archive, temporary alias, chain metadata, and SQLite WAL/SHM.
+            || self.directory_entries.checked_add(5).is_none_or(|n| n > MAX_FILES)
+        {
+            return Err(invalid("archive publication exceeds recovery budget"));
+        }
+        Ok(())
+    }
+
     /// Check all captured file versions before a host publishes restoration or
     /// query evidence. No decoded records are published on a stale source.
     pub fn check_all_sources(&self, deadline: Instant) -> Result<(), SessionError> {
@@ -76,7 +99,7 @@ impl ArchiveRecoveryEvidence {
     /// separately validate the selected head's captured prefix, allowing only
     /// verified append-only growth there. This alone does not authorize queries.
     pub fn check_supporting_sources(&self, deadline: Instant) -> Result<(), SessionError> {
-        self.check_versions(self.versions.iter().skip(1), deadline, &|| false)
+        self.check_versions(self.versions.iter().skip(1), deadline, &|| false, None)
     }
     /// Decode a complete, unchanged candidate through the normal host restore
     /// decoder. This preserves tool pairing across former archive cuts; it does
@@ -100,12 +123,52 @@ impl ArchiveRecoveryEvidence {
         Ok((messages, tail))
     }
 
-    fn check_current(
+    pub(crate) fn check_current(
         &self,
         deadline: Instant,
         stopped: &impl Fn() -> bool,
     ) -> Result<(), SessionError> {
-        self.check_versions(self.versions.iter(), deadline, stopped)
+        self.check_versions(self.versions.iter(), deadline, stopped, None)
+    }
+
+    // Only the receipt publisher may add this one previously absent sibling.
+    // It separately verifies exact child bytes before committing the receipt.
+    pub(crate) fn check_with_unpublished_child(
+        &self,
+        child: &Path,
+        deadline: Instant,
+        stopped: &impl Fn() -> bool,
+    ) -> Result<(), SessionError> {
+        if self.versions.iter().any(|(path, _)| path == child)
+            || self.versions.first().and_then(|(path, _)| path.parent()) != child.parent()
+            || recovery_source_kind(child) != Some(false)
+        {
+            return Err(invalid("invalid publication child"));
+        }
+        self.check_versions(self.versions.iter(), deadline, stopped, Some(child))
+    }
+
+    pub(crate) fn check_fork_addition(
+        &self,
+        bytes: usize,
+        records: usize,
+    ) -> Result<(), SessionError> {
+        if self
+            .input_bytes
+            .checked_add(bytes)
+            .is_none_or(|n| n > MAX_BYTES)
+            || self
+                .input_records
+                .checked_add(records)
+                .is_none_or(|n| n > MAX_ENTRIES)
+            || self
+                .directory_entries
+                .checked_add(4)
+                .is_none_or(|n| n > MAX_FILES)
+        {
+            return Err(invalid("fork publication exceeds recovery budget"));
+        }
+        Ok(())
     }
 
     fn check_versions<'a>(
@@ -113,12 +176,24 @@ impl ArchiveRecoveryEvidence {
         versions: impl Iterator<Item = &'a (PathBuf, ArchiveFileVersion)>,
         deadline: Instant,
         stopped: &impl Fn() -> bool,
+        unpublished_child: Option<&Path>,
     ) -> Result<(), SessionError> {
         let versions: Vec<_> = versions.collect();
         let head = self
             .versions
             .first()
             .ok_or_else(|| invalid("missing selected head"))?;
+        // Supporting-only validation deliberately permits head append, but must
+        // never retain disclosure authority after the selected identity retires.
+        check(deadline, stopped)?;
+        let _identity = crate::identity_custody::require_not_retired_until(&head.0, deadline)?;
+        for (path, expected) in &self.receipts {
+            check(deadline, stopped)?;
+            if crate::fork_receipt::load(path, deadline)? != *expected {
+                return Err(invalid("fork receipt changed"));
+            }
+        }
+        check(deadline, stopped)?;
         let directory = head
             .0
             .parent()
@@ -139,7 +214,10 @@ impl ArchiveRecoveryEvidence {
                 return Err(invalid("directory bound exceeded"));
             }
             let path = item?.path();
-            if recovery_source_kind(&path).is_some() && !expected_paths.remove(&path) {
+            if recovery_source_kind(&path).is_some()
+                && unpublished_child != Some(path.as_path())
+                && !expected_paths.remove(&path)
+            {
                 return Err(invalid("source inventory changed"));
             }
         }
@@ -154,8 +232,8 @@ impl ArchiveRecoveryEvidence {
         let mut remaining = MAX_BYTES;
         for (path, expected) in &versions {
             check(deadline, stopped)?;
-            let file =
-                crate::history_page::open_source(path).map_err(|e| invalid(&e.to_string()))?;
+            let file = crate::history_page::open_source_until(path, deadline)
+                .map_err(|e| invalid(&e.to_string()))?;
             let stamp =
                 crate::recovery_stamp::from_file(&file).map_err(|e| invalid(&e.to_string()))?;
             #[cfg(not(windows))]
@@ -207,7 +285,10 @@ impl ArchiveRecoveryEvidence {
                     return Err(invalid("directory bound exceeded"));
                 }
                 let path = item?.path();
-                if recovery_source_kind(&path).is_some() && !remaining_paths.remove(&path) {
+                if recovery_source_kind(&path).is_some()
+                    && unpublished_child != Some(path.as_path())
+                    && !remaining_paths.remove(&path)
+                {
                     return Err(invalid("source inventory changed"));
                 }
             }
@@ -220,8 +301,8 @@ impl ArchiveRecoveryEvidence {
         // Rebind every checked path after all source reads and inventory checks.
         for (path, expected) in versions {
             check(deadline, stopped)?;
-            let file =
-                crate::history_page::open_source(path).map_err(|e| invalid(&e.to_string()))?;
+            let file = crate::history_page::open_source_until(path, deadline)
+                .map_err(|e| invalid(&e.to_string()))?;
             let current =
                 crate::recovery_stamp::from_file(&file).map_err(|e| invalid(&e.to_string()))?;
             #[cfg(not(windows))]
@@ -276,6 +357,22 @@ impl ArchiveRecoveryEvidence {
         Ok(prefix)
     }
 
+    /// Whether the selected head has a validated private fork receipt.
+    /// This evidence still requires source revalidation before query delivery.
+    pub fn has_fork_receipt(&self) -> bool {
+        self.selected_fork_receipt().is_some()
+    }
+
+    // The selected head's receipt has already validated the complete logical
+    // stream; callers must recheck this evidence before publishing a descendant.
+    pub(crate) fn selected_fork_receipt(&self) -> Option<&crate::fork_receipt::Receipt> {
+        let head = &self.versions.first()?.0;
+        self.receipts
+            .iter()
+            .find(|(path, _)| path == head)
+            .map(|(_, receipt)| receipt)
+    }
+
     /// Original records in uniquely determined storage order, without synthetic
     /// count placeholders. These are host inspection data, not model disclosure.
     pub fn entries(&self) -> &[SessionEntry] {
@@ -300,6 +397,8 @@ struct FileRecords {
     stamp: crate::recovery_stamp::FileStamp,
     records: Vec<(SessionEntry, Vec<u8>)>,
     archive: bool,
+    receipt: Option<crate::fork_receipt::Receipt>,
+    envelope: bool,
 }
 
 fn invalid(reason: &str) -> SessionError {
@@ -406,206 +505,86 @@ impl Session {
             .collect();
         let ownership =
             crate::archive_publication::load(&self.file_path, &names, deadline, stopped)?;
-        let mut foreign = BTreeSet::new();
-        for (index, file) in files.iter().enumerate() {
-            if let Some(record) = ownership.iter().find(|record| {
-                file.source.path.file_name().and_then(|s| s.to_str()) == Some(record.name.as_str())
-            }) {
-                if record.digest != file.source.sha256 {
-                    return Err(invalid("archive ownership digest mismatch"));
-                }
-                if record.owner != self.id.to_string() {
-                    foreign.insert(index);
-                }
-            }
-        }
-        let locators = crate::compaction_locator::load(&self.file_path, deadline, stopped)?;
-        let mut bridges = BTreeMap::new();
-        for (index, file) in files.iter().enumerate() {
-            let Some((marker, raw)) = file.records.first() else {
-                continue;
+        let captured: Vec<_> = files.iter().collect();
+        let rebuilt = reconstruct(&captured, &ownership, self.id, deadline, stopped)?;
+        let ordered = rebuilt.entries;
+        let raw_records = rebuilt.raw;
+        let selected = rebuilt.selected;
+        let removed_placeholders = rebuilt.placeholders;
+        let own_positions: BTreeMap<_, _> = ordered
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| (entry.id.as_str(), index))
+            .collect();
+        for (file_index, file) in files
+            .iter()
+            .enumerate()
+            .skip(1)
+            .filter(|(_, file)| !file.archive)
+        {
+            let other_id = file
+                .source
+                .path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .and_then(|s| uuid::Uuid::parse_str(s).ok())
+                .ok_or_else(|| invalid("other head identity invalid"))?;
+            let sibling = if file.receipt.is_some()
+                && file
+                    .records
+                    .first()
+                    .is_some_and(|(entry, _)| placeholder(entry))
+            {
+                let mut reordered = captured.clone();
+                reordered.swap(0, file_index);
+                Some(reconstruct(
+                    &reordered, &ownership, other_id, deadline, stopped,
+                )?)
+            } else {
+                None
             };
-            if let Some(locator) = locators.iter().find(|locator| locator.marker == marker.id) {
-                if !placeholder(marker)
-                    || crate::compaction_locator::digest(raw) != locator.marker_digest
-                {
-                    return Err(invalid("compaction marker changed"));
-                }
-                let target = files
-                    .iter()
-                    .position(|candidate| {
-                        candidate.archive
-                            && candidate.source.path.file_name().and_then(|s| s.to_str())
-                                == Some(locator.archive.as_str())
-                    })
-                    .ok_or_else(|| invalid("compaction archive missing"))?;
-                if foreign.contains(&target) {
-                    return Err(invalid("compaction archive belongs to another owner"));
-                }
-                if files[target].source.sha256 != locator.archive_digest {
-                    return Err(invalid("compaction archive changed"));
-                }
-                let mut previous = locator.tail.as_str();
-                for (entry, _) in file.records.iter().skip(1) {
-                    check(deadline, stopped)?;
-                    if placeholder(entry) || entry.parent_id.as_deref() != Some(previous) {
-                        return Err(invalid("compaction suffix parent mismatch"));
-                    }
-                    previous = &entry.id;
-                }
-                bridges.insert(index, (target, locator.tail.clone()));
-            }
-        }
-        for (index, (target, tail)) in &bridges {
-            check(deadline, stopped)?;
-            let valid_tail = files[*target].records.last().is_some_and(|(entry, _)| {
-                if placeholder(entry) {
-                    files[*target].records.len() == 1
-                        && bridges
-                            .get(target)
-                            .is_some_and(|(_, prior_tail)| prior_tail == tail)
-                } else {
-                    entry.id == *tail
-                }
-            });
-            if !valid_tail {
-                return Err(invalid("compaction tail commitment mismatch"));
-            }
-            let mut seen = BTreeSet::new();
-            let mut current = *index;
-            while let Some((next, _)) = bridges.get(&current) {
-                check(deadline, stopped)?;
-                if !seen.insert(current) {
-                    return Err(invalid("compaction locator cycle"));
-                }
-                current = *next;
-            }
-        }
-        let mut selected = BTreeSet::from([0]);
-        let mut known: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-        insert_records(&files[0], &mut known)?;
-        loop {
-            let mut added = false;
-            for index in selected.clone() {
-                if let Some((target, _)) = bridges.get(&index)
-                    && selected.insert(*target)
-                {
-                    insert_records(&files[*target], &mut known)?;
-                    added = true;
-                }
-            }
-            for (index, file) in files.iter().enumerate().skip(1) {
-                check(deadline, stopped)?;
-                if selected.contains(&index) || !file.archive || foreign.contains(&index) {
-                    continue;
-                }
-                if file
+            let other_records: Vec<_> = match &sibling {
+                Some(rebuilt) => rebuilt.entries.iter().zip(&rebuilt.raw).collect(),
+                None => file
                     .records
                     .iter()
-                    .any(|(entry, _)| known.contains_key(&entry.id))
-                {
-                    insert_records(file, &mut known)?;
-                    selected.insert(index);
-                    added = true;
-                }
-            }
-            if !added {
-                break;
-            }
-        }
-        for file in files.iter().skip(1).filter(|file| !file.archive) {
-            if file
-                .records
-                .iter()
-                .any(|(entry, _)| known.contains_key(&entry.id))
-            {
-                return Err(invalid("candidate overlaps another live session"));
-            }
-        }
-        let mut records = BTreeMap::new();
-        let mut successors: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        let mut incoming: BTreeMap<String, usize> = BTreeMap::new();
-        let mut placeholders = BTreeSet::new();
-        for &index in &selected {
-            if files[index].records.first().is_some_and(|(entry, _)| {
-                placeholder(entry) && entry.content.ends_with(", 0 recent entries preserved]")
-            }) && !bridges.contains_key(&index)
-            {
-                return Err(invalid("zero-retention compaction receipt missing"));
-            }
-            let mut previous = bridges.get(&index).map(|(_, tail)| tail.clone());
-            if previous
-                .as_ref()
-                .is_some_and(|tail| !known.contains_key(tail))
-            {
-                return Err(invalid("compaction original tail missing"));
-            }
-            for (entry, _) in &files[index].records {
+                    .map(|(entry, raw)| (entry, raw))
+                    .collect(),
+            };
+            for (other_index, (entry, raw)) in other_records.into_iter().enumerate() {
                 check(deadline, stopped)?;
-                if placeholder(entry) {
-                    placeholders.insert(entry.id.clone());
+                let own_index = own_positions.get(entry.id.as_str()).copied();
+                let Some(own_raw) = own_index.map(|index| &raw_records[index]) else {
                     continue;
-                }
-                records.insert(entry.id.clone(), entry.clone());
-                incoming.entry(entry.id.clone()).or_default();
-                if let Some(parent) = previous
-                    && successors
-                        .entry(parent)
-                        .or_default()
-                        .insert(entry.id.clone())
-                {
-                    *incoming.entry(entry.id.clone()).or_default() += 1;
-                }
-                previous = Some(entry.id.clone());
-            }
-        }
-        let mut ready: BTreeSet<_> = incoming
-            .iter()
-            .filter(|(_, n)| **n == 0)
-            .map(|(id, _)| id.clone())
-            .collect();
-        let mut ordered = Vec::new();
-        let mut seen = BTreeSet::new();
-        while !ready.is_empty() {
-            check(deadline, stopped)?;
-            if ready.len() != 1 {
-                return Err(invalid("ambiguous record order"));
-            }
-            let id = ready
-                .pop_first()
-                .ok_or_else(|| invalid("missing ready record"))?;
-            let entry = records
-                .remove(&id)
-                .ok_or_else(|| invalid("missing record"))?;
-            if entry
-                .parent_id
-                .as_ref()
-                .is_some_and(|parent| !seen.contains(parent))
-            {
-                return Err(invalid("missing or forward original parent"));
-            }
-            seen.insert(id.clone());
-            ordered.push(entry);
-            if let Some(children) = successors.get(&id) {
-                for child in children {
-                    let degree = incoming
-                        .get_mut(child)
-                        .ok_or_else(|| invalid("missing adjacency"))?;
-                    *degree -= 1;
-                    if *degree == 0 {
-                        ready.insert(child.clone());
-                    }
+                };
+                let own_origin = match (&files[0].receipt, own_index) {
+                    (Some(receipt), Some(index)) => receipt.origin(index),
+                    (Some(_), None) => return Err(invalid("fork inherited record missing")),
+                    (None, _) => self.id,
+                };
+                let other_origin = file
+                    .receipt
+                    .as_ref()
+                    .map_or(other_id, |receipt| receipt.origin(other_index));
+                let inherited = file
+                    .receipt
+                    .as_ref()
+                    .is_some_and(|receipt| receipt.inherited(other_index))
+                    || files[0]
+                        .receipt
+                        .as_ref()
+                        .zip(own_index)
+                        .is_some_and(|(receipt, index)| receipt.inherited(index));
+                if raw != own_raw || own_origin != other_origin || !inherited {
+                    return Err(invalid("candidate overlaps another live session"));
                 }
             }
-        }
-        if !records.is_empty() {
-            return Err(invalid("record order cycle"));
         }
         // Recheck every inspected file: an excluded head/archive must not change
         // while its absence of overlap is used as evidence.
         for file in &files {
             check(deadline, stopped)?;
-            let current = crate::history_page::open_source(&file.source.path)
+            let current = crate::history_page::open_source_until(&file.source.path, deadline)
                 .map_err(|e| invalid(&e.to_string()))?;
             let stamp =
                 crate::recovery_stamp::from_file(&current).map_err(|e| invalid(&e.to_string()))?;
@@ -615,20 +594,24 @@ impl Session {
                 return Err(invalid("source changed"));
             }
         }
-        let raw_records = ordered
-            .iter()
-            .map(|entry| {
-                known
-                    .remove(&entry.id)
-                    .ok_or_else(|| invalid("missing original record bytes"))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
         if crate::archive_publication::load(&self.file_path, &names, deadline, stopped)?
             != ownership
         {
             return Err(invalid("archive ownership changed"));
         }
         Ok(ArchiveRecoveryEvidence {
+            input_bytes: MAX_BYTES - remaining,
+            input_records: count,
+            directory_entries: inspected,
+            head_records: files[0].records.len(),
+            receipts: files
+                .iter()
+                .filter_map(|file| {
+                    file.receipt
+                        .clone()
+                        .map(|receipt| (file.source.path.clone(), receipt))
+                })
+                .collect(),
             ownership,
             entries: ordered,
             raw_records,
@@ -638,13 +621,267 @@ impl Session {
                 .enumerate()
                 .filter(|(i, f)| f.archive && !selected.contains(i))
                 .count(),
-            removed_placeholders: placeholders.len(),
+            removed_placeholders,
             versions: files
                 .into_iter()
                 .map(ArchiveFileVersion::from_records)
                 .collect(),
         })
     }
+}
+
+struct Reconstructed {
+    entries: Vec<SessionEntry>,
+    raw: Vec<Vec<u8>>,
+    selected: BTreeSet<usize>,
+    placeholders: usize,
+}
+
+// Reuse the single captured inventory. Sibling reconstruction never recursively
+// scans the directory or resets its input bounds/deadline.
+fn reconstruct(
+    files: &[&FileRecords],
+    ownership: &[crate::archive_publication::Ownership],
+    owner: uuid::Uuid,
+    deadline: Instant,
+    stopped: &impl Fn() -> bool,
+) -> Result<Reconstructed, SessionError> {
+    let mut foreign = BTreeSet::new();
+    for (index, file) in files.iter().enumerate() {
+        let binding = ownership.iter().find(|record| {
+            file.source.path.file_name().and_then(|s| s.to_str()) == Some(record.name.as_str())
+        });
+        // Binary archives cannot enter the legacy overlap namespace. Their
+        // physical owner/digest must have been committed before visibility,
+        // including when that owner has since been deleted.
+        if file.archive && file.envelope && binding.is_none() {
+            return Err(invalid("fork archive ownership missing"));
+        }
+        if let Some(record) = binding {
+            if record.digest != file.source.sha256 {
+                return Err(invalid("archive ownership digest mismatch"));
+            }
+            if record.owner != owner.to_string() {
+                foreign.insert(index);
+            } else if file.envelope && files[0].receipt.is_none() {
+                return Err(invalid("fork archive selected without inheritance receipt"));
+            }
+        }
+    }
+    let locators = crate::compaction_locator::load(&files[0].source.path, deadline, stopped)?;
+    let mut bridges = BTreeMap::new();
+    for (index, file) in files.iter().enumerate() {
+        let Some((marker, raw)) = file.records.first() else {
+            continue;
+        };
+        if let Some(locator) = locators.iter().find(|locator| locator.marker == marker.id) {
+            if !placeholder(marker)
+                || crate::compaction_locator::digest(raw) != locator.marker_digest
+            {
+                return Err(invalid("compaction marker changed"));
+            }
+            let target = files
+                .iter()
+                .position(|candidate| {
+                    candidate.archive
+                        && candidate.source.path.file_name().and_then(|s| s.to_str())
+                            == Some(locator.archive.as_str())
+                })
+                .ok_or_else(|| invalid("compaction archive missing"))?;
+            if foreign.contains(&target) {
+                return Err(invalid("compaction archive belongs to another owner"));
+            }
+            if files[target].source.sha256 != locator.archive_digest {
+                return Err(invalid("compaction archive changed"));
+            }
+            let mut previous = locator.tail.as_str();
+            for (entry, _) in file.records.iter().skip(1) {
+                check(deadline, stopped)?;
+                if placeholder(entry) || entry.parent_id.as_deref() != Some(previous) {
+                    return Err(invalid("compaction suffix parent mismatch"));
+                }
+                previous = &entry.id;
+            }
+            bridges.insert(index, (target, locator.tail.clone()));
+        }
+    }
+    for (index, (target, tail)) in &bridges {
+        check(deadline, stopped)?;
+        let valid_tail = files[*target].records.last().is_some_and(|(entry, _)| {
+            if placeholder(entry) {
+                files[*target].records.len() == 1
+                    && bridges
+                        .get(target)
+                        .is_some_and(|(_, prior_tail)| prior_tail == tail)
+            } else {
+                entry.id == *tail
+            }
+        });
+        if !valid_tail {
+            return Err(invalid("compaction tail commitment mismatch"));
+        }
+        let mut seen = BTreeSet::new();
+        let mut current = *index;
+        while let Some((next, _)) = bridges.get(&current) {
+            check(deadline, stopped)?;
+            if !seen.insert(current) {
+                return Err(invalid("compaction locator cycle"));
+            }
+            current = *next;
+        }
+    }
+    let mut selected = BTreeSet::from([0]);
+    let mut known: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+    insert_records(files[0], &mut known)?;
+    loop {
+        let mut added = false;
+        for index in selected.clone() {
+            if let Some((target, _)) = bridges.get(&index)
+                && selected.insert(*target)
+            {
+                insert_records(files[*target], &mut known)?;
+                added = true;
+            }
+        }
+        for (index, file) in files.iter().enumerate().skip(1) {
+            check(deadline, stopped)?;
+            if selected.contains(&index)
+                || !file.archive
+                || foreign.contains(&index)
+                || (files[0].receipt.is_some()
+                    && !ownership.iter().any(|record| {
+                        record.owner == owner.to_string()
+                            && file.source.path.file_name().and_then(|name| name.to_str())
+                                == Some(record.name.as_str())
+                    }))
+            {
+                continue;
+            }
+            if file
+                .records
+                .iter()
+                .any(|(entry, _)| known.contains_key(&entry.id))
+            {
+                insert_records(file, &mut known)?;
+                selected.insert(index);
+                added = true;
+            }
+        }
+        if !added {
+            break;
+        }
+    }
+    if files[0].receipt.is_some() {
+        for &index in selected.iter().filter(|&&index| index != 0) {
+            let file = &files[index];
+            if !file.envelope
+                || !ownership.iter().any(|record| {
+                    record.owner == owner.to_string()
+                        && file.source.path.file_name().and_then(|name| name.to_str())
+                            == Some(record.name.as_str())
+                })
+            {
+                return Err(invalid("inherited archive lacks owned envelope"));
+            }
+        }
+    }
+    let mut records = BTreeMap::new();
+    let mut successors: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut incoming: BTreeMap<String, usize> = BTreeMap::new();
+    let mut placeholders = BTreeSet::new();
+    for &index in &selected {
+        if files[index].records.first().is_some_and(|(entry, _)| {
+            placeholder(entry) && entry.content.ends_with(", 0 recent entries preserved]")
+        }) && !bridges.contains_key(&index)
+        {
+            return Err(invalid("zero-retention compaction receipt missing"));
+        }
+        let mut previous = bridges.get(&index).map(|(_, tail)| tail.clone());
+        if previous
+            .as_ref()
+            .is_some_and(|tail| !known.contains_key(tail))
+        {
+            return Err(invalid("compaction original tail missing"));
+        }
+        for (entry, _) in &files[index].records {
+            check(deadline, stopped)?;
+            if placeholder(entry) {
+                placeholders.insert(entry.id.clone());
+                continue;
+            }
+            records.insert(entry.id.clone(), entry.clone());
+            incoming.entry(entry.id.clone()).or_default();
+            if let Some(parent) = previous
+                && successors
+                    .entry(parent)
+                    .or_default()
+                    .insert(entry.id.clone())
+            {
+                *incoming.entry(entry.id.clone()).or_default() += 1;
+            }
+            previous = Some(entry.id.clone());
+        }
+    }
+    let mut ready: BTreeSet<_> = incoming
+        .iter()
+        .filter(|(_, n)| **n == 0)
+        .map(|(id, _)| id.clone())
+        .collect();
+    let mut ordered = Vec::new();
+    let mut seen = BTreeSet::new();
+    while !ready.is_empty() {
+        check(deadline, stopped)?;
+        if ready.len() != 1 {
+            return Err(invalid("ambiguous record order"));
+        }
+        let id = ready
+            .pop_first()
+            .ok_or_else(|| invalid("missing ready record"))?;
+        let entry = records
+            .remove(&id)
+            .ok_or_else(|| invalid("missing record"))?;
+        if entry
+            .parent_id
+            .as_ref()
+            .is_some_and(|parent| !seen.contains(parent))
+        {
+            return Err(invalid("missing or forward original parent"));
+        }
+        seen.insert(id.clone());
+        ordered.push(entry);
+        if let Some(children) = successors.get(&id) {
+            for child in children {
+                let degree = incoming
+                    .get_mut(child)
+                    .ok_or_else(|| invalid("missing adjacency"))?;
+                *degree -= 1;
+                if *degree == 0 {
+                    ready.insert(child.clone());
+                }
+            }
+        }
+    }
+    if !records.is_empty() {
+        return Err(invalid("record order cycle"));
+    }
+    let raw_records = ordered
+        .iter()
+        .map(|entry| {
+            known
+                .get(&entry.id)
+                .cloned()
+                .ok_or_else(|| invalid("missing original record bytes"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if let Some(receipt) = &files[0].receipt {
+        receipt.validate_records(&raw_records, deadline)?;
+    }
+    Ok(Reconstructed {
+        entries: ordered,
+        raw: raw_records,
+        selected,
+        placeholders: placeholders.len(),
+    })
 }
 
 fn insert_records(
@@ -693,7 +930,8 @@ fn read_file(
     stopped: &impl Fn() -> bool,
 ) -> Result<FileRecords, SessionError> {
     check(deadline, stopped)?;
-    let mut file = crate::history_page::open_source(path).map_err(|e| invalid(&e.to_string()))?;
+    let mut file = crate::history_page::open_source_until(path, deadline)
+        .map_err(|e| invalid(&e.to_string()))?;
     let stamp = crate::recovery_stamp::from_file(&file).map_err(|e| invalid(&e.to_string()))?;
     let mut stored = Vec::new();
     read_bounded(&mut file, &mut stored, remaining, deadline, stopped)?;
@@ -719,7 +957,25 @@ fn read_file(
     } else {
         stored
     };
-    let mut offset = 0;
+    let envelope = decoded.starts_with(crate::fork_receipt::ENVELOPE);
+    let receipt = if envelope && !archive {
+        let receipt = crate::fork_receipt::load(path, deadline)?;
+        let offset = crate::fork_receipt::envelope_header_length(&decoded)?;
+        let compacted = crate::history_page::decode_tlog_record(&decoded[offset..], MAX_BYTES)
+            .map_err(|_| invalid("invalid fork first record"))?
+            .is_some_and(|(entry, _)| placeholder(&entry));
+        if !compacted {
+            receipt.validate_materialized(&decoded, deadline)?;
+        }
+        Some(receipt)
+    } else {
+        None
+    };
+    let mut offset = if envelope {
+        crate::fork_receipt::envelope_header_length(&decoded)?
+    } else {
+        0
+    };
     if decoded.starts_with(b"TALOS\t") {
         offset = decoded
             .iter()
@@ -734,18 +990,23 @@ fn read_file(
         }
     }
     let mut records = Vec::new();
+    let mut ids = BTreeSet::new();
     while offset < decoded.len() {
         check(deadline, stopped)?;
         if matches!(decoded[offset], b'\n' | b'\r') {
             offset += 1;
             continue;
         }
-        let (entry, length) = crate::history_page::tlog_record(&decoded[offset..])
-            .map_err(|e| invalid(&e.to_string()))?
-            .ok_or_else(|| invalid("incomplete record"))?;
+        let (entry, length) =
+            crate::history_page::decode_tlog_record(&decoded[offset..], MAX_BYTES)
+                .map_err(|e| invalid(&e.to_string()))?
+                .ok_or_else(|| invalid("incomplete record"))?;
         *count += 1;
         if *count > MAX_ENTRIES {
             return Err(invalid("record bound exceeded"));
+        }
+        if entry.id.is_empty() || !ids.insert(entry.id.clone()) {
+            return Err(invalid("duplicate or empty record ID"));
         }
         records.push((entry, decoded[offset..offset + length].to_vec()));
         offset += length;
@@ -758,6 +1019,8 @@ fn read_file(
         stamp,
         records,
         archive,
+        receipt,
+        envelope,
     })
 }
 
@@ -1452,6 +1715,32 @@ mod tests {
                 .check_supporting_sources(Instant::now() + Duration::from_secs(5))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn retired_head_revokes_prepared_supporting_evidence_without_changing_files() {
+        let (_root, _manager, session) = fixture();
+        append_users(&session, 0, 205);
+        session.compact_archived(50).expect("archive");
+        let database = session
+            .file_path
+            .parent()
+            .expect("directory")
+            .join("history-bindings.sqlite");
+        crate::reserve_session_identity(&database, session.id).expect("reserve");
+        let evidence = inspect(&session).expect("prepared evidence");
+        let before = std::fs::read(&session.file_path).expect("head");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        evidence
+            .check_supporting_sources(deadline)
+            .expect("active evidence");
+        crate::retire_session_identity(&database, session.id).expect("retire");
+        assert_eq!(
+            std::fs::read(&session.file_path).expect("unchanged head"),
+            before
+        );
+        assert!(evidence.check_supporting_sources(deadline).is_err());
+        assert!(evidence.check_all_sources(deadline).is_err());
     }
 
     #[test]

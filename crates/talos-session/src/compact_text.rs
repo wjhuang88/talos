@@ -42,10 +42,36 @@ pub struct CompactTextSessionStore;
 
 impl crate::store::SessionStore for CompactTextSessionStore {
     fn read_entries(&self, file_path: &Path) -> Result<Vec<SessionEntry>, SessionError> {
+        let _identity = crate::identity_custody::require_not_retired(file_path)?;
         read_tlog_entries(file_path)
     }
 
     fn append_entry(&self, file_path: &Path, entry: &SessionEntry) -> Result<(), SessionError> {
+        let _identity = crate::identity_custody::require_not_retired(file_path)?;
+        let is_fork = match crate::history_page::open_source_under_identity(file_path, &_identity) {
+            Ok(file) => {
+                let mut marker = Vec::new();
+                file.take(crate::fork_receipt::ENVELOPE.len() as u64)
+                    .read_to_end(&mut marker)?;
+                marker == crate::fork_receipt::ENVELOPE
+            }
+            Err(crate::history_page::HistoryPageError::Io(error))
+                if error.kind() == std::io::ErrorKind::NotFound =>
+            {
+                false
+            }
+            Err(_) => return Err(SessionError::ParseError("unsupported append source".into())),
+        };
+        if is_fork {
+            let prior = read_tlog_entries(file_path)?;
+            return rewrite_preserving_records(
+                file_path,
+                &prior,
+                0,
+                &[],
+                std::slice::from_ref(entry),
+            );
+        }
         let needs_header = match fs::metadata(file_path) {
             Ok(metadata) => metadata.len() == 0,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
@@ -85,19 +111,36 @@ impl crate::store::SessionStore for CompactTextSessionStore {
         file_path: &Path,
         entries: &[SessionEntry],
     ) -> Result<(), SessionError> {
+        let _identity = crate::identity_custody::require_not_retired(file_path)?;
         let parent = file_path.parent().ok_or_else(|| {
             SessionError::ParseError("session file has no parent directory".into())
         })?;
         fs::create_dir_all(parent)?;
         // Preserve the creation header across atomic turn commits. Replacing
         // the file must not change an otherwise identical historical prefix.
-        let header = existing_creation_header(file_path)?.unwrap_or_else(|| {
+        let header = existing_creation_header(file_path, &_identity)?.unwrap_or_else(|| {
             format!(
                 "{TLOG_MAGIC}\t{TLOG_VERSION}\t{}\n",
                 Utc::now().timestamp_millis()
             )
             .into_bytes()
         });
+        if header.starts_with(crate::fork_receipt::ENVELOPE) {
+            // An inherited prefix is immutable original bytes, not a decoded
+            // value that may be normalized by a general replacement writer.
+            let prior = read_tlog_entries(file_path)?;
+            if entries.len() < prior.len()
+                || prior
+                    .iter()
+                    .zip(entries)
+                    .any(|(old, new)| encode_entry(old) != encode_entry(new))
+            {
+                return Err(SessionError::ParseError(
+                    "fork replacement would change original records".into(),
+                ));
+            }
+            return rewrite_preserving_records(file_path, &prior, 0, &[], &entries[prior.len()..]);
+        }
         let temporary = temporary_sibling(file_path);
         let mut file = OpenOptions::new()
             .create_new(true)
@@ -124,14 +167,17 @@ impl crate::store::SessionStore for CompactTextSessionStore {
     }
 
     fn read_last_entry_id(&self, file_path: &Path) -> Option<String> {
+        let _identity = crate::identity_custody::require_not_retired(file_path).ok()?;
         read_last_entry_id_tlog(file_path)
     }
 
     fn scan_file(&self, file_path: &Path) -> Result<SessionInfo, SessionError> {
+        let _identity = crate::identity_custody::require_not_retired(file_path)?;
         scan_tlog_file(file_path)
     }
 
     fn read_bytes(&self, file_path: &Path) -> Result<Vec<u8>, SessionError> {
+        let _identity = crate::identity_custody::require_not_retired(file_path)?;
         std::fs::read(file_path).map_err(SessionError::IoError)
     }
 
@@ -154,19 +200,59 @@ pub(crate) fn rewrite_preserving_records(
     prepended: &[SessionEntry],
     appended: &[SessionEntry],
 ) -> Result<(), SessionError> {
+    rewrite_records(path, prior, retain_from, prepended, appended, None)
+}
+
+pub(crate) fn rewrite_archived_records(
+    path: &Path,
+    prior: &[SessionEntry],
+    retain_from: usize,
+    marker: &SessionEntry,
+    archive: &Path,
+) -> Result<(), SessionError> {
+    rewrite_records(
+        path,
+        prior,
+        retain_from,
+        std::slice::from_ref(marker),
+        &[],
+        Some(archive),
+    )
+}
+
+fn rewrite_records(
+    path: &Path,
+    prior: &[SessionEntry],
+    retain_from: usize,
+    prepended: &[SessionEntry],
+    appended: &[SessionEntry],
+    archive: Option<&Path>,
+) -> Result<(), SessionError> {
+    let identity = crate::identity_custody::require_not_retired(path)?;
     if retain_from > prior.len() {
         return Err(SessionError::DurableTurn(
             "invalid retained record cutoff".into(),
         ));
     }
-    let mut source = crate::history_page::open_source(path)
+    let mut source = crate::history_page::open_source_under_identity(path, &identity)
         .map_err(|_| SessionError::DurableTurn("cannot acquire original transcript".into()))?;
     let stamp = crate::recovery_stamp::from_file(&source)
         .map_err(|_| SessionError::DurableTurn("cannot capture original transcript".into()))?;
-    let mut original = Vec::new();
-    source.read_to_end(&mut original)?;
-    let header = existing_creation_header(path)?
+    let header = existing_creation_header(path, &identity)?
         .ok_or_else(|| SessionError::DurableTurn("missing original transcript header".into()))?;
+    let mut original = Vec::new();
+    let mut fork_receipt = None;
+    if header.starts_with(crate::fork_receipt::ENVELOPE) {
+        (&mut source)
+            .take(64 * 1024 * 1024 + 1)
+            .read_to_end(&mut original)?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let receipt = crate::fork_receipt::load(path, deadline)?;
+        let records = receipt.current_records(path, &original, deadline)?;
+        fork_receipt = Some((receipt, records, deadline));
+    } else {
+        source.read_to_end(&mut original)?;
+    }
     if !original.starts_with(&header) {
         return Err(SessionError::DurableTurn(
             "original transcript changed".into(),
@@ -212,6 +298,90 @@ pub(crate) fn rewrite_preserving_records(
             "unvalidated original transcript tail".into(),
         ));
     }
+    if let Some((receipt, mut records, deadline)) = fork_receipt {
+        if let Some(archive) = archive {
+            if !appended.is_empty()
+                || prepended.len() != 1
+                || !crate::archive_recovery::placeholder(&prepended[0])
+                || prepended[0].content
+                    != format!(
+                        "[Compaction summary: {retain_from} earlier entries summarized, {} recent entries preserved]",
+                        prior.len() - retain_from
+                    )
+                || records.iter().any(|raw| {
+                    crate::history_page::decode_tlog_record(raw, 64 * 1024 * 1024)
+                        .ok()
+                        .flatten()
+                        .is_some_and(|(entry, _)| entry.id == prepended[0].id)
+                })
+            {
+                return Err(SessionError::DurableTurn(
+                    "invalid fork compaction marker".into(),
+                ));
+            }
+            let archive_digest = crate::archive_publication::verify_replacement_archive(
+                path, archive, &original, deadline,
+            )?;
+            if retain_from == prior.len() {
+                let locators = crate::compaction_locator::load(path, deadline, &|| false)?;
+                let tail = records
+                    .last()
+                    .and_then(|raw| {
+                        crate::history_page::decode_tlog_record(raw, 64 * 1024 * 1024)
+                            .ok()
+                            .flatten()
+                    })
+                    .map(|(entry, _)| entry.id);
+                if !locators.iter().any(|locator| {
+                    locator.marker == prepended[0].id
+                        && locator.archive_digest == archive_digest
+                        && locator.marker_digest
+                            == crate::compaction_locator::digest(
+                                encode_entry(&prepended[0]).as_bytes(),
+                            )
+                        && Some(locator.tail.as_str()) == tail.as_deref()
+                        && archive.file_name().and_then(|s| s.to_str())
+                            == Some(locator.archive.as_str())
+                }) {
+                    return Err(SessionError::DurableTurn(
+                        "fork compaction bridge unavailable".into(),
+                    ));
+                }
+            }
+            let length = header
+                .len()
+                .checked_add(original.len() - retained_offset)
+                .and_then(|n| n.checked_add(encode_entry(&prepended[0]).len()));
+            if length.is_none_or(|n| n > 64 * 1024 * 1024) {
+                return Err(SessionError::DurableTurn(
+                    "fork physical transcript byte bound exceeded".into(),
+                ));
+            }
+        } else if retain_from != 0 || !prepended.is_empty() {
+            return Err(SessionError::DurableTurn(
+                "fork archive reconstruction unavailable".into(),
+            ));
+        }
+        let mut length: usize = records.iter().map(Vec::len).sum();
+        let mut physical_length = original.len();
+        for entry in appended {
+            let raw = encode_entry(entry).into_bytes();
+            physical_length = physical_length
+                .checked_add(raw.len())
+                .filter(|n| *n <= 64 * 1024 * 1024)
+                .ok_or_else(|| {
+                    SessionError::DurableTurn("fork physical transcript byte bound exceeded".into())
+                })?;
+            length = length
+                .checked_add(raw.len())
+                .filter(|n| *n <= 64 * 1024 * 1024)
+                .ok_or_else(|| {
+                    SessionError::DurableTurn("fork transcript byte bound exceeded".into())
+                })?;
+            records.push(raw);
+        }
+        receipt.validate_records(&records, deadline)?;
+    }
     let current = crate::recovery_stamp::from_file(&source)
         .map_err(|_| SessionError::DurableTurn("cannot recheck original transcript".into()))?;
     if !crate::recovery_seal::same_file_version(&stamp, &current)
@@ -247,8 +417,11 @@ pub(crate) fn rewrite_preserving_records(
 }
 
 // A format header is tiny; never scan an unbounded malformed first line.
-fn existing_creation_header(path: &Path) -> Result<Option<Vec<u8>>, SessionError> {
-    let file = match crate::history_page::open_source(path) {
+fn existing_creation_header(
+    path: &Path,
+    identity: &crate::identity_custody::IdentityLease,
+) -> Result<Option<Vec<u8>>, SessionError> {
+    let file = match crate::history_page::open_source_under_identity(path, identity) {
         Ok(file) => file,
         Err(crate::history_page::HistoryPageError::Io(error))
             if error.kind() == std::io::ErrorKind::NotFound =>
@@ -260,7 +433,17 @@ fn existing_creation_header(path: &Path) -> Result<Option<Vec<u8>>, SessionError
     };
     let mut bytes = Vec::new();
     use std::io::BufRead;
-    std::io::BufReader::new(file.take(128)).read_until(b'\n', &mut bytes)?;
+    let mut reader = std::io::BufReader::new(file.take(256));
+    reader.read_until(b'\n', &mut bytes)?;
+    if bytes == crate::fork_receipt::ENVELOPE {
+        reader.read_until(b'\n', &mut bytes)?;
+        if crate::fork_receipt::envelope_header_length(&bytes)? != bytes.len() {
+            return Err(SessionError::ParseError(
+                "invalid fork creation header".into(),
+            ));
+        }
+        return Ok(Some(bytes));
+    }
     if bytes.is_empty() {
         return Ok(None);
     }
@@ -347,7 +530,25 @@ fn read_tlog_entries(path: &Path) -> Result<Vec<SessionEntry>, SessionError> {
         return Ok(Vec::new());
     }
 
-    let data = std::fs::read(path)?;
+    let mut file = crate::history_page::open_source(path)
+        .map_err(|_| SessionError::ParseError("unsupported TLOG source".into()))?;
+    let mut prefix = Vec::new();
+    (&mut file)
+        .take(crate::fork_receipt::ENVELOPE.len() as u64)
+        .read_to_end(&mut prefix)?;
+    file.seek(SeekFrom::Start(0))?;
+    if prefix == crate::fork_receipt::ENVELOPE {
+        let mut data = Vec::new();
+        file.take(64 * 1024 * 1024 + 1).read_to_end(&mut data)?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let receipt = crate::fork_receipt::load(path, deadline)?;
+        receipt.current_records(path, &data, deadline)?;
+        // Store semantics remain the physical entries (including the marker).
+        // Full history restoration uses ArchiveRecoveryEvidence separately.
+        return parse_tlog_bytes(&data[crate::fork_receipt::ENVELOPE.len()..]);
+    }
+    let mut data = Vec::new();
+    file.read_to_end(&mut data)?;
     parse_tlog_bytes(&data)
 }
 
@@ -599,8 +800,7 @@ fn scan_tlog_file(path: &Path) -> Result<SessionInfo, SessionError> {
         .and_then(|s| Uuid::parse_str(s).ok())
         .unwrap_or_else(Uuid::nil);
 
-    let data = std::fs::read(path)?;
-    let entries = parse_tlog_bytes(&data)?;
+    let entries = read_tlog_entries(path)?;
 
     let count = entries.len();
     let last_preview = entries

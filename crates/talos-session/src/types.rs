@@ -287,9 +287,20 @@ impl Session {
     /// # Errors
     ///
     /// Returns [`SessionError::EntryNotFound`] if the entry ID doesn't exist.
-    /// Returns [`SessionError::ParseError`] for a legacy archive count placeholder:
+    /// Returns [`SessionError::ParseError`] for receipt-bound history (use
+    /// [`Session::publish_history_fork`]) or a legacy archive count placeholder:
     /// copying that head cannot preserve the child's complete source history.
     pub fn fork(&mut self, from_entry_id: &str) -> Result<String, SessionError> {
+        if crate::fork_receipt::published_branch(
+            self,
+            std::time::Instant::now() + std::time::Duration::from_secs(10),
+        )?
+        .is_some()
+        {
+            return Err(SessionError::ParseError(
+                "receipt-bound history requires publish_history_fork into a fresh child; its committed branch cannot be replaced in memory".into(),
+            ));
+        }
         let all_entries = self.read_entries()?;
 
         let pos = all_entries

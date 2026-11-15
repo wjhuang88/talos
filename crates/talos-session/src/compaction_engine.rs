@@ -72,9 +72,26 @@ impl CompactionEngine {
         session_dir: &Path,
         max_entries: usize,
     ) -> Result<CompactionResult, SessionError> {
+        // Keep retirement excluded between store calls and archive publication.
+        // Nested store acquisitions are nonblocking; no waiter is installed.
+        let _identity = crate::identity_custody::require_not_retired(head_path)?;
         let entries = self.store.read_entries(head_path)?;
         if entries.len() <= max_entries {
             return Ok(CompactionResult::Skipped);
+        }
+
+        let mut receipt_bound = false;
+        if matches!(
+            self.store.history_encoding(),
+            Some(crate::history_page::HistoryEncoding::Tlog)
+        ) {
+            use std::io::Read;
+            let file = crate::history_page::open_source_under_identity(head_path, &_identity)
+                .map_err(|_| SessionError::ParseError("compaction source unavailable".into()))?;
+            let mut marker = Vec::new();
+            file.take(crate::fork_receipt::ENVELOPE.len() as u64)
+                .read_to_end(&mut marker)?;
+            receipt_bound = marker == crate::fork_receipt::ENVELOPE;
         }
 
         let owned = matches!(
@@ -109,19 +126,34 @@ impl CompactionEngine {
         } else {
             None
         };
-        let archived_path = self.archive_head(head_path, &archive_path, &compressed_path)?;
+        let archived_path = self.archive_head(
+            head_path,
+            &archive_path,
+            &compressed_path,
+            crate::compact_text::encode_entry(&compacted[0]).len(),
+        )?;
         if let Some(tail) = zero_tail {
             crate::compaction_locator::record(head_path, &archived_path, &compacted[0], &tail)?;
             #[cfg(test)]
             crate::durable::fork_crash_probe("zero_registered");
         }
 
-        self.store.replace_with_retained_suffix(
-            head_path,
-            &entries,
-            entries.len() - max_entries,
-            &compacted[..1],
-        )?;
+        if receipt_bound {
+            crate::compact_text::rewrite_archived_records(
+                head_path,
+                &entries,
+                entries.len() - max_entries,
+                &compacted[0],
+                &archived_path,
+            )?;
+        } else {
+            self.store.replace_with_retained_suffix(
+                head_path,
+                &entries,
+                entries.len() - max_entries,
+                &compacted[..1],
+            )?;
+        }
 
         #[cfg(test)]
         if max_entries == 0 {
@@ -155,6 +187,7 @@ impl CompactionEngine {
         head_path: &Path,
         archive_path: &Path,
         compressed_path: &Path,
+        marker_bytes: usize,
     ) -> Result<PathBuf, SessionError> {
         let raw = std::fs::read(head_path)?;
         let compressed = self
@@ -166,6 +199,29 @@ impl CompactionEngine {
         } else {
             (compressed_path, &compressed)
         };
+        if raw.starts_with(crate::fork_receipt::ENVELOPE) {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let id = head_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .and_then(|s| uuid::Uuid::parse_str(s).ok())
+                .ok_or_else(|| SessionError::ParseError("fork head identity missing".into()))?;
+            let session = crate::Session::new(id, String::new(), String::new(), head_path.into());
+            let evidence = session.inspect_archive_recovery(deadline, || false)?;
+            // Reserve the full added marker without crediting removed records:
+            // a short removed record can be smaller than the new marker.
+            evidence.check_archive_addition(
+                bytes.len().checked_add(marker_bytes).ok_or_else(|| {
+                    SessionError::ParseError("archive publication size overflow".into())
+                })?,
+                if self.compressor.format_tag() == "none" {
+                    0
+                } else {
+                    raw.len()
+                },
+            )?;
+            evidence.check_all_sources(deadline)?;
+        }
         // Only complete, synced bytes receive a discoverable archive name.
         // Hard-link publication is create-new: never replace an existing archive
         // (or a symlink at its path). Unsupported filesystems fail before head
@@ -293,6 +349,53 @@ pub enum CompactionResult {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn retirement_during_compression_cannot_split_archive_publication() {
+        struct RetiringCompressor(std::path::PathBuf);
+        impl crate::compression::SegmentCompressor for RetiringCompressor {
+            fn compress(
+                &self,
+                bytes: &[u8],
+            ) -> Result<Vec<u8>, crate::compression::CompressionError> {
+                assert!(crate::artifacts::remove_session_transcript(&self.0).is_err());
+                Ok(bytes.to_vec())
+            }
+            fn decompress(
+                &self,
+                bytes: &[u8],
+            ) -> Result<Vec<u8>, crate::compression::CompressionError> {
+                Ok(bytes.to_vec())
+            }
+            fn format_tag(&self) -> &'static str {
+                "none"
+            }
+        }
+        let root = tempfile::tempdir().expect("root");
+        let id = uuid::Uuid::new_v4();
+        let head = root.path().join(format!("{id}.tlog"));
+        let database = root.path().join("history-bindings.sqlite");
+        let incarnation = crate::reserve_session_identity(&database, id).expect("reserve");
+        let session = crate::Session::new(id, "test".into(), String::new(), head.clone());
+        for text in ["first", "second", "third"] {
+            session
+                .append(&talos_core::message::Message::User {
+                    content: text.into(),
+                })
+                .expect("append");
+        }
+        let engine = CompactionEngine::new(Arc::new(CompactTextSessionStore))
+            .with_compressor(Box::new(RetiringCompressor(head.clone())));
+        assert!(matches!(
+            engine
+                .compact_segment(&head, root.path(), 1)
+                .expect("publication"),
+            CompactionResult::Compacted { .. }
+        ));
+        crate::require_active_session_identity(&database, id, incarnation).expect("still active");
+        assert_eq!(session.read_entries().expect("head readable").len(), 2);
+        crate::artifacts::remove_session_transcript(&head).expect("retire after publication");
+        assert!(crate::require_active_session_identity(&database, id, incarnation).is_err());
+    }
     use super::*;
     use crate::{CompactTextSessionStore, SessionStore};
 
@@ -306,14 +409,18 @@ mod tests {
         std::fs::write(&head, b"original compressed source").expect("head");
         std::fs::write(&compressed, b"existing archive").expect("destination");
         let engine = CompactionEngine::new(Arc::new(CompactTextSessionStore));
-        assert!(engine.archive_head(&head, &archive, &compressed).is_err());
+        assert!(
+            engine
+                .archive_head(&head, &archive, &compressed, 0)
+                .is_err()
+        );
         assert_eq!(
             std::fs::read(&compressed).expect("preserved"),
             b"existing archive"
         );
         let fresh = root.path().join("s-fresh.tlog.zst");
         engine
-            .archive_head(&head, &archive, &fresh)
+            .archive_head(&head, &archive, &fresh, 0)
             .expect("publish");
         let bytes = std::fs::read(fresh).expect("compressed bytes");
         assert_eq!(
@@ -336,7 +443,11 @@ mod tests {
         std::fs::write(&archive, b"existing archive").expect("archive");
         let engine = CompactionEngine::new(Arc::new(CompactTextSessionStore))
             .with_compressor(Box::new(crate::compression::NoCompressor));
-        assert!(engine.archive_head(&head, &archive, &compressed).is_err());
+        assert!(
+            engine
+                .archive_head(&head, &archive, &compressed, 0)
+                .is_err()
+        );
         assert_eq!(
             std::fs::read(&archive).expect("preserved"),
             b"existing archive"
@@ -344,7 +455,7 @@ mod tests {
         assert_eq!(std::fs::read(&head).expect("source"), b"original source");
         let fresh = root.path().join("s-fresh.tlog");
         engine
-            .archive_head(&head, &fresh, &compressed)
+            .archive_head(&head, &fresh, &compressed, 0)
             .expect("publish");
         assert_eq!(std::fs::read(fresh).expect("published"), b"original source");
     }
@@ -497,21 +608,22 @@ mod tests {
             .expect("unchecked append");
         let before = std::fs::read(&path).expect("before refusal");
         assert!(before.starts_with(&unsupported));
+        let inventory = || {
+            std::fs::read_dir(root.path())
+                .expect("inventory")
+                .map(|item| item.expect("entry").file_name())
+                .collect::<std::collections::BTreeSet<_>>()
+        };
+        let initial_inventory = inventory();
         let engine = CompactionEngine::new(store.clone());
         for keep in [0, 1] {
             assert!(engine.compact_segment(&path, root.path(), keep).is_err());
             assert_eq!(std::fs::read(&path).expect("unchanged"), before);
-            assert_eq!(
-                std::fs::read_dir(root.path()).expect("inventory").count(),
-                1
-            );
+            assert_eq!(inventory(), initial_inventory);
         }
         assert!(store.replace_entries_atomically(&path, &[entry]).is_err());
         assert_eq!(std::fs::read(&path).expect("still unchanged"), before);
-        assert_eq!(
-            std::fs::read_dir(root.path()).expect("inventory").count(),
-            1
-        );
+        assert_eq!(inventory(), initial_inventory);
     }
 
     #[test]

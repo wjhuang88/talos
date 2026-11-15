@@ -300,6 +300,16 @@ impl DurableRecoveryRecord {
 }
 
 impl DurableRecoverySource {
+    /// Exclude identity retirement for one synchronous history operation.
+    /// Keep the returned guard through final delivery checks, never in an idle
+    /// cache or across provider awaits. This does not validate content or permissions.
+    pub fn lock_identity_for_recovery(
+        &self,
+        deadline: std::time::Instant,
+    ) -> Result<impl Sized + use<>, SessionError> {
+        crate::identity_custody::require_not_retired_until(&self.descriptor.path, deadline)
+    }
+
     /// Try to serialize a bounded synchronous recovery read with this owner's
     /// writes. Returns None on contention or a poisoned lock. This guard grants
     /// no content or permission authority: verify the original prefix separately.
@@ -4034,7 +4044,13 @@ mod tests {
         let directory = tempfile::tempdir().expect("temporary host directory");
         let session = create_or_open(directory.path(), "task:write-failure").expect("session");
         std::fs::remove_file(session.file_path()).expect("remove initial TLOG");
-        std::fs::remove_dir(directory.path().join("durable")).expect("remove durable directory");
+        // Preserve permanent identity locks while making the transcript parent
+        // unavailable, rather than deleting the lock identity as test setup.
+        std::fs::rename(
+            directory.path().join("durable"),
+            directory.path().join("saved-durable"),
+        )
+        .expect("move durable directory");
         std::fs::write(directory.path().join("durable"), "not a directory")
             .expect("block durable directory");
 

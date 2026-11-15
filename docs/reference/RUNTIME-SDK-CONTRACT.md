@@ -772,13 +772,13 @@ record IDs and parents, refuses ambiguous or changed sources, and subjects resto
 messages to normal request admission and source-bound checkpoint folding. This does
 not certify real-provider summary quality or native platform acceptance.
 
-Startup `--fork`, TUI staging and `Session::fork` (including REPL `/fork` and direct
-API callers) reject legacy count-placeholder histories before publishing a child.
-`Session::fork` returns `SessionError::ParseError` before changing branch state. Copying
-only their current head would lose earlier history and introduce another live head with
-overlapping IDs. Complete child-owned archive
-provenance is not yet implemented. Ordinary non-archived forks retain existing behavior.
-See [ADR-103](../decisions/103-selected-session-history-recovery.md) and the
+Startup `--fork`, REPL and TUI publish archived or receipt-bound children through
+`publish_history_fork`, preserving original records with private origin evidence.
+Direct `Session::fork` refuses count-placeholder and receipt-bound histories;
+it cannot establish durable child ownership. Ordinary non-archived forks retain
+the legacy path. Receipt-backed publication and restart reconciliation are local
+candidate implementations; complete host/native acceptance and delivery remain open.
+See [ADR-104](../decisions/104-selected-session-history-recovery.md) and the
 [recovery owner](../tasks/session-archive-recovery-emergency.md) for candidate evidence
 and remaining review/deployment gates.
 
@@ -807,16 +807,15 @@ records, copies their original bytes, and encodes only the new turn and terminal
 marker. An incomplete or invalid existing tail fails without replacing the source;
 finalization does not repair that tail. Host-produced records larger than a model
 history page remain supported. This currently adds one full raw-transcript buffer
-alongside decoded history and does not establish a total memory bound. It does not
-implement archived-fork receipts or their migration through compaction.
+alongside decoded history and does not establish a total memory bound. Receipt publication and compaction migration are separate mechanisms described below.
 
 `SessionStore::replace_with_retained_suffix` is an additive extension point with
 a default implementation using the store's own atomic replacement. Built-in TLOG
 compaction overrides it to preserve retained record bytes and atomically publish
 the new head. A `.tlog` extension alone does not select that implementation; custom
 stores keep their own encoding and write behavior. This prevents re-encoding from
-creating conflicting IDs between retained records and archives, but does not yet
-provide archive/head/receipt crash recovery or trusted discovery after `keep0`.
+creating conflicting IDs between retained records and archives, while receipt/locator custody and keep0 discovery use the separate recovery
+protocol described below. Raw suffix preservation alone is not recovery authority.
 
 Archive publication writes a create-new temporary sibling, syncs its contents, then
 publishes the final archive name with a no-overwrite hard link before replacing
@@ -851,18 +850,20 @@ inside one SQLite step is currently deadline-bounded, not immediate. Each owner 
 at most 256 locators; canonical archive names/digests and a 512-byte original-tail ID
 limit bound values copied into Rust. Exceeding these limits fails before head
 replacement. Compaction still relies on host single-writer ownership. Process-death
-tests cover registration-before-head and published-head restart; power-loss durability
-on Windows, identity reuse/deletion lifecycle and fork inheritance remain unverified
-or unimplemented. The feature is an unreleased recovery candidate, not full fork
-or deployment acceptance.
+tests cover registration-before-head and published-head restart. Identity custody,
+incarnation checks and receipt-backed fork publication/replay implement identity
+reuse/deletion and fork inheritance boundaries described below. Native platform and
+power-loss durability acceptance remain pending. The feature is an unreleased
+recovery candidate; these mechanisms do not establish deployment acceptance.
 
-New UUID TLOG compactions in the next candidate use reserved `s-owned-<UUID>` archive
+New UUID TLOG compactions in the recovery candidate use reserved `s-owned-<UUID>` archive
 names and an immutable private publication intent committed before file visibility.
 Absent ownership is an error for these names, never legacy fallback. Foreign-owned
 archives are excluded even after their owner head is deleted; prepared evidence
 rechecks all observed ownership. Legacy archive names retain existing proof rules.
-This is not inherited fork authority, a power-loss guarantee or compatibility with
-old writers compacting future materialized children; those gates remain pending.
+Publication intent alone grants no inherited fork authority; inheritance requires
+the receipt and incarnation checks described below. Power-loss guarantees and
+compatibility with old writers compacting materialized children are not established.
 
 The recovery candidate adds `Session::begin_message_scan_through(entry_id)` and
 `SessionMessageScan::finish_with_copy_length()`. These are host raw-copy helpers,
@@ -913,3 +914,181 @@ are retained exactly; the source remains untouched, and invalid interior JSONL l
 are not rewritten. Ordinary `finish_with_copy_length()` retains physical EOF for
 callers that need a complete captured copy. Neither cutoff grants archive inheritance
 authority.
+
+### Unreleased identity-lock storage permission change
+
+Built-in UUID-named JSONL/TLOG reads and writes now acquire an operation-local
+identity lock before checking retirement. Hosts must provide a writable transcript
+parent and read/write access to permanent `.identity-locks/<canonical UUID>` files.
+A first read can create missing parent directories and the lock anchor even when
+the transcript is absent; it creates neither transcript nor custody database.
+Readonly media or read-only directory grants no longer suffice for these built-in
+reads. Migrate by provisioning the private lock directory/anchors with host access
+or copying input into a host-owned writable session directory; there is no unlocked
+fallback. Non-UUID archive names retain their existing source-read checks.
+Lock contention is nonblocking and returns unavailable; callers retry operations,
+never assume failed retirement succeeded. Lock anchors must never be deleted or
+replaced, including during session cleanup. Same-UID external lock/directory
+replacement is outside the cooperative custody boundary. Shared identity locks
+exclude retirement but do not serialize writers; existing host runtime ownership
+and transcript write locks remain mandatory. Native Windows acceptance remains pending. Archived-fork publication is
+implemented locally as described below; delivery is not yet complete.
+
+`DurableRecoverySource::lock_identity_for_recovery(deadline)` and
+`RecoveryPrefixSeal::lock_identity_for_recovery(deadline)` return an owned opaque
+operation guard. Keep it alive through synchronous query result validation; do not
+store it with idle cached history or hold across provider/tool awaits. The guard
+excludes managed identity retirement only, not concurrent writes, source changes
+or permission revocation. Prefix/receipt and permission checks remain required.
+Talos History queries acquire this guard per invocation, including archived
+search/detail; releasing a query result releases its guard, so later delivery
+still requires the host execution/permission fence.
+
+Materialized fork compatibility (local implementation, not delivery evidence):
+built-in TLOG append now reads the leading format marker before choosing its write
+path, so append requires read access as well as write access. Legacy headerless
+TLOG files remain accepted. Receipt-bound materialized heads use validated atomic
+append to preserve their exact inherited bytes and reject duplicate IDs or invalid
+suffix parents before publication. This imposes the existing atomic publication
+requirements on those heads; arbitrary append-only permissions are insufficient.
+Built-in receipt-bound compaction preserves the envelope and exact retained raw
+records, including repeated keep0/keepN compaction. Cold Session append resolves
+the logical tail through owned archives; a placeholder never becomes its parent.
+Before archive intent/publication, the writer checks the shared recovery input
+budget including the old head plus the new archive and, for compressed archives,
+its decoded bytes. This conservative crash-window reservation can refuse a
+compaction even if the eventual smaller head would fit. Keep0 head replacement
+also requires the locator to match the verified archive digest.
+Receipt-bound message scans validate a complete bounded recovery inventory on the
+first step, then decode logical originals in entry pages and revalidate custody
+and sources at finish. The first step uses the shared64MiB inventory bound, not
+legacy single-page I/O. Raw copying does not authorize receipt-bound children;
+startup, REPL and TUI use the receipt publisher for archived/envelope sources,
+including selected original prefixes where the host exposes a cutoff. Automatic pending-publication preservation and published metadata replay have
+the bounded coverage and residuals described below.
+
+
+Local archived-fork publication API (CLI integration implemented; not yet delivered):
+`Session::publish_history_fork` requires a matching retained SessionRuntimeLease,
+a fresh absent same-directory canonical UUID.tlog child, its final branch identity,
+an optional selected original entry, deadline and cancellation predicate. It
+reserves the child identity, captures proven raw history and publishes the private
+receipt. It returns the selected tail. Host runtime/index/lineage activation is
+still required. On error preserve pending artifacts and do not retry with the
+same UUID or blindly delete an uncertain committed child. The runtime lease is
+cooperative; independent SDK writers that do not honor it are outside that fence.
+
+`Session::quarantine_pending_history_fork` requires the child's matching runtime
+lease and a stopped/joined publisher. It preserves failed pending history outside
+the recognized transcript namespace, permanently retires its UUID, and refuses
+published receipts. It does not reconcile index/runtime metadata automatically.
+
+Fork publication requires both source and child stores to declare TLOG encoding;
+the child must also declare the tlog extension. Custom stores opting in must honor
+the built-in TLOG/envelope read/write and custody contracts. A JSONL writer under
+a .tlog path is refused before child identity reservation.
+
+
+Local legacy REPL fork lifecycle: `/fork` owns a pending operation before accepting
+another input. Ctrl+C cancels the host receipt wait; the Actor observes receiver
+closure and cooperatively stops its publisher while retaining its lease/busy state.
+Host completion does not prove that the Actor publisher has joined. Successful
+publication requests a runtime switch: the parent Actor is shut down, its scheduler
+is cancelled/joined, and the Actor is joined before rebuilding child tools,
+permissions, history and runtime. The input channel is retained; runtime events
+carry a generation so delayed parent events cannot affect the child. A cancelled
+operation that already published a child retains it without switching. Rebuild
+failure exits interactive mode with the retained session ID and resume command;
+it does not restart the parent automatically. Automatic crash/metadata reconciliation is described below;
+production-terminal acceptance remains outstanding.
+
+Startup pending-fork preservation: `SessionManager::new` invokes
+`reconcile_pending_history_forks(deadline)` before index and orphan maintenance.
+The custom-directory constructor remains side-effect-free; hosts may call the
+method explicitly. It discovers canonical heads with validated private pending
+intents, obtains both parent and child runtime leases, rechecks custody and
+quarantines interrupted heads. Busy owners are skipped, never interrupted.
+Published children are excluded. Returned count is not proof of exhaustive
+reconciliation; errors, deadline and the 256-entry per-directory recovery bound
+can defer work. Missing-head intents and temporary artifacts remain evidence.
+`.fork-unpublished` protects same-identity sidecars from automatic orphan cleanup.
+Published-child metadata replay follows ordinary index cleanup, as described below.
+
+Receipt branch restoration: SessionManager reopening uses the validated private
+receipt's child branch UUID before reading entries. This persists across keep0,
+keepN and parent removal. `Session::fork` rejects receipt-bound heads even when
+materialized; use `publish_history_fork` or the Actor's `ForkHistory` operation to
+create an independently recoverable child. The branch's in-memory root field keeps
+the Session constructor convention; no original root-entry identity is invented.
+
+Local runtime snapshot candidate: newly captured fork receipts are version2 and
+include the committed source runtime identity (or explicit absence) before
+publication. Version1 history remains readable but cannot supply this snapshot.
+`restore_history_fork_runtime` requires child runtime ownership and validated source
+evidence; it fills missing generation-zero identity, refuses conflicting initial
+metadata and preserves later activation state. Automatic published-child discovery invokes this primitive and separately replays
+lineage; this primitive alone does not repair indexes. Fork snapshot reads and
+restoration use nonblocking local/SQLite locks and the
+caller deadline for SQLite VM work. Snapshot reads never initialize schema or
+create an absent sidecar. Restore commits schema/generation/identity together;
+connection initialization may still create sidecar files before a later error.
+Filesystem I/O remains cooperative, and a final source-validation error can follow
+a committed metadata write: preserve artifacts and retry idempotently.
+
+Current startup integration supersedes earlier unconnected-candidate notes:
+`reconcile_published_history_forks(deadline)` runs after pending preservation and
+ordinary index cleanup in `SessionManager::new`. It validates version2 receipt history under child runtime
+ownership, restores initial identity and replays exact lineage through bounded
+index initialization/registration. Busy children and version1 receipts are skipped;
+malformed custody may defer the remaining pass with an error. Partial commits remain
+retryable, and returned count includes consistent children. Search transcript
+indexing still runs as the separate existing reconcile_index step, whose work is
+not covered by this recovery deadline. Production-host acceptance is outstanding.
+Startup ordering correction: pending preservation runs first, then ordinary index
+cleanup, then published runtime/lineage replay, then orphan maintenance. Replaying
+after stale parent-index deletion prevents cleanup from erasing recovered lineage.
+
+### Host startup runtime ownership transfer
+
+Hosts preparing persistent identity/history before Actor startup may acquire a
+`SessionRuntimeLease` first and move it into `run_with_runtime_lease`. The Actor
+checks the lease against its configured persistence transcript before recovery
+or execution; a different filename/format or absent persistence refuses startup.
+Ownership remains continuous across host preparation and Actor execution. Ordinary
+`run` still acquires ownership at startup, so its callers must separately address
+any earlier metadata preparation. REPL uses the transfer. Owned startup history
+restoration validates the supplied lease and avoids reacquiring it for archive
+recovery, including keep0 heads.
+
+Prepared hosts may alternatively call `adopt_runtime_lease` after configuring
+persistence, then use ordinary `run`. Adoption validates the transcript immediately
+and refuses replacing existing ownership; `run` revalidates before execution.
+TUI initial startup, resume, new-session preparation and ordinary/receipt-backed fork use
+this path. Shared startup/REPL fork metadata preparation holds a child lease until
+it returns; subsequent runtime construction reacquires before further preparation.
+Same-session model replacement reacquires after old Actor retirement, verifies
+both durable generation and exact activation, and retains ownership through
+marker/history preparation into the new Actor. Acquisition failure refuses further
+preparation; this is not an uninterrupted old-to-new lease transfer. Ordinary TUI
+fork owns the child before installation and transfers that lease to the Actor.
+Pre-transfer errors roll back once after releasing ownership; post-transfer
+cancellation and commit/publication errors retain the child for recovery.
+Ordinary fork source fencing uses the Actor capture described below; full native
+terminal acceptance remains open.
+
+Receipt-backed host fork metadata consumes the child's immutable receipt identity,
+not a later read of the parent's runtime state. A receipt with explicit absence
+inherits no runtime identity; normal host model selection may still choose one.
+TUI persists that effective selection under child ownership before runtime build,
+as startup/REPL activation does. Receipt restoration and new activation selection
+are distinct operations; absence does not prohibit future child model selection.
+
+Ordinary interactive REPL/TUI forks now obtain CaptureOrdinaryFork from the source
+Actor. History bytes and optional identity come from that fixed capture, not later
+parent reads; TUI/REPL publish a fresh child under child ownership. Capture excludes
+turns/compaction, and receiver loss cancels its worker. Once synchronous staging
+starts it completes before cancellation is observed. REPL retains a completed child
+without switching when cancellation is observed. TUI's staging guard rolls back an
+ordinary child before Actor ownership transfer; after transfer, cancellation or
+publication failure retains the child for recovery. This is cooperative ownership and
+does not fence external or older writers. Native terminal acceptance remains open.

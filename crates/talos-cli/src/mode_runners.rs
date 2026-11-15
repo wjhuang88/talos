@@ -318,6 +318,8 @@ pub(crate) async fn run_tui_mode(
         ResumeSelection::Latest,
         true,
     )?;
+    let runtime_lease = talos_session::SessionRuntimeLease::acquire(&session.file_path)
+        .context("cannot acquire TUI session runtime ownership")?;
     reconcile_session_runtime_state(&session)?;
     apply_session_model_to_config(&mut config, &session);
     if !config.model.is_empty() {
@@ -403,7 +405,8 @@ pub(crate) async fn run_tui_mode(
     .with_auto_control(auto_control.clone())
     .with_auto_report_sink(auto_report_sink);
 
-    let initial_history = crate::history_restore::read_session_history(&session).await?;
+    let initial_history =
+        crate::history_restore::read_session_history_owned(&session, &runtime_lease).await?;
     let visible_history = initial_history.clone();
     let built_runtime = initial_runtime_builder
         .build(&config, &session, initial_history)
@@ -415,6 +418,7 @@ pub(crate) async fn run_tui_mode(
     let mcp_diagnostics = built_runtime.mcp_runtime.diagnostics().to_vec();
     let mut handle = built_runtime.handle;
     let mut actor = built_runtime.actor;
+    actor.adopt_runtime_lease(runtime_lease)?;
     let sched_pending = built_runtime.pending_scheduler;
     let initial_mcp_runtime = built_runtime.mcp_runtime;
 

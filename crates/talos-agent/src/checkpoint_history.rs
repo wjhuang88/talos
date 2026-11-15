@@ -595,7 +595,9 @@ impl History {
             .session()
             .inspect_archive_recovery(deadline, || cancel.is_cancelled())
             .map_err(|_| failure("archive_evidence_unavailable"))?;
-        if evidence.removed_placeholders() == 0 || evidence.sources().len() < 2 {
+        if !evidence.has_fork_receipt()
+            && (evidence.removed_placeholders() == 0 || evidence.sources().len() < 2)
+        {
             return Err(failure("archive_evidence_not_applicable"));
         }
         let source = session
@@ -638,6 +640,38 @@ impl History {
             .map_err(|_| failure("archive_index_build_failed"))?;
         // This scope is the revocation/completion ledger, not an FTS substitute.
         // The evidence corpus owns projected records and their original sources.
+        if evidence.has_fork_receipt() {
+            // The validated logical corpus, not the physical envelope/head, is
+            // the query source. This index scope is only its revocation ledger.
+            evidence
+                .check_all_sources(deadline)
+                .map_err(|_| failure("archive_sources_changed"))?;
+            while !cursor.complete() {
+                index
+                    .advance_recovery_build(
+                        &scope,
+                        &cursor,
+                        RecoveryBuildPage {
+                            next_offset: cursor
+                                .next_offset()
+                                .saturating_add(
+                                    talos_session::history_page::HISTORY_PAGE_BYTES as u64,
+                                )
+                                .min(source.source_end()),
+                            // No physical records are indexed here. Logical corpus size
+                            // belongs to validated evidence, not this byte ledger.
+                            scanned_entries: 0,
+                            sources: &[],
+                        },
+                        &budget,
+                    )
+                    .map_err(|_| failure("archive_index_advance_failed"))?;
+                cursor = index
+                    .recovery_build_cursor(&scope, &budget)
+                    .map_err(|_| failure("archive_index_cursor_failed"))?
+                    .ok_or_else(|| failure("archive_index_cursor_missing"))?;
+            }
+        }
         while !cursor.complete() {
             let page = source
                 .read_page(cursor.next_offset(), deadline, || cancel.is_cancelled())
@@ -901,6 +935,24 @@ impl History {
             && Instant::now() < deadline
     }
 
+    pub(crate) fn lock_identity_for_delivery(
+        &self,
+        deadline: Instant,
+    ) -> Option<impl Sized + use<>> {
+        #[cfg(windows)]
+        {
+            self.source.lock_identity_for_recovery(deadline).ok()
+        }
+        #[cfg(not(windows))]
+        {
+            self.seal
+                .lock()
+                .ok()?
+                .lock_identity_for_recovery(deadline)
+                .ok()
+        }
+    }
+
     pub(crate) fn query(
         &self,
         query: Option<&str>,
@@ -908,6 +960,7 @@ impl History {
         cursor: Option<&str>,
     ) -> Option<Value> {
         let deadline = Instant::now() + Duration::from_secs(2);
+        let _identity = self.lock_identity_for_delivery(deadline)?;
         let stopped = self.cancel.clone();
         let budget =
             RecoveryWorkBudget::with_cancellation_check(Duration::from_secs(2), move || {
@@ -1340,6 +1393,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn idle_archived_cache_allows_retirement_then_refuses_search_and_detail() {
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "retired-cache").expect("owner");
+        for i in 0..12 {
+            owner
+                .session()
+                .append(&talos_core::message::Message::User {
+                    content: format!("retirementfact {i}"),
+                })
+                .expect("append");
+        }
+        owner.session().compact_archived(2).expect("archive");
+        let database = owner
+            .file_path()
+            .parent()
+            .expect("parent")
+            .join("history-bindings.sqlite");
+        talos_session::reserve_session_identity(&database, owner.id()).expect("reserve");
+        let history = History::prepare(&owner, &CancellationToken::new())
+            .await
+            .expect("history");
+        let page = history
+            .query(Some("retirementfact"), None, None)
+            .expect("active search");
+        let reference = page["results"][0]["reference"].as_str().expect("reference");
+        assert!(history.query(None, Some(reference), None).is_some());
+        let before = std::fs::read(owner.file_path()).expect("head");
+        talos_session::retire_session_identity(&database, owner.id())
+            .expect("idle cache holds no operation lock");
+        assert!(history.query(Some("retirementfact"), None, None).is_none());
+        assert!(history.query(None, Some(reference), None).is_none());
+        assert_eq!(std::fs::read(owner.file_path()).expect("unchanged"), before);
+    }
+
+    #[tokio::test]
     async fn archived_queries_preserve_legacy_parents_page_and_revoke_on_source_or_scope_change() {
         assert_archived_queries_preserve_sources(10).await;
     }
@@ -1461,6 +1549,167 @@ mod tests {
                 assert!(
                     history.is_none(),
                     "missing archive cannot become empty cached history"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn receipt_bound_child_history_queries_include_inherited_originals() {
+        use talos_core::message::Message;
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let parent = manager.create_session("query-fork", "").expect("parent");
+        for i in 0..6 {
+            parent
+                .append(&Message::User {
+                    content: format!("inheritedfact {i}"),
+                })
+                .expect("append");
+        }
+        parent.compact_archived(0).expect("compact");
+        let id = uuid::Uuid::new_v4();
+        let child = talos_session::Session::new(
+            id,
+            String::new(),
+            String::new(),
+            parent
+                .file_path
+                .parent()
+                .expect("directory")
+                .join(format!("{id}.tlog")),
+        );
+        let lease = talos_session::SessionRuntimeLease::acquire(&parent.file_path).expect("lease");
+        parent
+            .publish_history_fork(
+                &child,
+                &lease,
+                None,
+                Instant::now() + Duration::from_secs(10),
+                || false,
+            )
+            .expect("publish");
+        drop(lease);
+        let owner = DurableSession::bind_existing_history(child.clone()).expect("owner");
+        for keep in [None, Some(0), Some(1)] {
+            if let Some(keep) = keep {
+                child.compact_archived(keep).expect("child compact");
+            }
+            let history = History::prepare(&owner, &CancellationToken::new())
+                .await
+                .expect("receipt history");
+            assert!(history.archive.is_some());
+            let result = history
+                .query(Some("inheritedfact"), None, None)
+                .expect("search");
+            assert_eq!(result["results"].as_array().expect("results").len(), 6);
+            assert_eq!(result["results"][0]["text"], "inheritedfact 0");
+            let reference = result["results"][0]["reference"]
+                .as_str()
+                .expect("reference");
+            assert_eq!(
+                history.query(None, Some(reference), None).expect("detail")["text"],
+                "inheritedfact 0"
+            );
+        }
+        let history = History::prepare(&owner, &CancellationToken::new())
+            .await
+            .expect("last preparation");
+        let archive = std::fs::read_dir(child.file_path.parent().expect("directory"))
+            .expect("inventory")
+            .map(|item| item.expect("entry").path())
+            .find(|path| {
+                path.file_name()
+                    .and_then(|s| s.to_str())
+                    .is_some_and(|name| name.starts_with("s-owned-"))
+            })
+            .expect("owned archive");
+        std::fs::write(&archive, b"corrupt disposable archive").expect("change fixture source");
+        assert!(
+            history.query(Some("inheritedfact"), None, None).is_none(),
+            "changed supporting source revokes query"
+        );
+        assert!(
+            History::prepare(&owner, &CancellationToken::new())
+                .await
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn receipt_history_ledger_handles_large_heads_and_large_logical_corpora() {
+        use talos_core::message::Message;
+        for large_record in [false, true] {
+            let root = tempfile::tempdir().expect("root");
+            let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+            let parent = manager
+                .create_session("large-query-fork", "")
+                .expect("parent");
+            let count = if large_record { 2 } else { 8195 };
+            for i in 0..count {
+                parent
+                    .append(&Message::User {
+                        content: if large_record && i == 0 {
+                            // Oversized entries remain ineligible for search; a normal
+                            // sibling must still be queryable through the large head.
+                            format!("oversizedfact {}", "x".repeat(2 * 1024 * 1024 + 100))
+                        } else {
+                            format!("largeinheritedfact {i}")
+                        },
+                    })
+                    .expect("append");
+            }
+            let id = uuid::Uuid::new_v4();
+            let child = talos_session::Session::new(
+                id,
+                String::new(),
+                String::new(),
+                parent
+                    .file_path
+                    .parent()
+                    .expect("directory")
+                    .join(format!("{id}.tlog")),
+            );
+            let lease =
+                talos_session::SessionRuntimeLease::acquire(&parent.file_path).expect("lease");
+            parent
+                .publish_history_fork(
+                    &child,
+                    &lease,
+                    None,
+                    Instant::now() + Duration::from_secs(30),
+                    || false,
+                )
+                .expect("publish");
+            drop(lease);
+            if large_record {
+                assert!(std::fs::metadata(&child.file_path).expect("head").len() > 2 * 1024 * 1024);
+            } else {
+                child
+                    .compact_archived(0)
+                    .expect("keep0 large logical corpus");
+            }
+            let owner = DurableSession::bind_existing_history(child).expect("owner");
+            let history = History::prepare(&owner, &CancellationToken::new())
+                .await
+                .expect("large receipt preparation");
+            assert_eq!(
+                history.archive.as_ref().expect("evidence").entries().len(),
+                count
+            );
+            let result = history
+                .query(Some("largeinheritedfact"), None, None)
+                .expect("query");
+            assert!(!result["results"].as_array().expect("results").is_empty());
+            if large_record {
+                assert_eq!(result["results"][0]["text"], "largeinheritedfact 1");
+                assert!(
+                    history
+                        .query(Some("oversizedfact"), None, None)
+                        .expect("query")["results"]
+                        .as_array()
+                        .expect("results")
+                        .is_empty()
                 );
             }
         }

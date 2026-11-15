@@ -129,6 +129,8 @@ impl SessionCommandTarget {
             | SessionOp::SubmitStructuredReconcileTracked { .. }
             | SessionOp::SetSkillContext { .. }
             | SessionOp::ForkDurable { .. }
+            | SessionOp::ForkHistory { .. }
+            | SessionOp::CaptureOrdinaryFork { .. }
             | SessionOp::InterruptTurn { .. }
             | SessionOp::Compact { .. }
             | SessionOp::CancelCompact { .. }
@@ -186,6 +188,8 @@ pub struct SessionTransition {
     retiring_runtime: Option<JoinHandle<()>>,
     prepared: Option<PreparedSession>,
     quiesced_generation: Option<u64>,
+    quiesced_lease: Option<talos_session::SessionRuntimeLease>,
+    quiesced_activation: Option<SessionRuntimeActivation>,
     prepared_mcp_runtime: Option<McpSessionRuntime>,
 }
 
@@ -206,6 +210,8 @@ impl SessionTransition {
             retiring_runtime: None,
             prepared: None,
             quiesced_generation: None,
+            quiesced_lease: None,
+            quiesced_activation: None,
             prepared_mcp_runtime: None,
         })
     }
@@ -307,7 +313,10 @@ impl SessionTransition {
             );
         }
         if let Some(generation) = self.quiesced_generation {
-            if generation == activation.generation {
+            if generation == activation.generation
+                && self.quiesced_activation.as_ref() == Some(activation)
+            {
+                self.acquire_quiesced_ownership(session)?;
                 return Ok(generation);
             }
             return Err(format!(
@@ -321,6 +330,8 @@ impl SessionTransition {
             .map_err(|error| format!("failed to stage Session runtime activation: {error}"))?;
         self.retire_active_runtime().await;
         self.quiesced_generation = Some(next_generation);
+        self.quiesced_activation = Some(activation.clone());
+        self.acquire_quiesced_ownership(session)?;
         Ok(next_generation)
     }
 
@@ -335,6 +346,7 @@ impl SessionTransition {
             );
         }
         if let Some(generation) = self.quiesced_generation {
+            self.acquire_quiesced_ownership(session)?;
             return Ok(generation);
         }
 
@@ -343,7 +355,37 @@ impl SessionTransition {
             .map_err(|error| format!("failed to fence Session runtime generation: {error}"))?;
         self.retire_active_runtime().await;
         self.quiesced_generation = Some(next_generation);
+        self.acquire_quiesced_ownership(session)?;
         Ok(next_generation)
+    }
+
+    fn acquire_quiesced_ownership(&mut self, session: &Session) -> Result<(), String> {
+        if self.quiesced_lease.is_none() {
+            self.quiesced_lease = Some(
+                talos_session::SessionRuntimeLease::acquire(&session.file_path)
+                    .map_err(|error| format!("cannot own retired Session preparation: {error}"))?,
+            );
+        }
+        self.quiesced_lease
+            .as_ref()
+            .expect("ownership acquired")
+            .check_transcript(&session.file_path)
+            .map_err(|error| error.to_string())?;
+        let generation = PendingSubmissionStore::for_session(session)
+            .runtime_generation()
+            .map_err(|error| error.to_string())?;
+        if self.quiesced_generation != Some(generation) {
+            return Err("retired Session generation changed before preparation".into());
+        }
+        if let Some(expected) = &self.quiesced_activation {
+            let state = PendingSubmissionStore::for_session(session)
+                .runtime_state()
+                .map_err(|error| error.to_string())?;
+            if state.as_ref().map(|state| &state.activation) != Some(expected) {
+                return Err("retired Session activation changed before preparation".into());
+            }
+        }
+        Ok(())
     }
 
     pub fn prepare(&mut self, handle: SessionHandle, session: Session) -> Result<(), String> {
@@ -373,9 +415,13 @@ impl SessionTransition {
             .prepared
             .as_ref()
             .ok_or_else(|| "no prepared transition to commit".to_string())?;
-        let same_logical_session = prepared.session.id == self.active_session.id;
+        let target_session = prepared.session.clone();
+        let same_logical_session = target_session.id == self.active_session.id;
         let quiesced_generation = self.quiesced_generation;
-        let pending_store = PendingSubmissionStore::for_session(&prepared.session);
+        if same_logical_session && quiesced_generation.is_some() {
+            self.acquire_quiesced_ownership(&target_session)?;
+        }
+        let pending_store = PendingSubmissionStore::for_session(&target_session);
         let next_generation = if same_logical_session {
             if let Some(generation) = quiesced_generation {
                 generation
@@ -403,7 +449,15 @@ impl SessionTransition {
         if quiesced_generation.is_none() {
             self.retire_active_runtime().await;
         }
+        if let Some(lease) = self.quiesced_lease.take()
+            && same_logical_session
+        {
+            actor
+                .adopt_runtime_lease(lease)
+                .map_err(|error| error.to_string())?;
+        }
         self.quiesced_generation = None;
+        self.quiesced_activation = None;
 
         actor.set_generation(next_generation);
         let publication_ready = CancellationToken::new();
@@ -576,6 +630,7 @@ impl SessionTransition {
     pub async fn shutdown(&mut self) -> Session {
         self.rollback();
         self.retire_active_runtime().await;
+        self.quiesced_lease = None;
         self.active_session()
     }
 
@@ -588,6 +643,113 @@ impl SessionTransition {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn quiesced_preparation_retries_ownership_and_rejects_activation_drift() {
+        const CHILD_PATH: &str = "TALOS_QUIESCED_COMPETITOR_TRANSCRIPT";
+        if let Some(path) = std::env::var_os(CHILD_PATH) {
+            let path = std::path::PathBuf::from(path);
+            let _lease =
+                talos_session::SessionRuntimeLease::acquire(&path).expect("child ownership");
+            std::fs::write(path.with_extension("competitor-ready"), b"ready").expect("ready");
+            loop {
+                std::thread::park();
+            }
+        }
+        struct Competitor(std::process::Child);
+        impl Drop for Competitor {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let session = manager
+            .create_session("retry", "workspace")
+            .expect("session");
+        let (tx, rx) = mpsc::channel(4);
+        drop(rx);
+        let mut owner = SessionTransition::new(tx, session.clone()).expect("owner");
+        let initial = talos_session::SessionRuntimeIdentity::new("mock", "old", None);
+        let target = talos_session::SessionRuntimeIdentity::new("mock", "new", None);
+        let store = PendingSubmissionStore::for_session(&session);
+        store
+            .initialize_runtime_identity(initial.clone())
+            .expect("identity");
+        let activation = SessionRuntimeActivation::new(1, initial.clone(), target.clone());
+        let mut competitor = Competitor(std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args(["--exact", "session_transition::tests::quiesced_preparation_retries_ownership_and_rejects_activation_drift", "--nocapture"])
+            .env(CHILD_PATH, &session.file_path)
+            .stdout(std::process::Stdio::null())
+            .spawn().expect("competitor process"));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !session
+            .file_path
+            .with_extension("competitor-ready")
+            .exists()
+        {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "competitor readiness timeout"
+            );
+            assert!(
+                competitor
+                    .0
+                    .try_wait()
+                    .expect("competitor status")
+                    .is_none()
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert!(
+            owner
+                .quiesce_same_session_for_activation(&session, &activation)
+                .await
+                .is_err()
+        );
+        assert_eq!(owner.quiesced_generation, Some(1));
+        assert!(owner.quiesced_lease.is_none());
+        assert!(owner.acquire_quiesced_ownership(&session).is_err());
+        drop(competitor);
+        owner
+            .quiesce_same_session_for_activation(&session, &activation)
+            .await
+            .expect("retry");
+        assert!(talos_session::SessionRuntimeLease::acquire(&session.file_path).is_err());
+        let alternate = SessionRuntimeActivation::new(
+            1,
+            initial,
+            talos_session::SessionRuntimeIdentity::new("mock", "other", None),
+        );
+        assert!(
+            owner
+                .quiesce_same_session_for_activation(&session, &alternate)
+                .await
+                .is_err()
+        );
+        owner.quiesced_activation = Some(alternate);
+        assert!(
+            owner
+                .acquire_quiesced_ownership(&session)
+                .expect_err("exact state mismatch")
+                .contains("activation changed")
+        );
+        owner.quiesced_activation = Some(activation);
+        drop(owner.quiesced_lease.take());
+        store
+            .advance_runtime_generation(1)
+            .expect("competing generation advance");
+        assert!(
+            owner
+                .acquire_quiesced_ownership(&session)
+                .expect_err("generation mismatch")
+                .contains("generation changed")
+        );
+        owner.shutdown().await;
+        talos_session::SessionRuntimeLease::acquire(&session.file_path)
+            .expect("shutdown releases lease");
+    }
 
     #[tokio::test]
     async fn cancelled_retirement_keeps_shutdown_owned_until_retry_joins() {
@@ -1127,6 +1289,11 @@ mod tests {
                 .await
                 .expect("operation should succeed"),
             1
+        );
+
+        assert!(
+            talos_session::SessionRuntimeLease::acquire(&session.file_path).is_err(),
+            "retired runtime preparation excludes competing processes"
         );
 
         let history = session.read_messages().expect("operation should succeed");

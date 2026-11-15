@@ -386,6 +386,45 @@ impl AppServerSession {
         self.recovered_source.is_some()
     }
 
+    /// Retains host startup ownership until execution or Actor disposal.
+    /// Requires matching configured persistence and refuses replacing an existing lease.
+    /// `run` validates again, including after any persistence configuration change.
+    pub fn adopt_runtime_lease(
+        &mut self,
+        lease: talos_session::SessionRuntimeLease,
+    ) -> Result<(), talos_session::SessionError> {
+        if self.runtime_lease.is_some() {
+            return Err(talos_session::SessionError::DurableTurn(
+                "Actor already owns a runtime lease".into(),
+            ));
+        }
+        let transcript = self
+            .persistence
+            .as_ref()
+            .map(|p| p.session.file_path.as_path())
+            .or_else(|| {
+                self.durable_persistence
+                    .as_ref()
+                    .map(|p| p.session.file_path())
+            })
+            .ok_or_else(|| {
+                talos_session::SessionError::DurableTurn(
+                    "runtime lease requires persistence".into(),
+                )
+            })?;
+        lease.check_transcript(transcript)?;
+        self.runtime_lease = Some(Arc::new(lease));
+        Ok(())
+    }
+
+    /// Runs with ownership acquired before host identity/history preparation.
+    /// The lease is retained without reacquisition and checked against persistence
+    /// before any Actor recovery or execution. A mismatch refuses startup.
+    pub async fn run_with_runtime_lease(&mut self, lease: talos_session::SessionRuntimeLease) {
+        self.runtime_lease = Some(Arc::new(lease));
+        self.run().await;
+    }
+
     /// Runs the session actor until shutdown or SQ disconnect.
     pub async fn run(&mut self) {
         let transcript = self
@@ -398,13 +437,28 @@ impl AppServerSession {
                     .map(|p| p.session.file_path())
             });
         if let Some(transcript) = transcript {
-            match talos_session::SessionRuntimeLease::acquire(transcript) {
-                Ok(lease) => self.runtime_lease = Some(Arc::new(lease)),
+            let ownership = match self.runtime_lease.as_ref() {
+                Some(lease) => lease.check_transcript(transcript),
+                None => talos_session::SessionRuntimeLease::acquire(transcript).map(|lease| {
+                    self.runtime_lease = Some(Arc::new(lease));
+                }),
+            };
+            match ownership {
+                Ok(()) => {}
                 Err(error) => {
                     self.emit_custody_error("cannot start Session execution or recovery", &error);
+                    self.runtime_lease = None;
                     return;
                 }
             }
+        }
+        if transcript.is_none() && self.runtime_lease.is_some() {
+            self.emit_custody_error(
+                "cannot start Session execution or recovery",
+                &"runtime lease requires persistence",
+            );
+            self.runtime_lease = None;
+            return;
         }
         self.run_owned().await;
         self.runtime_lease = None;
@@ -476,10 +530,38 @@ impl AppServerSession {
             return;
         }
 
+        enum ForkOutput {
+            Published(String),
+            Captured(talos_core::session::OrdinaryForkCapture),
+        }
+        enum ForkReceipt {
+            Published(mpsc::UnboundedSender<Result<String, String>>),
+            Captured(
+                mpsc::UnboundedSender<Result<talos_core::session::OrdinaryForkCapture, String>>,
+            ),
+        }
+        impl ForkReceipt {
+            fn send(&self, result: Result<ForkOutput, String>) {
+                match self {
+                    Self::Published(tx) => {
+                        let _ = tx.send(result.and_then(|value| match value {
+                            ForkOutput::Published(id) => Ok(id),
+                            _ => Err("fork worker result mismatch".into()),
+                        }));
+                    }
+                    Self::Captured(tx) => {
+                        let _ = tx.send(result.and_then(|value| match value {
+                            ForkOutput::Captured(snapshot) => Ok(snapshot),
+                            _ => Err("fork worker result mismatch".into()),
+                        }));
+                    }
+                }
+            }
+        }
         struct ForkWork {
-            task: JoinHandle<Result<String, String>>,
+            task: JoinHandle<Result<ForkOutput, String>>,
             cancel: CancellationToken,
-            receipt: mpsc::UnboundedSender<Result<String, String>>,
+            receipt: ForkReceipt,
         }
         impl Drop for ForkWork {
             fn drop(&mut self) {
@@ -606,7 +688,7 @@ impl AppServerSession {
                 } }, if fork_work.is_some() => {
                     if let Some(work) = fork_work.take() {
                         let result = result.and_then(Result::ok).unwrap_or_else(|| Err("durable fork worker failed".into()));
-                        let _ = work.receipt.send(result);
+                        work.receipt.send(result);
                     }
                 }
                 result = compact.wait(), if compact.has_pending_work() => {
@@ -791,8 +873,11 @@ impl AppServerSession {
                                 }
                                 _ => {}
                             }
-                            if let SessionOp::ForkDurable { receipt_tx: Some(receipt), .. } = &op {
+                            if let SessionOp::ForkDurable { receipt_tx: Some(receipt), .. } | SessionOp::ForkHistory { receipt_tx: Some(receipt), .. } = &op {
                                 let _ = receipt.send(Err("durable fork is already running".into()));
+                            }
+                            if let SessionOp::CaptureOrdinaryFork { receipt_tx: Some(receipt), .. } = &op {
+                                let _ = receipt.send(Err("fork capture is already running".into()));
                             }
                             let _ = self.eq_tx.send(SessionEvent::Error { message: "session is busy creating a durable fork".into() });
                             continue;
@@ -964,6 +1049,88 @@ impl AppServerSession {
                                 paused = false;
                             }
                         }
+                        SessionOp::CaptureOrdinaryFork { through_entry, receipt_tx } => {
+                            let Some(receipt_tx) = receipt_tx else { continue; };
+                            if current_turn.is_some() || !compact.is_idle_for_fork() || !pending.is_empty() || shutting_down {
+                                let _ = receipt_tx.send(Err("ordinary fork requires an idle session".into()));
+                                continue;
+                            }
+                            if receipt_tx.is_closed() { continue; }
+                            let (Some(persistence), Some(lease)) = (&self.persistence, self.runtime_lease.clone()) else {
+                                let _ = receipt_tx.send(Err("ordinary fork requires transcript ownership".into()));
+                                continue;
+                            };
+                            let source = persistence.session.clone();
+                            let observer = receipt_tx.clone();
+                            let admission = self.runtime_admission.clone();
+                            let cancel = CancellationToken::new();
+                            let stopped = cancel.clone();
+                            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+                            #[cfg(test)]
+                            let gate = self.fork_worker_gate.clone();
+                            let task = tokio::task::spawn_blocking(move || {
+                                #[cfg(test)]
+                                if let Some((reached, release)) = gate {
+                                    reached.notify_one();
+                                    while !release.load(std::sync::atomic::Ordering::SeqCst) {
+                                        if stopped.is_cancelled() || observer.is_closed() || std::time::Instant::now() >= deadline {
+                                            return Err("ordinary fork cancelled at test gate".into());
+                                        }
+                                        std::thread::park_timeout(std::time::Duration::from_millis(1));
+                                    }
+                                }
+                                source.capture_ordinary_fork(&lease, through_entry.as_deref(), deadline,
+                                    || stopped.is_cancelled() || observer.is_closed() || admission.as_ref().is_some_and(|control| !control.is_open()))
+                                    .map(|snapshot| ForkOutput::Captured(talos_core::session::OrdinaryForkCapture {
+                                        bytes: snapshot.bytes,
+                                        tail_id: snapshot.tail.id,
+                                        runtime_identity: snapshot.runtime_identity.map(|identity| (identity.provider, identity.model, identity.variant)),
+                                    })).map_err(|_| "ordinary fork capture unavailable".to_owned())
+                            });
+                            fork_work = Some(ForkWork { task, cancel, receipt: ForkReceipt::Captured(receipt_tx) });
+                        }
+                        SessionOp::ForkHistory { child_id, child_branch, through_entry, receipt_tx } => {
+                            let Some(receipt_tx) = receipt_tx else { continue; };
+                            if current_turn.is_some() || !compact.is_idle_for_fork() || !pending.is_empty() || shutting_down {
+                                let _ = receipt_tx.send(Err("history fork requires an idle session".into()));
+                                continue;
+                            }
+                            if receipt_tx.is_closed() { continue; }
+                            let (Some(persistence), Some(lease)) = (&self.persistence, self.runtime_lease.clone()) else {
+                                let _ = receipt_tx.send(Err("history fork requires transcript runtime ownership".into()));
+                                continue;
+                            };
+                            let source = persistence.session.clone();
+                            let observer = receipt_tx.clone();
+                            let admission = self.runtime_admission.clone();
+                            let cancel = CancellationToken::new();
+                            let stopped = cancel.clone();
+                            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+                            #[cfg(test)]
+                            let gate = self.fork_worker_gate.clone();
+                            let task = tokio::task::spawn_blocking(move || {
+                                #[cfg(test)]
+                                if let Some((reached, release)) = gate {
+                                    reached.notify_one();
+                                    while !release.load(std::sync::atomic::Ordering::SeqCst) {
+                                        if stopped.is_cancelled() || observer.is_closed() || std::time::Instant::now() >= deadline {
+                                            return Err("history fork cancelled at test gate".into());
+                                        }
+                                        std::thread::park_timeout(std::time::Duration::from_millis(1));
+                                    }
+                                }
+                                let id = uuid::Uuid::parse_str(&child_id).map_err(|_| "invalid child identity".to_owned())?;
+                                let branch = uuid::Uuid::parse_str(&child_branch).map_err(|_| "invalid child branch".to_owned())?;
+                                if id.is_nil() || branch.is_nil() { return Err("invalid child identity".into()); }
+                                let directory = source.file_path.parent().ok_or_else(|| "source directory unavailable".to_owned())?;
+                                let mut child = talos_session::Session::new(id, source.project.clone(), source.workspace_root.clone(), directory.join(format!("{id}.tlog")));
+                                child.current_branch = branch.to_string();
+                                source.publish_history_fork(&child, &lease, through_entry.as_deref(), deadline,
+                                    || stopped.is_cancelled() || observer.is_closed() || admission.as_ref().is_some_and(|control| !control.is_open()))
+                                    .map(|tail| ForkOutput::Published(tail.id)).map_err(|_| "history fork publication unavailable; retain child for reconciliation".to_owned())
+                            });
+                            fork_work = Some(ForkWork { task, cancel, receipt: ForkReceipt::Published(receipt_tx) });
+                        }
                         SessionOp::ForkDurable { external_id, receipt_tx } => {
                             let Some(receipt_tx) = receipt_tx else {
                                 let _ = self.eq_tx.send(SessionEvent::Error { message: "durable fork requires an in-process receipt channel".into() });
@@ -998,9 +1165,9 @@ impl AppServerSession {
                                     session.fork_committed_tip(&external_id,
                                         deadline,
                                         move || stopped.is_cancelled() || observer.is_closed() || admission.as_ref().is_some_and(|control| !control.is_open())
-                                    ).map(|child| child.id().to_string()).map_err(|_| "durable fork storage unavailable".to_owned())
+                                    ).map(|child| ForkOutput::Published(child.id().to_string())).map_err(|_| "durable fork storage unavailable".to_owned())
                                 });
-                                fork_work = Some(ForkWork { task, cancel, receipt: receipt_tx });
+                                fork_work = Some(ForkWork { task, cancel, receipt: ForkReceipt::Published(receipt_tx) });
                             } else {
                                 let _ = receipt_tx.send(Err("durable fork requires configured durable storage".into()));
                             }

@@ -1516,3 +1516,50 @@ Final constructor-cleanup MSVC all-features tests check exited0 (4.93s, peak984M
 primary log target/recovery-unified-tail-msvc-final.log; the previous dead-code warning
 is gone. This remains cross-compilation only. Saving this reviewed increment locally
 does not close archived-fork receipt work or authorize deployment.
+
+
+## 2026-11-15 selected recovery candidate checkpoint — Partial
+
+Recovery source now includes receipt/incarnation-backed archive inheritance,
+identity custody and retirement fences, bounded original-prefix capture, Actor
+operation exclusion, and startup/REPL/TUI runtime replacement. Original record
+bytes and parents remain unchanged; unavailable or ambiguous provenance is refused.
+SDK/ADR describe additive APIs, storage access requirements and migration limits.
+This is implementation evidence, not installed-host or release acceptance.
+
+Mixed candidate standard preflight passed5496 tests/doctests,0failed/0ignored and
+both external SDK fixture modes: primary-worktree target/recovery-candidate-system-wb-r2.log.
+Its940 source-input hashes matched target/recovery-candidate-system-wb-manifest.json.
+Earlier run failed an unchanged Provider HTTP deadline fixture; same-binary
+focused/full reruns and subsequent full gate passed, but cause remains unresolved.
+These results cover the mixed candidate tree, not a separately built selective
+commit tree. Independent reviews and isolated CLI/PTY evidence remain recorded
+in the preserved primary coordination/recovery owners and original candidate file.
+
+The selected recovery source excludes queue presentation/layout, checkpoint test
+diagnostics, and primary-only background-completion interactions. Fixture isolation
+was separately saved in local commit736b77f992a5a135b285cca3a72548d853c32f94.
+The original mixed owner history remains preserved in the worktree and backup;
+only this checkpoint accompanies the selective recovery artifact. No completion
+status or Completion Commit is asserted. Native-platform/installed-host acceptance,
+real-provider summary quality, exact-head remote checks and delivery remain open.
+No session data cleanup, default background activation, push or merge authorized
+by this checkpoint.
+
+## 2026-11-15 selective recovery standard gate — Partial
+
+The exported recovery-only index passed standard release_preflight.sh (exec80710):
+5490 tests/doctests, zero failed/ignored, both external Runtime SDK modes passed;
+exit0, runtime15min19.776s, peak2G and swap0. All2445 exported inputs were unchanged
+at completion. Evidence in the primary target directory:
+recovery-selective-noincremental.log, recovery-selective-validation-manifest.json,
+and recovery-selective-preflight-result.json. This supersedes pending selective-tree
+validation above; the mixed-tree gate remains separate historical evidence.
+
+Current index differs from the tested snapshot only in the previously reviewed ADR
+keep0/release-enablement wording and this post-run evidence. Source equality is
+recorded in recovery-selective-index-comparison.json; current documents receive
+separate governance checks. Earlier failures/stopped runs remain retained.
+No installed-host/native-platform acceptance, remote exact-head validation or
+release/merge authorization follows from this local gate. Overall status remains
+Partial; original sessions, dirty changes, backups and migration sources are retained.
