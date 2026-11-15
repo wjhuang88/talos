@@ -778,7 +778,7 @@ Direct `Session::fork` refuses count-placeholder and receipt-bound histories;
 it cannot establish durable child ownership. Ordinary non-archived forks retain
 the legacy path. Receipt-backed publication and restart reconciliation are local
 candidate implementations; complete host/native acceptance and delivery remain open.
-See [ADR-104](../decisions/104-selected-session-history-recovery.md) and the
+See [ADR-105](../decisions/105-selected-session-history-recovery.md) and the
 [recovery owner](../tasks/session-archive-recovery-emergency.md) for candidate evidence
 and remaining review/deployment gates.
 
@@ -791,7 +791,7 @@ prepared History releases its restrictive source handles while idle and verifies
 the original prefix digest again for each read. Archive inventory changes still
 revoke evidence. Independently reopened owners and external writers are not covered
 by this mutex; source verification and restrictive handles remain required. See
-ADR-104's Windows live-history lease correction for limits and pending native gates.
+ADR-105's Windows live-history lease correction for limits and pending native gates.
 
 Windows built-in atomic transcript replacement coordinates with recovery reads by
 acquiring nontruncating write access to an existing target through publication.
@@ -892,7 +892,7 @@ textual routes also retain signed ordinary tool frames, so the same continuity l
 Custody is bounded to 32 blocks / 16 MiB. This is an unreleased candidate contract, not a patch
 release compatibility claim or live-vendor acceptance. See PROVIDER-PROTOCOLS for configuration.
 
-### Unreleased JSONL direct-store append migration (ADR-104)
+### Unreleased JSONL direct-store append migration (ADR-105)
 
 JsonlSessionStore::append_entry now opens one read+append handle to inspect the
 final byte. A nonempty legacy file without a final newline receives a separator

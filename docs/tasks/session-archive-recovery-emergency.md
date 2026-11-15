@@ -1563,3 +1563,13 @@ separate governance checks. Earlier failures/stopped runs remain retained.
 No installed-host/native-platform acceptance, remote exact-head validation or
 release/merge authorization follows from this local gate. Overall status remains
 Partial; original sessions, dirty changes, backups and migration sources are retained.
+
+## 2026-11-15 recovery ADR renumbering
+
+Remote main now contains ADR104-host-composition-ownership-boundary.md. Recovery
+ADR is therefore renamed to [ADR-105](../decisions/105-selected-session-history-recovery.md);
+SDK and decision-index references follow the new name. Earlier ADR-104 references
+in this historical owner describe the recovery decision at that time, not the host
+composition decision. Originals are retained in target/recovery-adr105-migration-20261115
+under the primary workspace. This is document-only; the5490-test selective gate
+continues to cover the unchanged production source. Status remains Partial.
