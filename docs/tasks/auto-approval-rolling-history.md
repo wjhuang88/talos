@@ -2,7 +2,8 @@
 
 Document status: Active / Claimed proposed via #916; ineffective until this governance record merges to main.
 Deliverable: subsequent approval-model requests include bounded, sanitized previous model judgments
-and attributable eventual human outcomes from the same live session, across every supported review family.
+and eventual fallback outcomes from the same live session, across every supported review family.
+Distinguish observed human choices, legacy-host/unknown attribution and request cancellation.
 User-facing documentation: README.md and README.zh-CN.md auto-approval lifecycle and limits.
 Source requirement: [durable intake](../proposals/session-auto-approval-rolling-history.md).
 
@@ -20,7 +21,7 @@ Source requirement: [durable intake](../proposals/session-auto-approval-rolling-
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requested completion of session-recovery handoff including this original requirement; independent security/design review required before activation and protected implementation delivery |
 | Implementation PR | Not started |
-| Last Updated | 2026-11-11 |
+| Last Updated | 2026-11-15 |
 | Handoff / Release Condition | Effective claim on main, bounded-history implementation across all supported review families, current-head security review and CI, documented runtime acceptance and existing implementation commit evidence |
 
 ## Constraints and selected design
@@ -37,9 +38,19 @@ monotonic correlation tokens ensure concurrent/delayed human results cannot upda
 or resurrect an evicted entry. Snapshot prior history before inserting the current request.
 
 Record sanitized tool/action context, public model effect summary/decision points and result,
-plus separately attributed human Pending/Allowed/Denied/Cancelled/Unavailable. Cancellation/drop
-must settle only its own pending token. Missing history or lock failure keeps existing safe
-fallback behavior. History receives no additional tools, retries or model authority.
+plus Pending/Allowed/Denied/Cancelled/Unavailable with independent outcome attribution.
+ObservedHuman, LegacyHost/Unknown and request cancellation must remain distinguishable;
+a host choice alone does not prove a human decision. Pending starts only when actual fallback
+begins, including early evidence-unavailable branches. A dropped enclosing future settles only
+its own token as request cancellation; explicit human cancellation requires a producer signal.
+Unexplained channel closure means Unavailable. Missing history or lock failure keeps existing
+safe fallback behavior. History receives no additional tools, retries or model authority.
+
+Preserve ApprovalChoice and existing resolver signatures. Legacy message-only errors map to
+Unavailable without parsing error text. Any additive SDK observation must preserve third-party
+implementations and retain unknown attribution for legacy hosts. Desktop infrastructure failures
+remain fail-closed without becoming human Denied. The concrete compatible observation API remains
+a review candidate; API/ADR migration review precedes its implementation.
 
 Read ADR-064 and its accepted successor decisions for each current review family, PERM-006,
 PERM-007-H, auto_resolver and its action/network/invocation/file-mutation/prepared-command modules,
@@ -48,12 +59,18 @@ Avoid public API breakage; any unavoidable change requires an ADR and migration 
 
 ## Acceptance and validation
 
-1. Captured actual provider requests include prior bounded history for ordinary invocation,
-   shell/context/script, file mutation, built-in invocation/action, network and prepared command.
-2. Real fallback oneshots update the exact entry with human allow/deny/cancel/unavailable;
-   model/human attribution remains distinct. No pending or failed action is represented as allowed.
-3. Concurrent calls, late outcomes, eviction, reset, rebind and session-ID reuse cannot cross-update
-   or leak history. The current request is absent from its own prior-history snapshot.
+1. Captured actual provider requests cover all six construction boundaries listed in the intake:
+   shell/context/script, shared ordinary/action builder (both entrypoints tested), file mutation,
+   built-in invocation, network and prepared command. Prior history retains existing evidence,
+   locale and payload bounds; early evidence-unavailable fallback is covered.
+2. Real Terminal, TUI, Runtime SDK and Desktop fallback channels update the exact entry with
+   independently attributed outcomes. Test actual user choices, explicit producer cancellation,
+   unexplained channel closure, legacy SDK handlers and Desktop infrastructure failures.
+   Never infer ObservedHuman from LegacyHost/Unknown or request cancellation. No pending or failed
+   action is represented as allowed; recorded outcomes confer no reusable authorization.
+3. Concurrent calls, late outcomes, eviction, reset(), control sync_reset(), replacement, rebind
+   and session-ID reuse cannot cross-update or leak history. The current request is absent from
+   its own prior-history snapshot; dropped old requests cannot update a new generation.
 4. Oversized Unicode/JSON-escaped inputs remain within count/per-entry/aggregate byte limits;
    sanitization excludes credentials/control sequences while retaining useful bounded context.
 5. Hostile previous approvals do not bypass explicit Ask/Deny, eligibility, current-request
@@ -80,3 +97,16 @@ PR-number backfill is recorded. Both governance validators, independent design/s
 merge-time main/owner CAS and main merge remain before the claim becomes effective.
 Implementation, tests, native acceptance and delivery commits remain unimplemented.
 Residual destination: this owner. No Completion Commit exists; no Complete claim is made.
+
+## 2026-11-15 review correction — preparation only
+
+Independent read-only review of PR916 at d0c7b2a identified missing provider/adapter coverage
+and ambiguous human attribution. The existing intake source map and adapter correction are
+synchronized here, with matching acceptance above. This refines the original Work Slice;
+it adds no permission authority or new task. No implementation or claim activation is claimed.
+Local proposal/owner diff passed independent design review and both repository governance
+validators (zero warnings), plus git diff --check. Logs: recovery-approval-claim-sync-governance.log
+and recovery-approval-claim-sync-claims.log under the primary target directory. Remote update,
+remote exact-head review/checks, merge-time CAS and authorized target-branch merge remain required.
+This local review does not replace future implementation security review. Implementation and
+delivery remain open.
