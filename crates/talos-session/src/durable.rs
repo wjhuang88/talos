@@ -4195,6 +4195,40 @@ mod tests {
     }
 
     #[test]
+    fn initialized_binding_open_does_not_require_existing_writer_to_finish() {
+        let directory = tempfile::tempdir().expect("directory");
+        let path = directory.path().join("durable-bindings.sqlite");
+        let holder = open_bindings(&path).expect("initialize complete schema");
+        holder
+            .execute_batch("BEGIN IMMEDIATE")
+            .expect("hold writer");
+        holder
+            .execute(
+                "INSERT INTO durable_bindings (external_id, session_id) VALUES (?1, ?2)",
+                params!["held-writer", Uuid::new_v4().to_string()],
+            )
+            .expect("uncommitted ordinary binding write");
+        // Schema is already committed. Unlike the held-schema regression below,
+        // this writer changes only binding data, as create_or_open does before
+        // materializing its head. Opening a connection must not need that lock.
+        let result = open_bindings(&path);
+        holder.execute_batch("ROLLBACK").expect("release writer");
+        assert!(
+            result.is_ok(),
+            "initialized open under DML writer: {result:?}"
+        );
+        let reopened = result.expect("opened");
+        let count: i64 = reopened
+            .query_row(
+                "SELECT count(*) FROM durable_bindings WHERE external_id='held-writer'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("binding count");
+        assert_eq!(count, 0, "opening must not commit the other connection");
+    }
+
+    #[test]
     fn open_bindings_wal_schema_contention_does_not_inherit_driver_busy_timeout() {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("durable-bindings.sqlite");
