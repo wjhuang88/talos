@@ -1833,7 +1833,7 @@ pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, Sessio
     }
     #[cfg(test)]
     binding_open_stage("connection-open");
-    let connection = open_binding_connection(path)?;
+    let mut connection = open_binding_connection(path)?;
     // rusqlite opens connections with a five-second busy handler. Disable it
     // during initialization so each explicit retry cannot inherit that wait.
     connection
@@ -1847,19 +1847,6 @@ pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, Sessio
     // are retried; all other
     // SQLite errors propagate immediately. After init succeeds, apply the
     // 5-second busy_timeout for subsequent transaction operations.
-    let init_sql = "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; \
-         CREATE TABLE IF NOT EXISTS durable_bindings \
-         (external_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE); \
-         CREATE TABLE IF NOT EXISTS durable_recovery_scans \
-         (session_id TEXT PRIMARY KEY, payload TEXT NOT NULL); \
-         CREATE TABLE IF NOT EXISTS durable_fork_lineage \
-         (child_id TEXT PRIMARY KEY, parent_id TEXT NOT NULL, parent_branch TEXT NOT NULL, source_end INTEGER NOT NULL); \
-         CREATE TABLE IF NOT EXISTS durable_fork_intents \
-         (child_id TEXT PRIMARY KEY, parent_id TEXT NOT NULL, external_id TEXT NOT NULL, version INTEGER NOT NULL); \
-         CREATE TRIGGER IF NOT EXISTS durable_binding_lineage_cleanup AFTER DELETE ON durable_bindings \
-         BEGIN DELETE FROM durable_fork_lineage WHERE child_id=OLD.session_id; END; \
-         CREATE TRIGGER IF NOT EXISTS durable_binding_scan_cleanup AFTER DELETE ON durable_bindings \
-         BEGIN DELETE FROM durable_recovery_scans WHERE session_id=OLD.session_id; END;";
     const MAX_INIT_RETRIES: u32 = 20;
     const RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(25);
     let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
@@ -1873,10 +1860,11 @@ pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, Sessio
                 trace.init_attempts += 1;
             }
         });
-        match connection.execute_batch(init_sql) {
+        match initialize_binding_schema(&mut connection) {
             Ok(()) => break,
             Err(error @ rusqlite::Error::SqliteFailure(_, _))
-                if retries < MAX_INIT_RETRIES
+                if connection.is_autocommit()
+                    && retries < MAX_INIT_RETRIES
                     && std::time::Instant::now() < deadline
                     && matches!(
                         error.sqlite_error_code(),
@@ -1910,6 +1898,29 @@ pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, Sessio
         .busy_timeout(std::time::Duration::from_secs(5))
         .map_err(sql_error)?;
     Ok(connection)
+}
+
+fn initialize_binding_schema(connection: &mut Connection) -> rusqlite::Result<()> {
+    connection.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")?;
+    // Publish the schema once rather than committing each object separately.
+    // DEFERRED keeps an already complete schema readable under an existing DML
+    // writer. A failed attempt drops/rolls back the transaction before retry;
+    // the caller refuses to retry if rollback did not restore autocommit.
+    let transaction = connection.transaction()?;
+    let init_sql = "CREATE TABLE IF NOT EXISTS durable_bindings \
+         (external_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE); \
+         CREATE TABLE IF NOT EXISTS durable_recovery_scans \
+         (session_id TEXT PRIMARY KEY, payload TEXT NOT NULL); \
+         CREATE TABLE IF NOT EXISTS durable_fork_lineage \
+         (child_id TEXT PRIMARY KEY, parent_id TEXT NOT NULL, parent_branch TEXT NOT NULL, source_end INTEGER NOT NULL); \
+         CREATE TABLE IF NOT EXISTS durable_fork_intents \
+         (child_id TEXT PRIMARY KEY, parent_id TEXT NOT NULL, external_id TEXT NOT NULL, version INTEGER NOT NULL); \
+         CREATE TRIGGER IF NOT EXISTS durable_binding_lineage_cleanup AFTER DELETE ON durable_bindings \
+         BEGIN DELETE FROM durable_fork_lineage WHERE child_id=OLD.session_id; END; \
+         CREATE TRIGGER IF NOT EXISTS durable_binding_scan_cleanup AFTER DELETE ON durable_bindings \
+         BEGIN DELETE FROM durable_recovery_scans WHERE session_id=OLD.session_id; END;";
+    transaction.execute_batch(init_sql)?;
+    transaction.commit()
 }
 
 fn validate_external_id(external_id: &str) -> Result<(), SessionError> {
@@ -4196,6 +4207,162 @@ mod tests {
             elapsed < std::time::Duration::from_millis(400),
             "non-BUSY error took {elapsed:?}; should return immediately"
         );
+    }
+
+    #[test]
+    fn binding_schema_failure_rolls_back_new_objects_and_preserves_existing_data() {
+        use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
+
+        for existing_binding in [false, true] {
+            let directory = tempfile::tempdir().expect("directory");
+            let path = directory.path().join("durable-bindings.sqlite");
+            let mut connection = Connection::open(&path).expect("connection");
+            connection
+                .execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")
+                .expect("configure WAL");
+            if existing_binding {
+                connection.execute_batch(
+                    "CREATE TABLE durable_bindings (external_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE);
+                     INSERT INTO durable_bindings VALUES ('preserved', 'original-identity');",
+                ).expect("legacy binding");
+            }
+            connection
+                .authorizer(Some(|context: AuthContext<'_>| match context.action {
+                    AuthAction::CreateTable {
+                        table_name: "durable_fork_intents",
+                    } => Authorization::Deny,
+                    _ => Authorization::Allow,
+                }))
+                .expect("deny later schema operation");
+            assert!(initialize_binding_schema(&mut connection).is_err());
+            assert!(
+                connection.is_autocommit(),
+                "failed initialization must end its transaction"
+            );
+            let observer = Connection::open(&path).expect("independent observer");
+            let tables: i64 = observer.query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name LIKE 'durable_%'",
+                [], |row| row.get(0),
+            ).expect("committed schema");
+            assert_eq!(
+                tables,
+                i64::from(existing_binding),
+                "failed initialization published partial schema"
+            );
+            connection
+                .authorizer(None::<fn(AuthContext<'_>) -> Authorization>)
+                .expect("remove denial");
+            drop(connection);
+            let reopened = open_bindings(&path).expect("retry real open after failure");
+            let tables: i64 = reopened.query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name LIKE 'durable_%'",
+                [], |row| row.get(0),
+            ).expect("complete schema");
+            assert_eq!(tables, 4);
+            if existing_binding {
+                let identity: String = reopened
+                    .query_row(
+                        "SELECT session_id FROM durable_bindings WHERE external_id='preserved'",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .expect("preserved identity");
+                assert_eq!(identity, "original-identity");
+            }
+        }
+    }
+
+    #[test]
+    fn binding_schema_initialization_publishes_one_transaction() {
+        let directory = tempfile::tempdir().expect("directory");
+        let path = directory.path().join("durable-bindings.sqlite");
+        let mut connection = Connection::open(&path).expect("connection");
+        connection
+            .execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")
+            .expect("configure WAL before observing schema commits");
+        let commits = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = commits.clone();
+        connection
+            .commit_hook(Some(move || {
+                observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                false
+            }))
+            .expect("observe commits");
+        initialize_binding_schema(&mut connection).expect("initialize schema");
+        assert_eq!(
+            commits.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "schema publication must not commit each object separately"
+        );
+    }
+
+    #[test]
+    fn binding_schema_rejected_commit_rolls_back_and_can_reopen() {
+        let directory = tempfile::tempdir().expect("directory");
+        let path = directory.path().join("durable-bindings.sqlite");
+        let mut connection = Connection::open(&path).expect("connection");
+        connection
+            .execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")
+            .expect("configure WAL");
+        connection
+            .commit_hook(Some(|| true))
+            .expect("reject commit");
+        assert!(initialize_binding_schema(&mut connection).is_err());
+        assert!(
+            connection.is_autocommit(),
+            "commit failure must release the transaction"
+        );
+        let observer = Connection::open(&path).expect("independent observer");
+        let objects: i64 = observer
+            .query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE name LIKE 'durable_%'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("committed schema");
+        assert_eq!(objects, 0);
+        connection
+            .commit_hook(None::<fn() -> bool>)
+            .expect("remove commit denial");
+        drop(connection);
+        open_bindings(&path).expect("real reopen after rejected commit");
+    }
+
+    #[test]
+    fn binding_schema_upgrade_preserves_rows_and_restores_cleanup_triggers() {
+        let directory = tempfile::tempdir().expect("directory");
+        let path = directory.path().join("durable-bindings.sqlite");
+        let connection = open_bindings(&path).expect("initial schema");
+        connection.execute_batch(
+            "DROP TRIGGER durable_binding_lineage_cleanup;
+             DROP TRIGGER durable_binding_scan_cleanup;
+             INSERT INTO durable_bindings VALUES ('preserved', 'original-identity');
+             INSERT INTO durable_recovery_scans VALUES ('original-identity', 'original-scan');
+             INSERT INTO durable_fork_lineage VALUES ('original-identity', 'parent', 'branch', 42);",
+        ).expect("older partial schema with real data");
+        drop(connection);
+        let reopened = open_bindings(&path).expect("upgrade missing triggers");
+        let preserved: (String, String, i64) = reopened.query_row(
+            "SELECT b.session_id, s.payload, l.source_end FROM durable_bindings b
+             JOIN durable_recovery_scans s ON s.session_id=b.session_id
+             JOIN durable_fork_lineage l ON l.child_id=b.session_id WHERE b.external_id='preserved'",
+            [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        ).expect("original binding and companion rows");
+        assert_eq!(
+            preserved,
+            ("original-identity".into(), "original-scan".into(), 42)
+        );
+        reopened
+            .execute(
+                "DELETE FROM durable_bindings WHERE external_id='preserved'",
+                [],
+            )
+            .expect("delete binding");
+        let remaining: i64 = reopened.query_row(
+            "SELECT (SELECT count(*) FROM durable_recovery_scans) + (SELECT count(*) FROM durable_fork_lineage)",
+            [], |row| row.get(0),
+        ).expect("cleanup effect");
+        assert_eq!(remaining, 0, "both reconstructed triggers must execute");
     }
 
     #[test]
