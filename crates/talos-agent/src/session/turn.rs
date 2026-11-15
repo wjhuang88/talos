@@ -35,6 +35,7 @@ pub(super) struct TurnRecord {
     // refused or exhausted its budget; never retry synchronously in the Actor.
     // Some(Some(source)): complete worker-owned snapshot for atomic installation.
     pub(super) committed_source: Option<Option<crate::compaction::HistorySource>>,
+    pub(super) consumed_background_jobs: Vec<talos_core::background_job::BackgroundJobId>,
     pub(super) completion_events: Vec<SessionEvent>,
     pub(super) new_messages: Vec<Message>,
     pub(super) persisted_entry_ids: Vec<String>,
@@ -197,6 +198,8 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
     let legacy_history = persistence.clone();
     let history_cancel = cancel_token.clone();
     let agent_lease = runtime_lease.clone();
+    let consumption = crate::background_consumption::Consumption::default();
+    let agent_consumption = consumption.clone();
     let mut agent_task = tokio::spawn(async move {
         let _runtime_lease = agent_lease;
         let recovery = if agent.tools.is_builtin_instance("history_search") {
@@ -248,12 +251,15 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
         crate::checkpoint_history::HISTORY
             .scope(
                 recovery,
-                agent.run_prepared_session_turn(
-                    prepared,
-                    event_tx,
-                    Some(snapshot_tx),
-                    Some(boundary_tx),
-                    Some(agent_ack_tx),
+                crate::background_consumption::TURN_CONSUMPTION.scope(
+                    agent_consumption,
+                    agent.run_prepared_session_turn(
+                        prepared,
+                        event_tx,
+                        Some(snapshot_tx),
+                        Some(boundary_tx),
+                        Some(agent_ack_tx),
+                    ),
                 ),
             )
             .await
@@ -363,6 +369,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 });
                 let _ = result_tx.send(TurnRecord {
                     committed_source: None,
+                    consumed_background_jobs: Vec::new(),
                     completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
@@ -383,6 +390,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             });
             let _ = result_tx.send(TurnRecord {
                 committed_source: None,
+                consumed_background_jobs: Vec::new(),
                 completion_events: Vec::new(),
                 persisted_entry_ids,
                 new_messages: stable_prefix,
@@ -452,6 +460,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 });
                 let _ = result_tx.send(TurnRecord {
                     committed_source: None,
+                    consumed_background_jobs: Vec::new(),
                     completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
@@ -492,6 +501,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 });
                 let _ = result_tx.send(TurnRecord {
                     committed_source: None,
+                    consumed_background_jobs: Vec::new(),
                     completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
@@ -520,6 +530,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                 });
                 let _ = result_tx.send(TurnRecord {
                     committed_source: None,
+                    consumed_background_jobs: Vec::new(),
                     completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
@@ -570,6 +581,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                         });
                         let _ = result_tx.send(TurnRecord {
                             committed_source: None,
+                            consumed_background_jobs: Vec::new(),
                             completion_events: Vec::new(),
                             persisted_entry_ids: Vec::new(),
                             new_messages: Vec::new(),
@@ -604,6 +616,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             });
             let _ = result_tx.send(TurnRecord {
                 committed_source: None,
+                consumed_background_jobs: consumption.confirmed(),
                 completion_events: Vec::new(),
                 persisted_entry_ids,
                 new_messages,
@@ -671,6 +684,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
                     TurnTranscriptOutcome::Error,
                 )
             {
+                transcript_persisted = false;
                 error_message = format!(
                     "{error_message}\n[warning: failed to persist terminal transcript outcome: {persist_err}]"
                 );
@@ -689,6 +703,13 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             });
             let _ = result_tx.send(TurnRecord {
                 committed_source: None,
+                // Earlier successful responses remain consumed even when a later
+                // provider call fails, provided the partial turn was committed.
+                consumed_background_jobs: if transcript_persisted {
+                    consumption.confirmed()
+                } else {
+                    Vec::new()
+                },
                 completion_events: Vec::new(),
                 persisted_entry_ids,
                 new_messages: partial_messages,
@@ -721,6 +742,7 @@ pub(super) async fn run_turn_with_forwarding(turn: TurnForwarding) {
             });
             let _ = result_tx.send(TurnRecord {
                 committed_source: None,
+                consumed_background_jobs: Vec::new(),
                 completion_events: Vec::new(),
                 persisted_entry_ids: Vec::new(),
                 new_messages: Vec::new(),

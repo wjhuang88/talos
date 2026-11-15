@@ -153,4 +153,14 @@ standard preflight, exact-head CI and independent runtime/security review.
 
 Owner: docs/tasks/background-job-default-continuation.md.
 User docs: README.md, README.zh-CN.md and applicable background-tool references.
-No implementation or validation evidence exists for this proposed decision.
+Historical pre-implementation checkpoint: no implementation or validation evidence
+existed for this proposed decision at that checkpoint.
+
+## 2026-11-15 implementation boundary
+
+The later user instruction requires production background continuation to remain
+disabled. The current foundation stage implements completion lifecycle machinery
+with activation available only to tests. The accepted design and original acceptance
+above remain historical requirements, not a claim of enabled or delivered behavior.
+Production enablement and automatic CLI continuation acceptance remain outstanding
+and must not be inferred from passing test-only continuation scenarios.

@@ -1460,3 +1460,10 @@ files are removed when detached or when the composer closes. Files retained for
 submitted messages must remain available for session recovery; they are not
 currently removed by session deletion. Delete them manually only when their
 messages no longer need image recovery.
+
+
+### Background completion behavior
+
+Background job completion does not automatically start another model turn. Use the
+existing `process` tools to inspect or wait for jobs. Internal completion-lifecycle
+tests do not enable automatic continuation in the shipped runtime.

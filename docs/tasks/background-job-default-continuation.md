@@ -291,3 +291,34 @@ Only source characterization and intake/design drafts exist. No effective claim,
 production changes, runtime tests, successor ADR approval or completion evidence.
 Next: resolve design, prepare atomic claim/activation and successor decision in a
 governance PR, obtain required authorization, implement from that merge or later.
+
+## 2026-11-15 selected default-off foundation — Partial
+
+The current user instruction prohibits default background continuation. This stage
+implements and tests Actor-owned completion custody, bounded admission, cancellation,
+retirement and provider-consumption bookkeeping with production activation disabled.
+The published acceptance baseline above is retained; automatic production continuation
+and its CLI smoke acceptance are not delivered by this stage. No production opt-in
+flag or installation is introduced. Historical activation authorizes implementation,
+not overriding the subsequent user instruction.
+
+Selected source: ten Agent files relative to recovery candidate55ba5752. Recovery-only
+diagnostic/temp-root test hunks and unrelated UI/approval changes are excluded.
+The isolated locked Agent library gate passed729 tests,0failed/ignored; format passed.
+Evidence: target/background-selected-agent-tests.log and
+target/background-selected-validation-manifest.json in the primary workspace.
+All2447 exported source files matched their recorded hashes before this documentation
+update. Full preflight, exact-candidate review/CI and delivery remain pending.
+Status remains Partial; this stage does not complete the default-continuation story.
+
+
+Preparation-custody regression: the original candidate passed the full standard
+preflight (5526 tests/doctests,0failed/ignored,two external SDK modes), but lacked
+coverage for a noncancelled preparation error. A new actual Actor denial regression
+failed on the original code at the Pending-custody assertion (exit101). The minimal
+fix retains Pending and pauses for noncancelled errors while preserving retirement
+for cancelled/revoked dispatch. The new test and three preparation/cancellation/fork
+regressions passed (4passed,0failed/ignored). Original and corrected logs are
+target/background-preparation-{red,green}.log in the primary workspace.
+Independent source review found no blocker. Later user-driven retry is not covered
+by this test. Corrected full preflight and delivery remain pending; default-off.

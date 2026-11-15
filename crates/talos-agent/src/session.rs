@@ -53,6 +53,18 @@ use turn::{
     run_turn_with_forwarding,
 };
 
+struct BackgroundPreparation {
+    future: futures_util::future::BoxFuture<'static, Result<crate::PreparedSessionTurn, String>>,
+    id: talos_core::background_job::BackgroundJobId,
+    turn_id: String,
+    token: CancellationToken,
+}
+impl Drop for BackgroundPreparation {
+    fn drop(&mut self) {
+        self.token.cancel();
+    }
+}
+
 static NEXT_RUNTIME_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 const MAX_RECENT_SUBMISSION_IDS: usize = 1024;
 const MAX_RECENT_ITEM_IDS: usize = 4096;
@@ -111,6 +123,7 @@ fn immediate_started_turn(
         });
         Some(TurnRecord {
             committed_source: None,
+            consumed_background_jobs: Vec::new(),
             completion_events: Vec::new(),
             persisted_entry_ids: Vec::new(),
             new_messages: Vec::new(),
@@ -578,6 +591,10 @@ impl AppServerSession {
         let mut pending_image_bytes = 0_u64;
         let mut recent_submission_ids = VecDeque::<String>::new();
         let mut recent_item_ids = VecDeque::<String>::new();
+        let completion_notify = self.background_jobs.completion_notify();
+        let mut current_completion: Option<(talos_core::background_job::BackgroundJobId, String)> =
+            None;
+        let mut background_preparation: Option<BackgroundPreparation> = None;
         let mut current_turn: Option<JoinHandle<Option<TurnRecord>>> = None;
         let mut current_submission_size: Option<(usize, usize, usize, u64)> = None;
         let mut current_structured: Option<ActiveStructuredTurn> = None;
@@ -609,10 +626,15 @@ impl AppServerSession {
                     work.cancel.cancel();
                 }
             }
-            if current_turn.is_none() && fork_work.is_none() && !shutting_down {
+            if current_turn.is_none()
+                && background_preparation.is_none()
+                && fork_work.is_none()
+                && !shutting_down
+            {
                 compact.start(self);
             }
             if current_turn.is_none()
+                && background_preparation.is_none()
                 && fork_work.is_none()
                 && !compact.is_running()
                 && !paused
@@ -672,7 +694,34 @@ impl AppServerSession {
                 }
             }
 
+            if !shutting_down
+                && !paused
+                && pending.is_empty()
+                && current_turn.is_none()
+                && fork_work.is_none()
+                && !compact.is_running()
+                && background_preparation.is_none()
+                && self.sq_rx.is_empty()
+                && let Some((id, terminal)) = self.background_jobs.pending_completion()
+            {
+                let token = CancellationToken::new();
+                if !self
+                    .runtime_admission
+                    .as_ref()
+                    .is_none_or(|admission| admission.commit_start(token.clone()))
+                {
+                    self.background_jobs.retire_completion(&id);
+                    paused = true;
+                    continue;
+                }
+                turn_counter = turn_counter.saturating_add(1);
+                let turn_id = format!("background-{}-{turn_counter}", self.session_generation);
+                background_preparation =
+                    Some(self.prepare_background_completion(id, terminal, turn_id, token));
+            }
+
             if shutting_down
+                && background_preparation.is_none()
                 && fork_work.is_none()
                 && current_turn.is_none()
                 && !compact.is_running()
@@ -682,6 +731,48 @@ impl AppServerSession {
             }
 
             tokio::select! {
+                result = async {
+                    match background_preparation.as_mut() {
+                        Some(work) => work.future.as_mut().await,
+                        None => Err("background preparation unavailable".into()),
+                    }
+                }, if background_preparation.is_some() => {
+                    let Some(mut work) = background_preparation.take() else { continue; };
+                    // Ready input wins even if the preparation future was selected first.
+                    if result.is_ok() && !self.sq_rx.is_empty() {
+                        if let Some(admission) = &self.runtime_admission { admission.finish_active(None); }
+                        continue;
+                    }
+                    match result {
+                        Ok(prepared) if !work.token.is_cancelled() && self.background_jobs.start_completion(&work.id) => {
+                            let token = std::mem::replace(&mut work.token, CancellationToken::new());
+                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                                session_id: self.session_id.clone(), turn_id: work.turn_id.clone(), sequence: 0,
+                                payload: TurnEventPayload::Started,
+                            });
+                            let started = self.spawn_prepared_turn(prepared, work.turn_id.clone(), token, None);
+                            current_completion = Some((work.id.clone(), work.turn_id.clone()));
+                            current_turn = Some(started.handle);
+                            current_boundary_rx = Some(started.boundary_rx);
+                            current_boundary_ack_rx = Some(started.boundary_ack_rx);
+                            cancel_token = Some(started.token);
+                        }
+                        result => {
+                            // A preparation error has not consumed this pending completion.
+                            // Keep custody until explicit stop or a later admitted retry.
+                            if result.is_ok() || work.token.is_cancelled() {
+                                self.background_jobs.retire_completion(&work.id);
+                            }
+                            paused = true;
+                            let error = result.err().unwrap_or_else(|| "background completion was revoked before dispatch".into());
+                            if let Some(admission) = &self.runtime_admission {
+                                admission.finish_active(Some(&TurnCompletionStatus::Error { message: error.clone() }));
+                            }
+                            let _ = self.eq_tx.send(SessionEvent::Error { message: format!("background continuation preparation paused: {error}") });
+                        }
+                    }
+                }
+                () = completion_notify.notified() => {}
                 result = async { match fork_work.as_mut() {
                     Some(work) => Some((&mut work.task).await),
                     None => None,
@@ -701,6 +792,7 @@ impl AppServerSession {
                     }
                 }, if current_turn.is_some() => {
                     current_turn = None;
+                    let completed_background = current_completion.take();
                     compact.cancel_queued_model(self);
                     cancel_token = None;
                     current_boundary_rx = None;
@@ -726,7 +818,9 @@ impl AppServerSession {
                             let completion_events = std::mem::take(&mut record.completion_events);
                             let status = record.status;
                             let completion = record.completion.clone();
+                            let consumed_background_jobs = std::mem::take(&mut record.consumed_background_jobs);
                             self.commit_turn_record(record);
+                            self.background_jobs.consume_completions(&consumed_background_jobs);
                             let mut custody_ok = true;
                             if let Some(active) = structured.as_ref() {
                                 custody_ok &= self.finish_structured_turn(active, &completion);
@@ -757,6 +851,9 @@ impl AppServerSession {
                             }
                             if let Some(admission) = &self.runtime_admission {
                                 admission.finish_active(Some(&completion));
+                            }
+                            if let Some((id, _)) = &completed_background {
+                                self.background_jobs.retire_completion(id);
                             }
                             for event in completion_events {
                                 let _ = self.eq_tx.send(event);
@@ -810,6 +907,9 @@ impl AppServerSession {
                             if let Some(admission) = &self.runtime_admission {
                                 admission.finish_active(None);
                             }
+                            if let Some((id, _)) = &completed_background {
+                                self.background_jobs.retire_completion(id);
+                            }
                             paused = true;
                             shutting_down = true;
                             self.release_in_memory_pending_on_shutdown(&mut pending);
@@ -822,6 +922,12 @@ impl AppServerSession {
                 }
                 op = self.sq_rx.recv(), if !shutting_down => {
                     let Some(op) = op else {
+                        self.background_jobs.invalidate_completions();
+                        if background_preparation.take().is_some()
+                            && let Some(admission) = &self.runtime_admission
+                        {
+                            admission.finish_active(None);
+                        }
                         shutting_down = true;
                         compact.cancel(self);
                         let should_interrupt = self.runtime_admission.as_ref().is_none_or(|control| {
@@ -848,6 +954,24 @@ impl AppServerSession {
                         pending_image_bytes = current_submission_size.map_or(0, |size| size.3);
                         continue;
                     };
+                    let preempts_preparation = match &op {
+                        SessionOp::InterruptTurn { session_generation, turn_id } => *session_generation == self.session_generation
+                            && background_preparation.as_ref().is_some_and(|work| work.turn_id == *turn_id),
+                        SessionOp::Submit { .. } | SessionOp::SubmitMultimodal { .. } | SessionOp::PreviewRequest { .. }
+                        | SessionOp::SubmitStructured { .. } | SessionOp::SubmitStructuredTracked { .. }
+                        | SessionOp::SubmitStructuredReconcile { .. } | SessionOp::SubmitStructuredReconcileTracked { .. }
+                        | SessionOp::SetSkillContext { .. } | SessionOp::ForkDurable { .. }
+                        | SessionOp::ForkHistory { .. } | SessionOp::CaptureOrdinaryFork { .. } | SessionOp::Compact { .. }
+                        | SessionOp::Interrupt | SessionOp::Shutdown => true,
+                        _ => false,
+                    };
+                    if preempts_preparation && let Some(work) = background_preparation.take() {
+                        if matches!(&op, SessionOp::InterruptTurn { .. }) {
+                            self.background_jobs.retire_completion(&work.id);
+                        }
+                        if let Some(admission) = &self.runtime_admission { admission.finish_active(None); }
+                        drop(work);
+                    }
                     if let Some(work) = &fork_work {
                         if matches!(&op, SessionOp::Interrupt | SessionOp::Shutdown) {
                             work.cancel.cancel();
@@ -1008,6 +1132,7 @@ impl AppServerSession {
                             self.reconcile_submission(&submission, receipt_tx.as_ref());
                         }
                         SessionOp::Interrupt => {
+                            self.background_jobs.invalidate_completions();
                             compact.cancel(self);
                             if let Some(token) = &cancel_token {
                                 token.cancel();
@@ -1023,9 +1148,8 @@ impl AppServerSession {
                             turn_id,
                         } => {
                             let matches = session_generation == self.session_generation
-                                && current_structured
-                                    .as_ref()
-                                    .is_some_and(|active| active.turn_id == turn_id);
+                                && (current_structured.as_ref().is_some_and(|active| active.turn_id == turn_id)
+                                    || current_completion.as_ref().is_some_and(|(_, active)| *active == turn_id));
                             if matches && let Some(token) = &cancel_token {
                                 resume_user_after_cancel = true;
                                 token.cancel();
@@ -1198,6 +1322,7 @@ impl AppServerSession {
                             }
                         }
                         SessionOp::Shutdown => {
+                            self.background_jobs.invalidate_completions();
                             shutting_down = true;
                             compact.cancel(self);
                             let should_interrupt = self.runtime_admission.as_ref().is_none_or(|control| {
@@ -1662,6 +1787,7 @@ impl AppServerSession {
                         });
                         return Some(TurnRecord {
                             committed_source: None,
+                            consumed_background_jobs: Vec::new(),
                             completion_events: Vec::new(),
                             persisted_entry_ids: Vec::new(),
                             new_messages: Vec::new(),
@@ -1737,6 +1863,7 @@ impl AppServerSession {
                 });
                 Some(TurnRecord {
                     committed_source: None,
+                    consumed_background_jobs: Vec::new(),
                     completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
@@ -1763,11 +1890,69 @@ impl AppServerSession {
             agent_mut.set_append_prompt_opt(None);
         }
 
+        let prepared = prepared_turn.expect("non-preview submission must be prepared");
+        Ok(self.spawn_prepared_turn(prepared, turn_id, token, structured))
+    }
+
+    /// Build owned preparation work so the Actor keeps polling control inputs.
+    fn prepare_background_completion(
+        &mut self,
+        id: talos_core::background_job::BackgroundJobId,
+        terminal: crate::background_completion::Terminal,
+        turn_id: String,
+        token: CancellationToken,
+    ) -> BackgroundPreparation {
+        let input = terminal.context(&id);
+        self.post_turn_pressure = Default::default();
+        let observer = crate::checkpoint_progress::CheckpointObserver {
+            sender: self.eq_tx.clone(),
+            session_id: self.session_id.clone(),
+            generation: self.session_generation,
+            admission: self.runtime_admission.clone(),
+            post_turn_pressure: self.post_turn_pressure.clone(),
+        };
+        let agent = self.agent.clone();
+        let history = self.history.clone();
+        let limit = self.model_context_limit;
+        let generation = self.session_generation;
+        let source = self.recovered_source.clone();
+        let replays = self.private_replays.clone();
+        let revision = history.len() as u64;
+        let cancel = token.clone();
+        let future = Box::pin(async move {
+            let input = input
+                .ok_or_else(|| "background completion has invalid identity or state".to_owned())?;
+            tokio::select! {
+                biased;
+                () = cancel.cancelled() => Err("background continuation cancelled before start".into()),
+                result = AssertUnwindSafe(agent.prepare_session_messages_at_revision(
+                    String::new(), vec![input], history, limit, generation,
+                    revision, source.as_ref(), Some(observer), replays,
+                )).catch_unwind() => result.map_err(|_| "background preparation panicked".to_owned())?
+                    .map_err(|error| error.to_string()),
+            }
+        });
+        BackgroundPreparation {
+            future,
+            id,
+            turn_id,
+            token,
+        }
+    }
+
+    /// Shares worker supervision and persistence for admitted prepared turns.
+    /// Callers must complete runtime admission and emit the start event first.
+    fn spawn_prepared_turn(
+        &self,
+        prepared: crate::PreparedSessionTurn,
+        turn_id: String,
+        token: CancellationToken,
+        structured: Option<ActiveStructuredTurn>,
+    ) -> StartedTurn {
         let sequence = Arc::new(AtomicU64::new(1));
         let token_clone = token.clone();
         let agent = self.agent.clone();
         let eq_tx = self.eq_tx.clone();
-        let prepared = prepared_turn.expect("non-preview submission must be prepared");
         let persistence = self.persistence.clone();
         let durable_persistence = self.durable_persistence.clone();
         let session_id = self.session_id.clone();
@@ -1852,13 +2037,13 @@ impl AppServerSession {
             );
             Some(record)
         });
-        Ok(StartedTurn {
+        StartedTurn {
             handle,
             token,
             structured,
             boundary_rx,
             boundary_ack_rx,
-        })
+        }
     }
 }
 
