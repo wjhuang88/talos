@@ -226,6 +226,32 @@ mod tests {
     }
 
     #[test]
+    fn exit_preserves_unsubmitted_ordered_tail_without_end_event() {
+        let mut tui = Tui::for_test(TuiState::new(), None);
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Start {
+            source: MessageSource::Assistant,
+        }));
+        let chunks: Vec<String> = (0..1000).map(|i| format!("word{i:04} ")).collect();
+        for chunk in &chunks {
+            tui.handle_ui_output(UiOutput::Content(ContentOutput::Delta {
+                text: chunk.clone(),
+            }));
+        }
+        assert!(tui.handle_ui_output(UiOutput::Exit));
+        let rendered = pending_text(&tui);
+        let mut previous = 0;
+        for chunk in &chunks {
+            let position = rendered[previous..]
+                .find(chunk.trim())
+                .expect("token retained in order")
+                + previous;
+            previous = position + chunk.trim().len();
+        }
+        assert!(!tui.ordered_content_open);
+        assert!(tui.stream_render.preview().is_empty());
+    }
+
+    #[test]
     fn work_projection_preserves_existing_tui_transcript() {
         let mut tui = Tui::for_test(TuiState::new(), None);
         let result = talos_core::work::MissionGateResult {
@@ -549,19 +575,6 @@ mod tests {
 }
 
 impl Tui {
-    pub(super) async fn next_stream_chunk(&mut self) -> Option<String> {
-        match self.active_stream.as_mut() {
-            Some(stream) => {
-                let chunk = stream.next().await;
-                if chunk.is_none() {
-                    self.finalize_active_stream();
-                }
-                chunk
-            }
-            None => std::future::pending().await,
-        }
-    }
-
     pub(super) fn finalize_active_stream(&mut self) {
         let lines = self.stream_render.finish();
         if self.stream_opening_pending {
@@ -843,6 +856,9 @@ impl Tui {
                 }
             }
             UiOutput::Exit => {
+                if self.active_stream.is_some() {
+                    self.finalize_active_stream();
+                }
                 self.finalize_ordered_content();
                 self.state.should_exit = true;
                 return true;
@@ -948,7 +964,7 @@ impl Tui {
         self.apply_status_snapshot(snapshot);
     }
 
-    fn release_deferred_reconnecting_status(&mut self, now: Instant) {
+    pub(super) fn release_deferred_reconnecting_status(&mut self, now: Instant) {
         let Some((_, deadline)) = self.deferred_reconnecting_status.as_ref() else {
             return;
         };
@@ -963,6 +979,11 @@ impl Tui {
     }
 
     fn apply_status_snapshot(&mut self, snapshot: StatusSnapshot) {
+        if !snapshot.workspace_path.is_empty()
+            && snapshot.workspace_path != self.state.status.workspace_path
+        {
+            crate::render_metrics::count(crate::render_metrics::Stage::WorkspaceChange);
+        }
         let workspace_path = std::mem::take(&mut self.state.status.workspace_path);
         self.state.status = snapshot;
         if self.state.status.workspace_path.is_empty() {

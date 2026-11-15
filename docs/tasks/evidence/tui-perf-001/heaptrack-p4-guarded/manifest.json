@@ -1,0 +1,41 @@
+{
+  "status": "complete",
+  "profiler": "heaptrack1.5.0 Arch1.5.0-11",
+  "scenario": "transcript-commit",
+  "history": 10000,
+  "seconds": 35,
+  "warmup": 5,
+  "rounds": 3,
+  "binaries": {
+    "baseline": {
+      "path": "/home/wjhuang/WorkSpace/personal/talos/target/tui-perf-artifacts/transcript-candidate-e42b9c9c/release",
+      "sha256": "4742bdd7de02735fa2f7050264777bcb57b2447866ce1e413a2f039ae934376c"
+    },
+    "candidate": {
+      "path": "/home/wjhuang/WorkSpace/personal/talos/target/tui-perf-artifacts/transcript-p4-e42b9c9c/release",
+      "sha256": "0c3d37f04e553af65704d970418ed3a3f3afd30f1e84e522ec2b5d7e3f6daf28"
+    }
+  },
+  "completed": [
+    "baseline-r1",
+    "candidate-r1",
+    "baseline-r2",
+    "candidate-r2",
+    "baseline-r3",
+    "candidate-r3"
+  ],
+  "limitations": [
+    "heaptrack totals include startup and shutdown, not just steady window",
+    "sampler observes profiler launcher; process tree includes interpreter/compressor overhead",
+    "allocation counts are allocator events, not CPU attribution or leaks proof",
+    "CPU-capped allocation probe, not comparable CPU/latency evidence; P4 artifact precedes ANSI helper extraction"
+  ],
+  "resource_guard": {
+    "CPUQuota": "100%",
+    "MemoryHigh": "2G",
+    "MemoryMax": "3G",
+    "MemorySwapMax": 0,
+    "TasksMax": 128,
+    "Nice": 10
+  }
+}

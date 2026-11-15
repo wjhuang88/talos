@@ -1,10 +1,10 @@
 //! Frozen actual-upstream comparison vectors for SEARCH-001-L / I319.
 //!
 //! The pinned `rust-websearch` 0.1.2 functions and Talos K1 equivalents were
-//! directly compared in exact-head CI3862. These literal expectations are
-//! verified against BOTH implementations in this incremental pre-retirement
-//! test. A later separately reviewed L1 step may remove the upstream calls
-//! only after this exact-head comparison passes; expected literals stay.
+//! directly compared in CI3862 and in L1a #904 / CI3981, before the dependency
+//! was retired. These independently captured literal expectations are retained
+//! as executable byte-for-byte fixtures in L1b; no live upstream oracle is linked.
+//! Removing the build crate must not rewrite these pinned expected bytes.
 //!
 //! Provenance: Rust-Framework/rust-agent-framework
 //! b30180a03609580e8b28dfb682284cb2ba249fba.
@@ -69,11 +69,6 @@ fn frozen_entity_values_match_owned_and_pinned_upstream() {
             expected,
             "owned entity {input:?}"
         );
-        assert_eq!(
-            rust_websearch::html_utils::decode_html_entities(input),
-            expected,
-            "pinned upstream entity {input:?}"
-        );
     }
 }
 
@@ -82,16 +77,6 @@ fn frozen_clean_values_match_owned_and_pinned_upstream() {
     for &(input, stripped, cleaned) in CLEAN_ORACLE {
         assert_eq!(strip_html_tags(input), stripped, "owned strip {input:?}");
         assert_eq!(clean_html(input), cleaned, "owned clean {input:?}");
-        assert_eq!(
-            rust_websearch::html_utils::strip_html_tags(input),
-            stripped,
-            "pinned upstream strip {input:?}"
-        );
-        assert_eq!(
-            rust_websearch::html_utils::clean_html(input),
-            cleaned,
-            "pinned upstream clean {input:?}"
-        );
     }
 }
 
@@ -102,11 +87,6 @@ fn frozen_redirect_values_match_owned_and_pinned_upstream() {
             resolve_duckduckgo_url(input),
             expected,
             "owned redirect {input:?}"
-        );
-        assert_eq!(
-            rust_websearch::html_utils::resolve_duckduckgo_url(input),
-            expected,
-            "pinned upstream redirect {input:?}"
         );
     }
 }

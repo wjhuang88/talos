@@ -1,0 +1,147 @@
+{
+  "schema": 1,
+  "source_commits_from_external_receipts_required": true,
+  "matrix": "/tmp/talos-perf-input-paired-release-539adfd2",
+  "cases": {
+    "idle-10000": {
+      "baseline_cpu_median": 0.33582375073104315,
+      "candidate_cpu_median": 0.0671191271194608,
+      "cpu_ratio": 0.19986414591985077,
+      "paired_cpu_percentage_point_deltas": [
+        -0.2687403496506806,
+        -0.23520914757782227,
+        -0.2688503404113601
+      ],
+      "candidate_peak_pss_kib": 37852,
+      "peak_pss_budget_kib": 54766.4,
+      "input_p95_p99_budget_ms": [
+        10,
+        20
+      ],
+      "checks": {
+        "peak_pss": true,
+        "input_p95": true,
+        "input_p99": true
+      }
+    },
+    "animation-10000": {
+      "baseline_cpu_median": 0.33669498133414266,
+      "candidate_cpu_median": 0.36850371445750313,
+      "cpu_ratio": 1.0944734400177853,
+      "paired_cpu_percentage_point_deltas": [
+        0.03236811817652879,
+        0.034292281346094855,
+        -0.06792875548343252
+      ],
+      "candidate_peak_pss_kib": 38272,
+      "peak_pss_budget_kib": 55428.799999999996,
+      "input_p95_p99_budget_ms": [
+        10,
+        20
+      ],
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "stable_layout_history": true,
+        "no_git_without_workspace": true,
+        "input_p95": true,
+        "input_p99": true,
+        "animation_deadline_p99": true
+      }
+    },
+    "stream-10000": {
+      "baseline_cpu_median": 1.541056936043812,
+      "candidate_cpu_median": 1.678880544621811,
+      "cpu_ratio": 1.0894344688729143,
+      "paired_cpu_percentage_point_deltas": [
+        0.1935759425185659,
+        -0.33878403762050846,
+        0.1378236085779989
+      ],
+      "candidate_peak_pss_kib": 53752,
+      "peak_pss_budget_kib": 68801.6,
+      "input_p95_p99_budget_ms": [
+        10,
+        20
+      ],
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "input_p95": true,
+        "input_p99": true
+      }
+    },
+    "approval-10000": {
+      "baseline_cpu_median": 0.3019697522066223,
+      "candidate_cpu_median": 0.0671617113065471,
+      "cpu_ratio": 0.22241204894121916,
+      "paired_cpu_percentage_point_deltas": [
+        -0.20168709721083986,
+        -0.26868554644768805,
+        -0.23474735471734742
+      ],
+      "candidate_peak_pss_kib": 38192,
+      "peak_pss_budget_kib": 53769.2,
+      "input_p95_p99_budget_ms": [
+        10,
+        20
+      ],
+      "checks": {
+        "peak_pss": true,
+        "input_p95": true,
+        "input_p99": true
+      }
+    },
+    "scroll-10000": {
+      "baseline_cpu_median": 0.4689000498583187,
+      "candidate_cpu_median": 0.16739809229195074,
+      "cpu_ratio": 0.357001651722006,
+      "paired_cpu_percentage_point_deltas": [
+        -0.30127217929021644,
+        -0.30150195756636794,
+        -0.3013662352865914
+      ],
+      "candidate_peak_pss_kib": 38032,
+      "peak_pss_budget_kib": 55030.4,
+      "input_p95_p99_budget_ms": [
+        10,
+        20
+      ],
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "input_p95": true,
+        "input_p99": true
+      }
+    },
+    "resize-10000": {
+      "baseline_cpu_median": 6.6184250066569765,
+      "candidate_cpu_median": 7.1681768702926005,
+      "cpu_ratio": 1.083063850248763,
+      "paired_cpu_percentage_point_deltas": [
+        -0.867042272483963,
+        2.228501352461122,
+        -0.24307334187990381
+      ],
+      "candidate_peak_pss_kib": 70036,
+      "peak_pss_budget_kib": 87267.2,
+      "input_p95_p99_budget_ms": [
+        100,
+        150
+      ],
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "input_p95": true,
+        "input_p99": true
+      }
+    }
+  },
+  "evaluated_checks_pass": true,
+  "limitations": [
+    "Only listed checks are evaluated; this is not whole-task acceptance.",
+    "CPU ratios at zero baseline are unavailable, not zero.",
+    "Native terminal, allocations and long-run heap stability require separate evidence; input latency is checked only with probes and animation lateness only in animation cases.",
+    "Pair deltas follow manifest round order; fixed baseline-first ordering can retain host drift."
+  ]
+}

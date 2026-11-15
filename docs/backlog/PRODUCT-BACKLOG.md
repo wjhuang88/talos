@@ -1,24 +1,36 @@
 # Product Backlog
 
-## PROVIDER-008-C / #914 — Azure OpenAI protocol intake (unclaimed)
+## SEARCH-001-D3-T2 / #947 — explicit Bing sponsored-ancestor correction (claim proposed)
 
-[PROVIDER-008-C](active/PROVIDER-008-C-azure-openai.md) / [#914](https://github.com/wjhuang88/talos/issues/914)
-is **Intake / Unclaimed** under parent #724. I323 and ADR-103 are proposals only;
-no implementation, credential-chain authority, deployment routing or model-default
-change is authorized until an independently reviewed atomic claim reaches main.
-This owner registration only repairs the remote Issue ↔ document inventory; it does
-not affect SEARCH-001-L / #901, already completed A/B, or the parent protocol gates.
+[Owner](active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](../iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **In Progress / Claimed proposed via Draft #948 (ineffective until merge)**, atomic claim/activation still pending. Narrow correction for hand-authored T1/#941 synthetic `b_ad` ancestor false-positive in existing Bing CN HTML parser, with parser-local tests only after effective claim. No live Bing requests, `www.bing.com`/`bing.cn` host admission, permission/default/source/schema/dependency change, real-world ad classifier qualification or E/F/G/I activation. D3/#937 and Epic/#624 remain Open.
 
-## STORE-002 / I322 C — proposed independent domain contracts
+## SEARCH-001-D3-T1 / #941 — Bing synthetic negative conformance (owner-first closeout)
 
-[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I322](../iterations/I322-store-002-domain-contract-extraction.md) / #670: I321 A/B completed in #909 at `a9914b7a62b0873027997c69d9966d17f3fd48ba`, CI #4039 8/8 and independent API review passed. I322 C domain-owned contract extraction is a **new, proposed governance claim #911** with no production code authorized before merge. Existing SQL/TLOG/JSONL/FTS, local composition, future engines, D/E/F, and #897 Host remain unchanged.
-## ARCH-035 / I320 — E0/E1 Review (PR #906)
+[Owner](active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](../iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): **Complete / Closed upon owner-first closeout merge**, claim #943 merged `2f43e7d7`, and five synthetic-only negative fixtures/evidence implemented in [#944](https://github.com/wjhuang88/talos/pull/944) Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606`. Exact-head [CI43428872719](https://github.com/wjhuang88/talos/actions/runs/43428872719) 8/8 SUCCESS, independent no-blocker review, CAS merge. Known parser sponsored-row misclassification remains **unfixed**; new Bing hosts, live automated Bing usage, regional/provider admission and E/F/G/I remain blocked; parent #624 Open. Close #941 after owner-first docs merge.
 
-[ARCH-035](active/ARCH-035-behavior-preserving-host-composition.md) / [I320](../iterations/I320-arch-035-host-composition-baseline.md) / #897: governance PR #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615`, activating a bounded, documentation-only E0 code-truth inventory and E1 host-composition decision review. No implementation or acceptance is implied. E2/E3 cannot begin without accepted STORE-002/#670 contracts and separate authorization; no ServerHost implementation is implied.
+## SEARCH-001-D3 / #937 — Bing direct HTML, multi-endpoint feasibility (intake only)
 
-## SEARCH-001-L / I319 — proposed legacy dependency retirement
+[Owner](active/SEARCH-001-D3-bing-direct-html-feasibility.md) / [source and offline test matrix](../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md): **Intake / Proposed / Unclaimed**. Reuse the existing Bing CN parser and protected request boundary for a *documentary-only* comparison with unverified `www.bing.com` and `bing.cn` candidates. Microsoft 2026-09-30 usage/result rights block new automated distributed-default access; no live SERP acquisition, code/test edits, new endpoint, claim, Auto reorder or independent-provider admission. D/#644 remains BLOCKED/ZERO-ADMISSION, D2/#848 separate, E/F/G/I gated; #624 stays Open.
 
-[SEARCH-001-L](active/SEARCH-001-L-legacy-dependency-retirement.md) / [I319](../iterations/I319-search-legacy-dependency-retirement.md) / #901 proposes replacing dormant `WebSearchTool` upstream coupling, freezing independent parity, and removing the `rust-websearch` build package only after claim+activation. The existing SEARCH-001-I global provider gate stays blocked, E/F/G remain unadmitted, and current production search and external dependency owners are unaffected. Proposed governance PR #902 does not establish effective authorization until merge.
+## GIT-COMPAT-001 / #919 — Windows Git 2.36 prepared preflight
+
+[GIT-COMPAT-001](active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](../iterations/I324-git-236-preflight-compatibility.md): **In Progress / Claimed proposed** by [#920](https://github.com/wjhuang88/talos/pull/920), ineffective until target merge. Bounded gix-native preflight replacing Git CLI inspection only. Existing snapshot capacity, ADR-089 authorization and TUI approval owners do not transfer.
+
+## STORE-002 / I322 C — Complete / Closed; D/E/F pending
+
+[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I322](../iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed in #909; C [implementation #912](https://github.com/wjhuang88/talos/pull/912) merged `3df409ef9ed707756350f2c7d4b2c8819f157222`, exact-head [CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) applicable checks and both validators passed, independent API/doc review and CAS no blockers. Existing Session Pending/Todo, Memory, Evolution, Exploration implementations now expose minimal domain-owned contracts by direct forwarding, without provider readiness or consumer/SQL/schema/format changes. C claim released; I325 D claim #932 merged/effective at `e49ccde70556403a9d7b66551565e2b6c81ad32d`, with implementation #935 in Review (not accepted); E/F and #897 Host remain gated. Global closed #901 reconciliation is an ADR-071 residual. Parent #670 remains Open.
+
+## STORE-002 / I325 D — existing-local-delegation implementation Review
+
+[STORE-002](active/STORE-002-storage-capability-contracts.md) / [I325](../iterations/I325-store-002-local-delegation.md) / #670: governance [#932](https://github.com/wjhuang88/talos/pull/932) **merged** at e49ccde70556403a9d7b66551565e2b6c81ad32d after C #912 implementation and #930 closure. D exercises existing accepted domain traits with current SQLite/FTS5/TLOG/JSONL fixtures; [coverage and explicit SessionIndex/durable residuals](../reference/STORE-002-I325-D-LOCAL-DELEGATION-INVENTORY-2026-11-13.md). No duplicate C forwarding, new provider, SQL/schema/format/transaction/default behavior changes. Candidate not accepted until full exact-head CI and independent review. E/F and #897 Host remain separately gated.
+
+## ARCH-035 / I320 — E0/E1 Complete; E2/E3 Blocked
+
+[ARCH-035](active/ARCH-035-behavior-preserving-host-composition.md) / [I320](../iterations/I320-arch-035-host-composition-baseline.md) / #897: **I320 E0/E1 documentation Complete / Closed**, #905 claim, #906 source inventory, #934 contract reconciliation and [ADR-104](../decisions/104-host-composition-ownership-boundary.md) **Accepted ownership/placement only** via #936 merge `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b` (I320 documentary Completion Commit). Parent #897 **Open / Blocked / Released** until #670 D/E provides accepted operational composition and a separate ARCH-035 E2/E3 claim; no runtime implementation, ServerHost or equivalence acceptance.
+
+## SEARCH-001-L / I319 — Complete / Closed (owner-first closeout)
+
+[SEARCH-001-L](active/SEARCH-001-L-legacy-dependency-retirement.md) / [I319](../iterations/I319-search-legacy-dependency-retirement.md) / #901: independent oracle #904 and accepted ADR-085 A1/#902 preceded owned legacy `WebSearchTool` implementation [#907](https://github.com/wjhuang88/talos/pull/907) merged as **`3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970`**, removing `rust-websearch` and reqwest 0.12 from three active locks. [CI4121](https://github.com/wjhuang88/talos/actions/runs/43195189353) succeeded 8/8 on exact head, independent source/security review and merge CAS passed. Close #901 only after this governance closeout merges. Protected production SearchRouter, E/F/G/I admission, parent #624 and unrelated storage/provider owners are unaffected.
 
 
 ## TUI-ELLIPSIS-001 — proposed activation
@@ -125,7 +137,7 @@ deferred behind this cycle, not cancelled.
 | 1 | Windows known-resource cleanup acceptance | TEST-004 / I305 / #729 Complete / Closed; Completion Commit `b5b8241e` (#716), all6CI3221/review/CAS passed. TEST-003 residual stays open. | `docs/backlog/active/TEST-004-windows-known-resource-acceptance.md`; `docs/iterations/I305-windows-known-resource-acceptance.md`; ADR-091 |
 | 1 | Parallel-test HOME isolation | TEST-001 / Issue #316 is Ready / Unclaimed. Isolate process-wide home-directory mutation in configuration and CLI tests without changing product paths or weakening sandbox coverage. | `docs/backlog/active/TEST-001-process-home-test-isolation.md`; `docs/sop/TESTING.md`; config and CLI test owners |
 | 1 | Embedded Skill progressive disclosure | SKILL-006 / I303 / #719 Complete / Closed; Completion Commit `6d72975e` (#721). | `docs/backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md`; `docs/iterations/I303-embedded-skill-progressive-disclosure.md`; ADR-092; ADR-074; SKILL-002 |
-| 1 | Complete wire-protocol family coverage (Responses, Gemini, Azure, Bedrock) | PROVIDER-008 Refinement / Unclaimed; child A/#748/I306 Complete / Closed with implementation through #803 dd6c5f8, 52 reviewed HTTP pairs, CI3570 8/8 and technical acceptance review. B/C/D remain unimplemented and unclaimed; parent #724 stays open. | `docs/backlog/active/PROVIDER-008-openai-responses-api-support.md`; `docs/decisions/093-openai-responses-protocol-boundary.md`; ADR-013/021/034/062; #724 |
+| 1 | Complete wire-protocol family coverage (Responses, Gemini, Azure, Bedrock) | PROVIDER-008 Refinement / Unclaimed; child A/#748/I306 Complete / Closed with implementation through #803 dd6c5f8, 52 reviewed HTTP pairs, CI3570 8/8 and technical acceptance review. B/#810/I310 Complete / Closed via #838/#913; C/#914/I323 governance proposed; D unclaimed; parent #724 stays open. | `docs/backlog/active/PROVIDER-008-openai-responses-api-support.md`; `docs/decisions/093-openai-responses-protocol-boundary.md`; ADR-013/021/034/062; #724 |
 | 1 | Windows current-process handle evidence | TEST-003 / I302 / #717 Review / Claimed; #718 merged f4313237 / ADR-091 effective. #716 mergedb5b8241e, fullCI3221 passed; known-resource criterion closes only TEST004. Prior cold73→76 and unknown/native lifetime residual retained. | `docs/backlog/active/TEST-003-windows-owned-handle-evidence.md`; `docs/iterations/I302-windows-owned-handle-evidence.md`; ADR-091 |
 | 1 | Tombstone-pruning fixture performance | TEST-002 / I227 Complete / Closed at Completion Commit `7b64a08b`; PR #399 merged as `d02915e0` after exact-head CI `32839820741` and independent approval `5409698923`. Production retention and behavior unchanged. | `docs/backlog/active/TEST-002-tombstone-pruning-fixture-performance.md`; `docs/iterations/I227-test002-tombstone-pruning-fixture-performance.md`; `docs/sop/TESTING.md`; pending-submission storage/tests; Windows CI |
 | 1 | Progressive workspace code intelligence | CODE-003 / Issue #317 is Refinement / Unclaimed; CODE-003-A is the only Ready/Unclaimed child. Characterize current symbol-tool claims before query packs, indexing, resolution or storage work. | `docs/backlog/active/CODE-003-tree-sitter-usage-pattern-analysis.md`; `docs/backlog/active/CODE-003-A-code-intelligence-contract-characterization.md`; ADR-020; CODE-001/002; ARCH-034-R04-AG5 |
@@ -249,7 +261,7 @@ Required reads:
 | ARCH-034-R03 / I173 | Complete | Completion Commit `e4818e34c1e047c41d41abc1f7859c7984008e83`; PR #149 merged as `506311dc`; exact-head CI `31143057387` passed. |
 | ARCH-034-R04 / I181 / I182 / I183 / I185 | Partial / I185 Complete | Review-only matrix completed at `aea26ad0`; AG-4 at `ae31242b`; AG-7/I183 at `edf903aa`; [AG-12](active/ARCH-034-R04-AG12-sqlite-validator-integrity.md) / [I185](../iterations/I185-sqlite-validator-policy-integrity.md) at `af978322`. AG-1/2/3/5/6/8/9/10/11 remain separate. |
 | DATA-002 | Intake — Issue #141 | Storage topology and runtime ownership require ADR-backed filesystem policy, cross-runtime ownership, and fail-safe reconciliation refinement before implementation. [Owner](active/DATA-002-storage-topology-and-runtime-ownership.md) |
-| ARCH-035 | Review / Claimed E0/E1 (#906); E2/E3 blocked — Issue #897 | Behavior-preserving domain persistence and cross-host Runtime composition decoupling; consumes STORE-002 / #670, blocks ServerHost implementation. [Owner](active/ARCH-035-behavior-preserving-host-composition.md) |
+| ARCH-035 | Blocked / Released; I320 E0/E1 docs Complete; E2/E3/E4 open — Issue #897 | Behavior-preserving domain persistence and cross-host Runtime composition decoupling; consumes STORE-002 / #670, blocks ServerHost implementation. [Owner](active/ARCH-035-behavior-preserving-host-composition.md) |
 | SERVER-001 | Intake — Issue #142 | Serve/connect protocol adapter architecture requires one authoritative runtime/session/permission path and dependency refinement before implementation. [Owner](active/SERVER-001-serve-connect-protocol-adapters.md) |
 | TOOL-025 | Intake — Issue #143 | RTK-derived shell filtering requires bounded source selection, provenance review, and preservation of Talos execution authorities before implementation. [Owner](active/TOOL-025-rtk-derived-semantic-output-filters.md) |
 | MODEL-007 follow-up | Deferred behind Desktop / Refinement / Unclaimed | 2026-09-22 Desktop scheduling supersedes the prior next-item order. Preserve verified provider/model reasoning-effort choices, catalog updates and picker-to-request requirements; not activated or cancelled. [Owner](active/MODEL-007-hierarchical-model-variant-selection.md#2026-09-22-scheduling-update) |
@@ -338,3 +350,9 @@ Complete / Closed; owner Completion Commit `1226f313e7136f4b2a3d8db6f9179c4ed520
 [PROVIDER-008-B](active/PROVIDER-008-B-google-gemini.md) / #810 / I310 is Complete / Closed.
 Completion Commit `dbcf6163f34d73def923484ad409814fd4a98039` (#838). Exact-head CI4046, independent
 technical/document review and merge CAS passed. A is Complete; C/D and #724 remain open.
+
+[PROVIDER-008-C](active/PROVIDER-008-C-azure-openai.md) / #914 / I323: In Progress / Claimed proposed; effective only on #918 merge; ADR-103, Azure transport and shape routing only.
+
+## Prior intake registration
+
+#915 registered this same owner before #918; no competing implementation claim.

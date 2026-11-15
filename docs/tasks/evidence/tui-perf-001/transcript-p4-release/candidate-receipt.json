@@ -1,0 +1,83 @@
+{
+  "source_commit": "e42b9c9cd39c4b75e5a7c7e8d558c1bad232e813",
+  "source_patch_sha256": "68877a116f37a63f02eea8958872fedf1a00f952a358c3ff7a98a87968a3ff73",
+  "binary": "/home/wjhuang/WorkSpace/personal/talos/target/tui-perf-artifacts/transcript-p4-e42b9c9c/release",
+  "sha256": "0c3d37f04e553af65704d970418ed3a3f3afd30f1e84e522ec2b5d7e3f6daf28",
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///tmp/talos-tui-perf-claim/crates/talos-tui#0.10.1",
+    "manifest_path": "/tmp/talos-tui-perf-claim/crates/talos-tui/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "tui_perf_replay",
+      "src_path": "/tmp/talos-tui-perf-claim/crates/talos-tui/examples/tui_perf_replay.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "3",
+      "debuginfo": 1,
+      "debug_assertions": false,
+      "overflow_checks": false,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/home/wjhuang/WorkSpace/personal/talos/target/release/examples/tui_perf_replay"
+    ],
+    "executable": "/home/wjhuang/WorkSpace/personal/talos/target/release/examples/tui_perf_replay",
+    "fresh": false
+  },
+  "profile": "release-with-symbols",
+  "source_sha256": {
+    "crates/talos-tui/src/app/app_tests.rs": "a36ded2fe9eaaa3440631aaacdc26e009a75be859cacd0e5c80809e1cbb229af",
+    "crates/talos-tui/src/app/frame.rs": "0e136c0da076461f5660abce2d021343870a0f4adf9ccb181c239bbcbca3b4d0",
+    "crates/talos-tui/src/app/input.rs": "09b1a2bf8d094d3a0df3b023d583c6d84d22afddee5a6ad982a6cb1252241351",
+    "crates/talos-tui/src/app/output.rs": "0a972dc64b4c6f949422fcba72afa2f1bef39edc5fa5666a25dbc2e1b3fc17dd",
+    "crates/talos-tui/src/app/scheduling.rs": "70dbedc1923f3e61f3032623dfc1733c3eda7f305641336dde99296662b567ca",
+    "crates/talos-tui/src/app/tool_activity.rs": "66b2b15027374214a5e580136e2f36bd20f0252e6b1e3d34c088aff82d4ff4c0",
+    "crates/talos-tui/src/app.rs": "deb191d045ad8db3bc9d1329ea304fab030db591c29b33e9fdb5a513edf54fda",
+    "crates/talos-tui/src/app_layout.rs": "c8064e841d60fb593fadfd85a1f956ceb4963fdae2f8645d7fa52c8cd8c92809",
+    "crates/talos-tui/src/app_stream.rs": "e3e742236c986daffa9b91df00de4d44d07c4951101704239a3026fdf33c4523",
+    "crates/talos-tui/src/app_summary.rs": "ff9d3426484853a3037895b6459e8a4ebdd41c08dba7928845a17aa7b2d135b1",
+    "crates/talos-tui/src/clipboard.rs": "48f57edc4024dfac77d7407339a3f7fea5650857749cce9cbf7ab16a7243c6d8",
+    "crates/talos-tui/src/evolution.rs": "91d3f1cddb652c6a8301cc2c26ef064cfef02377d231e10e2d84a7749094d395",
+    "crates/talos-tui/src/export.rs": "478322011802a230dc60d9ce96b00802ef48aaff1576f69bfff4357c04ec6c48",
+    "crates/talos-tui/src/formatting.rs": "f99831c40c4e944c866b1a0e9c5f7e7d88e36ea983c49778f3e3dcad25605c0b",
+    "crates/talos-tui/src/git_snapshot_worker.rs": "527f0653c6c1a7c79c01cad0380a78e3824a6f336726864e859fbe6390dc01bc",
+    "crates/talos-tui/src/highlight.rs": "f19d0688a5cb5dff7e3d059bce6b4835f968e463cbcbfb7808c5812ed0653fb3",
+    "crates/talos-tui/src/history_projection.rs": "e1aff18382eaabcc51f398990929711349f6aa18ebe4141439cb8afab7827a92",
+    "crates/talos-tui/src/inline_terminal.rs": "1b9c60a5475a6abc397559de6e222d99e6887dfeb3ec4ce8263017302302065e",
+    "crates/talos-tui/src/lib.rs": "c42203c34d8cc19563940cd536c7b0fc05d4fed6c4edd6dff7c70c33c7ebef07",
+    "crates/talos-tui/src/panel_state.rs": "2d789180c83b2a2d90db884ef833412fd8dd5eaa476e9e64e6a855485020049b",
+    "crates/talos-tui/src/process_poll.rs": "348990cae49d82ce3ee37757859c2aeb839757440524d266937f02fee643e720",
+    "crates/talos-tui/src/render_metrics.rs": "916c60f7f46a924c0e25e4ec5be0477c5fde07a1ed1f3c3c1af3286a3bb36bd2",
+    "crates/talos-tui/src/scrollback.rs": "952d102b33a59d7c96d6a5ca76741a9a9723e754eb2a08851788c26e4c237aaf",
+    "crates/talos-tui/src/scrollback_input.rs": "32e482b953da70b1fc5dd0ea458ebdef443a532b8e8491e92e7ec8955f264eb0",
+    "crates/talos-tui/src/scrollback_markdown.rs": "7a16fbaf03983bd5f566123a46ea02d613ffdcdf3f79ab3bd364426d58a106c9",
+    "crates/talos-tui/src/scrollback_status.rs": "81261d5069903ae5efdcb86bb86f04bca23a6b71600e8dcd9ee99a02b704fd81",
+    "crates/talos-tui/src/scrollback_status_git.rs": "718092f115fe86818a33503b2812b87032f6b4fea85d2f15145c9d97f7e59796",
+    "crates/talos-tui/src/sidebar.rs": "ef780d5ceb76527c25aefb4573b5b477530f8913f5c6cc71eb41c621c6a60872",
+    "crates/talos-tui/src/splash.rs": "8edab1c68dd084b345da512de755abac33745acf3865d16d309f2fcbfcba94e9",
+    "crates/talos-tui/src/state.rs": "bfb507a95fa9a449350b2709a32abadf5871d8bd11ff7437d0acd2b8a936f187",
+    "crates/talos-tui/src/state_tests.rs": "ce456cf521f69fa96e8ea9961b06bf41dffa73d464587193031d484e17338a4a",
+    "crates/talos-tui/src/stream_markdown.rs": "b3e490440e6fc333029ecce0dcb7e77527fec0c76fa1c1efae67b06e3482582b",
+    "crates/talos-tui/src/tests.rs": "bca4503086a25b9844a15c7f73ae3f0ce49249c723cb46d74a7241abea365fa9",
+    "crates/talos-tui/src/theme.rs": "9e46c72c637952a4f8779415679c113a6d782a84e01a9ff267c9a0c8024d8b26",
+    "crates/talos-tui/src/tool_display.rs": "c10126a305aab0b74a47cc1a11c3e3ca9f96cffccc93941d794968da24c0e311",
+    "crates/talos-tui/src/transcript.rs": "99ad800234746d9103309c04eca515f9df2b5837c80cd1fe3a72b79275eeb4ec",
+    "crates/talos-tui/src/validation_display.rs": "7c8c69bb47ff1e4bcc5bf5544192ad9c4949104138b7dea59614032010cf2d58",
+    "crates/talos-tui/src/widgets.rs": "5714667cb55e930a1b6a584f142c7e7347194437929ca3896c5d2707f8ee4cd2",
+    "crates/talos-tui/examples/i279_activity_acceptance.rs": "e3f681fb0e489ede2fdb7927faa65a86dfc79238f06011625a576b3200840d48",
+    "crates/talos-tui/examples/tui_perf_replay.rs": "b0d0d5c98779cfab50bd34fa7e6bdea384bf9b84209d8ff2063e5d284adde156"
+  },
+  "source_patch_file": "candidate-source.patch.gz",
+  "source_patch_hash_applies_to": "decompressed exact git diff"
+}

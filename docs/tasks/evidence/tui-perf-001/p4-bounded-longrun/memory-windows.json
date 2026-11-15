@@ -1,0 +1,29 @@
+[
+  {
+    "case": "candidate-animation-10000-r1",
+    "steady_samples": 437,
+    "first_30s_median_pss_kib": 34553,
+    "last_30s_median_pss_kib": 31388,
+    "delta_kib": -3165,
+    "min_pss_kib": 31383,
+    "max_pss_kib": 34553
+  },
+  {
+    "case": "candidate-animation-10000-r2",
+    "steady_samples": 429,
+    "first_30s_median_pss_kib": 32280,
+    "last_30s_median_pss_kib": 32279,
+    "delta_kib": -1,
+    "min_pss_kib": 32273,
+    "max_pss_kib": 32282
+  },
+  {
+    "case": "candidate-animation-10000-r3",
+    "steady_samples": 432,
+    "first_30s_median_pss_kib": 29496.0,
+    "last_30s_median_pss_kib": 29497.0,
+    "delta_kib": 1.0,
+    "min_pss_kib": 29494,
+    "max_pss_kib": 32210
+  }
+]

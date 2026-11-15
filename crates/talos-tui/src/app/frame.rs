@@ -1,5 +1,65 @@
 use super::*;
 
+#[derive(Default)]
+pub(super) struct ComposerHeightCache {
+    key: Option<(u16, String, usize)>,
+    height: u16,
+}
+
+impl ComposerHeightCache {
+    fn height(&mut self, state: &TuiState, width: u16) -> u16 {
+        let cursor = state.cursor_byte_pos();
+        if self
+            .key
+            .as_ref()
+            .is_none_or(|(old_width, text, old_cursor)| {
+                *old_width != width || text != &state.input_buffer || *old_cursor != cursor
+            })
+        {
+            self.height = crate::scrollback::InputComponent {
+                state,
+                max_height: crate::scrollback::MAX_COMPOSER_LINES,
+            }
+            .height_hint(width);
+            self.key = Some((width, state.input_buffer.clone(), cursor));
+        }
+        self.height
+    }
+}
+
+#[cfg(test)]
+mod cache_tests {
+    use super::*;
+
+    #[test]
+    fn composer_cache_matches_uncached_height_after_edits_moves_and_resize() {
+        let mut cache = ComposerHeightCache::default();
+        let mut state = TuiState::new();
+        for text in [
+            "",
+            "中文🦀e\u{301}\nnext line",
+            "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk",
+        ] {
+            state.input_buffer = text.to_string();
+            for cursor in 0..=text.chars().count() {
+                state.cursor_pos = cursor;
+                for width in [1, 7, 20, 80] {
+                    let natural = cache.height(&state, width);
+                    for cap in [0, 1, 4, 10] {
+                        let expected = crate::scrollback::InputComponent {
+                            state: &state,
+                            max_height: cap,
+                        }
+                        .height_hint(width);
+                        assert_eq!(natural.min(cap), expected);
+                        assert_eq!(cache.height(&state, width).min(cap), expected);
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct FrameHistoryScrollBounds {
     current_start: usize,
@@ -43,7 +103,20 @@ impl Tui {
     }
 
     pub(super) fn draw_frame(&mut self) -> io::Result<()> {
+        let _draw_metric = crate::render_metrics::measure(crate::render_metrics::Stage::Draw);
         let screen_size = self.terminal.size()?;
+        crate::render_metrics::screen_size(screen_size.width, screen_size.height);
+        if self
+            .history_projection_cache
+            .needs_update(&self.transcript, screen_size.width)
+        {
+            // Input has consumed the previous frame's hit map. Release its shared
+            // snapshot before updating the cache so stable prefixes stay in place.
+            // Other retained snapshots remain immutable through Arc copy-on-write.
+            self.last_history_projection = Default::default();
+        }
+        let preparation_metric =
+            crate::render_metrics::measure(crate::render_metrics::Stage::FramePreparation);
         let view = &mut self.state.slash_menu.approval_view;
         if view.width != screen_size.width {
             view.offset = 0;
@@ -129,10 +202,7 @@ impl Tui {
                     )
                 });
         let natural_startup_flow = is_startup || approval_startup;
-        let splash = crate::splash::viewport_splash_lines_with_dashboard(
-            width,
-            self.dashboard_availability.as_ref(),
-        );
+        let splash = self.splash_cache.lines(width, self.dashboard_availability);
         let splash_rows = splash.len();
         let startup_spacer_rows: usize = if natural_startup_flow { 1 } else { 0 };
         let follows_tail = matches!(
@@ -150,13 +220,7 @@ impl Tui {
         } else if follows_tail || approval_preserves_follow_tail {
             let natural_rows = self
                 .history_projection_cache
-                .project(
-                    &self.transcript,
-                    screen_size.width,
-                    screen_size.height,
-                    &self.history_scroll,
-                )
-                .total_rows;
+                .total_rows(&self.transcript, screen_size.width);
             Some(
                 splash_rows
                     .saturating_add(natural_rows)
@@ -165,24 +229,29 @@ impl Tui {
         } else {
             None
         };
-        let status_comp = crate::scrollback::StatusComponent { status, width };
+        let status_comp = crate::scrollback::StatusComponent {
+            status,
+            width,
+            git_summary: self
+                .git_snapshot
+                .get(&status.workspace_path, Instant::now()),
+        };
 
         let preview_natural = if is_startup {
             0
         } else if tool_preview_active {
             tool_preview.height_hint(width)
         } else {
-            preview.height_hint(width)
+            self.preview_layout_cache[0]
+                .plan(&preview, width)
+                .rows
+                .len() as u16
         };
         // Tips remain visible during startup for failures and other transient
         // notices. Successful Dashboard availability belongs to the Logo prefix.
         let tips_h = tips.height_hint(width);
 
-        let input_natural = crate::scrollback::InputComponent {
-            state,
-            max_height: crate::scrollback::MAX_COMPOSER_LINES,
-        }
-        .height_hint(width);
+        let input_natural = self.composer_height_cache.height(state, width);
         let modal_natural = bottom_panel.height_hint(width);
         let fixed_heights = tips_h
             + input_pad_top.height_hint(width)
@@ -222,42 +291,48 @@ impl Tui {
             max_rows: compressed.queue_max_rows,
         };
 
-        let actual_input_h = input.height_hint(width);
-        let preview_h = if tool_preview_active {
-            tool_preview.height_hint(width)
+        let actual_input_h = input_natural.min(compressed.input_max_height);
+        let queue_h = queue.height_hint(width);
+        let panel_h = bottom_panel.height_hint(width);
+        // Use the exact compressed plan for both geometry and painting. Replanning
+        // here and again inside render repeats wrapping on every animation frame.
+        let preview_plan = if tool_preview_active {
+            tool_preview.plan(width)
         } else {
-            preview.height_hint(width)
+            self.preview_layout_cache[1].plan(&preview, width)
         };
+        let preview_h = preview_plan.rows.len().min(u16::MAX as usize) as u16;
         // `bottom_panel_placement` adds its third argument itself, so this base
         // deliberately excludes the panel height. Preview is also excluded so
         // token-by-token growth cannot flip an open panel between placements.
-        let base_height = fixed_heights + actual_input_h + queue.height_hint(width);
+        let base_height = fixed_heights + actual_input_h + queue_h;
         let menu_placement = crate::scrollback::bottom_panel_placement(
             screen_size.height,
             base_height,
             modal_natural,
         );
 
-        let app_layout = compute_app_layout(
+        let app_layout = self.layout_cache.layout(
             screen_size,
             ComponentMetrics {
                 preview: preview_h,
-                queue: queue.height_hint(width),
+                queue: queue_h,
                 tips: tips_h,
                 panel_required: if state.slash_menu.is_credential_input()
                     || state.slash_menu.is_provider_wizard()
                     || !matches!(state.approval_state, ApprovalState::Hidden)
                 {
-                    bottom_panel.height_hint(width).min(4)
+                    panel_h.min(4)
                 } else {
                     0
                 },
-                panel_preferred: bottom_panel.height_hint(width),
+                panel_preferred: panel_h,
                 composer: actual_input_h,
                 history_cap,
             },
             menu_placement,
         );
+        drop(preparation_metric);
         let history_height = app_layout.history.map_or(0, |rect| rect.height);
         self.last_history_viewport_height = history_height;
         self.last_history_area = app_layout.history;
@@ -371,6 +446,17 @@ impl Tui {
             })
         };
 
+        // Schedule only animation that survived layout compression. Completed tool
+        // titles have no animated prefix, even while the overall turn is active.
+        self.visible_processing_animation = status.is_processing
+            && app_layout.preview.is_some_and(|area| {
+                area.width > 0
+                    && preview_plan
+                        .rows
+                        .iter()
+                        .take(usize::from(area.height))
+                        .any(|row| !tool_preview_active || !row.prefix.trim().is_empty())
+            });
         self.terminal
             .draw_with_cursor(screen_size, cursor, |frame| {
                 if let Some(area) = app_layout.history {
@@ -384,9 +470,9 @@ impl Tui {
                 }
                 if let Some(area) = app_layout.preview {
                     if tool_preview_active {
-                        tool_preview.render(frame, area);
+                        tool_preview.render_plan(frame, area, preview_plan);
                     } else {
-                        preview.render(frame, area);
+                        preview.render_plan(frame, area, preview_plan);
                     }
                 }
                 if let Some(area) = app_layout.queue {

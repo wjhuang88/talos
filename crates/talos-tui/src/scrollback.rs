@@ -248,8 +248,13 @@ impl ViewportComponent for ToolActivityComponent<'_> {
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let lines: Vec<_> = self
-            .plan(area.width)
+        self.render_plan(frame, area, self.plan(area.width));
+    }
+}
+
+impl ToolActivityComponent<'_> {
+    pub(crate) fn render_plan(&self, frame: &mut InlineFrame, area: Rect, plan: PreviewLayoutPlan) {
+        let lines: Vec<_> = plan
             .rows
             .into_iter()
             .map(|row| {
@@ -296,6 +301,129 @@ pub(crate) struct PreviewLayoutPlan {
     pub(crate) rows: Vec<PreviewLayoutRow>,
     pub(crate) natural_height: u16,
     pub(crate) clipped_before: bool,
+}
+
+/// Bounded geometry cache: animated prefix glyphs/colors do not affect wrapping.
+#[derive(Default)]
+pub(crate) struct PreviewLayoutCache {
+    entry: Option<PreviewCacheEntry>,
+    #[cfg(test)]
+    builds: usize,
+}
+
+struct PreviewCacheEntry {
+    width: u16,
+    padding_width: usize,
+    text: String,
+    max_height: u16,
+    active_spinner: bool,
+    thinking: bool,
+    plan: PreviewLayoutPlan,
+}
+
+impl PreviewLayoutCache {
+    pub(crate) fn plan(
+        &mut self,
+        component: &PreviewComponent<'_>,
+        width: u16,
+    ) -> PreviewLayoutPlan {
+        use unicode_width::UnicodeWidthStr;
+        let padding_width = component.padding.width().min(usize::from(width));
+        let active_spinner = component.spinner_color.is_some();
+        let thinking = component.thinking_label_frame.is_some();
+        if self.entry.as_ref().is_none_or(|entry| {
+            entry.width != width
+                || entry.padding_width != padding_width
+                || entry.text != component.text
+                || entry.max_height != component.max_height
+                || entry.active_spinner != active_spinner
+                || entry.thinking != thinking
+        }) {
+            let padding = " ".repeat(padding_width);
+            let neutral = PreviewComponent {
+                padding: &padding,
+                ..*component
+            };
+            self.entry = Some(PreviewCacheEntry {
+                width,
+                padding_width,
+                text: component.text.to_owned(),
+                max_height: component.max_height,
+                active_spinner,
+                thinking,
+                plan: neutral.plan(width),
+            });
+            #[cfg(test)]
+            {
+                self.builds += 1;
+            }
+        }
+        let mut plan = self
+            .entry
+            .as_ref()
+            .map(|entry| entry.plan.clone())
+            .unwrap_or_default();
+        if let Some(first) = plan.rows.first_mut() {
+            first.prefix = take_display_prefix(component.padding, padding_width);
+        }
+        plan
+    }
+}
+
+#[cfg(test)]
+mod preview_cache_tests {
+    use super::*;
+
+    #[test]
+    fn animated_geometry_matches_full_plan_and_only_real_dependencies_rebuild() {
+        let mut cache = PreviewLayoutCache::default();
+        for text in [
+            "",
+            "中文🦀e\u{301}\nexplicit",
+            "thinking: first\nsecond\nthird",
+            "long ".repeat(100).as_str(),
+        ] {
+            for width in [0, 1, 2, 3, 7, 80] {
+                for cap in [0, 1, 4, 10, 11] {
+                    for thinking in [false, true] {
+                        for active in [false, true] {
+                            for frame in 0..8 {
+                                let (padding, color) = preview_spinner_padding(frame);
+                                let component = PreviewComponent {
+                                    padding: &padding,
+                                    text,
+                                    spinner_color: active
+                                        .then_some(semantic::PROCESSING_SPINNER[color]),
+                                    text_color: None,
+                                    thinking_label_frame: thinking.then_some(frame),
+                                    max_height: cap,
+                                };
+                                let before = cache.builds;
+                                assert_eq!(cache.plan(&component, width), component.plan(width));
+                                if frame > 0 {
+                                    assert_eq!(cache.builds, before, "animation must not rewrap");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Prefix width and contents are separate dependencies, including clipped wide glyphs.
+        for padding in ["", "界", "界界", " x ", "   "] {
+            let component = PreviewComponent {
+                padding,
+                text: "body",
+                spinner_color: None,
+                text_color: None,
+                thinking_label_frame: None,
+                max_height: 10,
+            };
+            for width in [1, 2, 3, 80] {
+                assert_eq!(cache.plan(&component, width), component.plan(width));
+            }
+        }
+    }
 }
 
 impl PreviewComponent<'_> {
@@ -461,7 +589,12 @@ impl ViewportComponent for PreviewComponent<'_> {
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let plan = self.plan(area.width);
+        self.render_plan(frame, area, self.plan(area.width));
+    }
+}
+
+impl PreviewComponent<'_> {
+    pub(crate) fn render_plan(&self, frame: &mut InlineFrame, area: Rect, plan: PreviewLayoutPlan) {
         if plan.rows.is_empty() {
             return;
         }
@@ -493,7 +626,6 @@ impl ViewportComponent for PreviewComponent<'_> {
                 ))
             })
             .collect::<Vec<_>>();
-        debug_assert_eq!(lines.len(), self.height_hint(area.width) as usize);
         frame.render_widget(Paragraph::new(lines), area);
     }
 }
@@ -1143,6 +1275,7 @@ impl ViewportComponent for InputComponent<'_> {
 
 pub(crate) struct StatusComponent<'a> {
     pub(crate) status: &'a talos_conversation::StatusSnapshot,
+    pub(crate) git_summary: Option<&'a crate::scrollback_status_git::GitStatusSummary>,
     pub(crate) width: u16,
 }
 
@@ -1152,7 +1285,7 @@ impl ViewportComponent for StatusComponent<'_> {
     }
 
     fn render(&self, frame: &mut InlineFrame, area: Rect) {
-        let text = build_status_text(self.status, self.width);
+        let text = build_status_text(self.status, self.width, self.git_summary);
         frame.render_widget(Paragraph::new(text), area);
     }
 }

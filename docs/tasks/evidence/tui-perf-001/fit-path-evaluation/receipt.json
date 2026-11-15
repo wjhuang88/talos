@@ -1,0 +1,39 @@
+{
+  "source_commit": "e64706ab1ba727339e66428d3e4fabdef10fab39",
+  "source_patch_sha256": "38edd51c1e35edfce934862c3ed3616e30e246cc0149d7b6467ed5e783ad9779",
+  "binary_sha256": "ad51fef2d2ff576633b990af109a3fadb8f651e036c1b13faec12ff842674c7e",
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///tmp/talos-tui-perf-claim/crates/talos-tui#0.10.1",
+    "manifest_path": "/tmp/talos-tui-perf-claim/crates/talos-tui/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "tui_perf_replay",
+      "src_path": "/tmp/talos-tui-perf-claim/crates/talos-tui/examples/tui_perf_replay.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/home/wjhuang/WorkSpace/personal/talos/target/debug/examples/tui_perf_replay"
+    ],
+    "executable": "/home/wjhuang/WorkSpace/personal/talos/target/debug/examples/tui_perf_replay",
+    "fresh": false
+  },
+  "source_patch_file": "source.patch.gz",
+  "source_patch_hash_applies_to": "decompressed exact git diff"
+}

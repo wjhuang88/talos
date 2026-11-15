@@ -31,6 +31,8 @@ pub(crate) struct TranscriptStore {
     entries: Vec<TranscriptEntry>,
     next_id: u64,
     revision: u64,
+    // Append preserves the existing prefix; edits invalidate every cached projection.
+    edit_revision: u64,
     expanded_polls: std::collections::BTreeSet<TranscriptEntryId>,
 }
 
@@ -51,6 +53,10 @@ impl TranscriptStore {
         self.revision
     }
 
+    pub(crate) const fn edit_revision(&self) -> u64 {
+        self.edit_revision
+    }
+
     pub(crate) fn poll_expanded(&self, id: TranscriptEntryId) -> bool {
         self.expanded_polls.contains(&id)
     }
@@ -69,6 +75,7 @@ impl TranscriptStore {
             self.expanded_polls.insert(id);
         }
         self.revision = self.revision.saturating_add(1);
+        self.edit_revision = self.revision;
         true
     }
 
@@ -81,6 +88,7 @@ impl TranscriptStore {
         };
         *expanded = !*expanded;
         self.revision = self.revision.saturating_add(1);
+        self.edit_revision = self.revision;
         true
     }
 }

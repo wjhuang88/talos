@@ -55,6 +55,7 @@ mod runtime_state;
 pub use runtime_lease::SessionRuntimeLease;
 mod segment_chain;
 pub mod sqlite;
+mod storage_contracts;
 mod store;
 pub mod todo;
 mod tool_compression;
@@ -88,6 +89,7 @@ pub use runtime_state::{
     SessionRuntimeState,
 };
 pub use sqlite::{ForkInfo, IndexError, SearchResult, SessionIndex};
+pub use storage_contracts::{PendingSubmissionPersistence, TodoPersistence};
 pub use store::{CompactTextSessionStore, JsonlSessionStore, SessionStore};
 pub use todo::{
     CreateTodo, TodoAddDependencyTool, TodoCreateBatchInput, TodoCreateBatchTool, TodoCreateInput,

@@ -13,8 +13,10 @@
 //! - **No vector/graph**: pure relational storage with FTS5.
 
 pub mod ingestion;
+mod storage_contracts;
 mod types;
 
+pub use storage_contracts::ExplorationPersistence;
 pub use types::*;
 
 use chrono::{DateTime, Utc};

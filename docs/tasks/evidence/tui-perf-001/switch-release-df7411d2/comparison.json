@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "source_commits_from_external_receipts_required": true,
+  "matrix": "/tmp/talos-perf-switch-release-df7411d2",
+  "cases": {
+    "workspace-switch-10000": {
+      "baseline_cpu_median": 1.509232387894209,
+      "candidate_cpu_median": 0.605813354232942,
+      "cpu_ratio": 0.40140495200889303,
+      "paired_cpu_percentage_point_deltas": [
+        -0.6676467696751954,
+        -0.9034190336612671,
+        -0.6775220292996034
+      ],
+      "candidate_peak_pss_kib": 40170,
+      "peak_pss_budget_kib": 63116.0,
+      "input_p95_p99_budget_ms": [
+        10,
+        20
+      ],
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "input_p95": true,
+        "input_p99": true
+      },
+      "animation_deadline_evidence": null
+    }
+  },
+  "evaluated_checks_pass": true,
+  "limitations": [
+    "Only listed checks are evaluated; this is not whole-task acceptance.",
+    "CPU ratios at zero baseline are unavailable, not zero.",
+    "Native terminal, allocations and long-run heap stability require separate evidence; input latency is checked only with probes and animation lateness only in animation cases.",
+    "Pair deltas follow manifest round order; fixed baseline-first ordering can retain host drift."
+  ]
+}
