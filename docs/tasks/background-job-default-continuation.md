@@ -1,6 +1,6 @@
 # BG-CONTINUE-001: Default Background Completion Continuation
 
-> Document status: Active / Claimed (proposed atomic activation in #893; ineffective until independently authorized target-branch merge)
+> Document status: Active / Claimed (activation merged in #893; implementation remains Partial)
 > Historical checkpoints below describe their original revisions, not the current proposed disposition.
 > Deliverable: background success, failure and timeout resume the originating live Session without another user message or opt-in flag.
 
@@ -16,12 +16,12 @@
 | Source Issue | None |
 | Governance Claim PR | #893 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head activation and ADR-101 review; user authorized candidate preparation, not independent approval. Earlier inactive-remediation re-review does not authorize this activation |
-| Implementation PR | Not started |
+| Authorization Evidence | Exact-head activation/ADR-101 review: https://github.com/wjhuang88/talos/pull/893#issuecomment-6757010739; merged as bad94be8151253b7cc4806c3b4e9a449aa74eb69 |
+| Implementation PR | #953 (default-off foundation; depends on #917) |
 | Last Updated | 2026-11-09 |
 | Handoff / Release Condition | Accepted successor decision, effective target claim, tested implementation and exact-head review/CI |
 
-## Proposed atomic activation packet (not effective)
+## Proposed atomic activation packet (historical; merged in #893)
 
 This packet proposes atomic activation in #893 through the header and claim table
 above. Both are ineffective while this PR is open. The proposed claimant
@@ -322,3 +322,21 @@ regressions passed (4passed,0failed/ignored). Original and corrected logs are
 target/background-preparation-{red,green}.log in the primary workspace.
 Independent source review found no blocker. Later user-driven retry is not covered
 by this test. Corrected full preflight and delivery remain pending; default-off.
+
+
+## 2026-11-15 committed foundation validation — Partial
+
+Implementation commit: d50be16743cf16024f70d1fde870fb43fd6b3005 (Draft PR #953),
+based on recovery PR #917 at55ba5752. The corrected standard preflight passed5527
+tests/doctests,0failed/ignored,and both external Runtime SDK modes. All2447 committed
+blobs matched the validated export. The preparation-failure regression demonstrably
+failed on the old code, then passed with three related regressions after correction.
+Exact-commit independent content review found no blocker and confirmed production
+activation remains test-only. This supersedes earlier pending local-gate wording.
+
+Evidence retained in the primary workspace: target/background-corrected-preflight.log,
+target/background-corrected-preflight-result.json,
+target/background-selected-corrected-manifest.json and
+target/background-preparation-{red,green}.log. Remote/native CI, dependency merge,
+source merge and installed-host acceptance remain open. Production default
+continuation is not delivered or enabled; this owner remains Partial.

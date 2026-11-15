@@ -2,10 +2,12 @@
 
 ## Status
 
-Proposed for acceptance atomically with BG-CONTINUE-001 activation in #893.
-Acceptance takes effect only after independent exact-head decision/activation review
-and target-branch merge. No approval or implementation is currently implied.
-Recheck ADR-101 uniqueness at merge time; ADR-100 belongs to clipboard input.
+Accepted with BG-CONTINUE-001 activation in #893, merged as
+`bad94be8151253b7cc4806c3b4e9a449aa74eb69`.
+Exact-head activation review:
+https://github.com/wjhuang88/talos/pull/893#issuecomment-6757010739.
+This authorizes the design, not production enablement or completion. The subsequent
+user instruction requires default-off operation, as recorded below.
 
 ## Context
 
