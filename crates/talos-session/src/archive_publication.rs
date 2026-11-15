@@ -1,6 +1,6 @@
 //! Immutable physical ownership recorded before owned archives become discoverable.
 use crate::{SessionError, compaction_locator::digest};
-use rusqlite::{Connection, OpenFlags, params};
+use rusqlite::{OpenFlags, params};
 use std::{
     path::Path,
     time::{Duration, Instant},
@@ -134,7 +134,7 @@ pub(crate) fn load(
         let db = head.parent().ok_or_else(invalid)?.join("history-bindings.sqlite");
         if !std::fs::symlink_metadata(&db)?.file_type().is_file() { return Err(invalid()); }
         let db = db.parent().ok_or_else(invalid)?.canonicalize()?.join("history-bindings.sqlite");
-        let connection = Connection::open_with_flags(db, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW).map_err(|_| invalid())?;
+        let connection = crate::durable::open_binding_connection_with_flags(db, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW).map_err(|_| invalid())?;
         connection.busy_timeout(Duration::ZERO).map_err(|_| invalid())?;
         let budget = crate::sqlite::RecoveryWorkBudget::new(deadline.saturating_duration_since(Instant::now()));
         let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;

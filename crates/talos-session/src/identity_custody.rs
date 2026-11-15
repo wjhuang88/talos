@@ -183,7 +183,7 @@ pub(crate) fn retire_pending_fork(
             .parent()
             .ok_or_else(invalid)?
             .join("history-bindings.sqlite");
-        let connection = rusqlite::Connection::open_with_flags(
+        let connection = crate::durable::open_binding_connection_with_flags(
             database,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -274,7 +274,7 @@ fn check_not_retired(
             Ok(meta) if !meta.file_type().is_file() => return Err(invalid()),
             Ok(_) => {}
         }
-        let connection = rusqlite::Connection::open_with_flags(
+        let connection = crate::durable::open_binding_connection_with_flags(
             &database,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -345,7 +345,7 @@ fn retire_registered_under_lease(transcript: &Path) -> Result<(), SessionError> 
             .and_then(|s| s.to_str())
             .ok_or_else(invalid)?;
         let id = Uuid::parse_str(id).map_err(|_| invalid())?;
-        let connection = rusqlite::Connection::open_with_flags(
+        let connection = crate::durable::open_binding_connection_with_flags(
             &database,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -531,7 +531,7 @@ pub(crate) fn require_active_session_identity_until(
         if !std::fs::symlink_metadata(database)?.file_type().is_file() {
             return Err(invalid());
         }
-        let connection = rusqlite::Connection::open_with_flags(
+        let connection = crate::durable::open_binding_connection_with_flags(
             database,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )

@@ -246,7 +246,7 @@ pub(crate) fn reconcile_pending_in_directory(
             Ok(metadata) if metadata.file_type().is_file() => {}
             _ => return Err(invalid()),
         }
-        let connection = Connection::open_with_flags(
+        let connection = crate::durable::open_binding_connection_with_flags(
             &db,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -744,7 +744,7 @@ impl Receipt {
             }
             // Identity reservation already initialized this database in WAL
             // mode. Do not restart its independent initialization retry budget.
-            let connection = Connection::open_with_flags(
+            let connection = crate::durable::open_binding_connection_with_flags(
                 &db,
                 OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
             )
@@ -804,7 +804,7 @@ impl Receipt {
                 return Err(invalid());
             }
             check(deadline)?;
-            let connection = Connection::open_with_flags(
+            let connection = crate::durable::open_binding_connection_with_flags(
                 db,
                 OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
             )
@@ -958,7 +958,7 @@ pub(crate) fn published_branch(
             Ok(metadata) if metadata.file_type().is_file() => {}
             _ => return Err(invalid()),
         }
-        let connection = Connection::open_with_flags(
+        let connection = crate::durable::open_binding_connection_with_flags(
             &db,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -1008,7 +1008,7 @@ pub(crate) fn load(head: &Path, deadline: Instant) -> Result<Receipt, SessionErr
             .ok_or_else(invalid)?;
         let db = database(head, child)?;
         let _lease = crate::identity_custody::require_not_retired_until(head, deadline)?;
-        let connection = Connection::open_with_flags(
+        let connection = crate::durable::open_binding_connection_with_flags(
             &db,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )

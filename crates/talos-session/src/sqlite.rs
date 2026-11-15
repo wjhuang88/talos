@@ -147,8 +147,18 @@ impl SessionIndex {
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
+            // Resolve directory aliases only; SQLite must still reject a linked
+            // final database filename rather than following it to another store.
+            let filename = path.file_name().ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "index filename missing")
+            })?;
+            let parent = path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or_else(|| Path::new("."));
+            let canonical = parent.canonicalize()?.join(filename);
             let conn = Connection::open_with_flags(
-                path,
+                canonical,
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
                     | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
                     | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
@@ -1174,6 +1184,36 @@ mod tests {
             .expect("operation should succeed");
 
         assert_eq!(count, 1, "One fork relationship should be recorded");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn recovery_index_accepts_parent_alias_but_rejects_database_alias() {
+        use std::time::Duration;
+        let root = tempfile::tempdir().expect("root");
+        let real = root.path().join("real");
+        std::fs::create_dir(&real).expect("directory");
+        let alias = root.path().join("alias");
+        std::os::unix::fs::symlink(&real, &alias).expect("parent alias");
+        let path = alias.join("index.db");
+        let budget = || RecoveryWorkBudget::new(Duration::from_secs(2));
+        let index = SessionIndex::open_for_recovery(&path, &budget()).expect("alias open");
+        index
+            .record_fork_with_budget("parent", "child", "tail", &budget())
+            .expect("lineage");
+        drop(index);
+        let index = SessionIndex::open_for_recovery(&real.join("index.db"), &budget())
+            .expect("same physical index");
+        assert_eq!(index.get_forks("parent").expect("read lineage").len(), 1);
+        drop(index);
+        let before = std::fs::read(real.join("index.db")).expect("original bytes");
+        let linked = alias.join("linked.db");
+        std::os::unix::fs::symlink(real.join("index.db"), &linked).expect("database alias");
+        assert!(SessionIndex::open_for_recovery(&linked, &budget()).is_err());
+        assert_eq!(
+            std::fs::read(real.join("index.db")).expect("unchanged bytes"),
+            before
+        );
     }
 
     #[test]

@@ -1757,6 +1757,14 @@ pub(crate) fn remove_binding_for_session(
 }
 
 fn open_binding_connection(path: &std::path::Path) -> Result<Connection, SessionError> {
+    open_binding_connection_with_flags(path, rusqlite::OpenFlags::default())
+}
+
+pub(crate) fn open_binding_connection_with_flags(
+    path: impl AsRef<std::path::Path>,
+    flags: rusqlite::OpenFlags,
+) -> Result<Connection, SessionError> {
+    let path = path.as_ref();
     // Enforce at SQLite open time as well as at the caller's metadata check:
     // a binding path can be replaced between those two operations.
     // SQLite also rejects ancestor symlinks. Resolve only the parent to retain
@@ -1770,7 +1778,7 @@ fn open_binding_connection(path: &std::path::Path) -> Result<Connection, Session
         .ok_or_else(|| SessionError::DurableTurn("binding database name unavailable".into()))?;
     Connection::open_with_flags(
         directory.join(name),
-        rusqlite::OpenFlags::default() | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        flags | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(sql_error)
 }
@@ -2128,10 +2136,27 @@ mod tests {
         let path = alias.join("history-bindings.sqlite");
         drop(super::open_bindings(&path).expect("parent alias supported"));
         drop(super::open_binding_connection(&path).expect("reopen via alias"));
+        for flags in [
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE,
+        ] {
+            drop(super::open_binding_connection_with_flags(&path, flags).expect("existing alias"));
+            assert!(
+                super::open_binding_connection_with_flags(alias.join("absent.sqlite"), flags)
+                    .is_err()
+            );
+            assert!(!directory.join("absent.sqlite").exists());
+        }
         let database_alias = alias.join("other.sqlite");
         std::os::unix::fs::symlink(&path, &database_alias).expect("database alias");
         assert!(super::open_bindings(&database_alias).is_err());
         assert!(super::open_binding_connection(&database_alias).is_err());
+        for flags in [
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE,
+        ] {
+            assert!(super::open_binding_connection_with_flags(&database_alias, flags).is_err());
+        }
     }
 
     #[cfg(unix)]
