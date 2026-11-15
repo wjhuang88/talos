@@ -1655,14 +1655,22 @@ pub(crate) fn create_or_open(
     validate_external_id(external_id)?;
     fs::create_dir_all(root)?;
     let bindings_path = root.join("durable-bindings.sqlite");
+    #[cfg(test)]
+    binding_open_stage("open");
     let mut connection = open_bindings(&bindings_path)?;
+    #[cfg(test)]
+    binding_open_stage("begin");
     let transaction = connection.transaction().map_err(sql_error)?;
+    #[cfg(test)]
+    binding_open_stage("insert");
     transaction
         .execute(
             "INSERT OR IGNORE INTO durable_bindings (external_id, session_id) VALUES (?1, ?2)",
             params![external_id, Uuid::new_v4().to_string()],
         )
         .map_err(sql_error)?;
+    #[cfg(test)]
+    binding_open_stage("select");
     let bound_id: String = transaction
         .query_row(
             "SELECT session_id FROM durable_bindings WHERE external_id = ?1",
@@ -1672,6 +1680,8 @@ pub(crate) fn create_or_open(
         .map_err(sql_error)?;
     let id = Uuid::parse_str(&bound_id)
         .map_err(|_| SessionError::DurableTurn("binding contains invalid UUID".into()))?;
+    #[cfg(test)]
+    binding_open_stage("head-create");
     let session_dir = root.join("durable");
     fs::create_dir_all(&session_dir)?;
     let file_path = session_dir.join(format!("{id}.tlog"));
@@ -1688,6 +1698,8 @@ pub(crate) fn create_or_open(
             .store
             .replace_entries_atomically(&session.file_path, &[])?;
     }
+    #[cfg(test)]
+    binding_open_stage("commit");
     transaction.commit().map_err(sql_error)?;
     Ok(DurableSession::new(
         external_id.to_string(),
@@ -1784,6 +1796,31 @@ pub(crate) fn open_binding_connection_with_flags(
 }
 
 #[cfg(test)]
+#[derive(Debug)]
+struct BindingOpenTrace {
+    started: std::time::Instant,
+    stage: &'static str,
+    stage_elapsed_us: u128,
+    init_attempts: u32,
+    sqlite_codes: Option<(i32, i32)>,
+}
+
+#[cfg(test)]
+thread_local! {
+    static BINDING_OPEN_TRACE: std::cell::RefCell<Option<BindingOpenTrace>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn binding_open_stage(stage: &'static str) {
+    BINDING_OPEN_TRACE.with(|trace| {
+        if let Some(trace) = trace.borrow_mut().as_mut() {
+            trace.stage = stage;
+            trace.stage_elapsed_us = trace.started.elapsed().as_micros();
+        }
+    });
+}
+
+#[cfg(test)]
 thread_local! {
     static BINDING_INIT_RETRY_OBSERVER: std::cell::RefCell<Option<Box<dyn FnMut()>>> = const { std::cell::RefCell::new(None) };
 }
@@ -1792,6 +1829,8 @@ pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, Sessio
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
+    #[cfg(test)]
+    binding_open_stage("connection-open");
     let connection = open_binding_connection(path)?;
     // rusqlite opens connections with a five-second busy handler. Disable it
     // during initialization so each explicit retry cannot inherit that wait.
@@ -1823,7 +1862,15 @@ pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, Sessio
     const RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(25);
     let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
     let mut retries = 0u32;
+    #[cfg(test)]
+    binding_open_stage("wal-schema-init");
     loop {
+        #[cfg(test)]
+        BINDING_OPEN_TRACE.with(|trace| {
+            if let Some(trace) = trace.borrow_mut().as_mut() {
+                trace.init_attempts += 1;
+            }
+        });
         match connection.execute_batch(init_sql) {
             Ok(()) => break,
             Err(error @ rusqlite::Error::SqliteFailure(_, _))
@@ -1967,6 +2014,14 @@ pub(crate) fn fork_crash_probe(phase: &str) {
 }
 
 fn sql_error(error: rusqlite::Error) -> SessionError {
+    #[cfg(test)]
+    BINDING_OPEN_TRACE.with(|trace| {
+        if let Some(trace) = trace.borrow_mut().as_mut()
+            && let rusqlite::Error::SqliteFailure(code, _) = &error
+        {
+            trace.sqlite_codes = Some((code.extended_code & 0xff, code.extended_code));
+        }
+    });
     SessionError::DurableTurn(format!("binding index error: {error}"))
 }
 
@@ -3981,20 +4036,48 @@ mod tests {
         let root = directory.path().to_path_buf();
         let barrier = std::sync::Arc::new(std::sync::Barrier::new(6));
         let handles = (0..6)
-            .map(|_| {
+            .map(|worker| {
                 let root = root.clone();
                 let barrier = std::sync::Arc::clone(&barrier);
                 std::thread::spawn(move || {
                     barrier.wait();
-                    create_or_open(&root, "task:concurrent")
-                        .expect("concurrent open")
-                        .id()
+                    BINDING_OPEN_TRACE.with(|trace| {
+                        *trace.borrow_mut() = Some(BindingOpenTrace {
+                            started: std::time::Instant::now(),
+                            stage: "start",
+                            stage_elapsed_us: 0,
+                            init_attempts: 0,
+                            sqlite_codes: None,
+                        });
+                    });
+                    let result = create_or_open(&root, "task:concurrent").map(|session| session.id());
+                    let trace = BINDING_OPEN_TRACE.with(|trace| trace.borrow_mut().take())
+                        .expect("worker trace");
+                    let diagnostic = format!(
+                        "worker={worker} ok={} stage={} stage_enter_us={} elapsed_us={} init_attempts={} sqlite_codes={:?}",
+                        result.is_ok(), trace.stage, trace.stage_elapsed_us,
+                        trace.started.elapsed().as_micros(), trace.init_attempts, trace.sqlite_codes,
+                    );
+                    (result.map_err(|_| ()), diagnostic)
                 })
             })
             .collect::<Vec<_>>();
-        let ids = handles
+        let results = handles
             .into_iter()
-            .map(|handle| handle.join().expect("worker did not panic"))
+            .map(|handle| handle.join())
+            .collect::<Vec<_>>();
+        for (_, diagnostic) in results.iter().filter_map(|result| result.as_ref().ok()) {
+            eprintln!("binding-open {diagnostic}");
+        }
+        assert!(
+            results
+                .iter()
+                .all(|result| matches!(result, Ok((Ok(_), _)))),
+            "all six concurrent opens must succeed; see fixed-field worker diagnostics"
+        );
+        let ids = results
+            .into_iter()
+            .map(|result| result.expect("joined").0.expect("opened"))
             .collect::<Vec<_>>();
         assert!(ids.iter().all(|id| *id == ids[0]));
     }
