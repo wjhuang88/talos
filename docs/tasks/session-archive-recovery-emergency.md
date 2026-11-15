@@ -1573,3 +1573,33 @@ in this historical owner describe the recovery decision at that time, not the ho
 composition decision. Originals are retained in target/recovery-adr105-migration-20261115
 under the primary workspace. This is document-only; the5490-test selective gate
 continues to cover the unchanged production source. Status remains Partial.
+
+
+## 2026-11-15 parent-directory alias recovery gate — Partial
+
+Implementation commits: 2e85fdb0 (recovery directory aliases) and f0eb335b
+(portable Agent workspaces and closing the external test writer before recovery).
+SQLite recovery opens canonicalize the parent directory only, retaining final-file
+NOFOLLOW and each existing read/write/create policy. The index and pending runtime
+reader use the same boundary. Database-file aliases remain refused; regressions
+check no-create observation and unchanged original bytes. Independent review found
+no blocker in the combined eight-file slice.
+
+The exact source export passed standard release_preflight.sh: 5491 tests/doctests,
+zero failed/ignored, both external Runtime SDK modes, exit 0. All 2445 input hashes
+matched at completion. Evidence in the primary target directory:
+recovery-alias-validation-manifest.json, recovery-alias-selective-preflight4.log,
+and recovery-alias-selective-preflight-result.json. Run time 9min23.464s, peak 2G,
+swap 0B, single-job resource limits and explicit LC_ALL=C/LANG=C. Earlier setup,
+formatting and locale failures remain retained; no test assertions were relaxed.
+Focused alias-path Session 428 / Agent 730 tests also passed.
+
+Windows MSVC all-features/tests cross-check for Session and Agent passed with
+locked dependencies (recovery-alias-xwin-check.log); one Agent dead_code warning
+remains. This is compilation evidence only. Native CI at df29bb9c failed macOS
+recovery paths and Windows tests; refreshed native exact-head validation is still
+required. The Windows concurrent first-open database-lock failure is unresolved;
+its open/schema/transaction phase must be established before changing behavior.
+No installed-host acceptance, deployment, merge or Complete claim follows. UI,
+approval-history and background work are excluded; background remains default-off.
+Existing sessions, migration sources, backups and unrelated dirty work are retained.
