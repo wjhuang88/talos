@@ -256,3 +256,20 @@ fixture's old behavior. The retry passed the Azure browser test (1 passed / 422 
 Governance's first invocation failed because cargo was absent from PATH; the fixed-toolchain retry
 is tracked separately. Collaboration-claim validation passed with one existing SEARCH-001-D3
 Unclaimed documentation-intake warning. These local results do not replace exact-head native CI.
+
+### 2026-11-15 ordered-image matrix recovery
+
+Restored the previously tested extension lost in another workspace reset: actual Chat Agent read
+rounds now retain two distinct ordered images across both requests in all six transport/tool-mode
+combinations; actual Responses Agent read rounds cover Native/Compat/TalosStrict with the same
+image-order/path-leak assertions. Prior Chat matrix passed; initial Responses matrix failed because
+the fixture assumed text-mode tool results used native function_call_output. Corrected the matcher
+to check the returned tool content for all modes and enforce native call_id only in Native; the
+retry passed all three modes. These are historical observations until this restored tree reruns.
+No production encoder or tool semantics were changed to make the fixture pass.
+
+The preceding fixed-PATH governance retry passed with zero warnings. Current catalog audit found
+models.dev's HTTP API returned 403; Git checkout succeeded at a5458bdc8326d995619413b54425db97e911f4d4.
+Its Azure schema-2 entries contain multiple wire families and per-API overrides, so the old blanket
+SDK-name inference is not justified. The evidence fixture/audit is being restored separately;
+no new automatic inference, catalog regeneration or vendor endpoint substitution is claimed.

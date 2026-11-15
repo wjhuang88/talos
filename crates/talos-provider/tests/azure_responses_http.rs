@@ -520,35 +520,40 @@ async fn azure_success_status_error_event_is_redacted() {
 #[tokio::test]
 async fn azure_responses_actual_agent_completes_permission_gated_read() {
     use talos_core::tool::{ToolProtocol, ToolRegistry};
-    let directory = tempfile::tempdir().expect("workspace");
-    let workspace = directory.path().canonicalize().expect("canonical");
-    std::fs::write(workspace.join("fixture.txt"), "AZURE_AGENT_READ_OK").expect("fixture");
-    use base64::Engine as _;
-    use sha2::Digest as _;
-    let mut parts = vec![ContentPart::Text {
-        text: "Inspect these images in order".into(),
-    }];
-    let mut urls = Vec::new();
-    for (index, color) in [[255, 0, 0, 255], [0, 0, 255, 255]].into_iter().enumerate() {
-        let path = workspace.join(format!("private-image-{index}.png"));
-        image::RgbaImage::from_pixel(1, 1, image::Rgba(color))
-            .save(&path)
-            .expect("PNG");
-        let bytes = std::fs::read(&path).expect("image bytes");
-        urls.push(format!(
-            "data:image/png;base64,{}",
-            base64::engine::general_purpose::STANDARD.encode(&bytes)
-        ));
-        parts.push(ContentPart::Image {
-            path,
-            mime: "image/png".into(),
-            byte_count: bytes.len() as u64,
-            content_digest: ContentDigest::from_raw(sha2::Sha256::digest(&bytes).into()),
-        });
-    }
-    let expected_images = urls.clone();
-    let mut server = mockito::Server::new_async().await;
-    let first = server.mock("POST", "/openai/v1/responses")
+    for protocol in [
+        ToolProtocol::Native,
+        ToolProtocol::Compat,
+        ToolProtocol::TalosStrict,
+    ] {
+        let directory = tempfile::tempdir().expect("workspace");
+        let workspace = directory.path().canonicalize().expect("canonical");
+        std::fs::write(workspace.join("fixture.txt"), "AZURE_AGENT_READ_OK").expect("fixture");
+        use base64::Engine as _;
+        use sha2::Digest as _;
+        let mut parts = vec![ContentPart::Text {
+            text: "Inspect these images in order".into(),
+        }];
+        let mut urls = Vec::new();
+        for (index, color) in [[255, 0, 0, 255], [0, 0, 255, 255]].into_iter().enumerate() {
+            let path = workspace.join(format!("private-image-{index}.png"));
+            image::RgbaImage::from_pixel(1, 1, image::Rgba(color))
+                .save(&path)
+                .expect("PNG");
+            let bytes = std::fs::read(&path).expect("image bytes");
+            urls.push(format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(&bytes)
+            ));
+            parts.push(ContentPart::Image {
+                path,
+                mime: "image/png".into(),
+                byte_count: bytes.len() as u64,
+                content_digest: ContentDigest::from_raw(sha2::Sha256::digest(&bytes).into()),
+            });
+        }
+        let expected_images = urls.clone();
+        let mut server = mockito::Server::new_async().await;
+        let first = server.mock("POST", "/openai/v1/responses")
         .match_header("api-key", "sk-test")
         .match_header("authorization", mockito::Matcher::Missing)
         .match_request(move |request| {
@@ -557,18 +562,21 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
             let images: Vec<&str> = body["input"].as_array().expect("input").iter()
                 .filter_map(|item| item["content"].as_array()).flatten()
                 .filter(|part| part["type"] == "input_image").filter_map(|part| part["image_url"].as_str()).collect();
-            !raw.contains("function_call_output") && !raw.contains("private-image-")
+            !raw.contains("AZURE_AGENT_READ_OK") && !raw.contains("private-image-")
                 && images == expected_images && body["model"] == "azure-deployment"
         })
         .with_status(200).with_header("content-type", "text/event-stream")
-        .with_body(concat!(
+        .with_body(if protocol == ToolProtocol::Native { concat!(
             "data: {\"type\":\"response.created\"}\n\n",
             "data: {\"type\":\"response.output_item.added\",\"item\":{\"id\":\"fc_read\",\"type\":\"function_call\",\"call_id\":\"call_read\",\"name\":\"read\",\"arguments\":\"\"}}\n\n",
             "data: {\"type\":\"response.function_call_arguments.done\",\"item_id\":\"fc_read\",\"arguments\":\"{\\\"path\\\":\\\"fixture.txt\\\"}\"}\n\n",
             "data: {\"type\":\"response.output_item.done\",\"item\":{\"id\":\"fc_read\",\"type\":\"function_call\",\"call_id\":\"call_read\",\"name\":\"read\",\"arguments\":\"{\\\"path\\\":\\\"fixture.txt\\\"}\"}}\n\n",
             "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n"
-        )).expect(1).create_async().await;
-    let second = server.mock("POST", "/openai/v1/responses")
+        ).to_owned() } else { format!("data: {}\n\ndata: {}\n\n",
+            json!({"type":"response.output_text.delta","delta":"<tool_call>{\"name\":\"read\",\"args\":{\"path\":\"fixture.txt\"}}</tool_call>"}),
+            json!({"type":"response.completed","response":{"usage":{"input_tokens":4,"output_tokens":2}}}))
+        }).expect(1).create_async().await;
+        let second = server.mock("POST", "/openai/v1/responses")
         .match_header("api-key", "sk-test")
         .match_header("authorization", mockito::Matcher::Missing)
         .match_request(move |request| {
@@ -576,46 +584,52 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
             let images: Vec<&str> = body["input"].as_array().expect("input").iter()
                 .filter_map(|item| item["content"].as_array()).flatten()
                 .filter(|part| part["type"] == "input_image").filter_map(|part| part["image_url"].as_str()).collect();
-            images == urls && !body.to_string().contains("private-image-") && body["model"] == "azure-deployment" && body["input"].as_array().expect("input").iter().any(|item|
-                item["type"] == "function_call_output" && item["call_id"] == "call_read" && item["output"].as_str().is_some_and(|s| s.contains("AZURE_AGENT_READ_OK")))
+            images == urls && !body.to_string().contains("private-image-") && body["model"] == "azure-deployment" && body.to_string().contains("AZURE_AGENT_READ_OK")
+                && (protocol != ToolProtocol::Native || body["input"].as_array().expect("input").iter().any(|item|
+                    item["type"] == "function_call_output" && item["call_id"] == "call_read" && item["output"].as_str().is_some_and(|s| s.contains("AZURE_AGENT_READ_OK"))))
         }).with_status(200).with_header("content-type", "text/event-stream")
         .with_body("data: {\"type\":\"response.created\"}\n\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"done\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":8,\"output_tokens\":1}}}\n\n")
         .expect(1).create_async().await;
-    let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(talos_tools::file_tools::ReadTool::new(
-        workspace.clone(),
-    )));
-    let engine = talos_permission::PermissionEngine::with_workspace_root(workspace.clone());
-    let mut agent = talos_agent::Agent::with_security(
-        responses_provider(server.url()),
-        registry,
-        Some(Arc::new(engine)),
-        None,
-        workspace,
-    )
-    .with_reasoning_identity(Some("azure-fixture".into()), Some("gpt-test".into()), true);
-    agent.set_tool_protocol(ToolProtocol::Native);
-    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-    let (answer, history) = tokio::time::timeout(
-        Duration::from_secs(20),
-        agent.run_streaming(
-            "Read fixture.txt".into(),
-            vec![Message::Multimodal { parts }],
-            tx,
-        ),
-    )
-    .await
-    .expect("bounded Agent")
-    .expect("Agent round");
-    assert_eq!(answer, "done");
-    assert!(history.iter().any(|message| matches!(message, Message::Tool { result } if !result.is_error && result.content.contains("AZURE_AGENT_READ_OK"))));
-    assert!(
-        !serde_json::to_string(&history)
-            .expect("history")
-            .contains("sk-test")
-    );
-    first.assert_async().await;
-    second.assert_async().await;
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(talos_tools::file_tools::ReadTool::new(
+            workspace.clone(),
+        )));
+        let engine = talos_permission::PermissionEngine::with_workspace_root(workspace.clone());
+        let mut agent = talos_agent::Agent::with_security(
+            responses_provider(server.url()),
+            registry,
+            Some(Arc::new(engine)),
+            None,
+            workspace,
+        )
+        .with_reasoning_identity(
+            Some("azure-fixture".into()),
+            Some("gpt-test".into()),
+            true,
+        );
+        agent.set_tool_protocol(protocol);
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (answer, history) = tokio::time::timeout(
+            Duration::from_secs(20),
+            agent.run_streaming(
+                "Read fixture.txt".into(),
+                vec![Message::Multimodal { parts }],
+                tx,
+            ),
+        )
+        .await
+        .expect("bounded Agent")
+        .expect("Agent round");
+        assert_eq!(answer, "done");
+        assert!(history.iter().any(|message| matches!(message, Message::Tool { result } if !result.is_error && result.content.contains("AZURE_AGENT_READ_OK"))));
+        assert!(
+            !serde_json::to_string(&history)
+                .expect("history")
+                .contains("sk-test")
+        );
+        first.assert_async().await;
+        second.assert_async().await;
+    }
 }
 
 #[tokio::test]

@@ -111,7 +111,10 @@ async fn azure_chat_modes_preserve_tool_protocol_and_deployment_identity() {
 
 #[tokio::test]
 async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
+    use base64::Engine as _;
+    use sha2::Digest as _;
     use std::{sync::Arc, time::Duration};
+    use talos_core::message::{ContentDigest, ContentPart};
     use talos_core::tool::ToolRegistry;
     for api in [
         AzureApiMode::V1,
@@ -127,6 +130,25 @@ async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
             let directory = tempfile::tempdir().expect("workspace");
             let workspace = directory.path().canonicalize().expect("canonical");
             std::fs::write(workspace.join("fixture.txt"), "AZURE_CHAT_READ_OK").expect("fixture");
+            let mut parts = Vec::new();
+            let mut urls = Vec::new();
+            for (index, color) in [[255, 0, 0, 255], [0, 0, 255, 255]].into_iter().enumerate() {
+                let path = workspace.join(format!("private-image-{index}.png"));
+                image::RgbaImage::from_pixel(1, 1, image::Rgba(color))
+                    .save(&path)
+                    .expect("PNG");
+                let bytes = std::fs::read(&path).expect("bytes");
+                urls.push(format!(
+                    "data:image/png;base64,{}",
+                    base64::engine::general_purpose::STANDARD.encode(&bytes)
+                ));
+                parts.push(ContentPart::Image {
+                    path,
+                    mime: "image/png".into(),
+                    byte_count: bytes.len() as u64,
+                    content_digest: ContentDigest::from_raw(sha2::Sha256::digest(&bytes).into()),
+                });
+            }
             let mut server = mockito::Server::new_async().await;
             let legacy = matches!(api, AzureApiMode::Deployment { .. });
             let path = if legacy {
@@ -141,6 +163,7 @@ async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
             };
             let mut fixtures = Vec::new();
             for second in [false, true] {
+                let expected_images = urls.clone();
                 let response = if second {
                     json!({"content":"done"})
                 } else {
@@ -158,7 +181,12 @@ async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
                     .match_request(move |request| {
                         let raw = String::from_utf8_lossy(request.body().expect("body"));
                         let body: serde_json::Value = serde_json::from_str(&raw).expect("JSON");
-                        body["model"] == "deployment" && raw.contains("AZURE_CHAT_READ_OK") == second
+                        let images: Vec<&str> = body["messages"].as_array().expect("messages").iter()
+                            .filter_map(|message| message["content"].as_array()).flatten()
+                            .filter(|part| part["type"] == "image_url")
+                            .filter_map(|part| part["image_url"]["url"].as_str()).collect();
+                        images == expected_images && !raw.contains("private-image-")
+                            && body["model"] == "deployment" && raw.contains("AZURE_CHAT_READ_OK") == second
                             && (!second || protocol != ToolProtocol::Native || body["messages"].as_array().expect("messages").iter().any(|m| m["role"] == "tool" && m["tool_call_id"] == "call_read"))
                     })
                     .with_status(200).with_header("content-type", "text/event-stream")
@@ -215,7 +243,11 @@ async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
             let (tx, _) = tokio::sync::mpsc::unbounded_channel();
             let (answer, history) = tokio::time::timeout(
                 Duration::from_secs(20),
-                agent.run_streaming("Read fixture.txt".into(), vec![], tx),
+                agent.run_streaming(
+                    "Read fixture.txt".into(),
+                    vec![Message::Multimodal { parts }],
+                    tx,
+                ),
             )
             .await
             .expect("bounded Agent")
