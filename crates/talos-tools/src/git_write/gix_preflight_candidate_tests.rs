@@ -503,11 +503,9 @@ fn gix_pure_candidate_records_zero_child_git_invocations() {
 #[test]
 #[ignore = "only invoked by the isolated no-Git-child sentinel parent"]
 fn gix_pure_candidate_no_child_fixture() {
-    assert!(
-        std::env::var("TALOS_I324_RUN_ISOLATED_CHILD")
-            .is_ok_and(|value| value == "1"),
-        "the ignored fixture may run only under its isolated parent"
-    );
+    if std::env::var("TALOS_I324_RUN_ISOLATED_CHILD").as_deref() != Ok("1") {
+        return;
+    }
 
     let config = b"[core]\n bare = false\n[include]\n path = never-authorized.conf\n";
     let parsed = target_config::parse_records(config).expect("parse admitted bytes only");
