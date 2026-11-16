@@ -345,7 +345,7 @@ fn gix_admitted_filter_attributes_match_native_git_fixture() {
     // Search consumes only the already validated in-memory .gitattributes
     // source and must not discover or read ambient Git attribute files.
     const ATTRIBUTES: &[u8] =
-        b"[attr]myfilter filter=lfs\n*.bin myfilter\n*.txt -filter\n*.jpg filter=photo\n*.md !filter\n";
+        b"[attr]myfilter filter=lfs\n*.bin myfilter\n*.txt -filter\n*.jpg filter=photo\n*.md !filter\nspecial.bin filter=direct\n*.override filter=first\n*.override filter=second\n";
     assert!(
         gix_attributes::parse(ATTRIBUTES).all(|line| {
             let Ok((_, assignments, _)) = line else {
@@ -386,6 +386,10 @@ fn gix_admitted_filter_attributes_match_native_git_fixture() {
         ("sample.txt", "-filter"),
         ("sample.jpg", "filter=photo"),
         ("sample.md", "!filter"),
+        // Later specific/duplicate patterns override an earlier matching
+        // macro or assignment; effects must not be inferred from first match.
+        ("special.bin", "filter=direct"),
+        ("sample.override", "filter=second"),
     ] {
         let native = std::process::Command::new("git")
             .arg("-C")
