@@ -194,6 +194,23 @@ mod tests {
     }
 
     #[test]
+    fn selected_todo_repository_reuses_session_directory_and_domain_contract() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let profile = LocalStorageProfile::under_home_dir(dir.path());
+        let selected_db = profile.sessions_dir().join("todos.sqlite");
+        assert!(!selected_db.exists());
+
+        let store = profile.todo_repository().expect("selected todo repository");
+        assert_eq!(store.db_path(), selected_db.as_path());
+        let contract: &dyn talos_session::TodoPersistence = &store;
+        assert!(contract
+            .list(uuid::Uuid::new_v4(), talos_session::TodoQuery::default())
+            .expect("session scoped empty todo list")
+            .is_empty());
+        assert!(selected_db.is_file(), "explicit Todo open must use selected SQLite path");
+    }
+
+    #[test]
     fn explicit_local_stores_delegate_to_existing_domain_traits() {
         let dir = tempfile::tempdir().expect("tempdir");
         let profile = LocalStorageProfile::under_home_dir(dir.path());
