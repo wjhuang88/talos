@@ -14,7 +14,7 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 [Owner](tasks/session-ui-continuity-repair.md): Review / Claimed. Claim #952 is effective
 on main. Queue custody visibility, external user-background spacing and lifecycle
 regressions passed local standard preflight and controlled-provider ANSI PTY checks.
-Stable candidate review, native CI and native terminal acceptance remain open.
+Draft implementation #962: exact-head review, native CI and native terminal acceptance remain open.
 Recovery PR #917, approval history, edit locations and background retain separate owners.
 
 ## SEARCH-001-D3-T2 / I327 — Complete / Closed upon owner-first closeout merge

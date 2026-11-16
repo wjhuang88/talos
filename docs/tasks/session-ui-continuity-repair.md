@@ -35,7 +35,7 @@ this task does not reopen them or borrow their closed claims.
 | Governance Claim PR | #952 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer requested completion of the existing handoff; effective target-branch claim required before committed implementation |
-| Implementation PR | Stable candidate preparation; not yet opened |
+| Implementation PR | #962 |
 | Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Effective claim, isolated source validation, exact-head review/CI and native terminal acceptance |
 
@@ -191,3 +191,12 @@ occurred without OOM; this is capped validation, not a performance measurement.
 Source implementation is ready for staged-diff review and stable candidate creation.
 Exact-commit independent review/native CI and native terminal acceptance remain open;
 no product merge, installation, release, or whole-handoff completion is claimed.
+
+### Stable candidate publication
+
+Implementation commit d820d664c3059583baf1e47007b86532747694c4 was reviewed
+as a staged scoped diff and pushed as draft PR #962. Only owner/Board evidence
+changed after the full validation manifest; the product source remains identical.
+Both governance validators passed after owner-first Review/Board synchronization
+(existing unrelated SEARCH intake warning only). Exact-head independent review and
+native CI are pending. No completion or product merge authorization is asserted.
