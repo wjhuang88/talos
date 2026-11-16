@@ -177,7 +177,10 @@ mod tests {
         assert_eq!(profile.sessions_dir(), root.join("sessions"));
         assert_eq!(profile.memory_db(), root.join("memory.db"));
         assert_eq!(profile.exploration_db(), root.join("exploration.db"));
-        assert_eq!(profile.evolution_hook_db(), root.join("evolution/knowledge.db"));
+        assert_eq!(
+            profile.evolution_hook_db(),
+            root.join("evolution/knowledge.db")
+        );
         assert_eq!(profile.learned_index_db(), root.join("index.db"));
         assert_ne!(profile.evolution_hook_db(), profile.learned_index_db());
         assert!(!root.exists());
@@ -185,12 +188,22 @@ mod tests {
         let sessions = profile.custom_session_manager();
         assert_eq!(sessions.sessions_dir(), profile.sessions_dir());
         assert!(profile.memory_if_exists().expect("memory gate").is_none());
-        assert!(profile.exploration_if_exists().expect("research gate").is_none());
-        assert!(profile
-            .learned_knowledge_if_exists()
-            .expect("learned gate")
-            .is_none());
-        assert!(!root.exists(), "selection must not create a local DB or directory");
+        assert!(
+            profile
+                .exploration_if_exists()
+                .expect("research gate")
+                .is_none()
+        );
+        assert!(
+            profile
+                .learned_knowledge_if_exists()
+                .expect("learned gate")
+                .is_none()
+        );
+        assert!(
+            !root.exists(),
+            "selection must not create a local DB or directory"
+        );
     }
 
     #[test]
@@ -203,11 +216,16 @@ mod tests {
         let store = profile.todo_repository().expect("selected todo repository");
         assert_eq!(store.db_path(), selected_db.as_path());
         let contract: &dyn talos_session::TodoPersistence = &store;
-        assert!(contract
-            .list(uuid::Uuid::new_v4(), talos_session::TodoQuery::default())
-            .expect("session scoped empty todo list")
-            .is_empty());
-        assert!(selected_db.is_file(), "explicit Todo open must use selected SQLite path");
+        assert!(
+            contract
+                .list(uuid::Uuid::new_v4(), talos_session::TodoQuery::default())
+                .expect("session scoped empty todo list")
+                .is_empty()
+        );
+        assert!(
+            selected_db.is_file(),
+            "explicit Todo open must use selected SQLite path"
+        );
     }
 
     #[test]
@@ -217,30 +235,41 @@ mod tests {
         let memory = profile.memory_for_write().expect("explicit memory open");
         let memory_ops: &dyn MemoryPersistence = &memory;
         assert_eq!(memory_ops.count().expect("memory count"), 0);
-        assert!(profile.memory_if_exists().expect("existing memory").is_some());
+        assert!(
+            profile
+                .memory_if_exists()
+                .expect("existing memory")
+                .is_some()
+        );
 
         let exploration = profile
             .exploration_for_ingest()
             .expect("explicit exploration open");
         let exploration_ops: &dyn ExplorationPersistence = &exploration;
         assert_eq!(exploration_ops.count_sources().expect("source count"), 0);
-        assert!(profile
-            .exploration_if_exists()
-            .expect("existing exploration")
-            .is_some());
+        assert!(
+            profile
+                .exploration_if_exists()
+                .expect("existing exploration")
+                .is_some()
+        );
 
         let legacy_path = profile.learned_index_db();
         let learned = KnowledgeStore::open(legacy_path.to_str().expect("UTF-8 tempdir"))
             .expect("explicit learned creation");
         let knowledge_ops: &dyn KnowledgePersistence = &learned;
-        assert!(knowledge_ops
-            .get_all_patterns()
-            .expect("patterns")
-            .is_empty());
-        assert!(profile
-            .learned_knowledge_if_exists()
-            .expect("existing learned")
-            .is_some());
+        assert!(
+            knowledge_ops
+                .get_all_patterns()
+                .expect("patterns")
+                .is_empty()
+        );
+        assert!(
+            profile
+                .learned_knowledge_if_exists()
+                .expect("existing learned")
+                .is_some()
+        );
     }
 
     #[cfg(unix)]
