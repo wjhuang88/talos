@@ -6879,12 +6879,34 @@ async fn actor_history_search_and_detail(cli: bool, archived: bool) {
                     },
                 ]
             } else if self.compact && step == 4 {
+                let discovery = result("recover-0");
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "checkpoint-source-detail".into(),
+                            name: "history_search".into(),
+                            input: serde_json::json!({"mode":"source_detail", "snapshot":discovery["snapshot"], "reference":discovery["sources"][0]}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else if self.compact && step == 5 {
                 assert_eq!(
                     result("recover-3")["text"],
                     "originalfact unique constraint"
                 );
                 let discovery = result("recover-0");
-                let item = serde_json::json!({"text":"originalfact unique constraint", "sources":[discovery["sources"][0]]});
+                let source = result("checkpoint-source-detail");
+                assert_eq!(source["text"], "originalfact unique constraint");
+                assert_eq!(source["reference"], discovery["sources"][0]);
+                assert_eq!(source["checkpoint_source"], true);
+                let item =
+                    serde_json::json!({"text":source["text"], "sources":[source["reference"]]});
                 vec![
                     AgentEvent::ToolCall {
                         call: talos_core::message::ToolCall {
@@ -6904,7 +6926,7 @@ async fn actor_history_search_and_detail(cli: bool, archived: bool) {
                     },
                 ]
             } else {
-                assert_eq!(step, if self.compact { 5 } else { 4 });
+                assert_eq!(step, if self.compact { 6 } else { 4 });
                 if self.compact {
                     assert_eq!(result("archive-compact")["status"], "Admitted");
                     assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.contains("originalfact unique constraint"))), "installed source-backed checkpoint is present");
@@ -7030,6 +7052,10 @@ async fn actor_history_search_and_detail(cli: bool, archived: bool) {
                 .any(|entry| entry.content == "originalfact unique constraint")
         );
     }
+    drop(durable);
+    let durable = talos_session::DurableSession::open_existing(root.path(), "recovery")
+        .expect("cold reopen")
+        .expect("existing owner");
     let mut engine = talos_permission::PermissionEngine::empty();
     engine.set_workspace_root(root.path().into());
     engine.add_rule(talos_permission::PermissionRule::new_nature(
@@ -7114,7 +7140,7 @@ async fn actor_history_search_and_detail(cli: bool, archived: bool) {
             .expect("persisted diagnostics");
         assert_eq!(
             diagnostics.len(),
-            if archived { 6 } else { 5 },
+            if archived { 7 } else { 5 },
             "every provider response terminal must survive prepared recovery"
         );
         let reopened = talos_session::Session::new(

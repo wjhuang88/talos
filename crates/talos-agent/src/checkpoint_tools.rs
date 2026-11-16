@@ -15,6 +15,8 @@ use tokio::sync::{mpsc, oneshot};
 #[cfg(test)]
 type QueryCompletionHook =
     Box<dyn FnOnce() -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> + Send>;
+#[cfg(test)]
+type SourceDeliveryHook = Box<dyn FnOnce() + Send>;
 
 #[derive(Clone)]
 pub(crate) struct Execution {
@@ -23,6 +25,8 @@ pub(crate) struct Execution {
     permission: Option<Arc<talos_permission::PermissionSessionState>>,
     #[cfg(test)]
     after_history_query: Arc<Mutex<Option<QueryCompletionHook>>>,
+    #[cfg(test)]
+    before_source_delivery: Arc<Mutex<Option<SourceDeliveryHook>>>,
 }
 #[derive(Default)]
 struct State {
@@ -33,6 +37,7 @@ struct State {
     issued: Option<Snapshot>,
     cursor: Option<(String, usize)>,
     receipt: Option<(u64, oneshot::Receiver<CompactOutcome>)>,
+    admitting: bool,
 }
 #[derive(Clone)]
 struct Snapshot {
@@ -41,7 +46,47 @@ struct Snapshot {
     end: usize,
     refs: BTreeMap<String, String>,
     order: Vec<String>,
+    details: Arc<BTreeMap<String, talos_session::history_projection::RecoveryText>>,
     authority: PermissionLease,
+}
+
+// A reservation covers the asynchronous Actor admission window, including a
+// rediscovery during that window. Cancellation must release it as well.
+struct AdmissionReservation(Arc<Mutex<State>>);
+impl Drop for AdmissionReservation {
+    fn drop(&mut self) {
+        if let Ok(mut state) = self.0.lock() {
+            state.admitting = false;
+        }
+    }
+}
+
+fn checkpoint_source_text(
+    message: &Message,
+) -> Option<talos_session::history_projection::RecoveryText> {
+    let (role, content) = match message {
+        Message::User { content } => ("user", content),
+        Message::Assistant { content, .. } => ("assistant", content),
+        // Runtime tool messages have no durable receipt proving redisclosure.
+        // Never expose reasoning, tool arguments, system text or raw fallbacks.
+        _ => return None,
+    };
+    if content.len() > talos_session::history_page::HISTORY_PAGE_BYTES {
+        return None;
+    }
+    let entry = talos_session::SessionEntry {
+        id: String::new(),
+        parent_id: None,
+        timestamp: Default::default(),
+        role: role.into(),
+        content: content.clone(),
+        metadata: Default::default(),
+    };
+    talos_session::history_projection::recovery_response_text(
+        &entry,
+        None,
+        talos_session::history_projection::RecoveryTextKind::Detail,
+    )
 }
 #[derive(Clone)]
 pub(crate) struct PermissionLease {
@@ -75,6 +120,8 @@ impl Execution {
             permission,
             #[cfg(test)]
             after_history_query: Arc::new(Mutex::new(None)),
+            #[cfg(test)]
+            before_source_delivery: Arc::new(Mutex::new(None)),
         }
     }
     pub(crate) async fn refresh_cooperative(
@@ -110,6 +157,9 @@ impl Execution {
             }
             let mut refs = BTreeMap::new();
             let mut order = Vec::new();
+            let mut details = BTreeMap::new();
+            // Text payload budget, in addition to the existing source metadata.
+            let mut remaining = 2 * 1024 * 1024;
             for (index, message) in messages[..end].iter().enumerate() {
                 tokio::task::yield_now().await;
                 if tokio::time::Instant::now() >= deadline {
@@ -126,6 +176,13 @@ impl Execution {
                     source.resolve(source.generation(), source.revision(), index, message)
                 {
                     let reference = uuid::Uuid::new_v4().to_string();
+                    if remaining > 0
+                        && let Some(detail) = checkpoint_source_text(message)
+                        && detail.text.len() <= remaining
+                    {
+                        remaining -= detail.text.len();
+                        details.insert(reference.clone(), detail);
+                    }
                     refs.insert(reference.clone(), id.to_owned());
                     order.push(reference);
                 }
@@ -152,6 +209,7 @@ impl Execution {
                 end,
                 refs,
                 order,
+                details: Arc::new(details),
                 authority,
             })
         }
@@ -180,6 +238,9 @@ struct CompactInput {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct HistoryInput {
+    /// discover lists checkpoint sources; source_detail reads one of those
+    /// sources. search/detail use separate durable-history references, which
+    /// cannot be submitted as checkpoint sources.
     mode: String,
     #[serde(default)]
     cursor: Option<String>,
@@ -210,7 +271,7 @@ impl AgentTool for HistorySearchTool {
         "history_search"
     }
     fn description(&self) -> &str {
-        "Discover a checkpoint snapshot, search permitted durable history, or read a returned reference. Search/detail require the discovered snapshot and a prepared durable host index; unsupported storage returns Unavailable."
+        "Discover a checkpoint snapshot; source_detail reads an eligible checkpoint source UUID. Search/detail read permitted durable history using separate references that cannot be submitted to compact_context. All reads require the discovered snapshot; durable search/detail require a prepared host index."
     }
     fn parameters(&self) -> Value {
         serde_json::to_value(schemars::schema_for!(HistoryInput)).unwrap_or_else(|_| json!({}))
@@ -239,6 +300,90 @@ impl AgentTool for HistorySearchTool {
                 .as_ref()
                 .and_then(|history| history.refresh_prefix())
         });
+        if input.mode == "source_detail" {
+            if input.cursor.is_some()
+                || input.query.is_some()
+                || input.reference.as_ref().is_none_or(|r| r.len() > 128)
+            {
+                return ToolResult::error("invalid checkpoint source detail input");
+            }
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+            let durable = crate::checkpoint_history::HISTORY
+                .try_with(|history| history.is_some())
+                .unwrap_or(false);
+            let _identity = if durable {
+                let identity = crate::checkpoint_history::HISTORY
+                    .try_with(|history| history.as_ref()?.lock_identity_for_delivery(deadline))
+                    .ok()
+                    .flatten();
+                if identity.is_none() {
+                    return unavailable_reason("delivery_source_or_snapshot_unavailable");
+                }
+                identity
+            } else {
+                None
+            };
+            let Ok(state) = execution.state.lock() else {
+                return unavailable_reason("execution_state_poisoned");
+            };
+            let (Some(issued), Some(current)) = (&state.issued, &state.current) else {
+                return ToolResult::error("stale checkpoint snapshot; discover again");
+            };
+            if input.snapshot.as_deref() != Some(issued.token.as_str())
+                || current.end < issued.end
+                || !(0..issued.end).all(|i| issued.source.same_entry(&current.source, i))
+            {
+                return ToolResult::error("stale checkpoint source");
+            }
+            let Some(reference) = input.reference.as_deref() else {
+                return ToolResult::error("missing checkpoint source");
+            };
+            let Some(detail) = issued.details.get(reference) else {
+                return ToolResult::error(
+                    "checkpoint source text unavailable: unsupported projection, text budget, or unknown source",
+                );
+            };
+            if durable
+                && !crate::checkpoint_history::HISTORY
+                    .try_with(|history| {
+                        history
+                            .as_ref()
+                            .is_some_and(|h| h.available_until(deadline))
+                    })
+                    .unwrap_or(false)
+            {
+                return unavailable_reason("delivery_source_or_snapshot_unavailable");
+            }
+            #[cfg(test)]
+            if let Some(hook) = execution
+                .before_source_delivery
+                .lock()
+                .expect("hook")
+                .take()
+            {
+                hook();
+            }
+            return issued
+                .authority
+                .commit(|| {
+                    if std::time::Instant::now() >= deadline
+                        || (durable
+                            && !crate::checkpoint_history::HISTORY
+                                .try_with(|history| {
+                                    history.as_ref().is_some_and(|history| !history.cancelled())
+                                })
+                                .unwrap_or(false))
+                    {
+                        return unavailable_reason("delivery_cancelled_or_expired");
+                    }
+                    ToolResult::success(
+                        json!({"reference":reference,"text":detail.text,
+                    "truncated":detail.truncated,"checkpoint_source":true})
+                        .to_string(),
+                    )
+                })
+                .unwrap_or_else(|| unavailable_reason("permission_commit_rejected"));
+        }
         if matches!(input.mode.as_str(), "search" | "detail") {
             if input
                 .cursor
@@ -495,7 +640,7 @@ impl AgentTool for CompactContextTool {
         "compact_context"
     }
     fn description(&self) -> &str {
-        "Submit a structured checkpoint using a discovered snapshot and sources. Admitted reserves an operation; only a later Applied receipt confirms installation after the complete tool batch."
+        "Submit a structured checkpoint using a discovered snapshot and sources read with history_search source_detail. Durable search/detail references are not checkpoint sources. Admitted reserves an operation; only a later Applied receipt confirms installation after the complete tool batch."
     }
     fn parameters(&self) -> Value {
         serde_json::to_value(schemars::schema_for!(CompactInput)).unwrap_or_else(|_| json!({}))
@@ -522,15 +667,15 @@ impl AgentTool for CompactContextTool {
             return unavailable_reason("execution_scope_missing");
         };
         let snapshot = {
-            let Ok(mut state) = execution.state.lock() else {
+            let Ok(state) = execution.state.lock() else {
                 return unavailable_reason("execution_state_poisoned");
             };
-            if state.receipt.is_some() {
+            if state.receipt.is_some() || state.admitting {
                 return ToolResult::error("checkpoint operation busy");
             }
             let Some(issued) = state
                 .issued
-                .take()
+                .as_ref()
                 .filter(|issued| issued.token == input.snapshot)
             else {
                 return ToolResult::error("stale checkpoint snapshot");
@@ -544,7 +689,7 @@ impl AgentTool for CompactContextTool {
             {
                 return ToolResult::error("stale checkpoint source");
             }
-            issued
+            issued.clone()
         };
         let Ok(mut payload) = serde_json::to_value(input.checkpoint) else {
             return ToolResult::error("invalid checkpoint payload");
@@ -573,6 +718,29 @@ impl AgentTool for CompactContextTool {
         if !translate(&mut payload, &snapshot.refs) {
             return ToolResult::error("unknown checkpoint source");
         }
+        let _reservation = {
+            let Ok(mut state) = execution.state.lock() else {
+                return unavailable_reason("execution_state_poisoned");
+            };
+            if state.receipt.is_some() || state.admitting {
+                return ToolResult::error("checkpoint operation busy");
+            }
+            if !state
+                .issued
+                .as_ref()
+                .is_some_and(|issued| issued.token == snapshot.token)
+                || !state.current.as_ref().is_some_and(|current| {
+                    current.end >= snapshot.end
+                        && (0..snapshot.end).all(|i| snapshot.source.same_entry(&current.source, i))
+                })
+                || !snapshot.authority.valid()
+            {
+                return ToolResult::error("stale checkpoint source");
+            }
+            state.issued = None;
+            state.admitting = true;
+            AdmissionReservation(execution.state.clone())
+        };
         let (receipt, terminal) = oneshot::channel();
         let (response, admitted) = oneshot::channel();
         if execution
@@ -669,6 +837,242 @@ mod tests {
                 "receipt consumed exactly once"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn checkpoint_invalid_submission_preserves_issued_source() {
+        for wrong_snapshot in [false, true] {
+            let (execution, mut receiver, _) = fixture().await;
+            EXECUTION
+                .scope(execution.clone(), async {
+                    let result = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+                    let discovery: Value =
+                        serde_json::from_str(&result.content).expect("discovery");
+                    let mut input = submission(&discovery);
+                    if wrong_snapshot {
+                        input["snapshot"] = json!("wrong-snapshot");
+                    } else {
+                        input["checkpoint"]["goal"]["sources"] = json!(["durable-query-reference"]);
+                    }
+                    assert!(CompactContextTool.execute(input).await.is_error);
+                    assert!(receiver.try_recv().is_err());
+                    let detail = HistorySearchTool.execute(json!({"mode":"source_detail", "snapshot":discovery["snapshot"], "reference":discovery["sources"][0]})).await;
+                    assert!(!detail.is_error, "{}", detail.content);
+                    assert!(detail.content.contains("authorized source 0"));
+                    let actor = async {
+                        let crate::AgentActorRequest::AdmitModel { submission, response } = receiver.recv().await.expect("retry admission") else { panic!("expected admission") };
+                        response.send(Ok(7)).expect("admit");
+                        submission.receipt.send(CompactOutcome::Applied { before: 30, after: 10 }).expect("receipt");
+                    };
+                    let (retry, ()) = tokio::join!(CompactContextTool.execute(submission(&discovery)), actor);
+                    assert!(!retry.is_error, "{}", retry.content);
+                    assert!(execution.terminal().await.expect("terminal").1);
+                })
+                .await;
+        }
+    }
+
+    #[tokio::test]
+    async fn checkpoint_admission_reservation_blocks_rediscovery_and_recovers_after_cancel() {
+        let (execution, mut receiver, _) = fixture().await;
+        EXECUTION
+            .scope(execution.clone(), async {
+                let result = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+                let discovery: Value = serde_json::from_str(&result.content).expect("discovery");
+                let pending = CompactContextTool.execute(submission(&discovery));
+                tokio::pin!(pending);
+                let request = tokio::select! {
+                    biased;
+                    result = &mut pending => panic!("admission must wait: {result:?}"),
+                    request = receiver.recv() => request.expect("admission request"),
+                };
+                let rediscovered = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+                let rediscovered: Value =
+                    serde_json::from_str(&rediscovered.content).expect("rediscovery");
+                let busy = CompactContextTool.execute(submission(&rediscovered)).await;
+                assert!(busy.is_error);
+                assert!(busy.content.contains("busy"));
+                assert!(receiver.try_recv().is_err(), "only one Actor admission");
+                drop(request);
+                assert!(pending.await.is_error);
+                assert!(!execution.state.lock().expect("state").admitting);
+            })
+            .await;
+        // Dropping an in-flight tool future closes the Actor response channel
+        // and releases the reservation even without an admission reply.
+        let result = EXECUTION
+            .scope(
+                execution.clone(),
+                HistorySearchTool.execute(json!({"mode":"discover"})),
+            )
+            .await;
+        let discovery: Value = serde_json::from_str(&result.content).expect("discovery");
+        let request = {
+            let pending = EXECUTION.scope(
+                execution.clone(),
+                CompactContextTool.execute(submission(&discovery)),
+            );
+            tokio::pin!(pending);
+            tokio::select! {
+                biased;
+                _ = &mut pending => panic!("must wait"),
+                request = receiver.recv() => request.expect("request"),
+            }
+        };
+        let crate::AgentActorRequest::AdmitModel { response, .. } = request else {
+            panic!("expected model admission")
+        };
+        assert!(response.is_closed());
+        assert!(!execution.state.lock().expect("state").admitting);
+    }
+
+    #[test]
+    fn checkpoint_source_projection_excludes_private_fields_and_bounds_utf8() {
+        let source = Message::Assistant {
+            content: format!(
+                "public\n```json-tool\n{{\"secret\":\"HIDDEN_ARGUMENT\"}}\n```\n{}",
+                "界".repeat(4000)
+            ),
+            tool_calls: vec![talos_core::message::ToolCall {
+                id: "id".into(),
+                name: "hidden".into(),
+                input: json!({"private":"HIDDEN_NATIVE"}),
+            }],
+            reasoning: None,
+        };
+        let text = checkpoint_source_text(&source).expect("public projection");
+        assert!(text.truncated);
+        assert!(text.text.len() <= 8192);
+        assert!(!text.text.contains("HIDDEN"));
+        assert!(
+            checkpoint_source_text(&Message::Context {
+                content: "private".into()
+            })
+            .is_none()
+        );
+        assert!(
+            checkpoint_source_text(&Message::Tool {
+                result: talos_core::message::MessageToolResult {
+                    tool_use_id: "id".into(),
+                    content: "unverified".into(),
+                    is_error: false,
+                }
+            })
+            .is_none()
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn checkpoint_source_detail_reads_reopened_eligible_source() {
+        let (execution, _, raw) = fixture().await;
+        let root = tempfile::tempdir().expect("root");
+        let owner = talos_session::DurableSession::open_or_create(root.path(), "source-detail")
+            .expect("owner");
+        owner
+            .commit_turn("seed", &raw, &Default::default())
+            .expect("commit");
+        drop(owner);
+        let owner = talos_session::DurableSession::open_existing(root.path(), "source-detail")
+            .expect("reopen")
+            .expect("session");
+        let before = std::fs::read(owner.file_path()).expect("before");
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let history = crate::checkpoint_history::History::prepare(&owner, &cancel)
+            .await
+            .expect("history");
+        crate::checkpoint_history::HISTORY.scope(Some(history), EXECUTION.scope(execution.clone(), async {
+            let result = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+            let discovery: Value = serde_json::from_str(&result.content).expect("discovery");
+            let detail = HistorySearchTool.execute(json!({"mode":"source_detail", "snapshot":discovery["snapshot"], "reference":discovery["sources"][0]})).await;
+            assert!(!detail.is_error, "{}", detail.content);
+            let detail: Value = serde_json::from_str(&detail.content).expect("detail");
+            assert_eq!(detail["text"], "authorized source 0");
+            assert_eq!(detail["reference"], discovery["sources"][0]);
+            assert_eq!(detail["checkpoint_source"], true);
+            let cancelled = cancel.clone();
+            *execution.before_source_delivery.lock().expect("hook") = Some(Box::new(move || cancelled.cancel()));
+            let refused = HistorySearchTool.execute(json!({"mode":"source_detail", "snapshot":discovery["snapshot"], "reference":discovery["sources"][0]})).await;
+            assert!(refused.is_error, "cancel after availability check must prevent disclosure");
+            assert!(!refused.content.contains("authorized source"));
+
+        })).await;
+        assert_eq!(std::fs::read(owner.file_path()).expect("after"), before);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn checkpoint_source_detail_rejects_revoked_or_replaced_authority() {
+        for change in ["permission", "generation", "prefix", "durable", "cancel"] {
+            let (execution, _, mut raw) = fixture().await;
+            let root = tempfile::tempdir().expect("root");
+            let owner = talos_session::DurableSession::open_or_create(root.path(), "source-fence")
+                .expect("owner");
+            owner
+                .commit_turn("seed", &raw, &Default::default())
+                .expect("commit");
+            let cancel = tokio_util::sync::CancellationToken::new();
+            let history = crate::checkpoint_history::History::prepare(&owner, &cancel)
+                .await
+                .expect("history");
+            crate::checkpoint_history::HISTORY.scope(Some(history), EXECUTION.scope(execution.clone(), async {
+                let discovery = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+                let discovery: Value = serde_json::from_str(&discovery.content).expect("discovery");
+                match change {
+                    "permission" => { execution.permission.as_ref().expect("permission").clear().expect("revoke"); }
+                    "cancel" => cancel.cancel(),
+                    "durable" => {
+                        let mut bytes = std::fs::read(owner.file_path()).expect("source");
+                        let offset = bytes.windows(b"authorized source".len()).position(|part| part == b"authorized source").expect("text");
+                        bytes[offset] = b'X';
+                        std::fs::write(owner.file_path(), bytes).expect("same-length replacement");
+                    }
+                    _ => {
+                        if change == "prefix" { raw[0] = Message::User { content: "replacement".into() }; }
+                        let source = HistorySource::bind(u64::from(change == "generation"), raw.len() as u64,
+                            &raw, (0..raw.len()).map(|i| format!("raw-{i}")).collect()).expect("source");
+                        execution.refresh_cooperative(Some(&source), &raw).await;
+                    }
+                }
+                let result = HistorySearchTool.execute(json!({"mode":"source_detail", "snapshot":discovery["snapshot"], "reference":discovery["sources"][0]})).await;
+                assert!(result.is_error, "{change}: {}", result.content);
+                assert!(!result.content.contains("authorized source"));
+            })).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn checkpoint_source_detail_total_text_budget_is_explicit() {
+        let (execution, _, _) = fixture().await;
+        let raw = vec![
+            Message::User {
+                content: "x".repeat(8192)
+            };
+            280
+        ];
+        let source = HistorySource::bind_until(
+            0,
+            raw.len() as u64,
+            &raw,
+            (0..raw.len()).map(|i| format!("raw-{i}")).collect(),
+            tokio::time::Instant::now() + std::time::Duration::from_secs(10),
+        )
+        .await
+        .expect("source");
+        execution.refresh_cooperative(Some(&source), &raw).await;
+        EXECUTION.scope(execution.clone(), async {
+            let result = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+            let discovery: Value = serde_json::from_str(&result.content).expect("discovery");
+            let reference = {
+                let state = execution.state.lock().expect("state");
+                let issued = state.issued.as_ref().expect("issued");
+                assert_eq!(issued.details.values().map(|v| v.text.len()).sum::<usize>(), 2 * 1024 * 1024);
+                issued.order[256].clone()
+            };
+            let result = HistorySearchTool.execute(json!({"mode":"source_detail", "snapshot":discovery["snapshot"], "reference":reference})).await;
+            assert!(result.is_error);
+            assert!(result.content.contains("text budget"));
+        }).await;
     }
 
     async fn fixture() -> (

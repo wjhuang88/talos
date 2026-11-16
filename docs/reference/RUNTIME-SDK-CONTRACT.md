@@ -672,6 +672,20 @@ raw history. See the I313 owner for current implementation and validation status
 ### Model checkpoint tool registration (I313, next minor)
 
 RuntimeBuilder registers `compact_context` and `history_search` by default.
+`history_search` discovery returns eligible checkpoint source UUIDs. Read their
+bounded text with `mode: "source_detail"`, the snapshot, and a source UUID as
+`reference`; cite that same UUID in `compact_context`. Durable `search`/`detail`
+references belong to a different reference domain and cannot be checkpoint sources.
+Source detail currently projects user and public assistant text only, excluding
+reasoning, tool arguments, system/context text, tool results and multimodal content.
+Unsupported sources or exhausted projection budgets return an explicit error; there
+is no raw-text fallback. Each detail is at most 8192 UTF-8 bytes with `truncated`,
+and cached text payload per snapshot is capped at 2 MiB. Reads revalidate current
+source and permission authority; a configured unavailable durable host cannot fall
+back to memory disclosure. Invalid snapshot/source submissions preserve valid
+issued state for correction; admission reserves a single operation through its
+asynchronous response and terminal receipt.
+
 `history_search.query` is plain text, not an FTS expression. Linear durable history
 uses a safely quoted, tokenized phrase; archive recovery uses case-insensitive text
 containment. Punctuation is never evaluated as an FTS operator. Empty queries retain

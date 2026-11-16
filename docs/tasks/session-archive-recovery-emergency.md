@@ -1809,3 +1809,47 @@ Evidence in primary target/handoff-query-length-red-20261117.log,
 and exact-head review remain pending; combined evidence alone does not close them.
 No real-provider semantic success,installation or product merge claimed. This is original
 history-unavailable scope; background continuation remains default-off.
+
+## 2026-11-17 source-reference protocol and real-provider acceptance — Partial
+
+The model-visible source protocol now provides history_search source_detail for
+discover UUIDs, with bounded user/public-assistant projections and explicit unsupported
+source errors. Durable search references remain separate. Wrong source/snapshot input
+no longer consumes issued state; a cancellation-safe admission reservation prevents
+rediscovery from admitting a second operation while Actor admission is pending.
+Source,permission,identity and final cancellation checks remain mandatory. SDK docs
+state the8192byte/item,2MiB snapshot text payload and unsupported tool/multimodal limits.
+
+Red regression78065 failed2/2 before implementation. Expanded focused96892 passed
+109checkpoint+1child and3real host paths. Two test-fixture errors were preserved and
+corrected:refutable enum binding and synchronous source-bind aggregate limit; the
+latter now uses production cooperative bind_until without changing production limits.
+Final focused6passed, then full release_preflight passed5619summed tests/0failed/0ignored,
+SDK and SQLite external consumer checks. Exec11272 completed0,12min53.509s,CPU8min15.157s,
+peak2GiB/swap0; log target/checkpoint-source-final-r2-20261117.log. Independent
+technical/API/security APPROVE for source patch771e48f62e5944059f51d230f085d76d6fa68159.
+CLI SHA256 a46172b993223c8442ca8a4c1c50ad51a8700d8cc59b1375b12724eeeaae8874.
+
+Real-provider r3 correctly read source_detail and obtained Admitted but reported
+Preparation failure. Its8eligible messages estimate252tokens; even UUID-only submitted
+render estimates401tokens versus maximum226 for required10%reclaim. This proves the
+short fixture violates a necessary reclaim condition, not a unique diagnosis from
+generic Preparation. Preserved r3 artifacts. No production thresholds were relaxed.
+R4 adds redundant synthetic progress text and preserves configured model limits;
+REPL seeds13turns, then cold inline resumes so actual ModelCheckpointTerminal is
+observable. Same goal prompt and binary; only synthetic data sent. Five actual calls
+discover→search→detail→source_detail→compact all successful, exact issued source refs
+verified; operation0 Admitted→actual inline Applied:59689→58259 estimated request tokens.
+Final summary retained goal,constraints,decision,fixture-reported38hashes,pending native
+acceptance,unknown approval cause,rejected automatic continuation,and next step.
+Exec66671 completed0,48.211s,peak250.9MiB. Evidence:
+ target/handoff-real-provider-inline-r4-20261117/{structured-review,semantic-review}.json
+and real-provider.pty.log. Provider config removed after run. TLOG does not persist
+terminal receipts here; its parser receipt count0 is NOT an Applied/non-Applied verdict.
+
+This certifies one synthetic cold inline real-provider case and tested Actor paths,
+not installed-host acceptance,REPL terminal display,or broad summary quality. Original
+sessions remain intact; no default background activation,merge,installation or release.
+Standalone recovery follow-up still needs its own full/native CI before delivery.
+
+Standalone source protocol patch matches combined commit ceb86be47cfa6e33dd21fae6d86dec173403a70e. Combined source/API/security review and r4 evidence review approved. This standalone branch still awaits full validation and exact-head native CI; no product merge or installation.
