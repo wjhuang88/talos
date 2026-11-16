@@ -480,6 +480,21 @@ fn gix_pure_candidate_records_zero_child_git_invocations() {
     std::fs::set_permissions(&fake_git, std::fs::Permissions::from_mode(0o700))
         .expect("make fake git executable");
 
+    // Prove the sentinel itself works before measuring pure-gix behavior.
+    // This intentionally spawned Git is a TEST-ONLY positive control, not
+    // part of preflight; clear its log before launching the candidate child.
+    let control = std::process::Command::new("git")
+        .env("PATH", dir.path())
+        .env("TALOS_I324_FAKE_GIT_LOG", &log)
+        .status()
+        .expect("positive-control fake Git");
+    assert_eq!(control.code(), Some(97), "fake Git must fail on purpose");
+    assert_eq!(
+        std::fs::read(&log).expect("positive-control Git invocation log"),
+        b"git invoked\n"
+    );
+    std::fs::remove_file(&log).expect("reset the sentinel before candidate");
+
     let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
         .args([
             "gix_pure_candidate_no_child_fixture",
