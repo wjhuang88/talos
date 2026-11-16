@@ -23,7 +23,7 @@
 | Work Slice | D3-T3a / #957: offline pure endpoint-variant selection and fail-closed fallback classification, synthetic deterministic policy tests, bounded design receipt; no production path `www.bing.com` registration or live Bing requests. |
 | Claimed At | 2026-11-16 |
 | Source Issue | #957 |
-| Governance Claim PR | To be recorded on this governance PR |
+| Governance Claim PR | #958 (Draft / ineffective until merge) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer direction on SEARCH-001: use Bing HTML web pages as zero-key candidate; within Bing prefer non-CN, fallback CN. Actual governance effectiveness requires exact-head CI, independent review, accepted merge/CAS. |
 | Implementation PR | None; source must follow accepted claim |
