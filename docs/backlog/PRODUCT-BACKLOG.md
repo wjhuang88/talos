@@ -1,3 +1,7 @@
+## SEARCH-001-D3-T3 / #957 — proposed offline Bing dual-endpoint policy
+
+[Owner](active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](../iterations/I329-search-bing-dual-host-offline.md) / [#957](https://github.com/wjhuang88/talos/issues/957): maintainer selects Bing zero-key HTML approach **non-CN `www.bing.com` first, existing CN `cn.bing.com` fallback on allowed unavailability** within one Bing family, not two independent providers. A governance-only claim is proposed for offline failover logic/tests, **ineffective until merge**. No live automated `www` query or default activation before rights/service+output, ADR-090 Network/redirect/permission, real China/comparator evidence and a separately governed production scope; D3/#937 and Epic #624 remain Open.
+
 # Product Backlog
 
 ## SEARCH-001-D3-T2 / #947 — Complete / Closed upon owner-first closeout merge

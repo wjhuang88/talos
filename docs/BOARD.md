@@ -1,3 +1,7 @@
+## SEARCH-001-D3-T3 / I329 — proposed offline Bing variant/failover claim
+
+[Owner](backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](iterations/I329-search-bing-dual-host-offline.md) / [Issue #957](https://github.com/wjhuang88/talos/issues/957): proposed **Active / Claimed after governance merge** for offline-only non-CN→CN variant decision/negative-test candidate. No production endpoint, permission, Browser integration, new native provider, region or usage-rights admission. Parent D3/#937 and Epic #624 remain open; D/#644 ZERO-ADMISSION, E/F/G/I blocked.
+
 ## Azure C / PROVIDER-008-C
 
 [Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 proposes atomic claim+activation;
