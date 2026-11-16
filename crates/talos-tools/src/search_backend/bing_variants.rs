@@ -67,6 +67,7 @@ pub(super) enum BingAttempt {
 pub(super) struct BingFallbackGuards {
     pub(super) cn_prepared: bool,
     pub(super) network_permitted: bool,
+    pub(super) proxy_route_prepared: bool,
     pub(super) invocation_live: bool,
     pub(super) send_budget_remaining: bool,
 }
@@ -75,6 +76,7 @@ impl BingFallbackGuards {
     const fn all_satisfied(self) -> bool {
         self.cn_prepared
             && self.network_permitted
+            && self.proxy_route_prepared
             && self.invocation_live
             && self.send_budget_remaining
     }
@@ -126,6 +128,7 @@ mod tests {
     const ALLOWED: BingFallbackGuards = BingFallbackGuards {
         cn_prepared: true,
         network_permitted: true,
+        proxy_route_prepared: true,
         invocation_live: true,
         send_budget_remaining: true,
     };
@@ -182,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn fallback_needs_prepared_request_permission_live_clock_and_send_budget() {
+    fn fallback_needs_prepared_request_permission_proxy_live_clock_and_budget() {
         let denied = [
             BingFallbackGuards {
                 cn_prepared: false,
@@ -190,6 +193,10 @@ mod tests {
             },
             BingFallbackGuards {
                 network_permitted: false,
+                ..ALLOWED
+            },
+            BingFallbackGuards {
+                proxy_route_prepared: false,
                 ..ALLOWED
             },
             BingFallbackGuards {
