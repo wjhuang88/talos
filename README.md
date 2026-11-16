@@ -1,5 +1,16 @@
 # Talos
 
+### SQLite migration (development candidate)
+
+The SQLite upgrade candidate uses bundled SQLite 3.54.1 and rusqlite 0.43.
+Rust consumers that directly use rusqlite errors must migrate to the same version;
+recovery index operations now require a mutable index. See [ADR-106](docs/decisions/106-sqlite-native-upgrade-and-error-type-migration.md)
+for API, data compatibility and rollback requirements. This breaking dependency-type
+change requires the next minor release; it is not a 0.10 patch upgrade or an
+instruction to rewrite existing session data. Native and installed-host acceptance
+remain required before delivery.
+
+
 ### Process memory policy (I316 development)
 
 Foreground shell output on Unix and Windows retains up to 1 MiB of raw bytes per stream,

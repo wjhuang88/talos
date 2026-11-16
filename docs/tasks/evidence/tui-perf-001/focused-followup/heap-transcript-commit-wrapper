@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /tmp/talos-perf-profiler/usr/bin/heaptrack --record-only -o /home/wjhuang/WorkSpace/personal/talos/target/tui-perf-artifacts/native-followup-1eabf296/heap-transcript-commit /home/wjhuang/WorkSpace/personal/talos/target/tui-perf-artifacts/native-followup-1eabf296/debug "$@"

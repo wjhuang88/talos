@@ -1,0 +1,11 @@
+{
+  "source": "1eabf2964b5a81005f626644bd99053000518fdb",
+  "binary_sha256": "0dc196e186926af4c0ee52ce56d4ec4174cb574ceffedece292aa7a54d53bf2c",
+  "seconds": 305,
+  "warmup": 5,
+  "completed": [
+    "resize",
+    "transcript-commit"
+  ],
+  "status": "complete"
+}

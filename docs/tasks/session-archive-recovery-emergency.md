@@ -1665,3 +1665,118 @@ zero failed/ignored, two filtered subprocess passes and two external SDK modes.
 All2445 source file hashes matched before/after. Runtime15min47s, peak2G, swap0.
 Evidence: target/custody-release-preflight.log, -result.json and -source-manifest.json.
 This is source f5217299325b667ca8c8ae3f78b3a4c9e2241d12; native checks remain pending.
+
+## 2026-11-16 authorized SQLite dependency candidate — Partial
+
+User explicitly requested migrating SQLite to latest when feasible. Isolated
+source baseline4e8054a29a605e54b2752179331b318be4d6c49c; existing dirty
+worktrees and real session/migration originals remain untouched. Selected
+observed non-yanked stable rusqlite0.43.0/libsqlite3-sys0.40.0 (SQLite3.54.1)
+replaces0.40.2/0.38.2 (SQLite3.53.2), retaining all five consumers' features.
+Official sparse-index package checksums verified; API endpoint403 recorded.
+MSRV1.89/1.88 is below workspace1.95, pinned validation compiler1.99.0.
+
+Primary motivation is upstream Windows long-DOS-device/UNC fix2429af2e,
+plus native boundary fixes in rusqlite release notes. Native old/new path
+comparison, API semver assessment, old-data reopen/rollback compatibility,
+full locked preflight and all-feature consumer gates remain required.
+No schema migration or user-data rewrite is intended; source rollback must
+restore manifests and lockfile together. Existing originals are preserved.
+This candidate does not imply deployment, acceptance or default continuation.
+
+## 2026-11-16 SQLite migration focused validation — Partial
+
+Five-consumer locked all-target/all-feature compile passed after explicit mutable
+progress-guard migration. Session library435tests passed0failed/ignored, including
+real cancellation/deadline rollback, panic cleanup, legacy Todo migration and
+private receipt retirement. Log target/sqlite-upgrade-followup-checks.log; external
+API consumer is still compiling in the same live service/session2692. Independent
+RAII source review found no blocker; no final exact-head gate yet. Initial workspace
+check found Agent mutable-index bindings, now adjusted; workspace rerun still due.
+Both governance validators passed0warnings; scale assessment retained existing policy.
+Formatting check found wrapping differences, correction due after active build.
+
+Native old-version path comparison at4e8054a2/run43796341946 completed successfully:
+24ordinary+24extended opens, SQLite3.53.2, all successful. Extended spelling survives
+SQLite open, but protocol failure was NOT reproduced and causality remains unproven.
+Raw artifact14194429524/log target/wal-path-native-4e8054a2.log and SHA-bound
+-evidence.json retained. User-authorized latest dependency upgrade proceeds on its
+own merits; do not claim this experiment proves a PROTOCOL repair.
+
+External typed-error consumer added in isolated candidate tests/fixtures/sqlite-api-external;
+existing Runtime/Browser SDK lockfiles updated only for4SQLite packages after removing
+unrelated offline resolver drift. Old/new/old synthetic-data harness is prepared at
+target/sqlite-version-migration-20261116/run.py, not yet run. Full/native/new-version
+checks, data compatibility, installed-host and all original handoff residuals remain.
+
+## 2026-11-16 SQLite expanded validation and real-copy acceptance — Partial
+
+The corrected candidate passed the full standard locked preflight (5498 passed,
+zero failed/ignored), strict workspace all-target/all-feature Clippy, workspace
+all-feature tests with real packaged Rust/Python language guests, Session minimal
+feature tests, deterministic dependency audit (93-record Bash/PowerShell parity),
+and external Browser/SQLite API consumer runs. Five SQLite consumers also passed
+Windows MSVC --tests cross-check; native execution remains a separate gate.
+Evidence in primary target/: sqlite-upgrade-full-preflight-v2-result.json,
+sqlite-upgrade-extended-v6-result.json (overall failure was the subsequent Browser
+fixture lock, after passing all-feature/minimal stages),
+sqlite-upgrade-external-final-result.json, sqlite-stamp-followup-validation-result.json,
+and sqlite-upgrade-dependency-audit-tests-v3-result.json. The Browser lock correction
+also removes an obsolete hashbrown -> foldhash feature edge; the earlier description
+of only four SQLite package changes was incomplete. Workspace source hashes remained
+unchanged during the recorded gates.
+
+Old/new/old synthetic migration passed with committed WAL, BLOB/FTS, fork lineage,
+partial schemas, rollback/integrity/checkpoint and old-reader reopening. Evidence:
+target/sqlite-version-migration-20261116/result-v2.json. This direct rusqlite harness
+is supplementary, not a substitute for production Talos acceptance.
+
+Production CLI on preserved real data COPIES passed two cold-start rounds: exact
+archived-text discover/search/detail, fresh compact_context Admitted/Applied receipt
+correlation and inclusion of each round's unique derived checkpoint in a subsequent
+provider request. Original38 files (36 transcripts/archives +2SQLite backups) retained
+matching hashes; other copied transcripts unchanged and selected head prefix retained.
+Evidence: target/sqlite-real-copy-acceptance-v5-20261116/{result.json,case/report.json}.
+Binary SHA256:6ebe2e17e412085510680cb4cade47b214b6ed5277f63b7c84a49600801d05fb.
+Outer bwrap kept originals read-only and network isolated (loopback only); scripted
+provider requests were not persisted. Each cold start required41 structured source
+folds. This proves query and fresh checkpoint installation on copies, NOT persistent
+derived-checkpoint restoration, installed-host acceptance or real-model summary quality.
+
+Earlier failed harness runs are retained: v1 used a model identity conflicting with
+the copied durable activation. V2-v4 retained the original identity but returned plain
+text to a structured JSON checkpoint request; no history tool was reached. Correcting
+the fixture to return source-cited JSON completed v5 in8.99s. No production code was
+changed to bypass these failures. The REPL's lack of a visible terminal outcome after
+an invalid checkpoint response warrants a focused follow-up; cause/required production
+change remains unproven and must not be claimed fixed by the valid-response fixture.
+
+Remaining: final independent current-diff review, selective commits separating test
+lint prerequisites, exact-head native Windows/macOS CI and upgraded path-probe evidence,
+plus original host/UI/approval handoff residuals. Candidate is not merged, installed or
+released; background continuation remains default-off. Overall remains Partial.
+
+## 2026-11-16 REPL pre-start checkpoint rejection follow-up — Partial
+
+Invalid checkpoint response reproduction identified a presentation gap: compatibility
+submission preparation can reject before TurnStarted/Completed, emitting
+SubmissionRejected(ContextBudgetExceeded). REPL ignored it and remained AgentRunning.
+A focused event-forwarder regression failed before the fix (session70564, one-second
+forwarding deadline), then all9event_loop tests passed (session84529). Forward bounded
+rejection metadata as AgentError to return to input; no provider body or submission ID
+is displayed and no transcript rewrite or admission relaxation is introduced.
+
+Real production CLI PTY with the same preserved data copies and invalid plain-text
+checkpoint response passed in5.64s. It saw the context-budget error and prompt, exactly
+one summary attempt/no normal tool request, unchanged selected head before the next
+request, and all38original hashes unchanged. A subsequent request-preview returned to
+prompt. Evidence target/repl-invalid-checkpoint-acceptance-20261116/result.json and
+case/invalid-checkpoint-report.json; binary SHA256
+e49c55dc62e62a74740198b66465f8e75ba26c8a2bd2d1180e88aae07c662f0f.
+Follow-up remains uncommitted pending review; no claim of general invalid-response
+recovery, installed-host delivery or default background continuation.
+
+PR917 at e9f52a55 has no checks and reports DIRTY. Fetched origin/main b524c7a9;
+non-mutating merge-tree identified only docs/decisions/README.md conflict (ADR104
+upstream entry and local ADR106 insertion). No numbering collision. Preserve both.
+Candidate synchronization and fresh validation/native CI remain required.

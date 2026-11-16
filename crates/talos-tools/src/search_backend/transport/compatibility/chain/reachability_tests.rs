@@ -137,3 +137,43 @@ async fn both_unreachable_families_send_no_query_bearing_request() {
     assert_eq!(server.count(), 0);
     assert_eq!(effects.dns.load(Ordering::Relaxed), 0);
 }
+
+#[tokio::test]
+async fn query_free_bing_reachability_does_not_turn_a_failed_query_into_success() {
+    // bing: true models a previously reachable *root*, while the only
+    // query-bearing response is an offline loopback 403 fixture. No new
+    // health policy, live Bing request or host acceptance is introduced.
+    let server = Server::new(vec![
+        "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
+    ]);
+    let chain = PreparedCompatibilityChain::prepare(&fixed_manifest(), "toy-query", 1)
+        .expect("prepared chain");
+    let (chain, manifest) = super::tests::relocate(chain, &server);
+    let effects = Arc::new(Effects {
+        manifest: manifest.clone(),
+        dns: AtomicUsize::new(0),
+    });
+    let transport = SearchTransport::new(
+        manifest,
+        effects.clone(),
+        Arc::new(TransportBudget::new(Duration::from_secs(5), 2, 1_048_576).expect("budget")),
+        effects.clone(),
+    )
+    .expect("transport");
+
+    let failure = chain
+        .execute_with_reachability(
+            &transport,
+            Reachability {
+                duckduckgo: false,
+                bing: true,
+            },
+        )
+        .await
+        .expect_err("root reachability cannot prove a query succeeds");
+
+    assert!(matches!(failure, CompatibilityChainError::Exhausted(_)));
+    assert_eq!(server.count(), 1);
+    assert!(server.request(0).starts_with("GET /search?"));
+    assert_eq!(effects.dns.load(Ordering::Relaxed), 1);
+}

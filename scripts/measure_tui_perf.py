@@ -54,7 +54,8 @@ try:
             ready_at = now - start
             if a.input_probe:
                 next_probe = now + a.warmup
-        if a.scenario in ('scroll', 'resize') and ready_at is not None and now-start >= ready_at+a.warmup and now-last_action >= .5:
+        measurement_active = ready_at is not None and now-start < ready_at+a.seconds
+        if measurement_active and a.scenario in ('scroll', 'resize') and now-start >= ready_at+a.warmup and now-last_action >= .5:
             if a.scenario == 'scroll':
                 os.write(master, b'\x1b[5~' if action_count % 2 == 0 else b'\x1b[6~')
             else:
@@ -65,7 +66,7 @@ try:
                 os.killpg(proc.pid, signal.SIGWINCH)
             action_count += 1
             last_action = now
-        if next_probe is not None and now >= next_probe:
+        if measurement_active and next_probe is not None and now >= next_probe:
             os.write(master, b'x\x7f')
             interval = a.input_probe_interval_ms / 1000
             steps = int((now - next_probe) / interval) + 1
@@ -90,7 +91,7 @@ try:
             except (FileNotFoundError, ProcessLookupError):
                 pass
             last_sample = now
-        timeout = .05 if next_probe is None else min(.05, max(0, next_probe - time.monotonic()))
+        timeout = .05 if not measurement_active or next_probe is None else min(.05, max(0, next_probe - time.monotonic()))
         ready, _, _ = select.select([master], [], [], timeout)
         if ready:
             try:

@@ -38,4 +38,6 @@ cargo check --locked --workspace
 cargo clippy --locked --workspace -- -D warnings
 cargo test --locked --workspace
 python3 ./scripts/validate_runtime_sdk_fixture.py
+cargo run --locked --manifest-path tests/fixtures/sqlite-api-external/Cargo.toml \
+  --target-dir "${CARGO_TARGET_DIR:-target}"
 echo "release preflight: passed"

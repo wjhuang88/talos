@@ -222,6 +222,14 @@ impl EventLoop {
                     SessionEvent::Error { message } => {
                         let _ = event_tx_forward.send(AgentError(message));
                     }
+                    SessionEvent::SubmissionRejected { reason, .. } => {
+                        let message = if reason == talos_core::submission::SubmissionRejectionReason::ContextBudgetExceeded {
+                            "Request not started: context budget exceeded after checkpoint preparation. Session history retained.".to_owned()
+                        } else {
+                            format!("Request not started: {reason:?}.")
+                        };
+                        let _ = event_tx_forward.send(AgentError(message));
+                    }
                     _ => {}
                 }
             }
@@ -719,6 +727,56 @@ fn track_background_tool(
 #[cfg(test)]
 mod background_pairing_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn repl_prestart_budget_rejection_returns_to_input_without_a_turn_completion() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let session = manager.create_session("rejection", "").expect("session");
+        let original = std::fs::read(&session.file_path).expect("original transcript");
+        let (sq_tx, mut sq_rx) = mpsc::channel(8);
+        let (eq_tx, eq_rx) = mpsc::unbounded_channel();
+        let (_approval_tx, approval_rx) = mpsc::unbounded_channel();
+        let mut repl = EventLoop::new(
+            session.clone(),
+            manager,
+            talos_core::session::SessionHandle { sq_tx, eq_rx },
+            approval_rx,
+        );
+        repl.handle_event(UserInput("synthetic rejected request".into()));
+        assert!(matches!(sq_rx.recv().await, Some(SessionOp::Submit { .. })));
+        eq_tx
+            .send(SessionEvent::SubmissionRejected {
+                session_id: session.id.to_string(),
+                submission_id: "private-submission-id".into(),
+                sender_generation: 0,
+                reason: talos_core::submission::SubmissionRejectionReason::ContextBudgetExceeded,
+            })
+            .expect("reject before turn start");
+        let event = tokio::time::timeout(Duration::from_secs(1), repl.event_rx.recv())
+            .await
+            .expect("prestart rejection must reach REPL")
+            .expect("event");
+        let AppEvent::RuntimeEvent { event: inner, .. } = &event else {
+            panic!("generation fence")
+        };
+        let AgentError(message) = inner.as_ref() else {
+            panic!("visible rejection")
+        };
+        assert!(message.contains("context budget"));
+        assert!(!message.contains("private-submission-id"));
+        repl.handle_event(event);
+        assert!(matches!(repl.state, AppState::WaitingForInput));
+        assert_eq!(
+            std::fs::read(&session.file_path).expect("retained transcript"),
+            original
+        );
+        repl.handle_event(UserInput("next request".into()));
+        assert!(
+            matches!(sq_rx.recv().await, Some(SessionOp::Submit { message }) if message == "next request")
+        );
+        repl.shutdown().await;
+    }
 
     #[tokio::test]
     async fn repl_archived_fork_uses_actor_owned_source() {

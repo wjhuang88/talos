@@ -73,6 +73,31 @@ pathlib.Path(__file__).with_name('received').write_text(str(received))
             self.assertLessEqual(sample['input_probe_count'] - received, 1)
             self.assertGreaterEqual(sample['input_probe_skipped_count'], 0)
 
+    def test_actions_stop_at_measurement_end_before_delayed_exit(self):
+        sampler = Path(__file__).with_name('measure_tui_perf.py')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            child = root / 'fixture'
+            child.write_text(f'#!{sys.executable}\n' + """
+import os, pathlib, signal, time, tty
+tty.setraw(0)
+signal.signal(signal.SIGWINCH, lambda *args: None)
+pathlib.Path(os.environ['TALOS_REPLAY_READY']).write_text('ready')
+time.sleep(3.2)
+""")
+            child.chmod(0o700)
+            result = subprocess.run([sys.executable, str(sampler), str(child),
+                '--scenario', 'resize', '--seconds', '2', '--warmup', '0',
+                '--input-probe', '--output', str(root / 'sample.json')],
+                capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            sample = json.loads((root / 'sample.json').read_text())
+            self.assertGreaterEqual(sample['wall_seconds'], 3)
+            self.assertGreaterEqual(sample['action_count'], 3)
+            self.assertLessEqual(sample['action_count'], 4)
+            self.assertGreaterEqual(sample['input_probe_count'], 3)
+            self.assertLessEqual(sample['input_probe_count'], 4)
+
     def test_invalid_probe_interval_fails_before_launching_binary(self):
         sampler = Path(__file__).with_name('measure_tui_perf.py')
         result = subprocess.run([sys.executable, str(sampler), '/does-not-exist',

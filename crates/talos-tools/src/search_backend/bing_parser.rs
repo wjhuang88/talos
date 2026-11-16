@@ -122,6 +122,15 @@ fn parse_document(html: &str, max: usize) -> Result<BingCandidates, BingParseErr
         if results.len() >= max {
             break;
         }
+        // Only reject rows inside an explicitly marked sponsored container.
+        // This is not general ad detection or evidence of live Bing DOM parity.
+        if row
+            .ancestors()
+            .filter_map(ElementRef::wrap)
+            .any(|ancestor| ancestor.value().classes().any(|class| class == "b_ad"))
+        {
+            continue;
+        }
         let Some(link) = row.select(&links).next() else {
             continue;
         };

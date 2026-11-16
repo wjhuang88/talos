@@ -289,9 +289,11 @@ mod tests {
         let root = tempfile::tempdir().expect("root");
         let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
         let session = manager.create_session("identity", "").expect("session");
-        let mut original = Config::default();
-        original.provider = "openai".into();
-        original.model = "gpt-4o".into();
+        let mut original = Config {
+            provider: "openai".into(),
+            model: "gpt-4o".into(),
+            ..Config::default()
+        };
         prepare_interactive_session_identity(&mut original, &session).expect("initialize");
         let mut changed = original.clone();
         changed.model = "gpt-4o-mini".into();

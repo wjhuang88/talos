@@ -78,4 +78,44 @@ mod tests {
                 .is_empty()
         );
     }
+
+    #[test]
+    fn local_knowledge_trait_delegates_observation_and_active_pattern_lifecycle() {
+        let store = KnowledgeStore::open_memory().expect("knowledge store");
+        let contract: &dyn KnowledgePersistence = &store;
+        let observation = Observation::new(
+            crate::SignalType::Correction,
+            0.8,
+            "Keep typed persistence boundaries".into(),
+            None,
+            None,
+        );
+        contract
+            .insert_observation(&observation)
+            .expect("observation");
+        let observations = contract.get_observations().expect("observations");
+        assert_eq!(observations.len(), 1);
+        assert_eq!(observations[0].id, observation.id);
+
+        let mut pattern = Pattern::new(
+            "Typed local delegates".into(),
+            "Preserve existing storage behavior".into(),
+            "test".into(),
+        );
+        pattern.confidence = 0.8;
+        contract.insert_pattern(&pattern).expect("insert pattern");
+        let active = contract.get_active_patterns(0.7).expect("active patterns");
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].id, pattern.id);
+        contract
+            .deactivate_pattern(&pattern.id)
+            .expect("deactivate");
+        assert!(
+            contract
+                .get_active_patterns(0.7)
+                .expect("inactive")
+                .is_empty()
+        );
+        assert_eq!(contract.get_all_patterns().expect("all patterns").len(), 1);
+    }
 }

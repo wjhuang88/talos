@@ -241,7 +241,7 @@ pub(crate) fn retire_pending_fork(
             .parent()
             .ok_or_else(invalid)?
             .join("history-bindings.sqlite");
-        let connection = crate::durable::open_binding_connection_with_flags(
+        let mut connection = crate::durable::open_binding_connection_with_flags(
             database,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -249,7 +249,8 @@ pub(crate) fn retire_pending_fork(
         connection
             .busy_timeout(std::time::Duration::ZERO)
             .map_err(|_| invalid())?;
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         let mut query = connection
             .prepare("SELECT published FROM archived_fork_receipts WHERE child=?1 LIMIT 2")
             .map_err(|_| invalid())?;
@@ -332,7 +333,7 @@ fn check_not_retired(
             Ok(meta) if !meta.file_type().is_file() => return Err(invalid()),
             Ok(_) => {}
         }
-        let connection = crate::durable::open_binding_connection_with_flags(
+        let mut connection = crate::durable::open_binding_connection_with_flags(
             &database,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -340,7 +341,8 @@ fn check_not_retired(
         connection
             .busy_timeout(std::time::Duration::ZERO)
             .map_err(|_| invalid())?;
-        let _guard = crate::sqlite::install_budget(&connection, budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, budget).map_err(|_| invalid())?;
         if crate::fork_receipt::check_publication(&connection, id)? {
             // A published receipt must never fall back to a stripped legacy
             // header, including through ordinary append/atomic writer paths.
@@ -403,7 +405,7 @@ fn retire_registered_under_lease(transcript: &Path) -> Result<(), SessionError> 
             .and_then(|s| s.to_str())
             .ok_or_else(invalid)?;
         let id = Uuid::parse_str(id).map_err(|_| invalid())?;
-        let connection = crate::durable::open_binding_connection_with_flags(
+        let mut connection = crate::durable::open_binding_connection_with_flags(
             &database,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -412,7 +414,8 @@ fn retire_registered_under_lease(transcript: &Path) -> Result<(), SessionError> 
             .busy_timeout(std::time::Duration::ZERO)
             .map_err(|_| invalid())?;
         let budget = crate::sqlite::RecoveryWorkBudget::new(std::time::Duration::from_secs(1));
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         let exists: bool = connection.query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='session_identity_custody')",
             [], |row| row.get(0),
@@ -489,9 +492,9 @@ pub(crate) fn adopt_fork_source(
             // A missing source must not silently become a reserved new identity.
             let source = crate::history_page::open_source_under_identity(transcript, &lease)
                 .map_err(|_| invalid())?;
-            let connection = open(&database)?;
-            let _guard =
-                crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+            let mut connection = open(&database)?;
+            let connection =
+                crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
             let existing: Option<(String, i64)> = connection
                 .query_row(
                     "SELECT CASE WHEN length(CAST(incarnation AS BLOB))=36 THEN incarnation END,retired FROM session_identity_custody WHERE session_id=?1",
@@ -595,7 +598,7 @@ pub(crate) fn require_active_session_identity_until(
         }
         #[cfg(test)]
         custody_stage("active-open");
-        let connection = crate::durable::open_binding_connection_with_flags(
+        let mut connection = crate::durable::open_binding_connection_with_flags(
             database,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -612,7 +615,8 @@ pub(crate) fn require_active_session_identity_until(
         );
         #[cfg(test)]
         custody_stage("active-budget-install");
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         #[cfg(test)]
         custody_stage("active-prepare");
         let mut query = connection

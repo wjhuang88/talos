@@ -185,10 +185,10 @@ impl PendingSubmissionStore {
             let flags = if restore.is_some() {
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
             } else { rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY };
-            let connection = crate::durable::open_binding_connection_with_flags(self.path.as_ref(), flags)
+            let mut connection = crate::durable::open_binding_connection_with_flags(self.path.as_ref(), flags)
                 .map_err(|_| stopped())?;
             connection.busy_timeout(std::time::Duration::ZERO)?;
-            let _progress = crate::sqlite::install_budget(&connection, &budget).map_err(|_| stopped())?;
+            let connection = crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| stopped())?;
             if restore.is_none() {
                 let transaction = connection.unchecked_transaction()?;
                 let exists: bool = transaction.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='session_runtime_state')", [], |row| row.get(0))?;

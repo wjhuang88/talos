@@ -216,7 +216,7 @@ pub(crate) fn reconcile_published_metadata(
         let budget = crate::sqlite::RecoveryWorkBudget::new(
             deadline.saturating_duration_since(Instant::now()),
         );
-        let index =
+        let mut index =
             crate::SessionIndex::open_for_recovery(index_path, &budget).map_err(|_| invalid())?;
         evidence.check_current(deadline, &|| false)?;
         index
@@ -246,7 +246,7 @@ pub(crate) fn reconcile_pending_in_directory(
             Ok(metadata) if metadata.file_type().is_file() => {}
             _ => return Err(invalid()),
         }
-        let connection = crate::durable::open_binding_connection_with_flags(
+        let mut connection = crate::durable::open_binding_connection_with_flags(
             &db,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -257,7 +257,8 @@ pub(crate) fn reconcile_pending_in_directory(
         let budget = crate::sqlite::RecoveryWorkBudget::new(
             deadline.saturating_duration_since(Instant::now()),
         );
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         let exists: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='archived_fork_receipts')", [], |row| row.get(0)).map_err(|_| invalid())?;
         if !exists {
             return Ok(0);
@@ -750,7 +751,7 @@ impl Receipt {
             }
             // Identity reservation already initialized this database in WAL
             // mode. Do not restart its independent initialization retry budget.
-            let connection = crate::durable::open_binding_connection_with_flags(
+            let mut connection = crate::durable::open_binding_connection_with_flags(
                 &db,
                 OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
             )
@@ -761,8 +762,8 @@ impl Receipt {
             let budget = crate::sqlite::RecoveryWorkBudget::new(
                 deadline.saturating_duration_since(Instant::now()),
             );
-            let _guard =
-                crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+            let connection =
+                crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
             connection.execute_batch("PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS archived_fork_receipts (child TEXT PRIMARY KEY, payload TEXT NOT NULL, published INTEGER NOT NULL CHECK(published IN (0,1)))").map_err(|_| invalid())?;
             connection
                 .execute(
@@ -810,7 +811,7 @@ impl Receipt {
                 return Err(invalid());
             }
             check(deadline)?;
-            let connection = crate::durable::open_binding_connection_with_flags(
+            let mut connection = crate::durable::open_binding_connection_with_flags(
                 db,
                 OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
             )
@@ -821,8 +822,8 @@ impl Receipt {
             let budget = crate::sqlite::RecoveryWorkBudget::new(
                 deadline.saturating_duration_since(Instant::now()),
             );
-            let _guard =
-                crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+            let connection =
+                crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
             connection
                 .execute_batch("PRAGMA synchronous=FULL")
                 .map_err(|_| invalid())?;
@@ -964,7 +965,7 @@ pub(crate) fn published_branch(
             Ok(metadata) if metadata.file_type().is_file() => {}
             _ => return Err(invalid()),
         }
-        let connection = crate::durable::open_binding_connection_with_flags(
+        let mut connection = crate::durable::open_binding_connection_with_flags(
             &db,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -975,7 +976,8 @@ pub(crate) fn published_branch(
         let budget = crate::sqlite::RecoveryWorkBudget::new(
             deadline.saturating_duration_since(Instant::now()),
         );
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         if !check_publication(&connection, session.id)? {
             return Ok(None);
         }
@@ -1014,7 +1016,7 @@ pub(crate) fn load(head: &Path, deadline: Instant) -> Result<Receipt, SessionErr
             .ok_or_else(invalid)?;
         let db = database(head, child)?;
         let _lease = crate::identity_custody::require_not_retired_until(head, deadline)?;
-        let connection = crate::durable::open_binding_connection_with_flags(
+        let mut connection = crate::durable::open_binding_connection_with_flags(
             &db,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -1025,7 +1027,8 @@ pub(crate) fn load(head: &Path, deadline: Instant) -> Result<Receipt, SessionErr
         let budget = crate::sqlite::RecoveryWorkBudget::new(
             deadline.saturating_duration_since(Instant::now()),
         );
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         let mut query = connection.prepare("SELECT CASE WHEN length(CAST(payload AS BLOB))<=32768 THEN payload END,published FROM archived_fork_receipts WHERE child=?1 LIMIT 2").map_err(|_| invalid())?;
         let mut rows = query.query([child.to_string()]).map_err(|_| invalid())?;
         let row = rows.next().map_err(|_| invalid())?.ok_or_else(invalid)?;
@@ -1857,7 +1860,7 @@ mod tests {
                     crate::Session::new(receipt.child, String::new(), String::new(), head.clone());
                 reopened
                     .append(&talos_core::message::Message::User {
-                        content: format!("cold continuation {round}").into(),
+                        content: format!("cold continuation {round}"),
                     })
                     .expect("cold session append");
                 let evidence = reopened
@@ -1941,19 +1944,42 @@ mod tests {
 
     #[test]
     fn production_compaction_budget_refusal_preserves_readable_head() {
+        // Small capacity cases exercise the same store/receipt/publication path
+        // without competing with the independent production time budget.
         for marker_growth in [false, true] {
+            assert_compaction_refusal_preserves_head(marker_growth, false);
+        }
+    }
+
+    #[test]
+    fn production_compaction_large_safe_refusal_preserves_readable_head() {
+        assert_compaction_refusal_preserves_head(false, true);
+    }
+
+    fn assert_compaction_refusal_preserves_head(marker_growth: bool, large: bool) {
+        {
+            let byte_limit = if large { MAX_BYTES } else { 64 * 1024 };
+            let deadline = || Instant::now() + std::time::Duration::from_secs(120);
             let root = tempfile::tempdir().expect("root");
             let (head, template, _, _) = fixture(root.path());
             let records = if marker_growth {
                 let first = raw("a", None, "");
                 let target =
-                    MAX_BYTES / 2 - ENVELOPE.len() - b"TALOS\t1\t123\n".len() - first.len();
+                    byte_limit / 2 - ENVELOPE.len() - b"TALOS\t1\t123\n".len() - first.len();
                 let mut content = "x".repeat(target);
                 let overhead = raw("large", Some("a"), &content).len() - target;
                 content.truncate(target - overhead);
                 vec![first, raw("large", Some("a"), &content)]
             } else {
-                vec![raw("large", None, &"x".repeat(33 * 1024 * 1024))]
+                vec![raw(
+                    "large",
+                    None,
+                    &"x".repeat(if large {
+                        33 * 1024 * 1024
+                    } else {
+                        byte_limit / 2 + 1024
+                    }),
+                )]
             };
             let (receipt, bytes) = Receipt::capture(
                 (
@@ -1976,8 +2002,12 @@ mod tests {
             if marker_growth {
                 // Old head plus raw archive exactly fits. Replacing the short
                 // first record with the longer count marker would exceed the cap.
-                assert_eq!(bytes.len() * 2, MAX_BYTES);
+                assert_eq!(bytes.len() * 2, byte_limit);
                 assert!(records[0].len() < 80);
+                // Even the shortest possible nonempty marker exceeds this exact fit.
+                assert!(bytes.len() * 2 + 1 > byte_limit);
+            } else {
+                assert!(bytes.len() * 2 > byte_limit);
             }
             receipt.record_intent(&head, deadline()).expect("intent");
             write_synced(&head, &bytes);
@@ -1991,23 +2021,28 @@ mod tests {
                 names
             };
             let before = inventory();
-            let engine = crate::compaction_engine::CompactionEngine::new(std::sync::Arc::new(
+            let mut engine = crate::compaction_engine::CompactionEngine::new(std::sync::Arc::new(
                 crate::CompactTextSessionStore,
             ))
             .with_compressor(Box::new(crate::compression::NoCompressor));
+            if !large {
+                engine = engine.with_publication_byte_limit(byte_limit);
+            }
             let error = engine
                 .compact_segment(
                     &head,
                     head.parent().expect("directory"),
                     usize::from(marker_growth),
                 )
-                .expect_err("duplicate archive exceeds shared budget");
-            assert!(
-                error
-                    .to_string()
-                    .contains("archive publication exceeds recovery budget"),
-                "{error}"
-            );
+                .expect_err("compaction must refuse without publishing or replacing the head");
+            if !large {
+                assert!(
+                    error
+                        .to_string()
+                        .contains("archive publication exceeds recovery budget"),
+                    "{error}"
+                );
+            }
             let after: Vec<_> = inventory()
                 .into_iter()
                 .filter(|name| {
@@ -2562,7 +2597,7 @@ mod tests {
                 crate::Session::new(receipt.child, String::new(), String::new(), head.clone());
             reopened
                 .append(&talos_core::message::Message::User {
-                    content: format!("continuation {expected_count}").into(),
+                    content: format!("continuation {expected_count}"),
                 })
                 .expect("cold continuation");
             expected_count += 1;
