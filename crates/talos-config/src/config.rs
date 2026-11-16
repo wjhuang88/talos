@@ -223,6 +223,20 @@ impl Config {
             )
     }
 
+    fn uses_azure_supplied_token(&self) -> bool {
+        self.provider_protocol() == ProviderProtocol::AzureOpenAI
+            && self
+                .active_provider_config()
+                .azure
+                .as_ref()
+                .is_some_and(|profile| {
+                    matches!(
+                        profile.authentication,
+                        crate::AzureAuthentication::EntraToken { .. }
+                    )
+                })
+    }
+
     /// Returns the API key for the current provider.
     ///
     /// Resolution order:
@@ -234,11 +248,11 @@ impl Config {
     ///    gateways (DashScope / Bailian / Z.ai / self-hosted). It is checked
     ///    after `OPENAI_API_KEY` so existing setups are unaffected.
     ///
-    /// Explicit Vertex ADC returns an empty string
+    /// Explicit Vertex ADC and Azure supplied-token profiles return an empty string
     /// because its credentials are acquired later by the admitted request transport.
     pub fn api_key(&self) -> Result<String, ConfigError> {
         // Legacy host API: Vertex uses request-owned ADC, so there is no API-key secret.
-        if self.uses_vertex_adc() {
+        if self.uses_vertex_adc() || self.uses_azure_supplied_token() {
             return Ok(String::new());
         }
         let provider = self.active_provider_config();
@@ -478,6 +492,9 @@ impl Config {
             if user_config.api_key_env.is_some() {
                 config.api_key_env = user_config.api_key_env.clone();
             }
+            if user_config.azure.is_some() {
+                config.azure = user_config.azure.clone();
+            }
             if user_config.gemini.is_some() {
                 config.gemini = user_config.gemini.clone();
             }
@@ -523,6 +540,7 @@ impl Config {
         let provider = self.active_provider_config();
         if self.providers.contains_key(&self.provider)
             && !self.uses_vertex_adc()
+            && !self.uses_azure_supplied_token()
             && provider.api_key.is_none()
             && provider.api_key_env.is_none()
         {
@@ -629,12 +647,26 @@ impl Config {
     }
 
     /// Whether a model has an applicable authentication configuration.
-    /// Vertex ADC is selected lazily; this does not probe or validate credentials.
+    /// Vertex ADC and Azure supplied tokens are selected lazily, without probing credentials.
     pub fn model_authentication_configured(&self, provider: &str, model: &str) -> bool {
+        let protocol = self.resolve_model_protocol(provider, model).protocol;
+        let configured = self.providers.get(provider);
+        // Supplied tokens are resolved at dispatch, without unrelated API-key fallback.
+        if protocol == ProviderProtocol::AzureOpenAI
+            && let Some(profile) = configured.and_then(|config| config.azure.as_ref())
+            && matches!(
+                profile.authentication,
+                crate::AzureAuthentication::EntraToken { .. }
+            )
+        {
+            return configured.is_some_and(|c| c.base_url.is_none())
+                && profile
+                    .resolve_model(model, configured.and_then(|c| c.models.get(model)))
+                    .is_ok();
+        }
         self.provider_authenticated(provider)
-            || (self.resolve_model_protocol(provider, model).protocol
-                == ProviderProtocol::GoogleGemini
-                && self.providers.get(provider).is_some_and(|config| {
+            || (protocol == ProviderProtocol::GoogleGemini
+                && configured.is_some_and(|config| {
                     matches!(
                         config.gemini,
                         Some(crate::GeminiTransportConfig::Vertex { .. })
