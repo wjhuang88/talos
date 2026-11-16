@@ -30,7 +30,7 @@ No public API or persisted data format change is intended.
 | Governance Claim PR | #921 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requested completion of the session handoff; standard effective claim remains required before committed implementation |
-| Implementation PR | Local candidate fa8edabb; draft publication pending |
+| Implementation PR | #963 |
 | Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Effective claim, isolated implementation, validation, independent review and native display acceptance |
 
@@ -155,3 +155,10 @@ edit-full-preflight-20261116.log, -manifest.json and -result.json. Independent
 source review approved fa8edabb against the same base; final evidence/doc head review
 and remote native CI remain required. Terminal/manual acceptance remains open.
 No Complete, product merge, installation or release claim.
+
+### Draft publication
+
+Draft implementation PR #963 published from reviewed e4d8e3af. Exact-head remote
+CI is pending; independent final review approved that head/base5169d5f6 and checked
+source hashes against the full validation manifest. Native/manual acceptance and
+final delivery remain open.

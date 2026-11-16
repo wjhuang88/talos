@@ -13,8 +13,8 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 [Line-location owner](tasks/edit-diff-line-locations.md): Review; claim #921 effective.
 Implementation fa8edabb passed focused regressions and rebased standard preflight
-(5360 summed test passes and both external SDK fixtures). Draft publication, final
-review, native CI and terminal acceptance remain open; no merge/install claim.
+(5360 summed test passes and both external SDK fixtures). Draft PR #963 published after final
+independent review; native CI and terminal acceptance remain open; no merge/install claim.
 
 ## SESSION-UI-001 — session UI continuity repair preparation
 
