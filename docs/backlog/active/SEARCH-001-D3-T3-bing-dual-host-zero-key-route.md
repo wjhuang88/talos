@@ -1,6 +1,6 @@
 # SEARCH-001-D3-T3: Bing Non-CN-First, CN-Fallback Zero-Key HTML Route
 
-**Status**: Review / Proposed claim; offline candidate only — **no live or production endpoint admission**
+**Status**: In Progress / Claimed — T3a offline candidate; **T3b live/default activation remains BLOCKED**
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@
 | Source Issue | [#957](https://github.com/wjhuang88/talos/issues/957) |
 | Parent | [SEARCH-001-D3 / #937](SEARCH-001-D3-bing-direct-html-feasibility.md), [SEARCH-001 / #624](SEARCH-001-zero-config-global-search.md) |
 | Predecessors | D3-T1/#941 and D3-T2/#947 Complete/Closed; L/#901 retired `rust-websearch` |
-| Selected iteration | [I329](../../iterations/I329-search-bing-dual-host-offline.md) — proposed, ineffective until governance merge |
+| Selected iteration | [I329](../../iterations/I329-search-bing-dual-host-offline.md) — active after governance PR #958 merge |
 | Product direction | Non-CN `www.bing.com/search` first, then existing `cn.bing.com/search` on allowed unavailability |
 | Implemented by this claim | **T3a offline/test-only** failover policy candidate; no newly authorized host, default route, or live query |
 | Production activation | **T3b BLOCKED** on supplier/result rights, network authority, real independent region tests, and a later separately effective claim |
@@ -25,9 +25,9 @@
 | Source Issue | #957 |
 | Governance Claim PR | #958 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer direction on SEARCH-001: use Bing HTML web pages as zero-key candidate; within Bing prefer non-CN, fallback CN. Actual governance effectiveness requires exact-head CI, independent review, accepted merge/CAS. |
-| Implementation PR | None; source must follow accepted claim |
-| Last Updated | 2026-11-16 |
+| Authorization Evidence | Governance PR #958 accepted/merged `58207831675365e35cc80601097b96f9432a68aa` after exact-head [CI #4273](https://github.com/wjhuang88/talos/actions/runs/43805545051) 4 applicable SUCCESS/4 documentation-scoped SKIPPED, independent [no-blocker review](https://github.com/wjhuang88/talos/pull/958#issuecomment-6907540766) and head CAS. |
+| Implementation PR | In preparation on `feat/i329-search-bing-offline-failover` (source PR not yet accepted) |
+| Last Updated | 2026-11-16 (post-claim activation) |
 | Handoff / Release Condition | Do not start source before effective I329 claim. T3a closeout may describe only offline model acceptance, not product route. T3b remains blocked on additional rights/authority/region gates. |
 
 ## Product decision and boundary
@@ -60,3 +60,7 @@ Main has I328/STORE-002 E work, I324/GIT-COMPAT, Provider/TUI/Server owners. T3a
 After effective claim: `cargo fmt --all -- --check`, `cargo test --locked -p talos-tools --features network` focused policy tests, full workspace check/Clippy/tests, applicable native Windows/macOS/Linux CI, both governance validators, independent Security/API review bound to exact HEAD and merge-time CAS. A historical green SHA does not validate subsequent changed code.
 
 **Acceptance criterion**: demonstrate correct deterministic failover policy and negative controls *offline*, then record actual source Completion Commit in owner-first closeout. No production code path is changed by this governance PR. Parent D3/#937 and Epic/#624 remain OPEN, prior D/#644 remains ZERO-ADMISSION.
+
+## T3a implementation checkpoint — 2026-11-16
+
+I329 was activated by governance-only [PR #958](https://github.com/wjhuang88/talos/pull/958), merged at `58207831675365e35cc80601097b96f9432a68aa` after exact-head CI #4273 success and independent no-blocker review. A separate implementation branch from that exact merge introduces a private, **unwired** `search_backend::bing_variants` policy candidate and hand-authored tests. This may be compiled/tested but is not permitted to change the protected SearchRouter or manifest, register `www.bing.com`, perform live requests, activate Browser/CDP or imply Microsoft service/output rights. The [offline contract/evidence note](../../reference/SEARCH-001-D3-T3-OFFLINE-DECISION-2026-11-16.md) pins those boundaries. Completion and CI are **pending**, not accepted here.
