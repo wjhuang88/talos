@@ -1603,3 +1603,34 @@ its open/schema/transaction phase must be established before changing behavior.
 No installed-host acceptance, deployment, merge or Complete claim follows. UI,
 approval-history and background work are excluded; background remains default-off.
 Existing sessions, migration sources, backups and unrelated dirty work are retained.
+
+## 2026-11-16 atomic binding schema publication — Partial
+
+Implementation commit: `6ad2f96fcdb3eb393eb9018dcfe4fbc585a9ad79`.
+First-open schema publication now uses one DEFERRED transaction, keeping WAL/FULL
+configuration outside. Failed DDL/commit rolls back before retry; a connection still
+inside a transaction is not retried. Existing500ms/20retry/25ms limits, five-second
+post-initialization busy timeout and six-worker success assertions are unchanged.
+No database format or user-data rewrite is introduced; existing bindings and companion
+rows survive incremental schema completion, and both cleanup triggers retain their effect.
+
+Deterministic regressions failed on the former implementation: denying the fourth
+CREATE left three committed tables; successful schema setup invoked six commits.
+The atomic implementation passes those regressions plus rejected-COMMIT/reopen and
+partial-schema/data/trigger checks. Focused durable45 and final Session433 tests passed,
+zero failed/ignored. Logs: target/binding-schema-{red-tests,green-tests,session-tests}.log.
+Exact-commit independent source review found no blocker. Standard clean-checkout
+preflight passed:5494 unfiltered tests/doctests, zero failed/ignored, two external SDK
+modes; all2445 source files matched before and after the run. Logs/manifest/result:
+target/binding-schema-preflight{.log,-source-manifest.json,-result.json}. Runtime
+15min8.937s, peak2G, swap0. This gate used pinned1.99.0, locked commands and the
+specified TMPDIR. Native validation for this new implementation remains pending.
+
+Previous diagnostic headc8703bdb native run43739517986 passed scoped Windows/macOS
+jobs (Session407/429), while global Issue reconciliation failed independently. Its
+Windows timings localized329–411ms to initialization-to-BEGIN, not head creation;
+they include scheduling and do not prove the earlier intermittent failure's cause.
+This production change requires fresh native validation. The earlier macOS
+identity-custody failure remains independently unresolved. Installed-user-session,
+real-provider summary quality and the full handoff residuals remain open; no merge,
+deployment, cleanup or default background activation is claimed.
