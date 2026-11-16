@@ -164,16 +164,14 @@ impl SessionIndex {
                     | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
             )?;
             conn.busy_timeout(std::time::Duration::ZERO)?;
-            let index = Self {
+            let mut index = Self {
                 conn,
                 db_path: path.to_path_buf(),
             };
             {
-                let _progress = install_budget(&index.conn, budget)?;
-                index
-                    .conn
-                    .execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")?;
-                index.init_schema()?;
+                let conn = install_budget(&mut index.conn, budget)?;
+                conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")?;
+                Self::init_schema_connection(&conn)?;
                 budget.check()?;
             }
             Ok(index)
@@ -218,7 +216,11 @@ impl SessionIndex {
     ///
     /// Returns an error if the schema cannot be created.
     pub fn init_schema(&self) -> Result<(), IndexError> {
-        self.conn.execute_batch(
+        Self::init_schema_connection(&self.conn)
+    }
+
+    fn init_schema_connection(conn: &Connection) -> Result<(), IndexError> {
+        conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
@@ -246,12 +248,12 @@ impl SessionIndex {
         )?;
 
         // Do not swallow lock/deadline errors as if migration already existed.
-        let has_workspace_root: bool = self.conn.query_row(
+        let has_workspace_root: bool = conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM pragma_table_info('sessions') WHERE name='workspace_root')",
             [], |row| row.get(0),
         )?;
         if !has_workspace_root {
-            self.conn.execute_batch(
+            conn.execute_batch(
                 "ALTER TABLE sessions ADD COLUMN workspace_root TEXT NOT NULL DEFAULT '';",
             )?;
         }
@@ -574,15 +576,15 @@ impl SessionIndex {
     /// Register lineage with the caller's shared cancellation/deadline budget.
     /// Busy locks fail immediately; exact retries preserve existing ownership.
     pub fn record_fork_with_budget(
-        &self,
+        &mut self,
         source_session_id: &str,
         forked_session_id: &str,
         fork_entry_id: &str,
         budget: &RecoveryWorkBudget,
     ) -> Result<(), IndexError> {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let _progress = install_budget(&self.conn, budget)?;
-            let transaction = rusqlite::Transaction::new_unchecked(&self.conn, rusqlite::TransactionBehavior::Immediate)?;
+            let conn = install_budget(&mut self.conn, budget)?;
+            let transaction = rusqlite::Transaction::new_unchecked(&conn, rusqlite::TransactionBehavior::Immediate)?;
             let existing: Option<(String, String)> = transaction.query_row(
                 "SELECT source_session_id, fork_entry_id FROM forks WHERE forked_session_id=?1",
                 [forked_session_id], |row| Ok((row.get(0)?, row.get(1)?)),
@@ -1197,7 +1199,7 @@ mod tests {
         std::os::unix::fs::symlink(&real, &alias).expect("parent alias");
         let path = alias.join("index.db");
         let budget = || RecoveryWorkBudget::new(Duration::from_secs(2));
-        let index = SessionIndex::open_for_recovery(&path, &budget()).expect("alias open");
+        let mut index = SessionIndex::open_for_recovery(&path, &budget()).expect("alias open");
         index
             .record_fork_with_budget("parent", "child", "tail", &budget())
             .expect("lineage");
@@ -1239,7 +1241,7 @@ mod tests {
         );
         assert!(start.elapsed() < Duration::from_secs(1));
         blocker.execute_batch("ROLLBACK").expect("unlock");
-        let index = SessionIndex::open_for_recovery(
+        let mut index = SessionIndex::open_for_recovery(
             &path,
             &RecoveryWorkBudget::new(Duration::from_secs(1)),
         )
@@ -1263,7 +1265,7 @@ mod tests {
     #[test]
     fn fork_lineage_shared_budget_rejects_expired_and_busy_without_writes() {
         use std::time::{Duration, Instant};
-        let (index, _dir) = temp_index();
+        let (mut index, _dir) = temp_index();
         let expired = RecoveryWorkBudget::new(Duration::ZERO);
         assert!(
             index

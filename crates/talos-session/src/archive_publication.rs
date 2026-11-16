@@ -134,10 +134,10 @@ pub(crate) fn load(
         let db = head.parent().ok_or_else(invalid)?.join("history-bindings.sqlite");
         if !std::fs::symlink_metadata(&db)?.file_type().is_file() { return Err(invalid()); }
         let db = db.parent().ok_or_else(invalid)?.canonicalize()?.join("history-bindings.sqlite");
-        let connection = crate::durable::open_binding_connection_with_flags(db, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW).map_err(|_| invalid())?;
+        let mut connection = crate::durable::open_binding_connection_with_flags(db, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW).map_err(|_| invalid())?;
         connection.busy_timeout(Duration::ZERO).map_err(|_| invalid())?;
         let budget = crate::sqlite::RecoveryWorkBudget::new(deadline.saturating_duration_since(Instant::now()));
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection = crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         let mut query = connection.prepare("SELECT CASE WHEN length(CAST(owner AS BLOB))=36 THEN owner END, CASE WHEN length(CAST(digest AS BLOB))=64 THEN digest END FROM archive_publication_intents WHERE archive=?1 LIMIT 2").map_err(|_| invalid())?;
         let mut result = Vec::new();
         for name in names {

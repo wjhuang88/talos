@@ -1,0 +1,15 @@
+[package]
+name = "talos-sqlite-api-external"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+talos-session = { path = "../../../crates/talos-session" }
+talos-memory = { path = "../../../crates/talos-memory" }
+talos-models = { path = "../../../crates/talos-models" }
+talos-evolution = { path = "../../../crates/talos-evolution" }
+talos-exploration = { path = "../../../crates/talos-exploration" }

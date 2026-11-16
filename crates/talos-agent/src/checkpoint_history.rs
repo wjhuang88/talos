@@ -155,7 +155,7 @@ impl Preparation {
         }
         let scan = preparation_result(source.begin_prefix_seal(), "linear_seal_begin_failed")?;
         let path = preparation_result(session.recovery_index_path(), "linear_index_path_failed")?;
-        let index = preparation_result(SessionIndex::new(&path), "linear_index_open_failed")?;
+        let mut index = preparation_result(SessionIndex::new(&path), "linear_index_open_failed")?;
         let stopped = cancel.clone();
         let budget = RecoveryWorkBudget::with_cancellation_check(
             deadline
@@ -295,7 +295,7 @@ impl Preparation {
             deadline.saturating_duration_since(Instant::now()),
             move || stopped.is_cancelled(),
         );
-        let index = preparation_result(
+        let mut index = preparation_result(
             SessionIndex::new(&self.path),
             "linear_persist_index_open_failed",
         )?;
@@ -324,7 +324,7 @@ impl Preparation {
     fn retire(&self) {
         #[cfg(any(unix, windows))]
         self.scan_store.clear();
-        if let Ok(index) = SessionIndex::new(&self.path) {
+        if let Ok(mut index) = SessionIndex::new(&self.path) {
             let _ = index.clear_recovery_continuation(
                 &self.scope,
                 &RecoveryWorkBudget::new(Duration::from_secs(1)),
@@ -926,7 +926,7 @@ impl History {
         self.current_until(deadline)
             && SessionIndex::open_read_only(&self.path)
                 .ok()
-                .is_some_and(|index| {
+                .is_some_and(|mut index| {
                     index
                         .recovery_owner_scope_ready(&self.owner, &self.scope, &budget)
                         .unwrap_or(false)
@@ -969,7 +969,7 @@ impl History {
         if !self.current_until(deadline) {
             return None;
         }
-        let index = SessionIndex::open_read_only(&self.path).ok()?;
+        let mut index = SessionIndex::open_read_only(&self.path).ok()?;
         if !index
             .recovery_owner_scope_ready(&self.owner, &self.scope, &budget)
             .ok()?
@@ -2024,7 +2024,7 @@ mod tests {
             assert_eq!(work.step(&cancel, deadline), Some(PreparationStep::Pending));
         }
         work.persist(&cancel, deadline).expect("persist");
-        let index = SessionIndex::new(&work.path).expect("index");
+        let mut index = SessionIndex::new(&work.path).expect("index");
         let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
         let owner = session.id().to_string();
         let saved = index
@@ -2161,7 +2161,7 @@ mod tests {
         }
         work.persist(&cancel, deadline).expect("index continuation");
         let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
-        let index = SessionIndex::new(&work.path).expect("index");
+        let mut index = SessionIndex::new(&work.path).expect("index");
         let mut saved = index
             .recovery_continuation(&session.id().to_string(), &budget)
             .expect("read")
@@ -2350,7 +2350,7 @@ mod tests {
                 .is_none()
         );
         assert!(pending.lock().await.is_none());
-        let index = SessionIndex::open_read_only(&index_path).expect("index");
+        let mut index = SessionIndex::open_read_only(&index_path).expect("index");
         let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
         assert_eq!(
             index
@@ -2541,7 +2541,7 @@ mod tests {
             Some(PreparationStep::Pending)
         );
         let scope = work.scope.clone();
-        let reader = SessionIndex::open_read_only(&work.path).expect("read-only partial index");
+        let mut reader = SessionIndex::open_read_only(&work.path).expect("read-only partial index");
         let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
         assert!(
             !reader
@@ -2742,7 +2742,7 @@ mod tests {
         let first = History::prepare(&session, &cancel).await.expect("first");
         assert!(first.query(Some("fact"), None, None).is_some());
         let second = History::prepare(&session, &cancel).await.expect("second");
-        let index = SessionIndex::open_read_only(&second.path).expect("index");
+        let mut index = SessionIndex::open_read_only(&second.path).expect("index");
         let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
         assert!(
             index

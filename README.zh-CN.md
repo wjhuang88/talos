@@ -1,5 +1,14 @@
 # Talos
 
+### SQLite 迁移（开发候选）
+
+SQLite 升级候选使用 bundled SQLite 3.54.1 和 rusqlite 0.43。
+直接使用 rusqlite 错误类型的 Rust 调用方需要同步升级；恢复索引操作现在要求
+可变索引引用。API、数据兼容及回退要求见 [ADR-106](docs/decisions/106-sqlite-native-upgrade-and-error-type-migration.md)。
+这项依赖类型变更需要随下一个 minor 版本交付，不属于 0.10 补丁升级，也不要求
+改写已有会话数据。交付前仍需原生平台和运行宿主验收。
+
+
 ### 进程内存策略（I316 开发中）
 
 Unix 和 Windows 前台 Shell 每条输出流最多保留 1 MiB 原始字节，并显示截断提示；

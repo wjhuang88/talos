@@ -216,7 +216,7 @@ pub(crate) fn reconcile_published_metadata(
         let budget = crate::sqlite::RecoveryWorkBudget::new(
             deadline.saturating_duration_since(Instant::now()),
         );
-        let index =
+        let mut index =
             crate::SessionIndex::open_for_recovery(index_path, &budget).map_err(|_| invalid())?;
         evidence.check_current(deadline, &|| false)?;
         index
@@ -246,7 +246,7 @@ pub(crate) fn reconcile_pending_in_directory(
             Ok(metadata) if metadata.file_type().is_file() => {}
             _ => return Err(invalid()),
         }
-        let connection = crate::durable::open_binding_connection_with_flags(
+        let mut connection = crate::durable::open_binding_connection_with_flags(
             &db,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -257,7 +257,8 @@ pub(crate) fn reconcile_pending_in_directory(
         let budget = crate::sqlite::RecoveryWorkBudget::new(
             deadline.saturating_duration_since(Instant::now()),
         );
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         let exists: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='archived_fork_receipts')", [], |row| row.get(0)).map_err(|_| invalid())?;
         if !exists {
             return Ok(0);
@@ -750,7 +751,7 @@ impl Receipt {
             }
             // Identity reservation already initialized this database in WAL
             // mode. Do not restart its independent initialization retry budget.
-            let connection = crate::durable::open_binding_connection_with_flags(
+            let mut connection = crate::durable::open_binding_connection_with_flags(
                 &db,
                 OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
             )
@@ -761,8 +762,8 @@ impl Receipt {
             let budget = crate::sqlite::RecoveryWorkBudget::new(
                 deadline.saturating_duration_since(Instant::now()),
             );
-            let _guard =
-                crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+            let connection =
+                crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
             connection.execute_batch("PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS archived_fork_receipts (child TEXT PRIMARY KEY, payload TEXT NOT NULL, published INTEGER NOT NULL CHECK(published IN (0,1)))").map_err(|_| invalid())?;
             connection
                 .execute(
@@ -810,7 +811,7 @@ impl Receipt {
                 return Err(invalid());
             }
             check(deadline)?;
-            let connection = crate::durable::open_binding_connection_with_flags(
+            let mut connection = crate::durable::open_binding_connection_with_flags(
                 db,
                 OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
             )
@@ -821,8 +822,8 @@ impl Receipt {
             let budget = crate::sqlite::RecoveryWorkBudget::new(
                 deadline.saturating_duration_since(Instant::now()),
             );
-            let _guard =
-                crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+            let connection =
+                crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
             connection
                 .execute_batch("PRAGMA synchronous=FULL")
                 .map_err(|_| invalid())?;
@@ -964,7 +965,7 @@ pub(crate) fn published_branch(
             Ok(metadata) if metadata.file_type().is_file() => {}
             _ => return Err(invalid()),
         }
-        let connection = crate::durable::open_binding_connection_with_flags(
+        let mut connection = crate::durable::open_binding_connection_with_flags(
             &db,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -975,7 +976,8 @@ pub(crate) fn published_branch(
         let budget = crate::sqlite::RecoveryWorkBudget::new(
             deadline.saturating_duration_since(Instant::now()),
         );
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         if !check_publication(&connection, session.id)? {
             return Ok(None);
         }
@@ -1014,7 +1016,7 @@ pub(crate) fn load(head: &Path, deadline: Instant) -> Result<Receipt, SessionErr
             .ok_or_else(invalid)?;
         let db = database(head, child)?;
         let _lease = crate::identity_custody::require_not_retired_until(head, deadline)?;
-        let connection = crate::durable::open_binding_connection_with_flags(
+        let mut connection = crate::durable::open_binding_connection_with_flags(
             &db,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -1025,7 +1027,8 @@ pub(crate) fn load(head: &Path, deadline: Instant) -> Result<Receipt, SessionErr
         let budget = crate::sqlite::RecoveryWorkBudget::new(
             deadline.saturating_duration_since(Instant::now()),
         );
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         let mut query = connection.prepare("SELECT CASE WHEN length(CAST(payload AS BLOB))<=32768 THEN payload END,published FROM archived_fork_receipts WHERE child=?1 LIMIT 2").map_err(|_| invalid())?;
         let mut rows = query.query([child.to_string()]).map_err(|_| invalid())?;
         let row = rows.next().map_err(|_| invalid())?.ok_or_else(invalid)?;

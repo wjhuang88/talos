@@ -70,7 +70,7 @@ pub(crate) fn load(
             .ok_or_else(invalid)?
             .canonicalize()?
             .join("history-bindings.sqlite");
-        let connection = rusqlite::Connection::open_with_flags(
+        let mut connection = rusqlite::Connection::open_with_flags(
             canonical,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )
@@ -81,7 +81,8 @@ pub(crate) fn load(
         let budget = crate::sqlite::RecoveryWorkBudget::new(
             deadline.saturating_duration_since(Instant::now()),
         );
-        let _guard = crate::sqlite::install_budget(&connection, &budget).map_err(|_| invalid())?;
+        let connection =
+            crate::sqlite::install_budget(&mut connection, &budget).map_err(|_| invalid())?;
         check()?;
         let exists: bool = connection.query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='compaction_zero_locators')", [], |r| r.get(0)).map_err(|_| invalid())?;

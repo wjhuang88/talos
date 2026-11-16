@@ -568,8 +568,8 @@ impl DurableSession {
         after: Option<&str>,
     ) -> Result<(usize, usize, usize, Option<String>), SessionError> {
         recovery_storage_boundary(|| {
-            let connection = open_binding_connection(&self.bindings_path)?;
-            let _guard = crate::sqlite::install_budget(&connection, budget)
+            let mut connection = open_binding_connection(&self.bindings_path)?;
+            let connection = crate::sqlite::install_budget(&mut connection, budget)
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             let directory = self
                 .file_path()
@@ -738,8 +738,8 @@ impl DurableSession {
             let mut previous_entry: Option<String> = None;
             // Disposable uniqueness state spills to SQLite temporary storage;
             // avoids a transcript-sized Rust set; this is not a hard RSS limit.
-            let connection = open_binding_connection(&self.bindings_path)?;
-            let _guard = crate::sqlite::install_budget(&connection, &budget)
+            let mut connection = open_binding_connection(&self.bindings_path)?;
+            let connection = crate::sqlite::install_budget(&mut connection, &budget)
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             connection
                 .execute_batch(
@@ -1019,8 +1019,8 @@ impl DurableSession {
             }
             // Schema was installed when this configured handle was opened. Avoid
             // open_bindings' initialization retries during bounded scan work.
-            let connection = open_binding_connection(&self.bindings_path)?;
-            let _budget_guard = crate::sqlite::install_budget(&connection, budget)
+            let mut connection = open_binding_connection(&self.bindings_path)?;
+            let connection = crate::sqlite::install_budget(&mut connection, budget)
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             connection
                 .busy_timeout(std::time::Duration::ZERO)
@@ -1089,8 +1089,8 @@ impl DurableSession {
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             // Schema was installed when this configured handle was opened. Avoid
             // open_bindings' initialization retries during bounded scan work.
-            let connection = open_binding_connection(&self.bindings_path)?;
-            let _budget_guard = crate::sqlite::install_budget(&connection, budget)
+            let mut connection = open_binding_connection(&self.bindings_path)?;
+            let connection = crate::sqlite::install_budget(&mut connection, budget)
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             connection
                 .busy_timeout(std::time::Duration::ZERO)
@@ -1137,8 +1137,8 @@ impl DurableSession {
             if !Arc::ptr_eq(&receipt.owner, &self.recovery_owner) {
                 return Err(SessionError::DurableTurn("foreign scan receipt".into()));
             }
-            let connection = open_binding_connection(&self.bindings_path)?;
-            let _guard = crate::sqlite::install_budget(&connection, budget)
+            let mut connection = open_binding_connection(&self.bindings_path)?;
+            let connection = crate::sqlite::install_budget(&mut connection, budget)
                 .map_err(|e| SessionError::DurableTurn(e.to_string()))?;
             let tx = connection.unchecked_transaction().map_err(sql_error)?;
             let deleted = tx.execute("DELETE FROM durable_recovery_scans WHERE session_id=?1 AND payload=?2 AND EXISTS(SELECT 1 FROM durable_bindings WHERE external_id=?3 AND session_id=?1)",
