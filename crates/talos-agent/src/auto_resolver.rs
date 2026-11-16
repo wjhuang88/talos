@@ -11,6 +11,7 @@ mod file_mutation_review;
 mod invocation_review;
 mod network_review;
 mod prepared_command;
+mod rolling_history;
 mod script_evidence;
 
 pub use action_review::{BuiltinActionAssessmentRequest, OrdinaryInvocationAssessmentRequest};
@@ -1127,15 +1128,14 @@ impl ProviderAutoPermissionAssessor {
             payload["script_evidence"] =
                 serde_json::to_value(evidence).map_err(|error| error.to_string())?;
         }
-        let payload = serde_json::to_string(&payload).map_err(|error| error.to_string())?;
+        let payload = rolling_history::serialize_request(&payload, false)?;
         let messages = vec![
             Message::System {
-                content: if contextual {
+                content: rolling_history::system_prompt(if contextual {
                     AUTO_ASSESSOR_SYSTEM_PROMPT
                 } else {
                     LEGACY_AUTO_ASSESSOR_SYSTEM_PROMPT
-                }
-                .to_owned(),
+                }),
                 cache_markers: Vec::new(),
             },
             Message::User {
@@ -1180,6 +1180,8 @@ pub struct AutoDecisionReport {
 pub struct AutoPermissionControl {
     enabled: Arc<AtomicBool>,
     reset_epoch: Arc<AtomicU64>,
+    // Serializes epoch changes with live-history reads and writes. Never held across await.
+    history_fence: Arc<Mutex<()>>,
 }
 
 impl AutoPermissionControl {
@@ -1189,6 +1191,7 @@ impl AutoPermissionControl {
         Self {
             enabled: Arc::new(AtomicBool::new(enabled)),
             reset_epoch: Arc::new(AtomicU64::new(0)),
+            history_fence: Arc::new(Mutex::new(())),
         }
     }
 
@@ -1200,6 +1203,10 @@ impl AutoPermissionControl {
 
     /// Changes the session mode. Enabling starts a fresh circuit epoch.
     pub fn set_enabled(&self, enabled: bool) {
+        let Ok(_fence) = self.history_fence.lock() else {
+            self.enabled.store(false, Ordering::Release);
+            return;
+        };
         self.enabled.store(enabled, Ordering::Release);
         if enabled {
             self.reset_epoch.fetch_add(1, Ordering::AcqRel);
@@ -1226,6 +1233,7 @@ pub struct AutoCircuitStatus {
 pub struct AutoPermissionResolver {
     assessor: Arc<dyn AutoPermissionAssessor>,
     fallback: Arc<dyn ApprovalResolver>,
+    history: Arc<Mutex<rolling_history::History>>,
     lease: ManagedWorkspaceLease,
     state: Mutex<CircuitState>,
     last_report: Mutex<Option<AutoDecisionReport>>,
@@ -1248,9 +1256,14 @@ impl AutoPermissionResolver {
         control: AutoPermissionControl,
     ) -> Self {
         let session_id = lease.current_session_id();
+        let history = Arc::new(Mutex::new(rolling_history::History::default()));
         Self {
             assessor,
-            fallback,
+            fallback: Arc::new(rolling_history::ObservedFallback {
+                inner: fallback,
+                history: history.clone(),
+            }),
+            history,
             lease,
             state: Mutex::new(CircuitState::default()),
             last_report: Mutex::new(None),
@@ -1302,6 +1315,12 @@ impl AutoPermissionResolver {
 
     /// Explicitly resets the circuit, equivalent to `/auto on`.
     pub fn reset(&self) {
+        let Ok(_fence) = self.control.history_fence.lock() else {
+            return;
+        };
+        if let Ok(mut history) = self.history.lock() {
+            history.reset();
+        }
         if let Ok(mut state) = self.state.lock() {
             *state = CircuitState::default();
         }
@@ -1360,6 +1379,7 @@ impl AutoPermissionResolver {
     }
 
     fn notify_report(&self, report: &AutoDecisionReport) {
+        rolling_history::record_model(&self.history, &report.outcome);
         if let Some(sink) = &self.report_sink {
             sink(report.clone());
         }
@@ -2161,12 +2181,19 @@ impl ApprovalResolver for AutoPermissionResolver {
         auto_assessment_allowed: bool,
         user_intent: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        self.resolve_file_mutation_review(
-            request,
-            evidence,
-            remaining,
-            auto_assessment_allowed,
-            user_intent,
+        self.with_history(
+            request.binding.session_id.clone(),
+            request.tool_name.clone(),
+            async move {
+                self.resolve_file_mutation_review(
+                    request,
+                    evidence,
+                    remaining,
+                    auto_assessment_allowed,
+                    user_intent,
+                )
+                .await
+            },
         )
         .await
     }
@@ -2178,12 +2205,19 @@ impl ApprovalResolver for AutoPermissionResolver {
         auto_assessment_allowed: bool,
         user_intent: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        self.resolve_invocation_review(
-            request,
-            evidence,
-            remaining,
-            auto_assessment_allowed,
-            user_intent,
+        self.with_history(
+            request.binding.session_id.clone(),
+            request.tool_name.clone(),
+            async move {
+                self.resolve_invocation_review(
+                    request,
+                    evidence,
+                    remaining,
+                    auto_assessment_allowed,
+                    user_intent,
+                )
+                .await
+            },
         )
         .await
     }
@@ -2195,12 +2229,19 @@ impl ApprovalResolver for AutoPermissionResolver {
         auto_assessment_allowed: bool,
         user_intent: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        self.resolve_builtin_network_review(
-            request,
-            evidence,
-            remaining,
-            auto_assessment_allowed,
-            user_intent,
+        self.with_history(
+            request.binding.session_id.clone(),
+            request.tool_name.clone(),
+            async move {
+                self.resolve_builtin_network_review(
+                    request,
+                    evidence,
+                    remaining,
+                    auto_assessment_allowed,
+                    user_intent,
+                )
+                .await
+            },
         )
         .await
     }
@@ -2212,12 +2253,19 @@ impl ApprovalResolver for AutoPermissionResolver {
         auto_assessment_allowed: bool,
         user_intent: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        self.resolve_command(
-            request,
-            evidence,
-            remaining,
-            auto_assessment_allowed,
-            user_intent,
+        self.with_history(
+            request.binding.session_id.clone(),
+            request.tool_name.clone(),
+            async move {
+                self.resolve_command(
+                    request,
+                    evidence,
+                    remaining,
+                    auto_assessment_allowed,
+                    user_intent,
+                )
+                .await
+            },
         )
         .await
     }
@@ -2251,12 +2299,19 @@ impl ApprovalResolver for AutoPermissionResolver {
         auto_assessment_allowed: bool,
         user_intent: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        self.resolve_assessed(
-            request,
-            None,
-            remaining,
-            auto_assessment_allowed,
-            user_intent,
+        self.with_history(
+            request.binding.session_id.clone(),
+            request.tool_name.clone(),
+            async move {
+                self.resolve_assessed(
+                    request,
+                    None,
+                    remaining,
+                    auto_assessment_allowed,
+                    user_intent,
+                )
+                .await
+            },
         )
         .await
     }
@@ -2269,12 +2324,19 @@ impl ApprovalResolver for AutoPermissionResolver {
         auto_assessment_allowed: bool,
         user_intent: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        self.resolve_assessed(
-            request,
-            Some(execution_input),
-            remaining,
-            auto_assessment_allowed,
-            user_intent,
+        self.with_history(
+            request.binding.session_id.clone(),
+            request.tool_name.clone(),
+            async move {
+                self.resolve_assessed(
+                    request,
+                    Some(execution_input),
+                    remaining,
+                    auto_assessment_allowed,
+                    user_intent,
+                )
+                .await
+            },
         )
         .await
     }
@@ -2288,84 +2350,127 @@ impl ApprovalResolver for AutoPermissionResolver {
         auto_assessment_allowed: bool,
         user_intent: Option<&str>,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        if !matches!(request.tool_name.as_str(), "bash" | "powershell") {
-            return self
-                .resolve_with_execution_input(
-                    request,
-                    execution_input,
-                    remaining,
-                    auto_assessment_allowed,
-                    user_intent,
-                )
-                .await;
-        }
-        let Some(working_directory) = working_directory else {
-            // Do not collect files or assert workspace identity using caller JSON.
-            self.report(AutoDecisionReport {
-                outcome: "human_required".into(),
-                reason: "execution_context_unavailable".into(),
-                evaluator: self.assessor.identity().into(),
-                request_digest: "unavailable".into(),
-            });
-            return self
-                .fallback
-                .resolve_with_explanation(
-                    request,
-                    remaining,
-                    technical_review_explanation(
-                        "execution_context_unavailable",
-                        self.failure_locale().as_str(),
-                    ),
-                )
-                .await;
-        };
-        let cwd = Some(working_directory)
-            .and_then(|path| path.canonicalize().ok())
-            .filter(|path| path.is_dir())
-            .and_then(|path| {
-                path.strip_prefix(&self.lease.root)
-                    .ok()
-                    .map(Path::to_path_buf)
-            });
-        let Some(cwd) = cwd else {
-            self.report(AutoDecisionReport {
-                outcome: "human_required".into(),
-                reason: "execution_context_unavailable".into(),
-                evaluator: self.assessor.identity().into(),
-                request_digest: "unavailable".into(),
-            });
-            return self.fallback.resolve(request, remaining).await;
-        };
-        let mut assessment_input = execution_input.clone();
-        let Some(object) = assessment_input.as_object_mut() else {
-            return self.fallback.resolve(request, remaining).await;
-        };
-        object.insert(
-            "cwd".into(),
-            serde_json::Value::String(cwd.to_string_lossy().into_owned()),
-        );
-        let directory_before = execution_directory_identity(working_directory);
-        let result = self
-            .resolve_assessed(
-                request,
-                Some(&assessment_input),
-                remaining,
-                auto_assessment_allowed,
-                user_intent,
-            )
-            .await?;
-        if directory_before.is_none()
-            || execution_directory_identity(working_directory) != directory_before
-        {
-            return Err(ApprovalResolverError::new(
-                "tool execution directory changed during approval",
-            ));
-        }
-        Ok(result)
+        self.with_history(
+            request.binding.session_id.clone(),
+            request.tool_name.clone(),
+            async move {
+                if !matches!(request.tool_name.as_str(), "bash" | "powershell") {
+                    return self
+                        .resolve_assessed(
+                            request,
+                            Some(execution_input),
+                            remaining,
+                            auto_assessment_allowed,
+                            user_intent,
+                        )
+                        .await;
+                }
+                let Some(working_directory) = working_directory else {
+                    // Do not collect files or assert workspace identity using caller JSON.
+                    self.report(AutoDecisionReport {
+                        outcome: "human_required".into(),
+                        reason: "execution_context_unavailable".into(),
+                        evaluator: self.assessor.identity().into(),
+                        request_digest: "unavailable".into(),
+                    });
+                    return self
+                        .fallback
+                        .resolve_with_explanation(
+                            request,
+                            remaining,
+                            technical_review_explanation(
+                                "execution_context_unavailable",
+                                self.failure_locale().as_str(),
+                            ),
+                        )
+                        .await;
+                };
+                let cwd = Some(working_directory)
+                    .and_then(|path| path.canonicalize().ok())
+                    .filter(|path| path.is_dir())
+                    .and_then(|path| {
+                        path.strip_prefix(&self.lease.root)
+                            .ok()
+                            .map(Path::to_path_buf)
+                    });
+                let Some(cwd) = cwd else {
+                    self.report(AutoDecisionReport {
+                        outcome: "human_required".into(),
+                        reason: "execution_context_unavailable".into(),
+                        evaluator: self.assessor.identity().into(),
+                        request_digest: "unavailable".into(),
+                    });
+                    return self.fallback.resolve(request, remaining).await;
+                };
+                let mut assessment_input = execution_input.clone();
+                let Some(object) = assessment_input.as_object_mut() else {
+                    return self.fallback.resolve(request, remaining).await;
+                };
+                object.insert(
+                    "cwd".into(),
+                    serde_json::Value::String(cwd.to_string_lossy().into_owned()),
+                );
+                let directory_before = execution_directory_identity(working_directory);
+                let result = self
+                    .resolve_assessed(
+                        request,
+                        Some(&assessment_input),
+                        remaining,
+                        auto_assessment_allowed,
+                        user_intent,
+                    )
+                    .await?;
+                if directory_before.is_none()
+                    || execution_directory_identity(working_directory) != directory_before
+                {
+                    return Err(ApprovalResolverError::new(
+                        "tool execution directory changed during approval",
+                    ));
+                }
+                Ok(result)
+            },
+        )
+        .await
     }
 }
 
 impl AutoPermissionResolver {
+    async fn with_history<F>(
+        &self,
+        session: String,
+        tool: String,
+        future: F,
+    ) -> Result<ApprovalChoice, ApprovalResolverError>
+    where
+        F: std::future::Future<Output = Result<ApprovalChoice, ApprovalResolverError>>,
+    {
+        let scope = if let Ok(_fence) = self.control.history_fence.lock()
+            && self.lease.matches_session(&session)
+        {
+            self.history.lock().ok().and_then(|mut history| {
+                let epoch = self.control.reset_epoch();
+                if !self.lease.matches_session(&session) {
+                    return None;
+                }
+                history.bind(&session, epoch);
+                history
+                    .begin(rolling_history::Entry::new(&tool, "unavailable", ""))
+                    .map(|(prior, token)| rolling_history::RequestScope {
+                        history: self.history.clone(),
+                        token,
+                        prior,
+                        session: session.clone(),
+                        epoch,
+                        control: self.control.clone(),
+                        lease: self.lease.clone(),
+                    })
+            })
+        } else {
+            None
+        };
+        rolling_history::CURRENT.scope(scope, future).await
+    }
+
     async fn resolve_assessed(
         &self,
         request: PermissionApprovalRequest,
@@ -2618,6 +2723,13 @@ impl AutoPermissionResolver {
         });
         let response_bound = response.schema_version == AUTO_EVALUATOR_SCHEMA_VERSION
             && response.request_digest == evaluator_request.request_digest;
+        if response_bound {
+            rolling_history::record_details(
+                &self.history,
+                response.effect_summary.as_deref(),
+                &response.decision_points,
+            );
+        }
         let valid = auto_assessment_allowed
             && !requires_human_effect_review
             && response_bound

@@ -765,6 +765,10 @@ impl Tui {
                 preview,
                 response,
             } => {
+                self.drop_active_approval();
+                if response.is_closed() {
+                    return false;
+                }
                 self.state.pending_approval_response = Some(response);
                 let args_str = serde_json::to_string_pretty(&arguments)
                     .unwrap_or_else(|_| arguments.to_string());
@@ -788,7 +792,9 @@ impl Tui {
                 self.handle_status_snapshot(snapshot, Instant::now());
             }
             UiOutput::SessionIdentity { id } => {
+                self.retire_closed_approval();
                 if self.session_id.as_ref() != Some(&id) {
+                    self.retire_legacy_approvals();
                     self.repeat_key = None;
                     self.tool_activities.clear();
                 }
@@ -856,6 +862,7 @@ impl Tui {
                 }
             }
             UiOutput::Exit => {
+                self.retire_all_approvals();
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }

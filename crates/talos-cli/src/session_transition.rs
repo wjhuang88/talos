@@ -182,6 +182,7 @@ pub struct SessionTransition {
     active_target: SessionCommandTarget,
     active_session: Session,
     permission_state: Option<Arc<talos_permission::PermissionSessionState>>,
+    approval_binding: Option<talos_tui::ApprovalBinding>,
     active_runtime: Option<ActiveRuntime>,
     retiring_runtime: Option<JoinHandle<()>>,
     prepared: Option<PreparedSession>,
@@ -202,6 +203,7 @@ impl SessionTransition {
             active_target: SessionCommandTarget::new(sq_tx, generation),
             active_session: session,
             permission_state: None,
+            approval_binding: None,
             active_runtime: None,
             retiring_runtime: None,
             prepared: None,
@@ -217,6 +219,11 @@ impl SessionTransition {
         state: Arc<talos_permission::PermissionSessionState>,
     ) {
         self.permission_state = Some(state);
+    }
+
+    /// Installs synchronous invalidation for TUI observations at publication.
+    pub fn attach_approval_binding(&mut self, binding: talos_tui::ApprovalBinding) {
+        self.approval_binding = Some(binding);
     }
 
     /// Returns the authoritative generation of the currently active Actor.
@@ -480,7 +487,11 @@ impl SessionTransition {
         } = result;
         let SessionHandle { sq_tx, eq_rx } = new_handle;
 
+        let approval_binding = self.approval_binding.clone();
         let publish_routes = || {
+            if let Some(binding) = &approval_binding {
+                binding.invalidate();
+            }
             bridge_rx_update_tx
                 .send((session.clone(), eq_rx))
                 .map_err(|_| "Bridge event route receiver is unavailable".to_string())?;
@@ -875,6 +886,17 @@ mod tests {
             publication_failure_fixture("bridge-publication-failure").await;
         let permission_state = permission_state_with_session_grant(temp.path());
         transition.attach_permission_state(permission_state.clone());
+        let binding = talos_tui::ApprovalBinding::default();
+        let (_request, waiter) = binding
+            .request(
+                "same-tool".into(),
+                serde_json::json!({}),
+                vec![],
+                None,
+                None,
+            )
+            .expect("old approval");
+        transition.attach_approval_binding(binding.clone());
         let (session_watch_tx, session_watch_rx) = watch::channel(old_session.clone());
         let (placeholder_tx, _placeholder_rx) = mpsc::channel(1);
         let (sq_watch_tx, _sq_watch_rx) = watch::channel(placeholder_tx);
@@ -904,6 +926,25 @@ mod tests {
         )
         .await;
         assert_eq!(session_watch_rx.borrow().id, old_session.id);
+        let response = tokio::time::timeout(std::time::Duration::from_secs(1), waiter.receive())
+            .await
+            .expect("publication must invalidate even a retained responder");
+        assert_eq!(
+            response.source(),
+            talos_tui::ApprovalResponseSource::Unavailable
+        );
+        assert!(
+            binding
+                .request(
+                    "same-tool".into(),
+                    serde_json::json!({}),
+                    vec![],
+                    None,
+                    None
+                )
+                .is_some(),
+            "new generation remains usable without reviving old requests"
+        );
         assert_eq!(
             permission_state.grant_count().expect("grant count"),
             1,
@@ -920,6 +961,17 @@ mod tests {
             .session_id()
             .expect("permission Session ID");
         transition.attach_permission_state(permission_state.clone());
+        let binding = talos_tui::ApprovalBinding::default();
+        let (_request, waiter) = binding
+            .request(
+                "same-tool".into(),
+                serde_json::json!({}),
+                vec![],
+                None,
+                None,
+            )
+            .expect("old approval");
+        transition.attach_approval_binding(binding.clone());
         let (session_watch_tx, _session_watch_rx) = watch::channel(old_session);
         let (placeholder_tx, _placeholder_rx) = mpsc::channel(1);
         let (sq_watch_tx, _sq_watch_rx) = watch::channel(placeholder_tx);
@@ -936,6 +988,25 @@ mod tests {
             .await
             .expect("publication should succeed");
 
+        let response = tokio::time::timeout(std::time::Duration::from_secs(1), waiter.receive())
+            .await
+            .expect("publication must invalidate even a retained responder");
+        assert_eq!(
+            response.source(),
+            talos_tui::ApprovalResponseSource::Unavailable
+        );
+        assert!(
+            binding
+                .request(
+                    "same-tool".into(),
+                    serde_json::json!({}),
+                    vec![],
+                    None,
+                    None
+                )
+                .is_some(),
+            "new generation remains usable without reviving old requests"
+        );
         assert_eq!(
             permission_state.grant_count().expect("grant count"),
             0,

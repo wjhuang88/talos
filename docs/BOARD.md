@@ -2,6 +2,15 @@
 
 [Owner](backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](iterations/I329-search-bing-dual-host-offline.md) / [Issue #957](https://github.com/wjhuang88/talos/issues/957): proposed **Active / Claimed after governance merge** for offline-only non-CN→CN variant decision/negative-test candidate. No production endpoint, permission, Browser integration, new native provider, region or usage-rights admission. Parent D3/#937 and Epic #624 remain open; D/#644 ZERO-ADMISSION, E/F/G/I blocked.
 
+## AUTO-HISTORY-001 — Review / Claimed
+
+[Approval history owner](tasks/auto-approval-rolling-history.md): effective claim #916;
+bounded same-session history and correlated fallback observations implemented in isolated
+candidate. Final local preflight passed (5385 summed test passes,0failed/ignored,2SDK
+fixtures), with four-host denial-chain evidence. Exact-commit review, remote/native CI
+and delivery remain pending; stopped Desktop Windows cross-check is not a pass.
+No default background continuation or product release authorization.
+
 ## Azure C / PROVIDER-008-C
 
 [Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 proposes atomic claim+activation;
