@@ -151,7 +151,13 @@ impl LocalStorageProfile {
         if !path.exists() {
             return Ok(None);
         }
-        KnowledgeStore::open(path.to_str().unwrap_or_default()).map(Some)
+        let path_str = path.to_str().ok_or_else(|| {
+            talos_evolution::EvolutionError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "learned index path cannot be represented as UTF-8",
+            ))
+        })?;
+        KnowledgeStore::open(path_str).map(Some)
     }
 }
 
@@ -218,5 +224,26 @@ mod tests {
             .learned_knowledge_if_exists()
             .expect("existing learned")
             .is_some());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn learned_query_rejects_non_utf8_paths_without_substituting_a_database() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let non_utf8 = std::ffi::OsString::from_vec(b"broken-\xff".to_vec());
+        let profile = LocalStorageProfile::under_talos_root(dir.path().join(non_utf8));
+        std::fs::create_dir_all(profile.talos_root()).expect("create selected dir");
+        std::fs::write(profile.learned_index_db(), b"non-sqlite fixture")
+            .expect("write selected DB fixture");
+
+        match profile.learned_knowledge_if_exists() {
+            Err(talos_evolution::EvolutionError::Io(error)) => {
+                assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+            }
+            _ => panic!("non-UTF-8 path must fail with a typed invalid-input error"),
+        }
+        assert!(profile.learned_index_db().exists());
     }
 }
