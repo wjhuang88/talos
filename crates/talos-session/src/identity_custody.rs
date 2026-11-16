@@ -14,8 +14,21 @@ use crate::SessionError;
 /// Permanent files prevent deletion/recreation from splitting lock identity.
 #[derive(Clone)]
 pub(crate) struct IdentityLease {
-    _file: Option<std::sync::Arc<std::fs::File>>,
+    _file: Option<std::sync::Arc<IdentityLock>>,
     key: Option<std::path::PathBuf>,
+}
+
+// Arc owns the logical lease lifetime. Closing the last local File alone can
+// leave flock held by a transient descriptor inherited during process creation.
+// Unlock only when the final logical lease ends, not when any clone is dropped.
+struct IdentityLock(std::fs::File);
+
+impl Drop for IdentityLock {
+    fn drop(&mut self) {
+        // Release failure must not panic during unwinding. File still closes as
+        // the fallback; a failed unlock can delay availability, never grant access.
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.0.unlock()));
+    }
 }
 
 impl IdentityLease {
@@ -76,7 +89,7 @@ impl IdentityLease {
             #[cfg(test)]
             custody_stage("lock-acquired");
             Ok(Self {
-                _file: Some(std::sync::Arc::new(file)),
+                _file: Some(std::sync::Arc::new(IdentityLock(file))),
                 key: Some(key),
             })
         })
@@ -634,6 +647,46 @@ pub(crate) fn require_active_session_identity_until(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn final_logical_lease_releases_lock_with_extra_file_reference() {
+        let root = tempfile::tempdir().expect("root");
+        let id = Uuid::new_v4();
+        for exclusive in [false, true] {
+            let lease = IdentityLease::acquire(root.path(), id, exclusive).expect("lease");
+            // A duplicate models the extra open-file reference retained during spawn.
+            // It is not another logical custody lease and must not extend custody.
+            let descriptor = lease
+                ._file
+                .as_ref()
+                .expect("file")
+                .0
+                .try_clone()
+                .expect("duplicate");
+            let clone = lease.clone();
+            drop(lease);
+            assert!(IdentityLease::acquire(root.path(), id, true).is_err());
+            drop(clone);
+            let next = IdentityLease::acquire(root.path(), id, true)
+                .expect("last logical lease releases despite extra descriptor");
+            drop(descriptor);
+            assert!(IdentityLease::acquire(root.path(), id, true).is_err());
+            drop(next);
+            IdentityLease::acquire(root.path(), id, true).expect("next lease released");
+        }
+    }
+
+    #[test]
+    fn releasing_one_independent_shared_lease_keeps_other_custody() {
+        let root = tempfile::tempdir().expect("root");
+        let id = Uuid::new_v4();
+        let first = IdentityLease::acquire(root.path(), id, false).expect("first");
+        let second = IdentityLease::acquire(root.path(), id, false).expect("second");
+        drop(first);
+        assert!(IdentityLease::acquire(root.path(), id, true).is_err());
+        drop(second);
+        IdentityLease::acquire(root.path(), id, true).expect("all readers released");
+    }
 
     #[test]
     fn fork_source_adoption_is_stable_and_lease_excludes_retirement() {
