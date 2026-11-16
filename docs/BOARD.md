@@ -93,6 +93,10 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
   and finite allocation-path evidence are archived. Original Debug479ms tail
   and native/resource/platform acceptance remain open in #923. Basic Ghostty
   operations and Git display passed maintainer retest; missing platforms are not passed.
+  Git notification follow-up #960 merged as `3b1b1f67`: healthy 30s reconciliation
+  accepted, failure 2s polling retained; bounded watcher and early-exit scan delivered.
+  Exact-head code/platform CI `43861152146` and independent Agent review passed;
+  native gates and original 479ms tail remain open. macOS retains polling.
   Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001
