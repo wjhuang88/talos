@@ -1755,3 +1755,28 @@ Remaining: final independent current-diff review, selective commits separating t
 lint prerequisites, exact-head native Windows/macOS CI and upgraded path-probe evidence,
 plus original host/UI/approval handoff residuals. Candidate is not merged, installed or
 released; background continuation remains default-off. Overall remains Partial.
+
+## 2026-11-16 REPL pre-start checkpoint rejection follow-up — Partial
+
+Invalid checkpoint response reproduction identified a presentation gap: compatibility
+submission preparation can reject before TurnStarted/Completed, emitting
+SubmissionRejected(ContextBudgetExceeded). REPL ignored it and remained AgentRunning.
+A focused event-forwarder regression failed before the fix (session70564, one-second
+forwarding deadline), then all9event_loop tests passed (session84529). Forward bounded
+rejection metadata as AgentError to return to input; no provider body or submission ID
+is displayed and no transcript rewrite or admission relaxation is introduced.
+
+Real production CLI PTY with the same preserved data copies and invalid plain-text
+checkpoint response passed in5.64s. It saw the context-budget error and prompt, exactly
+one summary attempt/no normal tool request, unchanged selected head before the next
+request, and all38original hashes unchanged. A subsequent request-preview returned to
+prompt. Evidence target/repl-invalid-checkpoint-acceptance-20261116/result.json and
+case/invalid-checkpoint-report.json; binary SHA256
+e49c55dc62e62a74740198b66465f8e75ba26c8a2bd2d1180e88aae07c662f0f.
+Follow-up remains uncommitted pending review; no claim of general invalid-response
+recovery, installed-host delivery or default background continuation.
+
+PR917 at e9f52a55 has no checks and reports DIRTY. Fetched origin/main b524c7a9;
+non-mutating merge-tree identified only docs/decisions/README.md conflict (ADR104
+upstream entry and local ADR106 insertion). No numbering collision. Preserve both.
+Candidate synchronization and fresh validation/native CI remain required.
