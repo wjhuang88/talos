@@ -1,6 +1,6 @@
 # Iteration I329: Bing Non-CN-First/CN-Fallback Offline Contract
 
-> Status: **Active / Claimed proposed by governance PR**; ineffective until merged into main.
+> Status: **Active / Claimed** since governance PR #958 merged `58207831675365e35cc80601097b96f9432a68aa`; implementation review pending.
 > Selected: 2026-11-16
 > Story: [SEARCH-001-D3-T3 / #957](../backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md)
 > Parent: [D3/#937](https://github.com/wjhuang88/talos/issues/937) / [SEARCH-001/#624](https://github.com/wjhuang88/talos/issues/624)
@@ -17,8 +17,8 @@
 | Source Issue | #957 |
 | Governance Claim PR | #958 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer direction + existing #937 rights/authority gate; require exact-head documentation CI, independent governance/security review and expected-head CAS |
-| Implementation PR | None until effective claim |
+| Authorization Evidence | I329 activated by #958 merge `58207831675365e35cc80601097b96f9432a68aa`; exact-head CI #4273 4 applicable SUCCESS/4 skipped; independent no-blocker review #6907540766 and CAS. |
+| Implementation PR | Candidate on `feat/i329-search-bing-offline-failover`; no accepted source PR yet |
 | Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Implement and close only offline T3a after separately accepted claim; T3b production blocked pending rights/region/permission |
 
@@ -46,3 +46,7 @@ Parallel owned slices remain separate: I328/STORE-002 E activation, I325 D and I
 ## Explicit exclusions
 
 No production `www` request, browser/CDP activation, new SearchBackend identity, public `web_search` schema, Cargo/lock changes, network manifest or budget widening, new proxy flow, startup probes, rate/challenge bypass, GeoIP selection, user cookies or secrets. No supplier/region/rights assertion. Rollback of T3a is isolated candidate/test revert; there is **no** production route switch to roll back.
+
+## Claim activation and implementation checkpoint — 2026-11-16
+
+Claim #958 merged at `58207831675365e35cc80601097b96f9432a68aa`, after [CI #4273](https://github.com/wjhuang88/talos/actions/runs/43805545051) and independent exact-head no-blocker review. No source implementation was started before that merge. The new branch includes only private inert Bing variant decision/tests and an evidence note; source CI, independent source security/API review and CAS **not yet accepted**. Production `www.bing.com` activation T3b remains BLOCKED, no new Network authority was granted.
