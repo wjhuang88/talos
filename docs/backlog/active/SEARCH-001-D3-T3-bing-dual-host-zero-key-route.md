@@ -23,7 +23,7 @@
 | Work Slice | D3-T3a / #957: offline pure endpoint-variant selection and fail-closed fallback classification, synthetic deterministic policy tests, bounded design receipt; no production path `www.bing.com` registration or live Bing requests. |
 | Claimed At | 2026-11-16 |
 | Source Issue | #957 |
-| Governance Claim PR | #958 (Draft / ineffective until merge) |
+| Governance Claim PR | #958 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer direction on SEARCH-001: use Bing HTML web pages as zero-key candidate; within Bing prefer non-CN, fallback CN. Actual governance effectiveness requires exact-head CI, independent review, accepted merge/CAS. |
 | Implementation PR | None; source must follow accepted claim |
@@ -39,9 +39,9 @@ Reuse the existing Talos-owned Bing HTML parser (`li.b_algo`, `h2 a`, `.b_captio
 ## I329 T3a accepted work — offline candidate only
 
 1. Introduce an internal, deterministic **pure** descriptor/decision adapter for the two Bing variants; non-CN is considered before CN, but no runtime Network manifest, existing request factory, transport/fallback behavior, Cargo or public schema changes are permitted.
-2. Policy distinguishes genuine temporary *availability failures* (DNS, connect, source-local timeout; bounded 500/502 where independently identified as outage) from **no-fallback** events: 403/429, challenges/CAPTCHA, rate-limit-like 503, access refusal, unsupported redirect/host, invalid/malformed source, authorization denial, cancellation/stale state, deadline or physical-request exhaustion. No cross-host throttle or challenge evasion.
+2. Policy permits failover **only** for typed DNS resolution failure, connection establishment failure/refusal, or source-local timeout with a still-live invocation budget. Treat **all HTTP 5xx including 500/502/503 as no-fallback**, because a status response alone does not distinguish transient outage from server-side throttling; future evidence-based changes require their own policy review. Also **no fallback** for 403/429, challenges/CAPTCHA, access refusal, unsupported redirect/host, invalid/malformed source, authorization denial, cancellation/stale state, deadline or physical-request exhaustion. No cross-host throttle or challenge evasion.
 3. A valid HTTP 200 with no organic results must not be mistaken for network failure; current Bing parser emits `Empty`, so candidate tests must explicitly characterize "valid empty" versus challenge/DOM drift rather than auto-select CN. If a case is indistinguishable, fail closed and document it.
-4. Test with hand-authored local fixtures: preferred success/no fallback; temporary failure then CN; CN unavailable exhausted; 403/429/challenge/redirect no fallback; denied permission; stale/cancelled; exact ordering; per-variant source identity remains **one** Bing family; query secrecy/normalization and no startup request. These are **synthetic**, not live Bing assertions.
+4. Test with hand-authored local fixtures: preferred success/no fallback; temporary failure then CN; CN unavailable exhausted; 403/429/**all 5xx including 500/502/503**/challenge/redirect no fallback; denied permission; stale/cancelled; exact ordering; per-variant source identity remains **one** Bing family; query secrecy/normalization and no startup request. These are **synthetic**, not live Bing assertions.
 5. Record how an eventual production variant would preserve one invocation's separately approved `www` and `cn` endpoint manifest, proxy/redirect per-hop authority, immutable prepared requests, one deadline, retry/backoff and accurately expanded request-budget bounds. No newly observed `www` DOM equivalence or mainland-China reliability claim.
 
 ## T3b later, explicit external acceptance blocker
