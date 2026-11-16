@@ -460,3 +460,110 @@ fn gix_config_frontier_denial_prevents_all_content_capture() {
         "denied data must never enter a prepared source snapshot"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn gix_pure_candidate_records_zero_child_git_invocations() {
+    use std::os::unix::fs::PermissionsExt;
+
+    // Run the gix-only fixture in its own test-harness process, so a hostile
+    // PATH cannot interfere with other native Git fixture tests in parallel.
+    // The test-child launcher is NOT a Git preflight operation.
+    let dir = tempfile::tempdir().expect("isolated command sentinel");
+    let fake_git = dir.path().join("git");
+    let log = dir.path().join("git-invocations");
+    std::fs::write(
+        &fake_git,
+        b"#!/bin/sh\nprintf 'git invoked\n' >> \"$TALOS_I324_FAKE_GIT_LOG\"\nexit 97\n",
+    )
+    .expect("install fake git");
+    std::fs::set_permissions(&fake_git, std::fs::Permissions::from_mode(0o700))
+        .expect("make fake git executable");
+
+    let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args(["gix_pure_candidate_no_child_fixture", "--ignored", "--nocapture"])
+        .env("PATH", dir.path())
+        .env("TALOS_I324_RUN_ISOLATED_CHILD", "1")
+        .env("TALOS_I324_FAKE_GIT_LOG", &log)
+        .output()
+        .expect("isolated gix-only test process");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success() && stdout.contains("I324_PURE_CANDIDATE_CHILD_OK"),
+        "isolated pure-gix fixture failed or did not execute: stdout={stdout}, stderr={stderr}"
+    );
+    assert!(
+        !log.exists(),
+        "pure gix byte/lexical candidates launched a Git executable via PATH"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "only invoked by the isolated no-Git-child sentinel parent"]
+fn gix_pure_candidate_no_child_fixture() {
+    assert!(
+        std::env::var("TALOS_I324_RUN_ISOLATED_CHILD")
+            .is_ok_and(|value| value == "1"),
+        "the ignored fixture may run only under its isolated parent"
+    );
+
+    let config = b"[core]\n bare = false\n[include]\n path = never-authorized.conf\n";
+    let parsed = target_config::parse_records(config).expect("parse admitted bytes only");
+    assert!(
+        parsed.iter().any(|record| record.key == b"include.path"),
+        "include path remains a lexical name, not an implicit read"
+    );
+    let named = target_config::declared_paths(
+        config,
+        std::path::Path::new("/i324-unadmitted/root.conf"),
+        &BTreeMap::<OsString, OsString>::new(),
+        None,
+    )
+    .expect("compute include without ambient discovery");
+    assert_eq!(
+        named,
+        vec![std::path::PathBuf::from("/i324-unadmitted/never-authorized.conf")]
+    );
+
+    let _file = gix::config::File::from_bytes_no_includes(
+        config,
+        gix::config::file::Metadata::default(),
+        Default::default(),
+    )
+    .expect("gix config must consume only supplied bytes");
+    assert!(
+        gix::validate::reference::branch_name(b"refs/heads/topic".as_bstr()).is_ok(),
+        "gix branch lexical validation must not invoke native Git"
+    );
+    let attrs = b"*.txt filter=lfs\n";
+    assert!(
+        gix_attributes::parse(attrs).all(|line| line
+            .map(|(_, assignments, _)| assignments.into_iter().all(|a| a.is_ok()))
+            .unwrap_or(false)),
+        "attribute parsing refuses malformed assignments"
+    );
+    let mut search = gix_attributes::Search::default();
+    let mut metadata = gix_attributes::search::MetadataCollection::default();
+    search
+        .add_patterns_buffer(attrs, ".gitattributes".into(), None, &mut metadata, true)
+        .expect("in-memory attribute search");
+    let mut result = gix_attributes::search::Outcome::default();
+    result.initialize_with_selection(&metadata, ["filter"]);
+    assert!(
+        search.pattern_matching_relative_path(
+            "sample.txt".into(),
+            gix_attributes::glob::pattern::Case::Sensitive,
+            Some(false),
+            &mut result,
+        ),
+        "supplied attribute bytes should match"
+    );
+    let values = result
+        .iter_selected()
+        .map(|value| value.assignment.to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(values, vec!["filter=lfs".to_owned()]);
+    println!("I324_PURE_CANDIDATE_CHILD_OK");
+}
