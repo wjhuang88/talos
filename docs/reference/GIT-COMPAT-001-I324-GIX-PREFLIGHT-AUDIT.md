@@ -114,3 +114,18 @@ This is **not** a full preflight no-process acceptance test. It does not instrum
 **Conservative selected API policy:** continue to refuse generic gix config_path, implicit include resolution, ambient repository-open initialization, installation path/cached-global helper calls and MSYS conversion in production preflight. Restrict candidate tests to supplied-buffer parsing, lexical source naming and in-memory attribute/ref evaluation. A positive-control PATH sentinel is necessary but insufficient for absolute subprocesses, registry reads, external path discovery or complete operation-level zero-child proof.
 
 **Open review:** independently acquire and audit actual pinned crate sources matching Cargo.lock checksums, their feature-selected call paths, and the authority to bind compiled defaults to the exact final selected Git writer. Absence of independent provenance stays UnsupportedInstallationProfile. ADR-089 amendment, native Git 2.36 acceptance, and full no-child authorization remain blocked.
+
+## T0d: published gix-config 0.62.2 version-specific call-path evidence
+
+**Source status:** [docs.rs published source for gix-config 0.62.2](https://docs.rs/gix-config/0.62.2/src/gix_config/file/includes/mod.rs.html) is the same crate name/version as Cargo.lock. This is **version-matched published source evidence for one file**, not an independent digest/checksum match to the registry archive, feature-selected complete crate audit or third-party security approval.
+
+| Published source lines | Concrete behavior | I324 constraint |
+|---|---|---|
+| [14-39](https://docs.rs/gix-config/0.62.2/src/gix_config/file/includes/mod.rs.html#14-39) | File::resolve_includes recursively loads files and documents an include ordering deviation from native Git plus a hasconfig:remote.*.url caveat | Cannot assert native Git value-order equivalence by using this high-level include resolver |
+| [99-120](https://docs.rs/gix-config/0.62.2/src/gix_config/file/includes/mod.rs.html#99-120) | The include handler calls config_path.is_file() and std::fs::File::open() on derived path names | Lexical naming is not Read/metadata admission; this API performs unadmitted I/O unless bounded separately |
+| [159-211](https://docs.rs/gix-config/0.62.2/src/gix_config/file/includes/mod.rs.html#159-211) | includeIf checks gitdir/gitdir-i/onbranch and restricted hasconfig patterns | Only frozen repository/env conditions may select new candidate paths; never auto-read paths from a condition |
+| [234-309](https://docs.rs/gix-config/0.62.2/src/gix_config/file/includes/mod.rs.html#234-309) | If initial gitdir glob fails, the matcher calls gix_path::realpath() and checks the resolved path | Even conditional evaluation may invoke filesystem path resolution before including a file; that metadata traversal must be separately admitted |
+
+**Candidate API boundary:** keep only the supplied-buffer gix config parse (from_bytes_no_includes), Talos-owned target_config::parse_records and declared_paths, and source snapshots obtained from exact independently authorized Path Reads. Neither a gix include callback nor a successfully resolved include path is equivalent to permission. Revalidate missing/source identity and preserve actual Git ordering.
+
+**Still open:** gix-path 0.14.1, gix 0.90.0, and gix-attributes 0.37.1 + transitive selected feature paths, package checksum provenance, platform-level process/ambient-I-O tracing, selected-system-Git compiled-default attestation and native Git 2.36.1. T0c upstream gix-path source is not automatically proof about locked version 0.14.1. No production authority grant.
