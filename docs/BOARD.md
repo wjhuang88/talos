@@ -6,8 +6,9 @@
 
 [Approval history owner](tasks/auto-approval-rolling-history.md): effective claim #916;
 bounded same-session history and correlated fallback observations implemented in isolated
-candidate. Final local preflight passed (5385 summed test passes,0failed/ignored,2SDK
-fixtures), with four-host denial-chain evidence. Exact-commit review, remote/native CI
+[draft PR #964](https://github.com/wjhuang88/talos/pull/964). Final local preflight passed (5385 summed test passes,0failed/ignored,2SDK
+fixtures), with four-host denial-chain evidence. Source `3b0455a6` independent review
+approved; remote/native CI
 and delivery remain pending; stopped Desktop Windows cross-check is not a pass.
 No default background continuation or product release authorization.
 

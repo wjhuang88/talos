@@ -21,7 +21,7 @@ Source requirement: [durable intake](../proposals/session-auto-approval-rolling-
 | Governance Claim PR | #916 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requested completion of session-recovery handoff including this original requirement; independent security/design review required before activation and protected implementation delivery |
-| Implementation PR | Stable candidate prepared; draft PR pending |
+| Implementation PR | #964 (draft) |
 | Last Updated | 2026-11-17 |
 | Handoff / Release Condition | Effective claim on main, bounded-history implementation across all supported review families, current-head security review and CI, documented runtime acceptance and existing implementation commit evidence |
 
@@ -459,3 +459,11 @@ Closure ledger: update this owner first, then derived Board and primary handoff;
 all original execution notes, mixed primary changes and session data. Re-run both local
 governance validators and whitespace checks after metadata synchronization. Residuals
 remain in this owner and the primary session-recovery handoff.
+
+Stable implementation commit: 3b0455a67cd24dd706eda9df594be125246da1bf, pushed as
+draft PR #964. Independent exact-head Agent technical/API/security review APPROVE
+verified all32 committed files against the reviewed staged snapshot; no known blocking
+source finding. This is not native human acceptance or merge/install authorization.
+Remote exact-head CI remains pending. Both local governance validators and the current
+skill validator passed; collaboration validator retains one pre-existing unrelated
+SEARCH-001-D3 Unclaimed/claim-metadata warning. No unrelated repair was included.
