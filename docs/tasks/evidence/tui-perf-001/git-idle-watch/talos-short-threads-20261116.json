@@ -1,0 +1,230 @@
+{
+  "elapsed": 20.357042485033162,
+  "hz": 100,
+  "threads": [
+    {
+      "tid": "2083228",
+      "name": "talos",
+      "first": 0.00012700597289949656,
+      "min_ticks": 137,
+      "max_ticks": 137,
+      "last": 20.306575650000013
+    },
+    {
+      "tid": "2087211",
+      "name": "tokio-rt-worker",
+      "first": 0.00048940593842417,
+      "min_ticks": 36,
+      "max_ticks": 38,
+      "last": 20.306931562023237
+    },
+    {
+      "tid": "2089793",
+      "name": "talos-git-statu",
+      "first": 1.5791933930013329,
+      "min_ticks": 1,
+      "max_ticks": 36,
+      "last": 1.9343108109897003
+    },
+    {
+      "tid": "2089876",
+      "name": "talos-git-statu",
+      "first": 15.581718084984459,
+      "min_ticks": 1,
+      "max_ticks": 36,
+      "last": 15.938345405971631
+    },
+    {
+      "tid": "2089800",
+      "name": "talos-git-statu",
+      "first": 3.566339907934889,
+      "min_ticks": 0,
+      "max_ticks": 34,
+      "last": 3.919860051944852
+    },
+    {
+      "tid": "2089827",
+      "name": "talos-git-statu",
+      "first": 7.588853713939898,
+      "min_ticks": 2,
+      "max_ticks": 32,
+      "last": 7.893217005999759
+    },
+    {
+      "tid": "2089871",
+      "name": "talos-git-statu",
+      "first": 13.593312717042863,
+      "min_ticks": 2,
+      "max_ticks": 32,
+      "last": 13.89774339797441
+    },
+    {
+      "tid": "2089832",
+      "name": "talos-git-statu",
+      "first": 9.574788747006096,
+      "min_ticks": 1,
+      "max_ticks": 31,
+      "last": 9.879400162026286
+    },
+    {
+      "tid": "2089863",
+      "name": "talos-git-statu",
+      "first": 11.608822696958669,
+      "min_ticks": 4,
+      "max_ticks": 29,
+      "last": 11.862765396013856
+    },
+    {
+      "tid": "2089889",
+      "name": "talos-git-statu",
+      "first": 17.613389387028292,
+      "min_ticks": 4,
+      "max_ticks": 29,
+      "last": 17.866661043954082
+    },
+    {
+      "tid": "2089821",
+      "name": "talos-git-statu",
+      "first": 5.603904100949876,
+      "min_ticks": 3,
+      "max_ticks": 28,
+      "last": 5.85789703996852
+    },
+    {
+      "tid": "2089895",
+      "name": "talos-git-statu",
+      "first": 19.596044749952853,
+      "min_ticks": 2,
+      "max_ticks": 28,
+      "last": 19.849455095943995
+    },
+    {
+      "tid": "2087196",
+      "name": "tokio-rt-worker",
+      "first": 0.00016410602256655693,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.306602424941957
+    },
+    {
+      "tid": "2087197",
+      "name": "tokio-rt-worker",
+      "first": 0.00020955095533281565,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.306625813012943
+    },
+    {
+      "tid": "2087198",
+      "name": "tokio-rt-worker",
+      "first": 0.00023396802134811878,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.306648500962183
+    },
+    {
+      "tid": "2087199",
+      "name": "tokio-rt-worker",
+      "first": 0.00025699997786432505,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.306671272031963
+    },
+    {
+      "tid": "2087200",
+      "name": "tokio-rt-worker",
+      "first": 0.0002777610206976533,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.30669283797033
+    },
+    {
+      "tid": "2087201",
+      "name": "tokio-rt-worker",
+      "first": 0.00029797793831676245,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.306714472011663
+    },
+    {
+      "tid": "2087202",
+      "name": "tokio-rt-worker",
+      "first": 0.0003175910096615553,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.306736379978247
+    },
+    {
+      "tid": "2087203",
+      "name": "tokio-rt-worker",
+      "first": 0.00033810397144407034,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.30675810703542
+    },
+    {
+      "tid": "2087204",
+      "name": "tokio-rt-worker",
+      "first": 0.0003570299595594406,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.30678037996404
+    },
+    {
+      "tid": "2087205",
+      "name": "tokio-rt-worker",
+      "first": 0.0003760160179808736,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.30680206499528
+    },
+    {
+      "tid": "2087206",
+      "name": "tokio-rt-worker",
+      "first": 0.0003950769314542413,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.306823384016752
+    },
+    {
+      "tid": "2087207",
+      "name": "tokio-rt-worker",
+      "first": 0.000414003967307508,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.30684499000199
+    },
+    {
+      "tid": "2087208",
+      "name": "tokio-rt-worker",
+      "first": 0.0004325360059738159,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.306866460945457
+    },
+    {
+      "tid": "2087209",
+      "name": "tokio-rt-worker",
+      "first": 0.000451411004178226,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.30688846402336
+    },
+    {
+      "tid": "2087210",
+      "name": "tokio-rt-worker",
+      "first": 0.0004701119614765048,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.306910085026175
+    },
+    {
+      "tid": "2087215",
+      "name": "talos",
+      "first": 0.0005092619685456157,
+      "min_ticks": 0,
+      "max_ticks": 0,
+      "last": 20.306952915037982
+    }
+  ]
+}

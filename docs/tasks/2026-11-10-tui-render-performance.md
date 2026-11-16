@@ -1855,3 +1855,95 @@ host inventory shows Ghostty/niri but no process namedtalos, so no candidate
 native resource sample was taken. All local heavy tasks and the CI watcher have
 ended. Resume from the remaining acceptance rows; do not repeat unchanged
 matrices, waive budgets, or reinterpret stage merge as Complete.
+
+### Native idle follow-up — 2026-11-16: change-driven Git refresh
+
+User authorized replacing unconditional two-second repository scans with change-driven
+refresh scheduled by the existing TUI loop. This extends the execution approach, not
+completion evidence; the published acceptance and remaining native gates remain.
+Implementation stays in `target/tui-perf-acceptance`, branch `fix/tui-idle-git-scan`.
+
+Observed native Debug process was idle at the input prompt (maintainer confirmed).
+Two 30-second samples measured 18.24% and 16.87% of one core. A 20-second thread
+sample observed ten short-lived Git status workers, approximately two seconds apart.
+The synchronous early-exit experiment passes seven focused tests and reduces three
+read-only scans of the live dirty workspace from approximately 327ms to 186ms;
+this is scan wall time, not proof of whole-TUI idle acceptance.
+
+Implementation constraints for the authorized follow-up:
+
+- Reuse ToolResult, focus and workspace invalidation already in the event loop.
+- Native filesystem notifications invalidate Git snapshots; callback work is bounded,
+  with no scan, file-content reads, or unbounded event queue in the callback.
+- Debounce bursts with a bounded maximum delay. Changes received during a scan retain
+  a pending refresh. Workspace generation prevents obsolete publication.
+- Watch setup and teardown must not block terminal input. Cover linked worktree Git
+  metadata and external branch/index changes, not only the workspace directory.
+- Avoid watch storms from ignored build trees; watcher registration and event processing
+  must be measured on the actual repository, not just a tiny fixture.
+- Keep a low-frequency reconciliation path when notifications work; notification errors,
+  overflow, unsupported filesystems and setup failure require explicit polling fallback.
+- Reconcile the existing five-second cache expiry with watcher health; do not silently
+  lengthen expiry to disguise stale status. Errors remain unknown, not clean.
+- Preserve the single active scan invariant and joined worker lifetime. The rejected
+  gix parallel-iterator experiment detached internal workers on early drop.
+- Verify quiet idle scan count, external clean/dirty/clean, burst coalescing, mutation
+  during a blocked scan, switch/late-result rejection and watcher failure recovery.
+
+Local implementation now uses `notify` 8.2 native backends and `ignore` 0.4 for
+bounded registration. Soft dependency decision: use Rust libraries rather than host
+watch utilities; macOS selects kqueue (OS ABI boundary under ADR-007), not the
+FSEvents C wrapper. Review subsequently found notify 8.2 kqueue's directory-event
+handler calls `add_watch(path, true)` internally, defeating nonrecursive limits.
+macOS therefore never instantiates the watcher and retains polling; change-driven
+macOS refresh remains unimplemented pending a bounded backend. This is a source
+finding, not a native macOS measurement. No Talos-authored unsafe or host watcher
+command is introduced.
+Missing/failed notifications fall back to two-second polling with 30-second setup
+retries; healthy notification mode retains 30-second reconciliation and a 35-second
+snapshot lifetime. Undetected changes can therefore wait for reconciliation.
+Registration is capped at 8192 paths and a cooperative two-second budget; a blocked
+OS filesystem call cannot be forcibly interrupted, but stays off the UI thread.
+
+Local regression: 695 TUI library tests passed, zero ignored, including quiet
+actual-loop scan counts, tracked files under ignored directories, same-path
+directory recreation, and removal of ignore rules. Service wall 22.442s, CPU
+10.167s, peak 1.2GiB, zero swap under the agreed resource guards. Earlier MSVC
+cross-check passed but predates final review corrections. Full workspace checks,
+final review, integrated resource measurement and publication remain pending.
+Existing native acceptance and the overall task remain open.
+
+Validation follow-up: locked workspace check and Clippy passed. The first complete
+test run failed one native-Git English-stderr assertion because the validation
+unit omitted LOCAL-DEV's pinned locale; the identical existing test binary passed
+with `LC_ALL=C` / `LANG=C`. The standard preflight was restarted with that locale,
+reusing all Cargo artifacts (check 0.75s, Clippy 0.29s, test build 0.35s). Its full
+workspace tests, including tools 1161 and TUI 695, now pass. The SDK fixture's
+base mode passes; coding-mode validation is still running. Do not interpret these
+partial script results as a successful complete preflight yet.
+
+Target refresh found only `58207831` (search I329 governance #958) beyond this
+branch's base; no implementation/claim overlap or reason to rebase this candidate.
+Original full-task remaining acceptance and source-attestation limits still apply.
+
+The locale-correct standard preflight subsequently completed with exit 0, including
+both SDK modes: 13m39.795s wall, 8m4.924s CPU, 2GiB peak, zero swap. This supersedes
+the pending execution state above, without erasing the earlier failed attempt.
+Final MSVC cross-check and integrated real-workspace measurement follow serially.
+
+
+### Current follow-up acceptance checkpoint — 2026-11-16
+
+| Requirement | Current evidence / disposition |
+|---|---|
+| Isolated implementation and bounded validation | Own worktree/branch; all validation jobs terminal; main checkout and running native binary untouched |
+| Linux event-driven Git refresh | 695 TUI tests, including native watcher registration regressions and quiet-loop scan count, pass |
+| Workspace and cross-platform build gates | Standard preflight exit 0; final locked MSVC `--tests` check exit 0; neither substitutes for native device testing |
+| Actual-workspace resource evidence | Debug PTY, 10,000 entries, 59.842s steady sample: CPU 1.504%, PSS 49,531KiB, output zero; active external sessions prevent a controlled quiet baseline |
+| Git freshness budget adjustment | Maintainer explicitly accepted “接受30秒” on 2026-11-16: healthy-watch reconciliation every 30s / snapshot lifetime 35s replaces the original 5s freshness budget for this mode. This is a scheduling interval, not a scan-completion guarantee; failed/unavailable watchers retain 2s polling / 5s lifetime |
+| macOS bounded watcher | Unimplemented; upstream kqueue behavior bypasses registration limits, so existing 2s polling remains |
+| Candidate delivery | Not committed/pushed; local blocking review fixes resolved, final exact-head review and CI remain |
+| Whole-task completion | Not achieved: original 479ms tail, source-attested native resources/deferred operations, second terminal and native Windows still require evidence |
+
+See [raw data and measurement limits](evidence/tui-perf-001/git-idle-watch/README.md).
+No existing acceptance row is removed or marked Complete by this checkpoint.

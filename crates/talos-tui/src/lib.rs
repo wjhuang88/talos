@@ -7,6 +7,7 @@ pub mod evolution;
 mod export;
 pub mod formatting;
 mod git_snapshot_worker;
+mod git_watch;
 mod highlight;
 mod history_projection;
 mod inline_terminal;

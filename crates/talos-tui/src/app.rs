@@ -617,6 +617,10 @@ impl Tui {
         let mut git_generation = 0u64;
         let mut git_refresh_requested = false;
         let mut git_was_visible = false;
+        let mut git_watch: Option<crate::git_watch::Watch> = None;
+        let mut git_watch_healthy = false;
+        let mut git_watch_retry = None;
+        let mut git_change_deadline = None;
         let mut ui_output_rx = self.ui_output_rx.take().expect("ui_output_rx not set");
         let mut dirty = true;
         let mut stream_frame_deadline = None;
@@ -630,6 +634,7 @@ impl Tui {
             ApprovalClosed,
             Queued,
             Git(Option<crate::git_snapshot_worker::ScanResult>),
+            GitChanged(Option<crate::git_watch::State>),
         }
         let mut output_open = true;
         loop {
@@ -666,6 +671,10 @@ impl Tui {
                 !self.state.status.workspace_path.is_empty() && self.terminal.size()?.width >= 80;
             if git_workspace != self.state.status.workspace_path {
                 git_workspace.clone_from(&self.state.status.workspace_path);
+                git_watch = None;
+                git_watch_retry = None;
+                git_watch_healthy = false;
+                git_change_deadline = None;
                 git_generation = git_generation.wrapping_add(1);
                 git_scan = None;
                 git_scan_deadline = None;
@@ -676,6 +685,25 @@ impl Tui {
                 git_refresh_requested = true;
             }
             git_was_visible = git_visible;
+            if git_visible
+                && git_watch.is_none()
+                && git_watch_retry.is_none_or(|retry| now >= retry)
+            {
+                git_watch_retry = Some(now + Duration::from_secs(30));
+                git_watch = crate::git_watch::Watch::start(git_workspace.clone().into())
+                    .ok()
+                    .flatten();
+            }
+            let git_period = if git_watch_healthy {
+                Duration::from_secs(30)
+            } else {
+                Duration::from_secs(2)
+            };
+            self.git_snapshot.set_lifetime(if git_watch_healthy {
+                Duration::from_secs(35)
+            } else {
+                Duration::from_secs(5)
+            });
             if git_refresh_requested && git_visible && git_scan.is_none() {
                 match start_scan(git_workspace.clone(), git_generation) {
                     Ok(Some(scan)) => {
@@ -705,10 +733,11 @@ impl Tui {
                 git_scan = None;
                 git_scan_deadline = None;
             }
-            git_cadence.update(git_visible, now, Duration::from_secs(2));
+            git_cadence.update(git_visible, now, git_period);
             let deadline = [
                 stream_frame_deadline,
                 git_scan_deadline,
+                git_change_deadline,
                 if git_visible {
                     self.git_snapshot.stale_deadline(&git_workspace)
                 } else {
@@ -730,6 +759,12 @@ impl Tui {
             let stream = &mut self.active_stream;
             let approval = &mut self.state.pending_approval_response;
             let wake = tokio::select! {
+                change = async {
+                    match git_watch.as_mut() {
+                        Some(watch) => watch.changed().await,
+                        None => std::future::pending().await,
+                    }
+                } => Wake::GitChanged(change),
                 result = async {
                     match git_scan.as_mut() {
                         Some(scan) => scan.result().await,
@@ -744,6 +779,27 @@ impl Tui {
                 _ = std::future::ready(()), if queued => Wake::Queued,
             };
             match wake {
+                Wake::GitChanged(change) => {
+                    let healthy = change.is_some_and(|state| state.healthy);
+                    if healthy != git_watch_healthy {
+                        git_cadence.update(false, scheduling::now(), git_period);
+                    }
+                    git_watch_healthy = healthy;
+                    if !healthy {
+                        dirty |= self.git_snapshot.publish(
+                            git_workspace.clone(),
+                            None,
+                            scheduling::now(),
+                        );
+                        stream_frame_deadline = None;
+                    }
+                    if change.is_none() {
+                        git_watch = None;
+                    }
+                    // Leading-edge coalescing bounds refresh delay even during a storm.
+                    git_change_deadline
+                        .get_or_insert(scheduling::now() + Duration::from_millis(200));
+                }
                 Wake::Git(result) => {
                     git_scan = None;
                     git_scan_deadline = None;
@@ -793,7 +849,11 @@ impl Tui {
                             scheduling::now(),
                         );
                     }
-                    if git_cadence.consume(now, Duration::from_secs(2)) > 0 {
+                    if git_change_deadline.is_some_and(|deadline| deadline <= now) {
+                        git_change_deadline = None;
+                        git_refresh_requested = true;
+                    }
+                    if git_cadence.consume(now, git_period) > 0 {
                         git_refresh_requested = true;
                     }
 

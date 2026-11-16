@@ -1,0 +1,36 @@
+mod render_metrics {
+    pub fn snapshot_age(_: std::time::Duration) {}
+}
+#[allow(dead_code)]
+#[path = "../src/scrollback_status_git.rs"]
+mod status;
+fn main() {
+    let root = std::env::args().nth(1).expect("workspace argument");
+    for round in 0..3 {
+        for variant in ["old", "new"] {
+            let start = std::time::Instant::now();
+            let dirty = if variant == "new" {
+                status::compute_git_status(std::path::Path::new(&root))
+                    .expect("status")
+                    .dirty
+            } else {
+                let repo = gix::discover(&root).expect("repo");
+                let mut iter = repo
+                    .status(gix::progress::Discard)
+                    .expect("platform")
+                    .untracked_files(gix::status::UntrackedFiles::Files)
+                    .into_index_worktree_iter(Vec::<gix::bstr::BString>::new())
+                    .expect("iter");
+                match iter.next() {
+                    Some(Ok(_)) => true,
+                    None => false,
+                    Some(Err(e)) => panic!("{e}"),
+                }
+            };
+            println!(
+                "{round},{variant},{dirty},{}",
+                start.elapsed().as_secs_f64()
+            );
+        }
+    }
+}
