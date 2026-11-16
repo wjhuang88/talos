@@ -79,8 +79,30 @@ impl ArchiveRecoveryEvidence {
         stored_bytes: usize,
         decoded_bytes: usize,
     ) -> Result<(), SessionError> {
+        self.check_archive_addition_limit(stored_bytes, decoded_bytes, MAX_BYTES)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn check_archive_addition_with_limit(
+        &self,
+        stored_bytes: usize,
+        decoded_bytes: usize,
+        byte_limit: usize,
+    ) -> Result<(), SessionError> {
+        self.check_archive_addition_limit(stored_bytes, decoded_bytes, byte_limit)
+    }
+
+    fn check_archive_addition_limit(
+        &self,
+        stored_bytes: usize,
+        decoded_bytes: usize,
+        byte_limit: usize,
+    ) -> Result<(), SessionError> {
+        if byte_limit == 0 || byte_limit > MAX_BYTES {
+            return Err(invalid("invalid archive publication budget"));
+        }
         if self.input_bytes.checked_add(stored_bytes)
-            .and_then(|n| n.checked_add(decoded_bytes)).is_none_or(|n| n > MAX_BYTES)
+            .and_then(|n| n.checked_add(decoded_bytes)).is_none_or(|n| n > byte_limit)
             || self.input_records.checked_add(self.head_records).is_none_or(|n| n > MAX_ENTRIES)
             // Archive, temporary alias, chain metadata, and SQLite WAL/SHM.
             || self.directory_entries.checked_add(5).is_none_or(|n| n > MAX_FILES)

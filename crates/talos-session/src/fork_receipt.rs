@@ -1944,19 +1944,42 @@ mod tests {
 
     #[test]
     fn production_compaction_budget_refusal_preserves_readable_head() {
+        // Small capacity cases exercise the same store/receipt/publication path
+        // without competing with the independent production time budget.
         for marker_growth in [false, true] {
+            assert_compaction_refusal_preserves_head(marker_growth, false);
+        }
+    }
+
+    #[test]
+    fn production_compaction_large_safe_refusal_preserves_readable_head() {
+        assert_compaction_refusal_preserves_head(false, true);
+    }
+
+    fn assert_compaction_refusal_preserves_head(marker_growth: bool, large: bool) {
+        {
+            let byte_limit = if large { MAX_BYTES } else { 64 * 1024 };
+            let deadline = || Instant::now() + std::time::Duration::from_secs(120);
             let root = tempfile::tempdir().expect("root");
             let (head, template, _, _) = fixture(root.path());
             let records = if marker_growth {
                 let first = raw("a", None, "");
                 let target =
-                    MAX_BYTES / 2 - ENVELOPE.len() - b"TALOS\t1\t123\n".len() - first.len();
+                    byte_limit / 2 - ENVELOPE.len() - b"TALOS\t1\t123\n".len() - first.len();
                 let mut content = "x".repeat(target);
                 let overhead = raw("large", Some("a"), &content).len() - target;
                 content.truncate(target - overhead);
                 vec![first, raw("large", Some("a"), &content)]
             } else {
-                vec![raw("large", None, &"x".repeat(33 * 1024 * 1024))]
+                vec![raw(
+                    "large",
+                    None,
+                    &"x".repeat(if large {
+                        33 * 1024 * 1024
+                    } else {
+                        byte_limit / 2 + 1024
+                    }),
+                )]
             };
             let (receipt, bytes) = Receipt::capture(
                 (
@@ -1979,8 +2002,12 @@ mod tests {
             if marker_growth {
                 // Old head plus raw archive exactly fits. Replacing the short
                 // first record with the longer count marker would exceed the cap.
-                assert_eq!(bytes.len() * 2, MAX_BYTES);
+                assert_eq!(bytes.len() * 2, byte_limit);
                 assert!(records[0].len() < 80);
+                // Even the shortest possible nonempty marker exceeds this exact fit.
+                assert!(bytes.len() * 2 + 1 > byte_limit);
+            } else {
+                assert!(bytes.len() * 2 > byte_limit);
             }
             receipt.record_intent(&head, deadline()).expect("intent");
             write_synced(&head, &bytes);
@@ -1994,23 +2021,28 @@ mod tests {
                 names
             };
             let before = inventory();
-            let engine = crate::compaction_engine::CompactionEngine::new(std::sync::Arc::new(
+            let mut engine = crate::compaction_engine::CompactionEngine::new(std::sync::Arc::new(
                 crate::CompactTextSessionStore,
             ))
             .with_compressor(Box::new(crate::compression::NoCompressor));
+            if !large {
+                engine = engine.with_publication_byte_limit(byte_limit);
+            }
             let error = engine
                 .compact_segment(
                     &head,
                     head.parent().expect("directory"),
                     usize::from(marker_growth),
                 )
-                .expect_err("duplicate archive exceeds shared budget");
-            assert!(
-                error
-                    .to_string()
-                    .contains("archive publication exceeds recovery budget"),
-                "{error}"
-            );
+                .expect_err("compaction must refuse without publishing or replacing the head");
+            if !large {
+                assert!(
+                    error
+                        .to_string()
+                        .contains("archive publication exceeds recovery budget"),
+                    "{error}"
+                );
+            }
             let after: Vec<_> = inventory()
                 .into_iter()
                 .filter(|name| {

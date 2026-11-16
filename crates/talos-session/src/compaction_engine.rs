@@ -17,6 +17,8 @@ pub struct CompactionEngine {
     store: Arc<dyn SessionStore>,
     compressor: Box<dyn SegmentCompressor>,
     rules: CompactionRules,
+    #[cfg(test)]
+    publication_byte_limit: Option<usize>,
 }
 
 #[derive(Clone)]
@@ -45,11 +47,20 @@ impl CompactionEngine {
             #[cfg(not(feature = "archive-compress-zstd"))]
             compressor: Box::new(NoCompressor),
             rules: CompactionRules::default(),
+            #[cfg(test)]
+            publication_byte_limit: None,
         }
     }
 
     pub fn with_compressor(mut self, compressor: Box<dyn SegmentCompressor>) -> Self {
         self.compressor = compressor;
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_publication_byte_limit(mut self, limit: usize) -> Self {
+        assert!(limit > 0 && limit <= 64 * 1024 * 1024);
+        self.publication_byte_limit = Some(limit);
         self
     }
 
@@ -210,16 +221,22 @@ impl CompactionEngine {
             let evidence = session.inspect_archive_recovery(deadline, || false)?;
             // Reserve the full added marker without crediting removed records:
             // a short removed record can be smaller than the new marker.
-            evidence.check_archive_addition(
-                bytes.len().checked_add(marker_bytes).ok_or_else(|| {
-                    SessionError::ParseError("archive publication size overflow".into())
-                })?,
-                if self.compressor.format_tag() == "none" {
-                    0
-                } else {
-                    raw.len()
-                },
-            )?;
+            let stored_bytes = bytes.len().checked_add(marker_bytes).ok_or_else(|| {
+                SessionError::ParseError("archive publication size overflow".into())
+            })?;
+            let decoded_bytes = if self.compressor.format_tag() == "none" {
+                0
+            } else {
+                raw.len()
+            };
+            #[cfg(test)]
+            if let Some(limit) = self.publication_byte_limit {
+                evidence.check_archive_addition_with_limit(stored_bytes, decoded_bytes, limit)?;
+            } else {
+                evidence.check_archive_addition(stored_bytes, decoded_bytes)?;
+            }
+            #[cfg(not(test))]
+            evidence.check_archive_addition(stored_bytes, decoded_bytes)?;
             evidence.check_all_sources(deadline)?;
         }
         // Only complete, synced bytes receive a discoverable archive name.
