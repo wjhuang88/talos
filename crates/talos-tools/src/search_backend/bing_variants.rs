@@ -59,7 +59,7 @@ pub(super) enum BingAttempt {
     RequestBudgetExhausted,
 }
 
-/// An offline statement of four distinct gates; it does not confer actual Network authority.
+/// An offline statement of five distinct gates; it does not confer actual Network authority.
 ///
 /// A future caller must independently prove that the alternate *prepared* request and its
 /// per-hop permission, overall deadline and physical send budget are already established.
