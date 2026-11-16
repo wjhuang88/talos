@@ -539,9 +539,12 @@ fn gix_pure_candidate_no_child_fixture() {
     );
     let attrs = b"*.txt filter=lfs\n";
     assert!(
-        gix_attributes::parse(attrs).all(|line| line
-            .map(|(_, assignments, _)| assignments.into_iter().all(|a| a.is_ok()))
-            .unwrap_or(false)),
+        gix_attributes::parse(attrs).all(|line| {
+            let Ok((_, assignments, _)) = line else {
+                return false;
+            };
+            assignments.into_iter().all(|assignment| assignment.is_ok())
+        }),
         "attribute parsing refuses malformed assignments"
     );
     let mut search = gix_attributes::Search::default();
