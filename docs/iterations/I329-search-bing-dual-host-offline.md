@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed — proposed, not yet effective |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | D3-T3a/#957: deterministic offline non-CN-first/CN-fallback decision candidate and synthetic tests only. No live requests, production endpoints, Auto policy, Network grants or scope expansion. |
