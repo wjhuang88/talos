@@ -218,3 +218,79 @@ manifest files unchanged. Unit CPU274.948s,memory peak2GiB,swap0; same documente
 resource/locale envelope. Evidence target/ui-full-preflight-20261116-r3.log,
 -manifest.json and -result.json. This proves the integrated source candidate;
 exact final-head review/native CI and native terminal acceptance remain open.
+
+## 2026-11-17 committed-reasoning separator follow-up — Partial
+
+Actual isolated Ghostty+niri observation of the combined production CLI found that
+completed Thinking history directly followed a user background block even though
+user→Connecting already had a separator. Both reasoning ingestion paths bypassed
+normal stream opening separators. This is the original user-history spacing scope.
+
+The combined candidate adds a regression through actual UiOutput and draw_frame:
+both typed/live reasoning paths, pending/committed user tails, folded/expanded/folded,
+80→24→80 resize, assistant response and promoted queued input. Red failed as expected;
+minimal correction adds one default-background logical blank only after a user-colored
+tail. Full combined TUI library passes713/0failed/0ignored. Independent source review
+APPROVE. Actual Ghostty rerun confirms the committed Thinking gap plus direct/queued
+Connecting gaps and queued body; evidence in primary
+`target/handoff-native-ghostty-r3-20261117/` and visual-review.json. Binary SHA256:
+`c224a5a651cbfb42b8be7aedbcb98d4d9b81dd80db30e082ddcf6bd67658b07c`.
+Native rendering uses live nested-PTY output and scripted input; no installed-host,
+physical-key, all-size or GPUI acceptance is claimed.
+
+Only the two TUI files are selectively ported here from that correction. Source patch
+applied cleanly; the append-only test was extracted byte-for-byte because earlier
+combined tests differ. Provenance in primary
+`target/user-reasoning-gap-selective-20261117.json`. No recovery/approval/background
+source is copied. Standalone focused/full gates remain pending behind the running
+combined preflight81360; no PR update or final completion claimed yet. Keep original
+source and failure evidence; background remains default-off.
+
+## 2026-11-17 tool boundary regression and combined preflight result
+
+Reasoning-only combined preflight exec81360 completed successfully (9min2.875s,
+peak2G/swap0); log target/user-reasoning-gap-preflight-20261117.log. This evidence
+predates the generalized tool-boundary correction. Native edit rendering in
+target/handoff-native-edit-20261117/ passed line-location assertions, but its
+rendered.png exposed the remaining user-to-tool separator defect. This is original
+SESSION-UI-001 scope; spacing is not complete.
+
+Standalone actual UiOutput-to-draw_frame tool regression reproduced failure:
+header row14 instead of15, exec99521 exit101, log target/tool-gap-red-20261117.log.
+The correction moves separation to commit_pending_transcript, covering typed
+reasoning/tool blocks while preserving existing blanks and continuous user padding.
+Full standalone TUI validation exec18218 is in progress; no PR update or deployment.
+Primary session data, original work and migrated TMPDIR contents remain retained.
+
+Unified separator full TUI run exec18218 completed exit0:701passed,0failed,
+0ignored;22.033s,peak815M/swap0 (target/tool-gap-green-20261117.log). Added
+negative controls for existing whitespace gap, continuous user padding, plain
+non-user output and same/cross-commit behavior afterward. Final standalone
+preflight exec27916/unit talos-ui-boundary-preflight-20261117 is now running;
+log target/ui-boundary-preflight-20261117.log. Combined source has received the
+same bounded separator delta and both tool/negative regressions, preserving its
+independent integration fixture; it still needs validation and native rerender.
+Remote recovery head15bdc03f CI43936276699 is valid and now in Desktop explicit
+feature validation; no cancellation or replacement is warranted.
+
+Final standalone generalized-boundary preflight exec27916 passed exit0,8min33.615s,
+peak2G/swap0; log target/ui-boundary-preflight-20261117.log. Independent review
+APPROVE: no blocker, typed header indices/anchors preserved, existing gaps and
+user padding retained. This includes the new negative controls. Combined final
+preflight is now running (target/combined-boundary-preflight-20261117.log);
+new native screenshots and exact-head publication CI remain pending. No Complete claim.
+
+## 2026-11-17 final native boundary acceptance
+
+Both actual Ghostty runs passed on binary SHA256
+0d746296e1c3316cd0fcfd6ef2ac7f0547b677001836d5aeb38100aabedc9334:
+target/handoff-native-ghostty-r5-20261117/ (direct/queued/promoted) and
+target/handoff-native-edit-r2-20261117/ (actual edit/diff). Screenshot review
+confirms external blank rows before Thinking, Connecting and tool header, visible
+queued CJK body, correct old/new diff columns and absence-side blanks. Hashes and
+limits are in visual-review.json. Input remains scripted through a nested PTY;
+synthetic provider/isolated workspace, not installed-host/physical-key/GPUI evidence.
+The r4 attempt failed before CLI launch due to missing pyte; preserved screenshot
+and reran using the existing dependency directory, without installing dependencies.
+Standalone final preflight totals5363passed/0failed/0ignored. Combined gate remains
+running. Recovery exact15bdc03f CI43936276699 is now completed success.
