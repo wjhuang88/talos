@@ -1,8 +1,12 @@
+## I329 / SEARCH-001-D3-T3 — proposed offline Bing non-CN→CN fallback contract
+
+[I329](I329-search-bing-dual-host-offline.md) / [owner](../backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [#957](https://github.com/wjhuang88/talos/issues/957): governance-only proposed **Active / Claimed** test-only candidate, ineffective until its claim PR merges. One Bing family; non-CN `www.bing.com` preferred over existing `cn.bing.com` only if unavailable and permitted. **No** production route, newly admitted host, live Bing query, rights/region acceptance, default priority change or new independent provider.
+
 ## I323 Azure — proposed claim and activation
 
-## I327 / SEARCH-001-D3-T2 — proposed sponsored-ancestor correction
+## I327 / SEARCH-001-D3-T2 — Complete / Closed upon owner-first closeout
 
-[I327](I327-search-bing-sponsored-ancestor-rejection.md) / [owner](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Active / Claimed proposed via #948 (ineffective until merge)** pending atomic governance activation. Limit to existing Bing CN `b_ad` ancestor filter and synthetic parser regression after T1/#941 completed. No live Bing, endpoint permission, provider identity, or parent #624 acceptance change.
+[I327](I327-search-bing-sponsored-ancestor-rejection.md) / [owner](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **Complete / Closed upon owner-first closeout merge**. Governance #948 merged `5704bb66aca22919347705a5bff40a84d641c3c9`; implementation [#949](https://github.com/wjhuang88/talos/pull/949) Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99`. Exact-head [CI43465355386](https://github.com/wjhuang88/talos/actions/runs/43465355386) attempt 2 all eight successful and independent source review/CAS. Explicit synthetic `b_ad` ancestor correction only. #947 closes after closeout; #937/#624 stay Open, no new Bing admission.
 
 ## I326 / SEARCH-001-D3-T1 — Complete / Closed upon owner-first closeout
 
@@ -20,11 +24,15 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 
 ## I322 / STORE-002 C — Complete / Closed
 
-[I322](I322-store-002-domain-contract-extraction.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance #911 `60da1bb` and [implementation #912](https://github.com/wjhuang88/talos/pull/912) completion commit `3df409ef9ed707756350f2c7d4b2c8819f157222`. [Exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) scoped jobs and both validators passed; independent public API review and CAS no blockers. Old SessionStore reused; Pending/Todo, Memory, Evolution and Exploration domain contracts added with unchanged stores/callers. Advisory remote closed #901 owner-matrix drift retained; no new provider. I322 C closed; independent I325 D claim #932 is merged/effective (`e49ccde70556403a9d7b66551565e2b6c81ad32d`), D implementation #935 in Review; E/F and #897 Host remain gated and #670 Open.
+[I322](I322-store-002-domain-contract-extraction.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance #911 `60da1bb` and [implementation #912](https://github.com/wjhuang88/talos/pull/912) completion commit `3df409ef9ed707756350f2c7d4b2c8819f157222`. [Exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) scoped jobs and both validators passed; independent public API review and CAS no blockers. Old SessionStore reused; Pending/Todo, Memory, Evolution and Exploration domain contracts added with unchanged stores/callers. Advisory remote closed #901 owner-matrix drift retained; no new provider. I322 C closed; independent I325 D claim #932 is merged/effective (`e49ccde70556403a9d7b66551565e2b6c81ad32d`), D implementation #935 accepted/merged `027b8a59194f5ba496b0048c7183ad236e2e2dd2` (I325 Closed); E/F and #897 Host remain gated and #670 Open.
 
-## I325 / STORE-002 D — Review / Claimed
+## I325 / STORE-002 D — Complete / Closed
 
-[I325](I325-store-002-local-delegation.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance claim [#932](https://github.com/wjhuang88/talos/pull/932) merged at e49ccde70556403a9d7b66551565e2b6c81ad32d. D implementation candidate covers actual TLOG/JSONL SessionStore, Pending/Todo SQLite, Memory FTS+graph, Evolution observations/patterns and Exploration sources/chunks/citations via existing domain traits, with [source-backed inventory](../reference/STORE-002-I325-D-LOCAL-DELEGATION-INVENTORY-2026-11-13.md). No E default profile, F broad equivalence or #897 Host change. Exact-head CI and independent code review pending; D not Complete.
+[I325](I325-store-002-local-delegation.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance #932 effective; D implementation [#935](https://github.com/wjhuang88/talos/pull/935) merged **Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2`**, exact-head [CI #4223](https://github.com/wjhuang88/talos/actions/runs/43552408748) applicable jobs SUCCESS, independent no-blocker review/Copilot and final CAS. Actual SessionStore TLOG/JSONL, Pending/Todo, Memory+FTS/content dedup/graph, Evolution, Exploration tests. No default E profile, F parity, #897 Host or backend change. Separate remote Issue matrix reconciliation job FAILED #941/#947 and is recorded as unrelated ADR-071 governance residual, corrected in this docs batch. I325 D Complete / Closed; parent #670 Open for E/F.
+
+## I328 / STORE-002 E — governance claim/activation proposed (#955)
+
+[I328](I328-store-002-default-local-composition.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance Draft [#955](https://github.com/wjhuang88/talos/pull/955) proposes atomic Active / Claimed E **ineffective before merge**. I325 D #935/#951 is Complete/Closed, parent #670 Open for E/F. E chooses an explicit default-local composition over existing SQLite/FTS5/TLOG/JSONL domain delegates with identical constructors/paths/errors/optional loading; no SQL/schema, new engine, Host/SDK/RuntimeBuilder wiring or F conformance. ARCH-035/#897 E2/E3 remains separately Blocked.
 
 ## I321 / STORE-002 A/B — Complete / Closed (bounded slice)
 

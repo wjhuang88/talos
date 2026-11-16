@@ -1,3 +1,7 @@
+## SEARCH-001-D3-T3 / I329 — proposed offline Bing variant/failover claim
+
+[Owner](backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](iterations/I329-search-bing-dual-host-offline.md) / [Issue #957](https://github.com/wjhuang88/talos/issues/957): proposed **Active / Claimed after governance merge** for offline-only non-CN→CN variant decision/negative-test candidate. No production endpoint, permission, Browser integration, new native provider, region or usage-rights admission. Parent D3/#937 and Epic #624 remain open; D/#644 ZERO-ADMISSION, E/F/G/I blocked.
+
 ## Azure C / PROVIDER-008-C
 
 [Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 proposes atomic claim+activation;
@@ -11,9 +15,9 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 ineffective until governance merge. Old/new diff coordinates and ordinary/prepared/anchored edit
 locations only; no effective claim or implementation activation yet.
 
-## SEARCH-001-D3-T2 / I327 — proposed explicit sponsored-ancestor correction
+## SEARCH-001-D3-T2 / I327 — Complete / Closed upon owner-first closeout merge
 
-[SEARCH-001-D3-T2](backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): **In Progress / Claimed proposed via Draft #948 (ineffective until merge)** after T1/#941 Complete/Closed. Scope: localized `b_ad` ancestor exclusion in the existing response-only Bing parser, hand-authored synthetic positive/negative regressions; no real Bing, new hosts, network permission, SearchRouter default, provider count or rights assumption. Existing I324/I325 and other owners remain separate. No code until claim effective on main.
+[SEARCH-001-D3-T2](backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): I327 claim #948 effective on main; [source #949](https://github.com/wjhuang88/talos/pull/949) merged Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99` with exact-head CI43465355386 attempt 2, 8/8 SUCCESS, independent no-blocker parser/API/security review and CAS. Explicit `b_ad` ancestor only, synthetic offline tests; no live Bing, endpoint, permission, default SearchRouter routing, native provider or rights/region assurance. #947 closes after owner-first doc merge. D3/#937 and Epic #624 stay Open.
 
 ## SEARCH-001-D3-T1 / I326 — Complete / Closed upon closeout merge
 
@@ -39,9 +43,13 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 [STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I322](iterations/I322-store-002-domain-contract-extraction.md) / #670: A/B completed via #909 `a9914b7`; C claim #911 merged `60da1bb`, implementation [#912](https://github.com/wjhuang88/talos/pull/912) merged `3df409ef9ed707756350f2c7d4b2c8819f157222` after [exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758), both governance validators, independent no-blocker API/doc review and merge CAS. Minimal domain-owned Session Pending/Todo, Memory, Evolution and Exploration traits forward to unchanged stores with no runtime/SQL/schema/Host changes. Global closed #901 Issue-matrix warning is separate ADR-071 advisory, not a passed job. **I322 C complete; D selected for separate I325/#932 governance, E/F unclaimed, #897 E2/E3 gated, #670 Open.**
 
-## STORE-002 / I325 D — implementation Review / Claimed
+## STORE-002 / I325 D — Complete / Closed; #670 E/F Open
 
-[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I325](iterations/I325-store-002-local-delegation.md) / [#670](https://github.com/wjhuang88/talos/issues/670): C #912 and C closure #930 accepted; governance [#932](https://github.com/wjhuang88/talos/pull/932) **merged** at e49ccde70556403a9d7b66551565e2b6c81ad32d. The D candidate adds only real trait-directed SQLite/FTS5/TLOG/JSONL tests and [coverage inventory](reference/STORE-002-I325-D-LOCAL-DELEGATION-INVENTORY-2026-11-13.md). No new adapters, SQL/schema, default profile or caller/Host rewiring; independent API review and exact-head CI pending. E/F and #897 remain gated.
+[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I325](iterations/I325-store-002-local-delegation.md) / [#670](https://github.com/wjhuang88/talos/issues/670): D claim #932 merged; D implementation [#935](https://github.com/wjhuang88/talos/pull/935) accepted with **Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2`**, [CI #4223](https://github.com/wjhuang88/talos/actions/runs/43552408748) all seven applicable jobs success, independent no-blocker technical/Copilot review and final CAS. Real SQLite/FTS5/TLOG/JSONL trait delegation tested; no production/API/SQL/schema/default/Host change. **I325 D Complete / Closed, D parent claim Released; #670 Open for E/F, #897 Host gated.** Failed global #941/#947 remote matrix job is separately corrected in this governance batch, not counted green on #935.
+
+## STORE-002 / I328 E — default-local composition claim proposed (#955)
+
+[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I328](iterations/I328-store-002-default-local-composition.md) / [#670](https://github.com/wjhuang88/talos/issues/670): C/D accepted, I325 D closed via #951. Draft [governance #955](https://github.com/wjhuang88/talos/pull/955) proposes **I328 E Active / Claimed (ineffective until merge)** for one behavior-preserving default-local selection of existing TLOG/JSONL/SQLite/FTS5 domain implementations. No new executable provider, production caller/default change, #897 Host/runtime/SDK wiring or F broad parity. Parent #670 stays Open; #897 E2/E3 blocked.
 
 ## ARCH-035 / I320 — E0/E1 Complete; parent E2/E3 Blocked
 

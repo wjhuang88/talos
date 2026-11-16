@@ -1,6 +1,6 @@
 # STORE-002: Storage And Retrieval Capability Contracts
 
-**Status**: Review / Claimed — I321 A/B and I322 C accepted; I325 D local-delegation test candidate; E/F unclaimed
+**Status**: Active / Claimed proposed by #955 — I321 A/B, I322 C and I325 D accepted; I328 E selected (ineffective until claim merge); F unclaimed; parent #670 Open
 
 **Type**: Architecture / Contract Convergence
 
@@ -34,15 +34,15 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
-| Work Slice | STORE-002 I325 D only: use accepted I322 domain traits with existing SQLite/FTS5/TLOG/JSONL implementations for narrow, real, trait-directed local operational delegation/conformance; only strictly necessary domain-local glue, without reimplementing C traits/forwarders, changing concrete stores/SQL/schema/transaction/file formats, production call sites or Host/E composition, F broad conformance, new engines or new providers |
-| Claimed At | 2026-11-13 |
+| Work Slice | STORE-002 I328 E only: select one explicit behavior-preserving default-local composition over accepted SessionStore, PendingSubmissionPersistence, TodoPersistence, MemoryPersistence, KnowledgePersistence and ExplorationPersistence with current TLOG/JSONL/SQLite/FTS5 stores. Preserve existing paths, default-vs-custom Session startup reconciliation, lazy optional opens, typed errors, pending fences and domain authority. No duplicate domain traits, SQL/schema/formats, generic CRUD/registry, runtime/CLI/TUI/Desktop/SDK/Server Host wiring, new backend, F-wide parity or #897 E2/E3. |
+| Claimed At | 2026-11-16 |
 | Source Issue | #670 |
-| Governance Claim PR | #932 |
+| Governance Claim PR | #955 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | D governance #932 merged `e49ccde70556403a9d7b66551565e2b6c81ad32d` after CI #4151 and independent review; D implementation remains subject to separate exact-head CI and independent technical review. C completed: implementation [#912](https://github.com/wjhuang88/talos/pull/912) `3df409ef9ed707756350f2c7d4b2c8819f157222`; C owner/iteration closure [#930](https://github.com/wjhuang88/talos/pull/930) `a07b466d5aa2a03fb841cdcb918cd4968c778942`. User authorized continued #670 progress. D independent governance [#932](https://github.com/wjhuang88/talos/pull/932) is already merged/effective on main at `e49ccde70556403a9d7b66551565e2b6c81ad32d`; implementation PR #935 separately requires exact-head native CI, review and CAS. C API review accepted existing forwarders; D must not duplicate them. |
-| Implementation PR | #935 |
-| Last Updated | 2026-11-13 |
-| Handoff / Release Condition | Claim #932 is effective on main. D Review requires real local delegation tests, exact-head native CI, independent API/architecture review and a future completion commit. E/F and #897 Host E2/E3 remain separately gated. |
+| Authorization Evidence | User authorized continued #670 work. C #912 domain traits accepted; D implementation #935 Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2` and I325 owner-first closeout #951 merged `8cb0f97a44259b4c7f4caee24c06ab02fc542ad7`. Governance-only Draft #955 proposes I328 E atomic claim/activation, ineffective until final exact-head CI, both governance validators, independent read-only technical review, single-maintainer rationale, CAS and merge. No production E implementation before this claim is effective. |
+| Implementation PR | Not started — I328 E governance-only claim #955 |
+| Last Updated | 2026-11-16 |
+| Handoff / Release Condition | E activated only on reviewed #955 merge. Subsequent separate E implementation must preserve existing local defaults and pass native CI/independent API review; E owner closeout requires actual merged implementation Completion Commit. Parent #670 stays Open for F; ARCH-035/#897 E2/E3 and ServerHost remain gated. |
 
 ## Governance
 
@@ -84,9 +84,9 @@ Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim 
 - Historical macOS Session fork-recovery test `durable.rs:2363` failed on prior CI #4116 and on an unrelated historical #877 attempt, but **passed on final exact-head CI #4127**. Its intermittent cause remains unknown; no recovery/locking assertion, production store, SQL, FTS5, SQLite schema, TLOG/JSONL, transactions, dependencies or caller was changed to force a pass.
 - This closes **only I322 C**; parent #670 remains Open for D existing-implementation delegation, E default local composition and F conformance/recovery evidence. Their separate governance claims are required before implementation. #897 Host E2/E3 is not unblocked by C alone.
 
-## I325 D local delegation implementation — 2026-11-13 (Review / Claimed)
+## I325 D local delegation implementation — accepted 2026-11-14 (Complete / Released)
 
-- [I325](../../iterations/I325-store-002-local-delegation.md) selects the existing-storage **D** work slice after C merged and closed. Governance [#932](https://github.com/wjhuang88/talos/pull/932) merged `e49ccde70556403a9d7b66551565e2b6c81ad32d`; D ownership is effective, but this implementation candidate is **not Complete**.
+- [I325](../../iterations/I325-store-002-local-delegation.md) selects the existing-storage **D** work slice after C merged and closed. Governance [#932](https://github.com/wjhuang88/talos/pull/932) merged `e49ccde70556403a9d7b66551565e2b6c81ad32d`; D implementation #935 merged and accepted; Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2` is pre-existing main evidence. The D claim is Released while parent #670 stays Open for E/F.
 - C already implemented direct `impl Trait for Store` forwarding for the five new domain contracts; D must **not repeat or replace those interfaces or forwarders**. Its purpose is to demonstrate real local SQLite/FTS5/TLOG/JSONL operations through the accepted trait surfaces and add narrowly justified domain-local adapter glue only when evidence proves a gap, without moving SQL/transactions/paths or rewriting production callers.
 - Preserve explicit non-operational/unavailable storage category semantics: capability descriptors do not establish runtime/provider readiness. `SessionStore` already handles TLOG/JSONL; SessionIndex/durable-binding coverage needs explicit inventory/disposition rather than blind new APIs.
 - E owns default local composition, F owns full before/after equivalence and crash/recovery characterization, ARCH-035/#897 owns cross-Host consumption; no D claim transfers those work slices. Parent #670 stays Open.
@@ -94,4 +94,18 @@ Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim 
 ## I325 D execution checkpoint — 2026-11-13
 
 - [Source-backed local delegation inventory](../../reference/STORE-002-I325-D-LOCAL-DELEGATION-INVENTORY-2026-11-13.md) maps existing domain trait/Store operations and the seven capability categories, including SessionIndex/durable-binding gaps.
-- Proposed tests exercise actual local SQLite/FTS5/TLOG/JSONL through accepted traits; no duplicate C forwarders or production caller changes. Exact-head validation and independent review pending, no Completion Commit. E/F and #897 Host remain gated.
+- Accepted tests exercise real local SQLite/FTS5/TLOG/JSONL through existing domain traits; no duplicate C forwarders or production caller changes. Exact-head validation, independent review and merge CAS accepted; E/F and #897 Host remain gated.
+
+## I325 D completion evidence — 2026-11-14
+
+- **Completion Commit: `027b8a59194f5ba496b0048c7183ad236e2e2dd2`** — actual implementation #935 squash merge, not this documentation closeout.
+- Final reviewed head `259d240aa9f69d4c89060fd0891e61ea1b99eb19`: [CI #4223](https://github.com/wjhuang88/talos/actions/runs/43552408748) concluded overall SUCCESS; all seven applicable native/format/check/clippy/test/governance jobs succeeded, including both validators (one unrelated SEARCH-001-D3 collaboration warning). Separate **Remote Issue/Owner reconciliation FAILED** due global matrix missing #947 on the historical candidate and retaining closed #941. The failed job is not retroactively counted green; this closeout batches the separate register cleanup.
+- Independent [exact-head technical APPROVE](https://github.com/wjhuang88/talos/pull/935#issuecomment-6871229199), [formal Copilot approval recommendation](https://github.com/wjhuang88/talos/pull/935#pullrequestreview-5901387865) with original dedup finding resolved, [single-maintainer CAS](https://github.com/wjhuang88/talos/pull/935#issuecomment-6871430719). No second human reviewer claimed.
+- Delivered bounded Session TLOG/JSONL, Pending/Todo, Memory SQLite+FTS5/graph/content dedup, Evolution and Exploration trait-dispatch tests and inventory. No production code, SQL/schema/transactions/format/path, Cargo, default profile, runtime Host or SDK change.
+- Parent #670 remains OPEN for E local-default composition and F wide fault/recovery parity, separately governed. #897 E2/E3 and ServerHost remain gated; SessionIndex/durable-binding and unavailable provider capabilities remain explicit residuals.
+
+## I328 E default-local composition proposed activation — 2026-11-16
+
+- [I328](../../iterations/I328-store-002-default-local-composition.md) selects only E following accepted #935 implementation and #951 D closeout. Draft [governance #955](https://github.com/wjhuang88/talos/pull/955) **proposes** atomically claimed/active E ownership; neither is effective until target-branch merge. No E implementation exists yet.
+- E must select/assemble existing concrete local Session, Pending/Todo, Memory, Evolution and Exploration stores through accepted C/D delegate contracts, retaining all lazy/optional constructors and typed semantics. The seven `StorageCapabilityKind` entries remain metadata; Object/VectorSearch/Embedding/standalone Rerank remain explicitly unavailable. Do not invent a generic operational provider or SQL abstraction.
+- `SessionManager::new()` must preserve its startup reconciliation that `with_dir()` lacks. Memory must not create absent `memory.db` merely to assemble a profile. Exploration read-only search must not create absent DB. No runtime `RuntimeBuilder` / Desktop / TUI / SDK / Server Host consumption: #897 owns those independently after accepted E. F owns broader fault/recovery/behavior parity.
