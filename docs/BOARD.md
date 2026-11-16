@@ -9,6 +9,14 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 # Talos Board
 
+## SESSION-UI-001 — session UI continuity repair preparation
+
+[Owner](tasks/session-ui-continuity-repair.md): Active / Claimed proposed via #952,
+ineffective until target merge. Existing handoff
+queue visibility, external user-background separator and terminal-animation evidence
+only; governance preparation, no effective claim or committed implementation. Recovery
+PR #917, approval history, edit locations and background work retain separate owners.
+
 ## SEARCH-001-D3-T2 / I327 — Complete / Closed upon owner-first closeout merge
 
 [SEARCH-001-D3-T2](backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) / [I327](iterations/I327-search-bing-sponsored-ancestor-rejection.md) / [#947](https://github.com/wjhuang88/talos/issues/947): I327 claim #948 effective on main; [source #949](https://github.com/wjhuang88/talos/pull/949) merged Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99` with exact-head CI43465355386 attempt 2, 8/8 SUCCESS, independent no-blocker parser/API/security review and CAS. Explicit `b_ad` ancestor only, synthetic offline tests; no live Bing, endpoint, permission, default SearchRouter routing, native provider or rights/region assurance. #947 closes after owner-first doc merge. D3/#937 and Epic #624 stay Open.
