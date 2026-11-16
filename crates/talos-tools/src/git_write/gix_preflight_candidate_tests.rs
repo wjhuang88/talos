@@ -481,7 +481,11 @@ fn gix_pure_candidate_records_zero_child_git_invocations() {
         .expect("make fake git executable");
 
     let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
-        .args(["gix_pure_candidate_no_child_fixture", "--ignored", "--nocapture"])
+        .args([
+            "gix_pure_candidate_no_child_fixture",
+            "--ignored",
+            "--nocapture",
+        ])
         .env("PATH", dir.path())
         .env("TALOS_I324_RUN_ISOLATED_CHILD", "1")
         .env("TALOS_I324_FAKE_GIT_LOG", &log)
@@ -522,7 +526,9 @@ fn gix_pure_candidate_no_child_fixture() {
     .expect("compute include without ambient discovery");
     assert_eq!(
         named,
-        vec![std::path::PathBuf::from("/i324-unadmitted/never-authorized.conf")]
+        vec![std::path::PathBuf::from(
+            "/i324-unadmitted/never-authorized.conf"
+        )]
     );
 
     let _file = gix::config::File::from_bytes_no_includes(
