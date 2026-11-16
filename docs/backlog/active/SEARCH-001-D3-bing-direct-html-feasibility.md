@@ -27,7 +27,7 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | None |
-| Last Updated | 2026-11-13 |
+| Last Updated | 2026-11-15 |
 | Handoff / Release Condition | No live automated Bing SERP acquisition, new endpoint, test code, default-routing or provider admission until appropriate rights and an effective, independently reviewed owner/iteration claim. |
 
 ## Identity, goal and user value
@@ -115,7 +115,38 @@ D3.1 documentary research [PR #938](https://github.com/wjhuang88/talos/pull/938)
 
 ## Separate parser-local correction candidate — SEARCH-001-D3-T2 / #947
 
-T1/#941 was **Complete / Closed** after implementation #944 `9cbc615cebb119ead9706a4d00159d7151639606` and owner-first #946 `73ec650b6ef9804d0c9c42a6f1c5e7c9d9f0baa7`. Its synthetic test exposed a specific explicit `b_ad` ancestor containing `li.b_algo` falsely treated as an organic result. [D3-T2 / #947](SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) and [I327](../../iterations/I327-search-bing-sponsored-ancestor-rejection.md) then received effective claim #948 (`5704bb66aca22919347705a5bff40a84d641c3c9`) and a narrowly scoped **accepted parser correction** in [PR #949](https://github.com/wjhuang88/talos/pull/949), Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99`. Exact-head CI43465355386 second attempt 8/8 SUCCESS, independent source review and CAS; owner-first closeout pending. The correction recognizes **only explicit `b_ad` ancestor tokens**, not all real Bing sponsored formats. This does **not** change D3's **Intake / Proposed / Unclaimed** research status, query hosts, Microsoft usage/result rights, live mainland-China evidence, independent provider count or E/F/G/I admission. Epic #624 remains Open.
+T1/#941 was **Complete / Closed** after implementation #944 `9cbc615cebb119ead9706a4d00159d7151639606` and owner-first #946 `73ec650b6ef9804d0c9c42a6f1c5e7c9d9f0baa7`. Its synthetic test exposed a specific explicit `b_ad` ancestor containing `li.b_algo` falsely treated as an organic result. [D3-T2 / #947](SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) and [I327](../../iterations/I327-search-bing-sponsored-ancestor-rejection.md) then received effective claim #948 (`5704bb66aca22919347705a5bff40a84d641c3c9`) and a narrowly scoped **accepted parser correction** in [PR #949](https://github.com/wjhuang88/talos/pull/949), Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99`. Exact-head CI43465355386 second attempt 8/8 SUCCESS, independent source review and CAS; owner-first closeout [PR #950](https://github.com/wjhuang88/talos/pull/950) merged `6c5505abdc8d964ec39c01d221e9e3297a3458cf` after final docs CI43731465216 SUCCESS, independent review and CAS; [#947](https://github.com/wjhuang88/talos/issues/947) **Closed / Completed**. The correction recognizes **only explicit `b_ad` ancestor tokens**, not all real Bing sponsored formats. This does **not** change D3's **Intake / Proposed / Unclaimed** research status, query hosts, Microsoft usage/result rights, live mainland-China evidence, independent provider count or E/F/G/I admission. Epic #624 remains Open.
+
+## Rights-gate reconciliation — 2026-11-15 (research only)
+
+Following completed child D3-T2/#947, the parser's explicit `b_ad` ancestor
+false-positive is fixed, but **this does not clear Bing's service-use gate**.
+The [2026-11-15 vendor-source reconciliation](../../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md#7-rights-and-next-action-recheck--2026-11-15)
+confirms the Bing/MSN Materials clause in the Microsoft Services Agreement
+(published 2026-07-30, effective 2026-09-30) still limits unlicensed
+commercial/product-building reuse; the old Bing Search APIs were retired
+2025-08-11. Microsoft-hosted Foundry/Web Search, Grounding with Bing and
+Web IQ have distinct commercial service/terms and output contracts; none is
+evidence of a free, raw HTML request grant for Talos. **BLOCKED / UNPROVEN**
+for new automated default HTML use and result/display/model-context rights;
+**UNKNOWN** for live www/bare alias redirects and regional performance.
+These are product-use evidence gates, not an assertion that all individual
+manual browsing is forbidden or a legal opinion.
+
+**Next executable decision:** obtain supplier/rightsholder or qualified legal
+determination covering (a) user-initiated automatic queries from a distributed,
+zero-key OSS client to each proposed host; (b) user-facing titles/snippets/URLs,
+attribution, cache and LLM-context use; (c) permitted frequency/redirect
+handling and geographic applicability. Record permission in writing with
+scope/version, otherwise keep BLOCKED. Only after affirmative rights, create
+a *separate claimed work slice* for a bounded, consented live query/redirect
+study from genuine mainland-China and independent comparator networks,
+with prepared per-hop authority, Network permission, privacy redaction and
+existing budget. No license decision, host test or new source has occurred here.
+
+This closes no part of D3/#937 or Epic/#624, changes no code, tests, endpoint,
+default route or grant, does not reopen closed #947 and preserves #644's
+historical BLOCKED / ZERO-ADMISSION disposition.
 
 ## Acceptance (documentary only)
 

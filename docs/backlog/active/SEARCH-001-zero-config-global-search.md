@@ -85,6 +85,28 @@ I unactivated. Parent #624 remains Open and all other parent completion gates un
 
 [SEARCH-001-D3 / #937](SEARCH-001-D3-bing-direct-html-feasibility.md) is a separately documented **Intake / Proposed / Unclaimed** feasibility Spike, not a new search-provider implementation. Existing `cn.bing.com/search` and `bing_parser.rs` are Talos-owned compatibility; `www.bing.com/search` and `bing.cn` alias/redirect behavior are unverified candidates in **one Bing family**. The [dated source/fixture packet](../../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md) records Microsoft terms effective 2026-09-30 and BLOCKED new distributed-default usage/result-rights, UNKNOWN live and mainland-China observations, and offline-only tests for any separately claimed future scope. It does not reopen completed #901, replace D/#644 ZERO-ADMISSION, admit a provider, activate E/F/G/I or close this Epic.
 
+## SEARCH-001-D3 T2 closure and rights checkpoint — 2026-11-15
+
+[SEARCH-001-D3-T2 / #947](SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md)
+has completed its independently governed narrow parser fix: source #949
+Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99`,
+owner-first #950 closeout `6c5505abdc8d964ec39c01d221e9e3297a3458cf`,
+and #947 Closed. The accepted synthetic-only exclusion applies solely to
+`li.b_algo` with exact `b_ad` ancestor class; it does not demonstrate
+real Bing sponsored quality, region availability, or source independence.
+
+[Parent D3/#937](SEARCH-001-D3-bing-direct-html-feasibility.md)
+remains **OPEN / Intake / Unclaimed**. Current Microsoft service terms,
+retired Bing Search APIs, distinct commercial Foundry Grounding/Web Search
+and Web IQ products [rechecked 2026-11-15](../../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md#7-rights-and-next-action-recheck--2026-11-15)
+do not establish permission for an uncredentialed Talos-distributed
+automated Bing HTML route or its title/snippet/LLM-context rights.
+Written scoped access/output authorization plus separately claimed
+live mainland-China/comparator evidence remain prerequisite; no additional
+`www.bing.com`/`bing.cn` endpoint or independent provider is admitted.
+D/#644 ZERO-ADMISSION, E/F/G/I blocking and all parent completion
+requirements remain unchanged.
+
 ## Child Dependency Map
 
 The table is a proposal for child **outcomes**, not blanket implementation authorization. Completed
