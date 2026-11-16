@@ -200,3 +200,21 @@ changed after the full validation manifest; the product source remains identical
 Both governance validators passed after owner-first Review/Board synchronization
 (existing unrelated SEARCH intake warning only). Exact-head independent review and
 native CI are pending. No completion or product merge authorization is asserted.
+
+### Upstream integration in progress
+
+PR #962 could not run native CI while GitHub reported merge conflicts. Integrated
+origin/main 5169d5f6 (Git status notification stage #960 and its receipt #961) into
+the candidate without rewriting the already-published implementation evidence.
+Conflicts were append-only tests in app_tests.rs and Board insertion; both sides'
+tests/owner entries are retained. Upstream watcher source/dependencies remain intact.
+Formatting and whitespace checks passed. Because upstream changes affect the TUI,
+the prior full pass is historical for this integration: rerun standard preflight
+before pushing the integration candidate and refresh exact-head review/native CI.
+
+Integration full preflight r3 completed exit0 in513.80s:5360 successful test-summary
+passes,0failed/ignored and both Runtime SDK fixture configurations passed. All2661
+manifest files unchanged. Unit CPU274.948s,memory peak2GiB,swap0; same documented
+resource/locale envelope. Evidence target/ui-full-preflight-20261116-r3.log,
+-manifest.json and -result.json. This proves the integrated source candidate;
+exact final-head review/native CI and native terminal acceptance remain open.

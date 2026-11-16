@@ -5955,3 +5955,46 @@ fn user_preview_separator_is_absent_when_history_is_anchored() {
         "an offscreen user tail does not add a separator to anchored history"
     );
 }
+
+#[tokio::test]
+#[cfg(not(target_os = "macos"))]
+async fn healthy_git_watch_avoids_two_second_idle_scans() {
+    use crate::git_snapshot_worker::{Scan, TEST_SCAN_LOCK, wait_for_test_slot};
+    let _serial = TEST_SCAN_LOCK.lock().await;
+    wait_for_test_slot().await;
+    let directory = tempfile::tempdir().expect("fixture");
+    gix::init(directory.path()).expect("repo");
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(200, 24));
+    tui.state.status.workspace_path = directory.path().to_string_lossy().into_owned();
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let launches = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let observed = launches.clone();
+    let driver = async move {
+        // Use real time for the OS watcher. Let initial setup/refresh settle.
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        let before = observed.load(std::sync::atomic::Ordering::SeqCst);
+        tokio::time::sleep(std::time::Duration::from_secs(6)).await;
+        let after = observed.load(std::sync::atomic::Ordering::SeqCst);
+        tx.send(talos_conversation::UiOutput::Exit).expect("exit");
+        (before, after)
+    };
+    let run = tui.run_with_scanner(futures::stream::pending(), |workspace, generation| {
+        let scan = Scan::start(workspace, generation)?;
+        if scan.is_some() {
+            launches.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+        Ok(scan)
+    });
+    let (result, (before, after)) = tokio::join!(run, driver);
+    result.expect("loop");
+    assert!(before > 0, "initial status must be scanned");
+    assert_eq!(
+        before, after,
+        "quiet healthy watcher must suppress periodic scans"
+    );
+    wait_for_test_slot().await;
+}

@@ -73,7 +73,11 @@ it requires filesystem hard-link support. See the [startup compatibility limits]
 ### TUI responsiveness (unreleased)
 
 The TUI waits for input, output or a visible update instead of continuously
-redrawing while idle. Git status refreshes asynchronously; `Git ?` means no fresh
+redrawing while idle. Git status refreshes asynchronously on filesystem changes,
+with a 30-second reconciliation scan while native notifications are healthy. If
+watch setup or delivery fails, it falls back to two-second polling and retries
+watch setup. macOS currently retains two-second polling because the native
+backend cannot enforce bounded registration. Changes are coalesced by the existing event loop. `Git ?` means no fresh
 status is available, including a failed or timed-out scan. A stalled scan does not
 block typing or create additional scan threads. For reproducible CPU, memory and
 input-latency diagnostics, see [local development](docs/sop/LOCAL-DEV.md).
