@@ -32,6 +32,24 @@
 - `RuntimeBuilder::durable_session(DurableSession)` is optional under ADR-042, leaving the unbound in-memory runtime intact. ADR-104 is **ownership/placement only**, not an approved Host/RuntimeBuilder injection API.
 - `SessionIndex` is a derived metadata/search projection with bounded reconciliation; durable external-ID mapping, pending receipts and Todo/Memory/Exploration records remain domain-owned authority. Existing storage categories Object, VectorSearch, Embedding and standalone Rerank remain **unavailable** as generic operational providers.
 
+### Selection-time non-terminal inventory and disposition — 2026-11-16
+
+Source: `docs/iterations/README.md` and effective owners on `main@b524c7a9a0833cf9293c0fd77a730e1fb7fc1184`. This is a **non-overlap / select-or-retain record**, not a transfer of ownership or an assertion that unrelated iterations are completed.
+
+| Existing iteration / owner | Recorded state at I328 selection | Disposition for I328 E |
+|---|---|---|
+| I325 / STORE-002 D | Complete / Closed (#935 implementation, #951 closeout) | Dependency **satisfied**, not reopened |
+| I320 E0/E1 / ARCH-035 #897 | Bounded docs Complete / Closed; parent E2/E3 Blocked / Released | **Keep blocked** until accepted E and separate Host claim; E has no Host API mandate |
+| I318 / TUI-054 #269 | Review with physical terminal / IME acceptance deferred | **Retain Review**, no TUI input/terminal changes in E |
+| I302 / TEST-003 #717 | Review / Claimed with native Windows handle/resource residual | **Retain Review**, E neither asserts nor modifies native-process validation |
+| I323 / PROVIDER-008-C #914 | Proposed governance activation | **Defer/retain separate claim**; Azure provider unrelated to storage E |
+| I324 / GIT-COMPAT-001 #919 | Proposed governance claim (not effective at inventory snapshot) | **Defer/retain separate claim**; Git 2.36 preflight and protected review unaffected |
+| I277, I249, I164 | Review, Planned, Paused respectively as recorded in README | **Retain Review / defer Planned / retain Paused**; no Desktop/device/release acceptance transfer |
+| SEARCH-001 D3 and other separately owned search work | Independently owned source/research work; #957/I329 intake proposed separately | **Retain separate governance**, no shared search implementation source or provider admission |
+| STORE-002 F / #670 | Unclaimed, next broad crash/recovery/parity slice | **Defer** until independently claimed after E implementation and closeout |
+
+**Selection / non-overlap conclusion:** I328 E has the sole effective STORE-002 local-default composition claim through merged #955. No other non-terminal iteration owns this Work Slice; #956 changes only opt-in existing-store selection and its tests, bounded documentation and explicit feature CI. Concurrent search, provider, TUI, Git-compat, Windows diagnostics, Desktop and Host owners are retained, not superseded. No second active iteration or cross-owner implementation claim is inferred by this inventory.
+
 ### Work Slice
 
 1. Identify the **smallest existing ownership-safe module/layer** for an additive local-default selection/composition over current domain stores; first prove its dependency graph and existing public API impact. Any genuinely new public API must have specific signatures and independent review before acceptance; do not introduce generic CRUD/SQL/transaction or opaque `StorageProvider`.
