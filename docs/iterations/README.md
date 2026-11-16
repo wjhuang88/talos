@@ -26,6 +26,10 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 
 [I325](I325-store-002-local-delegation.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance #932 effective; D implementation [#935](https://github.com/wjhuang88/talos/pull/935) merged **Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2`**, exact-head [CI #4223](https://github.com/wjhuang88/talos/actions/runs/43552408748) applicable jobs SUCCESS, independent no-blocker review/Copilot and final CAS. Actual SessionStore TLOG/JSONL, Pending/Todo, Memory+FTS/content dedup/graph, Evolution, Exploration tests. No default E profile, F parity, #897 Host or backend change. Separate remote Issue matrix reconciliation job FAILED #941/#947 and is recorded as unrelated ADR-071 governance residual, corrected in this docs batch. I325 D Complete / Closed; parent #670 Open for E/F.
 
+## I328 / STORE-002 E — governance claim/activation proposed (#955)
+
+[I328](I328-store-002-default-local-composition.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance Draft [#955](https://github.com/wjhuang88/talos/pull/955) proposes atomic Active / Claimed E **ineffective before merge**. I325 D #935/#951 is Complete/Closed, parent #670 Open for E/F. E chooses an explicit default-local composition over existing SQLite/FTS5/TLOG/JSONL domain delegates with identical constructors/paths/errors/optional loading; no SQL/schema, new engine, Host/SDK/RuntimeBuilder wiring or F conformance. ARCH-035/#897 E2/E3 remains separately Blocked.
+
 ## I321 / STORE-002 A/B — Complete / Closed (bounded slice)
 
 [I321](I321-store-002-capability-contract-foundation.md): governance #908 and implementation #909 merged; exactly seven typed capability IDs, metadata-only registry requests and authority inventory, no functional provider binding or local storage migration. #670 OPEN for C/D/E/F.
