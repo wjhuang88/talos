@@ -18,7 +18,7 @@
 | Governance Claim PR | #958 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I329 activated by #958 merge `58207831675365e35cc80601097b96f9432a68aa`; exact-head CI #4273 4 applicable SUCCESS/4 skipped; independent no-blocker review #6907540766 and CAS. |
-| Implementation PR | Candidate on `feat/i329-search-bing-offline-failover`; no accepted source PR yet |
+| Implementation PR | #959 |
 | Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Implement and close only offline T3a after separately accepted claim; T3b production blocked pending rights/region/permission |
 
