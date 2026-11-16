@@ -15,7 +15,7 @@
 | Work Slice | D3-T3a/#957: deterministic offline non-CN-first/CN-fallback decision candidate and synthetic tests only. No live requests, production endpoints, Auto policy, Network grants or scope expansion. |
 | Claimed At | 2026-11-16 |
 | Source Issue | #957 |
-| Governance Claim PR | To be recorded after opening governance PR |
+| Governance Claim PR | #958 (Draft / ineffective until merge) |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer direction + existing #937 rights/authority gate; require exact-head documentation CI, independent governance/security review and expected-head CAS |
 | Implementation PR | None until effective claim |
