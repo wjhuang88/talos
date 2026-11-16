@@ -38,7 +38,7 @@ Source: `docs/iterations/README.md` and effective owners on `main@b524c7a9a0833c
 
 | Existing iteration / owner | Recorded state at I328 selection | Disposition for I328 E |
 |---|---|---|
-| I325 / STORE-002 D | Complete / Closed (#935 implementation, #951 closeout) | Dependency **satisfied**, not reopened |
+| I325 / STORE-002 D | Accepted and closed (#935 implementation, #951 closeout) | Dependency **satisfied**, not reopened |
 | I320 E0/E1 / ARCH-035 #897 | Bounded docs Complete / Closed; parent E2/E3 Blocked / Released | **Keep blocked** until accepted E and separate Host claim; E has no Host API mandate |
 | I318 / TUI-054 #269 | Review with physical terminal / IME acceptance deferred | **Retain Review**, no TUI input/terminal changes in E |
 | I302 / TEST-003 #717 | Review / Claimed with native Windows handle/resource residual | **Retain Review**, E neither asserts nor modifies native-process validation |
