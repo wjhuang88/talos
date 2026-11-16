@@ -7,6 +7,30 @@ Measured runtime source: `539adfd2`; candidate build receipt: `candidate-build/r
 Current implementation source: `43305a58` on base `6c81390a`. Each archive retains
 its own source receipt; earlier measurements do not automatically cover later changes.
 
+## Current follow-up checkpoint — 2026-11-13
+
+The historical table below describes earlier candidates. Runtime source is
+`293ce0a2`; published candidate `4d9e5cfc` merged through PR #929 as `a8dc7fb0`.
+This checkpoint supersedes current-state claims below without erasing history.
+
+| Gate | Current authoritative evidence | Still required |
+|---|---|---|
+| Resize/input, 10,000 entries | Three Debug rounds pass150/200ms; three Release rounds pass100/150ms; [raw evidence](bounded-segment/README.md) | Native display acceptance remains separate |
+| Wrapped/zero-width segments | Six-width old-function equality, alternating opt0/3 microbenchmarks,43 focused tests | No whole-workload claim from microbenchmarks |
+| Other workloads | Transcript CPU/PSS and Release input pass; original Debug P99 fails479ms | Cause unresolved; later non-reproduction does not erase it |
+| Cache/heap | Corrected sampler570/570 effective size changes; nine flat heap medians; finite transcript200,160B allocation-path attribution; [evidence](sampler-boundary/README.md) | No universal leak-freedom claim; prior569/571 failure retained |
+| Long-tail diagnosis | Procfs short run and [GDB paired frames](frame-breakpoint/README.md);33ms interval contains1majorfault | Original479ms event not captured; no causal proof or production fix |
+| Native operations | Maintainer reports basic Ghostty passes, including Git display | Exact binary/environment/resources; deferred approval/Git/workspace operations; second terminal; native Windows unavailable |
+| Local gates | Runtime293ce0a2 preflight5320passes and MSVC xwin; later diagnostic/sampler focused tests and governance pass | These do not replace native acceptance |
+| Remote gates | Exact4d9e5cfc CI43360750041 all code jobs passed | Global#901 matrix drift remains separate advisory; old macOS failure cause unproven |
+| Publication | PR929 merged as a8dc7fb0; independent exact-head Agent review and single-maintainer CAS recorded | Owner/#923 remain Review/Claimed until full acceptance |
+
+No Complete claim. Original scope and budgets remain; platform gaps cannot be
+replaced by PTY, cross-compilation or CI. Current host inventory has no process
+namedtalos, so no current candidate native resource sample was taken.
+
+## Historical candidate matrix
+
 | Requirement | Current evidence | Remaining verification |
 |---|---|---|
 | P0 reproducible debug/release baseline | Baseline archives, SHA receipts, six scenarios × three histories × three rounds | Allocation profiles now archived for animation, transcript and P4; terminal emulator resources remain missing |

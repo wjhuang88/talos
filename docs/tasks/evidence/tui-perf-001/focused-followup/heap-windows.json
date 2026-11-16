@@ -1,0 +1,162 @@
+[
+  {
+    "case": "heap-resize-massif",
+    "profile_first_seconds": 0.091,
+    "profile_last_seconds": 307.713,
+    "windows": [
+      {
+        "start_seconds": 30,
+        "end_seconds": 60,
+        "samples": 2953,
+        "min_bytes": 13314995,
+        "median_bytes": 25943809,
+        "max_bytes": 26195008
+      },
+      {
+        "start_seconds": 60,
+        "end_seconds": 90,
+        "samples": 2959,
+        "min_bytes": 13309136,
+        "median_bytes": 25943809,
+        "max_bytes": 26203200
+      },
+      {
+        "start_seconds": 90,
+        "end_seconds": 120,
+        "samples": 2955,
+        "min_bytes": 13310567,
+        "median_bytes": 25943809,
+        "max_bytes": 26203200
+      },
+      {
+        "start_seconds": 120,
+        "end_seconds": 150,
+        "samples": 2957,
+        "min_bytes": 13309136,
+        "median_bytes": 25943809,
+        "max_bytes": 26203200
+      },
+      {
+        "start_seconds": 150,
+        "end_seconds": 180,
+        "samples": 2955,
+        "min_bytes": 13309136,
+        "median_bytes": 25943809,
+        "max_bytes": 26082296
+      },
+      {
+        "start_seconds": 180,
+        "end_seconds": 210,
+        "samples": 2955,
+        "min_bytes": 13315542,
+        "median_bytes": 25943809,
+        "max_bytes": 26187840
+      },
+      {
+        "start_seconds": 210,
+        "end_seconds": 240,
+        "samples": 2958,
+        "min_bytes": 13309136,
+        "median_bytes": 25943809.0,
+        "max_bytes": 26065912
+      },
+      {
+        "start_seconds": 240,
+        "end_seconds": 270,
+        "samples": 2959,
+        "min_bytes": 13309176,
+        "median_bytes": 25943809,
+        "max_bytes": 26219584
+      },
+      {
+        "start_seconds": 270,
+        "end_seconds": 300,
+        "samples": 2957,
+        "min_bytes": 13310567,
+        "median_bytes": 25943809,
+        "max_bytes": 26190912
+      }
+    ],
+    "last_minus_first_median_bytes": 0
+  },
+  {
+    "case": "heap-transcript-commit-massif",
+    "profile_first_seconds": 0.083,
+    "profile_last_seconds": 307.703,
+    "windows": [
+      {
+        "start_seconds": 30,
+        "end_seconds": 60,
+        "samples": 2958,
+        "min_bytes": 25976429,
+        "median_bytes": 25988954.0,
+        "max_bytes": 26016238
+      },
+      {
+        "start_seconds": 60,
+        "end_seconds": 90,
+        "samples": 2958,
+        "min_bytes": 26001479,
+        "median_bytes": 26014004.0,
+        "max_bytes": 26039745
+      },
+      {
+        "start_seconds": 90,
+        "end_seconds": 120,
+        "samples": 2961,
+        "min_bytes": 26026529,
+        "median_bytes": 26039054,
+        "max_bytes": 26064036
+      },
+      {
+        "start_seconds": 120,
+        "end_seconds": 150,
+        "samples": 2960,
+        "min_bytes": 26051579,
+        "median_bytes": 26064104.0,
+        "max_bytes": 26089921
+      },
+      {
+        "start_seconds": 150,
+        "end_seconds": 180,
+        "samples": 2962,
+        "min_bytes": 26076629,
+        "median_bytes": 26089154.0,
+        "max_bytes": 26110531
+      },
+      {
+        "start_seconds": 180,
+        "end_seconds": 210,
+        "samples": 2960,
+        "min_bytes": 26101679,
+        "median_bytes": 26114204.0,
+        "max_bytes": 26140021
+      },
+      {
+        "start_seconds": 210,
+        "end_seconds": 240,
+        "samples": 2957,
+        "min_bytes": 26126729,
+        "median_bytes": 26139254,
+        "max_bytes": 26161466
+      },
+      {
+        "start_seconds": 240,
+        "end_seconds": 270,
+        "samples": 2956,
+        "min_bytes": 26150811,
+        "median_bytes": 26164304.0,
+        "max_bytes": 26190880
+      },
+      {
+        "start_seconds": 270,
+        "end_seconds": 300,
+        "samples": 2962,
+        "min_bytes": 26176829,
+        "median_bytes": 26189354.0,
+        "max_bytes": 26215171
+      }
+    ],
+    "last_minus_first_median_bytes": 200400.0
+  }
+]

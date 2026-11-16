@@ -1,0 +1,30 @@
+{
+  "service_wall_seconds": 112.076,
+  "service_cpu_seconds": 2.259,
+  "service_peak_memory": "54.9MiB",
+  "swap_bytes": 0,
+  "rounds": [
+    {
+      "round": 1,
+      "cpu_percent_one_core": 1.3756735317624296,
+      "peak_pss_kib": 38882,
+      "actual_resize_actions": 57,
+      "input_probes": 60
+    },
+    {
+      "round": 2,
+      "cpu_percent_one_core": 1.3804590017489904,
+      "peak_pss_kib": 38645,
+      "actual_resize_actions": 57,
+      "input_probes": 61
+    },
+    {
+      "round": 3,
+      "cpu_percent_one_core": 2.047365025149723,
+      "peak_pss_kib": 38544,
+      "actual_resize_actions": 58,
+      "input_probes": 61
+    }
+  ],
+  "boundary": "synthetic PTY; process PSS excludes terminal emulator; CPU rounded by procfs sampling"
+}

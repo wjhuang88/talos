@@ -1,0 +1,11 @@
+{
+  "implementation_commit": "f725b74b789ddb7021cb7c61b0565cb8414c3ef4",
+  "checkout_commit": "cef024a11d02607afe86da73682f2fe66f71b9b5",
+  "binary_sha256": "cf6e818b7e0da518de0e288ab4db5e3fc3f9d7e1dbc2931a2a28bf9438636013",
+  "profile": "repository default release; fat LTO; codegen-units=1; strip=true",
+  "build_result": "success",
+  "build_wall_seconds": 333.189,
+  "build_cpu_seconds": 306.126,
+  "build_memory_peak": "2G",
+  "swap_bytes": 0
+}
