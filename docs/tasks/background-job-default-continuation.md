@@ -374,3 +374,25 @@ above for3a7f1a7c; this evidence paragraph itself is a later documentation-only 
 
 Recovery diagnostic run43734019253 is still live. The recurring Windows binding
 lock failure is unresolved; no merge, installation or default activation occurred.
+
+## 2026-11-16 recovery dependency integration — Partial
+
+Rebased four existing background patches from55ba5752 onto recovery2beac8f8;
+range-diff confirms each patch unchanged. Original8f9dcc29 retained in
+backup/background-custody-before-recovery-20261116. New tested source:
+f2978d5008a1fba43297ec58ae118dcd8f0e09a0. This incorporates atomic binding-schema
+publication and final logical identity-lease unlock without changing background
+activation: completions defaults None and enable_completions remains cfg(test).
+Independent integration review found no API/lifetime conflict or blocker.
+
+Clean standard pinned1.99.0/locked release_preflight passed5533 unfiltered
+tests/doctests,0failed/ignored, two extra filtered subprocess passes and both
+external SDK modes. All2447 source hashes matched before/after. Session435
+includes both new logical-lock lifetime regressions. Runtime12min47s, peak2G,
+swap0 under existing resource limits and requested TMPDIR. Evidence:
+target/background-recovery-preflight.log, -result.json, -source-manifest.json.
+
+This supersedes old-source local validation only. Fresh exact-head native checks
+are still required; the earlier macOS unavailable failure is not causally closed.
+No default activation, merge, installation or session-data migration performed.
+Foundation and complete handoff remain Partial; all existing residuals retained.
