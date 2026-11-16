@@ -1,6 +1,6 @@
 # STORE-002: Storage And Retrieval Capability Contracts
 
-**Status**: Active / Claimed proposed by #955 — I321 A/B, I322 C and I325 D accepted; I328 E selected (ineffective until claim merge); F unclaimed; parent #670 Open
+**Status**: Review / Claimed — I328 E implementation #956 candidate; A/B, C and D accepted; F unclaimed; parent #670 Open
 
 **Type**: Architecture / Contract Convergence
 
@@ -39,10 +39,10 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Source Issue | #670 |
 | Governance Claim PR | #955 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User authorized continued #670 work. C #912 domain traits accepted; D implementation #935 Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2` and I325 owner-first closeout #951 merged `8cb0f97a44259b4c7f4caee24c06ab02fc542ad7`. Governance-only Draft #955 proposes I328 E atomic claim/activation, ineffective until final exact-head CI, both governance validators, independent read-only technical review, single-maintainer rationale, CAS and merge. No production E implementation before this claim is effective. |
-| Implementation PR | Not started — I328 E governance-only claim #955 |
+| Authorization Evidence | Governance #955 merged/effective on main `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184` after exact-head CI #4256 and independent no-blocker review/CAS. D #935 implementation Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2` and #951 closeout accepted. E candidate #956 still requires exact-head CI, independent public API/constructor review, and guarded merge; no E acceptance/Completion Commit claimed yet. |
+| Implementation PR | #956 (Review / Claimed; not merged) |
 | Last Updated | 2026-11-16 |
-| Handoff / Release Condition | E activated only on reviewed #955 merge. Subsequent separate E implementation must preserve existing local defaults and pass native CI/independent API review; E owner closeout requires actual merged implementation Completion Commit. Parent #670 stays Open for F; ARCH-035/#897 E2/E3 and ServerHost remain gated. |
+| Handoff / Release Condition | I328 E claim #955 is effective. #956 requires locked/native validation, independent API and behavior review, and a new owner-first completion record only after actual implementation merge. Parent #670 Open for F; #897 E2/E3 Host/SDK and ServerHost remain blocked. |
 
 ## Governance
 
@@ -109,3 +109,10 @@ Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim 
 - [I328](../../iterations/I328-store-002-default-local-composition.md) selects only E following accepted #935 implementation and #951 D closeout. Draft [governance #955](https://github.com/wjhuang88/talos/pull/955) **proposes** atomically claimed/active E ownership; neither is effective until target-branch merge. No E implementation exists yet.
 - E must select/assemble existing concrete local Session, Pending/Todo, Memory, Evolution and Exploration stores through accepted C/D delegate contracts, retaining all lazy/optional constructors and typed semantics. The seven `StorageCapabilityKind` entries remain metadata; Object/VectorSearch/Embedding/standalone Rerank remain explicitly unavailable. Do not invent a generic operational provider or SQL abstraction.
 - `SessionManager::new()` must preserve its startup reconciliation that `with_dir()` lacks. Memory must not create absent `memory.db` merely to assemble a profile. Exploration read-only search must not create absent DB. No runtime `RuntimeBuilder` / Desktop / TUI / SDK / Server Host consumption: #897 owns those independently after accepted E. F owns broader fault/recovery/behavior parity.
+
+## I328 E implementation candidate — PR #956 (Review / Claimed)
+
+- E governance claim #955 is effective on main after merge `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184`. [Implementation #956](https://github.com/wjhuang88/talos/pull/956) is **review only**; no completion evidence until current-head code CI, independent API/constructor review and guarded merge.
+- Opt-in feature `talos-runtime/local-storage` adds `LocalStorageProfile` as a bounded concrete-path and on-demand constructor selector for current Session, Pending/Todo, Memory, Evolution-path and Exploration delegates. The feature is OFF by default. No Host/CLI/TUI/Desktop/SDK/Server runtime caller is migrated in E; #897 retains those separate ownership/acceptance gates.
+- Tests must prove missing optional Memory/Exploration/legacy learned DBs do not get created, explicit opens retain existing typed operations, Session default `new()` versus custom `with_dir()` reconciliation remains distinct, and evolution hook `evolution/knowledge.db` is not conflated with legacy learned `index.db`. No new SQL/schema, capability registry, backend, public RuntimeBuilder signature or cross-resource atomicity.
+- **Current evidence pending:** first CI #4258 exposed a real missing `Cargo.lock` update after optional manifest dependencies; this was corrected on the same PR in a new exact head. Historical failing Linux/Windows jobs are not claimed passing. Subsequent exact-head native CI and independent review determine acceptance. #670 remains OPEN for F after E, #897 Host E2/E3 blocked.

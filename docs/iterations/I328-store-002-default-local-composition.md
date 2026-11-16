@@ -1,6 +1,6 @@
 # Iteration I328: STORE-002 Default Local Storage Composition (E)
 
-> Document status: Active / Claimed proposed by governance #955 — **ineffective until target-branch merge**
+> Document status: Review / Claimed — effective governance #955; E implementation #956 not accepted
 > Published plan date: 2026-11-16
 > Parent: [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / [Issue #670](https://github.com/wjhuang88/talos/issues/670)
 > Delivery target: one verifiable, behavior-preserving **local-default composition** over accepted concrete stores/domain delegates; not cross-host injection, new engines, or F-wide equivalence.
@@ -17,8 +17,8 @@
 | Source Issue | #670 |
 | Governance Claim PR | #955 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | D #935 implementation merged `027b8a59194f5ba496b0048c7183ad236e2e2dd2`; owner-first I325 D closeout #951 merged `8cb0f97a44259b4c7f4caee24c06ab02fc542ad7`. User authorized continuing parent #670; separate E claim must merge before code. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim+activation #955 merged/effective `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184` after CI #4256, both governance validators and independent no-blocker review/CAS. D #935 implementation/ #951 closeout accepted. E implementation #956 is Review, pending its own exact-head Rust/native CI, independent API/semantics review and guarded merge. |
+| Implementation PR | #956 (Review; no Completion Commit) |
 | Last Updated | 2026-11-16 |
 | Handoff / Release Condition | E requires selected local profile/assembly with source-backed operational checks, applicable exact-head native CI and independent API/semantics review, then owner-first closeout; F remains unclaimed and #897 E2/E3 blocked until accepted usable E and its own claim. |
 
@@ -62,4 +62,9 @@
 
 ## Activation / verification / completion
 
-Governance-only #955 claim and activation must merge on main first; this proposed Active/Claimed record has no ownership effect until then. It is not authority to write production E implementation. Record actual claim PR SHA, implementation CI/review/merge and pre-existing Completion Commit in later append-only execution evidence. Parent #670 remains Open for E/F and #897 Host E2/E3 remains blocked.
+Governance-only #955 claim and activation merged on main at `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184` and authorized bounded E implementation. #956 is an unaccepted code candidate pending native exact-head CI, independent API review and CAS. Record actual claim PR SHA, implementation CI/review/merge and pre-existing Completion Commit in later append-only execution evidence. Parent #670 remains Open for E/F and #897 Host E2/E3 remains blocked.
+
+## I328 E implementation checkpoint — 2026-11-16
+
+- [PR #956](https://github.com/wjhuang88/talos/pull/956) proposes feature-gated concrete `LocalStorageProfile` selection in runtime-facing composition layer without changing RuntimeBuilder, CLI/TUI/Desktop/SDK or ServerHost. It reuses accepted C domain traits and existing store constructors; paths are explicit, missing read-side optional DBs are skipped, write/ingest only on explicit call, and Evolution hook/learned query path distinction remains.
+- The first candidate omitted the optional dependency changes from `Cargo.lock`. Native Linux `--locked` check failed as expected, prompting a corrected lock-only commit; **the original CI failure is preserved**. Fresh exact-head CI, cargo format/test/clippy including `--features local-storage`, independent API/constructor review and all governance gates remain pending. No Completion Commit or E/F/Host acceptance.
