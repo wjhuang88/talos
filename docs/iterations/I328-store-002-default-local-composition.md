@@ -16,7 +16,7 @@
 | Claimed At | 2026-11-16 |
 | Source Issue | #670 |
 | Governance Claim PR | #955 |
-| Authorization Mode | Single-maintainer merge, independent read-only technical review and exact-head governance CI |
+| Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | D #935 implementation merged `027b8a59194f5ba496b0048c7183ad236e2e2dd2`; owner-first I325 D closeout #951 merged `8cb0f97a44259b4c7f4caee24c06ab02fc542ad7`. User authorized continuing parent #670; separate E claim must merge before code. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-16 |
