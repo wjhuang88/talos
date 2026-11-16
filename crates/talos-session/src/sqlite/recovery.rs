@@ -606,10 +606,48 @@ impl SessionIndex {
         limit: usize,
         budget: &RecoveryWorkBudget,
     ) -> Result<Vec<RecoveryCandidate>, IndexError> {
+        self.recovery_candidates_bounded(scope, query, after, limit, budget, 1024)
+    }
+
+    /// Search eligible projection text using a plain-text, tokenized FTS phrase.
+    /// Accepts at most 1024 UTF-8 bytes before escaping; operators are text.
+    /// Empty input retains bounded browsing. Source verification requirements,
+    /// scope, pagination, result limits and deadlines match [`Self::recovery_candidates`].
+    pub fn recovery_text_candidates(
+        &mut self,
+        scope: &str,
+        query: &str,
+        after: Option<u64>,
+        limit: usize,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<Vec<RecoveryCandidate>, IndexError> {
+        if query.len() > 1024 {
+            return Err(IndexError::Store(IndexStoreError::Database(
+                "invalid recovery query bounds".into(),
+            )));
+        }
+        let phrase = if query.is_empty() {
+            String::new()
+        } else {
+            format!("\"{}\"", query.replace('"', "\"\""))
+        };
+        // At most every input byte is a quote that doubles, plus outer quotes.
+        self.recovery_candidates_bounded(scope, &phrase, after, limit, budget, 2050)
+    }
+
+    fn recovery_candidates_bounded(
+        &mut self,
+        scope: &str,
+        query: &str,
+        after: Option<u64>,
+        limit: usize,
+        budget: &RecoveryWorkBudget,
+        encoded_limit: usize,
+    ) -> Result<Vec<RecoveryCandidate>, IndexError> {
         native_boundary(|| {
             if scope.is_empty()
                 || scope.len() > 128
-                || query.len() > 1024
+                || query.len() > encoded_limit
                 || limit == 0
                 || limit > 20
                 || after.is_some_and(|n| n > i64::MAX as u64)
@@ -2246,6 +2284,37 @@ mod tests {
             )
             .expect("projection");
         let changes = index.conn.total_changes();
+        assert_eq!(
+            index
+                .recovery_text_candidates("scope", "public", None, 1, &budget)
+                .expect("text match")
+                .len(),
+            1
+        );
+        for text in [
+            "x".repeat(1024),
+            "\"".repeat(1024),
+            format!("{}a", "中".repeat(341)),
+        ] {
+            assert_eq!(text.len(), 1024);
+            assert!(
+                index
+                    .recovery_text_candidates("scope", &text, None, 1, &budget)
+                    .expect("maximum text input")
+                    .is_empty()
+            );
+        }
+        let too_long = "x".repeat(1025);
+        assert!(
+            index
+                .recovery_text_candidates("scope", &too_long, None, 1, &budget)
+                .is_err()
+        );
+        assert!(
+            index
+                .recovery_candidates("scope", &too_long, None, 1, &budget)
+                .is_err()
+        );
         let cancelled = RecoveryWorkBudget::new(Duration::from_secs(2));
         cancelled.cancel();
         for stopped in [cancelled, RecoveryWorkBudget::new(Duration::ZERO)] {

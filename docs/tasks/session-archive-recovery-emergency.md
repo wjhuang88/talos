@@ -1780,3 +1780,32 @@ PR917 at e9f52a55 has no checks and reports DIRTY. Fetched origin/main b524c7a9;
 non-mutating merge-tree identified only docs/decisions/README.md conflict (ADR104
 upstream entry and local ADR106 insertion). No numbering collision. Preserve both.
 Candidate synchronization and fresh validation/native CI remain required.
+
+## 2026-11-17 plain-text recovery query follow-up — Partial
+
+Base PR917 head4b9760b799913be5eeabcf5a7c559a275db0d3f7 previously passed exact-head
+CI43828356349 (8jobs) and independent review. A subsequent combined synthetic-only
+real-provider REPL walkthrough reproduced history recovery Unavailable for ORCHID-7319.
+Read-only synthetic SQLite index reproduced raw FTS no such column:7319; quoted phrase
+matched. Real commit/reopen/discover/search/detail regression failed before correction.
+
+This follow-up treats model queries as text using additive
+SessionIndex::recovery_text_candidates: raw input<=1024UTF-8bytes, bounded internal
+phrase escaping<=2050. Raw recovery_candidates API keeps its original syntax and1024
+limit. Scopes,source seals,permission leases,deadlines,pagination bindings and native
+failure boundary are preserved. Search matching remains linear tokenized phrase versus
+archive case-insensitive containment; no claim of identical byte matching. Empty browse,
+quotes,operators,1024ASCII/quotes/UTF-8 and1025reject are covered. The first agent-only
+escape attempt failed the1024regression and was replaced; failures retained.
+
+Schema description increased request budget and exposed a CLI model-switch fixture
+assumption:32000capacity/output8192 measured25666tokens. Fixture low baseline is now
+40000 with all pressure,output-reserve,history and tool-equality assertions preserved;
+production thresholds unchanged. Combined focused storage17/checkpoint99/child1 and
+CLI fixture tests passed; exact combined commit0e0ee5d3 technical/API/security approved.
+Evidence in primary target/handoff-query-length-red-20261117.log,
+ target/handoff-query-length-focused-20261117.log and
+ target/handoff-pressure-diagnostic-20261117.log. New standalone full/native validation
+and exact-head review remain pending; combined evidence alone does not close them.
+No real-provider semantic success,installation or product merge claimed. This is original
+history-unavailable scope; background continuation remains default-off.

@@ -1016,8 +1016,10 @@ impl History {
                 } else {
                     None
                 };
+                // Keep the original text bound to pagination; storage performs
+                // bounded phrase escaping without shrinking the input limit.
                 let candidates = index
-                    .recovery_candidates(&self.scope, query, after, 20, &budget)
+                    .recovery_text_candidates(&self.scope, query, after, 20, &budget)
                     .ok()?;
                 let mut incomplete = candidates.len() == 20;
                 let mut results = Vec::new();

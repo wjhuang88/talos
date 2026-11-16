@@ -186,6 +186,7 @@ struct HistoryInput {
     #[serde(default)]
     snapshot: Option<String>,
     #[serde(default)]
+    /// Plain text search; FTS operators are not exposed. Matching depends on the storage backend.
     query: Option<String>,
     #[serde(default)]
     reference: Option<String>,
@@ -1043,6 +1044,76 @@ mod tests {
             assert!(!search.is_error, "{}", search.content);
             let result: Value = serde_json::from_str(&search.content).expect("search");
             assert!(result["results"].as_array().expect("results").iter().any(|item| item["text"].as_str().is_some_and(|text| text.contains("durable searchable constraint"))));
+        })).await;
+    }
+
+    #[tokio::test]
+    async fn durable_reopened_history_search_treats_punctuation_as_text() {
+        use crate::checkpoint_history::History;
+        use talos_session::DurableSession;
+        use tokio_util::sync::CancellationToken;
+        let (execution, _, _) = fixture().await;
+        execution.refresh_cooperative(None, &[]).await;
+        let root = tempfile::tempdir().expect("root");
+        let owner = DurableSession::open_or_create(root.path(), "literal-query").expect("owner");
+        let text =
+            "ORCHID-7319 preserves \"source records\"; decision: SQLite; literal OR constraint";
+        owner
+            .commit_turn(
+                "prior",
+                &[
+                    Message::User {
+                        content: text.into(),
+                    },
+                    Message::User {
+                        content: "constraint distractor".into(),
+                    },
+                ],
+                &Default::default(),
+            )
+            .expect("commit");
+        drop(owner);
+        let owner = DurableSession::open_existing(root.path(), "literal-query")
+            .expect("reopen")
+            .expect("owner");
+        let history = History::prepare_cached(
+            &owner,
+            &CancellationToken::new(),
+            &tokio::sync::Mutex::new(None),
+        )
+        .await
+        .expect("history");
+        crate::checkpoint_history::HISTORY.scope(Some(history), EXECUTION.scope(execution, async {
+            let discovery = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+            assert!(!discovery.is_error, "{}", discovery.content);
+            let discovery: Value = serde_json::from_str(&discovery.content).expect("discovery");
+            for query in ["ORCHID-7319", "\"source records\"", "decision: SQLite", "literal OR constraint"] {
+                let search = HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":query})).await;
+                assert!(!search.is_error, "{query}: {}", search.content);
+                let search: Value = serde_json::from_str(&search.content).expect("search");
+                let matches = search["results"].as_array().expect("results");
+                assert_eq!(matches.len(), 1, "{query}: {search}");
+                let detail = HistorySearchTool.execute(json!({"mode":"detail", "snapshot":discovery["snapshot"], "reference":matches[0]["reference"]})).await;
+                assert!(!detail.is_error, "{}", detail.content);
+                let detail: Value = serde_json::from_str(&detail.content).expect("detail");
+                assert_eq!(detail["text"], text);
+            }
+            for (query, count) in [
+                (String::new(), 2),
+                ("   ".into(), 0),
+                ("\"".into(), 0),
+                ("x".repeat(1024), 0),
+                ("\"".repeat(1024), 0),
+                (format!("{}a", "中".repeat(341)), 0),
+            ] {
+                let search = HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":query})).await;
+                assert!(!search.is_error, "{query}: {}", search.content);
+                let search: Value = serde_json::from_str(&search.content).expect("search");
+                assert_eq!(search["results"].as_array().expect("results").len(), count);
+            }
+            let oversized = HistorySearchTool.execute(json!({"mode":"search", "snapshot":discovery["snapshot"], "query":"x".repeat(1025)})).await;
+            assert!(oversized.is_error);
+            assert_eq!(oversized.content, "invalid history query bounds");
         })).await;
     }
 

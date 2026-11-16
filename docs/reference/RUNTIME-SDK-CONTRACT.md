@@ -672,6 +672,13 @@ raw history. See the I313 owner for current implementation and validation status
 ### Model checkpoint tool registration (I313, next minor)
 
 RuntimeBuilder registers `compact_context` and `history_search` by default.
+`history_search.query` is plain text, not an FTS expression. Linear durable history
+uses a safely quoted, tokenized phrase; archive recovery uses case-insensitive text
+containment. Punctuation is never evaluated as an FTS operator. Empty queries retain
+the existing bounded browse behavior; pagination remains bound to the original text.
+The model query limit remains 1024 UTF-8 bytes. `SessionIndex::recovery_text_candidates`
+escapes that bounded input internally; `recovery_candidates` retains its raw FTS
+syntax and original 1024-byte limit.
 A caller registration using either reserved name makes construction fail; it is
 not silently replaced. Low-level Agent hosts explicitly enable these tools.
 Permission checks still govern calls. Model compaction requires Actor admission;
