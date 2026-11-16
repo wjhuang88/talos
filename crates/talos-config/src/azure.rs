@@ -86,16 +86,15 @@ impl AzureTransportConfig {
         if model.is_some_and(|m| m.base_url.is_some()) {
             return Err(AzureTransportError("model endpoint override is forbidden"));
         }
-        if let AzureAuthentication::EntraToken { token_env } = &self.authentication {
-            if token_env.is_empty()
+        if let AzureAuthentication::EntraToken { token_env } = &self.authentication
+            && (token_env.is_empty()
                 || !token_env.bytes().enumerate().all(|(i, b)| {
                     b == b'_' || b.is_ascii_alphabetic() || i > 0 && b.is_ascii_digit()
-                })
-            {
-                return Err(AzureTransportError(
-                    "invalid token environment variable name",
-                ));
-            }
+                }))
+        {
+            return Err(AzureTransportError(
+                "invalid token environment variable name",
+            ));
         }
         let shape = model
             .and_then(|m| m.azure_shape)

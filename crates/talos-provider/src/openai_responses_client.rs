@@ -97,7 +97,6 @@ impl OpenAIResponsesClient {
         self
     }
 
-    #[must_use]
     pub(crate) fn with_azure(
         mut self,
         azure: crate::azure_transport::AzureConnection,

@@ -284,7 +284,7 @@ impl OpenAIProvider {
                 },
             );
             let builder = if let Some(azure) = &self.azure {
-                azure.request(&self.client, &self.api_key, &body)?
+                azure.request(&self.client, &self.api_key, body)?
             } else {
                 self.client
                     .post(self.endpoint_url())

@@ -345,3 +345,13 @@ in models_browser/config/I323. Aborted that rebase, preserved the pre-integratio
 the final Azure delta and rebased it onto `58207831` without conflicts. Cargo.lock is byte-identical
 to main; no dependency upgrade. The prior 345-test pass remains pre-integration evidence. Standard
 `release_preflight.sh` now validates the integrated tree, not assumed equivalent old results.
+
+Integrated-tree preflight attempt 1 passed governance, claim validation, catalog audit, format and
+workspace check, then failed Clippy on Azure's collapsible token-env validation condition. The
+focused retry exposed two further Azure-only lints (needless body borrow and redundant must_use
+on a Result-returning builder). Applied semantics-preserving corrections without lint suppression;
+`cargo clippy --locked --workspace -- -D warnings` then exited 0. These failures remain historical.
+Independent exact-source review approved remote `24f8df4db24c2be8136bb4b4e084714970df6c22` against
+base `58207831675365e35cc80601097b96f9432a68aa`, with shared-account/non-human limits disclosed.
+The subsequent lint and UI provenance documentation corrections require refreshed candidate review.
+Full standard preflight is rerunning; no workspace-test/CI/merge acceptance is claimed yet.
