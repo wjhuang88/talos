@@ -298,3 +298,11 @@ checking explicit resource, deployment alias and api-key exclusivity. Its execut
 README en/zh, ADR-103, SDK contract and unreleased notes now describe bounded catalog inference;
 the fixture README names all 22 current effective IDs. Prior full-catalog rejection is preserved
 as review history, not the final behavior. This is still not the stable implementation candidate.
+
+Current factory→HTTP catalog/override matrix passed all four cases (one test). Actual Agent
+reasoning/image/tool matrices now pass Chat 2 tests (including six-case Agent matrix) and Responses
+9 tests (including three-case Agent matrix): explicit high effort reaches the wire; Chat reasoning
+and completed Responses opaque items reach Agent history; the second Responses request replays
+the same-bound opaque item; accumulated provider TurnEnd usage is asserted (Chat 8/4, Responses
+12/3). This is local controlled evidence, not live vendor or final CI. Cross-destination HTTP replay,
+Chat stream property/negative cases, latest-main preflight and final review remain pending.

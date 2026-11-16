@@ -164,11 +164,14 @@ async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
             let mut fixtures = Vec::new();
             for second in [false, true] {
                 let expected_images = urls.clone();
-                let response = if second {
+                let mut response = if second {
                     json!({"content":"done"})
                 } else {
                     delta.clone()
                 };
+                if !second {
+                    response["reasoning_content"] = json!("azure-reasoning-fixture");
+                }
                 let finish = if !second && protocol == ToolProtocol::Native {
                     "tool_calls"
                 } else {
@@ -186,7 +189,7 @@ async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
                             .filter(|part| part["type"] == "image_url")
                             .filter_map(|part| part["image_url"]["url"].as_str()).collect();
                         images == expected_images && !raw.contains("private-image-")
-                            && body["model"] == "deployment" && raw.contains("AZURE_CHAT_READ_OK") == second
+                            && body["reasoning_effort"] == "high" && body["model"] == "deployment" && raw.contains("AZURE_CHAT_READ_OK") == second
                             && (!second || protocol != ToolProtocol::Native || body["messages"].as_array().expect("messages").iter().any(|m| m["role"] == "tool" && m["tool_call_id"] == "call_read"))
                     })
                     .with_status(200).with_header("content-type", "text/event-stream")
@@ -210,6 +213,11 @@ async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
                         config.model.clone(),
                         ModelConfig {
                             azure_deployment: Some("deployment".into()),
+                            reasoning_supported: Some(true),
+                            reasoning: Some(talos_config::ReasoningOptions {
+                                effort: Some(talos_core::model::ReasoningEffort::High),
+                                ..Default::default()
+                            }),
                             ..Default::default()
                         },
                     )]
@@ -238,9 +246,14 @@ async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
                 Some(Arc::new(engine)),
                 None,
                 workspace,
+            )
+            .with_reasoning_identity(
+                Some("azure-fixture".into()),
+                Some("logical-model".into()),
+                true,
             );
             agent.set_tool_protocol(protocol);
-            let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
             let (answer, history) = tokio::time::timeout(
                 Duration::from_secs(20),
                 agent.run_streaming(
@@ -253,6 +266,16 @@ async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
             .expect("bounded Agent")
             .expect("Agent");
             assert_eq!(answer, "done");
+            assert!(history.iter().any(|m| matches!(m, Message::Assistant { reasoning: Some(r), .. } if !r.blocks.is_empty())));
+            let mut input = 0;
+            let mut output = 0;
+            while let Ok(event) = rx.try_recv() {
+                if let AgentEvent::TurnEnd { usage, .. } = event {
+                    input += usage.input_tokens;
+                    output += usage.output_tokens;
+                }
+            }
+            assert_eq!((input, output), (8, 4));
             assert!(history.iter().any(|m| matches!(m, Message::Tool { result } if !result.is_error && result.content.contains("AZURE_CHAT_READ_OK"))));
             for fixture in fixtures {
                 fixture.assert_async().await;

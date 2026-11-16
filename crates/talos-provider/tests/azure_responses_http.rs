@@ -14,6 +14,13 @@ fn responses_provider(endpoint: String) -> Arc<dyn LanguageModel> {
     azure_provider(endpoint, 0)
 }
 fn azure_provider(endpoint: String, retries: u32) -> Arc<dyn LanguageModel> {
+    azure_provider_with_reasoning(endpoint, retries, false)
+}
+fn azure_provider_with_reasoning(
+    endpoint: String,
+    retries: u32,
+    reasoning: bool,
+) -> Arc<dyn LanguageModel> {
     let mut config = Config::default();
     config.provider = "azure-fixture".into();
     config.model = "gpt-test".into();
@@ -31,6 +38,11 @@ fn azure_provider(endpoint: String, retries: u32) -> Arc<dyn LanguageModel> {
                 config.model.clone(),
                 ModelConfig {
                     azure_deployment: Some("azure-deployment".into()),
+                    reasoning_supported: reasoning.then_some(true),
+                    reasoning: reasoning.then(|| talos_config::ReasoningOptions {
+                        effort: Some(talos_core::model::ReasoningEffort::High),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 },
             )]
@@ -563,10 +575,10 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
                 .filter_map(|item| item["content"].as_array()).flatten()
                 .filter(|part| part["type"] == "input_image").filter_map(|part| part["image_url"].as_str()).collect();
             !raw.contains("AZURE_AGENT_READ_OK") && !raw.contains("private-image-")
-                && images == expected_images && body["model"] == "azure-deployment"
+                && images == expected_images && body["reasoning"]["effort"] == "high" && body["model"] == "azure-deployment"
         })
         .with_status(200).with_header("content-type", "text/event-stream")
-        .with_body(if protocol == ToolProtocol::Native { concat!(
+        .with_body(format!("data: {}\n\n{}", json!({"type":"response.output_item.done","item":{"type":"reasoning","id":"rs_azure","encrypted_content":"opaque-azure-reasoning","summary":[]}}), if protocol == ToolProtocol::Native { concat!(
             "data: {\"type\":\"response.created\"}\n\n",
             "data: {\"type\":\"response.output_item.added\",\"item\":{\"id\":\"fc_read\",\"type\":\"function_call\",\"call_id\":\"call_read\",\"name\":\"read\",\"arguments\":\"\"}}\n\n",
             "data: {\"type\":\"response.function_call_arguments.done\",\"item_id\":\"fc_read\",\"arguments\":\"{\\\"path\\\":\\\"fixture.txt\\\"}\"}\n\n",
@@ -575,7 +587,7 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
         ).to_owned() } else { format!("data: {}\n\ndata: {}\n\n",
             json!({"type":"response.output_text.delta","delta":"<tool_call>{\"name\":\"read\",\"args\":{\"path\":\"fixture.txt\"}}</tool_call>"}),
             json!({"type":"response.completed","response":{"usage":{"input_tokens":4,"output_tokens":2}}}))
-        }).expect(1).create_async().await;
+        })).expect(1).create_async().await;
         let second = server.mock("POST", "/openai/v1/responses")
         .match_header("api-key", "sk-test")
         .match_header("authorization", mockito::Matcher::Missing)
@@ -584,7 +596,8 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
             let images: Vec<&str> = body["input"].as_array().expect("input").iter()
                 .filter_map(|item| item["content"].as_array()).flatten()
                 .filter(|part| part["type"] == "input_image").filter_map(|part| part["image_url"].as_str()).collect();
-            images == urls && !body.to_string().contains("private-image-") && body["model"] == "azure-deployment" && body.to_string().contains("AZURE_AGENT_READ_OK")
+            let reasoning_replayed = body["input"].as_array().expect("input").iter().any(|item| item["type"] == "reasoning" && item["id"] == "rs_azure" && item["encrypted_content"] == "opaque-azure-reasoning");
+            reasoning_replayed && images == urls && !body.to_string().contains("private-image-") && body["reasoning"]["effort"] == "high" && body["model"] == "azure-deployment" && body.to_string().contains("AZURE_AGENT_READ_OK")
                 && (protocol != ToolProtocol::Native || body["input"].as_array().expect("input").iter().any(|item|
                     item["type"] == "function_call_output" && item["call_id"] == "call_read" && item["output"].as_str().is_some_and(|s| s.contains("AZURE_AGENT_READ_OK"))))
         }).with_status(200).with_header("content-type", "text/event-stream")
@@ -596,7 +609,7 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
         )));
         let engine = talos_permission::PermissionEngine::with_workspace_root(workspace.clone());
         let mut agent = talos_agent::Agent::with_security(
-            responses_provider(server.url()),
+            azure_provider_with_reasoning(server.url(), 0, true),
             registry,
             Some(Arc::new(engine)),
             None,
@@ -608,7 +621,7 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
             true,
         );
         agent.set_tool_protocol(protocol);
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let (answer, history) = tokio::time::timeout(
             Duration::from_secs(20),
             agent.run_streaming(
@@ -621,6 +634,18 @@ async fn azure_responses_actual_agent_completes_permission_gated_read() {
         .expect("bounded Agent")
         .expect("Agent round");
         assert_eq!(answer, "done");
+        assert!(history.iter().any(
+            |m| matches!(m, Message::Assistant { reasoning: Some(r), .. } if !r.blocks.is_empty())
+        ));
+        let mut input = 0;
+        let mut output = 0;
+        while let Ok(event) = rx.try_recv() {
+            if let AgentEvent::TurnEnd { usage, .. } = event {
+                input += usage.input_tokens;
+                output += usage.output_tokens;
+            }
+        }
+        assert_eq!((input, output), (12, 3));
         assert!(history.iter().any(|message| matches!(message, Message::Tool { result } if !result.is_error && result.content.contains("AZURE_AGENT_READ_OK"))));
         assert!(
             !serde_json::to_string(&history)
