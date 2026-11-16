@@ -29,3 +29,7 @@ Wire/auth references checked 2026-11-14:
 - https://learn.microsoft.com/en-us/azure/ai-foundry/openai/api-version-lifecycle?tabs=key
 - https://learn.microsoft.com/en-us/rest/api/microsoft-foundry/azureopenai/responses?preserve-view=true&view=rest-microsoft-foundry-v1
 - https://ai-sdk.dev/providers/ai-sdk-providers/azure
+
+Current exact packaged admission (azure provider only):
+
+`gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `gpt-4o`, `gpt-4o-mini`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5.1`, `gpt-5.2`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.5`, `gpt-5.6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-chat-latest`, `o1`, `o3`, `o3-mini`, `o4-mini`.

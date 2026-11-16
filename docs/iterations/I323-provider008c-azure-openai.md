@@ -290,3 +290,11 @@ new external-crate recovery matrix adds model endpoint, invalid/missing profile,
 protocol, custom/alias and legacy exclusions. Current source audit passed. Current Rust execution
 and factory HTTP inference/override tests remain pending. This checkpoint is not a merge candidate
 or final independent approval. No full preflight/CI/closure/release is claimed.
+
+The recovered external-crate Azure config matrix passed both tests (22 actual catalog admissions,
+all added exclusions, overrides, schema and serialization). Added a four-case controlled
+factory→HTTP test for inferred Responses and provider/model Chat/Responses shape overrides,
+checking explicit resource, deployment alias and api-key exclusivity. Its execution is pending.
+README en/zh, ADR-103, SDK contract and unreleased notes now describe bounded catalog inference;
+the fixture README names all 22 current effective IDs. Prior full-catalog rejection is preserved
+as review history, not the final behavior. This is still not the stable implementation candidate.

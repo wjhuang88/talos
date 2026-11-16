@@ -329,6 +329,7 @@ Azure 实现候选（I323 / #914）通过显式 `azure-openai` 配置支持模�
 [SDK 契约](docs/reference/RUNTIME-SDK-CONTRACT.md)。当前仍待完整验收，未发布，也不代表
 已完成真实 Azure 服务验收。
 
+固定目录审计仅允许 22 个精确 Azure 模型组合在有效的显式 v1 资源配置下推断 Responses；显式协议及消息体配置优先。
 
 ## 运行 Talos
 

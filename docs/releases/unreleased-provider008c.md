@@ -3,7 +3,8 @@
 I323 / #914 adds explicit Azure OpenAI transport profiles over the existing Chat and Responses
 message builders and streaming parsers. V1 supports both bodies; explicitly versioned deployment
 paths support Chat. Model-local body selection overrides the profile default, with conservative
-Chat fallback. Deployment aliases do not replace logical model identity.
+Chat fallback. A frozen catalog audit admits 22 exact Azure/model pairs for Responses only
+with a valid explicit v1 resource profile and no endpoint overrides. Deployment aliases do not replace logical model identity.
 
 API-key and supplied Entra-token profiles use mutually exclusive headers. Tokens are read from the
 specified environment variable only at dispatch; missing or invalid values fail without API-key

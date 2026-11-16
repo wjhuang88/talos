@@ -799,3 +799,8 @@ For an explicit Entra supplied-token profile, legacy `Config::api_key()` returns
 the transport acquires the named environment token at dispatch. This is not an anonymous request
 or API-key fallback. See PROVIDER-PROTOCOLS for configuration and acquisition limitations.
 Implementation acceptance, catalog/UI and full SDK validation remain tracked in I323/#914.
+
+`Config::resolve_azure_body_shape(provider, model)` reports the effective Azure body and its
+Configured/CatalogInferred/Default source without reading credentials. Hosts should use this
+resolver for display instead of treating an omitted profile shape as always Chat. The 22 reviewed
+exact Azure pairs require valid explicit v1 profiles; resource destinations are never inferred.
