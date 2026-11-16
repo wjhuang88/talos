@@ -136,7 +136,7 @@ impl AzureTransportConfig {
                 "expected HTTPS resource origin without path, credentials, query or fragment",
             ));
         }
-        if !identifier(deployment) {
+        if !deployment_identifier(deployment) {
             return Err(AzureTransportError("invalid deployment identifier"));
         }
         match &self.api {
@@ -159,6 +159,17 @@ impl AzureTransportConfig {
         }
         Ok(url)
     }
+}
+
+// Internal dots support deployment names such as gpt-4.1; dot segments are forbidden.
+fn deployment_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value != "."
+        && value != ".."
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
 }
 
 fn identifier(value: &str) -> bool {
@@ -204,7 +215,7 @@ mod tests {
             p.request_url(AzureBodyShape::Responses, "deployment-1")
                 .is_err()
         );
-        for id in ["", "../x", "x/y", "x?key=secret", "x%2fy"] {
+        for id in ["", ".", "..", "../x", "x/y", "x?key=secret", "x%2fy"] {
             assert!(p.request_url(AzureBodyShape::Chat, id).is_err());
         }
     }

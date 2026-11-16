@@ -299,8 +299,10 @@ azure_deployment = "production"
 ```
 
 The default v1 mode sends `/openai/v1/chat/completions` or `/openai/v1/responses` with the deployment
-in body `model`. Model shape overrides provider shape; omission currently defaults to Chat.
-Azure catalog inference has not yet been admitted. A deployment alias defaults to the logical model.
+in body `model`. Model shape overrides provider shape; reviewed catalog evidence follows, then Chat.
+The frozen Azure audit admits 22 exact packaged azure/model pairs for Responses with a valid
+explicit v1 profile and no provider/model endpoint replacement. Explicit protocol/shape wins;
+custom providers, aliases, legacy mode and unreviewed models remain excluded. A deployment alias defaults to the logical model.
 For explicit dated Chat compatibility, add `[providers.azure-work.azure.api]`, `mode = "deployment"`
 and `api_version = "2024-10-21"`. This routes through
 `/openai/deployments/{deployment}/chat/completions?api-version=...`; Responses is rejected in this mode.

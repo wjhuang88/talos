@@ -273,3 +273,20 @@ models.dev's HTTP API returned 403; Git checkout succeeded at a5458bdc8326d99561
 Its Azure schema-2 entries contain multiple wire families and per-API overrides, so the old blanket
 SDK-name inference is not justified. The evidence fixture/audit is being restored separately;
 no new automatic inference, catalog regeneration or vendor endpoint substitution is claimed.
+
+### 2026-11-16 catalog recovery and admission checkpoint
+
+Restored fixed upstream 888c250133b38839c2018d66fe687cb03c03a8f2 and exact fixture hashes after
+workspace reset. Independent review rejected the initial blanket explicit-only conclusion:
+translator toV1Api selects the first authored API and toV1Shape recognizes Azure Responses default.
+All 27 Responses-bearing records select it first without endpoint/SDK override; 22 intersect the
+packaged catalog unchanged. Runtime now gates that exact intersection on azure provider, valid
+explicit v1 profile and no endpoint overrides. Explicit protocol/shape remains higher priority.
+Factory and browser share body-shape resolution. Dotted deployment names work; dot segments and
+path escape characters remain rejected, and api-version retains its separate strict validation.
+
+Prior local catalog tests passed after correcting the overly narrow deployment validator; the
+new external-crate recovery matrix adds model endpoint, invalid/missing profile, non-Azure model
+protocol, custom/alias and legacy exclusions. Current source audit passed. Current Rust execution
+and factory HTTP inference/override tests remain pending. This checkpoint is not a merge candidate
+or final independent approval. No full preflight/CI/closure/release is claimed.

@@ -112,12 +112,18 @@ fn build_with_connection(
             let profile = provider_config.azure.as_ref().ok_or_else(|| {
                 ProviderError::InvalidResponse("Azure resource profile is required".into())
             })?;
+            let mut profile = profile.clone();
+            profile.shape = Some(
+                config
+                    .resolve_azure_body_shape(&config.provider, &config.model)
+                    .protocol,
+            );
             let settings = provider_config.models.get(&config.model);
             let (shape, _, _) = profile
                 .resolve_model(&config.model, settings)
                 .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
             let azure =
-                crate::azure_transport::AzureConnection::new(profile, &config.model, settings)?;
+                crate::azure_transport::AzureConnection::new(&profile, &config.model, settings)?;
             match shape {
                 talos_config::AzureBodyShape::Chat => Ok(Arc::new(
                     OpenAIProvider::new(api_key, &config.model)

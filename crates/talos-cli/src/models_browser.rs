@@ -345,14 +345,19 @@ fn build_browser_rows(config: &Config) -> Vec<CatalogBrowserRow> {
                             {
                                 format!("{family}; invalid Azure profile")
                             } else {
+                                let resolution = config.resolve_azure_body_shape(&provider, &model.id);
+                                let mut profile = profile.clone();
+                                profile.shape = Some(resolution.protocol);
                                 match profile.resolve_model(&model.id, model_config) {
                                     Ok((shape, _, _)) => {
                                         let source = if model_config
                                             .is_some_and(|m| m.azure_shape.is_some())
                                         {
                                             "model configuration"
-                                        } else if profile.shape.is_some() {
+                                        } else if resolution.source == talos_config::ProtocolResolutionSource::Configured {
                                             "provider configuration"
+                                        } else if resolution.source == talos_config::ProtocolResolutionSource::CatalogInferred {
+                                            "catalog"
                                         } else {
                                             "default"
                                         };

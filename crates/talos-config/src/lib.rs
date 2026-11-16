@@ -10,6 +10,7 @@ pub mod variant;
 
 mod atomic_file;
 mod azure;
+mod azure_catalog;
 pub use azure::{
     AzureApiMode, AzureAuthentication, AzureBodyShape, AzureTransportConfig, AzureTransportError,
 };
