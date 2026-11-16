@@ -168,3 +168,23 @@ acceptance, `docs/backlog/PRODUCT-BACKLOG.md` is derived inventory and the
 Issue reconciliation matrix records remote status. Rollback of this documentary
 proposal requires only removal/reversion of its new documents and references.
 No runtime or user configuration migration is performed.
+
+## Maintainer implementation direction — 2026-11-16 (D3-T3 / #957)
+
+[SEARCH-001-D3-T3 / #957](SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md)
+records the **desired zero-key Bing HTML product design**: within the same Bing family,
+attempt `www.bing.com/search` (non-CN) first and use current `cn.bing.com/search`
+only for correctly classified, permitted *unavailability*. Bare `bing.cn` stays
+unadmitted. Existing higher-level DDG Lite → Instant Answer → DDG HTML → Bing order
+is **not** changed by this endpoint-variant preference.
+
+Its proposed [I329](../../iterations/I329-search-bing-dual-host-offline.md)
+claim covers **offline-only** failover decision logic and tests, not a new
+Network endpoint, live request, distribution, route switch, Browser/CDP integration,
+rights grant or product-default activation. In particular no 429/challenge/403
+fallback is allowed as an access-control evasion. New `www` HTTP traffic still needs
+written applicable access **and output-use rights**, independently accepted
+ADR-090 authority/budget, actual permitted mainland-China/comparator evidence,
+separate effective source/activation claim, exact-head CI and security/API review.
+D3/#937 stays Intake / Unclaimed; Epic #624 stays Open, D/#644 ZERO-ADMISSION and
+E/F/G/I are unchanged.
