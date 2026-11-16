@@ -26,7 +26,7 @@
 | Governance Claim PR | #958 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance PR #958 accepted/merged `58207831675365e35cc80601097b96f9432a68aa` after exact-head [CI #4273](https://github.com/wjhuang88/talos/actions/runs/43805545051) 4 applicable SUCCESS/4 documentation-scoped SKIPPED, independent [no-blocker review](https://github.com/wjhuang88/talos/pull/958#issuecomment-6907540766) and head CAS. |
-| Implementation PR | In preparation on `feat/i329-search-bing-offline-failover` (source PR not yet accepted) |
+| Implementation PR | #959 |
 | Last Updated | 2026-11-16 (post-claim activation) |
 | Handoff / Release Condition | Do not start source before effective I329 claim. T3a closeout may describe only offline model acceptance, not product route. T3b remains blocked on additional rights/authority/region gates. |
 
