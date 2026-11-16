@@ -5827,3 +5827,131 @@ async fn successful_old_workspace_scan_cannot_publish_after_switch() {
     );
     wait_for_test_slot().await;
 }
+
+#[test]
+fn queued_body_survives_long_live_preview_frame_allocation() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.state.status.is_processing = true;
+    tui.state.thinking_preview = Some("live thinking ".repeat(100));
+    tui.state.tip = Some(crate::state::Tip {
+        kind: TipKind::Info,
+        text: "Message queued and will run next".into(),
+        ttl: std::time::Duration::from_secs(30),
+        created_at: std::time::Instant::now(),
+    });
+    tui.state.steering_queue_snapshot = Some(talos_conversation::SteeringQueueSnapshot {
+        entries: vec![talos_conversation::SteeringQueueEntry {
+            text: "queued-body-visible".into(),
+            truncated: false,
+        }],
+        total_count: 1,
+        omitted_count: 0,
+    });
+    for size in [(80, 8), (24, 6)] {
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(size.0, size.1));
+        tui.draw_frame().expect("frame");
+        let frame = tui.terminal.test_rendered_text();
+        assert!(frame.contains("queued-body-visible"), "{size:?}: {frame}");
+    }
+}
+
+#[test]
+fn user_history_background_is_separated_from_connecting_preview() {
+    use talos_conversation::{ContentOutput, UiOutput};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.state.status.is_processing = true;
+    tui.state.status.phase = Some(TurnPhase::Connecting);
+    tui.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+        source: MessageSource::User,
+        text: "分析项目".into(),
+    }));
+    tui.commit_pending_transcript().expect("commit user block");
+    for (width, height) in [(24, 12), (80, 24), (24, 24), (24, 12)] {
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(width, height));
+        tui.draw_frame().expect("connecting frame");
+        let frame = tui.terminal.test_rendered_text();
+        let rows: Vec<_> = frame.lines().collect();
+        let user = rows
+            .iter()
+            .position(|row| {
+                row.split_whitespace()
+                    .collect::<String>()
+                    .contains("分析项目")
+            })
+            .unwrap_or_else(|| panic!("user visible: {frame}"));
+        let connecting = rows
+            .iter()
+            .position(|row| row.contains("Connecting..."))
+            .unwrap_or_else(|| panic!("connecting visible: {frame}"));
+        let user_bg = tui.terminal.test_cell_bg(0, user as u16);
+        assert_ne!(user_bg, Color::Reset);
+        let block_end = (user..connecting)
+            .rev()
+            .find(|row| tui.terminal.test_cell_bg(0, *row as u16) == user_bg)
+            .expect("user background end");
+        assert!(
+            connecting > block_end + 1,
+            "background padding is not an external separator at {width}x{height}: {frame}"
+        );
+        assert!(rows[block_end + 1].trim().is_empty());
+        assert!(
+            tui.history_selection_point_at_screen(0, user as u16)
+                .is_some(),
+            "user text retains history selection mapping after resize"
+        );
+        assert!(
+            tui.history_selection_point_at_screen(0, (block_end + 1) as u16)
+                .is_none(),
+            "the external separator must not select a history row"
+        );
+        assert_eq!(
+            tui.terminal.test_cell_bg(0, (block_end + 1) as u16),
+            Color::Reset
+        );
+    }
+}
+
+#[test]
+fn user_preview_separator_is_absent_when_history_is_anchored() {
+    use talos_conversation::{ContentOutput, UiOutput};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.state.status.is_processing = true;
+    tui.state.status.phase = Some(TurnPhase::Connecting);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(40, 12));
+    for n in 0..30 {
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+            source: MessageSource::User,
+            text: format!("history {n}"),
+        }));
+    }
+    tui.commit_pending_transcript().expect("commit history");
+    tui.draw_frame().expect("follow-tail frame");
+    let preview_row = |tui: &crate::app::Tui| {
+        tui.terminal
+            .test_rendered_text()
+            .lines()
+            .position(|row| row.contains("Connecting..."))
+            .expect("connecting preview") as u16
+    };
+    assert_eq!(
+        preview_row(&tui),
+        tui.last_history_area.expect("history").bottom() + 1
+    );
+    tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+    tui.draw_frame().expect("anchored frame");
+    assert!(matches!(
+        tui.history_scroll.mode,
+        HistoryScrollMode::Anchored { .. }
+    ));
+    assert_eq!(
+        preview_row(&tui),
+        tui.last_history_area.expect("anchored history").bottom(),
+        "an offscreen user tail does not add a separator to anchored history"
+    );
+}

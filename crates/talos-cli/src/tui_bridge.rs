@@ -349,6 +349,7 @@ pub(crate) async fn run_conversation_loop(mut engine: ConversationEngine, io: Co
                             // Clear the prior session's non-persistent auto override only after
                             // the replacement runtime is authoritative.
                             engine.reset_auto_override();
+                            reset_submission_preview(&mut engine, &ui_tx);
                             if !engine.pending_image_attachments.is_empty() {
                                 pending_attachment_generation = Some(sender_generation);
                                 send_bridge_stream(
@@ -1176,6 +1177,7 @@ async fn handle_session_event(
                 emit_bridge_error(ui_tx, "ignored stale paused-submission resolution");
                 return;
             }
+            clear_submission_preview(engine, ui_tx, &submission_id);
             *turn_state = deferred_accepted.take().map_or(
                 BridgeTurnState::Idle,
                 DeferredAcceptedSubmission::into_turn_state,
@@ -1224,6 +1226,7 @@ async fn handle_session_event(
                     && accepted.receipt_id == receipt_id
             });
             if matches_active || matches_deferred {
+                clear_submission_preview(engine, ui_tx, &submission_id);
                 if matches_active {
                     *turn_state = deferred_accepted.take().map_or(
                         BridgeTurnState::PreStartFailed,
@@ -1297,7 +1300,9 @@ fn handle_submission_receipt(
                     PendingSubmissionState::AcceptedPending | PendingSubmissionState::PausedPending,
                 ..
             } => {
-                if receipt_id.is_empty() || !engine.commit_prepared_steering(&submission_id) {
+                if receipt_id.is_empty()
+                    || !engine.commit_prepared_steering_with_preview(&submission_id)
+                {
                     *boundary_submission = Some(boundary);
                     emit_bridge_error(
                         ui_tx,
@@ -1430,6 +1435,7 @@ fn handle_submission_receipt(
                 *turn_state = BridgeTurnState::PausedAfterFailure;
                 return;
             }
+            clear_submission_preview(engine, ui_tx, &submission.id);
             *turn_state = BridgeTurnState::PausedAfterFailure;
             emit_bridge_error(
                 ui_tx,
@@ -1464,7 +1470,7 @@ fn commit_actor_custody(
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
     submission: &StructuredSubmission,
 ) -> bool {
-    if !engine.commit_prepared_steering(&submission.id) {
+    if !engine.commit_prepared_steering_with_preview(&submission.id) {
         emit_bridge_error(
             ui_tx,
             "durable receipt did not match the frozen Engine reservation",
@@ -1478,11 +1484,35 @@ fn commit_actor_custody(
     true
 }
 
+fn reset_submission_preview(
+    engine: &mut ConversationEngine,
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+) {
+    engine.reset_accepted_steering_preview();
+    let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
+        engine.steering_queue_snapshot(),
+    ));
+    let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+}
+
+fn clear_submission_preview(
+    engine: &mut ConversationEngine,
+    ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
+    submission_id: &str,
+) {
+    engine.clear_accepted_steering_preview(submission_id);
+    let _ = ui_tx.send(UiOutput::SteeringQueueSnapshot(
+        engine.steering_queue_snapshot(),
+    ));
+    let _ = ui_tx.send(UiOutput::Status(engine.status_snapshot()));
+}
+
 fn emit_submission_projection(
     engine: &mut ConversationEngine,
     ui_tx: &tokio::sync::mpsc::UnboundedSender<UiOutput>,
     submission: &StructuredSubmission,
 ) {
+    clear_submission_preview(engine, ui_tx, &submission.id);
     for item in &submission.items {
         for output in engine.start_user_message(&item.text) {
             let _ = ui_tx.send(output);
@@ -2096,7 +2126,7 @@ mod boundary_submission_tests {
                 let (sender, mut commands) = tokio::sync::mpsc::channel(8);
                 crate::session_transition::register_generation_bound_sender(&sender, 7);
                 let (_watch_tx, watch_rx) = tokio::sync::watch::channel(sender);
-                let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+                let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
                 let mut engine = ConversationEngine::new("model".into(), "provider".into());
                 engine.enqueue_steering("retained".into());
                 let mut boundary = None;
@@ -2187,6 +2217,22 @@ mod boundary_submission_tests {
                 if !receipt_first {
                     receive(&mut engine, &mut state, &mut boundary, &mut deferred);
                 }
+                // Actor custody must not erase a still-unexecuted user message
+                // from the queue shown by the TUI, including paused/error paths.
+                let mut displayed_queue = None;
+                while let Ok(output) = ui_rx.try_recv() {
+                    if let UiOutput::SteeringQueueSnapshot(snapshot) = output {
+                        displayed_queue = Some(snapshot);
+                    }
+                }
+                let displayed_queue = displayed_queue.expect("queue presentation after receipt");
+                assert!(
+                    displayed_queue
+                        .entries
+                        .iter()
+                        .any(|entry| entry.text == "retained"),
+                    "accepted but uninjected input disappeared: receipt_first={receipt_first}, cancelled={cancelled}"
+                );
                 if cancelled {
                     assert!(
                         matches!(&state, BridgeTurnState::AcceptedByActor { submission_id, .. } if submission_id == &submission.id)
@@ -2215,7 +2261,7 @@ mod boundary_submission_tests {
         engine.enqueue_steering("first".into());
         let mut submission = engine.prepare_steering_submission().expect("first batch");
         submission.sender_generation = 7;
-        assert!(engine.commit_prepared_steering(&submission.id));
+        assert!(engine.commit_prepared_steering_with_preview(&submission.id));
         engine.enqueue_steering("later".into());
         let mut deferred = Some(DeferredAcceptedSubmission {
             session_id: "session".into(),
@@ -2260,6 +2306,9 @@ mod boundary_submission_tests {
             matches!(state, BridgeTurnState::StructuredRunning { turn_id, .. } if turn_id == "turn")
         );
         assert!(deferred.is_none());
+        let snapshot = engine.steering_queue_snapshot();
+        assert_eq!(snapshot.total_count, 1);
+        assert_eq!(snapshot.entries[0].text, "later");
         assert!(boundary.is_some());
         let SessionOp::SubmitStructured { submission } =
             commands.try_recv().expect("later submission")
@@ -2268,6 +2317,152 @@ mod boundary_submission_tests {
         };
         assert_eq!(submission.items[0].text, "later");
         assert_eq!(submission.sender_generation, 7);
+    }
+
+    #[tokio::test]
+    async fn accepted_preview_clears_only_for_correlated_terminal_resolution() {
+        for terminal in [
+            PendingSubmissionState::TerminalCancelled,
+            PendingSubmissionState::TerminalError,
+        ] {
+            let (mut sender, _commands) = tokio::sync::mpsc::channel(8);
+            let (_watch_tx, watch_rx) = tokio::sync::watch::channel(sender.clone());
+            let (ui_tx, mut ui_rx) = tokio::sync::mpsc::unbounded_channel();
+            let mut engine = ConversationEngine::new("model".into(), "provider".into());
+            engine.enqueue_steering("pending-body".into());
+            let submission = engine.prepare_steering_submission().expect("prepared");
+            assert!(engine.commit_prepared_steering_with_preview(&submission.id));
+            let mut state = BridgeTurnState::PreStartPaused {
+                session_id: "session".into(),
+                session_generation: 7,
+                submission_id: submission.id.clone(),
+                receipt_id: "receipt".into(),
+            };
+            let mut deferred = None;
+            let mut boundary = None;
+            let mut generation = 7;
+            for receipt in ["stale", "receipt"] {
+                handle_session_event(
+                    SessionEvent::SubmissionResolved {
+                        session_id: "session".into(),
+                        session_generation: 7,
+                        submission_id: submission.id.clone(),
+                        receipt_id: receipt.into(),
+                        state: terminal,
+                    },
+                    &mut engine,
+                    &mut state,
+                    &mut deferred,
+                    &mut boundary,
+                    &watch_rx,
+                    &mut sender,
+                    &mut generation,
+                    &ui_tx,
+                )
+                .await;
+                assert_eq!(
+                    engine.steering_queue_snapshot().total_count,
+                    usize::from(receipt == "stale")
+                );
+            }
+            let mut last_snapshot = None;
+            while let Ok(output) = ui_rx.try_recv() {
+                if let UiOutput::SteeringQueueSnapshot(snapshot) = output {
+                    last_snapshot = Some(snapshot);
+                }
+            }
+            assert_eq!(last_snapshot.expect("terminal presentation").total_count, 0);
+            assert!(
+                !engine.has_steering(),
+                "terminal preview must never be requeued"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn replacement_sender_discards_old_preview_without_requeuing_it() {
+        let (mut old_sender, _old_rx) = tokio::sync::mpsc::channel(4);
+        let (new_sender, mut new_rx) = tokio::sync::mpsc::channel(4);
+        crate::session_transition::register_generation_bound_sender(&new_sender, 8);
+        let (_watch_tx, watch_rx) = tokio::sync::watch::channel(new_sender);
+        let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut engine = ConversationEngine::new("model".into(), "provider".into());
+        engine.enqueue_steering("old-actor-owned".into());
+        let old = engine.prepare_steering_submission().expect("old");
+        assert!(engine.commit_prepared_steering_with_preview(&old.id));
+        engine.enqueue_steering("new-engine-owned".into());
+        dispatch_prepared_submission(
+            &mut engine,
+            &mut BridgeTurnState::Idle,
+            &watch_rx,
+            &mut old_sender,
+            &mut 7,
+            &ui_tx,
+            QueuedDispatch::CurrentRoute,
+        )
+        .await;
+        let SessionOp::SubmitStructured { submission } = new_rx.try_recv().expect("new batch")
+        else {
+            panic!("structured submission");
+        };
+        assert_eq!(submission.items.len(), 1);
+        assert_eq!(submission.items[0].text, "new-engine-owned");
+        assert!(engine.commit_prepared_steering_with_preview(&submission.id));
+        assert_eq!(engine.steering_queue_snapshot().total_count, 1);
+        assert_eq!(
+            engine.steering_queue_snapshot().entries[0].text,
+            "new-engine-owned"
+        );
+    }
+
+    #[test]
+    fn reconciled_running_or_terminal_receipt_does_not_leave_queued_preview() {
+        for recovered in [
+            PendingSubmissionState::Running,
+            PendingSubmissionState::Committed,
+            PendingSubmissionState::TerminalCancelled,
+            PendingSubmissionState::TerminalError,
+        ] {
+            let (sender, _rx) = tokio::sync::mpsc::channel(4);
+            let (_watch_tx, watch_rx) = tokio::sync::watch::channel(sender.clone());
+            let (ui_tx, _ui_rx) = tokio::sync::mpsc::unbounded_channel();
+            let mut engine = ConversationEngine::new("model".into(), "provider".into());
+            engine.enqueue_steering("reconciled".into());
+            let mut submission = engine.prepare_steering_submission().expect("prepared");
+            submission.sender_generation = 7;
+            let mut state = BridgeTurnState::Submitting {
+                submission: submission.clone(),
+                session_id: Some("session".into()),
+                sender_generation: 7,
+                command_sender: sender,
+                cancel_requested: false,
+                last_reconcile: Instant::now(),
+                reconcile_attempts: 0,
+            };
+            handle_submission_receipt(
+                &mut engine,
+                &mut state,
+                &mut None,
+                &mut None,
+                &watch_rx,
+                &ui_tx,
+                "session".into(),
+                7,
+                submission.id.clone(),
+                format!("reservation:{}", submission.id),
+                "receipt".into(),
+                SubmissionSource::User,
+                submission.items.len(),
+                submission.total_text_bytes(),
+                SubmissionReceiptDisposition::AlreadyAccepted {
+                    state: recovered,
+                    turn_id: None,
+                },
+            );
+            assert!(matches!(state, BridgeTurnState::PausedAfterFailure));
+            assert!(!engine.has_steering());
+            assert_eq!(engine.steering_queue_snapshot().total_count, 0);
+        }
     }
 
     #[test]
@@ -2526,6 +2721,7 @@ async fn dispatch_prepared_submission(
         };
         *sender_generation = current_generation;
         *known_sender = current_sender.clone();
+        reset_submission_preview(engine, ui_tx);
     }
     if let QueuedDispatch::Generation(expected_generation) = dispatch
         && *sender_generation != expected_generation

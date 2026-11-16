@@ -7,6 +7,8 @@ use crate::scrollback::BottomPanelPlacement;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ComponentMetrics {
     pub(crate) preview: u16,
+    /// Separate a completed user background block from a live preview.
+    pub(crate) separate_preview: bool,
     pub(crate) queue: u16,
     pub(crate) tips: u16,
     pub(crate) panel_required: u16,
@@ -54,6 +56,7 @@ impl LayoutCache {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct AllocatedComponentHeights {
     history: u16,
+    preview_gap: u16,
     preview: u16,
     queue: u16,
     tips: u16,
@@ -98,6 +101,8 @@ fn allocate_heights(total: u16, metrics: ComponentMetrics) -> AllocatedComponent
     let composer = take(u16::from(metrics.composer > 0));
     let status = take(1);
     let panel_required = take(metrics.panel_required.min(metrics.panel_preferred));
+    // Preserve the queued message, not only its count, before optional spacing.
+    let queue_minimum = take(metrics.queue.min(2));
     let composer_top_pad = take(u16::from(metrics.composer > 0));
     let composer_bottom_pad = take(u16::from(metrics.composer > 0));
     let tips = take(metrics.tips);
@@ -106,7 +111,13 @@ fn allocate_heights(total: u16, metrics: ComponentMetrics) -> AllocatedComponent
     let preview_minimum = take(u16::from(metrics.preview > 0));
     let preview_extra = take(metrics.preview.saturating_sub(preview_minimum));
     let preview = preview_minimum.saturating_add(preview_extra);
-    let queue = take(metrics.queue);
+    let queue = queue_minimum.saturating_add(take(metrics.queue.saturating_sub(queue_minimum)));
+    // This optional gap cannot displace queue content, required controls, or
+    // the last visible history row in a short terminal.
+    let preview_gap = u16::from(
+        metrics.separate_preview && preview > 0 && metrics.history_cap != Some(0) && remaining > 1,
+    );
+    remaining = remaining.saturating_sub(preview_gap);
     let history = match metrics.history_cap {
         Some(cap) => remaining.min(cap),
         None => remaining,
@@ -114,6 +125,7 @@ fn allocate_heights(total: u16, metrics: ComponentMetrics) -> AllocatedComponent
 
     AllocatedComponentHeights {
         history,
+        preview_gap,
         preview,
         queue,
         tips,
@@ -141,6 +153,7 @@ fn place_rects(
     };
 
     let history = take(heights.history);
+    let _preview_gap = take(heights.preview_gap);
     let preview = take(heights.preview);
     let queue = take(heights.queue);
     let tips = take(heights.tips);
@@ -190,6 +203,7 @@ mod tests {
                 for height in 0..8 {
                     let metrics = super::ComponentMetrics {
                         preview: height,
+                        separate_preview: false,
                         queue: height / 2,
                         tips: 1,
                         panel_required: height.min(4),
@@ -209,6 +223,7 @@ mod tests {
     fn metrics() -> ComponentMetrics {
         ComponentMetrics {
             preview: 1,
+            separate_preview: false,
             queue: 2,
             tips: 1,
             panel_required: 2,
@@ -238,6 +253,50 @@ mod tests {
         }
         for pair in visible.windows(2) {
             assert!(pair[0].bottom() <= pair[1].y);
+        }
+    }
+
+    #[test]
+    fn user_preview_gap_preserves_queue_and_required_controls_at_short_heights() {
+        for height in 0..=24 {
+            for history_cap in [None, Some(0), Some(3)] {
+                for placement in [
+                    BottomPanelPlacement::AboveInput,
+                    BottomPanelPlacement::BelowInput,
+                ] {
+                    let base = ComponentMetrics {
+                        history_cap,
+                        ..metrics()
+                    };
+                    let without = compute_app_layout(Size::new(24, height), base, placement);
+                    let with = compute_app_layout(
+                        Size::new(24, height),
+                        ComponentMetrics {
+                            separate_preview: true,
+                            ..base
+                        },
+                        placement,
+                    );
+                    for (a, b) in [
+                        (without.queue, with.queue),
+                        (without.panel, with.panel),
+                        (without.composer, with.composer),
+                        (without.status, with.status),
+                        (without.preview, with.preview),
+                    ] {
+                        assert_eq!(a.map(|rect| rect.height), b.map(|rect| rect.height));
+                    }
+                    if let (Some(history), Some(preview)) = (with.history, with.preview) {
+                        let gap = preview.y - history.bottom();
+                        let room_for_gap = without.history.is_some_and(|rect| rect.height > 1);
+                        assert_eq!(gap, u16::from(room_for_gap));
+                        assert!(history.height >= 1);
+                    } else if with.history.is_none() {
+                        assert_eq!(without.preview.map(|r| r.y), with.preview.map(|r| r.y));
+                    }
+                    assert_bounded_and_ordered(with);
+                }
+            }
         }
     }
 
@@ -344,11 +403,12 @@ mod tests {
     }
 
     #[test]
-    fn dynamic_preview_yields_to_full_panel_and_composer_then_queue() {
+    fn dynamic_preview_reserves_queue_body_after_panel_and_composer() {
         let layout = compute_app_layout(
             Size::new(80, 14),
             ComponentMetrics {
                 preview: 6,
+                separate_preview: false,
                 queue: 4,
                 tips: 1,
                 panel_required: 2,
@@ -361,8 +421,8 @@ mod tests {
 
         assert_eq!(layout.panel.map(|rect| rect.height), Some(4));
         assert_eq!(layout.composer.map(|rect| rect.height), Some(3));
-        assert_eq!(layout.preview.map(|rect| rect.height), Some(3));
-        assert!(layout.queue.is_none());
+        assert_eq!(layout.preview.map(|rect| rect.height), Some(1));
+        assert_eq!(layout.queue.map(|rect| rect.height), Some(2));
         assert_bounded_and_ordered(layout);
     }
 }

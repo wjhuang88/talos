@@ -253,7 +253,7 @@ impl Tui {
 
         let input_natural = self.composer_height_cache.height(state, width);
         let modal_natural = bottom_panel.height_hint(width);
-        let fixed_heights = tips_h
+        let mut fixed_heights = tips_h
             + input_pad_top.height_hint(width)
             + input_pad_bot.height_hint(width)
             + status_comp.height_hint(width);
@@ -263,6 +263,20 @@ impl Tui {
             max_rows: 6,
         }
         .height_hint(width);
+
+        if queue_natural > 0 {
+            // Optional padding and tips must not compress the queue to its
+            // header before the final layout can reserve a body row.
+            let content_floor = modal_natural
+                .saturating_add(input_natural)
+                .saturating_add(queue_natural.min(2));
+            fixed_heights = fixed_heights.min(
+                screen_size
+                    .height
+                    .saturating_sub(content_floor)
+                    .max(status_comp.height_hint(width)),
+            );
+        }
 
         let content_budget = screen_size.height.saturating_sub(fixed_heights);
         let compressed = crate::scrollback::compress_layout(
@@ -316,6 +330,12 @@ impl Tui {
             screen_size,
             ComponentMetrics {
                 preview: preview_h,
+                separate_preview: follows_tail
+                    && self.transcript.entries().last().is_some_and(|entry| {
+                        matches!(&entry.block, TranscriptBlock::StyledLine(line)
+                            if line.bg.is_some()
+                                && line.bg == crate::scrollback::stream_bg_for(Some(&talos_conversation::MessageSource::User)))
+                    }),
                 queue: queue_h,
                 tips: tips_h,
                 panel_required: if state.slash_menu.is_credential_input()

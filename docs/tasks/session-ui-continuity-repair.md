@@ -1,6 +1,6 @@
 # SESSION-UI-001 — Queue visibility and user-history continuity repair
 
-Status: Active / Claimed proposed via #952; ineffective until this governance record merges to main.
+Status: Review. Claim #952 is effective on main; local implementation and standard validation passed, remote review/CI and native acceptance remain open.
 Owner: this document. Source: the maintainer's existing session-recovery handoff and
 reported missing queued text / missing blank row after user input.
 Primary-worktree source: `docs/tasks/2026-11-11-session-recovery-handoff.md`,
@@ -35,8 +35,8 @@ this task does not reopen them or borrow their closed claims.
 | Governance Claim PR | #952 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer requested completion of the existing handoff; effective target-branch claim required before committed implementation |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-15 |
+| Implementation PR | Stable candidate preparation; not yet opened |
+| Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Effective claim, isolated source validation, exact-head review/CI and native terminal acceptance |
 
 ## Hard constraints and implementation boundary
@@ -110,3 +110,84 @@ Local scope review found no blocker; follow-tail, selection/resize and correlate
 terminal-cleanup acceptance were clarified before publication. Initial governance
 validation passed with zero warnings; claim validation passed with one pre-existing
 SEARCH-001-D3 documentation-intake warning outside this work slice.
+
+## 2026-11-16 effective claim and isolated implementation — Partial
+
+Maintainer explicitly authorized governance merge. Claim #952 became effective at
+36eb752844e24a15ed295532d186d3bb6027c458. Implementation branch
+fix/session-ui-continuity-20261116 starts from later main e1cbee1e in the isolated
+worktree target/session-ui-implementation-20261116. The primary dirty worktree,
+original session data, migration backup and retained patches remain preserved.
+
+The candidate reserves queue header/body rows before optional spacing and adds an
+unshaded separator only at a FollowTail user-background tail before live preview.
+Accepted input remains in a display-only cache until correlated projection or terminal
+resolution; runtime replacement clears it. The cache holds at most one prepared
+batch (32 items / 256 KiB text, plus the items' existing attachment metadata), in
+addition to the pre-existing queue. It is not zero extra storage. Rendered snapshots
+remain bounded to 8 entries / 4096 UTF-8 bytes each and never dispatch the cache.
+Public API additions retain existing signatures; no persistent format changes.
+
+Locked local library tests: 195 Conversation and 691 TUI tests passed, zero failures
+or ignored tests (target/ui-focused-20261116.log). Separate CLI binary tests passed
+426 tests, zero failures/ignored (target/ui-cli-tests-20261116.log). The library-only
+command did not include CLI bridge tests; the latter is the authoritative bridge
+validation. Additional selection/anchored regression validation is in progress.
+Both READMEs describe queue custody visibility, external spacing and tiny-terminal
+priorities. Independent Agent local-diff review found no blocker; this is not final
+exact-commit review or independent human/device acceptance.
+
+Remaining: new geometry regression results, isolated actual CLI PTY (CJK/multiline,
+resize, direct and queued-history colors, exactly-once requests), full standard
+preflight, stable candidate/commit review and native CI, and native terminal
+observation. No product merge, installation or background activation is authorized
+by this claim merge. Handoff remains Partial; no Completion Commit asserted.
+
+### Additional runtime and geometry evidence
+
+Additional focused TUI run passed 9 user-related tests (683 filtered), including
+same-instance resize/selection mapping and actual ScrollUp removal of the gap in
+Anchored mode: target/ui-geometry-tests-20261116.log. Format and whitespace checks
+passed. Production CLI build passed; SHA256
+397ad5abcb4ce40331cfca058f6f6ec4978cc8788d99f1680e51c14842294cd8.
+
+Actual CLI ANSI PTY acceptance passed at target/session-ui-pty-20261116-r2/result.json:
+8 color-checked separator observations (direct and queued-history at 40x24, 24x12,
+80x24, 40x12), plus 7 long-reasoning queue frames including 24x6 and 80x8. Bracketed
+paste supplied two CJK lines; request capture verified the complete multiline input
+appeared exactly once in the second request, with two provider requests total.
+Queue body remained visible through same-instance resize. Raw ANSI output is retained
+in that artifact directory. Initial harness startup failed before product execution
+because system Python lacked pyte; isolated pinned pyte0.8.2/wcwidth0.2.13 wheels
+were installed only under target/ui-pty-python-20261116 with PyPI SHA256 provenance.
+No user session or system Python package was changed.
+
+These are production-binary/controlled-provider/terminal-emulator observations,
+not installed-host acceptance, a real provider quality claim, or native-terminal
+visual approval. Full standard preflight and final candidate gates remain open.
+
+### Full-gate locale correction
+
+First full preflight exited101 after873.78s; all2649 manifest files were unchanged.
+The Tools suite had1160 passed/1failed: hasconfig_non_path_key_still_triggers_url_prohibition
+expected an English native Git diagnostic. The launcher omitted LC_ALL=C/LANG=C,
+contrary to LOCAL-DEV.md's documented service-environment requirement. The exact
+same compiled test passed under the prescribed locale, without source or assertion
+changes (target/ui-git-locale-check-20261116.log). This focused result does not close
+the full gate. Repeat full standard preflight with fixed locale and resource limits;
+retain the initial failed log/manifest/result at target/ui-full-preflight-20261116*.
+
+### Current candidate standard gate passed
+
+Fixed-locale full standard preflight completed with exit0 in776.13s, including
+5353 workspace/doc tests (zero failures/ignored) and both independent Runtime SDK
+fixture feature configurations. Manifest2649files remained byte-identical throughout.
+Evidence in the primary workspace: target/ui-full-preflight-20261116-r2.log,
+-manifest.json and -result.json. Unit talos-ui-full-preflight-20261116-r2 reports
+success, CPU482.718s, memory peak2GiB and swap0; prescribed CPU100%/MemoryHigh2G/
+MemoryMax3G/TasksMax128/Nice10 and C locale were retained. Memory soft-limit reclaim
+occurred without OOM; this is capped validation, not a performance measurement.
+
+Source implementation is ready for staged-diff review and stable candidate creation.
+Exact-commit independent review/native CI and native terminal acceptance remain open;
+no product merge, installation, release, or whole-handoff completion is claimed.
