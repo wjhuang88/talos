@@ -1634,3 +1634,34 @@ This production change requires fresh native validation. The earlier macOS
 identity-custody failure remains independently unresolved. Installed-user-session,
 real-provider summary quality and the full handoff residuals remain open; no merge,
 deployment, cleanup or default background activation is claimed.
+
+## 2026-11-16 final logical identity-lease release — Partial
+
+Independent review confirmed that the isolated Linux probe retains no unintended
+local lock references. Concurrent-spawn explicit-unlock control then produced
+0/20,000 WouldBlock results (target/custody-lock-unlock.log), versus981/20,000
+with close-only release. This establishes a bounded lock-lifetime repair target,
+not the cause of the original macOS receipt failure.
+
+Source commit f5217299 changes only identity_custody.rs: Arc now owns an internal
+lock holder that explicitly unlocks once, when the final logical lease ends.
+Failure/panic is contained and File closes as fallback; no retry relaxation,
+unsafe code, public API or persistent format changes. Deterministic extra-file-
+reference regression fails before the fix (target/custody-release-red.log), then
+passes for SH/EX with live clones protected. A second regression preserves
+independent shared holders. Old descriptor close cannot release a new lease.
+Full Session435passed,0failed/ignored (target/custody-release-green.log).
+Independent source/security/API review found no blocker; native validation pending.
+
+Clean detached worktree target/custody-release-validation-20261116 is running
+standard release_preflight at f5217299 under resource limits, pinned1.99.0, locked
+commands and requested TMPDIR. Service talos-custody-release-preflight-20261116;
+exec49682; log target/custody-release-preflight.log. Source manifest and terminal
+result are produced by target/custody-release-preflight.py. No push yet.
+All other dirty files and migration/session data preserved. Overall remains Partial.
+
+Full clean preflight subsequently completed exit0:5496 unfiltered tests/doctests,
+zero failed/ignored, two filtered subprocess passes and two external SDK modes.
+All2445 source file hashes matched before/after. Runtime15min47s, peak2G, swap0.
+Evidence: target/custody-release-preflight.log, -result.json and -source-manifest.json.
+This is source f5217299325b667ca8c8ae3f78b3a4c9e2241d12; native checks remain pending.
