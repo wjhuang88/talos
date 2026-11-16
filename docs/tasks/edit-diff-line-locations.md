@@ -1,6 +1,6 @@
 # EDIT-LOCATIONS-001 — Edit and diff source line locations
 
-Status: Active / Claimed proposed via #921; ineffective until this governance record merges to main.
+Status: Active. Claim #921 is effective on main; isolated implementation validation is pending.
 Owner: this document; originated in user-requested session handoff (preserved in the original worktree).
 
 ## Outcome and scope
@@ -31,7 +31,7 @@ No public API or persisted data format change is intended.
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requested completion of the session handoff; standard effective claim remains required before committed implementation |
 | Implementation PR | Not started |
-| Last Updated | 2026-11-12 |
+| Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Effective claim, isolated implementation, validation, independent review and native display acceptance |
 
 ## Acceptance
@@ -80,3 +80,54 @@ Preparation base: `6c81390a`. Open PR inventory #861/#907/#912 (Search/storage),
 showed no overlapping line-location owner. Existing iterations and claims remain unchanged.
 Both governance validators and scale assessment passed before PR creation; finalized
 claim validation and independent review precede merge. No implementation branch is created.
+
+## 2026-11-16 effective claim and isolated candidate — Partial
+
+Maintainer explicitly authorized #921 merge. It became effective at
+c28b9df2342d715ad0c4a89b1615e9f594922752 after exact-head CI and independent
+Agent review. Branch fix/edit-line-locations-20261116 and worktree
+target/edit-line-locations-20261116 start at this merge. The retained seven-file
+patch SHA256 296aa27c4cabacf141527cc707d1edd0d005b921350624062e1b8259af61c1f7
+passed apply-check and applied without conflict. Primary mixed code/data are retained.
+
+Selective implementation includes ordinary/prepared/anchored edit coordinates and
+diff old/new columns, preserving original evidence and permission paths. Both README
+updates were extracted by scope rather than copying the mixed originals. A new actual
+TUI frame test complements the formatter tests: edit/diff output at 24/160/24 columns,
++/- and line coordinates, clipping/re-expansion, edit background colors and unchanged
+raw transcript content. This test is added but not yet executed. Full validation and
+native acceptance remain open; historical mixed-tree gates are not current evidence.
+
+Heavy jobs remain sequential: UI standard preflight is running in its separate frozen
+worktree; this candidate is source preparation only until that job finishes. No product
+PR merge, installation or release is authorized by the governance claim merge.
+
+### Review correction: clipped second preview line
+
+Independent local review found a blocking preview defect: bounded_preview appended
+a clipped subsequent line before its newline, joining two numbered locations. The
+candidate now reserves/writes the separator before computing remaining character
+budget. An extracted verbatim production-helper Rust probe failed before and passed
+after the fix (target/edit-preview-red.log and target/edit-preview-green.log;
+source/helper SHA recorded in target/edit-preview-red-provenance.json). This narrow
+probe is not the actual editing pipeline gate.
+
+Added real direct/prepared editing regression with a short first line and oversized
+CJK second line; it verifies distinct old coordinates, an unnumbered omission notice,
+the existing preview size bound and exact resulting file. Added a separate real
+ordinary/prepared disjoint-deletion case verifying original line4 becomes result
+line3 with CRLF/CJK/no-final-newline and exact prepared before/after evidence. These
+new pipeline regressions await execution after the UI preflight; no passed claim yet.
+
+### Isolated real-path regression passed
+
+Pinned locked Tools(coding feature)+TUI library tests completed exit0: Tools1167
+and TUI691 tests passed,0failed/ignored. The subprocess-only nested test summary is
+not an additional unique test. Actual direct/prepared oversized-CJK second-line,
+disjoint deletion/CRLF/missing-final-newline, and same-instance24/160/24-column
+render/color/raw-result regressions all ran and passed. Source manifest2650files
+unchanged,440.50s, CPU306.914s, memory peak2GiB/swap0 under the documented caps.
+Evidence: target/edit-focused-20261116.log, -manifest.json and -result.json in the
+primary workspace. This closes focused candidate tests, not full preflight/native
+Windows/terminal acceptance. Both governance validators passed before this record
+(existing unrelated SEARCH claim warning only). No product merge or installation.

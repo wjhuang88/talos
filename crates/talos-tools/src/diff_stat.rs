@@ -73,8 +73,22 @@ impl DiffTool {
                 similar::ChangeTag::Insert => '+',
                 similar::ChangeTag::Equal => ' ',
             };
-            output.push(sign);
-            output.push_str(change.value());
+            let old_line = change
+                .old_index()
+                .map(|index| (index + 1).to_string())
+                .unwrap_or_default();
+            let new_line = change
+                .new_index()
+                .map(|index| (index + 1).to_string())
+                .unwrap_or_default();
+            output.push_str(&format!(
+                "{sign} {old_line:>4} {new_line:>4} | {}",
+                change.value()
+            ));
+            // A missing final newline must not join the next change or summary.
+            if !change.value().ends_with('\n') {
+                output.push('\n');
+            }
         }
 
         if output.trim().is_empty() || output.lines().all(|l| l.starts_with(' ')) {
@@ -89,7 +103,7 @@ impl DiffTool {
             "\n{old_display} → {new_display}: +{added} -{removed} lines"
         ));
 
-        Ok(output)
+        Ok(format!("   old  new | content\n{output}"))
     }
 }
 
@@ -286,10 +300,45 @@ mod diff_tool_tests {
             .await;
 
         assert!(!result.is_error);
-        assert!(result.content.contains("-line2"));
-        assert!(result.content.contains("+changed"));
+        assert!(result.content.contains("-    2      | line2"));
+        assert!(result.content.contains("+         2 | changed"));
         assert!(result.content.contains("+1"));
         assert!(result.content.contains("-1"));
+    }
+
+    #[tokio::test]
+    async fn diff_line_numbers_track_insertions_and_unterminated_unicode_lines() {
+        let dir = tempfile::tempdir().expect("fixture");
+        let old = "first\n中间\nlast";
+        let new = "inserted\nfirst\n中间\n替换";
+        fs::write(dir.path().join("old"), old).expect("old");
+        fs::write(dir.path().join("new"), new).expect("new");
+        let result = DiffTool::new(dir.path().into())
+            .execute(json!({"old_path":"old", "new_path":"new"}))
+            .await;
+        assert!(!result.is_error);
+        for row in [
+            "+         1 | inserted",
+            "     1    2 | first",
+            "     2    3 | 中间",
+            "-    3      | last",
+            "+         4 | 替换",
+        ] {
+            assert!(
+                result.content.lines().any(|line| line == row),
+                "{}",
+                result.content
+            );
+        }
+        assert!(result.content.contains("+2 -1 lines"));
+        assert_eq!(
+            fs::read_to_string(dir.path().join("old")).expect("old"),
+            old
+        );
+        assert_eq!(
+            fs::read_to_string(dir.path().join("new")).expect("new"),
+            new
+        );
     }
 
     #[tokio::test]

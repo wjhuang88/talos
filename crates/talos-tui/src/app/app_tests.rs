@@ -5870,3 +5870,59 @@ async fn healthy_git_watch_avoids_two_second_idle_scans() {
     );
     wait_for_test_slot().await;
 }
+
+#[test]
+fn numbered_edit_and_diff_locations_survive_actual_frame_resize() {
+    use talos_conversation::UiOutput;
+    for tool in ["edit", "diff"] {
+        let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+        tui.first_message_dispatched = true;
+        let tail = format!("{} END_MARKER", "中文".repeat(20));
+        let content = if tool == "edit" {
+            format!("- 42 | removed {tail}\n+ 57 | inserted {tail}")
+        } else {
+            format!("-   42      | removed {tail}\n+        57 | inserted {tail}")
+        };
+        tui.handle_ui_output(UiOutput::ToolResult(ToolResultDisplay {
+            tool_name: Some(tool.into()),
+            content: content.clone(),
+            is_error: false,
+            todo_presentation: None,
+        }));
+        tui.commit_pending_transcript().expect("numbered result");
+        for width in [24, 160, 24] {
+            tui.terminal
+                .set_test_size(ratatui::layout::Size::new(width, 24));
+            tui.draw_frame().expect("numbered frame");
+            let text = tui.terminal.test_rendered_text();
+            let rows: Vec<_> = text.lines().collect();
+            let removed = rows
+                .iter()
+                .position(|r| r.contains("42"))
+                .expect("old location");
+            let added = rows
+                .iter()
+                .position(|r| r.contains("57"))
+                .expect("new location");
+            assert!(rows[removed].contains('-'), "{tool}: {text}");
+            assert!(rows[added].contains('+'), "{tool}: {text}");
+            assert_eq!(text.contains("END_MARKER"), width == 160, "{tool}: {text}");
+            if width == 24 {
+                assert!(rows[removed].contains('…'), "{tool}: {text}");
+                assert!(rows[added].contains('…'), "{tool}: {text}");
+            }
+            if tool == "edit" {
+                assert_eq!(
+                    tui.terminal.test_cell_bg(0, removed as u16),
+                    semantic::DIFF_REMOVED_BG
+                );
+                assert_eq!(
+                    tui.terminal.test_cell_bg(0, added as u16),
+                    semantic::DIFF_ADDED_BG
+                );
+            }
+        }
+        assert!(tui.transcript.entries().iter().any(|entry| matches!(
+            &entry.block, TranscriptBlock::ToolResult(result) if result.content == content)));
+    }
+}

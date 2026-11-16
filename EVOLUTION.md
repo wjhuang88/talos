@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-16 - Truncation must preserve row separators and their budget
+
+- Trigger: independent review of numbered edit previews found two file locations joined on one output row.
+- Symptom: a short first row followed by a clipped long second row lost the separating newline; first-row-only truncation tests missed it.
+- Root cause: the truncation branch appended content before the shared separator branch, and computed remaining capacity without charging that separator.
+- Fix: reserve and write the separator before clipping each subsequent row. A probe extracted from the production helper failed before and passed after this correction.
+- Prevention: exercise truncation after an earlier short row through both direct and prepared editing, checking distinct file coordinates, exact resulting file and Unicode bounds.
+- Promoted to rule/check: `direct_and_prepared_long_second_line_preserve_distinct_preview_locations` (passed through direct/prepared candidate pipelines; evidence in EDIT-LOCATIONS-001).
+
 ## 2026-11-11 - Build concurrency is not a workstation resource limit
 
 - Trigger: user reported CPU/memory exhaustion during TUI performance work.
