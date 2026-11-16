@@ -1857,7 +1857,7 @@ mod tests {
                     crate::Session::new(receipt.child, String::new(), String::new(), head.clone());
                 reopened
                     .append(&talos_core::message::Message::User {
-                        content: format!("cold continuation {round}").into(),
+                        content: format!("cold continuation {round}"),
                     })
                     .expect("cold session append");
                 let evidence = reopened
@@ -2562,7 +2562,7 @@ mod tests {
                 crate::Session::new(receipt.child, String::new(), String::new(), head.clone());
             reopened
                 .append(&talos_core::message::Message::User {
-                    content: format!("continuation {expected_count}").into(),
+                    content: format!("continuation {expected_count}"),
                 })
                 .expect("cold continuation");
             expected_count += 1;

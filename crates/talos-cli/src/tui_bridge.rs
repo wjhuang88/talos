@@ -3199,10 +3199,10 @@ mod attachment_authorization_tests {
     }
     #[tokio::test]
     async fn clipboard_file_authorization_is_cancellable_without_reading_or_approval() {
-        let workspace = tempfile::tempdir().unwrap();
-        let external = tempfile::tempdir().unwrap();
+        let workspace = tempfile::tempdir().expect("workspace");
+        let external = tempfile::tempdir().expect("external directory");
         let path = external.path().join("image.png");
-        std::fs::write(&path, b"not an image; must not be read").unwrap();
+        std::fs::write(&path, b"not an image; must not be read").expect("unread image fixture");
         let permission_engine = Some(Arc::new(talos_permission::PermissionSessionState::new(
             talos_permission::PermissionEngine::with_workspace_root(workspace.path().to_path_buf()),
         )));
@@ -3217,14 +3217,14 @@ mod attachment_authorization_tests {
             0,
         ));
         let approval = tokio::select! {
-            output = ui_rx.recv() => output.unwrap(),
+            output = ui_rx.recv() => output.expect("approval request"),
             _ = &mut job => panic!("must wait for approval"),
         };
         let UiOutput::ToolApprovalRequest { response, .. } = approval else {
             panic!("approval")
         };
         cancel.cancel();
-        let error = job.await.unwrap_err();
+        let error = job.await.expect_err("authorization cancelled");
         assert!(error.to_string().contains("cancelled"));
         assert!(response.is_closed());
         assert!(

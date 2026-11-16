@@ -1633,17 +1633,18 @@ mod tests {
         std::fs::write(&session.file_path, altered).expect("legacy encoding");
         let mut remaining = MAX_BYTES;
         let mut count = 0;
-        let before = read_file(
-            &session.file_path,
-            false,
-            &mut remaining,
-            &mut count,
-            Instant::now() + Duration::from_secs(5),
-            &|| false,
-        )
-        .expect("original records");
-        let before_records = before.records;
-        drop(before.stamp);
+        let before_records = {
+            let before = read_file(
+                &session.file_path,
+                false,
+                &mut remaining,
+                &mut count,
+                Instant::now() + Duration::from_secs(5),
+                &|| false,
+            )
+            .expect("original records");
+            before.records
+        };
         session.compact_archived(50).expect("real archive");
         append_users(&session, 205, 210);
         let evidence = inspect(&session).expect("recovery");
