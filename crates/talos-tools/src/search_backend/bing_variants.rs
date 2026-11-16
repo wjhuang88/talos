@@ -224,7 +224,9 @@ mod tests {
     #[test]
     fn all_http_responses_are_not_host_unavailability_evidence() {
         // Explicitly reject all server-error classes, not merely throttling-like 503.
-        for status in [200, 302, 400, 401, 403, 404, 408, 429, 500, 502, 503, 504] {
+        for status in [
+            200, 302, 400, 401, 403, 404, 408, 429, 500, 502, 503, 504,
+        ] {
             assert_eq!(
                 next_variant(
                     BingVariant::NonCn,
