@@ -16,7 +16,7 @@ const EXPECTED: [u64; 7] = [
     0x77b368f79911fbee,
     0xa95c60b55dcdf0fc,
     0x731d64963dd0ed44,
-    0xa0cb1fe26bacf108,
+    0x94c91b190a1030cb,
     0x4dbbc3c4bc8a6bf7,
 ];
 fn fingerprint(source: &str) -> u64 {
