@@ -116,3 +116,9 @@ Notifications still trigger coalesced refreshes. Thirty seconds is the scan
 scheduling interval, not a completion guarantee when scanning stalls; expiry marks
 an old snapshot unknown. Failed/unavailable watchers retain two-second polling and
 the five-second lifetime. Remaining full-task acceptance is unchanged.
+
+Stage published through PR #960, merge `3b1b1f67`, implementation `4c9bf99d`.
+Exact-head independent Agent review and all applicable CI code/platform checks
+passed in run `43861152146`; macOS remote preflight and Linux local preflight are
+separate evidence. The global missing-Issue-#957 reconciliation check remains an
+advisory failure. Full task/native acceptance remains open in the owner and #923.

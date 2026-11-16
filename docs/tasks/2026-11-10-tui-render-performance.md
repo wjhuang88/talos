@@ -3,7 +3,7 @@
 > Document status: Review / Claimed — implementation stage merged; acceptance pending #923
 > Created: 2026-11-10
 > Owner: 本文；Board 仅为派生入口。
-> 实现阶段及性能跟进已合并至主分支（#922，71655af8；#929，a8dc7fb0）；完整验收未完成，剩余项跟踪于 #923。下文原计划保留，执行记录见末尾。
+> 实现阶段及性能跟进已合并至主分支（#922，71655af8；#929，a8dc7fb0）；Git 变更通知阶段 #960 已合并（3b1b1f67）；完整验收未完成，剩余项跟踪于 #923。下文原计划保留，执行记录见末尾。
 
 ## 1. 目标与交付边界
 
@@ -334,8 +334,8 @@ measure baseline and freeze budgets before P1.
 | Governance Claim PR | #910 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim #910 merged as d355dd68; user authorized stage delivery 2026-11-12; exact-head Agent review APPROVE at 14a274ed; code CI43150963692 passed; stage decision recorded in #922 and #923 |
-| Implementation PR | #922 (merged as 71655af8); #929 (merged as a8dc7fb0; remaining acceptance #923) |
-| Last Updated | 2026-11-13 |
+| Implementation PR | #922 (71655af8); #929 (a8dc7fb0); #960 (3b1b1f67); remaining acceptance #923 |
+| Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Full published acceptance including native terminal evidence; incomplete platforms remain Review |
 
 ### P0 execution checkpoint — 2026-11-11
@@ -1929,7 +1929,7 @@ Original full-task remaining acceptance and source-attestation limits still appl
 The locale-correct standard preflight subsequently completed with exit 0, including
 both SDK modes: 13m39.795s wall, 8m4.924s CPU, 2GiB peak, zero swap. This supersedes
 the pending execution state above, without erasing the earlier failed attempt.
-Final MSVC cross-check and integrated real-workspace measurement follow serially.
+Final MSVC cross-check and integrated real-workspace measurement subsequently passed; see the checkpoint below.
 
 
 ### Current follow-up acceptance checkpoint — 2026-11-16
@@ -1942,8 +1942,39 @@ Final MSVC cross-check and integrated real-workspace measurement follow serially
 | Actual-workspace resource evidence | Debug PTY, 10,000 entries, 59.842s steady sample: CPU 1.504%, PSS 49,531KiB, output zero; active external sessions prevent a controlled quiet baseline |
 | Git freshness budget adjustment | Maintainer explicitly accepted “接受30秒” on 2026-11-16: healthy-watch reconciliation every 30s / snapshot lifetime 35s replaces the original 5s freshness budget for this mode. This is a scheduling interval, not a scan-completion guarantee; failed/unavailable watchers retain 2s polling / 5s lifetime |
 | macOS bounded watcher | Unimplemented; upstream kqueue behavior bypasses registration limits, so existing 2s polling remains |
-| Candidate delivery | Not committed/pushed; local blocking review fixes resolved, final exact-head review and CI remain |
+| Candidate delivery | #960 merged as 3b1b1f67; exact 4c9bf99d independent Agent review and applicable CI passed; whole-task acceptance remains open |
 | Whole-task completion | Not achieved: original 479ms tail, source-attested native resources/deferred operations, second terminal and native Windows still require evidence |
 
 See [raw data and measurement limits](evidence/tui-perf-001/git-idle-watch/README.md).
 No existing acceptance row is removed or marked Complete by this checkpoint.
+
+
+### Git notification stage delivery — 2026-11-16
+
+Implementation commit: `4c9bf99d97988c204c5cfab60cc8d9c0fd5ae50b`.
+Merge commit: `3b1b1f670b4187c0b3e529f4bc2bc974905713c7`, PR #960.
+This records stage delivery, not whole-task completion; status remains Review / Claimed.
+
+Exact-head CI `43861152146` passed all applicable code/platform jobs: macOS 15
+standard preflight, CLI/TUI locale, language plugins, dependency audit and Desktop;
+Windows workspace check/Clippy/tests, governance, dependency audit and CLI smoke;
+Linux Desktop, Windows Desktop and installer fixtures. Local Linux preflight and
+MSVC xwin `--tests` results remain separately recorded above. CI execution does not
+substitute for native terminal display/resource acceptance.
+
+Independent Agent technical review APPROVE names candidate `4c9bf99d` and base
+`b524c7a9`, verifies all 42 source receipt hashes and reports no blocking findings;
+shared maintainer identity disclosed. Existing Single-maintainer authorization
+and merge-time CAS were recorded in the PR body: target `c28b9df2`, unchanged
+claim #910 / actor / scope, docs-only target additions, no overlapping open PR,
+MERGEABLE exact head. The unrelated global reconciliation check failed because
+the matrix omitted Issue #957; it remains an advisory SEARCH/I329/global-governance
+residual under ADR-071, not a passed check.
+
+Remaining required acceptance is unchanged: original Debug 479ms tail attribution,
+source-attested Ghostty process/emulator resources and deferred approval/external
+Git/workspace-switch operations, another supported terminal and native Windows.
+macOS still uses the explicit bounded-backend fallback; change-driven macOS is
+unimplemented. The host check found Ghostty but no Talos process, so no new native
+resource acceptance is claimed. Next: resume these rows with source-bound evidence,
+without repeating unchanged matrices or overwriting other sessions' binaries.
