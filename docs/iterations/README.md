@@ -1,3 +1,7 @@
+## I329 / SEARCH-001-D3-T3 — proposed offline Bing non-CN→CN fallback contract
+
+[I329](I329-search-bing-dual-host-offline.md) / [owner](../backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [#957](https://github.com/wjhuang88/talos/issues/957): governance-only proposed **Active / Claimed** test-only candidate, ineffective until its claim PR merges. One Bing family; non-CN `www.bing.com` preferred over existing `cn.bing.com` only if unavailable and permitted. **No** production route, newly admitted host, live Bing query, rights/region acceptance, default priority change or new independent provider.
+
 ## I323 Azure — proposed claim and activation
 
 ## I327 / SEARCH-001-D3-T2 — Complete / Closed upon owner-first closeout
