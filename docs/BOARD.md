@@ -9,11 +9,12 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 # Talos Board
 
-## EDIT-LOCATIONS-001 — proposed display work ownership
+## EDIT-LOCATIONS-001 — edit and diff line locations
 
-[Line-location owner](tasks/edit-diff-line-locations.md): Active / Claimed proposed via #921;
-ineffective until governance merge. Old/new diff coordinates and ordinary/prepared/anchored edit
-locations only; no effective claim or implementation activation yet.
+[Line-location owner](tasks/edit-diff-line-locations.md): Review; claim #921 effective.
+Implementation fa8edabb passed focused regressions and rebased standard preflight
+(5360 summed test passes and both external SDK fixtures). Draft publication, final
+review, native CI and terminal acceptance remain open; no merge/install claim.
 
 ## SESSION-UI-001 — session UI continuity repair preparation
 

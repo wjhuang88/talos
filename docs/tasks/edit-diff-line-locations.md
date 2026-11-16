@@ -1,6 +1,6 @@
 # EDIT-LOCATIONS-001 — Edit and diff source line locations
 
-Status: Active. Claim #921 is effective on main; isolated implementation validation is pending.
+Status: Review. Claim #921 is effective; local standard validation passed, remote/native acceptance remains open.
 Owner: this document; originated in user-requested session handoff (preserved in the original worktree).
 
 ## Outcome and scope
@@ -30,7 +30,7 @@ No public API or persisted data format change is intended.
 | Governance Claim PR | #921 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | User requested completion of the session handoff; standard effective claim remains required before committed implementation |
-| Implementation PR | Not started |
+| Implementation PR | Local candidate fa8edabb; draft publication pending |
 | Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Effective claim, isolated implementation, validation, independent review and native display acceptance |
 
@@ -131,3 +131,27 @@ Evidence: target/edit-focused-20261116.log, -manifest.json and -result.json in t
 primary workspace. This closes focused candidate tests, not full preflight/native
 Windows/terminal acceptance. Both governance validators passed before this record
 (existing unrelated SEARCH claim warning only). No product merge or installation.
+
+### Latest target integration
+
+After scoped staged-diff review, created local implementation2b881084, then rebased
+the unpublished branch to origin/main5169d5f6 to include the accepted Git-watch
+stage. Result fa8edabb preserves the same12-file Work Slice. The sole app_tests
+append conflict was resolved by retaining the upstream file byte-for-byte and
+appending this candidate's exact new frame test; README sections merged cleanly.
+Original primary patches and the pre-rebase commit remain retained. Focused tests
+above prove the prior base only; full standard validation on the new base remains
+required before publication. No product merge/installation or completion claimed.
+
+### Rebased standard preflight passed — Review
+
+Implementation fa8edabbbd1121d1fd567051c5b6c69b836b0078 based on
+5169d5f6fbc341d82a86d695d72a42bea035d78b passed the pinned locked standard
+release_preflight.sh: exit0,5360 summed test-summary passes,0failed/ignored,
+both external SDK fixture configurations and final preflight marker. Manifest
+2661files unchanged throughout; elapsed1373.26s,CPU1005.035s,memory peak2GiB,
+swap0 under documented sequential CPU/memory limits. Evidence in primary target:
+edit-full-preflight-20261116.log, -manifest.json and -result.json. Independent
+source review approved fa8edabb against the same base; final evidence/doc head review
+and remote native CI remain required. Terminal/manual acceptance remains open.
+No Complete, product merge, installation or release claim.
