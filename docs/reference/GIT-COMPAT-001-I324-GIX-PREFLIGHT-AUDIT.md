@@ -57,6 +57,8 @@ Existing final **mutation** execution is out of scope for the CLI-preflight ban.
 
 **Current outcome:** This audit intentionally authorizes no new filesystem reads, subprocesses or mutations and makes no claim that the implementation already exists. It records the evidence needed to make the subsequent gix-native replacement safe.
 
+For a bounded, review-only installation-profile proposal, see [selected-system-Git trust-profile contract](GIT-COMPAT-001-I324-SELECTED-GIT-TRUST-PROFILE.md). It is not an accepted source of compiled-default authority.
+
 ## T0b: direct-process preflight inventory (2026-11-16; #928 snapshot)
 
 **Evidence baseline:** implementation candidate 979c925aa4f17d3bae134a8f2cd09b359d1fc1a1. Enumerated all 46 Rust sources under crates/talos-tools/src/git_write*, including test modules, and inspected the 19 non-test entry/helper modules. This supplements T0's approximate discovery table with the explicit **14 host-Git command constructors** in production prepared_add.rs. This is a source-level inventory, **not** an actual runtime/hidden-subprocess trace or native Git 2.36 compatibility proof.
