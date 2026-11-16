@@ -306,3 +306,14 @@ and completed Responses opaque items reach Agent history; the second Responses r
 the same-bound opaque item; accumulated provider TurnEnd usage is asserted (Chat 8/4, Responses
 12/3). This is local controlled evidence, not live vendor or final CI. Cross-destination HTTP replay,
 Chat stream property/negative cases, latest-main preflight and final review remain pending.
+
+### 2026-11-16 boundary acceptance recovery
+
+The next resume again found no restored worktree or previous boundary-test logs. Restored remote
+`a727dc2b275bebc5b4719e32236b931c93b67b62`; the two unpushed boundary tests were lost and their
+outcomes are unknown, not passed. Recreated real HTTP opaque replay checks across resource and
+deployment changes, preserving ordinary history; added Chat missing/unknown terminal, HTTP-200
+error, truncated UTF-8 and length termination cases. Added 32-case Chat SSE proptest with random
+HTTP byte chunks, Unicode, LF/CRLF, exact terminal count and usage. Pinned/locked execution and
+independent read-only review are in progress; this is a recovery checkpoint, not a merge candidate.
+Current fetched main is `58207831`; latest-main integration and full preflight remain next gates.

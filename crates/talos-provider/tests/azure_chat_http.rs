@@ -283,3 +283,79 @@ async fn azure_chat_agent_executes_read_in_all_transport_and_tool_modes() {
         }
     }
 }
+
+#[tokio::test]
+async fn azure_chat_terminal_failures_are_explicit_and_redacted() {
+    let cases: Vec<(Vec<u8>, bool)> = vec![
+        (b"data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n".to_vec(), false),
+        (b"data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"fixture-key\"}]}\n\n".to_vec(), false),
+        (b"data: {\"error\":{\"message\":\"fixture-key\"}}\n\n".to_vec(), false),
+        (vec![b'd', b'a', b't', b'a', b':', b' ', 0xe4, 0xbd], false),
+        (b"data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2}}\n\n".to_vec(), true),
+    ];
+    for (body, length) in cases {
+        let mut server = mockito::Server::new_async().await;
+        let fixture = server
+            .mock("POST", "/openai/v1/chat/completions")
+            .with_header("content-type", "text/event-stream")
+            .with_body(body)
+            .expect(1)
+            .create_async()
+            .await;
+        let mut config = Config::default();
+        config.provider = "azure-fixture".into();
+        config.model = "deployment".into();
+        config.providers.insert(
+            config.provider.clone(),
+            ProviderConfig {
+                protocol: ProviderProtocol::AzureOpenAI,
+                azure: Some(AzureTransportConfig {
+                    endpoint: server.url(),
+                    api: AzureApiMode::V1,
+                    shape: Some(AzureBodyShape::Chat),
+                    authentication: AzureAuthentication::ApiKey,
+                }),
+                timeout: talos_config::ProviderTimeoutConfig {
+                    max_attempts: 0,
+                    dispatch_timeout_secs: 5,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        );
+        let provider = talos_provider::openai_responses::factory::build_configured_provider(
+            &config,
+            "fixture-key",
+        )
+        .expect("factory");
+        let mut rx = provider
+            .stream(&[Message::User {
+                content: "test".into(),
+            }])
+            .await
+            .expect("dispatch");
+        tokio::time::timeout(std::time::Duration::from_secs(6), async {
+            let (mut errors, mut ends) = (0, 0);
+            while let Some(event) = rx.recv().await {
+                assert!(!format!("{event:?}").contains("fixture-key"));
+                match event {
+                    AgentEvent::Error { message, .. } => {
+                        assert_eq!(message, "Azure response stream failed");
+                        errors += 1;
+                    }
+                    AgentEvent::TurnEnd { stop_reason, .. } => {
+                        assert!(length);
+                        assert_eq!(stop_reason, StopReason::MaxTokens);
+                        ends += 1;
+                    }
+                    _ => {}
+                }
+            }
+            assert_eq!(errors, usize::from(!length));
+            assert_eq!(ends, usize::from(length));
+        })
+        .await
+        .expect("bounded terminal");
+        fixture.assert_async().await;
+    }
+}

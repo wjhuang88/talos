@@ -2726,3 +2726,72 @@ mod i168_terminal_outcome_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod azure_chunk_boundary_properties {
+    use super::*;
+    use proptest::prelude::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(32))]
+        #[test]
+        fn chat_sse_random_byte_chunks_preserve_utf8_terminal_and_usage(
+            widths in prop::collection::vec(1usize..31, 1..40),
+            crlf in any::<bool>(),
+        ) {
+            let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
+            runtime.block_on(async {
+                let body = concat!(
+                    "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"你好🌍é\"},\"finish_reason\":null}]}\n\n",
+                    "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":3}}\n\n",
+                    "data: [DONE]\n\n"
+                );
+                let bytes = if crlf { body.replace('\n', "\r\n") } else { body.to_owned() }.into_bytes();
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind");
+                let address = listener.local_addr().expect("address");
+                let server = tokio::spawn(async move {
+                    let (mut socket, _) = listener.accept().await.expect("accept");
+                    let mut request = Vec::new();
+                    while !request.ends_with(b"\r\n\r\n") {
+                        request.push(socket.read_u8().await.expect("request"));
+                        assert!(request.len() < 8192);
+                    }
+                    socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n").await.expect("headers");
+                    let mut offset = 0;
+                    for width in widths.iter().cycle() {
+                        if offset == bytes.len() { break; }
+                        let end = (offset + width).min(bytes.len());
+                        socket.write_all(format!("{:x}\r\n", end - offset).as_bytes()).await.expect("chunk size");
+                        socket.write_all(&bytes[offset..end]).await.expect("chunk payload");
+                        socket.write_all(b"\r\n").await.expect("chunk end");
+                        offset = end;
+                    }
+                    socket.write_all(b"0\r\n\r\n").await.expect("HTTP EOF");
+                });
+                tokio::time::timeout(Duration::from_secs(5), async {
+                    let response = reqwest::get(format!("http://{address}/stream")).await.expect("response");
+                    let (tx, mut rx) = mpsc::channel(16);
+                    parse_sse_stream(response, tx, Duration::from_secs(2), Duration::from_secs(2)).await;
+                    let (mut text, mut endings) = (String::new(), 0);
+                    while let Some(event) = rx.recv().await {
+                        match event {
+                            AgentEvent::TextDelta { delta } => text.push_str(&delta),
+                            AgentEvent::TurnEnd { stop_reason, usage, .. } => {
+                                assert_eq!(stop_reason, StopReason::EndTurn);
+                                assert_eq!(usage.input_tokens, 7);
+                                assert_eq!(usage.output_tokens, 3);
+                                endings += 1;
+                            }
+                            AgentEvent::Error { .. } => panic!("unexpected error: {event:?}"),
+                            _ => {}
+                        }
+                    }
+                    assert_eq!(text, "你好🌍é");
+                    assert_eq!(endings, 1);
+                    server.await.expect("server task");
+                }).await.expect("bounded stream property");
+            });
+        }
+    }
+}

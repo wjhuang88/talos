@@ -21,6 +21,14 @@ fn azure_provider_with_reasoning(
     retries: u32,
     reasoning: bool,
 ) -> Arc<dyn LanguageModel> {
+    azure_bound_provider(endpoint, retries, reasoning, "azure-deployment")
+}
+fn azure_bound_provider(
+    endpoint: String,
+    retries: u32,
+    reasoning: bool,
+    deployment: &str,
+) -> Arc<dyn LanguageModel> {
     let mut config = Config::default();
     config.provider = "azure-fixture".into();
     config.model = "gpt-test".into();
@@ -37,7 +45,7 @@ fn azure_provider_with_reasoning(
             models: [(
                 config.model.clone(),
                 ModelConfig {
-                    azure_deployment: Some("azure-deployment".into()),
+                    azure_deployment: Some(deployment.into()),
                     reasoning_supported: reasoning.then_some(true),
                     reasoning: reasoning.then(|| talos_config::ReasoningOptions {
                         effort: Some(talos_core::model::ReasoningEffort::High),
@@ -719,5 +727,93 @@ async fn azure_cancel_releases_silent_http_connection_in_all_tool_modes() {
             .await
             .expect("bounded server")
             .expect("fixture task");
+    }
+}
+
+#[tokio::test]
+async fn opaque_reasoning_replay_is_bound_to_resource_and_deployment_over_http() {
+    use talos_core::message::AssistantReasoning;
+    let mut origin = mockito::Server::new_async().await;
+    let mut other = mockito::Server::new_async().await;
+    let initial = origin.mock("POST", "/openai/v1/responses")
+        .with_header("content-type", "text/event-stream")
+        .with_body(concat!(
+            "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"reasoning\",\"id\":\"rs_bound\",\"encrypted_content\":\"bound-ciphertext\",\"summary\":[]}}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{}}\n\n"))
+        .expect(1).create_async().await;
+    let events = collect_events(
+        azure_bound_provider(origin.url(), 0, true, "one")
+            .stream(&[Message::User {
+                content: "initial".into(),
+            }])
+            .await
+            .expect("dispatch"),
+    )
+    .await;
+    let blocks = events
+        .into_iter()
+        .find_map(|event| match event {
+            AgentEvent::ReasoningComplete { blocks } => Some(blocks),
+            _ => None,
+        })
+        .expect("opaque reasoning captured through transport");
+    assert!(!blocks.is_empty());
+    initial.assert_async().await;
+    initial.remove_async().await;
+    let history = [
+        Message::Assistant {
+            content: "prior answer".into(),
+            tool_calls: vec![],
+            reasoning: Some(AssistantReasoning {
+                provider: "azure-fixture".into(),
+                model: "gpt-test".into(),
+                blocks,
+            }),
+        },
+        Message::User {
+            content: "continue".into(),
+        },
+    ];
+    for (server, deployment, replay) in [(&mut origin, "one", true), (&mut other, "one", false)] {
+        for (deployment, replay) in [(deployment, replay), ("two", false)] {
+            let fixture = server
+                .mock("POST", "/openai/v1/responses")
+                .match_request(move |request| {
+                    let body: Value =
+                        serde_json::from_slice(request.body().expect("body")).expect("JSON");
+                    let input = body["input"].as_array().expect("input");
+                    let opaque = input.iter().any(|item| {
+                        item["type"] == "reasoning"
+                            && item["encrypted_content"] == "bound-ciphertext"
+                    });
+                    let text = body.to_string();
+                    body["model"] == deployment
+                        && opaque == replay
+                        && text.contains("prior answer")
+                        && text.contains("continue")
+                })
+                .with_header("content-type", "text/event-stream")
+                .with_body("data: {\"type\":\"response.completed\",\"response\":{}}\n\n")
+                .expect(1)
+                .create_async()
+                .await;
+            let events = collect_events(
+                azure_bound_provider(server.url(), 0, true, deployment)
+                    .stream(&history)
+                    .await
+                    .expect("dispatch"),
+            )
+            .await;
+            assert!(events.iter().any(|e| matches!(
+                e,
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    ..
+                }
+            )));
+            assert!(!events.iter().any(|e| matches!(e, AgentEvent::Error { .. })));
+            fixture.assert_async().await;
+            fixture.remove_async().await;
+        }
     }
 }
