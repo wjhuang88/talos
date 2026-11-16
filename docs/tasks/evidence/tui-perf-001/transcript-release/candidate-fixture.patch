@@ -1,0 +1,48 @@
+diff --git a/crates/talos-tui/examples/tui_perf_replay.rs b/crates/talos-tui/examples/tui_perf_replay.rs
+index 8cba0704..fc2e5890 100644
+--- a/crates/talos-tui/examples/tui_perf_replay.rs
++++ b/crates/talos-tui/examples/tui_perf_replay.rs
+@@ -1,6 +1,7 @@
+ //! Deterministic offline TUI performance replay; no provider or tools execute.
+ //! Arguments: scenario (idle/animation/stream/approval/workspace-switch), history
+ //! count, duration seconds, optional workspace and alternate workspace.
++//! transcript-commit appends one complete short assistant message per second.
+ //! Drive scrolling/resize through the PTY harness.
+ use std::{io, time::Duration};
+ use talos_conversation::{ContentOutput, MessageSource, StatusSnapshot, TurnPhase, UiOutput};
+@@ -14,7 +15,7 @@ async fn main() -> io::Result<()> {
+     let scenario = args.get(1).map(String::as_str).unwrap_or("idle");
+     if !matches!(
+         scenario,
+-        "idle" | "animation" | "stream" | "approval" | "workspace-switch"
++        "idle" | "animation" | "stream" | "approval" | "workspace-switch" | "transcript-commit"
+     ) {
+         return Err(io::Error::new(
+             io::ErrorKind::InvalidInput,
+@@ -103,6 +104,26 @@ async fn main() -> io::Result<()> {
+             let _ = tx.send(UiOutput::Content(ContentOutput::End));
+             // Allow the final stream frame to be observed before fixture shutdown.
+             tokio::time::sleep(Duration::from_millis(200)).await;
++        } else if scenario == "transcript-commit" {
++            let mut interval = tokio::time::interval(Duration::from_secs(1));
++            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
++            interval.tick().await;
++            for index in 0..seconds {
++                interval.tick().await;
++                for content in [
++                    ContentOutput::Start {
++                        source: MessageSource::Assistant,
++                    },
++                    ContentOutput::Delta {
++                        text: format!("Commit {index:05}: 中文 🦀 e\u{301}.\nSecond line."),
++                    },
++                    ContentOutput::End,
++                ] {
++                    if tx.send(UiOutput::Content(content)).is_err() {
++                        return Ok(());
++                    }
++                }
++            }
+         } else if scenario == "workspace-switch" {
+             let mut interval = tokio::time::interval(Duration::from_secs(1));
+             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);

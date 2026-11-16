@@ -5125,3 +5125,705 @@ fn operation_review_does_not_displace_trusted_effects_in_short_panel() {
     }
     assert!(after.contains("[3] deny"));
 }
+
+#[tokio::test(start_paused = true)]
+async fn event_loop_submits_final_ordered_frame_without_end_and_handles_cancel_during_burst() {
+    use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+    use futures::StreamExt;
+    use talos_conversation::{ContentOutput, UiOutput};
+
+    let (user_tx, mut user_rx) = mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(user_tx));
+    tui.first_message_dispatched = true;
+    tui.state.status.is_processing = true;
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    tx.send(UiOutput::Content(ContentOutput::Start {
+        source: MessageSource::Assistant,
+    }))
+    .expect("start");
+    for i in 0..1000 {
+        tx.send(UiOutput::Content(ContentOutput::Delta {
+            text: format!("word{i:04} "),
+        }))
+        .expect("delta");
+    }
+    tx.send(UiOutput::Exit).expect("exit without End");
+    let input = futures::stream::iter([Ok(Event::Key(KeyEvent::new(
+        KeyCode::Esc,
+        KeyModifiers::NONE,
+    )))])
+    .chain(futures::stream::pending());
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        tui.run_with_events(input),
+    )
+    .await
+    .expect("loop must finish")
+    .expect("run");
+    assert!(matches!(user_rx.try_recv(), Ok(UserInput::Cancel)));
+    assert!(
+        tui.terminal.test_draw_count() <= 4,
+        "1000 ready deltas should coalesce between initial/start/input/final frames"
+    );
+    assert!(
+        tui.pending_transcript.is_empty(),
+        "final content must be committed"
+    );
+    assert!(!tui.ordered_content_open);
+    assert!(
+        tui.terminal.test_rendered_text().contains("word0999"),
+        "last token must reach the submitted terminal buffer"
+    );
+    let text = tui
+        .transcript
+        .entries()
+        .iter()
+        .filter_map(|entry| match &entry.block {
+            TranscriptBlock::StyledLine(line) => Some(line.text.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut offset = 0;
+    for i in 0..1000 {
+        let token = format!("word{i:04}");
+        offset += text[offset..]
+            .find(&token)
+            .expect("every token retained in order")
+            + token.len();
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn input_exit_submits_coalesced_content_before_restore() {
+    use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+    use futures::StreamExt;
+    use talos_conversation::{ContentOutput, StreamMessage, UiOutput};
+
+    for legacy in [false, true] {
+        for eof in [false, true] {
+            let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+            tui.first_message_dispatched = true;
+            assert!(!tui.state.handle_ctrl_c());
+            let (tx, rx) = mpsc::unbounded_channel();
+            tui.ui_output_rx = Some(rx);
+            if legacy {
+                tx.send(UiOutput::Stream(StreamMessage {
+                    source: MessageSource::Assistant,
+                    stream: Box::pin(
+                        futures::stream::iter(["final-input-token".to_string()])
+                            .chain(futures::stream::pending()),
+                    ),
+                }))
+                .expect("stream");
+            } else {
+                tx.send(UiOutput::Content(ContentOutput::Start {
+                    source: MessageSource::Assistant,
+                }))
+                .expect("start");
+                tx.send(UiOutput::Content(ContentOutput::Delta {
+                    text: "final-input-token".into(),
+                }))
+                .expect("delta");
+            }
+            let exit_at = tokio::time::Instant::now() + std::time::Duration::from_millis(1);
+            let input = futures::stream::once(async move {
+                tokio::time::sleep_until(exit_at).await;
+                (!eof).then_some(Ok(Event::Key(KeyEvent::new(
+                    KeyCode::Char('c'),
+                    KeyModifiers::CONTROL,
+                ))))
+            })
+            .filter_map(futures::future::ready)
+            // Key exit must succeed on its own, without a following EOF rescuing it.
+            .chain(futures::stream::pending().take(usize::from(!eof)));
+            tokio::time::timeout(
+                std::time::Duration::from_millis(100),
+                tui.run_with_events(Box::pin(input)),
+            )
+            .await
+            .expect("input exit must not wait for another event")
+            .expect("exit");
+            assert_eq!(tokio::time::Instant::now(), exit_at);
+            assert!(tui.pending_transcript.is_empty());
+            assert!(!tui.ordered_content_open);
+            assert!(tui.active_stream.is_none());
+            assert!(
+                tui.terminal
+                    .test_rendered_text()
+                    .contains("final-input-token"),
+                "final frame missing: legacy={legacy}, eof={eof}"
+            );
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn legacy_stream_eof_submits_last_token_before_any_exit_or_input_event() {
+    use talos_conversation::{StreamMessage, UiOutput};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let tokens: Vec<_> = (0..1000).map(|i| format!("legacy{i:04} ")).collect();
+    tx.send(UiOutput::Stream(StreamMessage {
+        source: MessageSource::Assistant,
+        stream: Box::pin(futures::stream::iter(tokens)),
+    }))
+    .expect("legacy stream");
+    let exit_at = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
+    let exit = tokio::spawn(async move {
+        tokio::time::sleep_until(exit_at).await;
+        tx.send(UiOutput::Exit).expect("delayed exit");
+    });
+    tui.run_with_events(futures::stream::pending())
+        .await
+        .expect("legacy EOF loop");
+    exit.await.expect("exit sender");
+    assert!(tui.active_stream.is_none());
+    assert!(tui.pending_transcript.is_empty());
+    assert!(tui.terminal.test_rendered_text().contains("legacy0999"));
+    assert!(
+        tui.terminal.test_last_draw_at().expect("submitted frame") < exit_at,
+        "Exit must not be the event that flushes the final legacy frame"
+    );
+    let text = tui
+        .transcript
+        .entries()
+        .iter()
+        .filter_map(|entry| match &entry.block {
+            TranscriptBlock::StyledLine(line) => Some(line.text.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut offset = 0;
+    for i in 0..1000 {
+        let token = format!("legacy{i:04}");
+        assert_eq!(text.matches(&token).count(), 1, "each token exactly once");
+        offset += text[offset..].find(&token).expect("token order") + token.len();
+    }
+}
+
+#[test]
+fn compressed_away_processing_preview_does_not_request_animation() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.state.status.is_processing = true;
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    tui.draw_frame().expect("visible processing frame");
+    assert!(tui.visible_processing_animation);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 1));
+    tui.draw_frame().expect("compressed frame");
+    assert!(!tui.visible_processing_animation);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 24));
+    tui.draw_frame().expect("restored frame");
+    assert!(tui.visible_processing_animation);
+    tui.state.status.is_processing = false;
+    tui.draw_frame().expect("idle frame");
+    assert!(!tui.visible_processing_animation);
+}
+
+#[test]
+fn animation_diff_cells_stay_inside_preview_and_keep_history_and_cursor_stable() {
+    for width in [7, 20, 80, 120] {
+        for thinking in [false, true] {
+            let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+            tui.first_message_dispatched = true;
+            tui.state.status.is_processing = true;
+            tui.state.input_buffer = "中文 🦀 e\u{301}".into();
+            tui.state.cursor_pos = tui.state.input_buffer.chars().count();
+            tui.state.thinking_preview = thinking.then(|| "thinking 中文\nsecond line".into());
+            for index in 0..40 {
+                tui.transcript
+                    .append(TranscriptBlock::StyledLine(state_line(&format!(
+                        "history {index} 中文 🦀"
+                    ))));
+            }
+            tui.terminal
+                .set_test_size(ratatui::layout::Size::new(width, 24));
+            tui.draw_frame().expect("initial frame");
+            let layout = tui.layout_cache.cached_layout().expect("layout");
+            let preview = layout.preview.expect("visible preview");
+            let cursor = tui.terminal.test_cursor_position();
+            let rebuilds = tui.history_projection_cache.rebuilds();
+            let mut changes = 0;
+            for frame in 1..64 {
+                let previous = tui.terminal.test_rendered_buffer().clone();
+                tui.processing_frame = frame;
+                tui.draw_frame().expect("animation frame");
+                assert_eq!(tui.layout_cache.cached_layout(), Some(layout));
+                assert_eq!(tui.terminal.test_cursor_position(), cursor);
+                assert_eq!(tui.history_projection_cache.rebuilds(), rebuilds);
+                for (x, y, _) in previous.diff_iter(tui.terminal.test_rendered_buffer()) {
+                    assert!(
+                        preview.contains(ratatui::layout::Position::new(x, y)),
+                        "animation changed ({x}, {y}) outside {preview:?}, width={width}, thinking={thinking}"
+                    );
+                    changes += 1;
+                }
+            }
+            assert!(changes > 0, "fixture must exercise visible animation");
+        }
+    }
+}
+
+#[test]
+fn cached_frames_match_fresh_planning_cells_styles_and_cursor_across_state_changes() {
+    let mut cached = crate::app::Tui::for_test(TuiState::new(), None);
+    let mut fresh = crate::app::Tui::for_test(TuiState::new(), None);
+    for step in 0..28 {
+        for tui in [&mut cached, &mut fresh] {
+            let width = [80, 80, 7, 100, 40, 80, 80][step % 7];
+            let height = [24, 24, 8, 40, 6, 24, 24][step % 7];
+            tui.terminal
+                .set_test_size(ratatui::layout::Size::new(width, height));
+            if step == 2 {
+                tui.first_message_dispatched = true;
+                for n in 0..40 {
+                    tui.transcript
+                        .append(TranscriptBlock::StyledLine(state_line(&format!(
+                            "row {n}: 中文 🦀 e\u{301} zero\u{200b}width\nexplicit newline"
+                        ))));
+                }
+            }
+            tui.state.input_buffer = [
+                "",
+                "中文🦀e\u{301}\nsecond",
+                "long words ".repeat(20).as_str(),
+            ][step % 3]
+                .to_owned();
+            tui.state.cursor_pos = if step % 2 == 0 {
+                0
+            } else {
+                tui.state.input_buffer.chars().count()
+            };
+            tui.state.status.is_processing = step % 4 != 0;
+            tui.processing_frame = step;
+            tui.state.thinking_preview =
+                (step % 4 == 1).then(|| "thinking body 中文\nsecond line".into());
+            if step == 10 {
+                tui.show_approval("write", "{\"path\":\"src/example.rs\"}");
+            }
+            if step == 13 {
+                tui.hide_approval();
+                tui.state.slash_menu.close();
+            }
+            if step == 17 {
+                tui.scroll_frame_history_up(5);
+            }
+            if step == 22 {
+                tui.history_scroll.jump_to_end();
+            }
+        }
+        // This path forces all new caches through their complete planning functions.
+        fresh.history_projection_cache = Default::default();
+        fresh.splash_cache = Default::default();
+        fresh.layout_cache = Default::default();
+        fresh.composer_height_cache = Default::default();
+        fresh.preview_layout_cache = Default::default();
+        cached.draw_frame().expect("cached frame");
+        fresh.draw_frame().expect("freshly planned frame");
+        assert_eq!(
+            cached.terminal.test_frame_ansi(),
+            fresh.terminal.test_frame_ansi(),
+            "actual ANSI bytes at step {step}"
+        );
+        assert!(
+            !cached.terminal.test_frame_ansi().is_empty(),
+            "state transition must submit ANSI"
+        );
+        assert_eq!(
+            cached.terminal.test_rendered_buffer(),
+            fresh.terminal.test_rendered_buffer(),
+            "cells/styles at step {step}"
+        );
+        assert_eq!(
+            cached.terminal.test_cursor_position(),
+            fresh.terminal.test_cursor_position(),
+            "cursor at step {step}"
+        );
+        assert_eq!(
+            cached.terminal.test_cursor_visible(),
+            fresh.terminal.test_cursor_visible()
+        );
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn event_loop_without_visible_deadlines_draws_once_during_a_minute_of_idle() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let exit = tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        tx.send(talos_conversation::UiOutput::Exit).expect("exit");
+    });
+    tui.run_with_events(futures::stream::pending())
+        .await
+        .expect("idle loop");
+    exit.await.expect("exit sender");
+    assert_eq!(tui.terminal.test_draw_count(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn event_loop_expires_tip_and_releases_reconnecting_without_input() {
+    use talos_conversation::{StatusSnapshot, UiOutput};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    // Hide animation: these updates must have their own deadlines.
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(80, 1));
+    tui.state.status.is_processing = true;
+    tui.state.status.phase = Some(TurnPhase::Connecting);
+    let now = super::scheduling::now();
+    tui.state.tip = Some(crate::state::Tip {
+        kind: TipKind::ExitHint,
+        text: "temporary".into(),
+        ttl: std::time::Duration::from_millis(300),
+        created_at: now,
+    });
+    tui.deferred_reconnecting_status = Some((
+        StatusSnapshot {
+            is_processing: true,
+            phase: Some(TurnPhase::Reconnecting {
+                attempt: 1,
+                max_attempts: 3,
+            }),
+            ..Default::default()
+        },
+        now + std::time::Duration::from_millis(150),
+    ));
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let exit = tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        tx.send(UiOutput::Exit).expect("exit");
+    });
+    tui.run_with_events(futures::stream::pending())
+        .await
+        .expect("deadline loop");
+    exit.await.expect("exit sender");
+    assert!(tui.state.tip.is_none());
+    assert!(tui.deferred_reconnecting_status.is_none());
+    assert!(matches!(
+        tui.state.status.phase,
+        Some(TurnPhase::Reconnecting { .. })
+    ));
+    assert_eq!(
+        tui.terminal.test_draw_count(),
+        3,
+        "initial, reconnect, tip expiry only"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn event_loop_drag_scroll_stops_deadlines_after_mouse_release() {
+    use crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use futures::StreamExt;
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    for n in 0..100 {
+        tui.transcript
+            .append(TranscriptBlock::StyledLine(state_line(&format!(
+                "history {n}"
+            ))));
+    }
+    tui.draw_frame().expect("prepare selection geometry");
+    let area = tui.last_history_area.expect("history area");
+    let anchor = tui
+        .history_selection_point_at_screen(area.x, area.y)
+        .expect("history anchor");
+    let initial_start = tui.last_frame_history_start;
+    let initial_draws = tui.terminal.test_draw_count();
+    tui.selection = Some(super::SelectionState {
+        anchor: (area.x, area.y),
+        focus: (area.x, area.y),
+        dragging: true,
+        moved: true,
+        edge: -1,
+        history_anchor: Some(anchor),
+        history_focus: Some(anchor),
+    });
+    let events = futures::stream::once(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        Ok(Event::Mouse(MouseEvent {
+            kind: MouseEventKind::Up(MouseButton::Left),
+            column: area.x,
+            row: area.y,
+            modifiers: KeyModifiers::NONE,
+        }))
+    })
+    .chain(futures::stream::pending())
+    .boxed();
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let exit = tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        tx.send(talos_conversation::UiOutput::Exit).expect("exit");
+    });
+    tui.run_with_events(events).await.expect("drag loop");
+    exit.await.expect("exit sender");
+    assert_eq!(tui.last_frame_history_start, initial_start - 3);
+    assert!(tui.selection.is_none_or(|selection| !selection.dragging));
+    assert_eq!(
+        tui.terminal.test_draw_count() - initial_draws,
+        5,
+        "initial, three scroll ticks, release; no post-release frames"
+    );
+}
+
+#[tokio::test]
+async fn event_loop_remains_interactive_and_exits_while_actual_git_scan_is_blocked() {
+    use crate::git_snapshot_worker::{Scan, TEST_SCAN_LOCK, wait_for_test_slot};
+    use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+    let _serial = TEST_SCAN_LOCK.lock().await;
+    wait_for_test_slot().await;
+    let (user_tx, mut user_rx) = mpsc::unbounded_channel();
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), Some(user_tx));
+    tui.first_message_dispatched = true;
+    tui.state.status.workspace_path = "blocked-test-workspace".into();
+    let (output_tx, output_rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(output_rx);
+    let (input_tx, input_rx) = futures::channel::mpsc::unbounded();
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let mut entered_tx = Some(entered_tx);
+    let mut release_rx = Some(release_rx);
+    let mut launches = 0;
+    let mut requests = Vec::new();
+    let driver = async move {
+        entered_rx.await.expect("scanner started");
+        // Once the real worker is known to be blocked, advance only the UI clock.
+        tokio::time::pause();
+        tokio::time::sleep(std::time::Duration::from_millis(2100)).await;
+        output_tx
+            .send(talos_conversation::UiOutput::Status(
+                talos_conversation::StatusSnapshot {
+                    workspace_path: "replacement-workspace".into(),
+                    ..Default::default()
+                },
+            ))
+            .expect("workspace switch after timeout");
+        for _ in 0..20 {
+            input_tx
+                .unbounded_send(Ok(Event::FocusGained))
+                .expect("refresh request");
+        }
+        for code in [KeyCode::Char('x'), KeyCode::Enter] {
+            input_tx
+                .unbounded_send(Ok(Event::Key(KeyEvent::new(code, KeyModifiers::NONE))))
+                .expect("input");
+        }
+        assert!(
+            matches!(user_rx.recv().await, Some(UserInput::Message(_))),
+            "input must reach business channel before scanner is released"
+        );
+        output_tx
+            .send(talos_conversation::UiOutput::Exit)
+            .expect("exit");
+        // Keep input open until Exit wins; this test must not pass by input EOF.
+        (input_tx, release_tx)
+    };
+    let run = tui.run_with_scanner(input_rx, |workspace, generation| {
+        requests.push((workspace.clone(), generation));
+        let Some(entered) = entered_tx.take() else {
+            let attempted = Scan::start_with(workspace, generation, |_| None)?;
+            assert!(
+                attempted.is_none(),
+                "timeout/switch must not start another actual worker"
+            );
+            return Ok(None);
+        };
+        launches += 1;
+        let release = release_rx.take().expect("one actual scan");
+        Scan::start_with(workspace, generation, move |_| {
+            let _ = entered.send(());
+            let _ = release.recv();
+            None
+        })
+    });
+    let (result, (_input_tx, release_tx)) =
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            tokio::join!(run, driver)
+        })
+        .await
+        .expect("blocked scan must not delay input or exit");
+    result.expect("loop");
+    assert_eq!(launches, 1);
+    assert!(
+        requests.iter().any(
+            |(workspace, generation)| workspace == "replacement-workspace" && *generation == 2
+        )
+    );
+    assert!(
+        tui.git_snapshot
+            .get("replacement-workspace", super::scheduling::now())
+            .is_none()
+    );
+    assert!(
+        Scan::start_with("next-session".into(), 2, |_| None)
+            .expect("probe")
+            .is_none(),
+        "exiting must not free the actual worker slot"
+    );
+    release_tx.send(()).expect("release blocked worker");
+    wait_for_test_slot().await;
+}
+
+#[tokio::test]
+async fn external_git_changes_reach_submitted_frames_without_input() {
+    use crate::git_snapshot_worker::{TEST_SCAN_LOCK, wait_for_test_slot};
+    let _serial = TEST_SCAN_LOCK.lock().await;
+    wait_for_test_slot().await;
+    let directory = tempfile::tempdir().expect("repository fixture");
+    gix::init(directory.path()).expect("initialize fixture");
+    std::fs::write(
+        directory.path().join(".git/HEAD"),
+        "ref: refs/heads/freshness-oracle\n",
+    )
+    .expect("fixture branch");
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(200, 24));
+    tui.state.status.workspace_path = directory.path().to_string_lossy().into_owned();
+    let mut frames = tui.terminal.observe_test_frames();
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let file = directory.path().join("external-change.txt");
+    let driver = async move {
+        let mut phase = 0;
+        let mut changed_at = None;
+        while let Some(frame) = frames.recv().await {
+            let clean =
+                frame.contains("⎇ freshness-oracle") && !frame.contains("freshness-oracle*");
+            match phase {
+                0 if clean => {
+                    std::fs::write(&file, "external mutation").expect("create file");
+                    changed_at = Some(std::time::Instant::now());
+                    phase = 1;
+                }
+                1 if frame.contains("freshness-oracle*") => {
+                    assert!(changed_at.expect("mutation time").elapsed().as_secs_f64() < 5.0);
+                    std::fs::remove_file(&file).expect("remove fixture file");
+                    changed_at = Some(std::time::Instant::now());
+                    phase = 2;
+                }
+                2 if clean => {
+                    assert!(changed_at.expect("mutation time").elapsed().as_secs_f64() < 5.0);
+                    tx.send(talos_conversation::UiOutput::Exit).expect("exit");
+                    return;
+                }
+                _ => {}
+            }
+        }
+        panic!("frame observer closed before clean/dirty/clean transitions");
+    };
+    let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(12), async {
+        tokio::join!(tui.run_with_events(futures::stream::pending()), driver)
+    })
+    .await
+    .expect("external changes must become visible without input");
+    result.expect("loop");
+    wait_for_test_slot().await;
+}
+
+#[tokio::test]
+async fn successful_old_workspace_scan_cannot_publish_after_switch() {
+    use crate::git_snapshot_worker::{Scan, TEST_SCAN_LOCK, wait_for_test_slot};
+    use crate::scrollback_status_git::GitStatusSummary;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    use talos_conversation::{StatusSnapshot, UiOutput};
+    let _serial = TEST_SCAN_LOCK.lock().await;
+    wait_for_test_slot().await;
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(200, 24));
+    tui.state.status.workspace_path = "old-workspace".into();
+    let mut frames = tui.terminal.observe_test_frames();
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let mut entered = Some(entered_tx);
+    let mut release = Some(release_rx);
+    let old_returned = Arc::new(AtomicBool::new(false));
+    let returned = old_returned.clone();
+    let mut launches = 0;
+    let driver = async move {
+        entered_rx.await.expect("old scan entered");
+        tx.send(UiOutput::Status(StatusSnapshot {
+            workspace_path: "new-workspace".into(),
+            ..Default::default()
+        }))
+        .expect("switch");
+        let mut release = Some(release_tx);
+        let mut switched = false;
+        while let Some(frame) = frames.recv().await {
+            if frame.contains("new-workspace") {
+                switched = true;
+                if let Some(release) = release.take() {
+                    release.send(()).expect("let obsolete scan return success");
+                }
+            }
+            if switched {
+                assert!(!frame.contains("old-late"), "obsolete result in new frame");
+            }
+            if frame.contains("new-live") {
+                assert!(switched);
+                tx.send(UiOutput::Exit).expect("exit");
+                return;
+            }
+        }
+        panic!("new workspace never became visible");
+    };
+    let run = tui.run_with_scanner(futures::stream::pending(), |workspace, generation| {
+        let scan = if workspace == "old-workspace" {
+            let entered = entered.take().expect("one old scan");
+            let release = release.take().expect("one release");
+            let returned = returned.clone();
+            Scan::start_with(workspace, generation, move |_| {
+                let _ = entered.send(());
+                let _ = release.recv();
+                returned.store(true, Ordering::Release);
+                Some(GitStatusSummary {
+                    branch: Some("old-late".into()),
+                    dirty: true,
+                })
+            })?
+        } else {
+            Scan::start_with(workspace, generation, |_| {
+                Some(GitStatusSummary {
+                    branch: Some("new-live".into()),
+                    dirty: false,
+                })
+            })?
+        };
+        launches += usize::from(scan.is_some());
+        Ok(scan)
+    });
+    let (result, ()) = tokio::time::timeout(std::time::Duration::from_secs(6), async {
+        tokio::join!(run, driver)
+    })
+    .await
+    .expect("successful replacement scan");
+    result.expect("loop");
+    assert!(old_returned.load(Ordering::Acquire));
+    assert_eq!(launches, 2);
+    assert_eq!(
+        tui.git_snapshot
+            .get("new-workspace", super::scheduling::now())
+            .and_then(|summary| summary.branch.as_deref()),
+        Some("new-live")
+    );
+    wait_for_test_slot().await;
+}

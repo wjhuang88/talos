@@ -1,0 +1,27 @@
+{
+  "source_commit": "6f558bf9807322e0b03ea7a9f3721dafb6708dd4",
+  "command": "./scripts/release_preflight.sh",
+  "exit_code": 0,
+  "rust_test_summaries": 148,
+  "passed": 5316,
+  "failed": 0,
+  "ignored": 0,
+  "log_sha256": "e29069492971b3d058d22f392ea7e09e2532b558ed2938a8b79c78e51a71ff8c",
+  "limits": {
+    "cpu_quota": "100%",
+    "cpu_affinity": "0",
+    "memory_high": "2G",
+    "memory_max": "3G",
+    "swap_max": "0",
+    "cargo_jobs": 1,
+    "test_threads": 1,
+    "locale": "C"
+  },
+  "service_runtime": "17min 7.763s",
+  "cpu_time": "8min 53.755s",
+  "memory_peak": "2G",
+  "notes": [
+    "Only owner documentation changed during run (3b7d8b4d); implementation and tests stayed unchanged.",
+    "Includes workspace check, Clippy, locked tests and runtime SDK fixture; performance/native acceptance remain separate."
+  ]
+}

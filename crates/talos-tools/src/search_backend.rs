@@ -36,6 +36,8 @@ mod ddg_parser;
 mod instant_answer;
 // Upstream-parity private helpers owned by the protected zero-key compatibility path.
 mod compat_helpers;
+// An isolated, unprepared public Tool compatibility path, never a protected fallback.
+pub(crate) mod legacy_owned;
 
 /// Backend identity retained across normalization and routing decisions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

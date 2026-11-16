@@ -1,0 +1,74 @@
+[
+  {
+    "scenario": "resize",
+    "coverage": {
+      "steady_first_seconds": 8.017545506998431,
+      "steady_last_seconds": 307.55982911004685,
+      "steady_covered_seconds": 299.5422836030484,
+      "nominal_steady_seconds": 300
+    },
+    "actions": 561,
+    "stages": {
+      "screen_resize": 561,
+      "history_rebuild": 561,
+      "output": 1,
+      "draw": 568
+    },
+    "first_cgroup": {
+      "path": "/user.slice/user-1000.slice/user@1000.service/app.slice/talos-perf-heap-followup.service",
+      "cpu.stat": "usage_usec 415821\nuser_usec 275429\nsystem_usec 140391\nnice_usec 270886\ncore_sched.force_idle_usec 0\nnr_periods 6\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "100000 100000",
+      "cpu.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=37911\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=2246",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.current": "115163136",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "io.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=146053\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=142870"
+    },
+    "last_cgroup": {
+      "path": "/user.slice/user-1000.slice/user@1000.service/app.slice/talos-perf-heap-followup.service",
+      "cpu.stat": "usage_usec 115641357\nuser_usec 108143731\nsystem_usec 7497625\nnice_usec 108329840\ncore_sched.force_idle_usec 0\nnr_periods 2929\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "100000 100000",
+      "cpu.pressure": "some avg10=16.29 avg60=16.41 avg300=10.71 total=51742828\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=937935",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.current": "228130816",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "io.pressure": "some avg10=0.00 avg60=0.00 avg300=0.01 total=336817\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=179622"
+    }
+  },
+  {
+    "scenario": "transcript-commit",
+    "coverage": {
+      "steady_first_seconds": 7.841427030973136,
+      "steady_last_seconds": 307.5644471599953,
+      "steady_covered_seconds": 299.7230201290222,
+      "nominal_steady_seconds": 300
+    },
+    "actions": 0,
+    "stages": {
+      "screen_resize": 0,
+      "history_rebuild": 301,
+      "output": 904,
+      "draw": 602
+    },
+    "first_cgroup": {
+      "path": "/user.slice/user-1000.slice/user@1000.service/app.slice/talos-perf-heap-followup.service",
+      "cpu.stat": "usage_usec 121654412\nuser_usec 114082593\nsystem_usec 7571819\nnice_usec 114236527\ncore_sched.force_idle_usec 0\nnr_periods 2992\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "100000 100000",
+      "cpu.pressure": "some avg10=9.39 avg60=14.96 avg300=10.56 total=51816753\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=950924",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.current": "131739648",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "io.pressure": "some avg10=0.00 avg60=0.00 avg300=0.01 total=355150\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=197948"
+    },
+    "last_cgroup": {
+      "path": "/user.slice/user-1000.slice/user@1000.service/app.slice/talos-perf-heap-followup.service",
+      "cpu.stat": "usage_usec 134998807\nuser_usec 121343534\nsystem_usec 13655273\nnice_usec 121403560\ncore_sched.force_idle_usec 0\nnr_periods 5631\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "cpu.max": "100000 100000",
+      "cpu.pressure": "some avg10=0.14 avg60=0.31 avg300=3.86 total=54793469\nfull avg10=0.13 avg60=0.07 avg300=0.01 total=2093370",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "memory.current": "185233408",
+      "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+      "io.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=355150\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=197948"
+    }
+  }
+]

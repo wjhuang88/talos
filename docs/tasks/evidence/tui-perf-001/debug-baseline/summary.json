@@ -1,0 +1,3827 @@
+{
+  "schema": 1,
+  "matrix": "/tmp/talos-p0-debug-full",
+  "cases": {
+    "baseline-idle-100": {
+      "rounds": [
+        {
+          "cpu_percent": 1.935965669532016,
+          "peak_pss_kib": 11112,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.95920894300798,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 245301163,
+            "diff": 103445168,
+            "draw": 531434462,
+            "flush": 0,
+            "frame_preparation": 32389416,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 866746,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1826052
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1826052
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.7697176970820865,
+          "peak_pss_kib": 11163,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.94827937099035,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 303222772,
+            "diff": 92077057,
+            "draw": 482882835,
+            "flush": 0,
+            "frame_preparation": 31150761,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 861972,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2070420
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2070420
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.9358068732864622,
+          "peak_pss_kib": 11116,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.96166652799002,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 240014706,
+            "diff": 105491341,
+            "draw": 538223785,
+            "flush": 0,
+            "frame_preparation": 31935961,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 823988,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1787064
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1787064
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 1.9358068732864622,
+          "min": 1.7697176970820865,
+          "max": 1.935965669532016
+        },
+        "peak_pss_kib": {
+          "median": 11116,
+          "min": 11112,
+          "max": 11163
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.95920894300798,
+          "min": 29.94827937099035,
+          "max": 29.96166652799002
+        }
+      }
+    },
+    "baseline-animation-100": {
+      "rounds": [
+        {
+          "cpu_percent": 1.7257974023904126,
+          "peak_pss_kib": 11584,
+          "steady_output_bytes": 11127,
+          "steady_covered_seconds": 29.55155682199984,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 200,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 256747834,
+            "diff": 88281567,
+            "draw": 470983104,
+            "flush": 2966151,
+            "frame_preparation": 40983248,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 825120,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1873675
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1873675
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.7815784055300303,
+          "peak_pss_kib": 11728,
+          "steady_output_bytes": 11243,
+          "steady_covered_seconds": 29.748901218990795,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 200,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 251103872,
+            "diff": 89439816,
+            "draw": 482090123,
+            "flush": 3349384,
+            "frame_preparation": 44588496,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 872807,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1871781
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1871781
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.6080285969657981,
+          "peak_pss_kib": 11605,
+          "steady_output_bytes": 11243,
+          "steady_covered_seconds": 29.850215406971984,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 200,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 180194865,
+            "diff": 82368514,
+            "draw": 440982531,
+            "flush": 2056075,
+            "frame_preparation": 39672232,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 794893,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1485610
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1485610
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 1.7257974023904126,
+          "min": 1.6080285969657981,
+          "max": 1.7815784055300303
+        },
+        "peak_pss_kib": {
+          "median": 11605,
+          "min": 11584,
+          "max": 11728
+        },
+        "steady_output_bytes": {
+          "median": 11243,
+          "min": 11127,
+          "max": 11243
+        },
+        "steady_covered_seconds": {
+          "median": 29.748901218990795,
+          "min": 29.55155682199984,
+          "max": 29.850215406971984
+        }
+      }
+    },
+    "baseline-stream-100": {
+      "rounds": [
+        {
+          "cpu_percent": 10.470727180057256,
+          "peak_pss_kib": 11907,
+          "steady_output_bytes": 238791,
+          "steady_covered_seconds": 29.510844345990336,
+          "stage_counts": {
+            "deadline_lateness": 201,
+            "diff": 802,
+            "draw": 802,
+            "flush": 802,
+            "frame_preparation": 802,
+            "git_scan": 0,
+            "history_hit": 1603,
+            "history_rebuild": 1,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 802,
+            "output": 602,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 201
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 141435485,
+            "diff": 332460727,
+            "draw": 3012274939,
+            "flush": 6093638,
+            "frame_preparation": 680025813,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 2739848,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 2094631,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1256111
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1256111
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 13.06430090829569,
+          "peak_pss_kib": 12048,
+          "steady_output_bytes": 241656,
+          "steady_covered_seconds": 29.852343629987445,
+          "stage_counts": {
+            "deadline_lateness": 201,
+            "diff": 802,
+            "draw": 802,
+            "flush": 802,
+            "frame_preparation": 802,
+            "git_scan": 0,
+            "history_hit": 1603,
+            "history_rebuild": 1,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 802,
+            "output": 602,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 201
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 382343161,
+            "diff": 456860448,
+            "draw": 3788008896,
+            "flush": 7369370,
+            "frame_preparation": 810505023,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 1103088,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 2620439,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 4194304,
+                "upper_ns": 8388607
+              },
+              "p99": {
+                "lower_ns": 4194304,
+                "upper_ns": 8388607
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 10.906309841695077,
+          "peak_pss_kib": 12059,
+          "steady_output_bytes": 239305,
+          "steady_covered_seconds": 29.799263427994447,
+          "stage_counts": {
+            "deadline_lateness": 201,
+            "diff": 802,
+            "draw": 802,
+            "flush": 802,
+            "frame_preparation": 802,
+            "git_scan": 0,
+            "history_hit": 1603,
+            "history_rebuild": 1,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 802,
+            "output": 602,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 201
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 466478345,
+            "diff": 372893809,
+            "draw": 3188989310,
+            "flush": 7631130,
+            "frame_preparation": 703447790,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 2465952,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 1873413,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 4194304,
+                "upper_ns": 8229641
+              },
+              "p99": {
+                "lower_ns": 4194304,
+                "upper_ns": 8229641
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 10.906309841695077,
+          "min": 10.470727180057256,
+          "max": 13.06430090829569
+        },
+        "peak_pss_kib": {
+          "median": 12048,
+          "min": 11907,
+          "max": 12059
+        },
+        "steady_output_bytes": {
+          "median": 239305,
+          "min": 238791,
+          "max": 241656
+        },
+        "steady_covered_seconds": {
+          "median": 29.799263427994447,
+          "min": 29.510844345990336,
+          "max": 29.852343629987445
+        }
+      }
+    },
+    "baseline-approval-100": {
+      "rounds": [
+        {
+          "cpu_percent": 1.346214198877152,
+          "peak_pss_kib": 11372,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.71295358001953,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 200,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 272444506,
+            "diff": 88854256,
+            "draw": 359263806,
+            "flush": 0,
+            "frame_preparation": 22996943,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 999500,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1925487
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1925487
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.5808190646909424,
+          "peak_pss_kib": 11580,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.731422810989898,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 200,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 162434596,
+            "diff": 105361457,
+            "draw": 427509157,
+            "flush": 0,
+            "frame_preparation": 27423073,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 1210175,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1343963
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1343963
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.346677798635437,
+          "peak_pss_kib": 11725,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.702724764996674,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 200,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 199619042,
+            "diff": 91355622,
+            "draw": 362254726,
+            "flush": 0,
+            "frame_preparation": 22130373,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 992212,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1509310
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1509310
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 1.346677798635437,
+          "min": 1.346214198877152,
+          "max": 1.5808190646909424
+        },
+        "peak_pss_kib": {
+          "median": 11580,
+          "min": 11372,
+          "max": 11725
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.71295358001953,
+          "min": 29.702724764996674,
+          "max": 29.731422810989898
+        }
+      }
+    },
+    "baseline-scroll-100": {
+      "rounds": [
+        {
+          "cpu_percent": 2.3118701566040776,
+          "peak_pss_kib": 11412,
+          "steady_output_bytes": 218597,
+          "steady_covered_seconds": 29.845966825989308,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 260,
+            "draw": 260,
+            "flush": 60,
+            "frame_preparation": 260,
+            "git_scan": 0,
+            "history_hit": 389,
+            "history_rebuild": 0,
+            "history_scroll": 60,
+            "input": 60,
+            "input_to_submit": 60,
+            "layout": 260,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 223810319,
+            "diff": 117768705,
+            "draw": 628073084,
+            "flush": 207690,
+            "frame_preparation": 30725753,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 168860909,
+            "layout": 1057882,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 2097152,
+                "upper_ns": 4194303
+              },
+              "p99": {
+                "lower_ns": 4194304,
+                "upper_ns": 4276895
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1704067
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1704067
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 2.4774919289935142,
+          "peak_pss_kib": 11360,
+          "steady_output_bytes": 218597,
+          "steady_covered_seconds": 29.868916678999085,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 260,
+            "draw": 260,
+            "flush": 60,
+            "frame_preparation": 260,
+            "git_scan": 0,
+            "history_hit": 393,
+            "history_rebuild": 0,
+            "history_scroll": 60,
+            "input": 60,
+            "input_to_submit": 60,
+            "layout": 260,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 281793455,
+            "diff": 139336184,
+            "draw": 693329673,
+            "flush": 176793,
+            "frame_preparation": 34845588,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 185012467,
+            "layout": 1224842,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 2097152,
+                "upper_ns": 3880949
+              },
+              "p99": {
+                "lower_ns": 2097152,
+                "upper_ns": 3880949
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 2.4106500863907945,
+          "peak_pss_kib": 11239,
+          "steady_output_bytes": 218597,
+          "steady_covered_seconds": 29.86746206198586,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 260,
+            "draw": 260,
+            "flush": 60,
+            "frame_preparation": 260,
+            "git_scan": 0,
+            "history_hit": 392,
+            "history_rebuild": 0,
+            "history_scroll": 60,
+            "input": 60,
+            "input_to_submit": 60,
+            "layout": 260,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 204083689,
+            "diff": 133010170,
+            "draw": 668918247,
+            "flush": 184765,
+            "frame_preparation": 32931901,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 177653716,
+            "layout": 1151004,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 2097152,
+                "upper_ns": 4165195
+              },
+              "p99": {
+                "lower_ns": 2097152,
+                "upper_ns": 4165195
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 2.4106500863907945,
+          "min": 2.3118701566040776,
+          "max": 2.4774919289935142
+        },
+        "peak_pss_kib": {
+          "median": 11360,
+          "min": 11239,
+          "max": 11412
+        },
+        "steady_output_bytes": {
+          "median": 218597,
+          "min": 218597,
+          "max": 218597
+        },
+        "steady_covered_seconds": {
+          "median": 29.86746206198586,
+          "min": 29.845966825989308,
+          "max": 29.868916678999085
+        }
+      }
+    },
+    "baseline-resize-100": {
+      "rounds": [
+        {
+          "cpu_percent": 1.9722420702887626,
+          "peak_pss_kib": 11837,
+          "steady_output_bytes": 165391,
+          "steady_covered_seconds": 29.91519189698738,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 260,
+            "draw": 260,
+            "flush": 60,
+            "frame_preparation": 260,
+            "git_scan": 0,
+            "history_hit": 460,
+            "history_rebuild": 60,
+            "history_scroll": 0,
+            "input": 60,
+            "input_to_submit": 60,
+            "layout": 260,
+            "output": 1,
+            "resize": 60,
+            "screen_resize": 60,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 161784227,
+            "diff": 72556861,
+            "draw": 528327789,
+            "flush": 195284,
+            "frame_preparation": 107566209,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 77166333,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 209806457,
+            "layout": 852316,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 4194304,
+                "upper_ns": 6217023
+              },
+              "p99": {
+                "lower_ns": 4194304,
+                "upper_ns": 6217023
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1410770
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1410770
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 2.2741447887502853,
+          "peak_pss_kib": 11533,
+          "steady_output_bytes": 164419,
+          "steady_covered_seconds": 29.901350316999014,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 260,
+            "draw": 260,
+            "flush": 60,
+            "frame_preparation": 260,
+            "git_scan": 0,
+            "history_hit": 460,
+            "history_rebuild": 60,
+            "history_scroll": 0,
+            "input": 60,
+            "input_to_submit": 60,
+            "layout": 260,
+            "output": 1,
+            "resize": 60,
+            "screen_resize": 60,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 210384645,
+            "diff": 90955510,
+            "draw": 617625123,
+            "flush": 184650,
+            "frame_preparation": 119589602,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 83475362,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 237709483,
+            "layout": 978151,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 4194304,
+                "upper_ns": 7389080
+              },
+              "p99": {
+                "lower_ns": 4194304,
+                "upper_ns": 7389080
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 2.1415576959828635,
+          "peak_pss_kib": 11753,
+          "steady_output_bytes": 164419,
+          "steady_covered_seconds": 29.8847890580073,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 260,
+            "draw": 260,
+            "flush": 60,
+            "frame_preparation": 260,
+            "git_scan": 0,
+            "history_hit": 460,
+            "history_rebuild": 60,
+            "history_scroll": 0,
+            "input": 60,
+            "input_to_submit": 60,
+            "layout": 260,
+            "output": 1,
+            "resize": 60,
+            "screen_resize": 60,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 286962772,
+            "diff": 91511823,
+            "draw": 595774935,
+            "flush": 193040,
+            "frame_preparation": 110079170,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 74778577,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 216513839,
+            "layout": 935694,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 4194304,
+                "upper_ns": 6060389
+              },
+              "p99": {
+                "lower_ns": 4194304,
+                "upper_ns": 6060389
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 2.1415576959828635,
+          "min": 1.9722420702887626,
+          "max": 2.2741447887502853
+        },
+        "peak_pss_kib": {
+          "median": 11753,
+          "min": 11533,
+          "max": 11837
+        },
+        "steady_output_bytes": {
+          "median": 164419,
+          "min": 164419,
+          "max": 165391
+        },
+        "steady_covered_seconds": {
+          "median": 29.901350316999014,
+          "min": 29.8847890580073,
+          "max": 29.91519189698738
+        }
+      }
+    },
+    "baseline-idle-1000": {
+      "rounds": [
+        {
+          "cpu_percent": 1.7695828044036201,
+          "peak_pss_kib": 13945,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.9505622840079,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 315781703,
+            "diff": 92954749,
+            "draw": 480530491,
+            "flush": 0,
+            "frame_preparation": 32464834,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 848131,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 2097152,
+                "upper_ns": 2131545
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.4364683556596138,
+          "peak_pss_kib": 14185,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.934526458993787,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 174633331,
+            "diff": 77681966,
+            "draw": 394820684,
+            "flush": 0,
+            "frame_preparation": 27483004,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 742009,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1424640
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1424640
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.4033472609397686,
+          "peak_pss_kib": 14124,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.928444062999915,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 197860365,
+            "diff": 73506944,
+            "draw": 379992222,
+            "flush": 0,
+            "frame_preparation": 25787402,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 673778,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1574305
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1574305
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 1.4364683556596138,
+          "min": 1.4033472609397686,
+          "max": 1.7695828044036201
+        },
+        "peak_pss_kib": {
+          "median": 14124,
+          "min": 13945,
+          "max": 14185
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.934526458993787,
+          "min": 29.928444062999915,
+          "max": 29.9505622840079
+        }
+      }
+    },
+    "baseline-animation-1000": {
+      "rounds": [
+        {
+          "cpu_percent": 1.8486555924367218,
+          "peak_pss_kib": 14292,
+          "steady_output_bytes": 11191,
+          "steady_covered_seconds": 29.751350237987936,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 200,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 189413030,
+            "diff": 92781022,
+            "draw": 503225790,
+            "flush": 3562557,
+            "frame_preparation": 45502546,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 933790,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1562427
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1562427
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 2.0303722079129507,
+          "peak_pss_kib": 14204,
+          "steady_output_bytes": 11139,
+          "steady_covered_seconds": 29.551231920020655,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 200,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 243469883,
+            "diff": 106972201,
+            "draw": 562705042,
+            "flush": 2715671,
+            "frame_preparation": 47228201,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 933298,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1724331
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1724331
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.5385125255386007,
+          "peak_pss_kib": 14153,
+          "steady_output_bytes": 11243,
+          "steady_covered_seconds": 29.89900909899734,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 200,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 131611574,
+            "diff": 78844395,
+            "draw": 427107772,
+            "flush": 2162519,
+            "frame_preparation": 40486370,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 809448,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1225101
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1225101
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 1.8486555924367218,
+          "min": 1.5385125255386007,
+          "max": 2.0303722079129507
+        },
+        "peak_pss_kib": {
+          "median": 14204,
+          "min": 14153,
+          "max": 14292
+        },
+        "steady_output_bytes": {
+          "median": 11191,
+          "min": 11139,
+          "max": 11243
+        },
+        "steady_covered_seconds": {
+          "median": 29.751350237987936,
+          "min": 29.551231920020655,
+          "max": 29.89900909899734
+        }
+      }
+    },
+    "baseline-stream-1000": {
+      "rounds": [
+        {
+          "cpu_percent": 14.0399219175207,
+          "peak_pss_kib": 16844,
+          "steady_output_bytes": 241443,
+          "steady_covered_seconds": 29.70101988100214,
+          "stage_counts": {
+            "deadline_lateness": 201,
+            "diff": 802,
+            "draw": 802,
+            "flush": 802,
+            "frame_preparation": 802,
+            "git_scan": 0,
+            "history_hit": 1603,
+            "history_rebuild": 1,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 802,
+            "output": 602,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 201
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 500615691,
+            "diff": 466390300,
+            "draw": 4089358071,
+            "flush": 9809053,
+            "frame_preparation": 920497889,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 7098466,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 2619532,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 4194304,
+                "upper_ns": 8388607
+              },
+              "p99": {
+                "lower_ns": 8388608,
+                "upper_ns": 9056116
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 10.017411611869903,
+          "peak_pss_kib": 16733,
+          "steady_output_bytes": 239007,
+          "steady_covered_seconds": 29.648377396020805,
+          "stage_counts": {
+            "deadline_lateness": 201,
+            "diff": 802,
+            "draw": 802,
+            "flush": 802,
+            "frame_preparation": 802,
+            "git_scan": 0,
+            "history_hit": 1603,
+            "history_rebuild": 1,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 802,
+            "output": 602,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 201
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 227959860,
+            "diff": 306549602,
+            "draw": 2863460922,
+            "flush": 5861691,
+            "frame_preparation": 646649002,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 5831007,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 2224934,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1676911
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1676911
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 12.382192983394564,
+          "peak_pss_kib": 16769,
+          "steady_output_bytes": 241656,
+          "steady_covered_seconds": 29.80086003302131,
+          "stage_counts": {
+            "deadline_lateness": 201,
+            "diff": 802,
+            "draw": 802,
+            "flush": 802,
+            "frame_preparation": 802,
+            "git_scan": 0,
+            "history_hit": 1603,
+            "history_rebuild": 1,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 802,
+            "output": 602,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 201
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 441161337,
+            "diff": 418515293,
+            "draw": 3604315650,
+            "flush": 6681770,
+            "frame_preparation": 810394918,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 9491442,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 2412787,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 4194304,
+                "upper_ns": 8388607
+              },
+              "p99": {
+                "lower_ns": 4194304,
+                "upper_ns": 8388607
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 12.382192983394564,
+          "min": 10.017411611869903,
+          "max": 14.0399219175207
+        },
+        "peak_pss_kib": {
+          "median": 16769,
+          "min": 16733,
+          "max": 16844
+        },
+        "steady_output_bytes": {
+          "median": 241443,
+          "min": 239007,
+          "max": 241656
+        },
+        "steady_covered_seconds": {
+          "median": 29.70101988100214,
+          "min": 29.648377396020805,
+          "max": 29.80086003302131
+        }
+      }
+    },
+    "baseline-approval-1000": {
+      "rounds": [
+        {
+          "cpu_percent": 1.4468215526240626,
+          "peak_pss_kib": 14320,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.72032032700372,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 200,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 269629864,
+            "diff": 96630751,
+            "draw": 392135048,
+            "flush": 0,
+            "frame_preparation": 23829956,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 1072422,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1967871
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1967871
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.1690338978055637,
+          "peak_pss_kib": 14340,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.939251603995217,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 200,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 315653071,
+            "diff": 78330694,
+            "draw": 315164733,
+            "flush": 0,
+            "frame_preparation": 20221018,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 940089,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.001980352076714,
+          "peak_pss_kib": 14388,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.940706858993508,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 200,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 261784891,
+            "diff": 59678480,
+            "draw": 262205617,
+            "flush": 0,
+            "frame_preparation": 17093964,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 733393,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1951699
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1951699
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 1.1690338978055637,
+          "min": 1.001980352076714,
+          "max": 1.4468215526240626
+        },
+        "peak_pss_kib": {
+          "median": 14340,
+          "min": 14320,
+          "max": 14388
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.939251603995217,
+          "min": 29.72032032700372,
+          "max": 29.940706858993508
+        }
+      }
+    },
+    "baseline-scroll-1000": {
+      "rounds": [
+        {
+          "cpu_percent": 2.377890348983493,
+          "peak_pss_kib": 13901,
+          "steady_output_bytes": 218597,
+          "steady_covered_seconds": 29.858399496995844,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 260,
+            "draw": 260,
+            "flush": 60,
+            "frame_preparation": 260,
+            "git_scan": 0,
+            "history_hit": 388,
+            "history_rebuild": 0,
+            "history_scroll": 60,
+            "input": 60,
+            "input_to_submit": 60,
+            "layout": 260,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 285282423,
+            "diff": 126406126,
+            "draw": 661026197,
+            "flush": 160315,
+            "frame_preparation": 33502576,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 164520264,
+            "layout": 1229614,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 2097152,
+                "upper_ns": 4030418
+              },
+              "p99": {
+                "lower_ns": 2097152,
+                "upper_ns": 4030418
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2001958
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2001958
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.3454166046214735,
+          "peak_pss_kib": 14033,
+          "steady_output_bytes": 218597,
+          "steady_covered_seconds": 29.730568109982414,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 260,
+            "draw": 260,
+            "flush": 60,
+            "frame_preparation": 260,
+            "git_scan": 0,
+            "history_hit": 387,
+            "history_rebuild": 0,
+            "history_scroll": 60,
+            "input": 60,
+            "input_to_submit": 60,
+            "layout": 260,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 288604959,
+            "diff": 68273458,
+            "draw": 364399577,
+            "flush": 92878,
+            "frame_preparation": 20261896,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 97658606,
+            "layout": 691424,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 2097152,
+                "upper_ns": 3596148
+              },
+              "p99": {
+                "lower_ns": 2097152,
+                "upper_ns": 3596148
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2063089
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2063089
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 2.0115016260974667,
+          "peak_pss_kib": 13893,
+          "steady_output_bytes": 218597,
+          "steady_covered_seconds": 29.82846209098352,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 260,
+            "draw": 260,
+            "flush": 60,
+            "frame_preparation": 260,
+            "git_scan": 0,
+            "history_hit": 387,
+            "history_rebuild": 0,
+            "history_scroll": 60,
+            "input": 60,
+            "input_to_submit": 60,
+            "layout": 260,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 144553185,
+            "diff": 106034111,
+            "draw": 551952551,
+            "flush": 146243,
+            "frame_preparation": 28388643,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 143719917,
+            "layout": 942274,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 2097152,
+                "upper_ns": 4192163
+              },
+              "p99": {
+                "lower_ns": 2097152,
+                "upper_ns": 4192163
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1654807
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1654807
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 2.0115016260974667,
+          "min": 1.3454166046214735,
+          "max": 2.377890348983493
+        },
+        "peak_pss_kib": {
+          "median": 13901,
+          "min": 13893,
+          "max": 14033
+        },
+        "steady_output_bytes": {
+          "median": 218597,
+          "min": 218597,
+          "max": 218597
+        },
+        "steady_covered_seconds": {
+          "median": 29.82846209098352,
+          "min": 29.730568109982414,
+          "max": 29.858399496995844
+        }
+      }
+    },
+    "baseline-resize-1000": {
+      "rounds": [
+        {
+          "cpu_percent": 4.232493292173213,
+          "peak_pss_kib": 17608,
+          "steady_output_bytes": 162110,
+          "steady_covered_seconds": 29.769686872983584,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 258,
+            "draw": 258,
+            "flush": 58,
+            "frame_preparation": 258,
+            "git_scan": 0,
+            "history_hit": 458,
+            "history_rebuild": 58,
+            "history_scroll": 0,
+            "input": 58,
+            "input_to_submit": 58,
+            "layout": 258,
+            "output": 1,
+            "resize": 58,
+            "screen_resize": 58,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 245553248,
+            "diff": 82250478,
+            "draw": 1204829420,
+            "flush": 167894,
+            "frame_preparation": 709907578,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 673496403,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 841755276,
+            "layout": 1004006,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 16777216,
+                "upper_ns": 27299784
+              },
+              "p99": {
+                "lower_ns": 16777216,
+                "upper_ns": 27299784
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 8388608,
+                "upper_ns": 16777215
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 3.814457288494313,
+          "peak_pss_kib": 17501,
+          "steady_output_bytes": 162110,
+          "steady_covered_seconds": 29.886296103999484,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 259,
+            "draw": 259,
+            "flush": 59,
+            "frame_preparation": 259,
+            "git_scan": 0,
+            "history_hit": 459,
+            "history_rebuild": 59,
+            "history_scroll": 0,
+            "input": 59,
+            "input_to_submit": 59,
+            "layout": 259,
+            "output": 1,
+            "resize": 59,
+            "screen_resize": 59,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 210168326,
+            "diff": 86925937,
+            "draw": 1114475186,
+            "flush": 124484,
+            "frame_preparation": 618324168,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 581763610,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 727912459,
+            "layout": 940154,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 16777216,
+                "upper_ns": 19389016
+              },
+              "p99": {
+                "lower_ns": 16777216,
+                "upper_ns": 19389016
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 8388608,
+                "upper_ns": 14970817
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 4.300605437501403,
+          "peak_pss_kib": 17744,
+          "steady_output_bytes": 162110,
+          "steady_covered_seconds": 29.763251211988972,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 258,
+            "draw": 258,
+            "flush": 58,
+            "frame_preparation": 258,
+            "git_scan": 0,
+            "history_hit": 458,
+            "history_rebuild": 58,
+            "history_scroll": 0,
+            "input": 58,
+            "input_to_submit": 58,
+            "layout": 258,
+            "output": 1,
+            "resize": 58,
+            "screen_resize": 58,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 348788645,
+            "diff": 84765876,
+            "draw": 1218734605,
+            "flush": 162352,
+            "frame_preparation": 711851153,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 673578302,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 839254638,
+            "layout": 1006112,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 16777216,
+                "upper_ns": 25954422
+              },
+              "p99": {
+                "lower_ns": 16777216,
+                "upper_ns": 25954422
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 2097152,
+                "upper_ns": 4194303
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 4.232493292173213,
+          "min": 3.814457288494313,
+          "max": 4.300605437501403
+        },
+        "peak_pss_kib": {
+          "median": 17608,
+          "min": 17501,
+          "max": 17744
+        },
+        "steady_output_bytes": {
+          "median": 162110,
+          "min": 162110,
+          "max": 162110
+        },
+        "steady_covered_seconds": {
+          "median": 29.769686872983584,
+          "min": 29.763251211988972,
+          "max": 29.886296103999484
+        }
+      }
+    },
+    "baseline-idle-10000": {
+      "rounds": [
+        {
+          "cpu_percent": 1.479228233478526,
+          "peak_pss_kib": 45915,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.745240797987208,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 328789328,
+            "diff": 67894960,
+            "draw": 393209900,
+            "flush": 0,
+            "frame_preparation": 27701077,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 724366,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 2097152,
+                "upper_ns": 2120655
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.6483055252581071,
+          "peak_pss_kib": 44505,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.72749848201056,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 176533634,
+            "diff": 85212963,
+            "draw": 445745031,
+            "flush": 0,
+            "frame_preparation": 28913614,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 708496,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1523476
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1523476
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.5789606111964662,
+          "peak_pss_kib": 45357,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.766417013015598,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 274499003,
+            "diff": 82821603,
+            "draw": 437220511,
+            "flush": 0,
+            "frame_preparation": 30045130,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 774048,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2000303
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2000303
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 1.5789606111964662,
+          "min": 1.479228233478526,
+          "max": 1.6483055252581071
+        },
+        "peak_pss_kib": {
+          "median": 45357,
+          "min": 44505,
+          "max": 45915
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.745240797987208,
+          "min": 29.72749848201056,
+          "max": 29.766417013015598
+        }
+      }
+    },
+    "baseline-animation-10000": {
+      "rounds": [
+        {
+          "cpu_percent": 1.7085291437252494,
+          "peak_pss_kib": 45596,
+          "steady_output_bytes": 11243,
+          "steady_covered_seconds": 29.85023708100198,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 200,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 155078321,
+            "diff": 86427732,
+            "draw": 476396857,
+            "flush": 3430210,
+            "frame_preparation": 45232921,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 900803,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1339565
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1339565
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.4094204103281411,
+          "peak_pss_kib": 44489,
+          "steady_output_bytes": 11191,
+          "steady_covered_seconds": 29.799483314011013,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 200,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 164662823,
+            "diff": 71748842,
+            "draw": 392544065,
+            "flush": 1923616,
+            "frame_preparation": 35294619,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 688645,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1370738
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1370738
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.5904353444197796,
+          "peak_pss_kib": 45443,
+          "steady_output_bytes": 11139,
+          "steady_covered_seconds": 29.551657138974406,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 200,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 400,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 229247564,
+            "diff": 79805952,
+            "draw": 442525076,
+            "flush": 2012075,
+            "frame_preparation": 41720604,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 812907,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1715457
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1715457
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 1.5904353444197796,
+          "min": 1.4094204103281411,
+          "max": 1.7085291437252494
+        },
+        "peak_pss_kib": {
+          "median": 45443,
+          "min": 44489,
+          "max": 45596
+        },
+        "steady_output_bytes": {
+          "median": 11191,
+          "min": 11139,
+          "max": 11243
+        },
+        "steady_covered_seconds": {
+          "median": 29.799483314011013,
+          "min": 29.551657138974406,
+          "max": 29.85023708100198
+        }
+      }
+    },
+    "baseline-stream-10000": {
+      "rounds": [
+        {
+          "cpu_percent": 12.60159380942806,
+          "peak_pss_kib": 59680,
+          "steady_output_bytes": 238925,
+          "steady_covered_seconds": 29.599430487985956,
+          "stage_counts": {
+            "deadline_lateness": 201,
+            "diff": 803,
+            "draw": 803,
+            "flush": 803,
+            "frame_preparation": 803,
+            "git_scan": 0,
+            "history_hit": 1605,
+            "history_rebuild": 1,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 803,
+            "output": 603,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 201
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 226407693,
+            "diff": 406465696,
+            "draw": 3699260371,
+            "flush": 7260404,
+            "frame_preparation": 881899293,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 58506983,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 2547264,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1748114
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1748114
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 11.93652530703141,
+          "peak_pss_kib": 58832,
+          "steady_output_bytes": 238843,
+          "steady_covered_seconds": 29.489318787993398,
+          "stage_counts": {
+            "deadline_lateness": 201,
+            "diff": 803,
+            "draw": 803,
+            "flush": 803,
+            "frame_preparation": 803,
+            "git_scan": 0,
+            "history_hit": 1605,
+            "history_rebuild": 1,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 803,
+            "output": 603,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 201
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 167443285,
+            "diff": 378051528,
+            "draw": 3519121883,
+            "flush": 6682918,
+            "frame_preparation": 855703006,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 67185897,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 2555021,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1407577
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1407577
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 11.93688536671236,
+          "peak_pss_kib": 58962,
+          "steady_output_bytes": 241440,
+          "steady_covered_seconds": 29.655977177026216,
+          "stage_counts": {
+            "deadline_lateness": 201,
+            "diff": 803,
+            "draw": 803,
+            "flush": 803,
+            "frame_preparation": 803,
+            "git_scan": 0,
+            "history_hit": 1605,
+            "history_rebuild": 1,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 803,
+            "output": 603,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 201
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 183258744,
+            "diff": 378731411,
+            "draw": 3546273404,
+            "flush": 7435974,
+            "frame_preparation": 890413683,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 76844712,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 2249444,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 11.93688536671236,
+          "min": 11.93652530703141,
+          "max": 12.60159380942806
+        },
+        "peak_pss_kib": {
+          "median": 58962,
+          "min": 58832,
+          "max": 59680
+        },
+        "steady_output_bytes": {
+          "median": 238925,
+          "min": 238843,
+          "max": 241440
+        },
+        "steady_covered_seconds": {
+          "median": 29.599430487985956,
+          "min": 29.489318787993398,
+          "max": 29.655977177026216
+        }
+      }
+    },
+    "baseline-approval-10000": {
+      "rounds": [
+        {
+          "cpu_percent": 1.3777772984016379,
+          "peak_pss_kib": 44680,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.75807486998383,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 200,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 261207635,
+            "diff": 79668782,
+            "draw": 361229288,
+            "flush": 0,
+            "frame_preparation": 22238311,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 993138,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2017570
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2017570
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.344131747549112,
+          "peak_pss_kib": 45038,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.758987593988422,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 200,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 199643070,
+            "diff": 87398026,
+            "draw": 356449365,
+            "flush": 0,
+            "frame_preparation": 23010696,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 1010921,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1560107
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1560107
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 1.6589417924165906,
+          "peak_pss_kib": 44452,
+          "steady_output_bytes": 0,
+          "steady_covered_seconds": 29.53690130900941,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 200,
+            "draw": 200,
+            "flush": 0,
+            "frame_preparation": 200,
+            "git_scan": 0,
+            "history_hit": 200,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 200,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 216356436,
+            "diff": 102454686,
+            "draw": 437073574,
+            "flush": 0,
+            "frame_preparation": 25998202,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 0,
+            "layout": 1165638,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": null,
+              "p99": null
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1584236
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1584236
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 1.3777772984016379,
+          "min": 1.344131747549112,
+          "max": 1.6589417924165906
+        },
+        "peak_pss_kib": {
+          "median": 44680,
+          "min": 44452,
+          "max": 45038
+        },
+        "steady_output_bytes": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "steady_covered_seconds": {
+          "median": 29.75807486998383,
+          "min": 29.53690130900941,
+          "max": 29.758987593988422
+        }
+      }
+    },
+    "baseline-scroll-10000": {
+      "rounds": [
+        {
+          "cpu_percent": 3.3231381687635695,
+          "peak_pss_kib": 44362,
+          "steady_output_bytes": 214890,
+          "steady_covered_seconds": 29.791117604007013,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 259,
+            "draw": 259,
+            "flush": 59,
+            "frame_preparation": 259,
+            "git_scan": 0,
+            "history_hit": 387,
+            "history_rebuild": 0,
+            "history_scroll": 59,
+            "input": 59,
+            "input_to_submit": 59,
+            "layout": 259,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 198860219,
+            "diff": 151225583,
+            "draw": 927442922,
+            "flush": 218262,
+            "frame_preparation": 38711537,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 240976924,
+            "layout": 1243367,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 4194304,
+                "upper_ns": 5361377
+              },
+              "p99": {
+                "lower_ns": 4194304,
+                "upper_ns": 5361377
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 2.490549153429066,
+          "peak_pss_kib": 45769,
+          "steady_output_bytes": 214890,
+          "steady_covered_seconds": 29.712322641018545,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 260,
+            "draw": 260,
+            "flush": 60,
+            "frame_preparation": 260,
+            "git_scan": 0,
+            "history_hit": 389,
+            "history_rebuild": 0,
+            "history_scroll": 60,
+            "input": 60,
+            "input_to_submit": 60,
+            "layout": 260,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 149394476,
+            "diff": 116006731,
+            "draw": 688560113,
+            "flush": 180526,
+            "frame_preparation": 31179786,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 181305325,
+            "layout": 1054671,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 4194304,
+                "upper_ns": 4684429
+              },
+              "p99": {
+                "lower_ns": 4194304,
+                "upper_ns": 4684429
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 2097151
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 2.4211256815986304,
+          "peak_pss_kib": 45428,
+          "steady_output_bytes": 214890,
+          "steady_covered_seconds": 29.73823314800393,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 259,
+            "draw": 259,
+            "flush": 59,
+            "frame_preparation": 259,
+            "git_scan": 0,
+            "history_hit": 388,
+            "history_rebuild": 0,
+            "history_scroll": 59,
+            "input": 59,
+            "input_to_submit": 59,
+            "layout": 259,
+            "output": 1,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 229472142,
+            "diff": 117507363,
+            "draw": 684048435,
+            "flush": 160107,
+            "frame_preparation": 30894816,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 0,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 177693930,
+            "layout": 1058984,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 4194304,
+                "upper_ns": 4899477
+              },
+              "p99": {
+                "lower_ns": 4194304,
+                "upper_ns": 4899477
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 1048576,
+                "upper_ns": 1721503
+              },
+              "p99": {
+                "lower_ns": 1048576,
+                "upper_ns": 1721503
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 2.490549153429066,
+          "min": 2.4211256815986304,
+          "max": 3.3231381687635695
+        },
+        "peak_pss_kib": {
+          "median": 45428,
+          "min": 44362,
+          "max": 45769
+        },
+        "steady_output_bytes": {
+          "median": 214890,
+          "min": 214890,
+          "max": 214890
+        },
+        "steady_covered_seconds": {
+          "median": 29.73823314800393,
+          "min": 29.712322641018545,
+          "max": 29.791117604007013
+        }
+      }
+    },
+    "baseline-resize-10000": {
+      "rounds": [
+        {
+          "cpu_percent": 15.147009081409502,
+          "peak_pss_kib": 67331,
+          "steady_output_bytes": 158829,
+          "steady_covered_seconds": 29.642815792001784,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 258,
+            "draw": 258,
+            "flush": 58,
+            "frame_preparation": 258,
+            "git_scan": 0,
+            "history_hit": 458,
+            "history_rebuild": 58,
+            "history_scroll": 0,
+            "input": 58,
+            "input_to_submit": 58,
+            "layout": 258,
+            "output": 1,
+            "resize": 58,
+            "screen_resize": 58,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 1515171011,
+            "diff": 52352689,
+            "draw": 4582029612,
+            "flush": 123442,
+            "frame_preparation": 4042599852,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 4010776895,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 4306469813,
+            "layout": 760906,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 67108864,
+                "upper_ns": 134217727
+              },
+              "p99": {
+                "lower_ns": 134217728,
+                "upper_ns": 162445199
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 33554432,
+                "upper_ns": 67108863
+              },
+              "p99": {
+                "lower_ns": 67108864,
+                "upper_ns": 98398783
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 14.540409804826163,
+          "peak_pss_kib": 71764,
+          "steady_output_bytes": 156520,
+          "steady_covered_seconds": 29.64153045101557,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 258,
+            "draw": 258,
+            "flush": 58,
+            "frame_preparation": 258,
+            "git_scan": 0,
+            "history_hit": 458,
+            "history_rebuild": 58,
+            "history_scroll": 0,
+            "input": 58,
+            "input_to_submit": 58,
+            "layout": 258,
+            "output": 1,
+            "resize": 58,
+            "screen_resize": 58,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 1096848805,
+            "diff": 56788914,
+            "draw": 4392128351,
+            "flush": 118779,
+            "frame_preparation": 3829536350,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 3794601823,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 3947279086,
+            "layout": 829474,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 67108864,
+                "upper_ns": 99068514
+              },
+              "p99": {
+                "lower_ns": 67108864,
+                "upper_ns": 99068514
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 33554432,
+                "upper_ns": 67108863
+              },
+              "p99": {
+                "lower_ns": 67108864,
+                "upper_ns": 75481279
+              }
+            }
+          }
+        },
+        {
+          "cpu_percent": 14.580177425516613,
+          "peak_pss_kib": 70293,
+          "steady_output_bytes": 156520,
+          "steady_covered_seconds": 29.629269068012945,
+          "stage_counts": {
+            "deadline_lateness": 200,
+            "diff": 258,
+            "draw": 258,
+            "flush": 58,
+            "frame_preparation": 258,
+            "git_scan": 0,
+            "history_hit": 458,
+            "history_rebuild": 58,
+            "history_scroll": 0,
+            "input": 58,
+            "input_to_submit": 58,
+            "layout": 258,
+            "output": 1,
+            "resize": 58,
+            "screen_resize": 58,
+            "stream": 0,
+            "timer": 200
+          },
+          "stage_total_ns": {
+            "deadline_lateness": 1118428946,
+            "diff": 50216757,
+            "draw": 4398339457,
+            "flush": 119047,
+            "frame_preparation": 3866339245,
+            "git_scan": 0,
+            "history_hit": 0,
+            "history_rebuild": 3835021912,
+            "history_scroll": 0,
+            "input": 0,
+            "input_to_submit": 4136978401,
+            "layout": 741856,
+            "output": 0,
+            "resize": 0,
+            "screen_resize": 0,
+            "stream": 0,
+            "timer": 0
+          },
+          "latency_bounds": {
+            "input_to_submit": {
+              "p95": {
+                "lower_ns": 67108864,
+                "upper_ns": 110656547
+              },
+              "p99": {
+                "lower_ns": 67108864,
+                "upper_ns": 110656547
+              }
+            },
+            "deadline_lateness": {
+              "p95": {
+                "lower_ns": 33554432,
+                "upper_ns": 67108863
+              },
+              "p99": {
+                "lower_ns": 33554432,
+                "upper_ns": 67108863
+              }
+            }
+          }
+        }
+      ],
+      "aggregate": {
+        "cpu_percent": {
+          "median": 14.580177425516613,
+          "min": 14.540409804826163,
+          "max": 15.147009081409502
+        },
+        "peak_pss_kib": {
+          "median": 70293,
+          "min": 67331,
+          "max": 71764
+        },
+        "steady_output_bytes": {
+          "median": 156520,
+          "min": 156520,
+          "max": 158829
+        },
+        "steady_covered_seconds": {
+          "median": 29.64153045101557,
+          "min": 29.629269068012945,
+          "max": 29.642815792001784
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Latency percentiles are histogram bounds, not exact samples or pixel latency.",
+    "Stage timers overlap; do not sum nested timings as CPU cost.",
+    "Process PSS is not heap allocation volume; synthetic PTY excludes terminal emulator."
+  ]
+}

@@ -1,6 +1,6 @@
 # Iteration I322: STORE-002 Domain-Owned Persistence/Retrieval Contracts (C)
 
-> Document status: Active / Claimed proposed — ineffective until governance PR merge
+> Document status: Complete / Closed — bounded I322 C accepted; parent #670 remains Open for D/E/F
 > Published plan date: 2026-11-11
 > Objective: extract existing domain-owned storage/retrieval operational interfaces **without changing implementation or a single existing caller**.
 > Existing A/B baseline: I321 completed in implementation #909, merge `a9914b7a62b0873027997c69d9966d17f3fd48ba` (exact-head CI #4039 8/8, independent API review no blockers).
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | STORE-002 I322 C only: extract minimal domain-owned typed persistence/retrieval traits from existing Session/PendingSubmission/Todo, Memory, Evolution and Exploration operations, documenting the seven A/B infrastructure categories, without changing existing concrete stores, SQL/paths/transactions, consumer dispatch, runtime/host composition or new backends |
@@ -18,10 +18,10 @@
 | Source Issue | #670 |
 | Governance Claim PR | #911 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | User instructed continued #670 implementation; previous A/B #908 claim and #909 implementation merged with exact-head validation and independent API review. Proposed C governance-only activation requires own exact-head CI, both validators, CAS, and no competing claim before any implementation work. No independent approving maintainer on this governance-only candidate; independent public API review is mandatory for the later C implementation PR. |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-11 |
-| Handoff / Release Condition | Independent API/architecture review accepts the implemented domain contracts with exact-head locked CI; future D delegates, E local profile, F conformance and #897 Host wiring require distinct governance authorization. |
+| Authorization Evidence | Claim #911 merged `60da1bbadca00c9bdee6fbcb8f5ad990a4313331`; implementation #912 merged `3df409ef9ed707756350f2c7d4b2c8819f157222` after [exact-head CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758), both validators, independent [API review](https://github.com/wjhuang88/talos/pull/912#issuecomment-6828277614) no blockers and [CAS](https://github.com/wjhuang88/talos/pull/912#issuecomment-6840919956); single-maintainer path, no independent human approval claimed. |
+| Implementation PR | #912 (merged; Completion Commit `3df409ef9ed707756350f2c7d4b2c8819f157222`) |
+| Last Updated | 2026-11-13 |
+| Handoff / Release Condition | I322 C is complete after #912 merge and formal closeout. Later D/E/F require distinct effective governance claims, and #897 Host E2/E3 remain gated. |
 
 ## Scope and source of truth
 
@@ -74,4 +74,24 @@ C5. Object/VectorSearch/Embedding/standalone Rerank: classify as not bound at th
 
 ## Execution / Verification / Completion
 
-Governance claim #911 is a proposal; **no C production code is authorized until #911 merges into main**. Track claim PR, exact-head checks, merge commit, implementation PR, independent technical review, and residual D/E/F authorization here as they occur. `I322` is not Complete and #670 stays OPEN until an actual C implementation merge.
+Governance claim #911 merged to main as `60da1bbadca00c9bdee6fbcb8f5ad990a4313331` after exact-head [CI #4055](https://github.com/wjhuang88/talos/actions/runs/42948954104), both governance validators 0 warnings, and recorded merge-time CAS. C implementation [#912](https://github.com/wjhuang88/talos/pull/912) merged as `3df409ef9ed707756350f2c7d4b2c8819f157222` after exact-head CI, both governance validators, independent review and CAS. **I322 C is Complete / Closed**; #670 remains OPEN for D/E/F. No Host or new storage-engine scope was admitted.
+
+## I322 C execution checkpoint — 2026-11-11
+
+- Effective governance: [#911](https://github.com/wjhuang88/talos/pull/911), merged `60da1bbadca00c9bdee6fbcb8f5ad990a4313331`.
+- [Source-aligned contract map](../reference/STORE-002-I322-DOMAIN-OPERATIONAL-CONTRACT-MAP-2026-11-11.md): existing `SessionStore` retained; PendingSubmission/Todo, Memory, Evolution and Exploration domain contracts exported, with concrete forwarding implementations and compile/in-memory tests.
+- No existing store, SQL/FTS, TLOG/JSONL, SQLite schema, transaction/locking, public constructor, runtime caller or Cargo manifest modified. Trait conformance does **not** mean alternate provider readiness.
+- **Implementation PR, native CI, independent public API review and merge-time CAS pending.** No C completion commit; #670 stays OPEN and D/E/F/Host blocked.
+
+## Completion Evidence — 2026-11-13
+
+- **Completion Commit: `3df409ef9ed707756350f2c7d4b2c8819f157222`** — actual #912 squash-merge on `main`, independent of this documentation closeout.
+- Exact-head `f908f86633ccee5892bf91d738b41bf65eb33799`: [CI #4127](https://github.com/wjhuang88/talos/actions/runs/43249945758) completed overall SUCCESS; macOS full Format/Check/Clippy/Test release preflight, native Windows workspace and Windows Rust, Linux/Windows Desktop, Windows installer and change scope all passed. Both project governance and collaboration claim validators passed. The *separate global remote Issue owner reconciliation* job failed due to already-closed unrelated #901 remaining in the Open Issue matrix; accepted ADR-071 classifies this as advisory for an unrelated implementation PR. The failed job is not misreported as passing.
+- Independent [public API/architecture and three-document rebase review](https://github.com/wjhuang88/talos/pull/912#issuecomment-6828277614) explicitly found no blocking findings on the exact head, and independently checked formatting/diff cleanliness. Agent review shares maintainer GitHub identity; this is not a second human approval. [Final CAS and single-maintainer authorization](https://github.com/wjhuang88/talos/pull/912#issuecomment-6840919956) recorded before guarded merge.
+- Delivered: new minimal domain-owned traits for PendingSubmission and Todo, Memory, Evolution, Exploration, implemented by forwarding into existing concrete stores. Existing `SessionStore` reused. All existing schemas, transaction/recovery behavior, SQL/FTS5, TLOG/JSONL, ranking, formats, callers and manifests preserved; no runtime provider binding or new backend claimed.
+
+## Variance And Residuals
+
+- Older CI #4116 failed macOS `talos-session` existing `durable.rs:2363` fork-recovery fixture once (retired=0, expected=1), a historically observed unexplained intermittent. The **final exact-head #4127 macOS job passed**; root cause is not fixed or claimed fixed. A separately owned recovery diagnostic is required if it recurs; no assertion weakening or scope expansion occurred.
+- D (existing local delegation), E (default local profile) and F (conformance/compatibility) require new effective claims. Parent #670 and #897 E2/E3 Host wiring remain Open/gated; C completion does not establish provider execution readiness or authorize model-owned SQL/embedding/vector providers.
+- The global Issue-matrix reconciliation residual for closed #901 belongs to its own governance owner under ADR-071 and does not alter the reviewed C implementation evidence.

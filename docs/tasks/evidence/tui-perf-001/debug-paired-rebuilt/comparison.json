@@ -1,0 +1,329 @@
+{
+  "schema": 1,
+  "source_commits_from_external_receipts_required": true,
+  "matrix": "/tmp/talos-perf-debug-paired-rebuilt-539adfd2",
+  "cases": {
+    "idle-100": {
+      "baseline_cpu_median": 1.4034273698123876,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -1.5373156701493642,
+        -1.4034140444606151,
+        -1.4034273698123876
+      ],
+      "candidate_peak_pss_kib": 11440,
+      "peak_pss_budget_kib": 21777.199999999997,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "idle_frames": true
+      }
+    },
+    "idle-1000": {
+      "baseline_cpu_median": 1.5365783934446744,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -1.3027199554224396,
+        -1.6030342913810123,
+        -1.5365783934446744
+      ],
+      "candidate_peak_pss_kib": 14221,
+      "peak_pss_budget_kib": 25145.6,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "idle_frames": true
+      }
+    },
+    "idle-10000": {
+      "baseline_cpu_median": 1.4790401596681453,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -1.4125390072526567,
+        -1.4790401596681453,
+        -1.7144258863797983
+      ],
+      "candidate_peak_pss_kib": 44867,
+      "peak_pss_budget_kib": 63047.6,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "idle_frames": true
+      }
+    },
+    "animation-100": {
+      "baseline_cpu_median": 1.5957943151290581,
+      "candidate_cpu_median": 1.5050232946788848,
+      "cpu_ratio": 0.9431185964321271,
+      "paired_cpu_percentage_point_deltas": [
+        -0.21163287613295179,
+        -0.09077102045017327,
+        -0.23778752927753755
+      ],
+      "candidate_peak_pss_kib": 11604,
+      "peak_pss_budget_kib": 22180.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "stable_layout_history": true,
+        "no_git_without_workspace": true,
+        "animation_deadline_p99": true
+      }
+    },
+    "animation-1000": {
+      "baseline_cpu_median": 1.708482432067898,
+      "candidate_cpu_median": 1.5877943278207824,
+      "cpu_ratio": 0.9293594701462408,
+      "paired_cpu_percentage_point_deltas": [
+        0.08269691739177487,
+        0.13727620299328924,
+        -0.22754078834775449
+      ],
+      "candidate_peak_pss_kib": 14468,
+      "peak_pss_budget_kib": 25428.8,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "stable_layout_history": true,
+        "no_git_without_workspace": true,
+        "animation_deadline_p99": true
+      }
+    },
+    "animation-10000": {
+      "baseline_cpu_median": 1.507513238294609,
+      "candidate_cpu_median": 1.4117066691740119,
+      "cpu_ratio": 0.9364472784139665,
+      "paired_cpu_percentage_point_deltas": [
+        -0.0696516252215893,
+        -0.09580656912059715,
+        -0.2501128795328791
+      ],
+      "candidate_peak_pss_kib": 44808,
+      "peak_pss_budget_kib": 63056.0,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true,
+        "stable_layout_history": true,
+        "no_git_without_workspace": true,
+        "animation_deadline_p99": true
+      }
+    },
+    "stream-100": {
+      "baseline_cpu_median": 11.248829813874217,
+      "candidate_cpu_median": 7.824817079972982,
+      "cpu_ratio": 0.6956116511178715,
+      "paired_cpu_percentage_point_deltas": [
+        -5.5233295801786975,
+        -3.4240127339012343,
+        -1.8834100835716843
+      ],
+      "candidate_peak_pss_kib": 12308,
+      "peak_pss_budget_kib": 22838.0,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "stream-1000": {
+      "baseline_cpu_median": 11.278651875180746,
+      "candidate_cpu_median": 8.260411938117956,
+      "cpu_ratio": 0.732393554614042,
+      "paired_cpu_percentage_point_deltas": [
+        -0.8696228588659203,
+        -3.0182399370627895,
+        -4.825965310913362
+      ],
+      "candidate_peak_pss_kib": 16776,
+      "peak_pss_budget_kib": 28607.6,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "stream-10000": {
+      "baseline_cpu_median": 11.016413477385125,
+      "candidate_cpu_median": 8.0891508016543,
+      "cpu_ratio": 0.7342816986907753,
+      "paired_cpu_percentage_point_deltas": [
+        -1.653356263020541,
+        -2.0684348746741144,
+        -3.8121659456232635
+      ],
+      "candidate_peak_pss_kib": 60073,
+      "peak_pss_budget_kib": 78874.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "approval-100": {
+      "baseline_cpu_median": 1.2464734190368543,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -1.0697520406890932,
+        -1.2464734190368543,
+        -1.4029113608913406
+      ],
+      "candidate_peak_pss_kib": 11557,
+      "peak_pss_budget_kib": 22060.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "approval_wait_frames": true
+      }
+    },
+    "approval-1000": {
+      "baseline_cpu_median": 1.3023862575410847,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -1.3023862575410847,
+        -1.4354748854425554,
+        -1.2691664775006406
+      ],
+      "candidate_peak_pss_kib": 14346,
+      "peak_pss_budget_kib": 25601.6,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "approval_wait_frames": true
+      }
+    },
+    "approval-10000": {
+      "baseline_cpu_median": 1.277883082710605,
+      "candidate_cpu_median": 0.0,
+      "cpu_ratio": 0.0,
+      "paired_cpu_percentage_point_deltas": [
+        -1.277883082710605,
+        -1.4790741182848652,
+        -1.1768024320833679
+      ],
+      "candidate_peak_pss_kib": 45041,
+      "peak_pss_budget_kib": 62392.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "approval_wait_frames": true
+      }
+    },
+    "scroll-100": {
+      "baseline_cpu_median": 1.9140630998565318,
+      "candidate_cpu_median": 0.536900440154693,
+      "cpu_ratio": 0.28050299919314897,
+      "paired_cpu_percentage_point_deltas": [
+        -1.3770192860150394,
+        -1.706854969144809,
+        -1.4106591867845188
+      ],
+      "candidate_peak_pss_kib": 11424,
+      "peak_pss_budget_kib": 21790.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "scroll-1000": {
+      "baseline_cpu_median": 2.0141871251439687,
+      "candidate_cpu_median": 0.5368307419186272,
+      "cpu_ratio": 0.2665247608909505,
+      "paired_cpu_percentage_point_deltas": [
+        -1.4097528095987317,
+        -1.5431357939642734,
+        -1.5111039694091706
+      ],
+      "candidate_peak_pss_kib": 14194,
+      "peak_pss_budget_kib": 25030.399999999998,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "scroll-10000": {
+      "baseline_cpu_median": 2.190109125550709,
+      "candidate_cpu_median": 0.6397598707686083,
+      "cpu_ratio": 0.29211323915548676,
+      "paired_cpu_percentage_point_deltas": [
+        -1.6174947907867612,
+        -1.7539003856191469,
+        -1.3851316584498177
+      ],
+      "candidate_peak_pss_kib": 44989,
+      "peak_pss_budget_kib": 62744.0,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "resize-100": {
+      "baseline_cpu_median": 2.007975863727249,
+      "candidate_cpu_median": 0.7024011169404125,
+      "cpu_ratio": 0.3498055577404203,
+      "paired_cpu_percentage_point_deltas": [
+        -1.2045854873447297,
+        -1.3392407616510418,
+        -1.4046446521597669
+      ],
+      "candidate_peak_pss_kib": 11776,
+      "peak_pss_budget_kib": 22540.4,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "resize-1000": {
+      "baseline_cpu_median": 3.971880117450731,
+      "candidate_cpu_median": 2.4104031062529043,
+      "cpu_ratio": 0.6068670339929524,
+      "paired_cpu_percentage_point_deltas": [
+        -1.5618425452629503,
+        -1.5614770111978267,
+        -1.6269958605660806
+      ],
+      "candidate_peak_pss_kib": 17254,
+      "peak_pss_budget_kib": 29374.399999999998,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    },
+    "resize-10000": {
+      "baseline_cpu_median": 16.4336359419125,
+      "candidate_cpu_median": 15.82412523960459,
+      "cpu_ratio": 0.9629107822235853,
+      "paired_cpu_percentage_point_deltas": [
+        0.40090852335016613,
+        -0.609510702307908,
+        -1.7422295630635674
+      ],
+      "candidate_peak_pss_kib": 77332,
+      "peak_pss_budget_kib": 101793.2,
+      "input_p95_p99_budget_ms": null,
+      "checks": {
+        "peak_pss": true,
+        "active_cpu": true
+      }
+    }
+  },
+  "evaluated_checks_pass": true,
+  "limitations": [
+    "Only listed checks are evaluated; this is not whole-task acceptance.",
+    "CPU ratios at zero baseline are unavailable, not zero.",
+    "Native terminal, allocations and long-run heap stability require separate evidence; input latency is checked only with probes and animation lateness only in animation cases.",
+    "Pair deltas follow manifest round order; fixed baseline-first ordering can retain host drift."
+  ]
+}

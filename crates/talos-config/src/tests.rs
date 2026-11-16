@@ -2523,9 +2523,15 @@ fn store_unset_builtin_provider_clears_credentials() {
 
     let reloaded = reload_via_config_load(&dir);
     assert!(!reloaded.providers.contains_key("anthropic"));
+    // API-key resolution also reads the host environment (and other tests mutate
+    // it). Disconnect removes persisted credentials, not environment fallback.
     assert!(
-        reloaded.api_key().is_err(),
-        "builtin provider must not have resurrected credential"
+        reloaded.active_provider_config().api_key.is_none(),
+        "builtin provider must not have resurrected persisted credential"
+    );
+    assert!(
+        !dir.join("credentials.toml").exists(),
+        "removing the last persisted key should remove the credentials file"
     );
 
     let _ = fs::remove_dir_all(&dir);
