@@ -151,3 +151,52 @@ is admitted*. New production and live automated acquisitions remain
 **BLOCKED** pending appropriate use rights and a new effective claim.
 D/#644 stays closed BLOCKED/ZERO-ADMISSION; D2/#848 remains unclaimed;
 E/F/G/I and parent #624 are unchanged.
+
+## 7. Rights and next-action recheck — 2026-11-15
+
+**Provenance:** This is a current review of *published Microsoft
+documentation* and accepted Talos GitHub source, **not** a live Bing query,
+written Microsoft approval, new commercial license or Chinese-network test.
+The 2026-11-13 original source matrix and its BLOCKED/UNKNOWN ratings stand.
+
+| Evidence surface | Official source | Rechecked decision |
+|---|---|---|
+| Bing/MSN user content and product reuse | [Microsoft Services Agreement](https://www.microsoft.com/en-us/servicesagreement), published 2026-07-30, effective 2026-09-30, Bing and MSN Materials | **BLOCKED for unapproved product use**. The personal/noncommercial grant does not establish Talos's distributed zero-key embedded automated search or response reuse rights. Permission by Microsoft/rightsholders or applicable law must be assessed independently. |
+| Historic paid Bing Search API | [Microsoft 2025-08-11 retirement notice](https://learn.microsoft.com/lifecycle/announcements/bing-search-api-retirement) | **NOT an available free default alternative**. Former paid API display and LLM-specific terms, where still posted, attach to those services; they are not a raw SERP scraping grant. |
+| Current Microsoft-managed Foundry Web Search/Grounding | [Foundry web grounding overview](https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/tools/web-overview), [Foundry Grounding with Bing](https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/tools/bing-tools), [general Microsoft Azure Product Terms (MCA; no Grounding-specific clause established from this page)](https://www.microsoft.com/licensing/terms/en-US/product/MicrosoftAzure/MCA) and **[Grounding enterprise-integration terms](https://www.microsoft.com/en-us/bing/apis/grounding-legal-enterprise)** | Foundry is an **enterprise integration** subject to the linked *enterprise* terms and customer agreement. [The separate Approved Microsoft Application terms](https://www.microsoft.com/en-us/bing/apis/grounding-legal) expressly **exclude Azure Foundry/enterprise integrations**; do not apply those terms to Foundry. This is a distinct managed/billed output and display contract, **not** a grant for anonymous consumer SERP HTML; its citations/summaries are not `li.b_algo` transport fixtures. Any optional opt-in integration requires separate review. |
+| Microsoft Web IQ | [Web IQ official FAQ](https://learn.microsoft.com/en-us/web-iq/resources/faq/) | Distinct commercial/search data product with restrictions on cache, archival and output; no automatic entitlement to use consumer Bing HTML. Any future consideration needs a separate paid/service/privacy review. |
+| Talos actual change | [D3-T2/#947](https://github.com/wjhuang88/talos/issues/947), [source PR #949](https://github.com/wjhuang88/talos/pull/949) and [owner-first #950](https://github.com/wjhuang88/talos/pull/950) | **Complete / Closed**, source Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99`, docs closeout `6c5505abdc8d964ec39c01d221e9e3297a3458cf`. Exact `b_ad` ancestor-only filtering and synthetic tests; NO real Bing DOM validation or host admission. |
+
+### Supplier/rightsholder clarification request — pre-implementation gate
+
+A documented affirmative answer needs to explicitly cover **both service
+access and output rights** for Talos's contemplated use, rather than treating
+a working browser page or HTTP 200 as authorization:
+
+1. Does Microsoft (or applicable rights holder) authorize end-user initiated
+   **automatic** queries made locally by a redistributed, uncredentialed
+   open-source Talos agent, as opposed to individual browser searches or
+   purchased Foundry tools? Clarify `cn.bing.com/search`,
+   `www.bing.com/search`, and the **unverified** `bing.cn` alias separately.
+2. Which access method, identity, agreement, rate/volume and distribution
+   conditions apply? Are automated HTML SERP requests permitted at all, or
+   must access use a documented, credentialed service?
+3. May Talos extract/display titles, result URLs and snippets; pass snippets
+   to a model for one user query; retain query/session traces or results; and
+   display attribution? Which per-user terms or rights apply?
+4. What geographic/locale and redirect restrictions, retention periods,
+   attribution and user-notice requirements are binding? Is a written
+   product-specific grant required and who can grant it?
+
+**GO criteria:** written applicable rights (including output use); an
+effective separately selected Issue/owner/iteration claim; ADR-090 prepared
+endpoint + redirect authority review and Network/privacy/budget acceptance;
+then bounded operator-attested mainland-China and separate comparator
+**query-level** observations, with no raw query in logs and no CAPTCHA
+workarounds. **Otherwise BLOCKED / no new host**. Do not infer legal
+authorization from official commercial grounding product docs.
+
+D3/#937 remains **OPEN / Intake / Unclaimed**; Epic/#624 remains OPEN.
+#644 stays historical **Complete / Closed with BLOCKED / ZERO-ADMISSION**.
+E/F/G/I and independent-provider counting remain gated. This evidence
+recheck makes **no** code/CI/network permission/default changes.

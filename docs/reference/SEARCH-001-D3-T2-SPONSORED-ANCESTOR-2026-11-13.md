@@ -4,8 +4,7 @@
 > [owner](../backlog/active/SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) /
 > [I327](../iterations/I327-search-bing-sponsored-ancestor-rejection.md).
 > **Synthetic-only behavior correction; no real Bing data acquired.**
-> Source PR/CI/independent review and implementation Completion Commit pending
-> at this initial evidence packet's publication.
+> **Accepted source**: [PR #949](https://github.com/wjhuang88/talos/pull/949), Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99`; [exact-head CI43465355386](https://github.com/wjhuang88/talos/actions/runs/43465355386) attempt 2, 8/8 SUCCESS and [independent read-only review](https://github.com/wjhuang88/talos/pull/949#issuecomment-6859139961). No new endpoint/network authority was admitted.
 
 ## Origin and scope
 
@@ -33,9 +32,7 @@ and normal candidate pipeline remain unchanged.
 | Pre-existing `bing_parser/tests.rs` cases | Status/challenge, BOM/UTF-8, input/field/result limits, dedup, ordered title/snippet selection unchanged | Regression parity |
 | Existing prepared compatibility chain tests | No change in query receiver, host/redirect permission or compound source identity | Authorization parity |
 
-These entries are an **intended test matrix**, not a declaration that CI
-passed; acceptance requires actual locked focused tests, cross-platform
-native CI and independent source review on the exact implementation head.
+These tests were accepted in source PR #949; exact-head CI43465355386 **attempt 2 completed 8/8 SUCCESS** after a first-attempt unrelated macOS `talos-session` recovery test failure (`durable.rs:2363`, expected 1 / observed 0). The failed macOS job was rerun at the **same SHA** with no changes, ignored tests or disabled gates. The separate first source-head rustfmt failure was corrected in the final reviewed head.
 
 ## Explicit residual limitations
 
@@ -54,13 +51,10 @@ native CI and independent source review on the exact implementation head.
   This source-only correction does not authorize live automated access.
 - Open stale Draft [PR #861](https://github.com/wjhuang88/talos/pull/861)
   modifies the same parser source **import** on an old unmergeable head,
-  while T2 edits only the result-loop body. Before merge, recheck #861
-  and current main, refuse to replace accepted `compat_helpers`
-  import, and stop on actual same-hunk conflict or newly active claim.
+  while T2 edits only the result-loop body. At #949 merge, #861 was still
+  open/dirty with no same-hunk conflict; final CAS preserved the accepted
+  `compat_helpers` import. #861 was not closed or superseded by this work.
 
 ## Completion evidence
 
-**Pending** source PR, exact-head CI, independent review, merge-time CAS
-and actual implementation Completion Commit. Final owner-first closeout
-must distinguish the real source commit from any later docs-only
-governance merge. Parent research D3/#937 and Epic #624 remain Open.
+**Implementation Completion Commit: `5b2fa4358b83698ca4c0e517ce24a6dbba021d99`** — actual [source PR #949](https://github.com/wjhuang88/talos/pull/949), not later documentation. Final accepted source head `ee1265c35685481d8eb9e753cd962975bd153bc0`, CI43465355386 attempt 2 all 8 jobs SUCCESS, independent exact-head no-blocker parser/API/security review and expected-head CAS merge. The initial failed macOS attempt and prior rustfmt-only failure remain documented as historical evidence; neither was suppressed. Owner-first closure must still be published before closing #947. Parent D3/#937 and Epic #624 remain Open.

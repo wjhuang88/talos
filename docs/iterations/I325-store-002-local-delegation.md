@@ -1,6 +1,6 @@
 # Iteration I325: STORE-002 Existing Local Delegation (D)
 
-> Document status: Review / Claimed — D local operational delegation test candidate, not Complete
+> Document status: Complete / Closed — I325 D accepted; #670 Open for E/F
 > Selected: 2026-11-13
 > Source: [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / [#670](https://github.com/wjhuang88/talos/issues/670)
 > Baseline: A/B [#909](https://github.com/wjhuang88/talos/pull/909) and C [#912](https://github.com/wjhuang88/talos/pull/912) implemented; C bounded closeout [#930](https://github.com/wjhuang88/talos/pull/930) merged at `a07b466d5aa2a03fb841cdcb918cd4968c778942`. E/F and #897 Host remain gated.
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | STORE-002 D only: verify and complete minimal functional local delegation of existing SQLite/FTS5/TLOG/JSONL stores via accepted I322 domain traits; add focused trait-directed conformance tests or narrowly necessary domain-local adapter glue without changing store implementations or production consumers. E local composition, F broad equivalence, ARCH-035/Host wiring and new engines excluded. |
@@ -17,10 +17,10 @@
 | Source Issue | #670 |
 | Governance Claim PR | #932 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | D governance claim #932 merged `e49ccde70556403a9d7b66551565e2b6c81ad32d` after CI #4151 and independent claim review; D code requires its own CI and independent technical review. C implemented in #912 (`3df409ef9ed707756350f2c7d4b2c8819f157222`) and closed in #930 (`a07b466d5aa2a03fb841cdcb918cd4968c778942`). D governance [#932](https://github.com/wjhuang88/talos/pull/932) is merged/effective and authorizes the bounded D implementation test slice. Source user authorized continued #670. Implementation #935 requires its own exact-head native CI, governance validators, independent technical review and final merge-time CAS; the open implementation branch is not yet accepted. |
-| Implementation PR | #935 |
-| Last Updated | 2026-11-13 |
-| Handoff / Release Condition | After accepted bounded D delegation and independent API/runtime review, record Completion Commit, release claim, and keep E/F plus #897 independently gated. |
+| Authorization Evidence | D governance claim #932 merged `e49ccde70556403a9d7b66551565e2b6c81ad32d`; implementation #935 merged `027b8a59194f5ba496b0048c7183ad236e2e2dd2` after exact-head CI #4223 applicable jobs success, independent [technical APPROVE](https://github.com/wjhuang88/talos/pull/935#issuecomment-6871229199), formal Copilot no-open-issues re-review and [CAS](https://github.com/wjhuang88/talos/pull/935#issuecomment-6871430719). Remote global Issue matrix job FAILED (#941/#947) and is an unrelated ADR-071 advisory, not a pass. Single-maintainer path, no independent human approval claimed. |
+| Implementation PR | #935 (merged; Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2`) |
+| Last Updated | 2026-11-14 |
+| Handoff / Release Condition | I325 D Complete / Closed. E local composition, F broad parity and #897 E2/E3 Host work require separate effective claims. Parent #670 stays Open. |
 
 ## Objective and dependency boundary
 
@@ -45,12 +45,19 @@ D makes their existing local delegation demonstrably operational at accepted dom
 
 ## Activation and completion gates
 
-- **Effective claim #932** merged to `main` at `e49ccde70556403a9d7b66551565e2b6c81ad32d`. D implementation is in Review, and no acceptance is asserted before CI, independent review and merged implementation evidence.
-- Completion requires a future **existing** implementation/evidence merge commit (not a status-only self-reference), exact-head CI, independent review appropriate to actual changed API/runtime scope, owner-first closure, derived index updates and #670 issue synchronization.
-- Parent #670 remains OPEN for D/E/F; later E/default local composition and F/characterization require separate claims, #897 Host remains gated until accepted functional delegation and local profile.
+- **Effective claim #932** merged to main at `e49ccde70556403a9d7b66551565e2b6c81ad32d`; D implementation #935 accepted with existing Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2`.
+- Completion rule satisfied: pre-existing implementation merge SHA, exact-head CI and independent review, CAS and this owner-first documentation closeout; the docs closeout does not cite itself as Completion Commit.
+- Parent #670 remains OPEN for E/F; E default local composition and F broader parity require separate claims, #897 Host integration remains gated.
 
-## I325 D implementation candidate — 2026-11-13
+## I325 D accepted implementation — 2026-11-14
 
 - [Local delegation inventory](../reference/STORE-002-I325-D-LOCAL-DELEGATION-INVENTORY-2026-11-13.md) maps all accepted domain traits to existing constructors and real local operations, and retains SessionIndex/durable-binding residuals.
-- Proposed tests use trait objects for Session TLOG/JSONL logs, Pending generation fencing, Todo transaction/dependency graph, Memory evidence/FTS/graph, Evolution patterns and Exploration atomic source/FTS/citations.
-- No duplicate C forwarder, new provider, Host/runtime composition or SQL/data format change; independent API review and exact-head Rust CI **pending**, D **not Complete**, E/F gated.
+- Merged tests use trait-directed operations for Session TLOG/JSONL, Pending generation fencing, Todo graphs, Memory SQLite/FTS5/evidence/graph/content dedup with distinct ID, Knowledge patterns, and Exploration citations/FTS5.
+- No duplicate C forwarding, new provider, Host/runtime composition or SQL/data-format change. Exact-head native CI and independent review passed, D Complete / Closed, E/F separately gated.
+
+## Completion evidence and residuals
+
+- **Completion Commit: `027b8a59194f5ba496b0048c7183ad236e2e2dd2`** — existing #935 squash implementation merge preceding this closeout.
+- [CI #4223](https://github.com/wjhuang88/talos/actions/runs/43552408748) for reviewed exact head `259d240aa9f69d4c89060fd0891e61ea1b99eb19`: overall Success, seven applicable jobs successful; both governance validators passed with one unrelated SEARCH-001-D3 claim warning. Independent global remote Issue/Owner reconciliation **FAILED** (#941/#947 matrix drift), not misreported as passing.
+- Independent [APPROVE technical review](https://github.com/wjhuang88/talos/pull/935#issuecomment-6871229199), [Copilot no-open-issues recommendation](https://github.com/wjhuang88/talos/pull/935#pullrequestreview-5901387865), [single-maintainer CAS](https://github.com/wjhuang88/talos/pull/935#issuecomment-6871430719). Dedup test repair uses a distinct primary ID to prove content-hash rejection; no new production implementation. Agent review does not imply separate human approval.
+- Parent #670 OPEN for separately claimed E/F; #897 E2/E3 Host remains blocked until usable E composition and a separate claim. Existing SessionIndex/durable-binding authority and unavailable Object/VectorSearch/Embedding/Rerank categories remain explicit limits, not claimed operational implementations.

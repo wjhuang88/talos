@@ -85,6 +85,28 @@ I unactivated. Parent #624 remains Open and all other parent completion gates un
 
 [SEARCH-001-D3 / #937](SEARCH-001-D3-bing-direct-html-feasibility.md) is a separately documented **Intake / Proposed / Unclaimed** feasibility Spike, not a new search-provider implementation. Existing `cn.bing.com/search` and `bing_parser.rs` are Talos-owned compatibility; `www.bing.com/search` and `bing.cn` alias/redirect behavior are unverified candidates in **one Bing family**. The [dated source/fixture packet](../../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md) records Microsoft terms effective 2026-09-30 and BLOCKED new distributed-default usage/result-rights, UNKNOWN live and mainland-China observations, and offline-only tests for any separately claimed future scope. It does not reopen completed #901, replace D/#644 ZERO-ADMISSION, admit a provider, activate E/F/G/I or close this Epic.
 
+## SEARCH-001-D3 T2 closure and rights checkpoint — 2026-11-15
+
+[SEARCH-001-D3-T2 / #947](SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md)
+has completed its independently governed narrow parser fix: source #949
+Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99`,
+owner-first #950 closeout `6c5505abdc8d964ec39c01d221e9e3297a3458cf`,
+and #947 Closed. The accepted synthetic-only exclusion applies solely to
+`li.b_algo` with exact `b_ad` ancestor class; it does not demonstrate
+real Bing sponsored quality, region availability, or source independence.
+
+[Parent D3/#937](SEARCH-001-D3-bing-direct-html-feasibility.md)
+remains **OPEN / Intake / Unclaimed**. Current Microsoft service terms,
+retired Bing Search APIs, distinct commercial Foundry Grounding/Web Search
+and Web IQ products [rechecked 2026-11-15](../../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md#7-rights-and-next-action-recheck--2026-11-15)
+do not establish permission for an uncredentialed Talos-distributed
+automated Bing HTML route or its title/snippet/LLM-context rights.
+Written scoped access/output authorization plus separately claimed
+live mainland-China/comparator evidence remain prerequisite; no additional
+`www.bing.com`/`bing.cn` endpoint or independent provider is admitted.
+D/#644 ZERO-ADMISSION, E/F/G/I blocking and all parent completion
+requirements remain unchanged.
+
 ## Child Dependency Map
 
 The table is a proposal for child **outcomes**, not blanket implementation authorization. Completed
@@ -97,6 +119,7 @@ accepted claims before executable work.
 | SEARCH-001-B | Domain extraction with current-behavior-compatible adapters | A ADR accepted | [#642](https://github.com/wjhuang88/talos/issues/642), Complete / Claimed; I292; #653/#656 plus closeout evidence merged |
 | SEARCH-001-C | Talos-owned auto router, deadlines, error semantics, #199 integration | B / A | [#643](https://github.com/wjhuang88/talos/issues/643), Complete / Closed; I293; Completion Commit `eb870cdf0a63f45f20d89f1a50eba276f9198643` (#808) |
 | SEARCH-001-D | Provider feasibility and real multi-region (incl. mainland China) evidence gate | A; research may overlap B | [#644](https://github.com/wjhuang88/talos/issues/644), Complete / Closed with **BLOCKED / ZERO-ADMISSION** outcome; I294; #831 merge `bdb98b2b47dbb76111f5b053a226efbb033c6b34` |
+| SEARCH-001-D3-T3 | Preferred non-CN Bing HTML → CN failover *within one family*; separately governed offline decision/tests, **no production admission** | D3/#937 research, existing parser, explicit rights/ADR-090 gate | [#957](https://github.com/wjhuang88/talos/issues/957) / [owner](SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](../../iterations/I329-search-bing-dual-host-offline.md): proposed claim, **ineffective until merge**; live/default activation blocked |
 | SEARCH-001-D3 | Direct Bing HTML multi-entry evidence, legal/right-to-use and offline contract plan; **same provider family**, not admission | Existing C/L complete, prior D zero-admission preserved | [#937](https://github.com/wjhuang88/talos/issues/937) / [owner](SEARCH-001-D3-bing-direct-html-feasibility.md) — **Intake / Proposed / Unclaimed**, documentary rights gate BLOCKED; no new endpoint, Auto selection or tests |
 | SEARCH-001-E | First Talos-native zero-key provider with fixtures | C + D admission | **Blocked** — D admission did not occur; no implementation authorization |
 | SEARCH-001-F | Second meaningfully independent native zero-key provider | C + D admission + E interface | **Blocked** — D admission did not occur; no implementation authorization |
@@ -172,3 +195,14 @@ unclaimed/blocked status until an explicit reviewed governance decision accepts 
 narrow scope amendment and independent atomic claim+iteration.** No code, default
 search behavior, API, permission, provider admission or Cargo manifest change is
 authorized by this preflight.
+
+## 2026-11-16 maintainer Bing endpoint-priority direction
+
+[SEARCH-001-D3-T3 / #957](SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md)
+sets the desired *Bing-family* zero-key HTML variant order: non-CN
+`www.bing.com/search` first, then existing CN `cn.bing.com/search` if the
+first is unavailable **and** fallback is authorized; `bing.cn` is not admitted.
+This does **not** reorder DDG vs Bing, count as a second native provider, enable a
+new query recipient, or waive D3/#937's Microsoft access/output-use and region
+qualification gates. I329 proposes strictly offline policy tests only; E/F/G/I
+remain blocked and this Epic remains Open.

@@ -27,7 +27,7 @@
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
 | Implementation PR | None |
-| Last Updated | 2026-11-13 |
+| Last Updated | 2026-11-15 |
 | Handoff / Release Condition | No live automated Bing SERP acquisition, new endpoint, test code, default-routing or provider admission until appropriate rights and an effective, independently reviewed owner/iteration claim. |
 
 ## Identity, goal and user value
@@ -115,7 +115,38 @@ D3.1 documentary research [PR #938](https://github.com/wjhuang88/talos/pull/938)
 
 ## Separate parser-local correction candidate — SEARCH-001-D3-T2 / #947
 
-T1/#941 was **Complete / Closed** after implementation #944 `9cbc615cebb119ead9706a4d00159d7151639606` and owner-first closeout #946 `73ec650b6ef9804d0c9c42a6f1c5e7c9d9f0baa7`. Its synthetic test records an explicit sponsored ancestor `b_ad` containing `li.b_algo` incorrectly yielded as an organic candidate. [D3-T2 / #947](SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) and [I327](../../iterations/I327-search-bing-sponsored-ancestor-rejection.md) propose a **separate, narrowly scoped parser correction**, with no new query host, network/default/permission or generic sponsor-classification heuristics. This registration has no effective source implementation claim until a reviewed governance PR merges. It does not amend D3's **Intake / Proposed / Unclaimed** research status or Microsoft's outstanding use-rights, live regional, second-provider and E/F/G/I gates. Epic #624 remains Open.
+T1/#941 was **Complete / Closed** after implementation #944 `9cbc615cebb119ead9706a4d00159d7151639606` and owner-first #946 `73ec650b6ef9804d0c9c42a6f1c5e7c9d9f0baa7`. Its synthetic test exposed a specific explicit `b_ad` ancestor containing `li.b_algo` falsely treated as an organic result. [D3-T2 / #947](SEARCH-001-D3-T2-bing-sponsored-ancestor-rejection.md) and [I327](../../iterations/I327-search-bing-sponsored-ancestor-rejection.md) then received effective claim #948 (`5704bb66aca22919347705a5bff40a84d641c3c9`) and a narrowly scoped **accepted parser correction** in [PR #949](https://github.com/wjhuang88/talos/pull/949), Completion Commit `5b2fa4358b83698ca4c0e517ce24a6dbba021d99`. Exact-head CI43465355386 second attempt 8/8 SUCCESS, independent source review and CAS; owner-first closeout [PR #950](https://github.com/wjhuang88/talos/pull/950) merged `6c5505abdc8d964ec39c01d221e9e3297a3458cf` after final docs CI43731465216 SUCCESS, independent review and CAS; [#947](https://github.com/wjhuang88/talos/issues/947) **Closed / Completed**. The correction recognizes **only explicit `b_ad` ancestor tokens**, not all real Bing sponsored formats. This does **not** change D3's **Intake / Proposed / Unclaimed** research status, query hosts, Microsoft usage/result rights, live mainland-China evidence, independent provider count or E/F/G/I admission. Epic #624 remains Open.
+
+## Rights-gate reconciliation — 2026-11-15 (research only)
+
+Following completed child D3-T2/#947, the parser's explicit `b_ad` ancestor
+false-positive is fixed, but **this does not clear Bing's service-use gate**.
+The [2026-11-15 vendor-source reconciliation](../../reference/SEARCH-001-D3-BING-DIRECT-HTML-2026-11-13.md#7-rights-and-next-action-recheck--2026-11-15)
+confirms the Bing/MSN Materials clause in the Microsoft Services Agreement
+(published 2026-07-30, effective 2026-09-30) still limits unlicensed
+commercial/product-building reuse; the old Bing Search APIs were retired
+2025-08-11. Microsoft-hosted Foundry/Web Search, Grounding with Bing and
+Web IQ have distinct commercial service/terms and output contracts; none is
+evidence of a free, raw HTML request grant for Talos. **BLOCKED / UNPROVEN**
+for new automated default HTML use and result/display/model-context rights;
+**UNKNOWN** for live www/bare alias redirects and regional performance.
+These are product-use evidence gates, not an assertion that all individual
+manual browsing is forbidden or a legal opinion.
+
+**Next executable decision:** obtain supplier/rightsholder or qualified legal
+determination covering (a) user-initiated automatic queries from a distributed,
+zero-key OSS client to each proposed host; (b) user-facing titles/snippets/URLs,
+attribution, cache and LLM-context use; (c) permitted frequency/redirect
+handling and geographic applicability. Record permission in writing with
+scope/version, otherwise keep BLOCKED. Only after affirmative rights, create
+a *separate claimed work slice* for a bounded, consented live query/redirect
+study from genuine mainland-China and independent comparator networks,
+with prepared per-hop authority, Network permission, privacy redaction and
+existing budget. No license decision, host test or new source has occurred here.
+
+This closes no part of D3/#937 or Epic/#624, changes no code, tests, endpoint,
+default route or grant, does not reopen closed #947 and preserves #644's
+historical BLOCKED / ZERO-ADMISSION disposition.
 
 ## Acceptance (documentary only)
 
@@ -137,3 +168,23 @@ acceptance, `docs/backlog/PRODUCT-BACKLOG.md` is derived inventory and the
 Issue reconciliation matrix records remote status. Rollback of this documentary
 proposal requires only removal/reversion of its new documents and references.
 No runtime or user configuration migration is performed.
+
+## Maintainer implementation direction — 2026-11-16 (D3-T3 / #957)
+
+[SEARCH-001-D3-T3 / #957](SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md)
+records the **desired zero-key Bing HTML product design**: within the same Bing family,
+attempt `www.bing.com/search` (non-CN) first and use current `cn.bing.com/search`
+only for correctly classified, permitted *unavailability*. Bare `bing.cn` stays
+unadmitted. Existing higher-level DDG Lite → Instant Answer → DDG HTML → Bing order
+is **not** changed by this endpoint-variant preference.
+
+Its proposed [I329](../../iterations/I329-search-bing-dual-host-offline.md)
+claim covers **offline-only** failover decision logic and tests, not a new
+Network endpoint, live request, distribution, route switch, Browser/CDP integration,
+rights grant or product-default activation. In particular no 429/challenge/403
+fallback is allowed as an access-control evasion. New `www` HTTP traffic still needs
+written applicable access **and output-use rights**, independently accepted
+ADR-090 authority/budget, actual permitted mainland-China/comparator evidence,
+separate effective source/activation claim, exact-head CI and security/API review.
+D3/#937 stays Intake / Unclaimed; Epic #624 stays Open, D/#644 ZERO-ADMISSION and
+E/F/G/I are unchanged.
