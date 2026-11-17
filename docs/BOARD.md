@@ -1,6 +1,6 @@
-## SEARCH-001-D3-T3 / I329 — proposed offline Bing variant/failover claim
+## SEARCH-001-D3-T3 / I329 — T3a offline Complete / Closed; T3b production BLOCKED
 
-[Owner](backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](iterations/I329-search-bing-dual-host-offline.md) / [Issue #957](https://github.com/wjhuang88/talos/issues/957): proposed **Active / Claimed after governance merge** for offline-only non-CN→CN variant decision/negative-test candidate. No production endpoint, permission, Browser integration, new native provider, region or usage-rights admission. Parent D3/#937 and Epic #624 remain open; D/#644 ZERO-ADMISSION, E/F/G/I blocked.
+[Owner](backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](iterations/I329-search-bing-dual-host-offline.md) / [Issue #957](https://github.com/wjhuang88/talos/issues/957): **T3a Complete / Closed upon owner-first closeout merge**. Offline-only failover policy and seven synthetic tests accepted via source [PR #959](https://github.com/wjhuang88/talos/pull/959), actual **Completion Commit `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a`**, exact-head CI #4333 8/8 SUCCESS and independent APPROVE/CAS. **T3b BLOCKED / Unclaimed**: no production `www.bing.com` request, new Network/redirect budget permission, Browser/CDP, vendor access/output rights, or real mainland-China/comparator evidence. Keep #957, parent D3/#937 and Epic #624 Open; #644 ZERO-ADMISSION and E/F/G/I gates unchanged.
 
 ## AUTO-HISTORY-001 — Review / Claimed
 
