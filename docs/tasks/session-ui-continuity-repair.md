@@ -330,3 +330,18 @@ Old CI43992079353 Windows workspace tests passed, including five watcher tests
 and TUI702/0/0. Its later WAL path diagnostic failed because old UI8bcb7b47 lacked
 wal_path_probe requested by target workflow. This integration includes that main
 example. Raw failure retained; new exact-head CI required, no whole old-run pass.
+
+
+## 2026-11-17 approval integration final gate
+
+Merged main0cf52249 into UI101687c2 locally. Fixed the stale EventLoop test literal
+(remove workspace_root, add runtime_generation:1/input_started:false); real compile
+failed E0560 before fix and4approval_queue_tests passed after. Independent review
+APPROVE; causal cancellation/cleanup assertions preserved. Production source matches
+validated combinedff068667; only a test's ordering differs within crates.
+Full pinned/locked preflight passed5622/0/0,exit0,11min52.695s,peak2G/swap0,
+external SDK/SQLite fixtures passed. All2686tracked file hashes unchanged. Evidence:
+target/ui-approval-integrated-preflight-20261117.log and source-manifest JSON.
+Old CI43998984637 was superseded; normal cancel remained live, authorized force-cancel
+confirmed completed/cancelled. New exact-head CI still required. No installation,
+source-session rewrite, default continuation or Complete claim.

@@ -325,6 +325,21 @@ The `[auto] enabled` setting defaults to `true` as an attempted bounded-assistan
 unconditional permission. `/auto`, `/auto on`, and `/auto off` inspect or override the active
 session without writing configuration or transcript state.
 
+In the unreleased rolling-history candidate, built-in approval reviewers receive up to eight
+previous judgments from the same live resolver/session: sanitized tool/review context, available
+public effect summaries and decision points, and correlated fallback outcomes. History is held
+in memory only, with at most 1024 serialized bytes per entry and 8192 bytes per envelope. Older
+entries are removed when the current review's payload budget needs room; current evidence is
+never truncated to fit history. A prior approval cannot override policy or authorize another call.
+`/auto on`, resolver replacement and permission-session rotation discard prior history for new
+requests. A reset cannot retract a request already constructed or sent to a provider.
+
+Human choices are distinguished from legacy-host choices with unknown attribution, unavailable
+approval surfaces and cancelled requests. The candidate uses correlated TUI requests that expire
+on session changes, transport closure or cancellation of the TUI run. Full platform and integrated
+acceptance remain pending; this is not a released completion claim. See the
+[approval-history task](docs/tasks/auto-approval-rolling-history.md) for remaining acceptance.
+
 With an interactive approval surface, registered built-in `delay`, `schedule`, and
 `cancel_scheduled_task` requests can receive one-time model approval after review of
 their exact arguments and current user intent. Scheduling may create recurring model

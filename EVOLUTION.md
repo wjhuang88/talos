@@ -1770,3 +1770,13 @@ visible; distinguish passed assertions from independently emitted evidence.
 - Fix: preserve exact external authorization through capability-relative creation; separately bind Session-owned worktree receipts and invalidate old approvals when root identities change.
 - Prevention: test real approval delivery with CLI-equivalent capabilities, approved/denied external paths, and stale Once/Session grants after worktree replacement.
 - Promoted to rule/check: `external_write_tui_approval_reaches_capability_execution`, `workspace_defaults_and_external_auto_fallback_reach_real_write`, and Session worktree custody/revocation tests. Implementation remains under review; this entry is not delivery evidence.
+
+
+## 2026-11-17 - Clean Git merges can retain incompatible test fixtures
+
+- Trigger: approval history merged after recovery while UI integration was pending.
+- Symptom: conflict-free combined CLI tests failed E0560 for removed `EventLoop.workspace_root`; new `runtime_generation` and `input_started` fields were absent.
+- Root cause: candidate-only CI and mergeability were checked, but the existing combined-candidate fixture adaptation was not propagated into the merge delivery sequence.
+- Fix: retain the already validated initializer adaptation; actual compile reproduced failure, then all four approval queue regressions passed with unchanged causal assertions.
+- Prevention: compare prospective merge trees with the validated integration candidate, including test-only adapters; run affected test compilation when independently green branches meet changed struct shapes.
+- Promoted to rule/check: existing `approval_queue_tests` compilation and `release_preflight.sh`; no new global governance rule.
