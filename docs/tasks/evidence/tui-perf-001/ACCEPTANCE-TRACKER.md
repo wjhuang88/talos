@@ -7,6 +7,15 @@ Measured runtime source: `539adfd2`; candidate build receipt: `candidate-build/r
 Current implementation source: `43305a58` on base `6c81390a`. Each archive retains
 its own source receipt; earlier measurements do not automatically cover later changes.
 
+## Maintainer acceptance adjustment — 2026-11-16
+
+Second-terminal acceptance is **waived**, not passed, by explicit maintainer
+instruction “跳过第二终端，直接放行”. Earlier outstanding second-terminal rows
+are historical and superseded by this decision. Other gates remain in effect.
+Ghostty external Git create/delete/branch refresh, native workspace-switch replay
+and display-only approval/reject interaction were confirmed. See the owner’s
+latest native acceptance checkpoint for source/evidence limits and residuals.
+
 ## Current delivery checkpoint — 2026-11-16
 
 PR #960 merged as `3b1b1f67`, exact candidate `4c9bf99d`. Bounded native Git
