@@ -2040,3 +2040,16 @@ This supersedes earlier checkpoints listing original479ms attribution as require
 remaining work. Native Windows terminal acceptance remains unavailable and unwaived;
 the second supported terminal remains explicitly waived, not passed. Overall status
 remains Review / Claimed pending the remaining acceptance and delivery gates.
+
+
+### Native production approval acceptance — 2026-11-17
+
+Maintainer confirmed complete panel text and normal cursor; denying an actual
+outside-workspace write closed the panel and restored input. Approving the
+subsequent stat with key1 returned file-not-found, confirming the denied write
+was absent. Screenshots show production tool/permission execution with auto off;
+this closes the previously display-only approval observation for these operations.
+Installed binary hash matches source-b2a7d471 receipt; post-operation geometry92x47.
+See [operation evidence and limits](evidence/tui-perf-001/native-approval-20261117/README.md).
+No long-tail reruns. Native Windows remains unavailable/unwaived; full task remains
+Review / Claimed. This checkpoint does not claim all native operation paths passed.

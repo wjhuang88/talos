@@ -1,0 +1,9 @@
+{
+  "sample_time": "2026-11-17T09:40:03.226628+00:00",
+  "pid": 879502,
+  "rows": 47,
+  "columns": 92,
+  "sha256": "5347488615ef9be965fa5a156dde541dca9eea098084698577d10941ed39c49c",
+  "file_exists_after_rejection": false,
+  "geometry_scope": "after operation, not captured during approval"
+}
