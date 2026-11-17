@@ -7,7 +7,7 @@
 
 use std::collections::VecDeque;
 use std::panic::AssertUnwindSafe;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -52,6 +52,18 @@ use turn::{
     DurableTurnPersistence, TurnForwarding, TurnPersistence, TurnRecord, TurnRecordStatus,
     run_turn_with_forwarding,
 };
+
+struct BackgroundPreparation {
+    future: futures_util::future::BoxFuture<'static, Result<crate::PreparedSessionTurn, String>>,
+    id: talos_core::background_job::BackgroundJobId,
+    turn_id: String,
+    token: CancellationToken,
+}
+impl Drop for BackgroundPreparation {
+    fn drop(&mut self) {
+        self.token.cancel();
+    }
+}
 
 static NEXT_RUNTIME_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 const MAX_RECENT_SUBMISSION_IDS: usize = 1024;
@@ -111,6 +123,7 @@ fn immediate_started_turn(
         });
         Some(TurnRecord {
             committed_source: None,
+            consumed_background_jobs: Vec::new(),
             completion_events: Vec::new(),
             persisted_entry_ids: Vec::new(),
             new_messages: Vec::new(),
@@ -138,10 +151,9 @@ pub struct AppServerSession {
     eq_tx: mpsc::UnboundedSender<SessionEvent>,
     history: Vec<Message>,
     private_replays: Arc<crate::private_replay::PrivateReplayStore>,
+    session_file: Option<PathBuf>,
     recovered_source: Option<crate::compaction::HistorySource>,
     post_turn_pressure: crate::checkpoint_progress::PostTurnPressure,
-    session_file: Option<PathBuf>,
-    session_dir: Option<PathBuf>,
     persistence: Option<TurnPersistence>,
     durable_persistence: Option<DurableTurnPersistence>,
     pending_store: PendingSubmissionStore,
@@ -194,7 +206,6 @@ impl AppServerSession {
             history: config.initial_history,
             private_replays: Default::default(),
             session_file: None,
-            session_dir: None,
             persistence: None,
             durable_persistence: None,
             recovered_source: None,
@@ -254,12 +265,15 @@ impl AppServerSession {
         self.background_jobs.finalizer_handle()
     }
 
-    pub fn set_session_paths(&mut self, file: PathBuf, dir: PathBuf) {
+    /// Records the legacy session path and invalidates private replay on change.
+    ///
+    /// Automatic head trimming is disabled to preserve restart history. This
+    /// does not configure turn persistence; use `set_persistence` instead.
+    pub fn set_session_paths(&mut self, file: PathBuf, _dir: PathBuf) {
         if self.session_file.as_ref() != Some(&file) {
             self.private_replays = Default::default();
         }
         self.session_file = Some(file);
-        self.session_dir = Some(dir);
     }
 
     /// Assigns the durable session that owns successful turn-message writes.
@@ -276,7 +290,12 @@ impl AppServerSession {
         self.session_id = session.id.to_string();
         self.background_jobs
             .set_identity(self.session_id.clone(), self.session_generation);
-        self.persistence = Some(TurnPersistence { session, metadata });
+        self.persistence = Some(TurnPersistence {
+            session,
+            metadata,
+            history_owner: Arc::new(tokio::sync::Mutex::new(None)),
+            recovery_preparation: Arc::new(tokio::sync::Mutex::new(None)),
+        });
     }
 
     /// Assigns an atomic durable session used by the embedded runtime.
@@ -380,6 +399,45 @@ impl AppServerSession {
         self.recovered_source.is_some()
     }
 
+    /// Retains host startup ownership until execution or Actor disposal.
+    /// Requires matching configured persistence and refuses replacing an existing lease.
+    /// `run` validates again, including after any persistence configuration change.
+    pub fn adopt_runtime_lease(
+        &mut self,
+        lease: talos_session::SessionRuntimeLease,
+    ) -> Result<(), talos_session::SessionError> {
+        if self.runtime_lease.is_some() {
+            return Err(talos_session::SessionError::DurableTurn(
+                "Actor already owns a runtime lease".into(),
+            ));
+        }
+        let transcript = self
+            .persistence
+            .as_ref()
+            .map(|p| p.session.file_path.as_path())
+            .or_else(|| {
+                self.durable_persistence
+                    .as_ref()
+                    .map(|p| p.session.file_path())
+            })
+            .ok_or_else(|| {
+                talos_session::SessionError::DurableTurn(
+                    "runtime lease requires persistence".into(),
+                )
+            })?;
+        lease.check_transcript(transcript)?;
+        self.runtime_lease = Some(Arc::new(lease));
+        Ok(())
+    }
+
+    /// Runs with ownership acquired before host identity/history preparation.
+    /// The lease is retained without reacquisition and checked against persistence
+    /// before any Actor recovery or execution. A mismatch refuses startup.
+    pub async fn run_with_runtime_lease(&mut self, lease: talos_session::SessionRuntimeLease) {
+        self.runtime_lease = Some(Arc::new(lease));
+        self.run().await;
+    }
+
     /// Runs the session actor until shutdown or SQ disconnect.
     pub async fn run(&mut self) {
         let transcript = self
@@ -392,13 +450,28 @@ impl AppServerSession {
                     .map(|p| p.session.file_path())
             });
         if let Some(transcript) = transcript {
-            match talos_session::SessionRuntimeLease::acquire(transcript) {
-                Ok(lease) => self.runtime_lease = Some(Arc::new(lease)),
+            let ownership = match self.runtime_lease.as_ref() {
+                Some(lease) => lease.check_transcript(transcript),
+                None => talos_session::SessionRuntimeLease::acquire(transcript).map(|lease| {
+                    self.runtime_lease = Some(Arc::new(lease));
+                }),
+            };
+            match ownership {
+                Ok(()) => {}
                 Err(error) => {
                     self.emit_custody_error("cannot start Session execution or recovery", &error);
+                    self.runtime_lease = None;
                     return;
                 }
             }
+        }
+        if transcript.is_none() && self.runtime_lease.is_some() {
+            self.emit_custody_error(
+                "cannot start Session execution or recovery",
+                &"runtime lease requires persistence",
+            );
+            self.runtime_lease = None;
+            return;
         }
         self.run_owned().await;
         self.runtime_lease = None;
@@ -470,10 +543,38 @@ impl AppServerSession {
             return;
         }
 
+        enum ForkOutput {
+            Published(String),
+            Captured(talos_core::session::OrdinaryForkCapture),
+        }
+        enum ForkReceipt {
+            Published(mpsc::UnboundedSender<Result<String, String>>),
+            Captured(
+                mpsc::UnboundedSender<Result<talos_core::session::OrdinaryForkCapture, String>>,
+            ),
+        }
+        impl ForkReceipt {
+            fn send(&self, result: Result<ForkOutput, String>) {
+                match self {
+                    Self::Published(tx) => {
+                        let _ = tx.send(result.and_then(|value| match value {
+                            ForkOutput::Published(id) => Ok(id),
+                            _ => Err("fork worker result mismatch".into()),
+                        }));
+                    }
+                    Self::Captured(tx) => {
+                        let _ = tx.send(result.and_then(|value| match value {
+                            ForkOutput::Captured(snapshot) => Ok(snapshot),
+                            _ => Err("fork worker result mismatch".into()),
+                        }));
+                    }
+                }
+            }
+        }
         struct ForkWork {
-            task: JoinHandle<Result<String, String>>,
+            task: JoinHandle<Result<ForkOutput, String>>,
             cancel: CancellationToken,
-            receipt: mpsc::UnboundedSender<Result<String, String>>,
+            receipt: ForkReceipt,
         }
         impl Drop for ForkWork {
             fn drop(&mut self) {
@@ -490,6 +591,10 @@ impl AppServerSession {
         let mut pending_image_bytes = 0_u64;
         let mut recent_submission_ids = VecDeque::<String>::new();
         let mut recent_item_ids = VecDeque::<String>::new();
+        let completion_notify = self.background_jobs.completion_notify();
+        let mut current_completion: Option<(talos_core::background_job::BackgroundJobId, String)> =
+            None;
+        let mut background_preparation: Option<BackgroundPreparation> = None;
         let mut current_turn: Option<JoinHandle<Option<TurnRecord>>> = None;
         let mut current_submission_size: Option<(usize, usize, usize, u64)> = None;
         let mut current_structured: Option<ActiveStructuredTurn> = None;
@@ -521,10 +626,15 @@ impl AppServerSession {
                     work.cancel.cancel();
                 }
             }
-            if current_turn.is_none() && fork_work.is_none() && !shutting_down {
+            if current_turn.is_none()
+                && background_preparation.is_none()
+                && fork_work.is_none()
+                && !shutting_down
+            {
                 compact.start(self);
             }
             if current_turn.is_none()
+                && background_preparation.is_none()
                 && fork_work.is_none()
                 && !compact.is_running()
                 && !paused
@@ -584,7 +694,34 @@ impl AppServerSession {
                 }
             }
 
+            if !shutting_down
+                && !paused
+                && pending.is_empty()
+                && current_turn.is_none()
+                && fork_work.is_none()
+                && !compact.is_running()
+                && background_preparation.is_none()
+                && self.sq_rx.is_empty()
+                && let Some((id, terminal)) = self.background_jobs.pending_completion()
+            {
+                let token = CancellationToken::new();
+                if !self
+                    .runtime_admission
+                    .as_ref()
+                    .is_none_or(|admission| admission.commit_start(token.clone()))
+                {
+                    self.background_jobs.retire_completion(&id);
+                    paused = true;
+                    continue;
+                }
+                turn_counter = turn_counter.saturating_add(1);
+                let turn_id = format!("background-{}-{turn_counter}", self.session_generation);
+                background_preparation =
+                    Some(self.prepare_background_completion(id, terminal, turn_id, token));
+            }
+
             if shutting_down
+                && background_preparation.is_none()
                 && fork_work.is_none()
                 && current_turn.is_none()
                 && !compact.is_running()
@@ -594,13 +731,55 @@ impl AppServerSession {
             }
 
             tokio::select! {
+                result = async {
+                    match background_preparation.as_mut() {
+                        Some(work) => work.future.as_mut().await,
+                        None => Err("background preparation unavailable".into()),
+                    }
+                }, if background_preparation.is_some() => {
+                    let Some(mut work) = background_preparation.take() else { continue; };
+                    // Ready input wins even if the preparation future was selected first.
+                    if result.is_ok() && !self.sq_rx.is_empty() {
+                        if let Some(admission) = &self.runtime_admission { admission.finish_active(None); }
+                        continue;
+                    }
+                    match result {
+                        Ok(prepared) if !work.token.is_cancelled() && self.background_jobs.start_completion(&work.id) => {
+                            let token = std::mem::replace(&mut work.token, CancellationToken::new());
+                            let _ = self.eq_tx.send(SessionEvent::TurnEvent {
+                                session_id: self.session_id.clone(), turn_id: work.turn_id.clone(), sequence: 0,
+                                payload: TurnEventPayload::Started,
+                            });
+                            let started = self.spawn_prepared_turn(prepared, work.turn_id.clone(), token, None);
+                            current_completion = Some((work.id.clone(), work.turn_id.clone()));
+                            current_turn = Some(started.handle);
+                            current_boundary_rx = Some(started.boundary_rx);
+                            current_boundary_ack_rx = Some(started.boundary_ack_rx);
+                            cancel_token = Some(started.token);
+                        }
+                        result => {
+                            // A preparation error has not consumed this pending completion.
+                            // Keep custody until explicit stop or a later admitted retry.
+                            if result.is_ok() || work.token.is_cancelled() {
+                                self.background_jobs.retire_completion(&work.id);
+                            }
+                            paused = true;
+                            let error = result.err().unwrap_or_else(|| "background completion was revoked before dispatch".into());
+                            if let Some(admission) = &self.runtime_admission {
+                                admission.finish_active(Some(&TurnCompletionStatus::Error { message: error.clone() }));
+                            }
+                            let _ = self.eq_tx.send(SessionEvent::Error { message: format!("background continuation preparation paused: {error}") });
+                        }
+                    }
+                }
+                () = completion_notify.notified() => {}
                 result = async { match fork_work.as_mut() {
                     Some(work) => Some((&mut work.task).await),
                     None => None,
                 } }, if fork_work.is_some() => {
                     if let Some(work) = fork_work.take() {
                         let result = result.and_then(Result::ok).unwrap_or_else(|| Err("durable fork worker failed".into()));
-                        let _ = work.receipt.send(result);
+                        work.receipt.send(result);
                     }
                 }
                 result = compact.wait(), if compact.has_pending_work() => {
@@ -613,6 +792,7 @@ impl AppServerSession {
                     }
                 }, if current_turn.is_some() => {
                     current_turn = None;
+                    let completed_background = current_completion.take();
                     compact.cancel_queued_model(self);
                     cancel_token = None;
                     current_boundary_rx = None;
@@ -638,7 +818,9 @@ impl AppServerSession {
                             let completion_events = std::mem::take(&mut record.completion_events);
                             let status = record.status;
                             let completion = record.completion.clone();
+                            let consumed_background_jobs = std::mem::take(&mut record.consumed_background_jobs);
                             self.commit_turn_record(record);
+                            self.background_jobs.consume_completions(&consumed_background_jobs);
                             let mut custody_ok = true;
                             if let Some(active) = structured.as_ref() {
                                 custody_ok &= self.finish_structured_turn(active, &completion);
@@ -669,6 +851,9 @@ impl AppServerSession {
                             }
                             if let Some(admission) = &self.runtime_admission {
                                 admission.finish_active(Some(&completion));
+                            }
+                            if let Some((id, _)) = &completed_background {
+                                self.background_jobs.retire_completion(id);
                             }
                             for event in completion_events {
                                 let _ = self.eq_tx.send(event);
@@ -722,6 +907,9 @@ impl AppServerSession {
                             if let Some(admission) = &self.runtime_admission {
                                 admission.finish_active(None);
                             }
+                            if let Some((id, _)) = &completed_background {
+                                self.background_jobs.retire_completion(id);
+                            }
                             paused = true;
                             shutting_down = true;
                             self.release_in_memory_pending_on_shutdown(&mut pending);
@@ -734,6 +922,12 @@ impl AppServerSession {
                 }
                 op = self.sq_rx.recv(), if !shutting_down => {
                     let Some(op) = op else {
+                        self.background_jobs.invalidate_completions();
+                        if background_preparation.take().is_some()
+                            && let Some(admission) = &self.runtime_admission
+                        {
+                            admission.finish_active(None);
+                        }
                         shutting_down = true;
                         compact.cancel(self);
                         let should_interrupt = self.runtime_admission.as_ref().is_none_or(|control| {
@@ -760,6 +954,24 @@ impl AppServerSession {
                         pending_image_bytes = current_submission_size.map_or(0, |size| size.3);
                         continue;
                     };
+                    let preempts_preparation = match &op {
+                        SessionOp::InterruptTurn { session_generation, turn_id } => *session_generation == self.session_generation
+                            && background_preparation.as_ref().is_some_and(|work| work.turn_id == *turn_id),
+                        SessionOp::Submit { .. } | SessionOp::SubmitMultimodal { .. } | SessionOp::PreviewRequest { .. }
+                        | SessionOp::SubmitStructured { .. } | SessionOp::SubmitStructuredTracked { .. }
+                        | SessionOp::SubmitStructuredReconcile { .. } | SessionOp::SubmitStructuredReconcileTracked { .. }
+                        | SessionOp::SetSkillContext { .. } | SessionOp::ForkDurable { .. }
+                        | SessionOp::ForkHistory { .. } | SessionOp::CaptureOrdinaryFork { .. } | SessionOp::Compact { .. }
+                        | SessionOp::Interrupt | SessionOp::Shutdown => true,
+                        _ => false,
+                    };
+                    if preempts_preparation && let Some(work) = background_preparation.take() {
+                        if matches!(&op, SessionOp::InterruptTurn { .. }) {
+                            self.background_jobs.retire_completion(&work.id);
+                        }
+                        if let Some(admission) = &self.runtime_admission { admission.finish_active(None); }
+                        drop(work);
+                    }
                     if let Some(work) = &fork_work {
                         if matches!(&op, SessionOp::Interrupt | SessionOp::Shutdown) {
                             work.cancel.cancel();
@@ -785,8 +997,11 @@ impl AppServerSession {
                                 }
                                 _ => {}
                             }
-                            if let SessionOp::ForkDurable { receipt_tx: Some(receipt), .. } = &op {
+                            if let SessionOp::ForkDurable { receipt_tx: Some(receipt), .. } | SessionOp::ForkHistory { receipt_tx: Some(receipt), .. } = &op {
                                 let _ = receipt.send(Err("durable fork is already running".into()));
+                            }
+                            if let SessionOp::CaptureOrdinaryFork { receipt_tx: Some(receipt), .. } = &op {
+                                let _ = receipt.send(Err("fork capture is already running".into()));
                             }
                             let _ = self.eq_tx.send(SessionEvent::Error { message: "session is busy creating a durable fork".into() });
                             continue;
@@ -917,6 +1132,7 @@ impl AppServerSession {
                             self.reconcile_submission(&submission, receipt_tx.as_ref());
                         }
                         SessionOp::Interrupt => {
+                            self.background_jobs.invalidate_completions();
                             compact.cancel(self);
                             if let Some(token) = &cancel_token {
                                 token.cancel();
@@ -932,9 +1148,8 @@ impl AppServerSession {
                             turn_id,
                         } => {
                             let matches = session_generation == self.session_generation
-                                && current_structured
-                                    .as_ref()
-                                    .is_some_and(|active| active.turn_id == turn_id);
+                                && (current_structured.as_ref().is_some_and(|active| active.turn_id == turn_id)
+                                    || current_completion.as_ref().is_some_and(|(_, active)| *active == turn_id));
                             if matches && let Some(token) = &cancel_token {
                                 resume_user_after_cancel = true;
                                 token.cancel();
@@ -957,6 +1172,88 @@ impl AppServerSession {
                             {
                                 paused = false;
                             }
+                        }
+                        SessionOp::CaptureOrdinaryFork { through_entry, receipt_tx } => {
+                            let Some(receipt_tx) = receipt_tx else { continue; };
+                            if current_turn.is_some() || !compact.is_idle_for_fork() || !pending.is_empty() || shutting_down {
+                                let _ = receipt_tx.send(Err("ordinary fork requires an idle session".into()));
+                                continue;
+                            }
+                            if receipt_tx.is_closed() { continue; }
+                            let (Some(persistence), Some(lease)) = (&self.persistence, self.runtime_lease.clone()) else {
+                                let _ = receipt_tx.send(Err("ordinary fork requires transcript ownership".into()));
+                                continue;
+                            };
+                            let source = persistence.session.clone();
+                            let observer = receipt_tx.clone();
+                            let admission = self.runtime_admission.clone();
+                            let cancel = CancellationToken::new();
+                            let stopped = cancel.clone();
+                            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+                            #[cfg(test)]
+                            let gate = self.fork_worker_gate.clone();
+                            let task = tokio::task::spawn_blocking(move || {
+                                #[cfg(test)]
+                                if let Some((reached, release)) = gate {
+                                    reached.notify_one();
+                                    while !release.load(std::sync::atomic::Ordering::SeqCst) {
+                                        if stopped.is_cancelled() || observer.is_closed() || std::time::Instant::now() >= deadline {
+                                            return Err("ordinary fork cancelled at test gate".into());
+                                        }
+                                        std::thread::park_timeout(std::time::Duration::from_millis(1));
+                                    }
+                                }
+                                source.capture_ordinary_fork(&lease, through_entry.as_deref(), deadline,
+                                    || stopped.is_cancelled() || observer.is_closed() || admission.as_ref().is_some_and(|control| !control.is_open()))
+                                    .map(|snapshot| ForkOutput::Captured(talos_core::session::OrdinaryForkCapture {
+                                        bytes: snapshot.bytes,
+                                        tail_id: snapshot.tail.id,
+                                        runtime_identity: snapshot.runtime_identity.map(|identity| (identity.provider, identity.model, identity.variant)),
+                                    })).map_err(|_| "ordinary fork capture unavailable".to_owned())
+                            });
+                            fork_work = Some(ForkWork { task, cancel, receipt: ForkReceipt::Captured(receipt_tx) });
+                        }
+                        SessionOp::ForkHistory { child_id, child_branch, through_entry, receipt_tx } => {
+                            let Some(receipt_tx) = receipt_tx else { continue; };
+                            if current_turn.is_some() || !compact.is_idle_for_fork() || !pending.is_empty() || shutting_down {
+                                let _ = receipt_tx.send(Err("history fork requires an idle session".into()));
+                                continue;
+                            }
+                            if receipt_tx.is_closed() { continue; }
+                            let (Some(persistence), Some(lease)) = (&self.persistence, self.runtime_lease.clone()) else {
+                                let _ = receipt_tx.send(Err("history fork requires transcript runtime ownership".into()));
+                                continue;
+                            };
+                            let source = persistence.session.clone();
+                            let observer = receipt_tx.clone();
+                            let admission = self.runtime_admission.clone();
+                            let cancel = CancellationToken::new();
+                            let stopped = cancel.clone();
+                            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+                            #[cfg(test)]
+                            let gate = self.fork_worker_gate.clone();
+                            let task = tokio::task::spawn_blocking(move || {
+                                #[cfg(test)]
+                                if let Some((reached, release)) = gate {
+                                    reached.notify_one();
+                                    while !release.load(std::sync::atomic::Ordering::SeqCst) {
+                                        if stopped.is_cancelled() || observer.is_closed() || std::time::Instant::now() >= deadline {
+                                            return Err("history fork cancelled at test gate".into());
+                                        }
+                                        std::thread::park_timeout(std::time::Duration::from_millis(1));
+                                    }
+                                }
+                                let id = uuid::Uuid::parse_str(&child_id).map_err(|_| "invalid child identity".to_owned())?;
+                                let branch = uuid::Uuid::parse_str(&child_branch).map_err(|_| "invalid child branch".to_owned())?;
+                                if id.is_nil() || branch.is_nil() { return Err("invalid child identity".into()); }
+                                let directory = source.file_path.parent().ok_or_else(|| "source directory unavailable".to_owned())?;
+                                let mut child = talos_session::Session::new(id, source.project.clone(), source.workspace_root.clone(), directory.join(format!("{id}.tlog")));
+                                child.current_branch = branch.to_string();
+                                source.publish_history_fork(&child, &lease, through_entry.as_deref(), deadline,
+                                    || stopped.is_cancelled() || observer.is_closed() || admission.as_ref().is_some_and(|control| !control.is_open()))
+                                    .map(|tail| ForkOutput::Published(tail.id)).map_err(|_| "history fork publication unavailable; retain child for reconciliation".to_owned())
+                            });
+                            fork_work = Some(ForkWork { task, cancel, receipt: ForkReceipt::Published(receipt_tx) });
                         }
                         SessionOp::ForkDurable { external_id, receipt_tx } => {
                             let Some(receipt_tx) = receipt_tx else {
@@ -992,9 +1289,9 @@ impl AppServerSession {
                                     session.fork_committed_tip(&external_id,
                                         deadline,
                                         move || stopped.is_cancelled() || observer.is_closed() || admission.as_ref().is_some_and(|control| !control.is_open())
-                                    ).map(|child| child.id().to_string()).map_err(|_| "durable fork storage unavailable".to_owned())
+                                    ).map(|child| ForkOutput::Published(child.id().to_string())).map_err(|_| "durable fork storage unavailable".to_owned())
                                 });
-                                fork_work = Some(ForkWork { task, cancel, receipt: receipt_tx });
+                                fork_work = Some(ForkWork { task, cancel, receipt: ForkReceipt::Published(receipt_tx) });
                             } else {
                                 let _ = receipt_tx.send(Err("durable fork requires configured durable storage".into()));
                             }
@@ -1025,6 +1322,7 @@ impl AppServerSession {
                             }
                         }
                         SessionOp::Shutdown => {
+                            self.background_jobs.invalidate_completions();
                             shutting_down = true;
                             compact.cancel(self);
                             let should_interrupt = self.runtime_admission.as_ref().is_none_or(|control| {
@@ -1266,11 +1564,6 @@ impl AppServerSession {
         turn_counter: u64,
         token: CancellationToken,
     ) -> Result<StartedTurn, UnstartedOutcome> {
-        // Durable segment archival retains original records and is independent
-        // of the model request projection. Never replace Actor history here.
-        if let (Some(file), Some(dir)) = (&self.session_file, &self.session_dir) {
-            let _ = self.try_archive_session(file, dir);
-        }
         if let Some(estimated_tokens) = self.post_turn_pressure.take() {
             tracing::debug!(
                 estimated_tokens,
@@ -1494,6 +1787,7 @@ impl AppServerSession {
                         });
                         return Some(TurnRecord {
                             committed_source: None,
+                            consumed_background_jobs: Vec::new(),
                             completion_events: Vec::new(),
                             persisted_entry_ids: Vec::new(),
                             new_messages: Vec::new(),
@@ -1569,6 +1863,7 @@ impl AppServerSession {
                 });
                 Some(TurnRecord {
                     committed_source: None,
+                    consumed_background_jobs: Vec::new(),
                     completion_events: Vec::new(),
                     persisted_entry_ids: Vec::new(),
                     new_messages: Vec::new(),
@@ -1595,11 +1890,69 @@ impl AppServerSession {
             agent_mut.set_append_prompt_opt(None);
         }
 
+        let prepared = prepared_turn.expect("non-preview submission must be prepared");
+        Ok(self.spawn_prepared_turn(prepared, turn_id, token, structured))
+    }
+
+    /// Build owned preparation work so the Actor keeps polling control inputs.
+    fn prepare_background_completion(
+        &mut self,
+        id: talos_core::background_job::BackgroundJobId,
+        terminal: crate::background_completion::Terminal,
+        turn_id: String,
+        token: CancellationToken,
+    ) -> BackgroundPreparation {
+        let input = terminal.context(&id);
+        self.post_turn_pressure = Default::default();
+        let observer = crate::checkpoint_progress::CheckpointObserver {
+            sender: self.eq_tx.clone(),
+            session_id: self.session_id.clone(),
+            generation: self.session_generation,
+            admission: self.runtime_admission.clone(),
+            post_turn_pressure: self.post_turn_pressure.clone(),
+        };
+        let agent = self.agent.clone();
+        let history = self.history.clone();
+        let limit = self.model_context_limit;
+        let generation = self.session_generation;
+        let source = self.recovered_source.clone();
+        let replays = self.private_replays.clone();
+        let revision = history.len() as u64;
+        let cancel = token.clone();
+        let future = Box::pin(async move {
+            let input = input
+                .ok_or_else(|| "background completion has invalid identity or state".to_owned())?;
+            tokio::select! {
+                biased;
+                () = cancel.cancelled() => Err("background continuation cancelled before start".into()),
+                result = AssertUnwindSafe(agent.prepare_session_messages_at_revision(
+                    String::new(), vec![input], history, limit, generation,
+                    revision, source.as_ref(), Some(observer), replays,
+                )).catch_unwind() => result.map_err(|_| "background preparation panicked".to_owned())?
+                    .map_err(|error| error.to_string()),
+            }
+        });
+        BackgroundPreparation {
+            future,
+            id,
+            turn_id,
+            token,
+        }
+    }
+
+    /// Shares worker supervision and persistence for admitted prepared turns.
+    /// Callers must complete runtime admission and emit the start event first.
+    fn spawn_prepared_turn(
+        &self,
+        prepared: crate::PreparedSessionTurn,
+        turn_id: String,
+        token: CancellationToken,
+        structured: Option<ActiveStructuredTurn>,
+    ) -> StartedTurn {
         let sequence = Arc::new(AtomicU64::new(1));
         let token_clone = token.clone();
         let agent = self.agent.clone();
         let eq_tx = self.eq_tx.clone();
-        let prepared = prepared_turn.expect("non-preview submission must be prepared");
         let persistence = self.persistence.clone();
         let durable_persistence = self.durable_persistence.clone();
         let session_id = self.session_id.clone();
@@ -1717,46 +2070,13 @@ impl AppServerSession {
             }
             Some(record)
         });
-        Ok(StartedTurn {
+        StartedTurn {
             handle,
             token,
             structured,
             boundary_rx,
             boundary_ack_rx,
-        })
-    }
-
-    fn try_archive_session(
-        &self,
-        file: &Path,
-        dir: &Path,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        use talos_session::CompactTextSessionStore;
-        use talos_session::compaction_engine::CompactionEngine;
-
-        let store = std::sync::Arc::new(CompactTextSessionStore);
-        let engine = CompactionEngine::new(store);
-
-        if !engine.should_compact(file, 0) {
-            return Ok(());
         }
-
-        match engine.compact_segment(file, dir, 0)? {
-            talos_session::compaction_engine::CompactionResult::Compacted {
-                segment_id,
-                original_count,
-                ..
-            } => {
-                let _ = self.eq_tx.send(SessionEvent::Error {
-                    message: format!(
-                        "Session compacted: {original_count} entries archived to {segment_id}"
-                    ),
-                });
-            }
-            talos_session::compaction_engine::CompactionResult::Skipped => {}
-        }
-
-        Ok(())
     }
 }
 

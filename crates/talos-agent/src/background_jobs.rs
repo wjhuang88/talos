@@ -157,6 +157,7 @@ struct SupervisorState {
     launching: usize,
     jobs: HashMap<BackgroundJobId, JobRecord>,
     terminal_order: VecDeque<BackgroundJobId>,
+    completions: Option<crate::background_completion::CompletionSlots>,
 }
 
 struct ShutdownState {
@@ -170,6 +171,7 @@ struct SupervisorInner {
     event_tx: mpsc::UnboundedSender<SessionEvent>,
     shutdown_token: CancellationToken,
     state_changed: Notify,
+    completion_changed: Arc<Notify>,
     shutdown_state: Mutex<ShutdownState>,
     shutdown_complete: Notify,
 }
@@ -196,6 +198,7 @@ impl BackgroundJobSupervisor {
                     launching: 0,
                     jobs: HashMap::new(),
                     terminal_order: VecDeque::new(),
+                    completions: None,
                 }),
                 identity: RwLock::new(SessionIdentity {
                     id: session_id,
@@ -204,6 +207,7 @@ impl BackgroundJobSupervisor {
                 event_tx,
                 shutdown_token: CancellationToken::new(),
                 state_changed: Notify::new(),
+                completion_changed: Arc::new(Notify::new()),
                 shutdown_state: Mutex::new(ShutdownState {
                     started: false,
                     result: None,
@@ -217,6 +221,116 @@ impl BackgroundJobSupervisor {
         if let Ok(mut identity) = self.inner.identity.write() {
             identity.id = session_id;
             identity.generation = generation;
+        }
+        if let Ok(mut state) = self.inner.state.lock()
+            && let Some(slots) = state.completions.as_mut()
+        {
+            slots.set_generation(generation);
+        }
+    }
+
+    /// Enables live completion custody before accepting background launches.
+    #[cfg(test)]
+    pub(crate) fn enable_completions(&self, generation: u64) -> Result<(), String> {
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| "background supervisor state unavailable".to_owned())?;
+        if state.shutdown_requested || !state.jobs.is_empty() {
+            return Err("completion custody must be enabled before jobs start".into());
+        }
+        let slots = state.completions.get_or_insert_with(Default::default);
+        slots.set_generation(generation);
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn completion_count_for_test(&self) -> usize {
+        self.inner
+            .state
+            .lock()
+            .expect("supervisor lock")
+            .completions
+            .as_ref()
+            .map_or(0, |slots| slots.len_for_test())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn inject_completion_for_test(&self, id: BackgroundJobId) {
+        {
+            let mut state = self.inner.state.lock().expect("supervisor lock");
+            assert!(
+                state
+                    .completions
+                    .as_mut()
+                    .expect("enabled")
+                    .reserve(id.clone())
+            );
+            state.jobs.insert(
+                id.clone(),
+                JobRecord::starting(id.clone(), "fixture".into(), "fixture".into(), 0),
+            );
+            state.active += 1;
+        }
+        self.terminalize(
+            &id,
+            BackgroundJobState::Completed,
+            Some(0),
+            BackgroundCleanupOutcome::Natural,
+            None,
+        );
+    }
+
+    pub(crate) fn completion_notify(&self) -> Arc<Notify> {
+        self.inner.completion_changed.clone()
+    }
+
+    pub(crate) fn pending_completion(
+        &self,
+    ) -> Option<(BackgroundJobId, crate::background_completion::Terminal)> {
+        self.inner
+            .state
+            .lock()
+            .ok()?
+            .completions
+            .as_ref()?
+            .pending()
+    }
+
+    pub(crate) fn start_completion(&self, id: &BackgroundJobId) -> bool {
+        self.inner
+            .state
+            .lock()
+            .ok()
+            .and_then(|mut state| state.completions.as_mut().map(|slots| slots.start(id)))
+            .unwrap_or(false)
+    }
+
+    /// Called by the Actor only after committing provider-confirmed consumption.
+    pub(crate) fn consume_completions(&self, ids: &[BackgroundJobId]) {
+        if let Ok(mut state) = self.inner.state.lock()
+            && let Some(slots) = state.completions.as_mut()
+        {
+            for id in ids {
+                slots.consumed(id);
+            }
+        }
+    }
+
+    pub(crate) fn retire_completion(&self, id: &BackgroundJobId) {
+        if let Ok(mut state) = self.inner.state.lock()
+            && let Some(slots) = state.completions.as_mut()
+        {
+            slots.retire(id);
+        }
+    }
+
+    pub(crate) fn invalidate_completions(&self) {
+        if let Ok(mut state) = self.inner.state.lock()
+            && let Some(slots) = state.completions.as_mut()
+        {
+            slots.invalidate();
         }
     }
 
@@ -246,6 +360,9 @@ impl BackgroundJobSupervisor {
 
         if let Ok(mut state) = self.inner.state.lock() {
             state.shutdown_requested = true;
+            if let Some(slots) = state.completions.as_mut() {
+                slots.close();
+            }
         }
         self.inner.shutdown_token.cancel();
 
@@ -346,6 +463,9 @@ impl BackgroundJobSupervisor {
             && state.jobs.remove(id).is_some()
         {
             state.reserved = state.reserved.saturating_sub(1);
+            if let Some(slots) = state.completions.as_mut() {
+                slots.retire(id);
+            }
         }
         self.inner.state_changed.notify_waiters();
     }
@@ -363,6 +483,9 @@ impl BackgroundJobSupervisor {
                     state.reserved = state.reserved.saturating_sub(1);
                     if state.closing || state.shutdown_requested {
                         state.jobs.remove(&id);
+                        if let Some(slots) = state.completions.as_mut() {
+                            slots.retire(&id);
+                        }
                         0
                     } else {
                         state.active = state.active.saturating_add(1);
@@ -689,15 +812,24 @@ impl BackgroundJobSupervisor {
     }
 
     fn process_status(&self, job_id: &str) -> ToolResult {
-        let Some(job) = self.inner.state.lock().ok().and_then(|state| {
-            state
-                .jobs
-                .get(&BackgroundJobId::new(job_id))
-                .map(job_status_json)
-        }) else {
+        self.process_status_observed(job_id, true)
+    }
+
+    fn process_status_observed(&self, job_id: &str, observe: bool) -> ToolResult {
+        let state = match self.inner.state.lock() {
+            Ok(state) => state,
+            Err(_) => return ToolResult::error("background supervisor state is unavailable"),
+        };
+        let Some(job) = state.jobs.get(&BackgroundJobId::new(job_id)) else {
             return ToolResult::error("unknown background job");
         };
-        ToolResult::success(job.to_string())
+        if observe
+            && job.is_terminal()
+            && let Err(error) = crate::background_consumption::observe_terminal(&job.id)
+        {
+            return ToolResult::error(error);
+        }
+        ToolResult::success(job_status_json(job).to_string())
     }
 
     async fn process_read(
@@ -779,6 +911,9 @@ impl BackgroundJobSupervisor {
         }
         let next_cursor = read_cursor;
         let terminal = job.is_terminal();
+        if terminal {
+            crate::background_consumption::observe_terminal(&job.id)?;
+        }
         let value = serde_json::json!({
             "job_id": job.id,
             "state": job.state,
@@ -814,11 +949,11 @@ impl BackgroundJobSupervisor {
             })
             .unwrap_or((None, false));
         let Some(token) = token else {
-            return self.process_status(job_id);
+            return self.process_status_observed(job_id, false);
         };
         token.cancel();
         if starting {
-            let mut result = self.process_status(job_id);
+            let mut result = self.process_status_observed(job_id, false);
             if !result.is_error
                 && let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&result.content)
             {
@@ -843,7 +978,7 @@ impl BackgroundJobSupervisor {
                 return ToolResult::success(status.to_string());
             }
             if tokio::time::timeout_at(deadline, notified).await.is_err() {
-                return self.process_status(job_id);
+                return self.process_status_observed(job_id, false);
             }
         }
     }
@@ -867,6 +1002,15 @@ impl BackgroundJobSupervisor {
             job.cleanup_outcome = cleanup_outcome;
             job.cleanup_error = cleanup_error;
             let summary = job.summary();
+            if let Some(slots) = state.completions.as_mut() {
+                slots.terminal(
+                    id,
+                    crate::background_completion::Terminal {
+                        state: state_value,
+                        exit_code,
+                    },
+                );
+            }
             state.active = state.active.saturating_sub(1);
             state.terminal_order.push_back(id.clone());
             while state.terminal_order.len() > MAX_TERMINAL_BACKGROUND_JOBS {
@@ -877,6 +1021,9 @@ impl BackgroundJobSupervisor {
             Some(summary)
         });
         self.inner.state_changed.notify_waiters();
+        if summary.is_some() {
+            self.inner.completion_changed.notify_one();
+        }
         summary
     }
 
@@ -945,6 +1092,11 @@ impl BackgroundJobSupervisor {
         }
         if state.reserved.saturating_add(state.active) >= MAX_NONTERMINAL_BACKGROUND_JOBS {
             return Err("background job capacity exhausted".to_owned());
+        }
+        if let Some(slots) = state.completions.as_mut()
+            && !slots.reserve(id.clone())
+        {
+            return Err("background completion capacity exhausted".into());
         }
         state.reserved = state.reserved.saturating_add(1);
         state.jobs.insert(
@@ -1170,6 +1322,228 @@ mod tests {
         assert_eq!(chunk.cursor, 3);
         assert_eq!(chunk.stream, BackgroundOutputStream::Stderr);
         assert_eq!(chunk.captured_at_unix_ms, 7);
+    }
+
+    #[tokio::test]
+    async fn process_terminal_observation_requires_model_scope_and_confirmation() {
+        use crate::background_consumption::{Consumption, OBSERVATION, ToolObservation};
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(tx, "fixture".into(), 1);
+        supervisor.enable_completions(1).expect("enable");
+        let id = BackgroundJobId::new("job_observed");
+        supervisor.inject_completion_for_test(id.clone());
+        let evidence = Consumption::default();
+        assert!(!supervisor.process_status(id.as_str()).is_error);
+        evidence.confirm_request(&["host".into()]);
+        assert!(evidence.confirmed().is_empty());
+        OBSERVATION
+            .scope(
+                ToolObservation {
+                    consumption: evidence.clone(),
+                    call_id: "model".into(),
+                },
+                async {
+                    assert!(!supervisor.process_status(id.as_str()).is_error);
+                },
+            )
+            .await;
+        assert!(evidence.confirmed().is_empty());
+        assert!(supervisor.pending_completion().is_some());
+        evidence.confirm_request(&["model".into()]);
+        assert_eq!(evidence.confirmed(), vec![id]);
+        assert!(
+            supervisor.pending_completion().is_some(),
+            "observation cannot retire before turn commit"
+        );
+    }
+
+    #[tokio::test]
+    async fn terminal_read_and_status_refuse_when_consumption_evidence_is_full() {
+        use crate::background_consumption::{
+            Consumption, OBSERVATION, ToolObservation, observe_terminal,
+        };
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(tx, "fixture".into(), 1);
+        supervisor.enable_completions(1).expect("enable");
+        let id = BackgroundJobId::new("job_capacity");
+        supervisor.inject_completion_for_test(id.clone());
+        let evidence = Consumption::default();
+        for index in 0..128 {
+            let call = format!("consumed-{index}");
+            OBSERVATION
+                .scope(
+                    ToolObservation {
+                        consumption: evidence.clone(),
+                        call_id: call.clone(),
+                    },
+                    async {
+                        observe_terminal(&BackgroundJobId::new(format!("job-{index}")))
+                            .expect("capacity");
+                    },
+                )
+                .await;
+            evidence.confirm_request(&[call]);
+        }
+        for read in [false, true] {
+            let result = OBSERVATION
+                .scope(
+                    ToolObservation {
+                        consumption: evidence.clone(),
+                        call_id: "overflow".into(),
+                    },
+                    async {
+                        if read {
+                            supervisor.process_read(id.as_str(), 0, 4096, 0).await
+                        } else {
+                            supervisor.process_status(id.as_str())
+                        }
+                    },
+                )
+                .await;
+            assert!(result.is_error);
+            assert!(result.content.contains("capacity reached"));
+            assert!(
+                !result.content.contains("job_capacity"),
+                "terminal payload not disclosed without custody"
+            );
+        }
+        assert_eq!(evidence.confirmed().len(), 128);
+        assert_eq!(supervisor.pending_completion().expect("pending").0, id);
+        assert!(
+            !supervisor.process_status(id.as_str()).is_error,
+            "host inspection needs no model-consumption evidence"
+        );
+    }
+
+    #[tokio::test]
+    async fn cancel_status_fallback_does_not_record_consumption() {
+        use crate::background_consumption::{Consumption, OBSERVATION, ToolObservation};
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(tx, "fixture".into(), 1);
+        supervisor.enable_completions(1).expect("enable");
+        let id = BackgroundJobId::new("job_cancel_status");
+        supervisor.inject_completion_for_test(id.clone());
+        supervisor
+            .inner
+            .state
+            .lock()
+            .expect("lock")
+            .jobs
+            .get_mut(&id)
+            .expect("job")
+            .cancel_token = None;
+        let evidence = Consumption::default();
+        OBSERVATION
+            .scope(
+                ToolObservation {
+                    consumption: evidence.clone(),
+                    call_id: "cancel-call".into(),
+                },
+                async {
+                    assert!(!supervisor.process_cancel(id.as_str(), 0).await.is_error);
+                },
+            )
+            .await;
+        evidence.confirm_request(&["cancel-call".into()]);
+        assert!(evidence.confirmed().is_empty());
+        assert!(supervisor.pending_completion().is_some());
+    }
+
+    #[tokio::test]
+    async fn confirmed_consumption_retires_pending_but_not_running() {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(tx, "fixture".into(), 1);
+        supervisor.enable_completions(1).expect("enable");
+        let pending = BackgroundJobId::new("job_pending");
+        let running = BackgroundJobId::new("job_running");
+        supervisor.inject_completion_for_test(pending.clone());
+        supervisor.inject_completion_for_test(running.clone());
+        assert!(supervisor.start_completion(&running));
+        supervisor.consume_completions(&[pending.clone(), running.clone()]);
+        assert_eq!(supervisor.completion_count_for_test(), 1);
+        assert!(supervisor.pending_completion().is_none());
+        supervisor.consume_completions(&[pending, running.clone()]);
+        assert_eq!(supervisor.completion_count_for_test(), 1);
+        supervisor.retire_completion(&running);
+        assert_eq!(supervisor.completion_count_for_test(), 0);
+    }
+
+    #[tokio::test]
+    async fn session_rebinding_discards_pending_completion() {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(tx, "original".into(), 1);
+        supervisor.enable_completions(1).expect("enable");
+        let old = BackgroundJobId::new("job_old");
+        supervisor.inject_completion_for_test(old.clone());
+        assert!(supervisor.pending_completion().is_some());
+        supervisor.set_identity("replacement".into(), 2);
+        assert!(supervisor.pending_completion().is_none());
+        assert!(!supervisor.start_completion(&old));
+        // A delayed duplicate cannot revive the old identity.
+        supervisor.terminalize(
+            &old,
+            BackgroundJobState::Completed,
+            Some(0),
+            BackgroundCleanupOutcome::Natural,
+            None,
+        );
+        assert!(supervisor.pending_completion().is_none());
+        supervisor.inject_completion_for_test(BackgroundJobId::new("job_new"));
+        assert_eq!(
+            supervisor
+                .pending_completion()
+                .expect("new pending")
+                .0
+                .as_str(),
+            "job_new"
+        );
+    }
+
+    #[tokio::test]
+    async fn completion_notification_retains_custody_until_actor_retirement() {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let supervisor = BackgroundJobSupervisor::new(tx, "fixture".into(), 1);
+        supervisor.enable_completions(1).expect("enable");
+        let id = BackgroundJobId::new("job_fixture");
+        {
+            let mut state = supervisor.inner.state.lock().expect("lock");
+            assert!(
+                state
+                    .completions
+                    .as_mut()
+                    .expect("slots")
+                    .reserve(id.clone())
+            );
+            state.jobs.insert(
+                id.clone(),
+                JobRecord::starting(id.clone(), "exec".into(), "fixture".into(), 0),
+            );
+            state.active = 1;
+        }
+        supervisor.terminalize(
+            &id,
+            BackgroundJobState::Completed,
+            Some(0),
+            BackgroundCleanupOutcome::Natural,
+            None,
+        );
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            supervisor.completion_notify().notified(),
+        )
+        .await
+        .expect("stored wakeup");
+        assert_eq!(supervisor.pending_completion().expect("pending").0, id);
+        assert!(supervisor.start_completion(&id));
+        supervisor.invalidate_completions();
+        assert!(supervisor.pending_completion().is_none());
+        supervisor.retire_completion(&id);
+        supervisor.retire_completion(&id);
+        let state = supervisor.inner.state.lock().expect("lock");
+        assert!(
+            state.jobs.contains_key(&id),
+            "output retention is independent"
+        );
     }
 
     #[tokio::test]

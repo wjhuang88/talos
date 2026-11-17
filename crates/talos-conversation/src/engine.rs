@@ -76,6 +76,8 @@ pub struct ConversationEngine {
     pending_tool_calls: Vec<(String, usize)>,
     pub(crate) current_turn_text: String,
     pub(crate) steering_queue: Vec<SubmissionItem>,
+    // Presentation only: Actor owns execution after a durable receipt.
+    accepted_steering_preview: Option<(String, Vec<SubmissionItem>)>,
     prepared_steering: Option<(String, Vec<String>)>,
     steering_identity_namespace: String,
     next_steering_sequence: u64,
@@ -118,6 +120,7 @@ impl ConversationEngine {
             pending_tool_calls: Vec::new(),
             current_turn_text: String::new(),
             steering_queue: Vec::new(),
+            accepted_steering_preview: None,
             prepared_steering: None,
             steering_identity_namespace: next_steering_identity_namespace(),
             next_steering_sequence: 0,
@@ -232,7 +235,11 @@ impl ConversationEngine {
             usage: self.usage.clone(),
             context_budget: self.context_budget,
             branch_id: self.branch_id.clone(),
-            steering_count: self.steering_queue.len(),
+            steering_count: self.steering_queue.len()
+                + self
+                    .accepted_steering_preview
+                    .as_ref()
+                    .map_or(0, |(_, items)| items.len()),
             followup_count: self.followup_queue.len(),
             is_processing: self.is_processing,
             phase: self.current_phase.clone(),
@@ -783,6 +790,42 @@ impl ConversationEngine {
         true
     }
 
+    /// Transfers a prepared batch to Actor custody while retaining its queue preview.
+    /// The retained items cannot be prepared or dispatched again by this engine.
+    pub fn commit_prepared_steering_with_preview(&mut self, submission_id: &str) -> bool {
+        if self.accepted_steering_preview.is_some() {
+            return false;
+        }
+        let count = self
+            .prepared_steering
+            .as_ref()
+            .map_or(0, |(_, ids)| ids.len());
+        let items: Vec<_> = self.steering_queue.iter().take(count).cloned().collect();
+        if !self.commit_prepared_steering(submission_id) {
+            return false;
+        }
+        self.accepted_steering_preview = Some((submission_id.to_owned(), items));
+        true
+    }
+
+    /// Removes a matching Actor-owned preview after projection or terminal resolution.
+    /// Stale submission identities cannot erase a newer pending preview.
+    pub fn clear_accepted_steering_preview(&mut self, submission_id: &str) {
+        if self
+            .accepted_steering_preview
+            .as_ref()
+            .is_some_and(|(id, _)| id == submission_id)
+        {
+            self.accepted_steering_preview = None;
+        }
+    }
+
+    /// Discards display-only Actor custody when a replacement runtime is authoritative.
+    /// This does not requeue or cancel any durable submission in the old runtime.
+    pub fn reset_accepted_steering_preview(&mut self) {
+        self.accepted_steering_preview = None;
+    }
+
     /// Releases a matching failed preparation while preserving every item.
     pub fn rollback_prepared_steering(&mut self, submission_id: &str) -> bool {
         if self
@@ -815,11 +858,15 @@ impl ConversationEngine {
         const MAX_ENTRIES: usize = 8;
         const MAX_BYTES: usize = 4096;
         const ELLIPSIS: &str = "…";
-        let total_count = self.steering_queue.len();
+        let accepted = self
+            .accepted_steering_preview
+            .as_ref()
+            .map_or(&[][..], |(_, items)| items.as_slice());
+        let total_count = accepted.len() + self.steering_queue.len();
         let omitted_count = total_count.saturating_sub(MAX_ENTRIES);
-        let entries = self
-            .steering_queue
+        let entries = accepted
             .iter()
+            .chain(self.steering_queue.iter())
             .take(MAX_ENTRIES)
             .map(|item| {
                 let msg = &item.text;

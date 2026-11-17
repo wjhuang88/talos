@@ -765,6 +765,10 @@ impl Tui {
                 preview,
                 response,
             } => {
+                self.drop_active_approval();
+                if response.is_closed() {
+                    return false;
+                }
                 self.state.pending_approval_response = Some(response);
                 let args_str = serde_json::to_string_pretty(&arguments)
                     .unwrap_or_else(|_| arguments.to_string());
@@ -788,7 +792,9 @@ impl Tui {
                 self.handle_status_snapshot(snapshot, Instant::now());
             }
             UiOutput::SessionIdentity { id } => {
+                self.retire_closed_approval();
                 if self.session_id.as_ref() != Some(&id) {
+                    self.retire_legacy_approvals();
                     self.repeat_key = None;
                     self.tool_activities.clear();
                 }
@@ -856,6 +862,7 @@ impl Tui {
                 }
             }
             UiOutput::Exit => {
+                self.retire_all_approvals();
                 if self.active_stream.is_some() {
                     self.finalize_active_stream();
                 }
@@ -919,7 +926,23 @@ impl Tui {
     }
 
     pub(super) fn commit_pending_transcript(&mut self) -> io::Result<()> {
+        let user_bg = crate::scrollback::stream_bg_for(Some(&MessageSource::User));
         for block in std::mem::take(&mut self.pending_transcript) {
+            let follows_user = matches!(self.transcript.entries().last().map(|entry| &entry.block),
+                Some(TranscriptBlock::StyledLine(line)) if line.bg.is_some() && line.bg == user_bg);
+            let continues_user_or_separator = matches!(&block,
+                TranscriptBlock::StyledLine(line)
+                    if (line.bg.is_some() && line.bg == user_bg)
+                        || (line.bg.is_none() && line.text.trim().is_empty()));
+            if follows_user && !continues_user_or_separator {
+                // Typed blocks bypass stream_opening_lines. Keep the external
+                // user separator in committed history for every output kind.
+                self.transcript
+                    .append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                        String::new(),
+                        None,
+                    )));
+            }
             self.transcript.append(block);
         }
         Ok(())

@@ -150,6 +150,1300 @@ impl LanguageModel for MockModel {
     }
 }
 
+#[tokio::test]
+async fn background_completion_entry_preserves_context_in_worker_record() {
+    let model = MockModel::new(vec![vec![
+        AgentEvent::TurnStart,
+        AgentEvent::TextDelta {
+            delta: "continued".into(),
+        },
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            usage: Default::default(),
+        },
+    ]]);
+    #[allow(deprecated)]
+    let agent = Agent::new(Arc::new(model), ToolRegistry::new());
+    let (_handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: std::env::current_dir().expect("workspace"),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    let mut work = actor.prepare_background_completion(
+        talos_core::background_job::BackgroundJobId::new("job_fixture"),
+        crate::background_completion::Terminal {
+            state: talos_core::background_job::BackgroundJobState::Completed,
+            exit_code: Some(0),
+        },
+        "background-fixture".into(),
+        CancellationToken::new(),
+    );
+    let prepared = work.future.as_mut().await.expect("prepared completion");
+    let token = std::mem::replace(&mut work.token, CancellationToken::new());
+    let started = actor.spawn_prepared_turn(prepared, work.turn_id.clone(), token, None);
+    assert!(started.structured.is_none(), "not a user submission");
+    let record = tokio::time::timeout(Duration::from_secs(10), started.handle)
+        .await
+        .expect("worker deadline")
+        .expect("worker join")
+        .expect("record");
+    assert!(matches!(record.status, TurnRecordStatus::Success));
+    assert!(record.new_messages.iter().any(|message| matches!(message,
+        Message::Context { content } if content.contains("job_id: job_fixture"))));
+    assert!(!record.new_messages.iter().any(|message| matches!(message,
+        Message::User { content } if content.contains("job_fixture"))));
+}
+
+#[tokio::test]
+async fn background_preparation_failure_keeps_pending_until_shutdown() {
+    check_background_preparation_failure(false).await;
+}
+
+#[tokio::test]
+async fn background_preparation_failure_retries_after_user_input() {
+    check_background_preparation_failure(true).await;
+}
+
+async fn check_background_preparation_failure(resume: bool) {
+    struct RejectPreparation(Arc<AtomicUsize>);
+    #[async_trait]
+    impl talos_plugin::HookHandler for RejectPreparation {
+        fn name(&self) -> &str {
+            "reject-background-preparation"
+        }
+        fn subscribed(&self) -> &'static [talos_plugin::HookEventKind] {
+            &[talos_plugin::HookEventKind::BeforeProviderCall]
+        }
+        async fn on_event(
+            &self,
+            _: &talos_plugin::HookContext,
+            _: &mut talos_plugin::HookEvent<'_>,
+        ) -> talos_plugin::HookResult {
+            if self.0.fetch_add(1, Ordering::SeqCst) == 0 {
+                talos_plugin::HookResult::Deny {
+                    reason: "preparation regression".into(),
+                }
+            } else {
+                talos_plugin::HookResult::Continue
+            }
+        }
+    }
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let mut hooks = talos_plugin::HookRegistry::new();
+    hooks.register(Arc::new(RejectPreparation(attempts.clone())));
+    let root = tempfile::tempdir().expect("workspace");
+    let agent = Agent::with_security_and_hooks(
+        Arc::new(CapturingSequenceModel {
+            captured: captured.clone(),
+            responses: Arc::new(Mutex::new(VecDeque::from(vec![
+                success_events("user response"),
+                success_events("completion response"),
+            ]))),
+        }),
+        ToolRegistry::new(),
+        None,
+        None,
+        root.path().into(),
+        Arc::new(hooks),
+    );
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor
+        .background_jobs
+        .enable_completions(actor.session_generation)
+        .expect("test activation");
+    let supervisor = actor.background_jobs.clone();
+    let id = talos_core::background_job::BackgroundJobId::new("job_preparation_failure");
+    supervisor.inject_completion_for_test(id.clone());
+    let task = tokio::spawn(async move { actor.run().await });
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let event = handle.eq_rx.recv().await.expect("actor event");
+            assert!(!matches!(event, SessionEvent::TurnEvent { payload: TurnEventPayload::Started, .. }));
+            if matches!(event, SessionEvent::Error { ref message } if message.contains("background continuation preparation paused")) {
+                break;
+            }
+        }
+    }).await.expect("preparation failure diagnostic");
+    assert_eq!(
+        supervisor.pending_completion().expect("pending custody").0,
+        id
+    );
+    assert_eq!(supervisor.completion_count_for_test(), 1);
+    assert!(captured.lock().expect("capture").is_empty());
+    // Give the Actor opportunities to dispatch; pause must prevent automatic retry.
+    for _ in 0..32 {
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    if resume {
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "resume after preparation failure".into(),
+            })
+            .await
+            .expect("user input");
+        let events = tokio::time::timeout(
+            Duration::from_secs(5),
+            collect_until_completions(&mut handle.eq_rx, 2),
+        )
+        .await
+        .expect("user and retained completion finish");
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| matches!(
+                    completed_status(event),
+                    Some(TurnCompletionStatus::Success { .. })
+                ))
+                .count(),
+            2
+        );
+        let requests = captured.lock().expect("capture");
+        assert_eq!(requests.len(), 2);
+        assert!(matches!(requests[0].last(), Some(Message::User { content })
+            if content == "resume after preparation failure"));
+        assert!(
+            matches!(requests[1].last(), Some(Message::Context { content })
+            if content.contains("job_preparation_failure"))
+        );
+        assert_eq!(supervisor.completion_count_for_test(), 0);
+    }
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("shutdown deadline")
+        .expect("actor");
+    assert_eq!(supervisor.completion_count_for_test(), 0);
+    assert_eq!(
+        captured.lock().expect("capture").len(),
+        if resume { 2 } else { 0 }
+    );
+    assert_eq!(attempts.load(Ordering::SeqCst), if resume { 3 } else { 1 });
+    while let Ok(event) = handle.eq_rx.try_recv() {
+        assert!(!matches!(
+            event,
+            SessionEvent::TurnEvent {
+                payload: TurnEventPayload::Started,
+                ..
+            }
+        ));
+    }
+}
+
+#[tokio::test]
+async fn cancelled_background_preparation_does_not_call_provider() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    #[allow(deprecated)]
+    let agent = Agent::new(
+        Arc::new(CountingModel {
+            calls: calls.clone(),
+        }),
+        ToolRegistry::new(),
+    );
+    let (_handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: std::env::current_dir().expect("workspace"),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    let token = CancellationToken::new();
+    token.cancel();
+    let mut work = actor.prepare_background_completion(
+        talos_core::background_job::BackgroundJobId::new("job_cancelled"),
+        crate::background_completion::Terminal {
+            state: talos_core::background_job::BackgroundJobState::Completed,
+            exit_code: Some(0),
+        },
+        "cancelled-background".into(),
+        token,
+    );
+    assert!(work.future.as_mut().await.is_err());
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert!(actor.history.is_empty());
+}
+
+#[tokio::test]
+async fn background_preparation_yields_to_control_and_revalidates_before_dispatch() {
+    struct GateFirstPreparation {
+        count: AtomicUsize,
+        reached: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+    }
+    #[async_trait]
+    impl talos_plugin::HookHandler for GateFirstPreparation {
+        fn name(&self) -> &str {
+            "gate-first-background-preparation"
+        }
+        fn subscribed(&self) -> &'static [talos_plugin::HookEventKind] {
+            &[talos_plugin::HookEventKind::BeforeProviderCall]
+        }
+        fn timeout(&self) -> Duration {
+            Duration::from_secs(30)
+        }
+        async fn on_event(
+            &self,
+            _: &talos_plugin::HookContext,
+            _: &mut talos_plugin::HookEvent<'_>,
+        ) -> talos_plugin::HookResult {
+            if self.count.fetch_add(1, Ordering::SeqCst) == 0 {
+                self.reached.notify_one();
+                self.release.notified().await;
+            }
+            talos_plugin::HookResult::Continue
+        }
+    }
+    for action in ["input", "interrupt", "targeted", "shutdown", "revoked"] {
+        let reached = Arc::new(tokio::sync::Notify::new());
+        let release = Arc::new(tokio::sync::Notify::new());
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let mut hooks = talos_plugin::HookRegistry::new();
+        hooks.register(Arc::new(GateFirstPreparation {
+            count: AtomicUsize::new(0),
+            reached: reached.clone(),
+            release: release.clone(),
+        }));
+        let root = tempfile::tempdir().expect("workspace");
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(CapturingSequenceModel {
+                captured: captured.clone(),
+                responses: Arc::new(Mutex::new(VecDeque::from(vec![
+                    success_events("first"),
+                    success_events("second"),
+                ]))),
+            }),
+            ToolRegistry::new(),
+            None,
+            None,
+            root.path().into(),
+            Arc::new(hooks),
+        );
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor
+            .background_jobs
+            .enable_completions(actor.session_generation)
+            .expect("test activation");
+        let supervisor = actor.background_jobs.clone();
+        supervisor.inject_completion_for_test(talos_core::background_job::BackgroundJobId::new(
+            "job_preparation",
+        ));
+        let task = tokio::spawn(async move { actor.run().await });
+        tokio::time::timeout(Duration::from_secs(5), reached.notified())
+            .await
+            .expect("preparation reached");
+        assert!(captured.lock().expect("capture").is_empty());
+        match action {
+            "interrupt" => handle
+                .sq_tx
+                .send(SessionOp::Interrupt)
+                .await
+                .expect("interrupt"),
+            "targeted" => handle
+                .sq_tx
+                .send(SessionOp::InterruptTurn {
+                    session_generation: 0,
+                    turn_id: "background-0-1".into(),
+                })
+                .await
+                .expect("targeted"),
+            "shutdown" => handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown"),
+            "revoked" => {
+                supervisor.invalidate_completions();
+                release.notify_one();
+                tokio::time::timeout(Duration::from_secs(5), async {
+                    loop {
+                        if matches!(
+                            handle.eq_rx.recv().await.expect("event"),
+                            SessionEvent::Error { .. }
+                        ) {
+                            break;
+                        }
+                    }
+                })
+                .await
+                .expect("revoked before dispatch");
+            }
+            _ => {}
+        }
+        if action != "shutdown" {
+            handle
+                .sq_tx
+                .send(SessionOp::Submit {
+                    message: "priority user input".into(),
+                })
+                .await
+                .expect("user input");
+            tokio::time::timeout(
+                Duration::from_secs(5),
+                collect_until_completions(&mut handle.eq_rx, if action == "input" { 2 } else { 1 }),
+            )
+            .await
+            .expect("actor remains responsive");
+            let requests = captured.lock().expect("capture");
+            assert_eq!(
+                requests.len(),
+                if action == "input" { 2 } else { 1 },
+                "{action}"
+            );
+            assert!(
+                matches!(requests[0].last(), Some(Message::User { content }) if content == "priority user input")
+            );
+            if action == "input" {
+                assert!(
+                    matches!(requests[1].last(), Some(Message::Context { content }) if content.contains("job_preparation"))
+                );
+            }
+            drop(requests);
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+        }
+        tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .expect("shutdown finishes")
+            .expect("actor");
+        assert_eq!(supervisor.completion_count_for_test(), 0, "{action}");
+        if action == "shutdown" {
+            assert!(captured.lock().expect("capture").is_empty());
+        }
+    }
+}
+
+#[tokio::test]
+async fn background_running_targeted_cancel_panic_and_finalization_retire_once() {
+    struct FinishGate {
+        reached: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+    }
+    #[async_trait]
+    impl talos_plugin::HookHandler for FinishGate {
+        fn name(&self) -> &str {
+            "background-finalization-gate"
+        }
+        fn subscribed(&self) -> &'static [talos_plugin::HookEventKind] {
+            &[talos_plugin::HookEventKind::TurnComplete]
+        }
+        fn timeout(&self) -> Duration {
+            Duration::from_secs(30)
+        }
+        async fn on_event(
+            &self,
+            _: &talos_plugin::HookContext,
+            _: &mut talos_plugin::HookEvent<'_>,
+        ) -> talos_plugin::HookResult {
+            self.reached.notify_one();
+            self.release.notified().await;
+            talos_plugin::HookResult::Continue
+        }
+    }
+    for action in ["targeted", "panic", "finalize"] {
+        let reached = Arc::new(tokio::sync::Notify::new());
+        let release = Arc::new(tokio::sync::Notify::new());
+        let mut hooks = talos_plugin::HookRegistry::new();
+        if action == "finalize" {
+            hooks.register(Arc::new(FinishGate {
+                reached: reached.clone(),
+                release: release.clone(),
+            }));
+        }
+        let model: Arc<dyn LanguageModel> = match action {
+            "targeted" => Arc::new(SlowModel {
+                delay: Duration::from_secs(30),
+                events: success_events("too late"),
+            }),
+            "panic" => Arc::new(PanicModel),
+            _ => Arc::new(MockModel::new(vec![success_events("finalized")])),
+        };
+        let root = tempfile::tempdir().expect("workspace");
+        let agent = Agent::with_security_and_hooks(
+            model,
+            ToolRegistry::new(),
+            None,
+            None,
+            root.path().into(),
+            Arc::new(hooks),
+        );
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor
+            .background_jobs
+            .enable_completions(0)
+            .expect("test activation");
+        let supervisor = actor.background_jobs.clone();
+        let id = talos_core::background_job::BackgroundJobId::new("job_running");
+        supervisor.inject_completion_for_test(id.clone());
+        let task = tokio::spawn(async move { actor.run().await });
+        let turn_id = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if let SessionEvent::TurnEvent {
+                    turn_id,
+                    payload: TurnEventPayload::Started,
+                    ..
+                } = handle.eq_rx.recv().await.expect("start event")
+                {
+                    break turn_id;
+                }
+            }
+        })
+        .await
+        .expect("started");
+        if action == "targeted" {
+            handle
+                .sq_tx
+                .send(SessionOp::InterruptTurn {
+                    session_generation: 0,
+                    turn_id,
+                })
+                .await
+                .expect("targeted stop");
+        } else if action == "finalize" {
+            tokio::time::timeout(Duration::from_secs(5), reached.notified())
+                .await
+                .expect("finalization gate");
+            supervisor.consume_completions(std::slice::from_ref(&id));
+            supervisor.invalidate_completions();
+            assert_eq!(
+                supervisor.completion_count_for_test(),
+                1,
+                "running slot remains until finalization"
+            );
+            release.notify_one();
+        }
+        let events = tokio::time::timeout(
+            Duration::from_secs(5),
+            collect_until_completions(&mut handle.eq_rx, 1),
+        )
+        .await
+        .expect("terminal receipt");
+        assert!(
+            events.iter().any(|event| matches!(
+                (action, completed_status(event)),
+                ("targeted", Some(TurnCompletionStatus::Cancelled))
+                    | ("panic", Some(TurnCompletionStatus::Error { .. }))
+                    | ("finalize", Some(TurnCompletionStatus::Success { .. }))
+            )),
+            "{action}"
+        );
+        assert_eq!(supervisor.completion_count_for_test(), 0);
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .expect("actor stopped")
+            .expect("join");
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn real_background_process_terminal_resumes_actor_without_second_submission() {
+    struct ApproveFixture;
+    #[async_trait]
+    impl crate::permission_pipeline::ApprovalResolver for ApproveFixture {
+        async fn resolve(
+            &self,
+            _: crate::permission_pipeline::PermissionApprovalRequest,
+            _: Duration,
+        ) -> Result<talos_core::ApprovalChoice, crate::permission_pipeline::ApprovalResolverError>
+        {
+            Ok(talos_core::ApprovalChoice::ApproveOnce)
+        }
+    }
+    for (command, expected) in [
+        ("printf real-completion", "completed"),
+        ("exit 7", "failed"),
+        ("sleep 5", "timed_out"),
+    ] {
+        let root = tempfile::tempdir().expect("workspace");
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let model = CapturingSequenceModel {
+            captured: captured.clone(),
+            responses: Arc::new(Mutex::new(VecDeque::from(vec![
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "real-launch".into(),
+                            name: "exec".into(),
+                            input: serde_json::json!({"command":"/bin/sh", "args":["-c",command], "background":true, "timeout_secs":1}),
+                        },
+                        provenance: Default::default(),
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ],
+                success_events("job launched"),
+                success_events("terminal continuation"),
+            ]))),
+        };
+        let mut tools = ToolRegistry::new();
+        tools.register(Arc::new(talos_tools::ExecTool::new(root.path().into())));
+        let mut engine = talos_permission::PermissionEngine::empty();
+        engine.set_workspace_root(root.path().into());
+        for nature in [
+            talos_core::tool::ToolNature::Read,
+            talos_core::tool::ToolNature::Execute,
+        ] {
+            engine.add_rule(talos_permission::PermissionRule::new_nature(
+                nature,
+                None,
+                None,
+                talos_permission::PermissionDecision::Allow,
+            ));
+        }
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(model),
+            tools,
+            Some(Arc::new(engine)),
+            None,
+            root.path().into(),
+            Arc::new(talos_plugin::HookRegistry::new()),
+        )
+        .with_approval_resolver(Arc::new(ApproveFixture));
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor
+            .background_jobs
+            .enable_completions(0)
+            .expect("test-only activation");
+        let supervisor = actor.background_jobs.clone();
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "run the authorized fixture job".into(),
+            })
+            .await
+            .expect("only user input");
+        let task = tokio::spawn(async move { actor.run().await });
+        let events = tokio::time::timeout(
+            Duration::from_secs(15),
+            collect_until_completions(&mut handle.eq_rx, 2),
+        )
+        .await
+        .expect("launch and completion");
+        let launched = events
+            .iter()
+            .find_map(|event| match progress_event(event) {
+                Some(AgentEvent::ToolResult { result, .. })
+                    if result.tool_use_id == "real-launch" =>
+                {
+                    Some(result)
+                }
+                _ => None,
+            })
+            .expect("launch receipt");
+        assert!(!launched.is_error, "{}", launched.content);
+        let receipt: serde_json::Value =
+            serde_json::from_str(&launched.content).expect("receipt JSON");
+        let job_id = receipt["job_id"].as_str().expect("real supervisor job");
+        let requests = captured.lock().expect("capture");
+        assert_eq!(
+            requests.len(),
+            3,
+            "one launch, one user-turn answer, one completion"
+        );
+        assert!(
+            matches!(requests[2].last(), Some(Message::Context { content }) if content.contains(job_id) && content.contains(&format!("state: {expected}")))
+        );
+        drop(requests);
+        assert_eq!(supervisor.completion_count_for_test(), 0);
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .expect("shutdown deadline")
+            .expect("actor");
+    }
+}
+
+#[tokio::test]
+async fn closed_runtime_admission_retires_background_completion_without_dispatch() {
+    let root = tempfile::tempdir().expect("workspace");
+    let calls = Arc::new(AtomicUsize::new(0));
+    #[allow(deprecated)]
+    let agent = Agent::new(
+        Arc::new(CountingModel {
+            calls: calls.clone(),
+        }),
+        ToolRegistry::new(),
+    );
+    let (handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    let control = RuntimeAdmissionControl::new();
+    control.begin_shutdown(1, RuntimeShutdownTurnPolicy::FinishCurrent);
+    actor.set_runtime_admission(control);
+    actor
+        .background_jobs
+        .enable_completions(0)
+        .expect("test activation");
+    let supervisor = actor.background_jobs.clone();
+    supervisor.inject_completion_for_test(talos_core::background_job::BackgroundJobId::new(
+        "job_closed",
+    ));
+    let task = tokio::spawn(async move { actor.run().await });
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while supervisor.completion_count_for_test() != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("denied admission releases slot");
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("actor stopped")
+        .expect("join");
+}
+
+#[tokio::test]
+async fn actor_background_completion_runs_without_user_submission() {
+    let model = MockModel::new(
+        (0..130)
+            .map(|_| {
+                vec![
+                    AgentEvent::TurnStart,
+                    AgentEvent::TextDelta {
+                        delta: "automatic continuation".into(),
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::EndTurn,
+                        usage: Default::default(),
+                    },
+                ]
+            })
+            .collect(),
+    );
+    #[allow(deprecated)]
+    let agent = Agent::new(Arc::new(model), ToolRegistry::new());
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: std::env::current_dir().expect("workspace"),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor
+        .background_jobs
+        .enable_completions(actor.session_generation)
+        .expect("enable");
+    let supervisor = actor.background_jobs.clone();
+    let task = tokio::spawn(async move { actor.run().await });
+    for index in 0..130 {
+        supervisor.inject_completion_for_test(talos_core::background_job::BackgroundJobId::new(
+            format!("job_auto_{index}"),
+        ));
+        let events = tokio::time::timeout(
+            Duration::from_secs(10),
+            collect_until_completions(&mut handle.eq_rx, 1),
+        )
+        .await
+        .expect("automatic continuation deadline");
+        assert!(events.iter().any(|event| matches!(completed_status(event),
+            Some(TurnCompletionStatus::Success { final_text, .. }) if final_text == "automatic continuation")));
+        assert!(supervisor.pending_completion().is_none());
+    }
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(10), task)
+        .await
+        .expect("shutdown deadline")
+        .expect("actor");
+}
+
+#[tokio::test]
+async fn background_provider_failures_retire_slots_without_retry() {
+    struct FailingModel(Arc<AtomicUsize>);
+    #[async_trait]
+    impl LanguageModel for FailingModel {
+        async fn stream(&self, _messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            let call = self.0.fetch_add(1, Ordering::SeqCst);
+            if call % 2 == 0 {
+                Err(talos_core::provider::ProviderError::NetworkError(
+                    "fixture failure".into(),
+                ))
+            } else {
+                let (tx, rx) = mpsc::channel(2);
+                tx.send(AgentEvent::TurnStart).await.expect("start");
+                tx.send(AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Default::default(),
+                })
+                .await
+                .expect("end");
+                Ok(rx)
+            }
+        }
+    }
+    let calls = Arc::new(AtomicUsize::new(0));
+    #[allow(deprecated)]
+    let agent = Agent::new(Arc::new(FailingModel(calls.clone())), ToolRegistry::new());
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: std::env::current_dir().expect("workspace"),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor
+        .background_jobs
+        .enable_completions(actor.session_generation)
+        .expect("enable");
+    let supervisor = actor.background_jobs.clone();
+    let task = tokio::spawn(async move { actor.run().await });
+    for index in 0..130 {
+        supervisor.inject_completion_for_test(talos_core::background_job::BackgroundJobId::new(
+            format!("job_failure_{index}"),
+        ));
+        let events = tokio::time::timeout(
+            Duration::from_secs(10),
+            collect_until_completions(&mut handle.eq_rx, 1),
+        )
+        .await
+        .expect("failure completion deadline");
+        assert!(events.iter().any(|event| matches!(
+            completed_status(event),
+            Some(TurnCompletionStatus::Error { .. })
+        )));
+        assert_eq!(calls.load(Ordering::SeqCst), index * 2 + 1);
+        assert_eq!(supervisor.completion_count_for_test(), 0);
+        // Explicit user input resumes the existing error pause; never weaken it
+        // merely to admit the next background completion.
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "resume".into(),
+            })
+            .await
+            .expect("resume");
+        let resumed = collect_until_completions(&mut handle.eq_rx, 1).await;
+        assert!(resumed.iter().any(|event| matches!(
+            completed_status(event),
+            Some(TurnCompletionStatus::Success { .. })
+        )));
+        assert_eq!(calls.load(Ordering::SeqCst), index * 2 + 2);
+    }
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(10), task)
+        .await
+        .expect("shutdown deadline")
+        .expect("actor");
+    assert_eq!(calls.load(Ordering::SeqCst), 260);
+}
+
+#[tokio::test]
+async fn queued_interrupt_suppresses_background_completion_before_dispatch() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    #[allow(deprecated)]
+    let agent = Agent::new(
+        Arc::new(CountingModel {
+            calls: calls.clone(),
+        }),
+        ToolRegistry::new(),
+    );
+    let (handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: std::env::current_dir().expect("workspace"),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor
+        .background_jobs
+        .enable_completions(actor.session_generation)
+        .expect("enable");
+    let supervisor = actor.background_jobs.clone();
+    handle
+        .sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("interrupt");
+    supervisor.inject_completion_for_test(talos_core::background_job::BackgroundJobId::new(
+        "job_stopped",
+    ));
+    let task = tokio::spawn(async move { actor.run().await });
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while supervisor.completion_count_for_test() != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("interrupt must retire pending completion before shutdown");
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert!(!task.is_finished(), "Actor remains live after interrupt");
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(10), task)
+        .await
+        .expect("actor deadline")
+        .expect("actor join");
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn queued_user_runs_before_background_completion() {
+    struct RecordingModel(Arc<Mutex<Vec<Vec<Message>>>>);
+    #[async_trait]
+    impl LanguageModel for RecordingModel {
+        async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            self.0.lock().expect("requests").push(messages.to_vec());
+            let (tx, rx) = mpsc::channel(2);
+            tx.send(AgentEvent::TurnStart).await.expect("start");
+            tx.send(AgentEvent::TurnEnd {
+                stop_reason: StopReason::EndTurn,
+                usage: Default::default(),
+            })
+            .await
+            .expect("end");
+            Ok(rx)
+        }
+    }
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    #[allow(deprecated)]
+    let agent = Agent::new(
+        Arc::new(RecordingModel(requests.clone())),
+        ToolRegistry::new(),
+    );
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: std::env::current_dir().expect("workspace"),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor
+        .background_jobs
+        .enable_completions(actor.session_generation)
+        .expect("enable");
+    let supervisor = actor.background_jobs.clone();
+    supervisor.inject_completion_for_test(talos_core::background_job::BackgroundJobId::new(
+        "job_after_user",
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "user first".into(),
+        })
+        .await
+        .expect("user");
+    let task = tokio::spawn(async move { actor.run().await });
+    collect_until_completions(&mut handle.eq_rx, 2).await;
+    {
+        let requests = requests.lock().expect("requests");
+        assert_eq!(requests.len(), 2);
+        assert!(
+            matches!(requests[0].last(), Some(Message::User { content }) if content == "user first")
+        );
+        assert!(
+            matches!(requests[1].last(), Some(Message::Context { content }) if content.contains("job_after_user"))
+        );
+    }
+    assert_eq!(supervisor.completion_count_for_test(), 0);
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(10), task)
+        .await
+        .expect("deadline")
+        .expect("join");
+}
+
+#[tokio::test]
+async fn model_consumed_terminal_result_suppresses_completion_turn() {
+    for action in ["status", "read"] {
+        let model = MockModel::new(vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "read-terminal".into(),
+                        name: "process".into(),
+                        input: serde_json::json!({"action":action, "job_id":"job_consumed"}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Default::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "observed terminal".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Default::default(),
+                },
+            ],
+        ]);
+        let remaining = model.responses.clone();
+        #[allow(deprecated)]
+        let agent = Agent::new(Arc::new(model), ToolRegistry::new());
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: std::env::current_dir().expect("workspace"),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor
+            .background_jobs
+            .enable_completions(actor.session_generation)
+            .expect("enable");
+        let supervisor = actor.background_jobs.clone();
+        supervisor.inject_completion_for_test(talos_core::background_job::BackgroundJobId::new(
+            "job_consumed",
+        ));
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "check terminal status".into(),
+            })
+            .await
+            .expect("submit");
+        let task = tokio::spawn(async move { actor.run().await });
+        let events = collect_until_completions(&mut handle.eq_rx, 1).await;
+        assert!(events.iter().any(|event| matches!(completed_status(event),
+        Some(TurnCompletionStatus::Success { final_text, .. }) if final_text == "observed terminal")));
+        assert!(remaining.lock().expect("responses").is_empty());
+        assert_eq!(
+            supervisor.completion_count_for_test(),
+            0,
+            "consumed pending slot retired at commit"
+        );
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        tokio::time::timeout(Duration::from_secs(10), task)
+            .await
+            .expect("deadline")
+            .expect("join");
+    }
+}
+
+#[tokio::test]
+async fn rewritten_terminal_result_does_not_suppress_completion_turn() {
+    struct RewriteResult;
+    #[async_trait]
+    impl talos_plugin::HookHandler for RewriteResult {
+        fn name(&self) -> &str {
+            "replace-process-result"
+        }
+        fn subscribed(&self) -> &'static [talos_plugin::HookEventKind] {
+            &[talos_plugin::HookEventKind::OnToolResultObserved]
+        }
+        async fn on_event(
+            &self,
+            _: &talos_plugin::HookContext,
+            event: &mut talos_plugin::HookEvent<'_>,
+        ) -> talos_plugin::HookResult {
+            if let talos_plugin::HookEvent::OnToolResultObserved { observation } = event {
+                let mut replacement = (*observation).clone();
+                replacement.result.content = "tool output withheld by hook".into();
+                return talos_plugin::HookResult::Modify(
+                    talos_plugin::HookEvent::OnToolResultObserved {
+                        observation: Box::leak(Box::new(replacement)),
+                    },
+                );
+            }
+            talos_plugin::HookResult::Continue
+        }
+    }
+    for action in ["status", "read"] {
+        let model = MockModel::new(vec![
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "read-terminal".into(),
+                        name: "process".into(),
+                        input: serde_json::json!({"action":action, "job_id":"job_consumed"}),
+                    },
+                    provenance: Default::default(),
+                    summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::ToolUse,
+                    usage: Default::default(),
+                },
+            ],
+            vec![
+                AgentEvent::TurnStart,
+                AgentEvent::TextDelta {
+                    delta: "observed terminal".into(),
+                },
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Default::default(),
+                },
+            ],
+            success_events("completion still delivered"),
+        ]);
+        let remaining = model.responses.clone();
+        let mut hooks = talos_plugin::HookRegistry::new();
+        hooks.register(Arc::new(RewriteResult));
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(model),
+            ToolRegistry::new(),
+            None,
+            None,
+            std::env::current_dir().expect("workspace"),
+            Arc::new(hooks),
+        );
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: std::env::current_dir().expect("workspace"),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor
+            .background_jobs
+            .enable_completions(actor.session_generation)
+            .expect("enable");
+        let supervisor = actor.background_jobs.clone();
+        supervisor.inject_completion_for_test(talos_core::background_job::BackgroundJobId::new(
+            "job_consumed",
+        ));
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "check terminal status".into(),
+            })
+            .await
+            .expect("submit");
+        let task = tokio::spawn(async move { actor.run().await });
+        let events = tokio::time::timeout(
+            Duration::from_secs(10),
+            collect_until_completions(&mut handle.eq_rx, 2),
+        )
+        .await
+        .expect("rewritten result must not count as consumption");
+        assert!(events.iter().any(|event| matches!(completed_status(event),
+        Some(TurnCompletionStatus::Success { final_text, .. }) if final_text == "observed terminal")));
+        assert!(remaining.lock().expect("responses").is_empty());
+        assert_eq!(
+            supervisor.completion_count_for_test(),
+            0,
+            "separate completion turn retired the pending slot"
+        );
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        tokio::time::timeout(Duration::from_secs(10), task)
+            .await
+            .expect("deadline")
+            .expect("join");
+    }
+}
+
+#[tokio::test]
+async fn failed_provider_response_does_not_consume_terminal_result() {
+    for previously_consumed in [false, true] {
+        for action in ["status", "read"] {
+            let mut responses = vec![
+                vec![
+                    AgentEvent::TurnStart,
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "read-before-failure".into(),
+                            name: "process".into(),
+                            input: serde_json::json!({"action":action, "job_id":"job_unconsumed"}),
+                        },
+                        provenance: Default::default(),
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ],
+                // A closed stream without TurnEnd is not successful consumption.
+                vec![AgentEvent::TurnStart],
+            ];
+            if previously_consumed {
+                responses.insert(1, vec![
+                AgentEvent::ToolCall {
+                    call: talos_core::message::ToolCall {
+                        id: "second-read".into(), name: "process".into(),
+                        input: serde_json::json!({"action":action,"job_id":"job_unconsumed"}),
+                    }, provenance: Default::default(), summary_fields: vec![],
+                },
+                AgentEvent::TurnEnd { stop_reason: StopReason::ToolUse, usage: Default::default() },
+            ]);
+            }
+            let model = MockModel::new(responses);
+            #[allow(deprecated)]
+            let agent = Agent::new(Arc::new(model), ToolRegistry::new());
+            let root = tempfile::tempdir().expect("workspace");
+            let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+            let session = manager
+                .create_session("partial-consumption", "workspace")
+                .expect("session");
+            let (mut handle, mut actor) = AppServerSession::new(
+                agent,
+                SessionConfig {
+                    runtime_policy: RuntimePolicy::interactive(),
+                    workspace_root: root.path().into(),
+                    initial_history: vec![],
+                    model_context_limit: 128_000,
+                },
+            );
+            actor.set_persistence(session.clone(), Default::default());
+            actor
+                .background_jobs
+                .enable_completions(actor.session_generation)
+                .expect("enable");
+            let supervisor = actor.background_jobs.clone();
+            supervisor.inject_completion_for_test(
+                talos_core::background_job::BackgroundJobId::new("job_unconsumed"),
+            );
+            handle
+                .sq_tx
+                .send(SessionOp::Submit {
+                    message: "check status".into(),
+                })
+                .await
+                .expect("submit");
+            let task = tokio::spawn(async move { actor.run().await });
+            let events = collect_until_completions(&mut handle.eq_rx, 1).await;
+            assert!(events.iter().any(|event| matches!(
+                completed_status(event),
+                Some(TurnCompletionStatus::Error { .. })
+            )));
+            assert_eq!(
+                supervisor.completion_count_for_test(),
+                usize::from(!previously_consumed)
+            );
+            if !previously_consumed {
+                assert_eq!(
+                    supervisor
+                        .pending_completion()
+                        .expect("unconsumed pending")
+                        .0
+                        .as_str(),
+                    "job_unconsumed"
+                );
+            }
+            if previously_consumed {
+                let restored = manager
+                    .get_session(&session.id)
+                    .expect("reopen committed partial turn")
+                    .read_messages()
+                    .expect("restored messages");
+                assert!(restored.iter().any(|message| matches!(message, Message::Tool { result } if result.tool_use_id == "read-before-failure" && !result.is_error)), "consumed original result must survive restart after the later failure");
+            }
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+            tokio::time::timeout(Duration::from_secs(10), task)
+                .await
+                .expect("deadline")
+                .expect("join");
+        }
+    }
+}
+
 struct SlowModel {
     delay: Duration,
     events: Vec<AgentEvent>,
@@ -390,7 +1684,7 @@ fn structured_submission_rejects_unbounded_image_metadata() {
 
 #[cfg(windows)]
 #[tokio::test]
-async fn actor_interrupt_and_shutdown_release_recovery_source_before_persistence() {
+async fn actor_idle_recovery_allows_writes_and_cancellation_persists() {
     struct HeldModel(Arc<tokio::sync::Notify>);
     #[async_trait]
     impl LanguageModel for HeldModel {
@@ -445,8 +1739,8 @@ async fn actor_interrupt_and_shutdown_release_recovery_source_before_persistence
             std::fs::OpenOptions::new()
                 .write(true)
                 .open(durable.file_path())
-                .is_err(),
-            "live recovery must retain source"
+                .is_ok(),
+            "provider await must not retain a write-excluding recovery lease"
         );
         handle
             .sq_tx
@@ -1155,13 +2449,14 @@ async fn test_multi_turn() {
 
 #[tokio::test]
 async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1230,13 +2525,14 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
 
 #[tokio::test]
 async fn duplicate_submission_reconciles_and_executes_at_most_once() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1292,13 +2588,14 @@ async fn duplicate_submission_reconciles_and_executes_at_most_once() {
 
 #[tokio::test]
 async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1357,13 +2654,14 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
 
 #[tokio::test]
 async fn context_budget_terminalizes_before_submission_started() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 64,
     };
@@ -1486,13 +2784,14 @@ async fn context_budget_terminalizes_before_submission_started() {
 
 #[tokio::test]
 async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let agent = make_agent(SlowModel {
         delay: Duration::from_secs(30),
         events: success_events("too late"),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1560,6 +2859,7 @@ async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
 
 #[tokio::test]
 async fn paused_user_submission_runs_before_retained_scheduler_work() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let responses = Arc::new(Mutex::new(VecDeque::from(vec![
         vec![AgentEvent::Error {
@@ -1574,7 +2874,7 @@ async fn paused_user_submission_runs_before_retained_scheduler_work() {
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -5542,7 +6842,27 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                             }),
                         _ => None,
                     })
-                    .expect("installed checkpoint in actual provider request");
+                    .unwrap_or_else(|| {
+                        let outcomes: Vec<_> = messages
+                            .iter()
+                            .filter_map(|message| match message {
+                                Message::Multimodal { parts } => Some(parts),
+                                _ => None,
+                            })
+                            .flatten()
+                            .filter_map(|part| match part {
+                                talos_core::message::ContentPart::Text { text } => {
+                                    serde_json::from_str::<serde_json::Value>(text)
+                                        .ok()
+                                        .filter(|value| value.get("checkpoint_operation").is_some())
+                                }
+                                _ => None,
+                            })
+                            .collect();
+                        panic!(
+                            "installed checkpoint missing in provider step {step}; terminal outcomes: {outcomes:?}"
+                        );
+                    });
                 assert_task_state(&checkpoint);
             }
             let events = match step {
@@ -6637,11 +7957,146 @@ fn model_checkpoint_enable_reports_collision_without_partial_registration() {
     assert!(agent.tools.get("compact_context").is_none());
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 #[tokio::test]
 async fn durable_actor_history_search_and_detail_reach_real_provider_continuation() {
+    actor_history_search_and_detail(false, false).await;
+}
+
+#[cfg(any(unix, windows))]
+#[tokio::test]
+async fn cli_persistence_history_search_and_detail_reach_real_provider_continuation() {
+    actor_history_search_and_detail(true, false).await;
+}
+
+#[cfg(any(unix, windows))]
+#[tokio::test]
+async fn archived_cli_history_search_and_detail_reach_real_provider_continuation() {
+    actor_history_search_and_detail(true, true).await;
+}
+
+#[cfg(any(unix, windows))]
+#[tokio::test]
+async fn archived_history_does_not_hold_other_session_writes_during_provider_await() {
+    struct PausedModel {
+        entered: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+    }
+    #[async_trait]
+    impl LanguageModel for PausedModel {
+        async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            assert!(
+                crate::checkpoint_history::HISTORY
+                    .try_with(|history| history.as_ref().is_some_and(|history| history.available()))
+                    .expect("prepared history scope"),
+                "must exercise actual prepared recovery"
+            );
+            self.entered.notify_one();
+            self.release.notified().await;
+            let (tx, rx) = mpsc::channel(16);
+            for event in success_events("continued after concurrent session write") {
+                tx.send(event).await.expect("receiver");
+            }
+            Ok(rx)
+        }
+    }
+    let root = tempfile::tempdir().expect("root");
+    let first = talos_session::DurableSession::open_or_create(root.path(), "first").expect("first");
+    let second =
+        talos_session::DurableSession::open_or_create(root.path(), "second").expect("second");
+    assert_eq!(first.file_path().parent(), second.file_path().parent());
+    for i in 0..205 {
+        first
+            .session()
+            .append(&Message::User {
+                content: format!("original {i}"),
+            })
+            .expect("append");
+    }
+    first.session().compact_archived(50).expect("archive");
+    second
+        .commit_turn(
+            "seed",
+            &[Message::User {
+                content: "independent fact".into(),
+            }],
+            &Default::default(),
+        )
+        .expect("seed second");
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let mut agent = make_agent(PausedModel {
+        entered: entered.clone(),
+        release: release.clone(),
+    });
+    agent
+        .enable_model_checkpoint_tools()
+        .expect("enable recovery preparation");
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            workspace_root: root.path().into(),
+            runtime_policy: RuntimePolicy::interactive(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(first.session().clone(), Default::default());
+    let task = tokio::spawn(async move { actor.run().await });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "continue".into(),
+        })
+        .await
+        .expect("submit");
+    tokio::time::timeout(Duration::from_secs(10), entered.notified())
+        .await
+        .expect("provider paused with prepared history");
+    second
+        .commit_turn(
+            "concurrent",
+            &[Message::User {
+                content: "durable concurrent append".into(),
+            }],
+            &Default::default(),
+        )
+        .expect("other session remains writable while provider awaits");
+    release.notify_one();
+    let events = tokio::time::timeout(
+        Duration::from_secs(10),
+        collect_until_completions(&mut handle.eq_rx, 1),
+    )
+    .await
+    .expect("completion");
+    assert!(events.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    task.await.expect("actor");
+    assert_eq!(
+        first
+            .session()
+            .read_terminal_diagnostics()
+            .expect("diagnostics")
+            .len(),
+        1
+    );
+    let reopened = talos_session::DurableSession::open_or_create(root.path(), "second")
+        .expect("reopen second");
+    assert!(reopened.read_messages().expect("second history").iter().any(|message| matches!(message, Message::User { content } if content == "durable concurrent append")));
+}
+
+#[cfg(any(unix, windows))]
+async fn actor_history_search_and_detail(cli: bool, archived: bool) {
     struct RecoveryModel {
         step: AtomicUsize,
+        compact: bool,
     }
     #[async_trait]
     impl LanguageModel for RecoveryModel {
@@ -6717,12 +8172,64 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
                         usage: Default::default(),
                     },
                 ]
-            } else {
-                assert_eq!(step, 4);
+            } else if self.compact && step == 4 {
+                let discovery = result("recover-0");
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "checkpoint-source-detail".into(),
+                            name: "history_search".into(),
+                            input: serde_json::json!({"mode":"source_detail", "snapshot":discovery["snapshot"], "reference":discovery["sources"][0]}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else if self.compact && step == 5 {
                 assert_eq!(
                     result("recover-3")["text"],
                     "originalfact unique constraint"
                 );
+                let discovery = result("recover-0");
+                let source = result("checkpoint-source-detail");
+                assert_eq!(source["text"], "originalfact unique constraint");
+                assert_eq!(source["reference"], discovery["sources"][0]);
+                assert_eq!(source["checkpoint_source"], true);
+                let item =
+                    serde_json::json!({"text":source["text"], "sources":[source["reference"]]});
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "archive-compact".into(),
+                            name: "compact_context".into(),
+                            input: serde_json::json!({"snapshot":discovery["snapshot"],"checkpoint":{
+                            "schema_version":1,"summary":item,"goal":item,"next_step":item,
+                            "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                            "facts":[],"assumptions":[],"resources":[],"open_loops":[]}}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else {
+                assert_eq!(step, if self.compact { 6 } else { 4 });
+                if self.compact {
+                    assert_eq!(result("archive-compact")["status"], "Admitted");
+                    assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.contains("originalfact unique constraint"))), "installed source-backed checkpoint is present");
+                } else {
+                    assert_eq!(
+                        result("recover-3")["text"],
+                        "originalfact unique constraint"
+                    );
+                }
                 success_events("recovered and continued")
             };
             let (tx, rx) = mpsc::channel(16);
@@ -6740,7 +8247,7 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             content: if i == 0 {
                 "originalfact unique constraint".into()
             } else {
-                format!("other {i}")
+                format!("other {i} ").repeat(if archived { 80 } else { 1 })
             },
         })
         .collect();
@@ -6777,16 +8284,22 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             },
         },
     ]);
-    durable
-        .commit_turn(
-            "prior",
-            &raw,
-            &talos_session::PersistencePolicy {
-                persist_reasoning: true,
-                persist_raw_tool_output: true,
-            },
-        )
-        .expect("commit");
+    if cli {
+        for message in &raw {
+            durable.session().append(message).expect("CLI append");
+        }
+    } else {
+        durable
+            .commit_turn(
+                "prior",
+                &raw,
+                &talos_session::PersistencePolicy {
+                    persist_reasoning: true,
+                    persist_raw_tool_output: true,
+                },
+            )
+            .expect("commit");
+    }
     durable
         .session()
         .append_with_metadata(
@@ -6804,8 +8317,10 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             .expect("serialized persisted evidence");
     assert!(persisted.contains("originalfact hidden input sentinel"));
     assert!(persisted.contains("originalfact unverified output sentinel"));
-    assert!(!persisted.contains("originalfact credential sentinel"));
-    assert!(persisted.contains("[REDACTED]"));
+    assert_eq!(persisted.contains("originalfact credential sentinel"), cli);
+    if !cli {
+        assert!(persisted.contains("[REDACTED]"));
+    }
     for marker in [
         "originalfact private reasoning sentinel",
         "originalfact opaque signature sentinel",
@@ -6817,6 +8332,24 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             "private metadata must actually be persisted: {marker}"
         );
     }
+    if archived {
+        durable
+            .session()
+            .compact_archived(10)
+            .expect("archive original fact out of head");
+        assert!(
+            !durable
+                .session()
+                .read_entries()
+                .expect("head")
+                .iter()
+                .any(|entry| entry.content == "originalfact unique constraint")
+        );
+    }
+    drop(durable);
+    let durable = talos_session::DurableSession::open_existing(root.path(), "recovery")
+        .expect("cold reopen")
+        .expect("existing owner");
     let mut engine = talos_permission::PermissionEngine::empty();
     engine.set_workspace_root(root.path().into());
     engine.add_rule(talos_permission::PermissionRule::new_nature(
@@ -6828,6 +8361,7 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(RecoveryModel {
             step: AtomicUsize::new(0),
+            compact: archived,
         }),
         ToolRegistry::new(),
         Some(Arc::new(engine)),
@@ -6845,8 +8379,22 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             model_context_limit: 128_000,
         },
     );
-    actor.set_durable_persistence(durable.clone(), Default::default());
-    actor.set_recovered_history_sources(durable.read_history_snapshot().expect("snapshot"));
+    let original_head = std::fs::read(durable.session().file_path.clone()).expect("head bytes");
+    actor.set_session_paths(
+        durable.session().file_path.clone(),
+        durable
+            .session()
+            .file_path
+            .parent()
+            .expect("directory")
+            .to_path_buf(),
+    );
+    if cli {
+        actor.set_persistence(durable.session().clone(), Default::default());
+    } else {
+        actor.set_durable_persistence(durable.clone(), Default::default());
+        actor.set_recovered_history_sources(durable.read_history_snapshot().expect("snapshot"));
+    }
     let task = tokio::spawn(async move {
         actor.run().await;
         actor
@@ -6868,13 +8416,54 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
         completed_status(event),
         Some(TurnCompletionStatus::Success { .. })
     )));
+    if archived {
+        assert!(events.iter().any(|event| matches!(event,
+            SessionEvent::ModelCheckpointTerminal { outcome: talos_core::session::CompactOutcome::Applied { before, after }, .. } if after < before
+        )), "checkpoint must actually be Applied, not merely admitted");
+    }
     handle
         .sq_tx
         .send(SessionOp::Shutdown)
         .await
         .expect("shutdown");
     let actor = task.await.expect("actor");
+    if cli {
+        let diagnostics = durable
+            .session()
+            .read_terminal_diagnostics()
+            .expect("persisted diagnostics");
+        assert_eq!(
+            diagnostics.len(),
+            if archived { 7 } else { 5 },
+            "every provider response terminal must survive prepared recovery"
+        );
+        let reopened = talos_session::Session::new(
+            durable.id(),
+            durable.session().project.clone(),
+            String::new(),
+            durable.session().file_path.clone(),
+        );
+        let restored = reopened.read_messages().expect("restart transcript");
+        assert!(
+            restored.iter().any(|message| matches!(message,
+                Message::Assistant { content, .. } if content == "recovered and continued"
+            )),
+            "successful final response must be durable after restart"
+        );
+        assert!(
+            restored.iter().any(|message| matches!(message,
+                Message::Tool { result } if result.tool_use_id == "recover-3" && !result.is_error
+            )),
+            "tool exchange must survive restart"
+        );
+    }
     assert_eq!(&actor.history[..raw.len()], raw.as_slice());
+    assert!(
+        std::fs::read(&durable.session().file_path)
+            .expect("persisted head")
+            .starts_with(&original_head),
+        "turn startup must preserve the original head even with legacy archival paths configured"
+    );
 }
 
 #[cfg(any(unix, windows))]
@@ -7206,4 +8795,527 @@ async fn cooperative_recovered_sources_bind_long_history_and_refuse_foreign_or_e
         source.resolve(0, revision, last, &actor.history[last]),
         Some(last_id.as_str())
     );
+}
+
+#[tokio::test]
+async fn idle_actor_publishes_archived_history_under_its_runtime_lease() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+    let source = manager.create_session("actor-fork", "").expect("source");
+    for i in 0..8 {
+        source
+            .append(&Message::User {
+                content: format!("fact {i}"),
+            })
+            .expect("append");
+    }
+    source.compact_archived(0).expect("compact");
+    let (handle, mut actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: Arc::new(AtomicUsize::new(0)),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(source.clone(), Default::default());
+    let task = tokio::spawn(async move { actor.run().await });
+    let child = uuid::Uuid::new_v4();
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkHistory {
+            child_id: child.to_string(),
+            child_branch: uuid::Uuid::new_v4().to_string(),
+            through_entry: None,
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("request");
+    let tail = tokio::time::timeout(Duration::from_secs(10), result.recv())
+        .await
+        .expect("deadline")
+        .expect("receipt")
+        .expect("published");
+    let child_session = talos_session::Session::new(
+        child,
+        String::new(),
+        String::new(),
+        source
+            .file_path
+            .parent()
+            .expect("directory")
+            .join(format!("{child}.tlog")),
+    );
+    let entries = child_session.read_entries().expect("child history");
+    assert_eq!(entries.len(), 8);
+    assert_eq!(entries.last().expect("tail").id, tail);
+    assert!(talos_session::SessionRuntimeLease::acquire(&source.file_path).is_err());
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("joined")
+        .expect("actor");
+}
+
+#[tokio::test]
+async fn history_fork_worker_interrupt_preserves_source_and_allows_retry() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+    let source = manager.create_session("actor-fork", "").expect("source");
+    for i in 0..8 {
+        source
+            .append(&Message::User {
+                content: format!("fact {i}"),
+            })
+            .expect("append");
+    }
+    source.compact_archived(0).expect("compact");
+    let (mut handle, mut actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: Arc::new(AtomicUsize::new(0)),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(source.clone(), Default::default());
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    actor.fork_worker_gate = Some((reached.clone(), release.clone()));
+    let task = tokio::spawn(async move { actor.run().await });
+    let child = uuid::Uuid::new_v4();
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkHistory {
+            child_id: child.to_string(),
+            child_branch: uuid::Uuid::new_v4().to_string(),
+            through_entry: None,
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("request");
+    tokio::time::timeout(Duration::from_secs(2), reached.notified())
+        .await
+        .expect("worker entered");
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 913,
+        })
+        .await
+        .expect("compact");
+    let event = tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+        .await
+        .expect("event")
+        .expect("status");
+    assert!(matches!(
+        event,
+        SessionEvent::CompactStatus {
+            operation_id: 913,
+            state: talos_core::session::CompactState::Busy,
+            ..
+        }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("interrupt");
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), result.recv())
+            .await
+            .expect("cancelled")
+            .expect("receipt")
+            .is_err()
+    );
+    assert!(
+        !source
+            .file_path
+            .parent()
+            .expect("directory")
+            .join(format!("{child}.tlog"))
+            .exists()
+    );
+    assert_eq!(
+        source
+            .inspect_archive_recovery(std::time::Instant::now() + Duration::from_secs(5), || false)
+            .expect("source intact")
+            .entries()
+            .len(),
+        8
+    );
+    release.store(true, Ordering::SeqCst);
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkHistory {
+            child_id: child.to_string(),
+            child_branch: uuid::Uuid::new_v4().to_string(),
+            through_entry: None,
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("retry");
+    let tail = tokio::time::timeout(Duration::from_secs(10), result.recv())
+        .await
+        .expect("deadline")
+        .expect("receipt")
+        .expect("published");
+    let child_session = talos_session::Session::new(
+        child,
+        String::new(),
+        String::new(),
+        source
+            .file_path
+            .parent()
+            .expect("directory")
+            .join(format!("{child}.tlog")),
+    );
+    let entries = child_session.read_entries().expect("child history");
+    assert_eq!(entries.len(), 8);
+    assert_eq!(entries.last().expect("tail").id, tail);
+    assert!(talos_session::SessionRuntimeLease::acquire(&source.file_path).is_err());
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("joined")
+        .expect("actor");
+}
+
+#[tokio::test]
+async fn prepared_runtime_lease_handoff_preserves_exclusion_and_rejects_mismatch() {
+    for matching in [true, false] {
+        let temp = tempfile::tempdir().expect("temp");
+        let manager = talos_session::SessionManager::with_dir(temp.path().to_path_buf());
+        let session = manager.create_session("handoff", "").expect("session");
+        let other = manager.create_session("other", "").expect("other");
+        let leased = if matching { &session } else { &other };
+        let lease =
+            talos_session::SessionRuntimeLease::acquire(&leased.file_path).expect("host lease");
+        assert!(talos_session::SessionRuntimeLease::acquire(&leased.file_path).is_err());
+        let agent = make_agent(MockModel::new(vec![success_events("handoff response")]));
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: temp.path().to_path_buf(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_persistence(session.clone(), talos_session::SessionMetadata::default());
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "handoff request".into(),
+            })
+            .await
+            .expect("submit");
+        let task = if matching {
+            actor
+                .adopt_runtime_lease(lease)
+                .expect("adopt prepared ownership");
+            assert!(talos_session::SessionRuntimeLease::acquire(&session.file_path).is_err());
+            tokio::spawn(async move { actor.run().await })
+        } else {
+            tokio::spawn(async move { actor.run_with_runtime_lease(lease).await })
+        };
+        if matching {
+            let events = collect_until_completions(&mut handle.eq_rx, 1).await;
+            assert!(events.iter().any(is_turn_started));
+            assert!(talos_session::SessionRuntimeLease::acquire(&session.file_path).is_err());
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+        }
+        tokio::time::timeout(std::time::Duration::from_secs(10), task)
+            .await
+            .expect("actor exits")
+            .expect("join");
+        let entries = session.read_entries().expect("entries");
+        assert_eq!(
+            entries
+                .iter()
+                .any(|entry| entry.content == "handoff response"),
+            matching
+        );
+        talos_session::SessionRuntimeLease::acquire(&leased.file_path)
+            .expect("released after exit");
+    }
+}
+
+#[tokio::test]
+async fn ordinary_fork_capture_excludes_turns_and_compaction_and_can_retry_cancel() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+    let source = manager.create_session("ordinary", "").expect("source");
+    source
+        .append(&Message::User {
+            content: "original".into(),
+        })
+        .expect("append");
+    let before = std::fs::read(&source.file_path).expect("bytes");
+    let identity = talos_session::SessionRuntimeIdentity::new("provider", "model", Some("variant"));
+    talos_session::PendingSubmissionStore::for_session(&source)
+        .initialize_runtime_identity(identity.clone())
+        .expect("identity");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let (mut handle, mut actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: calls.clone(),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(source.clone(), Default::default());
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    actor.fork_worker_gate = Some((reached.clone(), release.clone()));
+    let task = tokio::spawn(async move { actor.run().await });
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::CaptureOrdinaryFork {
+            through_entry: None,
+            receipt_tx: Some(tx),
+        })
+        .await
+        .expect("capture");
+    tokio::time::timeout(Duration::from_secs(2), reached.notified())
+        .await
+        .expect("capture running");
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "must not start".into(),
+        })
+        .await
+        .expect("submit");
+    assert!(matches!(
+        tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+            .await
+            .expect("event")
+            .expect("busy"),
+        SessionEvent::Error { .. }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 914,
+        })
+        .await
+        .expect("compact");
+    assert!(matches!(
+        tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+            .await
+            .expect("event")
+            .expect("busy"),
+        SessionEvent::CompactStatus {
+            operation_id: 914,
+            state: talos_core::session::CompactState::Busy,
+            ..
+        }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("interrupt");
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .expect("deadline")
+            .expect("receipt")
+            .is_err()
+    );
+    release.store(true, Ordering::SeqCst);
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::CaptureOrdinaryFork {
+            through_entry: None,
+            receipt_tx: Some(tx),
+        })
+        .await
+        .expect("retry");
+    let snapshot = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+        .await
+        .expect("deadline")
+        .expect("receipt")
+        .expect("capture");
+    assert_eq!(snapshot.bytes, before);
+    assert_eq!(
+        snapshot.runtime_identity,
+        Some((identity.provider, identity.model, identity.variant))
+    );
+    assert_eq!(
+        snapshot.tail_id,
+        source.read_entries().expect("entries")[0].id
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_eq!(std::fs::read(&source.file_path).expect("unchanged"), before);
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("joined")
+        .expect("actor");
+}
+
+#[tokio::test]
+async fn recovery_forks_cancel_background_preparation_before_capture() {
+    struct PreparationGate {
+        reached: Arc<tokio::sync::Notify>,
+        dropped: Arc<std::sync::atomic::AtomicBool>,
+    }
+    struct DropSignal(Arc<std::sync::atomic::AtomicBool>);
+    impl Drop for DropSignal {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+    #[async_trait]
+    impl talos_plugin::HookHandler for PreparationGate {
+        fn name(&self) -> &str {
+            "background-fork-exclusion"
+        }
+        fn subscribed(&self) -> &'static [talos_plugin::HookEventKind] {
+            &[talos_plugin::HookEventKind::BeforeProviderCall]
+        }
+        fn timeout(&self) -> Duration {
+            Duration::from_secs(30)
+        }
+        async fn on_event(
+            &self,
+            _: &talos_plugin::HookContext,
+            _: &mut talos_plugin::HookEvent<'_>,
+        ) -> talos_plugin::HookResult {
+            let _drop = DropSignal(self.dropped.clone());
+            self.reached.notify_one();
+            std::future::pending().await
+        }
+    }
+    for archived in [false, true] {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager
+            .create_session("background-fork", "")
+            .expect("source");
+        source
+            .append(&Message::User {
+                content: "retained fact".into(),
+            })
+            .expect("append");
+        if archived {
+            source.compact_archived(0).expect("archive");
+        }
+        let preparing = Arc::new(tokio::sync::Notify::new());
+        let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut hooks = talos_plugin::HookRegistry::new();
+        hooks.register(Arc::new(PreparationGate {
+            reached: preparing.clone(),
+            dropped: dropped.clone(),
+        }));
+        let agent = Agent::with_security_and_hooks(
+            Arc::new(CountingModel {
+                calls: calls.clone(),
+            }),
+            ToolRegistry::new(),
+            None,
+            None,
+            root.path().into(),
+            Arc::new(hooks),
+        );
+        let (handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_persistence(source, Default::default());
+        actor
+            .background_jobs
+            .enable_completions(actor.session_generation)
+            .expect("test activation");
+        actor.background_jobs.inject_completion_for_test(
+            talos_core::background_job::BackgroundJobId::new("fork-preparation"),
+        );
+        let fork_reached = Arc::new(tokio::sync::Notify::new());
+        let fork_release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        actor.fork_worker_gate = Some((fork_reached.clone(), fork_release.clone()));
+        let task = tokio::spawn(async move { actor.run().await });
+        tokio::time::timeout(Duration::from_secs(5), preparing.notified())
+            .await
+            .expect("preparing");
+        let (history_tx, history_rx) = mpsc::unbounded_channel();
+        let (capture_tx, capture_rx) = mpsc::unbounded_channel();
+        let op = if archived {
+            SessionOp::ForkHistory {
+                child_id: uuid::Uuid::new_v4().to_string(),
+                child_branch: uuid::Uuid::new_v4().to_string(),
+                through_entry: None,
+                receipt_tx: Some(history_tx),
+            }
+        } else {
+            SessionOp::CaptureOrdinaryFork {
+                through_entry: None,
+                receipt_tx: Some(capture_tx),
+            }
+        };
+        handle.sq_tx.send(op).await.expect("fork request");
+        let started = tokio::time::timeout(Duration::from_secs(5), fork_reached.notified()).await;
+        let cancelled_before_capture = dropped.load(Ordering::SeqCst);
+        let provider_calls = calls.load(Ordering::SeqCst);
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        fork_release.store(true, Ordering::SeqCst);
+        tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .expect("actor stops")
+            .expect("actor");
+        drop((history_rx, capture_rx));
+        started.expect("fork enters worker");
+        assert!(
+            cancelled_before_capture,
+            "archived={archived}: preparation survived fork admission"
+        );
+        assert_eq!(
+            provider_calls, 0,
+            "fork must not overlap background dispatch"
+        );
+    }
 }

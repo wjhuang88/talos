@@ -92,8 +92,18 @@ impl SessionManager {
             store: Arc::new(CompactTextSessionStore),
             jsonl_store: Arc::new(JsonlSessionStore),
         };
+        if let Err(error) = manager.reconcile_pending_history_forks(
+            std::time::Instant::now() + std::time::Duration::from_secs(10),
+        ) {
+            eprintln!("Session pending-fork reconciliation deferred: {error}");
+        }
         if let Err(error) = manager.reconcile_index() {
             eprintln!("Session index reconciliation failed during startup: {error}");
+        }
+        if let Err(error) = manager.reconcile_published_history_forks(
+            std::time::Instant::now() + std::time::Duration::from_secs(10),
+        ) {
+            eprintln!("Session published-fork reconciliation deferred: {error}");
         }
         match manager.reconcile_orphan_sidecars(&OrphanSidecarReconciliationPolicy::default()) {
             Ok(report) => {
@@ -117,6 +127,92 @@ impl SessionManager {
             }
         }
         Ok(manager)
+    }
+
+    /// Preserve interrupted pending fork heads before normal session discovery.
+    ///
+    /// Private intents identify both runtime fences; busy sources/children are
+    /// skipped. Published children are never quarantined. Returns the number of
+    /// heads preserved outside the transcript namespace, not a completeness claim.
+    /// Retired identities, intents and temporary evidence remain on disk. This
+    /// does not repair published-child runtime, index or lineage metadata.
+    pub fn reconcile_pending_history_forks(
+        &self,
+        deadline: std::time::Instant,
+    ) -> Result<usize, SessionError> {
+        if !self.sessions_dir.exists() {
+            return Ok(0);
+        }
+        let mut preserved = 0;
+        for entry in fs::read_dir(&self.sessions_dir)? {
+            if std::time::Instant::now() >= deadline {
+                return Err(SessionError::ParseError(
+                    "pending fork reconciliation deadline".into(),
+                ));
+            }
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                preserved +=
+                    crate::fork_receipt::reconcile_pending_in_directory(&entry.path(), deadline)?;
+            }
+        }
+        Ok(preserved)
+    }
+
+    /// Replay published fork runtime identity and lineage from validated receipts.
+    /// Busy children and old receipts without runtime snapshots are skipped.
+    /// Returns validated children, including idempotent retries; errors can follow
+    /// partial metadata commits, which are preserved for retry. Transcript search
+    /// indexing remains the separate `reconcile_index` startup step.
+    pub fn reconcile_published_history_forks(
+        &self,
+        deadline: std::time::Instant,
+    ) -> Result<usize, SessionError> {
+        if !self.sessions_dir.exists() {
+            return Ok(0);
+        }
+        let mut restored = 0;
+        for workspace in fs::read_dir(&self.sessions_dir)? {
+            if std::time::Instant::now() >= deadline {
+                return Err(SessionError::ParseError(
+                    "published fork recovery deadline".into(),
+                ));
+            }
+            let workspace = workspace?;
+            if !workspace.file_type()?.is_dir() {
+                continue;
+            }
+            let mut candidates = Vec::new();
+            for (count, entry) in fs::read_dir(workspace.path())?.enumerate() {
+                if count >= 256 || std::time::Instant::now() >= deadline {
+                    return Err(SessionError::ParseError(
+                        "published fork recovery budget exhausted".into(),
+                    ));
+                }
+                let path = entry?.path();
+                let Some(id) = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .and_then(|s| Uuid::parse_str(s).ok())
+                else {
+                    continue;
+                };
+                if path.file_name().and_then(|s| s.to_str()) == Some(&format!("{id}.tlog")) {
+                    candidates.push((id, path));
+                }
+            }
+            for (id, path) in candidates {
+                let session = Session::new(id, String::new(), String::new(), path);
+                if crate::fork_receipt::reconcile_published_metadata(
+                    &session,
+                    &self.sessions_dir.join("index.db"),
+                    deadline,
+                )? {
+                    restored += 1;
+                }
+            }
+        }
+        Ok(restored)
     }
 
     /// Return the default sessions directory without opening indexes or reconciling state.
@@ -328,6 +424,10 @@ impl SessionManager {
                     store,
                 );
                 session.created_at = created_at;
+                crate::fork_receipt::restore_branch(
+                    &mut session,
+                    std::time::Instant::now() + std::time::Duration::from_secs(10),
+                )?;
 
                 let entries = session.read_entries()?;
                 if !entries.is_empty()

@@ -120,12 +120,12 @@ impl ProviderAutoPermissionAssessor {
         if let Some(locale) = locale {
             payload["locale"] = serde_json::Value::String(locale.to_owned());
         }
-        let payload = bounded_json(&payload).ok_or("action review payload exceeds limit")?;
+        let payload = rolling_history::serialize_request(&payload, true)?;
         crate::bounded_model::invoke_auto_review(
             self.provider.as_ref(),
             &[
                 Message::System {
-                    content: prompt.into(),
+                    content: rolling_history::system_prompt(prompt),
                     cache_markers: vec![],
                 },
                 Message::User { content: payload },
@@ -270,6 +270,13 @@ impl AutoPermissionResolver {
                     && (!ordinary
                         || directory.and_then(execution_directory_identity) == directory_before);
                 if let Some(response) = response {
+                    if current && response.schema == schema && response.request_digest == digest {
+                        rolling_history::record_details(
+                            &self.history,
+                            response.effect_summary.as_deref(),
+                            &response.decision_points,
+                        );
+                    }
                     if current
                         && response.schema == schema
                         && response.request_digest == digest

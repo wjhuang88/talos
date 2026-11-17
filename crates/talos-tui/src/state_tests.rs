@@ -1679,12 +1679,12 @@ fn compress_layout_zero_queue_natural() {
 #[test]
 fn compress_layout_preserves_panel_and_natural_composer_before_preview() {
     // Panel and multiline composer retain their natural rows. Preview receives
-    // the remainder and queue is the first optional region removed.
+    // the remainder after reserving the queue header and one body row.
     let r = crate::scrollback::compress_layout(10, 5, 3, 6, 4);
     assert_eq!(r.panel_max_height, 5);
     assert_eq!(r.input_max_height, 3);
-    assert_eq!(r.preview_max_height, 2);
-    assert_eq!(r.queue_max_rows, 0);
+    assert_eq!(r.preview_max_height, 0);
+    assert_eq!(r.queue_max_rows, 2);
 }
 
 #[test]

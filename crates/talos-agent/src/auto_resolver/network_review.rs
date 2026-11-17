@@ -145,12 +145,12 @@ impl ProviderAutoPermissionAssessor {
         request: BuiltinNetworkAssessmentRequest,
         remaining: Duration,
     ) -> Result<String, String> {
-        let payload = bounded_json(&request).ok_or("network review payload exceeds limit")?;
+        let payload = rolling_history::serialize_request(&request, true)?;
         crate::bounded_model::invoke_auto_review(
             self.provider.as_ref(),
             &[
                 Message::System {
-                    content: PROMPT.into(),
+                    content: rolling_history::system_prompt(PROMPT),
                     cache_markers: vec![],
                 },
                 Message::User { content: payload },

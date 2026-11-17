@@ -3,7 +3,7 @@
 > Document status: Review / Claimed — implementation stage merged; acceptance pending #923
 > Created: 2026-11-10
 > Owner: 本文；Board 仅为派生入口。
-> 实现阶段及性能跟进已合并至主分支（#922，71655af8；#929，a8dc7fb0）；完整验收未完成，剩余项跟踪于 #923。下文原计划保留，执行记录见末尾。
+> 实现阶段及性能跟进已合并至主分支（#922，71655af8；#929，a8dc7fb0）；Git 变更通知阶段 #960 已合并（3b1b1f67）；完整验收未完成，剩余项跟踪于 #923。下文原计划保留，执行记录见末尾。
 
 ## 1. 目标与交付边界
 
@@ -334,8 +334,8 @@ measure baseline and freeze budgets before P1.
 | Governance Claim PR | #910 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Claim #910 merged as d355dd68; user authorized stage delivery 2026-11-12; exact-head Agent review APPROVE at 14a274ed; code CI43150963692 passed; stage decision recorded in #922 and #923 |
-| Implementation PR | #922 (merged as 71655af8); #929 (merged as a8dc7fb0; remaining acceptance #923) |
-| Last Updated | 2026-11-13 |
+| Implementation PR | #922 (71655af8); #929 (a8dc7fb0); #960 (3b1b1f67); remaining acceptance #923 |
+| Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Full published acceptance including native terminal evidence; incomplete platforms remain Review |
 
 ### P0 execution checkpoint — 2026-11-11
@@ -1855,3 +1855,126 @@ host inventory shows Ghostty/niri but no process namedtalos, so no candidate
 native resource sample was taken. All local heavy tasks and the CI watcher have
 ended. Resume from the remaining acceptance rows; do not repeat unchanged
 matrices, waive budgets, or reinterpret stage merge as Complete.
+
+### Native idle follow-up — 2026-11-16: change-driven Git refresh
+
+User authorized replacing unconditional two-second repository scans with change-driven
+refresh scheduled by the existing TUI loop. This extends the execution approach, not
+completion evidence; the published acceptance and remaining native gates remain.
+Implementation stays in `target/tui-perf-acceptance`, branch `fix/tui-idle-git-scan`.
+
+Observed native Debug process was idle at the input prompt (maintainer confirmed).
+Two 30-second samples measured 18.24% and 16.87% of one core. A 20-second thread
+sample observed ten short-lived Git status workers, approximately two seconds apart.
+The synchronous early-exit experiment passes seven focused tests and reduces three
+read-only scans of the live dirty workspace from approximately 327ms to 186ms;
+this is scan wall time, not proof of whole-TUI idle acceptance.
+
+Implementation constraints for the authorized follow-up:
+
+- Reuse ToolResult, focus and workspace invalidation already in the event loop.
+- Native filesystem notifications invalidate Git snapshots; callback work is bounded,
+  with no scan, file-content reads, or unbounded event queue in the callback.
+- Debounce bursts with a bounded maximum delay. Changes received during a scan retain
+  a pending refresh. Workspace generation prevents obsolete publication.
+- Watch setup and teardown must not block terminal input. Cover linked worktree Git
+  metadata and external branch/index changes, not only the workspace directory.
+- Avoid watch storms from ignored build trees; watcher registration and event processing
+  must be measured on the actual repository, not just a tiny fixture.
+- Keep a low-frequency reconciliation path when notifications work; notification errors,
+  overflow, unsupported filesystems and setup failure require explicit polling fallback.
+- Reconcile the existing five-second cache expiry with watcher health; do not silently
+  lengthen expiry to disguise stale status. Errors remain unknown, not clean.
+- Preserve the single active scan invariant and joined worker lifetime. The rejected
+  gix parallel-iterator experiment detached internal workers on early drop.
+- Verify quiet idle scan count, external clean/dirty/clean, burst coalescing, mutation
+  during a blocked scan, switch/late-result rejection and watcher failure recovery.
+
+Local implementation now uses `notify` 8.2 native backends and `ignore` 0.4 for
+bounded registration. Soft dependency decision: use Rust libraries rather than host
+watch utilities; macOS selects kqueue (OS ABI boundary under ADR-007), not the
+FSEvents C wrapper. Review subsequently found notify 8.2 kqueue's directory-event
+handler calls `add_watch(path, true)` internally, defeating nonrecursive limits.
+macOS therefore never instantiates the watcher and retains polling; change-driven
+macOS refresh remains unimplemented pending a bounded backend. This is a source
+finding, not a native macOS measurement. No Talos-authored unsafe or host watcher
+command is introduced.
+Missing/failed notifications fall back to two-second polling with 30-second setup
+retries; healthy notification mode retains 30-second reconciliation and a 35-second
+snapshot lifetime. Undetected changes can therefore wait for reconciliation.
+Registration is capped at 8192 paths and a cooperative two-second budget; a blocked
+OS filesystem call cannot be forcibly interrupted, but stays off the UI thread.
+
+Local regression: 695 TUI library tests passed, zero ignored, including quiet
+actual-loop scan counts, tracked files under ignored directories, same-path
+directory recreation, and removal of ignore rules. Service wall 22.442s, CPU
+10.167s, peak 1.2GiB, zero swap under the agreed resource guards. Earlier MSVC
+cross-check passed but predates final review corrections. Full workspace checks,
+final review, integrated resource measurement and publication remain pending.
+Existing native acceptance and the overall task remain open.
+
+Validation follow-up: locked workspace check and Clippy passed. The first complete
+test run failed one native-Git English-stderr assertion because the validation
+unit omitted LOCAL-DEV's pinned locale; the identical existing test binary passed
+with `LC_ALL=C` / `LANG=C`. The standard preflight was restarted with that locale,
+reusing all Cargo artifacts (check 0.75s, Clippy 0.29s, test build 0.35s). Its full
+workspace tests, including tools 1161 and TUI 695, now pass. The SDK fixture's
+base mode passes; coding-mode validation is still running. Do not interpret these
+partial script results as a successful complete preflight yet.
+
+Target refresh found only `58207831` (search I329 governance #958) beyond this
+branch's base; no implementation/claim overlap or reason to rebase this candidate.
+Original full-task remaining acceptance and source-attestation limits still apply.
+
+The locale-correct standard preflight subsequently completed with exit 0, including
+both SDK modes: 13m39.795s wall, 8m4.924s CPU, 2GiB peak, zero swap. This supersedes
+the pending execution state above, without erasing the earlier failed attempt.
+Final MSVC cross-check and integrated real-workspace measurement subsequently passed; see the checkpoint below.
+
+
+### Current follow-up acceptance checkpoint — 2026-11-16
+
+| Requirement | Current evidence / disposition |
+|---|---|
+| Isolated implementation and bounded validation | Own worktree/branch; all validation jobs terminal; main checkout and running native binary untouched |
+| Linux event-driven Git refresh | 695 TUI tests, including native watcher registration regressions and quiet-loop scan count, pass |
+| Workspace and cross-platform build gates | Standard preflight exit 0; final locked MSVC `--tests` check exit 0; neither substitutes for native device testing |
+| Actual-workspace resource evidence | Debug PTY, 10,000 entries, 59.842s steady sample: CPU 1.504%, PSS 49,531KiB, output zero; active external sessions prevent a controlled quiet baseline |
+| Git freshness budget adjustment | Maintainer explicitly accepted “接受30秒” on 2026-11-16: healthy-watch reconciliation every 30s / snapshot lifetime 35s replaces the original 5s freshness budget for this mode. This is a scheduling interval, not a scan-completion guarantee; failed/unavailable watchers retain 2s polling / 5s lifetime |
+| macOS bounded watcher | Unimplemented; upstream kqueue behavior bypasses registration limits, so existing 2s polling remains |
+| Candidate delivery | #960 merged as 3b1b1f67; exact 4c9bf99d independent Agent review and applicable CI passed; whole-task acceptance remains open |
+| Whole-task completion | Not achieved: original 479ms tail, source-attested native resources/deferred operations, second terminal and native Windows still require evidence |
+
+See [raw data and measurement limits](evidence/tui-perf-001/git-idle-watch/README.md).
+No existing acceptance row is removed or marked Complete by this checkpoint.
+
+
+### Git notification stage delivery — 2026-11-16
+
+Implementation commit: `4c9bf99d97988c204c5cfab60cc8d9c0fd5ae50b`.
+Merge commit: `3b1b1f670b4187c0b3e529f4bc2bc974905713c7`, PR #960.
+This records stage delivery, not whole-task completion; status remains Review / Claimed.
+
+Exact-head CI `43861152146` passed all applicable code/platform jobs: macOS 15
+standard preflight, CLI/TUI locale, language plugins, dependency audit and Desktop;
+Windows workspace check/Clippy/tests, governance, dependency audit and CLI smoke;
+Linux Desktop, Windows Desktop and installer fixtures. Local Linux preflight and
+MSVC xwin `--tests` results remain separately recorded above. CI execution does not
+substitute for native terminal display/resource acceptance.
+
+Independent Agent technical review APPROVE names candidate `4c9bf99d` and base
+`b524c7a9`, verifies all 42 source receipt hashes and reports no blocking findings;
+shared maintainer identity disclosed. Existing Single-maintainer authorization
+and merge-time CAS were recorded in the PR body: target `c28b9df2`, unchanged
+claim #910 / actor / scope, docs-only target additions, no overlapping open PR,
+MERGEABLE exact head. The unrelated global reconciliation check failed because
+the matrix omitted Issue #957; it remains an advisory SEARCH/I329/global-governance
+residual under ADR-071, not a passed check.
+
+Remaining required acceptance is unchanged: original Debug 479ms tail attribution,
+source-attested Ghostty process/emulator resources and deferred approval/external
+Git/workspace-switch operations, another supported terminal and native Windows.
+macOS still uses the explicit bounded-backend fallback; change-driven macOS is
+unimplemented. The host check found Ghostty but no Talos process, so no new native
+resource acceptance is claimed. Next: resume these rows with source-bound evidence,
+without repeating unchanged matrices or overwriting other sessions' binaries.

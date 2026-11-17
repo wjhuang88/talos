@@ -35,6 +35,7 @@ use talos_agent::auto_resolver::{
     AutoPermissionControl, AutoPermissionResolver, ManagedWorkspaceLease,
     ProviderAutoPermissionAssessor,
 };
+pub use talos_agent::permission_pipeline::{ApprovalAttribution, ApprovalObservation};
 use talos_agent::permission_pipeline::{
     ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
 };
@@ -1038,6 +1039,38 @@ pub trait ApprovalHandler: Send + Sync {
             .await
     }
 
+    /// Requests scoped approval with explicit outcome attribution.
+    ///
+    /// Legacy hosts keep their existing dispatch and scope checks, with unknown human
+    /// attribution. Hosts that observe a real user action may override this method;
+    /// infrastructure refusal must use [`ApprovalObservation::unavailable`].
+    async fn request_scoped_approval_observed(
+        &self,
+        tool_name: &str,
+        arguments: &Value,
+        summary_fields: &[String],
+        preview: &GrantPreview,
+        explanation: Option<&str>,
+    ) -> ApprovalObservation {
+        let choice = match explanation {
+            Some(explanation) => {
+                self.request_scoped_approval_with_explanation(
+                    tool_name,
+                    arguments,
+                    summary_fields,
+                    preview,
+                    explanation,
+                )
+                .await
+            }
+            None => {
+                self.request_scoped_approval(tool_name, arguments, summary_fields, preview)
+                    .await
+            }
+        };
+        ApprovalObservation::legacy(choice)
+    }
+
     /// Requests a one-invocation approval to continue without sandbox
     /// isolation. This is distinct from normal tool permission approval and
     /// defaults to denial; `AlwaysApprove` is never accepted for fallback.
@@ -1059,6 +1092,24 @@ struct RuntimeApprovalResolver {
 
 #[async_trait]
 impl ApprovalResolver for RuntimeApprovalResolver {
+    async fn resolve_observed(
+        &self,
+        request: PermissionApprovalRequest,
+        _remaining: std::time::Duration,
+        explanation: Option<&str>,
+    ) -> Result<ApprovalObservation, ApprovalResolverError> {
+        Ok(self
+            .inner
+            .request_scoped_approval_observed(
+                &request.tool_name,
+                &request.arguments,
+                &request.summary_fields,
+                &request.preview,
+                explanation,
+            )
+            .await)
+    }
+
     async fn resolve_with_explanation(
         &self,
         request: PermissionApprovalRequest,
@@ -3995,6 +4046,23 @@ mod tests {
             .await;
         assert_eq!(choice, ApprovalChoice::Deny);
         assert_eq!(records.lock().expect("records")[0].arguments, input);
+        for explanation in [None, Some("Confirm this write.")] {
+            let observed = handler
+                .request_scoped_approval_observed(
+                    "write",
+                    &input,
+                    &["message".into()],
+                    session.preview(),
+                    explanation,
+                )
+                .await;
+            assert_eq!(observed.choice(), &ApprovalChoice::Deny);
+            assert_eq!(
+                observed.attribution(),
+                ApprovalAttribution::LegacyHostUnknown
+            );
+        }
+        assert_eq!(records.lock().expect("records").len(), 3);
     }
 
     #[tokio::test]
@@ -4055,6 +4123,55 @@ mod tests {
                 interaction: context.interaction(),
             },
         };
+        struct ObservingHost;
+        #[async_trait]
+        impl ApprovalHandler for ObservingHost {
+            async fn request_approval(&self, _: &str, _: &Value, _: &[String]) -> ApprovalChoice {
+                panic!("observed resolution must reach the scope-aware override")
+            }
+            async fn request_scoped_approval_observed(
+                &self,
+                tool: &str,
+                arguments: &Value,
+                fields: &[String],
+                preview: &GrantPreview,
+                explanation: Option<&str>,
+            ) -> ApprovalObservation {
+                assert_eq!(tool, "web_search");
+                assert_eq!(arguments, &serde_json::json!({"query":"<redacted>"}));
+                assert_eq!(fields, &["query"]);
+                assert!(preview.network_scope().is_some());
+                assert_eq!(explanation, Some("Search scope"));
+                ApprovalObservation::observed_human(ApprovalChoice::Deny)
+            }
+        }
+        let observed = RuntimeApprovalResolver {
+            inner: Arc::new(ObservingHost),
+        }
+        .resolve_observed(
+            request.clone(),
+            std::time::Duration::from_secs(1),
+            Some("Search scope"),
+        )
+        .await
+        .expect("observed host result");
+        assert_eq!(observed.choice(), &ApprovalChoice::Deny);
+        assert_eq!(observed.attribution(), ApprovalAttribution::ObservedHuman);
+        for explanation in [None, Some("Search scope")] {
+            let observed = resolver
+                .resolve_observed(
+                    request.clone(),
+                    std::time::Duration::from_secs(1),
+                    explanation,
+                )
+                .await
+                .expect("observed resolve");
+            assert_eq!(observed.choice(), &ApprovalChoice::Deny);
+            assert_eq!(
+                observed.attribution(),
+                ApprovalAttribution::LegacyHostUnknown
+            );
+        }
         assert_eq!(
             resolver
                 .resolve(request.clone(), std::time::Duration::from_secs(1))
@@ -6419,3 +6536,6 @@ mod checkpoint_coding_tests;
 
 #[cfg(all(test, feature = "shared-composition", unix))]
 mod validation_dispatch_tests;
+
+#[cfg(test)]
+mod approval_history_tests;

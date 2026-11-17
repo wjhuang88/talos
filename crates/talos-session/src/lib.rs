@@ -30,22 +30,34 @@
 //! Entries without `id` or `parent_id` fields (from older JSONL files) are treated
 //! as part of a single linear branch. They are assigned synthetic IDs on load.
 
+mod archive_publication;
+mod archive_recovery;
 mod artifacts;
+pub use archive_recovery::{ArchiveRecoveryEvidence, ArchiveRecoverySource};
 mod compact_text;
 pub mod compaction_engine;
+mod compaction_locator;
 mod compression;
 mod diagnostic;
 mod durable;
 mod durable_recovery;
 mod error;
+mod fork_origins;
+mod fork_receipt;
 pub mod history_page;
 pub mod history_projection;
 mod history_receipt;
+mod identity_custody;
 pub use history_receipt::{HistoryRecoveryReceipt, RecoveryProjection};
+pub use identity_custody::{
+    require_active_session_identity, reserve_session_identity, retire_session_identity,
+};
 mod jsonl;
 mod manager;
 mod message_scan;
+mod ordinary_fork;
 pub use message_scan::SessionMessageScan;
+pub use ordinary_fork::OrdinaryForkSnapshot;
 mod pending_submission;
 mod recovery_seal;
 mod recovery_stamp;

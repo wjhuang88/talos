@@ -209,11 +209,11 @@ mod tests {
     #[test]
     fn policy_rejects_unbounded_zero_values() {
         assert_eq!(
-            SearchHealthState::new(0, Duration::from_secs(1)).unwrap_err(),
+            SearchHealthState::new(0, Duration::from_secs(1)).expect_err("zero capacity rejected"),
             SearchHealthPolicyError::ZeroCapacity
         );
         assert_eq!(
-            SearchHealthState::new(1, Duration::ZERO).unwrap_err(),
+            SearchHealthState::new(1, Duration::ZERO).expect_err("zero TTL rejected"),
             SearchHealthPolicyError::ZeroTtl
         );
     }

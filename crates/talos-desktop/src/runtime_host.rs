@@ -14,8 +14,8 @@ use std::sync::{
 
 use async_trait::async_trait;
 use talos_runtime::{
-    AgentEvent, ApprovalChoice, ApprovalHandler, GrantPreview, LanguageModel, RuntimeBuilder,
-    RuntimeHandle, SessionEvent,
+    AgentEvent, ApprovalChoice, ApprovalHandler, ApprovalObservation, GrantPreview, LanguageModel,
+    RuntimeBuilder, RuntimeHandle, SessionEvent,
 };
 use tokio::sync::{mpsc, oneshot};
 
@@ -832,10 +832,29 @@ impl ApprovalHandler for DesktopApprovalHandler {
         &self,
         tool_name: &str,
         arguments: &serde_json::Value,
-        _summary_fields: &[String],
+        summary_fields: &[String],
         preview: &GrantPreview,
         explanation: &str,
     ) -> ApprovalChoice {
+        self.request_scoped_approval_observed(
+            tool_name,
+            arguments,
+            summary_fields,
+            preview,
+            Some(explanation),
+        )
+        .await
+        .into_choice()
+    }
+
+    async fn request_scoped_approval_observed(
+        &self,
+        tool_name: &str,
+        arguments: &serde_json::Value,
+        _summary_fields: &[String],
+        preview: &GrantPreview,
+        explanation: Option<&str>,
+    ) -> ApprovalObservation {
         let scope = preview
             .facets()
             .iter()
@@ -848,8 +867,8 @@ impl ApprovalHandler for DesktopApprovalHandler {
             .collect::<Vec<_>>()
             .join("\n");
         let scope = self.redact_scope(&scope);
-        let Ok(details) = approval_details(arguments, explanation) else {
-            return ApprovalChoice::Deny;
+        let Ok(details) = approval_details(arguments, explanation.unwrap_or_default()) else {
+            return ApprovalObservation::unavailable();
         };
         self.request_ui(tool_name, &scope, &details).await
     }
@@ -883,23 +902,28 @@ impl DesktopApprovalHandler {
         value
     }
 
-    async fn request_ui(&self, tool_name: &str, scope: &str, explanation: &str) -> ApprovalChoice {
+    async fn request_ui(
+        &self,
+        tool_name: &str,
+        scope: &str,
+        explanation: &str,
+    ) -> ApprovalObservation {
         if tool_name.len() + scope.len() + explanation.len() > 16 * 1024 {
-            return ApprovalChoice::Deny;
+            return ApprovalObservation::unavailable();
         }
         let Ok(request_id) =
             NEXT_APPROVAL_ID
                 .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
         else {
-            return ApprovalChoice::Deny;
+            return ApprovalObservation::unavailable();
         };
         let (sender, receiver) = oneshot::channel();
         {
             let Ok(mut pending) = self.pending.lock() else {
-                return ApprovalChoice::Deny;
+                return ApprovalObservation::unavailable();
             };
             if !pending.is_empty() {
-                return ApprovalChoice::Deny;
+                return ApprovalObservation::unavailable();
             }
             pending.insert(request_id, sender);
         }
@@ -914,11 +938,11 @@ impl DesktopApprovalHandler {
             explanation: explanation.to_owned(),
         };
         if self.events.send(request).await.is_err() {
-            return ApprovalChoice::Deny;
+            return ApprovalObservation::unavailable();
         }
         tokio::select! {
-            result = receiver => result.unwrap_or(ApprovalChoice::Deny),
-            _ = self.events.closed() => ApprovalChoice::Deny,
+            result = receiver => result.map(ApprovalObservation::observed_human).unwrap_or_else(|_| ApprovalObservation::unavailable()),
+            _ = self.events.closed() => ApprovalObservation::unavailable(),
         }
     }
 }
@@ -3632,7 +3656,7 @@ mod tests {
                 .await
                 .expect("disconnect must release waiter")
                 .expect("approval task"),
-            ApprovalChoice::Deny
+            ApprovalObservation::unavailable()
         );
         assert!(
             !handler
@@ -3666,7 +3690,7 @@ mod tests {
         );
         assert_eq!(
             waiting.await.expect("approval task"),
-            ApprovalChoice::ApproveOnce
+            ApprovalObservation::observed_human(ApprovalChoice::ApproveOnce)
         );
         assert!(
             matches!(received.recv().await, Some(RuntimeOutput::ApprovalClosed { request_id: closed }) if closed == request_id)
@@ -3707,7 +3731,10 @@ mod tests {
         assert_ne!(old, current);
         assert!(!handler.resolve(old, ApprovalChoice::AlwaysApprove).await);
         assert!(handler.resolve(current, ApprovalChoice::Deny).await);
-        assert_eq!(next.await.expect("request completes"), ApprovalChoice::Deny);
+        assert_eq!(
+            next.await.expect("request completes"),
+            ApprovalObservation::observed_human(ApprovalChoice::Deny)
+        );
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -3717,9 +3744,49 @@ mod tests {
         let handler = DesktopApprovalHandler::new(events, PathBuf::from("."));
         assert_eq!(
             handler.request_ui("write", "scope", "").await,
-            ApprovalChoice::Deny
+            ApprovalObservation::unavailable()
         );
         assert!(handler.pending.lock().expect("pending lock").is_empty());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn approval_infrastructure_refusal_is_not_a_human_denial() {
+        let (events, mut received) = mpsc::channel(8);
+        let handler = Arc::new(DesktopApprovalHandler::new(events, PathBuf::from(".")));
+        assert_eq!(
+            handler
+                .request_ui("write", "scope", &"x".repeat(16 * 1024))
+                .await,
+            ApprovalObservation::unavailable()
+        );
+        assert!(received.try_recv().is_err());
+        let waiting = {
+            let handler = handler.clone();
+            tokio::spawn(async move { handler.request_ui("write", "scope", "").await })
+        };
+        let Some(RuntimeOutput::ApprovalRequested { request_id, .. }) = received.recv().await
+        else {
+            panic!("approval expected");
+        };
+        assert_eq!(
+            handler.request_ui("write", "another scope", "").await,
+            ApprovalObservation::unavailable()
+        );
+        assert_eq!(handler.pending.lock().expect("pending").len(), 1);
+        // Lose the producer without any input event. The receiver must not invent a user choice.
+        handler.pending.lock().expect("pending").remove(&request_id);
+        assert_eq!(
+            tokio::time::timeout(std::time::Duration::from_secs(1), waiting)
+                .await
+                .expect("closed channel releases request")
+                .expect("request task"),
+            ApprovalObservation::unavailable()
+        );
+        assert!(
+            !handler
+                .resolve(request_id, ApprovalChoice::AlwaysApprove)
+                .await
+        );
     }
 
     #[tokio::test(flavor = "current_thread")]

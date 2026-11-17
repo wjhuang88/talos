@@ -7,9 +7,11 @@ pub mod evolution;
 mod export;
 pub mod formatting;
 mod git_snapshot_worker;
+mod git_watch;
 mod highlight;
 mod history_projection;
 mod inline_terminal;
+mod observed_approval;
 mod panel_state;
 mod process_poll;
 mod render_metrics;
@@ -29,6 +31,10 @@ mod validation_display;
 mod widgets;
 
 pub use app::Tui;
+pub use observed_approval::{
+    ApprovalBinding, ApprovalResponseSource, ApprovalWaiter, ObservedApprovalRequest,
+    ObservedApprovalResponse,
+};
 pub use sidebar::{SkillInfo, SkillSidebar};
 pub use state::ApprovalState;
 pub use theme::nord;

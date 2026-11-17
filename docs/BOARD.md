@@ -2,6 +2,16 @@
 
 [Owner](backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](iterations/I329-search-bing-dual-host-offline.md) / [Issue #957](https://github.com/wjhuang88/talos/issues/957): proposed **Active / Claimed after governance merge** for offline-only non-CN→CN variant decision/negative-test candidate. No production endpoint, permission, Browser integration, new native provider, region or usage-rights admission. Parent D3/#937 and Epic #624 remain open; D/#644 ZERO-ADMISSION, E/F/G/I blocked.
 
+## AUTO-HISTORY-001 — Review / Claimed
+
+[Approval history owner](tasks/auto-approval-rolling-history.md): effective claim #916;
+bounded same-session history and correlated fallback observations implemented in isolated
+[draft PR #964](https://github.com/wjhuang88/talos/pull/964). Final local preflight passed (5385 summed test passes,0failed/ignored,2SDK
+fixtures), with four-host denial-chain evidence. Source `3b0455a6` independent review
+approved; remote/native CI
+and delivery remain pending; stopped Desktop Windows cross-check is not a pass.
+No default background continuation or product release authorization.
+
 ## Azure C / PROVIDER-008-C
 
 [Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 proposes atomic claim+activation;
@@ -9,19 +19,20 @@ ineffective until governance merge. A/B remain Complete; D and #724 remain unfin
 
 # Talos Board
 
-## EDIT-LOCATIONS-001 — proposed display work ownership
+## EDIT-LOCATIONS-001 — edit and diff line locations
 
-[Line-location owner](tasks/edit-diff-line-locations.md): Active / Claimed proposed via #921;
-ineffective until governance merge. Old/new diff coordinates and ordinary/prepared/anchored edit
-locations only; no effective claim or implementation activation yet.
+[Line-location owner](tasks/edit-diff-line-locations.md): Review; claim #921 effective.
+Implementation fa8edabb passed focused regressions and rebased standard preflight
+(5360 summed test passes and both external SDK fixtures). Draft PR #963 published after final
+independent review; native CI and terminal acceptance remain open; no merge/install claim.
 
-## SESSION-UI-001 — session UI continuity repair preparation
+## SESSION-UI-001 — session UI continuity repair
 
-[Owner](tasks/session-ui-continuity-repair.md): Active / Claimed proposed via #952,
-ineffective until target merge. Existing handoff
-queue visibility, external user-background separator and terminal-animation evidence
-only; governance preparation, no effective claim or committed implementation. Recovery
-PR #917, approval history, edit locations and background work retain separate owners.
+[Owner](tasks/session-ui-continuity-repair.md): Review / Claimed. Claim #952 is effective
+on main. Queue custody visibility, external user-background spacing and lifecycle
+regressions passed local standard preflight and controlled-provider ANSI PTY checks.
+Draft implementation #962: exact-head review, native CI and native terminal acceptance remain open.
+Recovery PR #917, approval history, edit locations and background retain separate owners.
 
 ## SEARCH-001-D3-T2 / I327 — Complete / Closed upon owner-first closeout merge
 
@@ -40,6 +51,18 @@ Native Windows follow-up (2026-11-10, source `c065236a`):
 process-boundary 58 and Skill 71 passing tests. Git-enabled tools remain failing
 on Git 2.36.1; [gix-assisted compatibility](proposals/gix-preflight-system-git-compatibility.md)
 is a proposal, not an activated repair. Owner statuses and manual/native residuals remain unchanged.
+
+## Session recovery integration
+
+- Partial / Emergency override: [recovery owner](tasks/session-archive-recovery-emergency.md) and
+  [checkpoint admission](tasks/compact-context-admission-emergency.md). Isolated CLI/Actor candidate
+  builds and passes three provider-path regressions; full validation and independent review pending.
+  Archived fork remains refused; default background continuation is unchanged.
+
+## Session recovery storage prerequisite
+
+- Partial / Emergency override: [isolated storage candidate](tasks/session-recovery-storage-candidate.md).
+  Parent repair and bounded archive evidence only; integration, independent review and delivery remain pending.
 
 Native Windows follow-up (2026-11-10, source `c065236a`):
 [validation evidence](reference/WINDOWS-VALIDATION-2026-11-10.md) records TUI 652,
@@ -93,6 +116,10 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
   and finite allocation-path evidence are archived. Original Debug479ms tail
   and native/resource/platform acceptance remain open in #923. Basic Ghostty
   operations and Git display passed maintainer retest; missing platforms are not passed.
+  Git notification follow-up #960 merged as `3b1b1f67`: healthy 30s reconciliation
+  accepted, failure 2s polling retained; bounded watcher and early-exit scan delivered.
+  Exact-head code/platform CI `43861152146` and independent Agent review passed;
+  native gates and original 479ms tail remain open. macOS retains polling.
   Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001

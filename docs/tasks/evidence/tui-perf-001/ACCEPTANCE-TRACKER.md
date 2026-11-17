@@ -7,6 +7,18 @@ Measured runtime source: `539adfd2`; candidate build receipt: `candidate-build/r
 Current implementation source: `43305a58` on base `6c81390a`. Each archive retains
 its own source receipt; earlier measurements do not automatically cover later changes.
 
+## Current delivery checkpoint — 2026-11-16
+
+PR #960 merged as `3b1b1f67`, exact candidate `4c9bf99d`. Bounded native Git
+notifications and synchronous early-exit dirty scanning are delivered. Maintainer
+accepted healthy-watch 30s reconciliation / 35s expiry; failure remains 2s / 5s.
+Local Linux preflight, MSVC xwin tests and exact-head CI `43861152146` code/platform
+jobs passed, with independent Agent APPROVE. Global Issue #957 reconciliation is a
+separate advisory failure. [Measurements and limits](git-idle-watch/README.md)
+include the source-bound Debug PTY sample, not a native or three-round budget pass.
+The 479ms tail and native resource/operations/second-terminal/Windows rows below
+remain open. macOS retains polling; its bounded notification backend is unavailable.
+
 ## Current follow-up checkpoint — 2026-11-13
 
 The historical table below describes earlier candidates. Runtime source is

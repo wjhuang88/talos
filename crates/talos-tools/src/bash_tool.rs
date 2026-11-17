@@ -1394,11 +1394,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_shell_metacharacters_redirect() {
-        let tool = BashTool::new(test_dir());
+        let workspace = tempfile::tempdir().expect("isolated shell workspace");
+        let tool = BashTool::new(workspace.path().to_path_buf());
         #[cfg(windows)]
-        let command = "$p = Join-Path ([System.IO.Path]::GetTempPath()) 'talos_shell_test.txt'; 'test123' | Set-Content $p; Get-Content $p; Remove-Item $p";
+        let command = "$p = 'talos_shell_test.txt'; 'test123' | Set-Content $p; Get-Content $p; Remove-Item $p";
         #[cfg(not(windows))]
-        let command = "echo test123 > /tmp/talos_bash_test.txt && cat /tmp/talos_bash_test.txt && rm /tmp/talos_bash_test.txt";
+        let command = "echo test123 > talos_bash_test.txt && cat talos_bash_test.txt && rm talos_bash_test.txt";
         let result = tool
             .execute(serde_json::json!({ "command": command }))
             .await;

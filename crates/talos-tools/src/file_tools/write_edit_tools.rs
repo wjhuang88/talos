@@ -440,7 +440,12 @@ impl EditTool {
         Ok(format!(
             "edited {}{recovery}\ndiff:\n{}",
             edit_input.path,
-            bounded_replacement_diff(&edit_input.old_string, &edit_input.new_string)
+            bounded_replacement_diff(
+                &edit_input.old_string,
+                &edit_input.new_string,
+                line_at(content.as_bytes(), first_match_start),
+                line_at(content.as_bytes(), first_match_start)
+            )
         ))
     }
 
@@ -560,17 +565,6 @@ fn plan_anchored_edit(
         )?);
     }
     validate_mutations(&mut mutations)?;
-    let old_preview = mutations
-        .iter()
-        .map(|mutation| String::from_utf8_lossy(&current[mutation.start..mutation.end]))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let new_preview = mutations
-        .iter()
-        .map(|mutation| String::from_utf8_lossy(&mutation.replacement))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let diff = bounded_replacement_diff(&old_preview, &new_preview);
     let length = mutations
         .iter()
         .try_fold(current.len(), |length, mutation| {
@@ -584,12 +578,31 @@ fn plan_anchored_edit(
         })?;
     let mut updated = Vec::with_capacity(length);
     let mut cursor = 0;
+    let mut diff = String::new();
+    let mut omitted = false;
     for mutation in &mutations {
         updated.extend_from_slice(&current[cursor..mutation.start]);
+        if diff.len() < MAX_PREVIEW_CHARS && diff.lines().count() < MAX_PREVIEW_LINES {
+            if !diff.is_empty() {
+                diff.push('\n');
+            }
+            diff.push_str(&bounded_replacement_diff(
+                &String::from_utf8_lossy(&current[mutation.start..mutation.end]),
+                &String::from_utf8_lossy(&mutation.replacement),
+                line_at(current, mutation.start),
+                line_at(&updated, updated.len()),
+            ));
+        } else {
+            omitted = true;
+        }
         updated.extend_from_slice(&mutation.replacement);
         cursor = mutation.end;
     }
     updated.extend_from_slice(&current[cursor..]);
+    let mut diff = bounded_preview(&diff);
+    if omitted {
+        diff.push_str("\n... additional edit locations omitted");
+    }
     Ok((updated, diff))
 }
 
@@ -1015,6 +1028,12 @@ fn bounded_preview(content: &str) -> String {
             break;
         }
 
+        // A clipped later row still needs its own line; reserve the separator
+        // before calculating the remaining content budget.
+        if idx > 0 {
+            rendered.push('\n');
+            used_chars += 1;
+        }
         let remaining = MAX_PREVIEW_CHARS - used_chars;
         let line_chars = line.chars().count();
         if line_chars > remaining {
@@ -1024,10 +1043,6 @@ fn bounded_preview(content: &str) -> String {
             break;
         }
 
-        if idx > 0 {
-            rendered.push('\n');
-            used_chars += 1;
-        }
         rendered.push_str(line);
         used_chars += line_chars;
     }
@@ -1049,16 +1064,44 @@ fn bounded_preview(content: &str) -> String {
     rendered
 }
 
-fn bounded_replacement_diff(old: &str, new: &str) -> String {
-    let old_preview = prefixed_block("-", old);
-    let new_preview = prefixed_block("+", new);
+fn line_at(bytes: &[u8], offset: usize) -> usize {
+    1 + bytes[..offset]
+        .iter()
+        .filter(|byte| **byte == b'\n')
+        .count()
+}
+
+fn bounded_replacement_diff(old: &str, new: &str, old_line: usize, new_line: usize) -> String {
+    let old_preview = numbered_block("-", old, old_line);
+    let new_preview = numbered_block("+", new, new_line);
     format!("{old_preview}\n{new_preview}")
 }
 
-fn prefixed_block(prefix: &str, content: &str) -> String {
-    bounded_preview(content)
+fn numbered_block(prefix: &str, content: &str, first_line: usize) -> String {
+    if content.is_empty() {
+        return format!("{prefix} (empty)");
+    }
+    let numbered = content
         .lines()
-        .map(|line| format!("{prefix} {line}"))
+        .take(MAX_PREVIEW_LINES)
+        .enumerate()
+        .map(|(index, line)| {
+            format!(
+                "{prefix} {} | {}",
+                first_line + index,
+                line.chars().take(MAX_PREVIEW_CHARS).collect::<String>()
+            )
+        })
         .collect::<Vec<_>>()
-        .join("\n")
+        .join("\n");
+    let mut preview = bounded_preview(&numbered);
+    if content.lines().count() > MAX_PREVIEW_LINES
+        || content
+            .lines()
+            .take(MAX_PREVIEW_LINES)
+            .any(|line| line.chars().count() > MAX_PREVIEW_CHARS)
+    {
+        preview.push_str("\n... edit content truncated");
+    }
+    preview
 }
