@@ -1853,3 +1853,54 @@ sessions remain intact; no default background activation,merge,installation or r
 Standalone recovery follow-up still needs its own full/native CI before delivery.
 
 Standalone source protocol patch matches combined commit ceb86be47cfa6e33dd21fae6d86dec173403a70e. Combined source/API/security review and r4 evidence review approved. This standalone branch still awaits full validation and exact-head native CI; no product merge or installation.
+
+
+## 2026-11-17 Windows binding initialization follow-up — Partial
+
+Authorizing maintainer: current user explicitly assigned the native Windows storage
+blocker for TUI evidence PR #965 to this recovery task. This continues the existing
+emergency recovery scope; no Search, storage-composition or TUI performance change.
+Branch: `fix/session-windows-init-diagnostics-20261117`, based on main `08a302ea`.
+Rollback: revert only this follow-up; retain databases, transcripts and all backups.
+
+Native failure: PR #965 head `a14b8727481e20ec3cfb44a0b5ed4fbadbf7db37`,
+run `43994859879`, job `133744347337`, actual six-worker create_or_open test.
+Five workers failed SQLITE_BUSY(5,5) in initialization after approximately529–530ms;
+one reached its subsequent business transaction at528ms and completed664ms.
+The48-worker WAL probe and later green CI are not root-cause elimination evidence.
+
+A real two-connection regression independently reproduces SQLITE_BUSY: an early
+connection caches empty schema, another publishes full schema and holds ordinary
+binding DML, and the early connection then tries IF NOT EXISTS initialization.
+Candidate establishes a read snapshot of sqlite_schema in the existing transaction
+before preparing DDL. The deterministic regression fails without this read and passes
+with it. This proves the local stale-schema contention mechanism, not yet that it
+fully explains or eliminates the recorded native Windows failure. No timeout, retry
+count, six-worker success assertion or schema atomicity requirement is weakened.
+
+Test-only SQLite statement/profile callbacks emit fixed labels for journal mode,
+synchronous, begin, DDL, commit and rollback. No SQL text, bound values, paths or
+identifiers are emitted. Statement callbacks do not prove preparation succeeded;
+PROFILE means returned, not successful. Per-attempt autocommit state is recorded.
+
+Validation so far: pinned/locked49durable tests and full talos-session468tests passed
+on Linux, zero failures/ignored. Logs retained in the primary workspace:
+`target/windows-init-stale-schema-red-20261117.log`,
+`target/windows-init-stale-schema-fix-20261117.log`,
+`target/windows-init-session-gate-20261117.log`. Native Windows verification,
+independent review remain pending; full preflight results follow below.
+The known approval-test initializer mismatch is now fixed by authorized UI merge
+#962 (`08a302ea`) in the target branch; this storage candidate has no CLI fixture
+delta. Pre-integration patch and stash remain preserved in the primary workspace.
+
+No installation/release/default background enablement. TUI #965 waits for an actual
+validated repair merge SHA. Existing handoff/host/Desktop/low-rate residuals remain
+open; this follow-up does not close the complete recovery task.
+
+
+Final local gate on main08a302ea: standard pinned/locked release_preflight passed
+5624tests,0failed/ignored; external Runtime SDK and SQLite API fixtures passed.
+Exit0,17min53.301s,peak2GiB/swap0; all2686tracked file hashes unchanged throughout.
+Log: target/windows-init-preflight-20261117.log; source manifest: matching
+windows-init-preflight-source-manifest-20261117.json in the primary workspace.
+Native Windows exact-head CI and independent review remain required before merge.

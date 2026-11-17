@@ -34,6 +34,7 @@ default = ["archive-compress-zstd"]
 archive-compress-zstd = ["dep:zstd"]
 
 [dev-dependencies]
+rusqlite = { version = "0.43.0", features = ["trace"] }
 tempfile = "3"
 tokio = { version = "1.53.1", features = ["macros", "rt", "sync", "time"] }
 
