@@ -1,15 +1,19 @@
 # GitHub Issue / Owner Document Status Reconciliation — Rolling Register (origin 2026-09-30)
 
 **Original baseline (2026-09-30)**: `main@5bb36663d13f133f8b90d7cc0c692ec876de7954`.
-**Latest registration update**: 2026-11-16 (open-Issue/owner rows are an evolving reconciliation register, **not** a point-in-time 2026-09-30 inventory).
+**Latest registration update**: 2026-11-17 (open-Issue/owner rows are an evolving reconciliation register, **not** a point-in-time 2026-09-30 inventory).
 **Purpose**: preserve the original 2026-09-30 / 2026-08-31 historical provenance while tracking subsequent open-Issue owner relationships for remote CI. The original filename remains stable because governance automation uses it; entries created after September are dated below, not backdated to the initial snapshot.
 **Authority rule**: owner document first, then Product Backlog / Board, then remote Issue.
+
+## I329 T3a owner-first closeout — 2026-11-17
+
+Bounded offline T3a / #957 implementation [PR #959](https://github.com/wjhuang88/talos/pull/959) merged as existing target-main **Completion Commit `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a`**, exact-head CI #4333 8/8 SUCCESS and independent exact-head technical APPROVE. T3b production activation remains BLOCKED/Unclaimed; Issue #957 remains Open, as do #937/#624. This is a rolling-register closeout event, not an amendment of the historical September baseline.
 
 ## Open Issue Matrix
 
 | Issue | Summary | Owner | Owner Status | Disposition |
 |---|---|---|---|---|
-| [#957](https://github.com/wjhuang88/talos/issues/957) | Bing non-CN-first/CN-fallback zero-key HTML variant contract | [SEARCH-001-D3-T3](../backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) | Active / Claimed (proposed; ineffective before governance merge) | I329 offline policy/tests only; production `www.bing.com`, Bing rights, region, endpoint manifest and independent review remain blocked. Parent D3/#937 and Epic #624 Open. |
+| [#957](https://github.com/wjhuang88/talos/issues/957) | Bing non-CN-first/CN-fallback zero-key HTML variant contract | [SEARCH-001-D3-T3](../backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) | T3a Complete / Closed (I329); T3b Blocked / Unclaimed; Issue Open | I329 offline-only implementation #959 merged with Completion Commit `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a`; exact-head CI #4333 8/8 SUCCESS, independent technical APPROVE and CAS. Existing CN-only production chain unchanged; `www.bing.com` rights, new Network/ADR authority and true China/comparator evidence BLOCK T3b. D3/#937 and Epic #624 Open. |
 | [#937](https://github.com/wjhuang88/talos/issues/937) | Bing same-family direct-HTML multi-endpoint research | [SEARCH-001-D3](../backlog/active/SEARCH-001-D3-bing-direct-html-feasibility.md) | Intake / Proposed / Unclaimed | Source/authority-only feasibility; 2026 Microsoft Bing/MSN product-use rights BLOCKED, live endpoint/region UNKNOWN; no executable claim, new default, or provider admission. Parent #624 Open. |
 | [#901](https://github.com/wjhuang88/talos/issues/901) | Eliminate legacy rust-websearch build dependency without admitting providers | [SEARCH-001-L](../backlog/active/SEARCH-001-L-legacy-dependency-retirement.md) | Complete / Closed | I319 claim/ADR-085 A1 via #902, independent oracle #904, implementation #907 merged `3cfe8927ac7c71976e8cb3aa02a44ad21c3ca970` after exact-head CI4121 8/8 and independent review/CAS. Documentation closeout is pending acceptance; parent #624 and E/F/G/I remain separate. |
 | [#853](https://github.com/wjhuang88/talos/issues/853) | Model-selectable process memory limit (handoff T6) | [PROCESS-001](../backlog/active/PROCESS-001-model-process-memory-limit.md) | In Progress / proposed activation | I316 claim #854 and ADR-098 design reviewed; finalized atomic claim and target merge required before implementation. |
