@@ -3824,3 +3824,29 @@ fn compact_command_is_builtin_typed_and_does_not_create_chat_history() {
             .any(|output| matches!(output, UiOutput::CompactRequest))
     );
 }
+
+#[test]
+fn accepted_steering_preview_preserves_fifo_bounds_without_execution_custody() {
+    let mut engine = new_engine();
+    engine.enqueue_steering("界".repeat(2000));
+    let accepted = engine.prepare_steering_submission().expect("prepared");
+    assert!(engine.commit_prepared_steering_with_preview(&accepted.id));
+    assert!(!engine.has_steering());
+    assert!(engine.prepare_steering_submission().is_none());
+    assert!(engine.drain_steering_queue().is_none());
+    for i in 0..10 {
+        engine.enqueue_steering(format!("later-{i}"));
+    }
+    let snapshot = engine.steering_queue_snapshot();
+    assert_eq!(snapshot.total_count, 11);
+    assert_eq!(snapshot.omitted_count, 3);
+    assert_eq!(snapshot.entries.len(), 8);
+    assert!(snapshot.entries[0].truncated);
+    assert!(snapshot.entries[0].text.len() <= 4096);
+    assert_eq!(snapshot.entries[1].text, "later-0");
+    engine.clear_accepted_steering_preview("stale-id");
+    assert_eq!(engine.steering_queue_snapshot().total_count, 11);
+    engine.clear_accepted_steering_preview(&accepted.id);
+    assert_eq!(engine.steering_queue_snapshot().total_count, 10);
+    assert_eq!(engine.drain_steering_queue().as_deref(), Some("later-0"));
+}

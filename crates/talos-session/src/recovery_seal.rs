@@ -278,6 +278,16 @@ impl RecoveryPrefixSeal {
         Ok(())
     }
 
+    /// Exclude identity retirement during one synchronous query, independently
+    /// of this cached byte seal. Release the guard after final delivery checks.
+    /// This grants no content or permission authority and must not span awaits.
+    pub fn lock_identity_for_recovery(
+        &self,
+        deadline: Instant,
+    ) -> Result<impl Sized + use<>, crate::SessionError> {
+        self.source.lock_identity_for_recovery(deadline)
+    }
+
     /// Captured source cutoff, unaffected by later append-only writes.
     pub fn source_end(&self) -> u64 {
         self.source.source_end()

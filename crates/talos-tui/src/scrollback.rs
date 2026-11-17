@@ -881,8 +881,8 @@ pub(crate) struct CompressedLayout {
 /// Allocate the height remaining after fixed viewport components.
 ///
 /// Priority: modal panels (approval/credential/slash) > natural composer >
-/// bounded live preview > queue preview. The returned allocations always sum
-/// to no more than `content_budget`.
+/// queue header/body minimum > bounded live preview > remaining queue preview.
+/// The returned allocations always sum to no more than `content_budget`.
 pub(crate) fn compress_layout(
     content_budget: u16,
     panel_natural: u16,
@@ -895,7 +895,8 @@ pub(crate) fn compress_layout(
     let after_panel = content_budget.saturating_sub(panel_max_height);
     let input_max_height = composer_natural.min(after_panel);
     let after_input = after_panel.saturating_sub(input_max_height);
-    let preview_max_height = preview_natural.min(after_input);
+    let queue_minimum = queue_natural.min(2).min(after_input);
+    let preview_max_height = preview_natural.min(after_input.saturating_sub(queue_minimum));
     let queue_max_rows = queue_natural.min(after_input.saturating_sub(preview_max_height));
 
     CompressedLayout {

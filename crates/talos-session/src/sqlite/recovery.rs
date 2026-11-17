@@ -84,7 +84,15 @@ impl RecoveryWorkBudget {
     }
 }
 
-pub(crate) struct ProgressGuard<'a>(&'a rusqlite::Connection, Duration);
+pub(crate) struct ProgressGuard<'a>(&'a mut rusqlite::Connection, Duration);
+impl std::ops::Deref for ProgressGuard<'_> {
+    type Target = rusqlite::Connection;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
 impl Drop for ProgressGuard<'_> {
     fn drop(&mut self) {
         let _ = self.0.progress_handler(0, None::<fn() -> bool>);
@@ -93,7 +101,7 @@ impl Drop for ProgressGuard<'_> {
 }
 
 pub(crate) fn install_budget<'a>(
-    conn: &'a rusqlite::Connection,
+    conn: &'a mut rusqlite::Connection,
     budget: &RecoveryWorkBudget,
 ) -> Result<ProgressGuard<'a>, IndexError> {
     budget.check()?;
@@ -103,7 +111,9 @@ pub(crate) fn install_budget<'a>(
     conn.busy_timeout(Duration::ZERO)?;
     let guard = ProgressGuard(conn, Duration::from_millis(u64::from(prior_busy_ms)));
     let observed = budget.clone();
-    conn.progress_handler(1000, Some(move || observed.stopped()))?;
+    guard
+        .0
+        .progress_handler(1000, Some(move || observed.stopped()))?;
     Ok(guard)
 }
 
@@ -205,7 +215,7 @@ impl SessionIndex {
     /// Save bounded continuation metadata only for the exact current owner/cursor.
     /// A crash between page commit and this write causes resume refusal, not drift.
     pub fn save_recovery_continuation(
-        &self,
+        &mut self,
         owner: &str,
         value: &RecoveryContinuation,
         budget: &RecoveryWorkBudget,
@@ -220,8 +230,8 @@ impl SessionIndex {
             {
                 return Err(invalid_build());
             }
-            let _guard = install_budget(&self.conn, budget)?;
-            let tx = self.conn.unchecked_transaction()?;
+            let conn = install_budget(&mut self.conn, budget)?;
+            let tx = conn.unchecked_transaction()?;
             let valid: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM recovery_host_scopes h JOIN recovery_builds b ON b.scope=h.scope WHERE h.owner=?1 AND h.scope=?2 AND b.next_offset=?3 AND b.next_ordinal=?4 AND b.source_end=?5)", params![owner,value.scope,value.offset as i64,value.ordinal as i64,value.prefix.cutoff() as i64], |row| row.get(0))?;
             if !valid {
                 return Err(invalid_build());
@@ -236,13 +246,13 @@ impl SessionIndex {
     /// Load only metadata whose owner and persisted cursor still match exactly.
     /// The caller must verify the prefix and configured source before reuse.
     pub fn recovery_continuation(
-        &self,
+        &mut self,
         owner: &str,
         budget: &RecoveryWorkBudget,
     ) -> Result<Option<RecoveryContinuation>, IndexError> {
         native_boundary(|| {
-            let _guard = install_budget(&self.conn, budget)?;
-            let row: Option<(String,String,i64,i64,i64)> = self.conn.query_row("SELECT c.scope,c.payload,b.next_offset,b.next_ordinal,b.source_end FROM recovery_continuations c JOIN recovery_host_scopes h ON h.scope=c.scope JOIN recovery_builds b ON b.scope=c.scope WHERE h.owner=?1 AND length(c.payload)<=4096", [owner], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?))).optional()?;
+            let conn = install_budget(&mut self.conn, budget)?;
+            let row: Option<(String,String,i64,i64,i64)> = conn.query_row("SELECT c.scope,c.payload,b.next_offset,b.next_ordinal,b.source_end FROM recovery_continuations c JOIN recovery_host_scopes h ON h.scope=c.scope JOIN recovery_builds b ON b.scope=c.scope WHERE h.owner=?1 AND length(c.payload)<=4096", [owner], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?))).optional()?;
             row.map(|(scope, payload, offset, ordinal, end)| {
                 let value: RecoveryContinuation =
                     serde_json::from_str(&payload).map_err(|_| invalid_build())?;
@@ -265,14 +275,13 @@ impl SessionIndex {
 
     /// Retire restart metadata after completion or failed source validation.
     pub fn clear_recovery_continuation(
-        &self,
+        &mut self,
         scope: &str,
         budget: &RecoveryWorkBudget,
     ) -> Result<(), IndexError> {
         native_boundary(|| {
-            let _guard = install_budget(&self.conn, budget)?;
-            self.conn
-                .execute("DELETE FROM recovery_continuations WHERE scope=?1", [scope])?;
+            let conn = install_budget(&mut self.conn, budget)?;
+            conn.execute("DELETE FROM recovery_continuations WHERE scope=?1", [scope])?;
             Ok(())
         })
     }
@@ -281,7 +290,7 @@ impl SessionIndex {
     /// This bounds retained per-owner cache copies; concurrent older readers
     /// fail closed as their candidate mappings disappear. Host maintenance only.
     pub fn replace_recovery_owner_scope(
-        &self,
+        &mut self,
         owner: &str,
         scope: &str,
         budget: &RecoveryWorkBudget,
@@ -290,8 +299,8 @@ impl SessionIndex {
             if owner.is_empty() || owner.len() > 128 || scope.is_empty() || scope.len() > 128 {
                 return Err(invalid_build());
             }
-            let _guard = install_budget(&self.conn, budget)?;
-            let tx = self.conn.unchecked_transaction()?;
+            let conn = install_budget(&mut self.conn, budget)?;
+            let tx = conn.unchecked_transaction()?;
             let old: Option<String> = tx
                 .query_row(
                     "SELECT scope FROM recovery_host_scopes WHERE owner=?1",
@@ -322,7 +331,7 @@ impl SessionIndex {
     /// Check that a completed transient scope still belongs to its host owner.
     /// Unlike an empty candidate list, absence is not a completed empty index.
     pub fn recovery_owner_scope_ready(
-        &self,
+        &mut self,
         owner: &str,
         scope: &str,
         budget: &RecoveryWorkBudget,
@@ -331,8 +340,8 @@ impl SessionIndex {
             if owner.is_empty() || owner.len() > 128 || scope.is_empty() || scope.len() > 128 {
                 return Err(invalid_build());
             }
-            let _guard = install_budget(&self.conn, budget)?;
-            let ready=self.conn.query_row("SELECT EXISTS(SELECT 1 FROM recovery_host_scopes h JOIN recovery_builds b ON b.scope=h.scope WHERE h.owner=?1 AND h.scope=?2 AND b.next_offset=b.source_end AND NOT EXISTS(SELECT 1 FROM recovery_pending p WHERE p.scope=h.scope))",params![owner,scope],|row|row.get(0))?;
+            let conn = install_budget(&mut self.conn, budget)?;
+            let ready=conn.query_row("SELECT EXISTS(SELECT 1 FROM recovery_host_scopes h JOIN recovery_builds b ON b.scope=h.scope WHERE h.owner=?1 AND h.scope=?2 AND b.next_offset=b.source_end AND NOT EXISTS(SELECT 1 FROM recovery_pending p WHERE p.scope=h.scope))",params![owner,scope],|row|row.get(0))?;
             budget.check()?;
             Ok(ready)
         })
@@ -341,7 +350,7 @@ impl SessionIndex {
     /// Begin host maintenance for a fresh opaque snapshot scope. Existing state
     /// is never replaced: resume it or issue a new scope after revalidation.
     pub fn begin_recovery_build(
-        &self,
+        &mut self,
         scope: &str,
         source_end: u64,
         budget: &RecoveryWorkBudget,
@@ -350,8 +359,8 @@ impl SessionIndex {
             if scope.is_empty() || scope.len() > 128 || source_end > i64::MAX as u64 {
                 return Err(invalid_build());
             }
-            let _guard = install_budget(&self.conn, budget)?;
-            let tx = self.conn.unchecked_transaction()?;
+            let conn = install_budget(&mut self.conn, budget)?;
+            let tx = conn.unchecked_transaction()?;
             let existing: i64 = tx.query_row(
                 "SELECT (SELECT count(*) FROM recovery_sources WHERE scope=?1) + (SELECT count(*) FROM recovery_terminals WHERE scope=?1)",
                 [scope],
@@ -374,7 +383,7 @@ impl SessionIndex {
     /// Read persisted maintenance progress without initializing or repairing it.
     /// A complete cursor still requires current source/branch revalidation.
     pub fn recovery_build_cursor(
-        &self,
+        &mut self,
         scope: &str,
         budget: &RecoveryWorkBudget,
     ) -> Result<Option<RecoveryBuildCursor>, IndexError> {
@@ -382,8 +391,8 @@ impl SessionIndex {
             if scope.is_empty() || scope.len() > 128 {
                 return Err(invalid_build());
             }
-            let _guard = install_budget(&self.conn, budget)?;
-            let row: Option<(i64, i64, i64)> = self.conn.query_row(
+            let conn = install_budget(&mut self.conn, budget)?;
+            let row: Option<(i64, i64, i64)> = conn.query_row(
                 "SELECT source_end,next_offset,next_ordinal FROM recovery_builds WHERE scope=?1",
                 [scope], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
             ).optional()?;
@@ -493,8 +502,8 @@ impl SessionIndex {
             if !cursor.complete() || cursor.source_end() != source.source_end() {
                 return Err(invalid_build());
             }
-            let _guard = install_budget(&self.conn, budget)?;
-            let tx = self.conn.unchecked_transaction()?;
+            let conn = install_budget(&mut self.conn, budget)?;
+            let tx = conn.unchecked_transaction()?;
             let row: Option<(String,String,i64,i64,i64)> = tx.query_row(
                 "SELECT entry_id,turn_id,ordinal,start,end FROM recovery_pending WHERE scope=?1 ORDER BY ordinal LIMIT 1",
                 [scope], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
@@ -590,17 +599,55 @@ impl SessionIndex {
     /// This never initializes/repairs storage or returns raw text. The caller
     /// must verify index completeness and reread authorized sources before use.
     pub fn recovery_candidates(
-        &self,
+        &mut self,
         scope: &str,
         query: &str,
         after: Option<u64>,
         limit: usize,
         budget: &RecoveryWorkBudget,
     ) -> Result<Vec<RecoveryCandidate>, IndexError> {
+        self.recovery_candidates_bounded(scope, query, after, limit, budget, 1024)
+    }
+
+    /// Search eligible projection text using a plain-text, tokenized FTS phrase.
+    /// Accepts at most 1024 UTF-8 bytes before escaping; operators are text.
+    /// Empty input retains bounded browsing. Source verification requirements,
+    /// scope, pagination, result limits and deadlines match [`Self::recovery_candidates`].
+    pub fn recovery_text_candidates(
+        &mut self,
+        scope: &str,
+        query: &str,
+        after: Option<u64>,
+        limit: usize,
+        budget: &RecoveryWorkBudget,
+    ) -> Result<Vec<RecoveryCandidate>, IndexError> {
+        if query.len() > 1024 {
+            return Err(IndexError::Store(IndexStoreError::Database(
+                "invalid recovery query bounds".into(),
+            )));
+        }
+        let phrase = if query.is_empty() {
+            String::new()
+        } else {
+            format!("\"{}\"", query.replace('"', "\"\""))
+        };
+        // At most every input byte is a quote that doubles, plus outer quotes.
+        self.recovery_candidates_bounded(scope, &phrase, after, limit, budget, 2050)
+    }
+
+    fn recovery_candidates_bounded(
+        &mut self,
+        scope: &str,
+        query: &str,
+        after: Option<u64>,
+        limit: usize,
+        budget: &RecoveryWorkBudget,
+        encoded_limit: usize,
+    ) -> Result<Vec<RecoveryCandidate>, IndexError> {
         native_boundary(|| {
             if scope.is_empty()
                 || scope.len() > 128
-                || query.len() > 1024
+                || query.len() > encoded_limit
                 || limit == 0
                 || limit > 20
                 || after.is_some_and(|n| n > i64::MAX as u64)
@@ -615,8 +662,8 @@ impl SessionIndex {
                 external_stop: budget.external_stop.clone(),
                 deadline: budget.deadline.min(Instant::now() + Duration::from_secs(2)),
             };
-            let _guard = install_budget(&self.conn, &local)?;
-            let building: bool = self.conn.query_row(
+            let conn = install_budget(&mut self.conn, &local)?;
+            let building: bool = conn.query_row(
                 "SELECT EXISTS(SELECT 1 FROM recovery_builds WHERE scope=?1 AND next_offset<>source_end) OR EXISTS(SELECT 1 FROM recovery_pending WHERE scope=?1)",
                 [scope], |r| r.get(0),
             )?;
@@ -630,7 +677,7 @@ impl SessionIndex {
             } else {
                 "SELECT s.entry_id,s.ordinal,l.start,l.end FROM recovery_sources s JOIN recovery_projection_fts f ON f.rowid=s.id LEFT JOIN recovery_locations l ON l.source_id=s.id WHERE s.scope=?1 AND s.ordinal>?2 AND recovery_projection_fts MATCH ?4 ORDER BY s.ordinal LIMIT ?3"
             };
-            let mut statement = self.conn.prepare(sql)?;
+            let mut statement = conn.prepare(sql)?;
             let cursor = after.map_or(-1, |n| n as i64);
             let mut rows = if query.is_empty() {
                 statement.query(params![scope, cursor, limit as i64])?
@@ -676,7 +723,7 @@ impl SessionIndex {
     /// The caller must authorize scope/branch before calling and recheck the
     /// seal, generation and permission inside its final result-delivery fence.
     pub fn recovery_candidate_text(
-        &self,
+        &mut self,
         scope: &str,
         candidate: &RecoveryCandidate,
         seal: &crate::RecoveryPrefixSeal,
@@ -700,7 +747,7 @@ impl SessionIndex {
     /// As candidate_text, sharing a source-byte allowance across one result page.
     /// Bytes are charged before each original read, including repeated terminals.
     pub fn recovery_candidate_text_with_source_budget(
-        &self,
+        &mut self,
         scope: &str,
         candidate: &RecoveryCandidate,
         seal: &crate::RecoveryPrefixSeal,
@@ -782,7 +829,7 @@ impl SessionIndex {
     /// encountered on a later scan page. This returns an untrusted locator only;
     /// reread and verify the original marker and branch scope before disclosure.
     pub fn recovery_terminal_candidate(
-        &self,
+        &mut self,
         scope: &str,
         turn_id: &str,
         budget: &RecoveryWorkBudget,
@@ -791,8 +838,8 @@ impl SessionIndex {
             if scope.is_empty() || scope.len() > 128 || turn_id.is_empty() || turn_id.len() > 1024 {
                 return Err(invalid_build());
             }
-            let _guard = install_budget(&self.conn, budget)?;
-            let row: Option<(String, i64, i64, i64)> = self.conn.query_row(
+            let conn = install_budget(&mut self.conn, budget)?;
+            let row: Option<(String, i64, i64, i64)> = conn.query_row(
                 "SELECT entry_id,ordinal,start,end FROM recovery_terminals WHERE scope=?1 AND turn_id=?2",
                 params![scope,turn_id], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).optional()?;
             budget.check()?;
@@ -817,18 +864,18 @@ impl SessionIndex {
 
     /// Initialize the additive recovery cache schema during authorized host maintenance.
     /// Model queries must never call this method implicitly.
-    pub fn init_recovery_schema(&self) -> Result<(), IndexError> {
+    pub fn init_recovery_schema(&mut self) -> Result<(), IndexError> {
         self.init_recovery_schema_with_budget(&RecoveryWorkBudget::new(Duration::from_secs(10)))
     }
 
     /// Initialize recovery cache tables atomically under the host's work budget.
     pub fn init_recovery_schema_with_budget(
-        &self,
+        &mut self,
         budget: &RecoveryWorkBudget,
     ) -> Result<(), IndexError> {
         native_boundary(|| {
-            let _guard = install_budget(&self.conn, budget)?;
-            let tx = self.conn.unchecked_transaction()?;
+            let conn = install_budget(&mut self.conn, budget)?;
+            let tx = conn.unchecked_transaction()?;
             tx.execute_batch(
                 "CREATE TABLE IF NOT EXISTS recovery_continuations (scope TEXT PRIMARY KEY, payload TEXT NOT NULL);
                  CREATE TABLE IF NOT EXISTS recovery_host_scopes (owner TEXT PRIMARY KEY, scope TEXT NOT NULL);
@@ -886,13 +933,13 @@ impl SessionIndex {
     }
 
     fn cache_page_inner(
-        &self,
+        &mut self,
         scope: &str,
         sources: &[RecoveryIndexSource<'_>],
         budget: &RecoveryWorkBudget,
         advance: Option<RecoveryPageAdvance<'_>>,
     ) -> Result<(), IndexError> {
-        let _guard = install_budget(&self.conn, budget)?;
+        let conn = install_budget(&mut self.conn, budget)?;
         let invalid = || {
             IndexError::Store(IndexStoreError::Database(
                 "invalid recovery cache page".into(),
@@ -924,7 +971,7 @@ impl SessionIndex {
             }
             projected.push((source, recovery_index_text(source.entry, source.terminal)));
         }
-        let tx = self.conn.unchecked_transaction()?;
+        let tx = conn.unchecked_transaction()?;
         let append_only = advance.is_some();
         if let Some(advance) = advance {
             let prior = advance.prior;
@@ -1108,7 +1155,7 @@ mod tests {
         let source = session.capture_recovery_source().expect("source");
         let path = dir.path().join("index.db");
         {
-            let host = SessionIndex::new(&path).expect("index");
+            let mut host = SessionIndex::new(&path).expect("index");
             host.init_recovery_schema().expect("schema");
             host.begin_recovery_build(
                 "scope",
@@ -1329,7 +1376,7 @@ mod tests {
             .expect("resolve persisted work")
         {}
         drop(host);
-        let reader = SessionIndex::open_read_only(&path).expect("read-only reopen");
+        let mut reader = SessionIndex::open_read_only(&path).expect("read-only reopen");
         let hits = reader
             .recovery_candidates("scope", "original", None, 20, &budget)
             .expect("search backfilled text");
@@ -1581,10 +1628,10 @@ mod tests {
         let path = dir.path().join("index.db");
         assert!(SessionIndex::open_read_only(&path).is_err());
         assert!(!path.exists());
-        let index = SessionIndex::new(&path).expect("host creates index");
+        let mut index = SessionIndex::new(&path).expect("host creates index");
         index.init_recovery_schema().expect("host schema");
         let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
-        let reader = SessionIndex::open_read_only(&path).expect("reader");
+        let mut reader = SessionIndex::open_read_only(&path).expect("reader");
         assert!(
             reader
                 .recovery_candidates("scope", "", None, 20, &budget)
@@ -1600,7 +1647,7 @@ mod tests {
         );
         let no_schema = dir.path().join("empty.db");
         let _host = SessionIndex::new(&no_schema).expect("empty host database");
-        let empty = SessionIndex::open_read_only(&no_schema).expect("read empty database");
+        let mut empty = SessionIndex::open_read_only(&no_schema).expect("read empty database");
         assert!(
             empty
                 .recovery_candidates("scope", "", None, 20, &budget)
@@ -1627,7 +1674,7 @@ mod tests {
         let prior = host
             .begin_recovery_build("authorized", 100, &budget)
             .expect("begin");
-        let reader = SessionIndex::open_read_only(&path).expect("reader");
+        let mut reader = SessionIndex::open_read_only(&path).expect("reader");
         assert!(
             reader
                 .recovery_candidates("authorized", "fact", None, 20, &budget)
@@ -1677,7 +1724,7 @@ mod tests {
         let corrupt = dir.path().join("corrupt.db");
         let bytes = b"not a sqlite database";
         std::fs::write(&corrupt, bytes).expect("corrupt fixture");
-        if let Ok(reader) = SessionIndex::open_read_only(&corrupt) {
+        if let Ok(mut reader) = SessionIndex::open_read_only(&corrupt) {
             assert!(
                 reader
                     .recovery_candidates(
@@ -1986,20 +2033,20 @@ mod tests {
     #[test]
     fn progress_budget_interrupts_actual_sqlite_work_and_clears_handler() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
+        let mut index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
         let external = Arc::new(AtomicBool::new(false));
         let signal = external.clone();
         let budget =
             RecoveryWorkBudget::with_cancellation_check(Duration::from_secs(2), move || {
                 signal.load(Ordering::Acquire)
             });
-        let guard = install_budget(&index.conn, &budget).expect("install");
+        let guard = install_budget(&mut index.conn, &budget).expect("install");
         let cancel = external;
         let task = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(10));
             cancel.store(true, Ordering::Release);
         });
-        let result = index.conn.query_row("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<1000000000) SELECT sum(x) FROM n", [], |r| r.get::<_, i64>(0));
+        let result = guard.query_row("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<1000000000) SELECT sum(x) FROM n", [], |r| r.get::<_, i64>(0));
         task.join().expect("cancel thread");
         assert!(
             matches!(result, Err(rusqlite::Error::SqliteFailure(ref e, _)) if e.code == rusqlite::ErrorCode::OperationInterrupted)
@@ -2017,7 +2064,7 @@ mod tests {
     #[test]
     fn actual_sql_deadline_interrupt_rolls_back_progress_and_allows_retry() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
+        let mut index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
         index.init_recovery_schema().expect("schema");
         let setup = RecoveryWorkBudget::new(Duration::from_secs(2));
         index
@@ -2025,8 +2072,8 @@ mod tests {
             .expect("begin");
         let budget = RecoveryWorkBudget::new(Duration::from_millis(50));
         {
-            let _guard = install_budget(&index.conn, &budget).expect("install");
-            let tx = index.conn.unchecked_transaction().expect("transaction");
+            let guard = install_budget(&mut index.conn, &budget).expect("install");
+            let tx = guard.unchecked_transaction().expect("transaction");
             tx.execute(
                 "UPDATE recovery_builds SET next_offset=50,next_ordinal=1 WHERE scope='scope'",
                 [],
@@ -2047,11 +2094,8 @@ mod tests {
         assert_eq!(cursor.next_offset(), 0);
         assert_eq!(cursor.next_ordinal(), 0);
         {
-            let _guard = install_budget(&index.conn, &retry).expect("retry guard");
-            let tx = index
-                .conn
-                .unchecked_transaction()
-                .expect("retry transaction");
+            let guard = install_budget(&mut index.conn, &retry).expect("retry guard");
+            let tx = guard.unchecked_transaction().expect("retry transaction");
             tx.execute(
                 "UPDATE recovery_builds SET next_offset=50,next_ordinal=1 WHERE scope='scope'",
                 [],
@@ -2071,7 +2115,7 @@ mod tests {
     #[test]
     fn panic_rolls_back_and_restores_connection_settings() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
+        let mut index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
         index.init_recovery_schema().expect("schema");
         index
             .conn
@@ -2079,8 +2123,8 @@ mod tests {
             .expect("timeout");
         let result: Result<(), IndexError> = native_boundary(|| {
             let budget = RecoveryWorkBudget::new(Duration::from_secs(1));
-            let _guard = install_budget(&index.conn, &budget)?;
-            let tx = index.conn.unchecked_transaction()?;
+            let guard = install_budget(&mut index.conn, &budget)?;
+            let tx = guard.unchecked_transaction()?;
             tx.execute(
                 "INSERT INTO recovery_sources(scope,entry_id,ordinal) VALUES('scope','partial',0)",
                 [],
@@ -2113,7 +2157,7 @@ mod tests {
     #[test]
     fn expired_schema_budget_creates_no_tables() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
+        let mut index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
         assert!(
             index
                 .init_recovery_schema_with_budget(&RecoveryWorkBudget::new(Duration::ZERO))
@@ -2212,7 +2256,7 @@ mod tests {
     #[test]
     fn queries_do_not_repair_missing_schema_or_mutate_on_failure() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
+        let mut index = SessionIndex::new(&dir.path().join("index.db")).expect("index");
         let budget = RecoveryWorkBudget::new(Duration::from_secs(2));
         assert!(
             index
@@ -2240,6 +2284,37 @@ mod tests {
             )
             .expect("projection");
         let changes = index.conn.total_changes();
+        assert_eq!(
+            index
+                .recovery_text_candidates("scope", "public", None, 1, &budget)
+                .expect("text match")
+                .len(),
+            1
+        );
+        for text in [
+            "x".repeat(1024),
+            "\"".repeat(1024),
+            format!("{}a", "中".repeat(341)),
+        ] {
+            assert_eq!(text.len(), 1024);
+            assert!(
+                index
+                    .recovery_text_candidates("scope", &text, None, 1, &budget)
+                    .expect("maximum text input")
+                    .is_empty()
+            );
+        }
+        let too_long = "x".repeat(1025);
+        assert!(
+            index
+                .recovery_text_candidates("scope", &too_long, None, 1, &budget)
+                .is_err()
+        );
+        assert!(
+            index
+                .recovery_candidates("scope", &too_long, None, 1, &budget)
+                .is_err()
+        );
         let cancelled = RecoveryWorkBudget::new(Duration::from_secs(2));
         cancelled.cancel();
         for stopped in [cancelled, RecoveryWorkBudget::new(Duration::ZERO)] {

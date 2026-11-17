@@ -8,6 +8,7 @@ struct AssessmentProvider {
     conversation: MockProvider,
     assessments: AtomicUsize,
     validated: AtomicUsize,
+    payloads: Mutex<Vec<serde_json::Value>>,
     allow: bool,
 }
 
@@ -48,6 +49,10 @@ impl LanguageModel for AssessmentProvider {
                 .as_str()
                 .is_some_and(|v| !v.is_empty())
         );
+        self.payloads
+            .lock()
+            .expect("payloads")
+            .push(payload.clone());
         let digest = payload["request_digest"]
             .as_str()
             .expect("request-bound digest");
@@ -133,12 +138,16 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     )));
     std::fs::create_dir(&workspace.0).expect("unique workspace");
     let shell = if cfg!(windows) { "powershell" } else { "bash" };
+    let calls = if enabled && !allow { 2 } else { 1 };
+    let mut conversation = MockProvider::new();
+    for _ in 0..calls {
+        conversation = conversation.with_tool_call(shell, serde_json::json!({"command": "pwd"}));
+    }
     let provider = Arc::new(AssessmentProvider {
-        conversation: MockProvider::new()
-            .with_tool_call(shell, serde_json::json!({"command": "pwd"}))
-            .with_response("Inspection request finished."),
+        conversation: conversation.with_response("Inspection request finished."),
         assessments: AtomicUsize::new(0),
         validated: AtomicUsize::new(0),
+        payloads: Mutex::new(Vec::new()),
         allow,
     });
     let configured = provider.clone();
@@ -229,8 +238,8 @@ async fn exercise_auto(enabled: bool, allow: bool) {
             .iter()
             .any(|(stage, _)| *stage == "before_tool_call")
     );
-    assert_eq!(results.len(), 1, "one authoritative tool result");
-    assert_eq!(approvals, usize::from(!(enabled && allow)));
+    assert_eq!(results.len(), calls, "one authoritative result per call");
+    assert_eq!(approvals, calls * usize::from(!(enabled && allow)));
     if !allow {
         assert!(results[0].0, "manual Deny must reach the tool result");
         assert!(results[0].1.to_ascii_lowercase().contains("denied"));
@@ -262,26 +271,50 @@ async fn exercise_auto(enabled: bool, allow: bool) {
     }
     assert_eq!(
         provider.assessments.load(Ordering::SeqCst),
-        usize::from(enabled)
+        calls * usize::from(enabled)
     );
     assert_eq!(
         provider.validated.load(Ordering::SeqCst),
-        usize::from(enabled),
+        calls * usize::from(enabled),
         "review evidence assertions must run, even when panic containment falls back"
     );
     if enabled {
         assert_eq!(
             reports,
-            [(
-                if allow {
-                    "allow_once"
-                } else {
-                    "human_required"
-                }
-                .into(),
-                "configured-model".into()
-            )]
+            vec![
+                (
+                    if allow {
+                        "allow_once"
+                    } else {
+                        "human_required"
+                    }
+                    .into(),
+                    "configured-model".into()
+                );
+                calls
+            ]
         );
+        if !allow {
+            let payloads = provider.payloads.lock().expect("payloads");
+            assert_eq!(payloads.len(), 2);
+            assert!(
+                payloads[0]["approval_history"]["entries"]
+                    .as_array()
+                    .expect("first history")
+                    .is_empty()
+            );
+            let entries = payloads[1]["approval_history"]["entries"]
+                .as_array()
+                .expect("next history");
+            assert_eq!(entries.len(), 1, "second identical call excludes itself");
+            assert_eq!(
+                entries[0]["fallback"],
+                serde_json::json!(["denied", "observed_human"]),
+                "real Desktop RuntimeCommand response must reach next model request"
+            );
+            assert_ne!(payloads[0]["request_digest"], payloads[1]["request_digest"]);
+            assert!(results.iter().all(|result| result.0));
+        }
     } else {
         assert!(
             reports.is_empty(),

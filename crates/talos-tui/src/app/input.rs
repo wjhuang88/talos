@@ -241,7 +241,7 @@ impl Tui {
                 self.resolve_approval(choice);
             }
             KeyCode::Esc => {
-                self.resolve_approval(ApprovalChoice::Deny);
+                self.resolve_observed_choice(ApprovalChoice::Deny, true);
             }
             KeyCode::Char(c) => {
                 if let Some(choice) = match c {
@@ -258,6 +258,13 @@ impl Tui {
     }
 
     pub(super) fn resolve_approval(&mut self, choice: ApprovalChoice) {
+        self.resolve_observed_choice(choice, false);
+    }
+
+    fn resolve_observed_choice(&mut self, choice: ApprovalChoice, cancelled: bool) {
+        if matches!(self.state.approval_state, ApprovalState::Hidden) {
+            return;
+        }
         if self.retire_closed_approval() {
             return;
         }
@@ -283,9 +290,15 @@ impl Tui {
             });
             return;
         }
-        if let Some(response_tx) = self.state.pending_approval_response.take()
-            && response_tx.send(choice.clone()).is_err()
-        {
+        let failed = if let Some(response) = self.observed_approval.take() {
+            !response.respond(choice.clone(), cancelled)
+        } else {
+            self.state
+                .pending_approval_response
+                .take()
+                .is_some_and(|tx| tx.send(choice.clone()).is_err())
+        };
+        if failed {
             self.hide_approval();
             self.state.slash_menu.close();
             self.append_styled_lines([ScrollbackLine::styled(
@@ -403,7 +416,7 @@ impl Tui {
                     && key.modifiers.contains(event::KeyModifiers::CONTROL)
                 {
                     if !matches!(self.state.approval_state, ApprovalState::Hidden) {
-                        self.resolve_approval(ApprovalChoice::Deny);
+                        self.resolve_observed_choice(ApprovalChoice::Deny, true);
                         return false;
                     }
                     if self.state.slash_menu.is_credential_input() {

@@ -1,0 +1,175 @@
+{
+  "pids": {
+    "talos": 2083228,
+    "ghostty": 2662
+  },
+  "duration_seconds": 30.04276291804854,
+  "samples": [
+    {
+      "elapsed": 8.669449016451836e-07,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 1886,
+          "start_ticks": 70230569,
+          "memory_kib": {
+            "Rss": 144712,
+            "Pss": 141853,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 2842733,
+          "start_ticks": 3923,
+          "memory_kib": {
+            "Rss": 249308,
+            "Pss": 217735,
+            "Swap": 89916
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 5.004378512967378,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 1987,
+          "start_ticks": 70230569,
+          "memory_kib": {
+            "Rss": 144712,
+            "Pss": 141853,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 2842779,
+          "start_ticks": 3923,
+          "memory_kib": {
+            "Rss": 249308,
+            "Pss": 217735,
+            "Swap": 89916
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 10.010333377984352,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 2052,
+          "start_ticks": 70230569,
+          "memory_kib": {
+            "Rss": 144720,
+            "Pss": 141861,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 2842824,
+          "start_ticks": 3923,
+          "memory_kib": {
+            "Rss": 249308,
+            "Pss": 217763,
+            "Swap": 89916
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 15.016301698982716,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 2165,
+          "start_ticks": 70230569,
+          "memory_kib": {
+            "Rss": 144720,
+            "Pss": 141862,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 2842890,
+          "start_ticks": 3923,
+          "memory_kib": {
+            "Rss": 249308,
+            "Pss": 217763,
+            "Swap": 89916
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 20.02504218404647,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 2241,
+          "start_ticks": 70230569,
+          "memory_kib": {
+            "Rss": 146064,
+            "Pss": 143206,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 2842954,
+          "start_ticks": 3923,
+          "memory_kib": {
+            "Rss": 249308,
+            "Pss": 217763,
+            "Swap": 89916
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 25.033628329983912,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 2349,
+          "start_ticks": 70230569,
+          "memory_kib": {
+            "Rss": 146064,
+            "Pss": 143205,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 2843018,
+          "start_ticks": 3923,
+          "memory_kib": {
+            "Rss": 249308,
+            "Pss": 217759,
+            "Swap": 89916
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 30.04276378499344,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 2434,
+          "start_ticks": 70230569,
+          "memory_kib": {
+            "Rss": 146064,
+            "Pss": 143206,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 2843091,
+          "start_ticks": 3923,
+          "memory_kib": {
+            "Rss": 249308,
+            "Pss": 217763,
+            "Swap": 89916
+          }
+        }
+      }
+    }
+  ],
+  "cpu_percent_one_core": {
+    "talos": 18.240665863351158,
+    "ghostty": 11.91634740707977
+  },
+  "scope": "current native debug binary; terminal includes other surfaces; no child-process accounting"
+}

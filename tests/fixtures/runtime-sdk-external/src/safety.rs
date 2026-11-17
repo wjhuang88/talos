@@ -8,11 +8,35 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 use talos_runtime::{
-    AgentEvent, AgentTool, ApprovalChoice, ApprovalHandler, GrantPreview, Message,
-    PermissionDecision, PermissionRule, RuntimeBuilder, RuntimeHandle, SandboxConfig, SandboxError,
-    SandboxFallbackPolicy, SandboxProvider, SandboxResult, SessionEvent, ToolNature,
+    AgentEvent, AgentTool, ApprovalAttribution, ApprovalChoice, ApprovalHandler, GrantPreview,
+    Message, PermissionDecision, PermissionRule, RuntimeBuilder, RuntimeHandle, SandboxConfig,
+    SandboxError, SandboxFallbackPolicy, SandboxProvider, SandboxResult, SessionEvent, ToolNature,
     ToolPermissionFacet, ToolResourceKind, ToolResult, TurnCompletionStatus, TurnEventPayload,
 };
+
+// Deliberately implements only pre-observation SDK methods. The fixture has no
+// direct dependency on the internal Agent crate.
+struct LegacyObservationHost;
+
+#[async_trait]
+impl ApprovalHandler for LegacyObservationHost {
+    async fn request_approval(&self, _: &str, _: &Value, _: &[String]) -> ApprovalChoice {
+        ApprovalChoice::Deny
+    }
+
+    async fn request_scoped_approval_with_explanation(
+        &self,
+        name: &str,
+        arguments: &Value,
+        fields: &[String],
+        preview: &GrantPreview,
+        explanation: &str,
+    ) -> ApprovalChoice {
+        assert_eq!(explanation, "fixture public explanation");
+        self.request_scoped_approval(name, arguments, fields, preview)
+            .await
+    }
+}
 
 struct ScopedApproval(Arc<AtomicUsize>);
 
@@ -31,6 +55,16 @@ impl ApprovalHandler for ScopedApproval {
         assert_eq!(name, "bash");
         assert!(!preview.facets().is_empty());
         assert_eq!(preview.facets()[0].nature, ToolNature::Execute);
+        for explanation in [None, Some("fixture public explanation")] {
+            let observation = LegacyObservationHost
+                .request_scoped_approval_observed(name, &json!({}), &[], preview, explanation)
+                .await;
+            assert_eq!(observation.choice(), &ApprovalChoice::Deny);
+            assert_eq!(
+                observation.attribution(),
+                ApprovalAttribution::LegacyHostUnknown
+            );
+        }
         self.0.fetch_add(1, Ordering::SeqCst);
         ApprovalChoice::ApproveOnce
     }

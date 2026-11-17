@@ -318,6 +318,8 @@ pub(crate) async fn run_tui_mode(
         ResumeSelection::Latest,
         true,
     )?;
+    let runtime_lease = talos_session::SessionRuntimeLease::acquire(&session.file_path)
+        .context("cannot acquire TUI session runtime ownership")?;
     reconcile_session_runtime_state(&session)?;
     apply_session_model_to_config(&mut config, &session);
     if !config.model.is_empty() {
@@ -358,11 +360,15 @@ pub(crate) async fn run_tui_mode(
         }
     }
 
-    let approval_handler = Arc::new(TuiApprovalHandler::new_with_trust(
-        ui_output_tx.clone(),
-        workspace_root.to_path_buf(),
-        &talos_root,
-    ));
+    let (observed_approval_tx, observed_approval_rx) = mpsc::unbounded_channel();
+    let approval_handler = Arc::new(
+        TuiApprovalHandler::new_with_trust(
+            ui_output_tx.clone(),
+            workspace_root.to_path_buf(),
+            &talos_root,
+        )
+        .with_observed_transport(observed_approval_tx),
+    );
     let auto_control = AutoPermissionControl::new(config.auto.enabled);
     let auto_report_sink: Arc<
         dyn Fn(talos_agent::auto_resolver::AutoDecisionReport) + Send + Sync,
@@ -403,7 +409,8 @@ pub(crate) async fn run_tui_mode(
     .with_auto_control(auto_control.clone())
     .with_auto_report_sink(auto_report_sink);
 
-    let initial_history = crate::history_restore::read_session_history(&session).await?;
+    let initial_history =
+        crate::history_restore::read_session_history_owned(&session, &runtime_lease).await?;
     let visible_history = initial_history.clone();
     let built_runtime = initial_runtime_builder
         .build(&config, &session, initial_history)
@@ -415,12 +422,14 @@ pub(crate) async fn run_tui_mode(
     let mcp_diagnostics = built_runtime.mcp_runtime.diagnostics().to_vec();
     let mut handle = built_runtime.handle;
     let mut actor = built_runtime.actor;
+    actor.adopt_runtime_lease(runtime_lease)?;
     let sched_pending = built_runtime.pending_scheduler;
     let initial_mcp_runtime = built_runtime.mcp_runtime;
 
     let mut transition_owner = SessionTransition::new(handle.sq_tx.clone(), session.clone())
         .map_err(anyhow::Error::msg)?;
     transition_owner.attach_permission_state(approval_handler.shared_engine());
+    transition_owner.attach_approval_binding(approval_handler.approval_binding());
     let session_generation = transition_owner.active_generation();
     actor.set_generation(session_generation);
     handle.sq_tx = transition_owner.bind_active_sender();
@@ -666,6 +675,7 @@ pub(crate) async fn run_tui_mode(
     let (user_input_tx, user_input_rx) = mpsc::unbounded_channel::<UserInput>();
 
     tui.set_ui_output_rx(ui_output_rx);
+    tui.set_observed_approval_rx(observed_approval_rx);
     tui.set_user_input_tx(user_input_tx.clone());
     tui.set_model_name(config.model.clone());
     tui.set_provider(config.provider.clone());
@@ -805,21 +815,13 @@ async fn forward_session_events(
                     },
                 ..
             } = &session_event
+                && let Err(e) = session_manager.update_index(&owning_session)
             {
-                if let Err(e) = session_manager.update_index(&owning_session) {
-                    eprintln!("Warning: failed to update session index: {e}");
-                }
-                // Keep on-disk session logs bounded after persistence. The session owns
-                // the write lock, so archival cannot race an append from this bridge.
-                if owning_session
-                    .read_entries()
-                    .map(|entries| entries.len() > 200)
-                    .unwrap_or(false)
-                    && let Err(e) = owning_session.compact_archived(50)
-                {
-                    eprintln!("Warning: failed to archive session: {e}");
-                }
+                eprintln!("Warning: failed to update session index: {e}");
             }
+            // Keep original history in the durable head. Legacy archive recovery
+            // is bounded and can refuse ambiguous provenance; it is not a reason
+            // to resume automatic destructive trimming after successful turns.
             dashboard_activity
                 .project_session_event(&owning_session.id.to_string(), &session_event);
             let _ = bridge_tx.send(session_event);

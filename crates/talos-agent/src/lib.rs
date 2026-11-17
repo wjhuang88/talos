@@ -38,6 +38,8 @@
 //! See `docs/reference/RUNTIME-SDK-CONTRACT.md` for the supported embedding
 //! surface.
 
+mod background_completion;
+mod background_consumption;
 mod background_jobs;
 pub(crate) mod bounded_model;
 mod checkpoint_history;
@@ -1653,6 +1655,12 @@ impl Agent {
                 }
             }
 
+            // Only a complete, structurally valid provider response acknowledges
+            // tool results retained in the exact dispatched request plan.
+            let _ = crate::background_consumption::TURN_CONSUMPTION.try_with(|evidence| {
+                evidence.confirm_messages(&plan.messages);
+            });
+
             if turn_tool_calls.is_empty() {
                 let reasoning = turn_reasoning_blocks
                     .take()
@@ -2046,6 +2054,15 @@ impl Agent {
                     if observed.call == *call {
                         self.record_checkpoint_result(&call.name, &llm_result);
                     }
+                    let _ = crate::background_consumption::TURN_CONSUMPTION.try_with(|evidence| {
+                        evidence.bind_result(
+                            &call.id,
+                            (observed.call == *call
+                                && observed.result.content == result.content
+                                && observed.result.is_error == result.is_error)
+                                .then_some(&llm_result),
+                        );
+                    });
                     messages.push(Message::Tool { result: llm_result });
                 }
 

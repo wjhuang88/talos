@@ -50,11 +50,10 @@ impl ProviderAutoPermissionAssessor {
         request: PreparedCommandAssessmentRequest,
         remaining: Duration,
     ) -> Result<String, String> {
-        let payload =
-            serde_json::to_string(&request).map_err(|_| "command serialization failed")?;
+        let payload = rolling_history::serialize_request(&request, false)?;
         let messages = [
             Message::System {
-                content: SYSTEM_PROMPT.into(),
+                content: rolling_history::system_prompt(SYSTEM_PROMPT),
                 cache_markers: vec![],
             },
             Message::User { content: payload },

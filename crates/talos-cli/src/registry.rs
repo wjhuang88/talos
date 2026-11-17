@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use serde_json::Value;
 use talos_agent::permission_pipeline::{
-    ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
+    ApprovalObservation, ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
 };
 use talos_conversation::{TipKind, UiOutput};
 use talos_core::ApprovalChoice;
@@ -87,6 +87,8 @@ pub(crate) fn bind_session_worktrees(
 pub(crate) struct TuiApprovalHandler {
     ui_output_tx: mpsc::UnboundedSender<UiOutput>,
     state: Arc<PermissionSessionState>,
+    observed_tx: Option<mpsc::UnboundedSender<talos_tui::ObservedApprovalRequest>>,
+    approval_binding: talos_tui::ApprovalBinding,
 }
 
 impl TuiApprovalHandler {
@@ -97,6 +99,8 @@ impl TuiApprovalHandler {
     ) -> Self {
         Self {
             ui_output_tx,
+            observed_tx: None,
+            approval_binding: talos_tui::ApprovalBinding::default(),
             state: Arc::new(PermissionSessionState::new(
                 PermissionEngine::with_workspace_root(workspace_root),
             )),
@@ -132,8 +136,22 @@ impl TuiApprovalHandler {
 
         Self {
             ui_output_tx,
+            observed_tx: None,
+            approval_binding: talos_tui::ApprovalBinding::default(),
             state: Arc::new(PermissionSessionState::new(engine)),
         }
+    }
+
+    pub(crate) fn with_observed_transport(
+        mut self,
+        tx: mpsc::UnboundedSender<talos_tui::ObservedApprovalRequest>,
+    ) -> Self {
+        self.observed_tx = Some(tx);
+        self
+    }
+
+    pub(crate) fn approval_binding(&self) -> talos_tui::ApprovalBinding {
+        self.approval_binding.clone()
     }
 
     /// Returns a shared handle to the permission engine so callers like
@@ -222,18 +240,91 @@ impl ApprovalResolver for TuiApprovalHandler {
     async fn resolve(
         &self,
         request: PermissionApprovalRequest,
-        _remaining: std::time::Duration,
+        remaining: std::time::Duration,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        self.resolve_presented(request, None).await
+        self.resolve_observed(request, remaining, None)
+            .await
+            .map(ApprovalObservation::into_choice)
     }
 
     async fn resolve_with_explanation(
         &self,
         request: PermissionApprovalRequest,
-        _remaining: std::time::Duration,
+        remaining: std::time::Duration,
         explanation: &str,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        self.resolve_presented(request, Some(explanation)).await
+        self.resolve_observed(request, remaining, Some(explanation))
+            .await
+            .map(ApprovalObservation::into_choice)
+    }
+    async fn resolve_observed(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: std::time::Duration,
+        explanation: Option<&str>,
+    ) -> Result<ApprovalObservation, ApprovalResolverError> {
+        let Some(tx) = &self.observed_tx else {
+            return self
+                .resolve_presented(request, explanation)
+                .await
+                .map(ApprovalObservation::legacy);
+        };
+        let Ok(snapshot) = self.state.state_snapshot() else {
+            return Ok(ApprovalObservation::unavailable());
+        };
+        if snapshot.session_id.stable_id() != request.binding.session_id
+            || snapshot.revisions.as_array() != request.binding.revisions
+        {
+            return Ok(ApprovalObservation::unavailable());
+        }
+        let presentation = crate::approval::operation_approval_presentation(&request);
+        let preview = Some(crate::approval::format_explained_grant_preview(
+            &request.preview,
+            explanation,
+        ));
+        let created = self
+            .state
+            .with_current_snapshot(snapshot, || {
+                self.approval_binding.request(
+                    request.tool_name,
+                    request.arguments,
+                    request.summary_fields,
+                    presentation,
+                    preview,
+                )
+            })
+            .ok()
+            .flatten()
+            .flatten();
+        let Some((request, waiter)) = created else {
+            return Ok(ApprovalObservation::unavailable());
+        };
+        if tx.send(request).is_err() {
+            return Ok(ApprovalObservation::unavailable());
+        }
+        let Ok(response) = tokio::time::timeout(remaining, waiter.receive()).await else {
+            return Ok(ApprovalObservation::unavailable());
+        };
+        let observation = self
+            .state
+            .with_current_snapshot(snapshot, || {
+                if !response.is_current() {
+                    return ApprovalObservation::unavailable();
+                }
+                match response.source() {
+                    talos_tui::ApprovalResponseSource::Human => {
+                        ApprovalObservation::observed_human(response.choice().clone())
+                    }
+                    talos_tui::ApprovalResponseSource::UserCancellation => {
+                        ApprovalObservation::user_cancelled()
+                    }
+                    _ => ApprovalObservation::unavailable(),
+                }
+            })
+            .ok()
+            .flatten()
+            .unwrap_or_else(ApprovalObservation::unavailable);
+        Ok(observation)
     }
 }
 
@@ -2561,3 +2652,7 @@ mod tests {
 #[cfg(test)]
 #[path = "registry_builtin_tests.rs"]
 mod builtin_registration_tests;
+
+#[cfg(test)]
+#[path = "registry/observed_approval_tests.rs"]
+mod observed_approval_tests;

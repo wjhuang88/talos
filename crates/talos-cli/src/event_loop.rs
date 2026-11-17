@@ -1,9 +1,9 @@
 use std::collections::{HashMap, VecDeque};
 use std::io::{self, Write};
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use talos_agent::permission_pipeline::ApprovalObservation;
 #[cfg(test)]
 use talos_agent::permission_pipeline::PermissionBinding;
 use talos_core::background_job::BackgroundJobTerminalSummary;
@@ -24,6 +24,10 @@ use crate::mode_runtime::request_preview_payload;
 const DOUBLE_CTRL_C_WINDOW: Duration = Duration::from_secs(2);
 
 pub(crate) enum AppEvent {
+    RuntimeEvent {
+        generation: u64,
+        event: Box<AppEvent>,
+    },
     UserInput(String),
     UserInterrupt,
     ApprovalRequested(Box<TerminalApprovalRequest>),
@@ -41,14 +45,10 @@ pub(crate) enum AppEvent {
     BackgroundJobTerminal(BackgroundJobTerminalSummary),
     AgentCompleted,
     AgentError(String),
-    /// Request to fork the current session from a specific entry.
-    ForkSession {
-        entry_id: Option<String>,
-    },
     /// Fork completed with the new session ID.
     ForkCompleted {
-        new_session_id: String,
-        branch_id: String,
+        operation_id: uuid::Uuid,
+        result: Result<Session, String>,
     },
 }
 
@@ -58,6 +58,13 @@ pub(crate) enum AppState {
         cancel_token: CancellationToken,
         task_handle: JoinHandle<()>,
     },
+    ForkPending {
+        operation_id: uuid::Uuid,
+        cancel_token: CancellationToken,
+    },
+    SwitchReady {
+        child: Session,
+    },
     ShuttingDown,
 }
 
@@ -66,7 +73,6 @@ pub(crate) struct EventLoop {
     event_rx: mpsc::UnboundedReceiver<AppEvent>,
     state: AppState,
     first_ctrl_c_time: Option<Instant>,
-    workspace_root: PathBuf,
     session: Session,
     branch_id: Option<String>,
     session_manager: SessionManager,
@@ -76,23 +82,88 @@ pub(crate) struct EventLoop {
     displayed_approval: Option<uuid::Uuid>,
     approval_rollover_barrier: bool,
     background_tools: HashMap<String, String>,
+    runtime_generation: u64,
+    input_started: bool,
+}
+
+#[derive(Clone)]
+struct RuntimeEventSender {
+    tx: mpsc::UnboundedSender<AppEvent>,
+    generation: u64,
+}
+impl RuntimeEventSender {
+    fn send(
+        &self,
+        event: AppEvent,
+    ) -> std::result::Result<(), Box<mpsc::error::SendError<AppEvent>>> {
+        self.tx
+            .send(AppEvent::RuntimeEvent {
+                generation: self.generation,
+                event: Box::new(event),
+            })
+            .map_err(Box::new)
+    }
 }
 
 impl EventLoop {
     pub(crate) fn new(
-        workspace_root: PathBuf,
+        session: Session,
+        session_manager: SessionManager,
+        handle: talos_core::session::SessionHandle,
+        approval_rx: mpsc::UnboundedReceiver<TerminalApprovalRequest>,
+    ) -> Self {
+        let (tx, rx) = mpsc::unbounded_channel();
+        Self::with_events(
+            session,
+            session_manager,
+            handle,
+            approval_rx,
+            (tx, rx, 0, false),
+        )
+    }
+
+    pub(crate) fn rebind(
+        self,
+        session: Session,
+        handle: talos_core::session::SessionHandle,
+        approval_rx: mpsc::UnboundedReceiver<TerminalApprovalRequest>,
+    ) -> Self {
+        Self::with_events(
+            session,
+            self.session_manager,
+            handle,
+            approval_rx,
+            (
+                self.event_tx,
+                self.event_rx,
+                self.runtime_generation + 1,
+                self.input_started,
+            ),
+        )
+    }
+
+    fn with_events(
         session: Session,
         session_manager: SessionManager,
         handle: talos_core::session::SessionHandle,
         mut approval_rx: mpsc::UnboundedReceiver<TerminalApprovalRequest>,
+        events: (
+            mpsc::UnboundedSender<AppEvent>,
+            mpsc::UnboundedReceiver<AppEvent>,
+            u64,
+            bool,
+        ),
     ) -> Self {
-        let (event_tx, event_rx) = mpsc::unbounded_channel();
+        let (event_tx, event_rx, runtime_generation, input_started) = events;
         let sq_tx = handle.sq_tx;
 
         // Spawn a single long-lived forwarding task that translates
         // SessionEvent → AppEvent for the lifetime of the EventLoop.
         let mut eq_rx = handle.eq_rx;
-        let event_tx_forward = event_tx.clone();
+        let event_tx_forward = RuntimeEventSender {
+            tx: event_tx.clone(),
+            generation: runtime_generation,
+        };
         tokio::spawn(async move {
             while let Some(session_event) = eq_rx.recv().await {
                 match session_event {
@@ -152,11 +223,22 @@ impl EventLoop {
                     SessionEvent::Error { message } => {
                         let _ = event_tx_forward.send(AgentError(message));
                     }
+                    SessionEvent::SubmissionRejected { reason, .. } => {
+                        let message = if reason == talos_core::submission::SubmissionRejectionReason::ContextBudgetExceeded {
+                            "Request not started: context budget exceeded after checkpoint preparation. Session history retained.".to_owned()
+                        } else {
+                            format!("Request not started: {reason:?}.")
+                        };
+                        let _ = event_tx_forward.send(AgentError(message));
+                    }
                     _ => {}
                 }
             }
         });
-        let event_tx_approval = event_tx.clone();
+        let event_tx_approval = RuntimeEventSender {
+            tx: event_tx.clone(),
+            generation: runtime_generation,
+        };
         tokio::spawn(async move {
             while let Some(request) = approval_rx.recv().await {
                 if event_tx_approval
@@ -173,7 +255,6 @@ impl EventLoop {
             event_rx,
             state: AppState::WaitingForInput,
             first_ctrl_c_time: None,
-            workspace_root,
             session,
             branch_id: None,
             session_manager,
@@ -182,10 +263,12 @@ impl EventLoop {
             displayed_approval: None,
             approval_rollover_barrier: false,
             background_tools: HashMap::new(),
+            runtime_generation,
+            input_started,
         }
     }
 
-    pub async fn run(mut self) -> Result<()> {
+    pub async fn run(&mut self) -> Result<Option<Session>> {
         let branch_info = self
             .branch_id
             .as_ref()
@@ -197,8 +280,11 @@ impl EventLoop {
         );
         eprintln!("Ctrl+C to cancel current turn, double Ctrl+C to exit.\n");
 
-        self.spawn_stdin_reader();
-        self.spawn_signal_handler();
+        if !self.input_started {
+            self.spawn_stdin_reader();
+            self.spawn_signal_handler();
+            self.input_started = true;
+        }
         self.render();
 
         loop {
@@ -210,13 +296,20 @@ impl EventLoop {
             self.handle_event(event);
             self.render();
 
-            if matches!(self.state, AppState::ShuttingDown) {
+            if matches!(
+                self.state,
+                AppState::ShuttingDown | AppState::SwitchReady { .. }
+            ) {
                 break;
             }
         }
 
+        let next = match &self.state {
+            AppState::SwitchReady { child } => Some(child.clone()),
+            _ => None,
+        };
         self.shutdown().await;
-        Ok(())
+        Ok(next)
     }
 
     fn spawn_stdin_reader(&self) {
@@ -254,12 +347,21 @@ impl EventLoop {
 
     fn handle_event(&mut self, event: AppEvent) {
         let event = match event {
+            AppEvent::RuntimeEvent { generation, event }
+                if generation == self.runtime_generation =>
+            {
+                *event
+            }
+            AppEvent::RuntimeEvent { .. } => return,
+            event => event,
+        };
+        let event = match event {
             ApprovalRequested(request) => {
                 if matches!(self.state, AppState::AgentRunning { .. }) {
                     self.approval_queue.push_back(*request);
                     self.render_active_approval();
                 } else {
-                    let _ = request.response.send(talos_core::ApprovalChoice::Deny);
+                    let _ = request.response.send(ApprovalObservation::unavailable());
                 }
                 return;
             }
@@ -337,7 +439,7 @@ impl EventLoop {
                 });
                 // Abort the dummy task handle (no-op, but keeps the enum contract).
                 task_handle.abort();
-                self.deny_pending_approvals();
+                self.deny_pending_approvals(true);
                 self.background_tools.clear();
                 eprintln!("Turn cancelled.");
                 self.state = AppState::WaitingForInput;
@@ -379,7 +481,7 @@ impl EventLoop {
             }
 
             (AppState::AgentRunning { .. }, AgentCompleted) => {
-                self.deny_pending_approvals();
+                self.deny_pending_approvals(false);
                 self.background_tools.clear();
                 println!();
                 if let Err(e) = self.session_manager.update_index(&self.session) {
@@ -389,60 +491,61 @@ impl EventLoop {
             }
 
             (AppState::AgentRunning { .. }, AgentError(msg)) => {
-                self.deny_pending_approvals();
+                self.deny_pending_approvals(false);
                 self.background_tools.clear();
                 eprintln!("Error: {msg}");
                 self.state = AppState::WaitingForInput;
             }
 
             (
-                AppState::WaitingForInput,
-                AppEvent::ForkCompleted {
-                    new_session_id,
-                    branch_id,
+                AppState::ForkPending {
+                    operation_id,
+                    cancel_token,
                 },
-            ) => {
-                self.branch_id = Some(branch_id.clone());
-                // Reload the fork from disk so subsequent turns append to the new file.
-                // Without this, `self.session` still points at the source session's id/path
-                // and tool calls would be logged into the source JSONL, not the fork.
-                if let Ok(new_uuid) = uuid::Uuid::parse_str(&new_session_id) {
-                    match self.session_manager.get_session(&new_uuid) {
-                        Ok(forked) => {
-                            self.session = forked;
-                            eprintln!(
-                                "Fork completed. New session: {new_session_id}, branch: {branch_id}"
-                            );
-                        }
-                        Err(e) => {
-                            eprintln!(
-                                "Fork completed but could not reload fork session: {e}. \
-                                 Falling back to in-memory id; subsequent turns may write to the \
-                                 source session."
-                            );
-                        }
+                AppEvent::ForkCompleted {
+                    operation_id: completed,
+                    result,
+                },
+            ) if *operation_id == completed => {
+                let cancelled = cancel_token.is_cancelled();
+                self.state = AppState::WaitingForInput;
+                match result {
+                    Ok(child) if cancelled => {
+                        eprintln!(
+                            "Fork cancelled after publication; child {} at {} retained. Parent remains active.",
+                            child.id,
+                            child.file_path.display()
+                        );
                     }
-                } else {
-                    eprintln!(
-                        "Fork completed. New session: {new_session_id}, branch: {branch_id} \
-                         (invalid uuid; not reloading)"
-                    );
+                    Ok(child) => {
+                        eprintln!("Fork published: {}; switching runtime.", child.id);
+                        self.state = AppState::SwitchReady { child };
+                    }
+                    Err(error) => eprintln!("Fork failed: {error}"),
                 }
             }
-
-            (AppState::WaitingForInput, AppEvent::ForkSession { entry_id }) => {
-                self.handle_fork_session(entry_id);
+            (AppState::ForkPending { cancel_token, .. }, UserInterrupt) => {
+                cancel_token.cancel();
+                eprintln!("Cancelling fork; waiting for publication worker to finish.");
+            }
+            (AppState::ForkPending { .. }, UserInput(_)) => {
+                eprintln!("Fork in progress; wait for completion or press Ctrl+C to cancel.");
             }
 
             _ => {}
         }
     }
 
-    fn deny_pending_approvals(&mut self) {
+    fn deny_pending_approvals(&mut self, user_cancelled: bool) {
         self.displayed_approval = None;
         self.approval_rollover_barrier = false;
         while let Some(request) = self.approval_queue.pop_front() {
-            let _ = request.response.send(talos_core::ApprovalChoice::Deny);
+            let observation = if user_cancelled {
+                ApprovalObservation::user_cancelled()
+            } else {
+                ApprovalObservation::unavailable()
+            };
+            let _ = request.response.send(observation);
         }
     }
 
@@ -466,7 +569,7 @@ impl EventLoop {
             && let Some(request) = self.approval_queue.pop_front()
         {
             self.displayed_approval = None;
-            let _ = request.response.send(talos_core::ApprovalChoice::Deny);
+            let _ = request.response.send(ApprovalObservation::unavailable());
         }
     }
 
@@ -504,107 +607,97 @@ impl EventLoop {
             Some(entry_id.to_string())
         };
 
-        let _ = self.event_tx.send(AppEvent::ForkSession { entry_id });
+        self.handle_fork_session(entry_id);
     }
 
     fn handle_fork_session(&mut self, entry_id: Option<String>) {
-        use talos_session::SessionIndex;
-
+        if !matches!(self.state, AppState::WaitingForInput) {
+            return;
+        }
+        let operation_id = uuid::Uuid::new_v4();
+        let cancel_token = CancellationToken::new();
+        self.state = AppState::ForkPending {
+            operation_id,
+            cancel_token: cancel_token.clone(),
+        };
         let session = self.session.clone();
-        let _workspace = self.workspace_root.clone();
+        let manager = self.session_manager.clone();
         let event_tx = self.event_tx.clone();
-        let sessions_dir = self.session_manager.sessions_dir().to_path_buf();
 
+        let sq_tx = self.sq_tx.clone();
+        let runtime = tokio::runtime::Handle::current();
         std::thread::spawn(move || {
-            let result = (|| -> anyhow::Result<(String, String)> {
-                let entries = session.read_entries()?;
-                if entries.is_empty() {
-                    anyhow::bail!("cannot fork an empty session");
-                }
-
-                let fork_from_id = match &entry_id {
-                    Some(id) => {
-                        if entries.iter().any(|e| e.id == *id) {
-                            id.clone()
-                        } else {
-                            anyhow::bail!("entry not found: {id}");
+            let result = (|| -> anyhow::Result<talos_session::Session> {
+            let snapshot = if crate::history_restore::requires_fork_receipt(&session)? {
+                None
+            } else {
+                Some(runtime.block_on(async {
+                    tokio::select! {
+                        biased;
+                        _ = cancel_token.cancelled() => Err(anyhow::anyhow!("fork cancelled")),
+                        result = tokio::time::timeout(std::time::Duration::from_secs(35), async {
+                            let (receipt_tx, mut receipt_rx) = mpsc::unbounded_channel();
+                            sq_tx.send(SessionOp::CaptureOrdinaryFork {
+                                through_entry: entry_id.clone(), receipt_tx: Some(receipt_tx),
+                            }).await.map_err(|_| anyhow::anyhow!("source Actor unavailable"))?;
+                            receipt_rx.recv().await.ok_or_else(|| anyhow::anyhow!("source Actor dropped capture"))?
+                                .map_err(|error| anyhow::anyhow!(error))
+                        }) => result.map_err(|_| anyhow::anyhow!("source Actor capture timed out"))?,
+                    }
+                })?)
+            };
+            if cancel_token.is_cancelled() { anyhow::bail!("fork cancelled"); }
+            crate::session_setup::fork_session_from_snapshot(
+                &manager,
+                &session,
+                entry_id.as_deref(),
+                snapshot,
+                |child| {
+                    runtime.block_on(async {
+                        tokio::select! {
+                            biased;
+                            _ = cancel_token.cancelled() => Err(anyhow::anyhow!("fork cancelled")),
+                            result = tokio::time::timeout(std::time::Duration::from_secs(35), async {
+                            let (receipt_tx, mut receipt_rx) = mpsc::unbounded_channel();
+                            sq_tx
+                                .send(SessionOp::ForkHistory {
+                                    child_id: child.id.to_string(),
+                                    child_branch: child.current_branch.clone(),
+                                    through_entry: entry_id.clone(),
+                                    receipt_tx: Some(receipt_tx),
+                                })
+                                .await
+                                .map_err(|_| anyhow::anyhow!("source Actor unavailable"))?;
+                            receipt_rx
+                                .recv()
+                                .await
+                                .ok_or_else(|| {
+                                    anyhow::anyhow!("source Actor dropped fork receipt")
+                                })?
+                                .map_err(|error| anyhow::anyhow!("{error:?}"))
+                        }) => result.map_err(|_| anyhow::anyhow!("source Actor fork timed out"))?,
                         }
-                    }
-                    None => entries
-                        .last()
-                        .expect("entries checked non-empty above")
-                        .id
-                        .clone(),
-                };
-
-                let mut forked = session.clone();
-                let branch_id = forked.fork(&fork_from_id)?;
-
-                let project_dir = sessions_dir.join(&forked.project);
-                std::fs::create_dir_all(&project_dir)?;
-
-                let new_id = uuid::Uuid::new_v4();
-                let ext = session.file_extension();
-                let new_file_path = project_dir.join(format!("{new_id}.{ext}"));
-
-                let entries_to_copy = if let Some(branch) = forked.get_branch(&branch_id) {
-                    branch.entries.clone()
-                } else {
-                    entries
-                };
-
-                if ext == "tlog" {
-                    let store = talos_session::CompactTextSessionStore;
-                    use talos_session::SessionStore;
-                    for entry in &entries_to_copy {
-                        store.append_entry(&new_file_path, entry)?;
-                    }
-                } else {
-                    let mut file = std::fs::OpenOptions::new()
-                        .create(true)
-                        .write(true)
-                        .truncate(true)
-                        .open(&new_file_path)?;
-                    for entry in &entries_to_copy {
-                        let line = serde_json::to_string(entry)?;
-                        std::io::Write::write_all(&mut file, line.as_bytes())?;
-                        std::io::Write::write_all(&mut file, b"\n")?;
-                    }
-                }
-
-                if let Ok(mut index) = SessionIndex::new(&sessions_dir.join("index.db")) {
-                    let _ = index.init_schema();
-                    let _ = index.record_fork(
-                        &session.id.to_string(),
-                        &new_id.to_string(),
-                        &fork_from_id,
-                    );
-                    // Re-stamp `forked` with the new identity BEFORE indexing so the
-                    // SQLite FTS5 index points at the fork's id/file_path/branch_id,
-                    // not the source's. Without this, search and list_recent would
-                    // surface the source under the fork's UUID.
-                    forked.with_fork_identity(new_id, new_file_path.clone(), branch_id.clone());
-                    let _ = index.index_session(&forked);
-                }
-
-                Ok((new_id.to_string(), branch_id))
-            })();
-
-            match result {
-                Ok((new_session_id, branch_id)) => {
-                    let _ = event_tx.send(AppEvent::ForkCompleted {
-                        new_session_id,
-                        branch_id,
-                    });
-                }
-                Err(e) => {
-                    let _ = event_tx.send(AgentError(format!("Fork failed: {e}")));
-                }
-            }
+                    })
+                },
+            )
+            })().map_err(|error| format!("{error:#}"));
+            let _ = event_tx.send(AppEvent::ForkCompleted {
+                operation_id,
+                result,
+            });
         });
     }
 
     async fn shutdown(&mut self) {
+        if let AppState::ForkPending { cancel_token, .. } = &self.state {
+            cancel_token.cancel();
+            while let Some(event) = self.event_rx.recv().await {
+                self.handle_event(event);
+                if !matches!(self.state, AppState::ForkPending { .. }) {
+                    break;
+                }
+            }
+        }
         // Send shutdown to the session actor.
         let _ = self.sq_tx.send(SessionOp::Shutdown).await;
 
@@ -640,6 +733,186 @@ fn track_background_tool(
 #[cfg(test)]
 mod background_pairing_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn repl_prestart_budget_rejection_returns_to_input_without_a_turn_completion() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let session = manager.create_session("rejection", "").expect("session");
+        let original = std::fs::read(&session.file_path).expect("original transcript");
+        let (sq_tx, mut sq_rx) = mpsc::channel(8);
+        let (eq_tx, eq_rx) = mpsc::unbounded_channel();
+        let (_approval_tx, approval_rx) = mpsc::unbounded_channel();
+        let mut repl = EventLoop::new(
+            session.clone(),
+            manager,
+            talos_core::session::SessionHandle { sq_tx, eq_rx },
+            approval_rx,
+        );
+        repl.handle_event(UserInput("synthetic rejected request".into()));
+        assert!(matches!(sq_rx.recv().await, Some(SessionOp::Submit { .. })));
+        eq_tx
+            .send(SessionEvent::SubmissionRejected {
+                session_id: session.id.to_string(),
+                submission_id: "private-submission-id".into(),
+                sender_generation: 0,
+                reason: talos_core::submission::SubmissionRejectionReason::ContextBudgetExceeded,
+            })
+            .expect("reject before turn start");
+        let event = tokio::time::timeout(Duration::from_secs(1), repl.event_rx.recv())
+            .await
+            .expect("prestart rejection must reach REPL")
+            .expect("event");
+        let AppEvent::RuntimeEvent { event: inner, .. } = &event else {
+            panic!("generation fence")
+        };
+        let AgentError(message) = inner.as_ref() else {
+            panic!("visible rejection")
+        };
+        assert!(message.contains("context budget"));
+        assert!(!message.contains("private-submission-id"));
+        repl.handle_event(event);
+        assert!(matches!(repl.state, AppState::WaitingForInput));
+        assert_eq!(
+            std::fs::read(&session.file_path).expect("retained transcript"),
+            original
+        );
+        repl.handle_event(UserInput("next request".into()));
+        assert!(
+            matches!(sq_rx.recv().await, Some(SessionOp::Submit { message }) if message == "next request")
+        );
+        repl.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn repl_archived_fork_uses_actor_owned_source() {
+        assert_repl_fork_uses_actor_owned_source(true).await;
+    }
+
+    #[tokio::test]
+    async fn repl_ordinary_fork_uses_actor_snapshot_and_child_runtime() {
+        assert_repl_fork_uses_actor_owned_source(false).await;
+    }
+
+    async fn assert_repl_fork_uses_actor_owned_source(archived: bool) {
+        use talos_core::message::Message;
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let workspace = crate::session_setup::canonical_workspace_root(root.path());
+        let parent = manager.create_session("repl", &workspace).expect("parent");
+        for i in 0..16 {
+            parent
+                .append(&Message::User {
+                    content: format!("repl fact {i}"),
+                })
+                .expect("append");
+        }
+        let selected = parent.read_entries().expect("entries")[7].id.clone();
+        if archived {
+            parent.compact_archived(0).expect("keep0");
+        }
+        let original = std::fs::read(&parent.file_path).expect("bytes");
+        let (ui_tx, _ui_rx) = mpsc::unbounded_channel();
+        let builder = crate::tui_runtime_builder::TuiRuntimeBuilder::new(
+            crate::build_hook_registry(true),
+            root.path().to_path_buf(),
+            manager.clone(),
+            std::sync::Arc::new(crate::registry::TuiApprovalHandler::new(
+                ui_tx,
+                root.path().to_path_buf(),
+            )),
+            Vec::new(),
+            false,
+            true,
+        );
+        let built = builder
+            .build(&talos_config::Config::default(), &parent, vec![])
+            .await
+            .expect("runtime");
+        let mut actor = built.actor;
+        let actor_join = tokio::spawn(async move { actor.run().await });
+        let (_approval_tx, approval_rx) = mpsc::unbounded_channel();
+        let mut event_loop =
+            EventLoop::new(parent.clone(), manager.clone(), built.handle, approval_rx);
+        event_loop.handle_event(UserInput(format!("/fork {selected}")));
+        assert!(matches!(event_loop.state, AppState::ForkPending { .. }));
+        event_loop.handle_event(UserInput("must not enter parent during fork".into()));
+        let child_id = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            loop {
+                let event = event_loop.event_rx.recv().await.expect("event");
+                event_loop.handle_event(event);
+                if let AppState::SwitchReady { child } = &event_loop.state {
+                    break child.id.to_string();
+                }
+                assert!(
+                    matches!(event_loop.state, AppState::ForkPending { .. }),
+                    "fork failed"
+                );
+            }
+        })
+        .await
+        .expect("fork completes");
+        let child = manager.resume_session(&child_id).expect("child");
+        let restored = crate::history_restore::read_session_history(&child)
+            .await
+            .expect("restore");
+        assert_eq!(restored.len(), 8);
+        assert!(
+            matches!(restored.last(), Some(Message::User {content}) if content == "repl fact 7")
+        );
+        assert_eq!(
+            manager
+                .get_forks(&parent.id.to_string())
+                .expect("lineage")
+                .len(),
+            1
+        );
+        assert_eq!(
+            std::fs::read(&parent.file_path).expect("parent bytes"),
+            original
+        );
+        event_loop.shutdown().await;
+        actor_join.await.expect("parent actor joined");
+        let built = builder
+            .build(&talos_config::Config::default(), &child, restored)
+            .await
+            .expect("child runtime");
+        let mut actor = built.actor;
+        let actor_join = tokio::spawn(async move { actor.run().await });
+        let (_approval_tx, approval_rx) = mpsc::unbounded_channel();
+        let mut event_loop = event_loop.rebind(child.clone(), built.handle, approval_rx);
+        event_loop.handle_event(UserInput("post-fork child turn".into()));
+        event_loop.handle_event(AppEvent::RuntimeEvent {
+            generation: 0,
+            event: Box::new(AgentCompleted),
+        });
+        assert!(
+            matches!(event_loop.state, AppState::AgentRunning { .. }),
+            "old runtime cannot finish child turn"
+        );
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while matches!(event_loop.state, AppState::AgentRunning { .. }) {
+                let event = event_loop.event_rx.recv().await.expect("turn event");
+                event_loop.handle_event(event);
+            }
+        })
+        .await
+        .expect("child turn completes");
+        let child_history = crate::history_restore::read_session_history(&child)
+            .await
+            .expect("child history");
+        assert!(
+            child_history.iter().any(
+                |m| matches!(m, Message::User { content } if content == "post-fork child turn")
+            )
+        );
+        assert_eq!(
+            std::fs::read(&parent.file_path).expect("parent bytes"),
+            original
+        );
+        event_loop.shutdown().await;
+        actor_join.await.expect("child actor joined");
+    }
 
     #[test]
     fn interleaved_calls_remain_paired_by_tool_use_id() {
@@ -716,7 +989,9 @@ fn resolve_displayed_approval(
     };
     let request = queue.pop_front().expect("displayed request is present");
     *displayed = None;
-    let _ = request.response.send(choice);
+    let _ = request
+        .response
+        .send(ApprovalObservation::observed_human(choice));
     ApprovalInputOutcome::Resolved
 }
 
@@ -756,7 +1031,7 @@ mod approval_queue_tests {
 
     fn queued_request() -> (
         TerminalApprovalRequest,
-        tokio::sync::oneshot::Receiver<talos_core::ApprovalChoice>,
+        tokio::sync::oneshot::Receiver<ApprovalObservation>,
     ) {
         let root = tempfile::tempdir().expect("tempdir");
         let target = root.path().join("target.txt");
@@ -809,6 +1084,87 @@ mod approval_queue_tests {
         )
     }
 
+    #[tokio::test]
+    async fn actual_terminal_teardown_distinguishes_interrupt_from_completion_and_error() {
+        for (event, expected) in [
+            (UserInterrupt, ApprovalObservation::user_cancelled()),
+            (AgentCompleted, ApprovalObservation::unavailable()),
+            (
+                AgentError("fixture failure".into()),
+                ApprovalObservation::unavailable(),
+            ),
+        ] {
+            let root = tempfile::tempdir().expect("isolated storage");
+            let manager = SessionManager::with_dir(root.path().join("sessions"));
+            let session = manager
+                .create_session("fixture", &root.path().to_string_lossy())
+                .expect("fixture session");
+            let (event_tx, event_rx) = mpsc::unbounded_channel();
+            let (sq_tx, mut sq_rx) = mpsc::channel(8);
+            let (request, mut response) = queued_request();
+            let displayed = request.id;
+            let cancel = CancellationToken::new();
+            let mut driver = EventLoop {
+                event_tx,
+                event_rx,
+                state: AppState::AgentRunning {
+                    cancel_token: cancel.clone(),
+                    task_handle: tokio::spawn(async {}),
+                },
+                first_ctrl_c_time: None,
+                session,
+                branch_id: None,
+                session_manager: manager,
+                sq_tx,
+                approval_queue: VecDeque::from([request]),
+                displayed_approval: Some(displayed),
+                approval_rollover_barrier: true,
+                background_tools: HashMap::new(),
+                runtime_generation: 1,
+                input_started: false,
+            };
+            driver.handle_event(event);
+            assert_eq!(
+                response.try_recv().expect("actual teardown response"),
+                expected
+            );
+            assert!(driver.approval_queue.is_empty());
+            assert!(driver.displayed_approval.is_none());
+            assert!(!driver.approval_rollover_barrier);
+            assert!(matches!(driver.state, AppState::WaitingForInput));
+            if expected == ApprovalObservation::user_cancelled() {
+                assert!(cancel.is_cancelled());
+                assert!(matches!(sq_rx.recv().await, Some(SessionOp::Interrupt)));
+            } else {
+                assert!(!cancel.is_cancelled());
+                assert!(sq_rx.try_recv().is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn actual_terminal_choice_is_attributed_to_the_displayed_request() {
+        use talos_agent::permission_pipeline::ApprovalAttribution;
+        for (input, choice) in [
+            ("1", talos_core::ApprovalChoice::ApproveOnce),
+            ("2", talos_core::ApprovalChoice::AlwaysApprove),
+            ("3", talos_core::ApprovalChoice::Deny),
+        ] {
+            let (request, mut response) = queued_request();
+            let mut displayed = Some(request.id);
+            let mut queue = VecDeque::from([request]);
+            let mut barrier = false;
+            assert!(matches!(
+                resolve_displayed_approval(&mut queue, &mut displayed, &mut barrier, input),
+                ApprovalInputOutcome::Resolved
+            ));
+            let observed = response.try_recv().expect("real input response");
+            assert_eq!(observed.attribution(), ApprovalAttribution::ObservedHuman);
+            assert_eq!(observed.into_choice(), choice);
+            assert!(queue.is_empty());
+        }
+    }
+
     #[test]
     fn input_for_expired_displayed_request_never_approves_next_request() {
         let (expired, expired_rx) = queued_request();
@@ -841,7 +1197,10 @@ mod approval_queue_tests {
             ApprovalInputOutcome::Resolved
         ));
         assert_eq!(
-            current_rx.try_recv().expect("current request response"),
+            current_rx
+                .try_recv()
+                .expect("current request response")
+                .into_choice(),
             talos_core::ApprovalChoice::ApproveOnce
         );
     }
@@ -884,8 +1243,157 @@ mod approval_queue_tests {
             ApprovalInputOutcome::Resolved
         ));
         assert_eq!(
-            current_rx.try_recv().expect("current request response"),
+            current_rx
+                .try_recv()
+                .expect("current request response")
+                .into_choice(),
             talos_core::ApprovalChoice::ApproveOnce
         );
+    }
+}
+
+#[cfg(test)]
+mod archive_fork_tests {
+    use super::*;
+    use talos_core::message::Message;
+
+    #[tokio::test]
+    async fn repl_pending_fork_cancels_receipt_and_ignores_stale_completion() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = SessionManager::with_dir(root.path().join("sessions"));
+        let parent = manager.create_session("cancel", "").expect("parent");
+        parent
+            .append(&Message::User {
+                content: "original".into(),
+            })
+            .expect("append");
+        parent.compact_archived(0).expect("archive");
+        let (sq_tx, mut sq_rx) = mpsc::channel(4);
+        let (_eq_tx, eq_rx) = mpsc::unbounded_channel();
+        let (_approval_tx, approval_rx) = mpsc::unbounded_channel();
+        let mut repl = EventLoop::new(
+            parent.clone(),
+            manager.clone(),
+            talos_core::session::SessionHandle { sq_tx, eq_rx },
+            approval_rx,
+        );
+        repl.handle_event(UserInput("/fork".into()));
+        let receipt = match tokio::time::timeout(Duration::from_secs(5), sq_rx.recv())
+            .await
+            .expect("request")
+            .expect("op")
+        {
+            SessionOp::ForkHistory {
+                receipt_tx: Some(tx),
+                ..
+            } => tx,
+            _ => panic!("expected fork"),
+        };
+        repl.handle_event(UserInput("must not submit".into()));
+        assert!(sq_rx.try_recv().is_err());
+        repl.handle_event(AppEvent::ForkCompleted {
+            operation_id: uuid::Uuid::new_v4(),
+            result: Ok(parent.clone()),
+        });
+        assert!(matches!(repl.state, AppState::ForkPending { .. }));
+        repl.handle_event(UserInterrupt);
+        assert!(
+            matches!(&repl.state, AppState::ForkPending { cancel_token, .. } if cancel_token.is_cancelled())
+        );
+        let result = tokio::time::timeout(Duration::from_secs(5), repl.event_rx.recv())
+            .await
+            .expect("cancel finishes")
+            .expect("completion");
+        assert!(
+            matches!(&result, AppEvent::ForkCompleted { result: Err(message), .. } if message.contains("fork cancelled"))
+        );
+        repl.handle_event(result);
+        assert!(matches!(repl.state, AppState::WaitingForInput));
+        assert!(
+            receipt.is_closed(),
+            "Actor observes cancellation through closed receipt"
+        );
+        assert_eq!(repl.session.id, parent.id);
+        assert_eq!(manager.list_sessions().expect("sessions").len(), 1);
+    }
+
+    #[tokio::test]
+    async fn repl_fork_preserves_archived_source_when_actor_unavailable() {
+        for explicit_entry in [false, true] {
+            let root = tempfile::tempdir().expect("root");
+            let manager = SessionManager::with_dir(root.path().join("sessions"));
+            let source = manager.create_session("archive-repl", "").expect("source");
+            for index in 0..205 {
+                source
+                    .append(&Message::User {
+                        content: format!("original fact {index}"),
+                    })
+                    .expect("append");
+            }
+            source.compact_archived(50).expect("archive");
+            let before = source.snapshot_bytes().expect("before");
+            let tail = source
+                .read_entries()
+                .expect("entries")
+                .last()
+                .expect("tail")
+                .id
+                .clone();
+            let (event_tx, event_rx) = mpsc::unbounded_channel();
+            let (sq_tx, sq_rx) = mpsc::channel(1);
+            drop(sq_rx);
+            let mut repl = EventLoop {
+                event_tx,
+                event_rx,
+                state: AppState::WaitingForInput,
+                first_ctrl_c_time: None,
+                session: source.clone(),
+                branch_id: None,
+                session_manager: manager.clone(),
+                sq_tx,
+                approval_queue: VecDeque::new(),
+                displayed_approval: None,
+                approval_rollover_barrier: false,
+                background_tools: HashMap::new(),
+                runtime_generation: 0,
+                input_started: false,
+            };
+            let command = if explicit_entry {
+                format!("/fork {tail}")
+            } else {
+                "/fork".into()
+            };
+            repl.handle_event(AppEvent::UserInput(command));
+            assert!(matches!(repl.state, AppState::ForkPending { .. }));
+            let result = tokio::time::timeout(Duration::from_secs(10), repl.event_rx.recv())
+                .await
+                .expect("fork worker deadline")
+                .expect("fork worker event");
+            match &result {
+                AppEvent::ForkCompleted {
+                    result: Err(message),
+                    ..
+                } => assert!(message.contains("source Actor unavailable")),
+                _ => panic!("unexpected fork worker event"),
+            }
+            repl.handle_event(result);
+            assert!(matches!(repl.state, AppState::WaitingForInput));
+            assert_eq!(manager.list_sessions().expect("sessions").len(), 1);
+            assert!(
+                manager
+                    .get_forks(&source.id.to_string())
+                    .expect("forks")
+                    .is_empty()
+            );
+            assert_eq!(source.snapshot_bytes().expect("preserved head"), before);
+            assert_eq!(
+                source
+                    .inspect_archive_recovery(Instant::now() + Duration::from_secs(5), || false)
+                    .expect("all originals recoverable")
+                    .entries()
+                    .len(),
+                205
+            );
+        }
     }
 }

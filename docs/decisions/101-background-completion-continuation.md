@@ -2,10 +2,12 @@
 
 ## Status
 
-Proposed for acceptance atomically with BG-CONTINUE-001 activation in #893.
-Acceptance takes effect only after independent exact-head decision/activation review
-and target-branch merge. No approval or implementation is currently implied.
-Recheck ADR-101 uniqueness at merge time; ADR-100 belongs to clipboard input.
+Accepted with BG-CONTINUE-001 activation in #893, merged as
+`bad94be8151253b7cc4806c3b4e9a449aa74eb69`.
+Exact-head activation review:
+https://github.com/wjhuang88/talos/pull/893#issuecomment-6757010739.
+This authorizes the design, not production enablement or completion. The subsequent
+user instruction requires default-off operation, as recorded below.
 
 ## Context
 
@@ -153,4 +155,14 @@ standard preflight, exact-head CI and independent runtime/security review.
 
 Owner: docs/tasks/background-job-default-continuation.md.
 User docs: README.md, README.zh-CN.md and applicable background-tool references.
-No implementation or validation evidence exists for this proposed decision.
+Historical pre-implementation checkpoint: no implementation or validation evidence
+existed for this proposed decision at that checkpoint.
+
+## 2026-11-15 implementation boundary
+
+The later user instruction requires production background continuation to remain
+disabled. The current foundation stage implements completion lifecycle machinery
+with activation available only to tests. The accepted design and original acceptance
+above remain historical requirements, not a claim of enabled or delivered behavior.
+Production enablement and automatic CLI continuation acceptance remain outstanding
+and must not be inferred from passing test-only continuation scenarios.

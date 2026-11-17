@@ -18,16 +18,48 @@ pub use crate::submission::{
     SubmissionReceipt, SubmissionReceiptDisposition, SubmissionRejectionReason, SubmissionSource,
 };
 
+/// Host-only ordinary fork snapshot captured during one Actor exclusion window.
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct OrdinaryForkCapture {
+    /// Exact original transcript prefix, without an incomplete compatibility tail.
+    pub bytes: Vec<u8>,
+    /// Original selected tail ID for lineage registration.
+    pub tail_id: String,
+    /// Captured provider/model/variant, or explicit absence of a committed identity.
+    pub runtime_identity: Option<(String, String, Option<String>)>,
+}
+
 /// Commands sent to the session actor via the bounded SQ.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionOp {
+    /// Host-only ordinary history capture, admitted only while the Actor is idle.
+    CaptureOrdinaryFork {
+        /// Optional inclusive original-record cutoff.
+        through_entry: Option<String>,
+        /// In-process response; absent channels cannot authorize capture.
+        #[serde(skip)]
+        receipt_tx: Option<mpsc::UnboundedSender<Result<OrdinaryForkCapture, String>>>,
+    },
     /// Host-only durable tip fork, admitted only while the Actor is idle.
     /// This is not a model tool and does not change the active session.
     ForkDurable {
         /// New logical durable identity; existing identities must be rejected.
         external_id: String,
         /// Direct completion receipt (child UUID or content-free failure).
+        #[serde(skip)]
+        receipt_tx: Option<mpsc::UnboundedSender<Result<String, String>>>,
+    },
+    /// Host-only receipt-bound history fork, admitted while the Actor is idle.
+    /// The host supplies a fresh child identity and completes metadata activation.
+    ForkHistory {
+        /// Fresh canonical child UUID, in the source transcript directory.
+        child_id: String,
+        /// Final child branch UUID committed by the inheritance receipt.
+        child_branch: String,
+        /// Optional inclusive original-record cutoff.
+        through_entry: Option<String>,
+        /// In-process completion channel; success contains the selected tail ID.
         #[serde(skip)]
         receipt_tx: Option<mpsc::UnboundedSender<Result<String, String>>>,
     },

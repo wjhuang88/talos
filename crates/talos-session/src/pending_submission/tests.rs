@@ -1080,3 +1080,102 @@ fn absent_parentdir_path_retains_original_sqlite_creation() {
     assert!(missing.is_dir());
     assert!(dir.path().join("session-1.pending.sqlite").is_file());
 }
+
+#[test]
+fn fork_runtime_budget_is_read_only_for_snapshot_and_nonblocking_for_contention() {
+    use std::time::{Duration, Instant};
+    let root = tempfile::tempdir().expect("root");
+    let transcript = root.path().join("session.tlog");
+    std::fs::write(&transcript, b"original").expect("transcript");
+    let store = PendingSubmissionStore::for_session_file(&transcript, "session");
+    let identity = SessionRuntimeIdentity::new("provider", "model", None);
+    assert!(
+        store
+            .fork_runtime_with_budget(Instant::now(), Some(&identity))
+            .is_err()
+    );
+    assert!(!store.path().exists(), "expired budget creates nothing");
+    assert_eq!(
+        store
+            .fork_runtime_with_budget(Instant::now() + Duration::from_secs(1), None)
+            .expect("missing snapshot"),
+        (None, false)
+    );
+    assert!(
+        !store.path().exists(),
+        "snapshot does not initialize sidecars"
+    );
+    assert!(
+        store
+            .fork_runtime_with_budget(Instant::now() + Duration::from_secs(1), Some(&identity))
+            .expect("restore")
+            .1
+    );
+    let connection = Connection::open(store.path()).expect("contention connection");
+    connection
+        .execute_batch("BEGIN IMMEDIATE;")
+        .expect("writer lock");
+    let start = Instant::now();
+    assert!(
+        store
+            .fork_runtime_with_budget(start + Duration::from_millis(100), Some(&identity))
+            .is_err()
+    );
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "no independent five-second busy retry"
+    );
+    connection.execute_batch("ROLLBACK;").expect("release");
+    let local_guard = store.lock.lock().expect("local lock");
+    assert!(
+        store
+            .fork_runtime_with_budget(Instant::now() + Duration::from_secs(1), None)
+            .is_err()
+    );
+    drop(local_guard);
+    let state = store
+        .fork_runtime_with_budget(Instant::now() + Duration::from_secs(1), None)
+        .expect("snapshot")
+        .0
+        .expect("identity");
+    assert_eq!(state.activation.target, identity);
+    assert_eq!(std::fs::read(&transcript).expect("preserved"), b"original");
+}
+
+#[test]
+fn fork_snapshot_rejects_advanced_generation_with_missing_or_stale_identity() {
+    use std::time::{Duration, Instant};
+    let root = tempfile::tempdir().expect("root");
+    let transcript = root.path().join("session.tlog");
+    std::fs::write(&transcript, b"original").expect("transcript");
+    let store = PendingSubmissionStore::for_session_file(&transcript, "session");
+    store
+        .initialize_runtime_identity(SessionRuntimeIdentity::new("provider", "old", None))
+        .expect("initialize");
+    let connection = Connection::open(store.path()).expect("fixture db");
+    connection
+        .execute(
+            "UPDATE pending_journal_meta SET value=1 WHERE key=?1",
+            [RUNTIME_GENERATION_KEY],
+        )
+        .expect("advanced generation");
+    assert!(
+        store
+            .fork_runtime_with_budget(Instant::now() + Duration::from_secs(1), None)
+            .is_err()
+    );
+    connection
+        .execute("DELETE FROM session_runtime_state", [])
+        .expect("missing identity");
+    assert!(
+        store
+            .fork_runtime_with_budget(Instant::now() + Duration::from_secs(1), None)
+            .is_err()
+    );
+    let count: i64 = connection
+        .query_row("SELECT COUNT(*) FROM session_runtime_state", [], |row| {
+            row.get(0)
+        })
+        .expect("count");
+    assert_eq!(count, 0, "snapshot does not repair inconsistent authority");
+}

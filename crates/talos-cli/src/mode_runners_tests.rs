@@ -1360,7 +1360,9 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
 
     let _lock = HOME_ENV_MUTEX.lock().await;
     let mut budgets = Vec::new();
-    for (context_limit, output_limit) in [(64_000, 1024), (32_000, 1024), (32_000, 8192)] {
+    // Leave room for registered tool-schema growth plus the 8k output reserve.
+    // The second switch derives its pressure boundary from the measured request.
+    for (context_limit, output_limit) in [(64_000, 1024), (40_000, 1024), (40_000, 8192)] {
         let result = with_isolated_home(|| async {
         let workspace = tempfile::tempdir().expect("operation should succeed");
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -1580,7 +1582,7 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
         {
             let requests = server.await.expect("server joined");
             let pressure = |request: &serde_json::Value| request["messages"].to_string().contains("context_pressure");
-            assert!(!pressure(&requests[0]));
+            assert!(!pressure(&requests[0]), "baseline capacity={context_limit}, output={output_limit}, budget={budget:?}");
             assert_eq!(pressure(&requests[1]), context_limit == 64_000, "pressure follows switched capacity: {next_limit}, first={budget:?}, second={next_budget:?}");
             let tools = requests[0]["tools"].as_array().expect("wire tool definitions");
             for name in ["compact_context", "history_search"] {
@@ -1619,8 +1621,8 @@ async fn p1fix3_handle_session_model_success_rebuilds_once() {
     // The production switch resolves the new model's context and output policy,
     // rebuilds the Actor/registered tools, then measures an actual admitted turn.
     assert_eq!(budgets[0].limit, Some(64_000));
-    assert_eq!(budgets[1].limit, Some(32_000));
-    assert_eq!(budgets[2].limit, Some(32_000));
+    assert_eq!(budgets[1].limit, Some(40_000));
+    assert_eq!(budgets[2].limit, Some(40_000));
     assert!(
         budgets[2].estimated_tokens > budgets[1].estimated_tokens + 6000,
         "larger output reservation must reduce available request capacity: {budgets:?}"

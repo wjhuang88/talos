@@ -5827,3 +5827,430 @@ async fn successful_old_workspace_scan_cannot_publish_after_switch() {
     );
     wait_for_test_slot().await;
 }
+
+#[test]
+fn queued_body_survives_long_live_preview_frame_allocation() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.state.status.is_processing = true;
+    tui.state.thinking_preview = Some("live thinking ".repeat(100));
+    tui.state.tip = Some(crate::state::Tip {
+        kind: TipKind::Info,
+        text: "Message queued and will run next".into(),
+        ttl: std::time::Duration::from_secs(30),
+        created_at: std::time::Instant::now(),
+    });
+    tui.state.steering_queue_snapshot = Some(talos_conversation::SteeringQueueSnapshot {
+        entries: vec![talos_conversation::SteeringQueueEntry {
+            text: "queued-body-visible".into(),
+            truncated: false,
+        }],
+        total_count: 1,
+        omitted_count: 0,
+    });
+    for size in [(80, 8), (24, 6)] {
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(size.0, size.1));
+        tui.draw_frame().expect("frame");
+        let frame = tui.terminal.test_rendered_text();
+        assert!(frame.contains("queued-body-visible"), "{size:?}: {frame}");
+    }
+}
+
+#[test]
+fn user_history_background_is_separated_from_connecting_preview() {
+    use talos_conversation::{ContentOutput, UiOutput};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.state.status.is_processing = true;
+    tui.state.status.phase = Some(TurnPhase::Connecting);
+    tui.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+        source: MessageSource::User,
+        text: "分析项目".into(),
+    }));
+    tui.commit_pending_transcript().expect("commit user block");
+    for (width, height) in [(24, 12), (80, 24), (24, 24), (24, 12)] {
+        tui.terminal
+            .set_test_size(ratatui::layout::Size::new(width, height));
+        tui.draw_frame().expect("connecting frame");
+        let frame = tui.terminal.test_rendered_text();
+        let rows: Vec<_> = frame.lines().collect();
+        let user = rows
+            .iter()
+            .position(|row| {
+                row.split_whitespace()
+                    .collect::<String>()
+                    .contains("分析项目")
+            })
+            .unwrap_or_else(|| panic!("user visible: {frame}"));
+        let connecting = rows
+            .iter()
+            .position(|row| row.contains("Connecting..."))
+            .unwrap_or_else(|| panic!("connecting visible: {frame}"));
+        let user_bg = tui.terminal.test_cell_bg(0, user as u16);
+        assert_ne!(user_bg, Color::Reset);
+        let block_end = (user..connecting)
+            .rev()
+            .find(|row| tui.terminal.test_cell_bg(0, *row as u16) == user_bg)
+            .expect("user background end");
+        assert!(
+            connecting > block_end + 1,
+            "background padding is not an external separator at {width}x{height}: {frame}"
+        );
+        assert!(rows[block_end + 1].trim().is_empty());
+        assert!(
+            tui.history_selection_point_at_screen(0, user as u16)
+                .is_some(),
+            "user text retains history selection mapping after resize"
+        );
+        assert!(
+            tui.history_selection_point_at_screen(0, (block_end + 1) as u16)
+                .is_none(),
+            "the external separator must not select a history row"
+        );
+        assert_eq!(
+            tui.terminal.test_cell_bg(0, (block_end + 1) as u16),
+            Color::Reset
+        );
+    }
+}
+
+#[test]
+fn user_preview_separator_is_absent_when_history_is_anchored() {
+    use talos_conversation::{ContentOutput, UiOutput};
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.state.status.is_processing = true;
+    tui.state.status.phase = Some(TurnPhase::Connecting);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(40, 12));
+    for n in 0..30 {
+        tui.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+            source: MessageSource::User,
+            text: format!("history {n}"),
+        }));
+    }
+    tui.commit_pending_transcript().expect("commit history");
+    tui.draw_frame().expect("follow-tail frame");
+    let preview_row = |tui: &crate::app::Tui| {
+        tui.terminal
+            .test_rendered_text()
+            .lines()
+            .position(|row| row.contains("Connecting..."))
+            .expect("connecting preview") as u16
+    };
+    assert_eq!(
+        preview_row(&tui),
+        tui.last_history_area.expect("history").bottom() + 1
+    );
+    tui.handle_input_event(&mouse_scroll(MouseEventKind::ScrollUp));
+    tui.draw_frame().expect("anchored frame");
+    assert!(matches!(
+        tui.history_scroll.mode,
+        HistoryScrollMode::Anchored { .. }
+    ));
+    assert_eq!(
+        preview_row(&tui),
+        tui.last_history_area.expect("anchored history").bottom(),
+        "an offscreen user tail does not add a separator to anchored history"
+    );
+}
+
+#[tokio::test]
+#[cfg(not(target_os = "macos"))]
+async fn healthy_git_watch_avoids_two_second_idle_scans() {
+    use crate::git_snapshot_worker::{Scan, TEST_SCAN_LOCK, wait_for_test_slot};
+    let _serial = TEST_SCAN_LOCK.lock().await;
+    wait_for_test_slot().await;
+    let directory = tempfile::tempdir().expect("fixture");
+    gix::init(directory.path()).expect("repo");
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.first_message_dispatched = true;
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(200, 24));
+    tui.state.status.workspace_path = directory.path().to_string_lossy().into_owned();
+    let (tx, rx) = mpsc::unbounded_channel();
+    tui.ui_output_rx = Some(rx);
+    let launches = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let observed = launches.clone();
+    let driver = async move {
+        // Use real time for the OS watcher. Let initial setup/refresh settle.
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        let before = observed.load(std::sync::atomic::Ordering::SeqCst);
+        tokio::time::sleep(std::time::Duration::from_secs(6)).await;
+        let after = observed.load(std::sync::atomic::Ordering::SeqCst);
+        tx.send(talos_conversation::UiOutput::Exit).expect("exit");
+        (before, after)
+    };
+    let run = tui.run_with_scanner(futures::stream::pending(), |workspace, generation| {
+        let scan = Scan::start(workspace, generation)?;
+        if scan.is_some() {
+            launches.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+        Ok(scan)
+    });
+    let (result, (before, after)) = tokio::join!(run, driver);
+    result.expect("loop");
+    assert!(before > 0, "initial status must be scanned");
+    assert_eq!(
+        before, after,
+        "quiet healthy watcher must suppress periodic scans"
+    );
+    wait_for_test_slot().await;
+}
+
+#[test]
+fn committed_reasoning_keeps_external_user_separator() {
+    use talos_conversation::{ContentOutput, UiOutput};
+    for typed in [false, true] {
+        for commit_user_first in [false, true] {
+            let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+            tui.first_message_dispatched = true;
+            tui.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::User,
+                text: "分析项目".into(),
+            }));
+            if commit_user_first {
+                tui.commit_pending_transcript().expect("commit user");
+            }
+            tui.handle_ui_output(if typed {
+                UiOutput::Reasoning("思考正文".into())
+            } else {
+                UiOutput::Content(ContentOutput::Block {
+                    source: MessageSource::Reasoning,
+                    text: "Thinking: 思考正文\n".into(),
+                })
+            });
+            tui.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::Assistant,
+                text: "response".into(),
+            }));
+            tui.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::User,
+                text: "排队晋升".into(),
+            }));
+            tui.commit_pending_transcript().expect("commit history");
+            let reasoning = tui
+                .transcript
+                .entries()
+                .iter()
+                .find_map(|entry| {
+                    matches!(entry.block, TranscriptBlock::Reasoning { .. }).then_some(entry.id)
+                })
+                .expect("reasoning block");
+            for expanded in [false, true, false] {
+                if matches!(tui.transcript.entries().iter().find(|e| e.id == reasoning).map(|e| &e.block),
+                    Some(TranscriptBlock::Reasoning { expanded: current, .. }) if *current != expanded)
+                {
+                    assert!(tui.transcript.toggle_reasoning(reasoning));
+                }
+                for (width, height) in [(80, 30), (24, 30), (80, 30)] {
+                    tui.terminal
+                        .set_test_size(ratatui::layout::Size::new(width, height));
+                    tui.draw_frame().expect("history frame");
+                    let frame = tui.terminal.test_rendered_text();
+                    let rows: Vec<_> = frame.lines().collect();
+                    let user = rows
+                        .iter()
+                        .position(|r| {
+                            r.split_whitespace()
+                                .collect::<String>()
+                                .contains("分析项目")
+                        })
+                        .expect("user visible");
+                    let header = rows
+                        .iter()
+                        .position(|r| r.contains("Thinking"))
+                        .expect("reasoning visible");
+                    let bg = tui.terminal.test_cell_bg(0, user as u16);
+                    assert_ne!(bg, Color::Reset);
+                    let end = (user..header)
+                        .rev()
+                        .find(|r| tui.terminal.test_cell_bg(0, *r as u16) == bg)
+                        .expect("user background");
+                    assert_eq!(
+                        header,
+                        end + 2,
+                        "typed={typed} committed={commit_user_first} expanded={expanded}: {frame}"
+                    );
+                    assert!(rows[end + 1].trim().is_empty());
+                    assert_eq!(tui.terminal.test_cell_bg(0, (end + 1) as u16), Color::Reset);
+                    assert!(frame.contains("response"));
+                    assert!(rows.iter().any(|r| {
+                        r.split_whitespace()
+                            .collect::<String>()
+                            .contains("排队晋升")
+                    }));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn committed_tool_output_keeps_external_user_separator() {
+    use talos_conversation::{ContentOutput, ToolCallDisplay, ToolResultDisplay, UiOutput};
+    for result_only in [false, true] {
+        for commit_user_first in [false, true] {
+            let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+            tui.first_message_dispatched = true;
+            tui.handle_ui_output(UiOutput::Content(ContentOutput::Block {
+                source: MessageSource::User,
+                text: "分析项目".into(),
+            }));
+            if commit_user_first {
+                tui.commit_pending_transcript().expect("commit user");
+            }
+            tui.handle_ui_output(if result_only {
+                UiOutput::ToolResult(ToolResultDisplay {
+                    tool_name: Some("edit".into()),
+                    content: "tool-boundary-marker".into(),
+                    is_error: false,
+                    todo_presentation: None,
+                })
+            } else {
+                UiOutput::ToolCall(ToolCallDisplay {
+                    tool_name: "tool-boundary-marker".into(),
+                    arguments: serde_json::json!({}),
+                    provenance: talos_core::tool::ToolProvenance::Native,
+                    summary_fields: vec![],
+                })
+            });
+            tui.commit_pending_transcript().expect("commit tool");
+            let count = tui.transcript.entries().len();
+            tui.commit_pending_transcript().expect("empty commit");
+            assert_eq!(count, tui.transcript.entries().len());
+            for (width, height) in [(80, 30), (32, 30), (80, 30)] {
+                tui.terminal
+                    .set_test_size(ratatui::layout::Size::new(width, height));
+                tui.draw_frame().expect("tool frame");
+                let frame = tui.terminal.test_rendered_text();
+                let rows: Vec<_> = frame.lines().collect();
+                let user = rows
+                    .iter()
+                    .position(|r| {
+                        r.split_whitespace()
+                            .collect::<String>()
+                            .contains("分析项目")
+                    })
+                    .expect("user visible");
+                let next = rows
+                    .iter()
+                    .position(|r| r.contains("tool-boundary-marker"))
+                    .expect("tool visible");
+                let bg = tui.terminal.test_cell_bg(0, user as u16);
+                assert_ne!(bg, Color::Reset);
+                let end = (user..next)
+                    .rev()
+                    .find(|r| tui.terminal.test_cell_bg(0, *r as u16) == bg)
+                    .expect("user background");
+                assert_eq!(
+                    next,
+                    end + 2,
+                    "result={result_only} committed={commit_user_first}: {frame}"
+                );
+                assert!(rows[end + 1].trim().is_empty());
+                assert_eq!(tui.terminal.test_cell_bg(0, (end + 1) as u16), Color::Reset);
+            }
+        }
+    }
+}
+
+#[test]
+fn committed_user_separator_preserves_existing_gaps_and_padding() {
+    let user_bg = scrollback::stream_bg_for(Some(&MessageSource::User));
+    assert!(user_bg.is_some());
+    for existing_gap in [false, true] {
+        for commit_user_first in [false, true] {
+            let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+            tui.append_styled_lines([
+                ScrollbackLine::plain("user", user_bg),
+                ScrollbackLine::plain("", user_bg),
+            ]);
+            if commit_user_first {
+                tui.commit_pending_transcript().expect("user commit");
+                assert_eq!(tui.transcript.entries().len(), 2);
+            }
+            if existing_gap {
+                tui.append_styled_lines([ScrollbackLine::plain("  ", None)]);
+            }
+            tui.append_styled_lines([ScrollbackLine::plain("assistant", None)]);
+            tui.commit_pending_transcript().expect("assistant commit");
+            let entries = tui.transcript.entries();
+            assert_eq!(entries.len(), 4);
+            assert!(
+                matches!(&entries[1].block, TranscriptBlock::StyledLine(line)
+                if line.bg == user_bg && line.text.is_empty())
+            );
+            assert!(
+                matches!(&entries[2].block, TranscriptBlock::StyledLine(line)
+                if line.bg.is_none() && line.text.trim().is_empty())
+            );
+            assert!(
+                matches!(&entries[3].block, TranscriptBlock::StyledLine(line)
+                if line.text == "assistant")
+            );
+        }
+    }
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.append_styled_lines([ScrollbackLine::plain("assistant without user", None)]);
+    tui.commit_pending_transcript()
+        .expect("standalone assistant");
+    assert_eq!(tui.transcript.entries().len(), 1);
+}
+
+#[test]
+fn numbered_edit_and_diff_locations_survive_actual_frame_resize() {
+    use talos_conversation::UiOutput;
+    for tool in ["edit", "diff"] {
+        let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+        tui.first_message_dispatched = true;
+        let tail = format!("{} END_MARKER", "中文".repeat(20));
+        let content = if tool == "edit" {
+            format!("- 42 | removed {tail}\n+ 57 | inserted {tail}")
+        } else {
+            format!("-   42      | removed {tail}\n+        57 | inserted {tail}")
+        };
+        tui.handle_ui_output(UiOutput::ToolResult(ToolResultDisplay {
+            tool_name: Some(tool.into()),
+            content: content.clone(),
+            is_error: false,
+            todo_presentation: None,
+        }));
+        tui.commit_pending_transcript().expect("numbered result");
+        for width in [24, 160, 24] {
+            tui.terminal
+                .set_test_size(ratatui::layout::Size::new(width, 24));
+            tui.draw_frame().expect("numbered frame");
+            let text = tui.terminal.test_rendered_text();
+            let rows: Vec<_> = text.lines().collect();
+            let removed = rows
+                .iter()
+                .position(|r| r.contains("42"))
+                .expect("old location");
+            let added = rows
+                .iter()
+                .position(|r| r.contains("57"))
+                .expect("new location");
+            assert!(rows[removed].contains('-'), "{tool}: {text}");
+            assert!(rows[added].contains('+'), "{tool}: {text}");
+            assert_eq!(text.contains("END_MARKER"), width == 160, "{tool}: {text}");
+            if width == 24 {
+                assert!(rows[removed].contains('…'), "{tool}: {text}");
+                assert!(rows[added].contains('…'), "{tool}: {text}");
+            }
+            if tool == "edit" {
+                assert_eq!(
+                    tui.terminal.test_cell_bg(0, removed as u16),
+                    semantic::DIFF_REMOVED_BG
+                );
+                assert_eq!(
+                    tui.terminal.test_cell_bg(0, added as u16),
+                    semantic::DIFF_ADDED_BG
+                );
+            }
+        }
+        assert!(tui.transcript.entries().iter().any(|entry| matches!(
+            &entry.block, TranscriptBlock::ToolResult(result) if result.content == content)));
+    }
+}

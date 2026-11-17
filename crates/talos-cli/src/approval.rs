@@ -19,7 +19,7 @@ use async_trait::async_trait;
 #[cfg(test)]
 use talos_agent::permission_pipeline::PermissionBinding;
 use talos_agent::permission_pipeline::{
-    ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
+    ApprovalObservation, ApprovalResolver, ApprovalResolverError, PermissionApprovalRequest,
 };
 use talos_core::ApprovalChoice;
 use talos_core::tool::ToolNature;
@@ -52,7 +52,7 @@ pub struct ApprovalPrompt {
 pub(crate) struct TerminalApprovalRequest {
     pub(crate) id: uuid::Uuid,
     pub(crate) request: PermissionApprovalRequest,
-    pub(crate) response: tokio::sync::oneshot::Sender<ApprovalChoice>,
+    pub(crate) response: tokio::sync::oneshot::Sender<ApprovalObservation>,
 }
 
 /// Terminal adapter that delegates input ownership to the interactive event loop.
@@ -79,12 +79,9 @@ impl ApprovalResolver for TerminalApprovalResolver {
         remaining: Duration,
         explanation: &str,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
-        // Display separately so argument truncation cannot hide the decision points.
-        // The resolver supplies bounded, sanitized text; this is never execution input.
-        if !explanation.is_empty() {
-            eprintln!("Auto review:\n{explanation}");
-        }
-        self.resolve(request, remaining).await
+        self.resolve_observed(request, remaining, Some(explanation))
+            .await
+            .map(ApprovalObservation::into_choice)
     }
 
     async fn resolve(
@@ -92,6 +89,21 @@ impl ApprovalResolver for TerminalApprovalResolver {
         request: PermissionApprovalRequest,
         remaining: Duration,
     ) -> Result<ApprovalChoice, ApprovalResolverError> {
+        self.resolve_observed(request, remaining, None)
+            .await
+            .map(ApprovalObservation::into_choice)
+    }
+
+    async fn resolve_observed(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: Duration,
+        explanation: Option<&str>,
+    ) -> Result<ApprovalObservation, ApprovalResolverError> {
+        // Presentation only; never used as execution input or permission evidence.
+        if let Some(explanation) = explanation.filter(|text| !text.is_empty()) {
+            eprintln!("Auto review:\n{explanation}");
+        }
         let (response, response_rx) = tokio::sync::oneshot::channel();
         self.request_tx
             .send(TerminalApprovalRequest {
@@ -103,7 +115,7 @@ impl ApprovalResolver for TerminalApprovalResolver {
         tokio::time::timeout(remaining, response_rx)
             .await
             .map_err(|_| ApprovalResolverError::new("terminal approval deadline exceeded"))?
-            .map_err(|_| ApprovalResolverError::new("terminal approval cancelled"))
+            .map_err(|_| ApprovalResolverError::new("terminal approval channel closed"))
     }
 }
 
@@ -713,6 +725,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn terminal_observation_preserves_unavailable_and_user_cancellation() {
+        use talos_agent::permission_pipeline::ApprovalAttribution;
+        for expected in [
+            ApprovalObservation::unavailable(),
+            ApprovalObservation::user_cancelled(),
+        ] {
+            let (resolver, mut requests) = terminal_approval_channel();
+            let request = approval_request();
+            let task = tokio::spawn(async move {
+                resolver
+                    .resolve_observed(request, Duration::from_secs(5), None)
+                    .await
+            });
+            let pending = requests.recv().await.expect("actual terminal request");
+            pending.response.send(expected.clone()).expect("response");
+            let actual = task.await.expect("join").expect("observation");
+            assert_eq!(actual, expected);
+            assert_ne!(actual.attribution(), ApprovalAttribution::ObservedHuman);
+            assert_eq!(actual.into_choice(), ApprovalChoice::Deny);
+        }
+        let (resolver, mut requests) = terminal_approval_channel();
+        let request = approval_request();
+        let task = tokio::spawn(async move {
+            resolver
+                .resolve_observed(request, Duration::from_secs(5), None)
+                .await
+        });
+        drop(requests.recv().await.expect("actual terminal request"));
+        assert!(
+            task.await.expect("join").is_err(),
+            "closure is not a human denial"
+        );
+    }
+
+    #[tokio::test]
     async fn expired_terminal_request_cannot_consume_input_and_next_request_resolves() {
         let (resolver, mut requests) = terminal_approval_channel();
         let first_resolver = resolver.clone();
@@ -742,7 +789,9 @@ mod tests {
             .expect("second request queued");
         current
             .response
-            .send(ApprovalChoice::ApproveOnce)
+            .send(ApprovalObservation::observed_human(
+                ApprovalChoice::ApproveOnce,
+            ))
             .expect("second response accepted");
         assert_eq!(
             second.await.expect("second task").expect("approval"),

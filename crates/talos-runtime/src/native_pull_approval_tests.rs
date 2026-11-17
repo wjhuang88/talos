@@ -50,4 +50,20 @@ async fn legacy_host_cannot_approve_native_pull_without_its_scope_notes() {
             .await,
         ApprovalChoice::Deny
     );
+    for explanation in [None, Some("Review transitive Pull effects.")] {
+        let observed = LegacyHost
+            .request_scoped_approval_observed(
+                "git_pull",
+                &input,
+                &[],
+                proposal.preview(),
+                explanation,
+            )
+            .await;
+        assert_eq!(observed.choice(), &ApprovalChoice::Deny);
+        assert_eq!(
+            observed.attribution(),
+            ApprovalAttribution::LegacyHostUnknown
+        );
+    }
 }
