@@ -312,6 +312,69 @@ fn gix_host_candidate_retains_missing_root_and_rejects_later_appearance() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn gix_gitdir_conditional_requires_admitted_repository_identity() {
+    // Capturing the exact config/include bytes does NOT authorize reading or
+    // resolving an unadmitted repository gitdir. The gitdir is a separate
+    // metadata-only frontier, even though the source values are complete.
+    let dir = tempfile::tempdir().expect("fixture");
+    let fixture = dir.path().canonicalize().expect("fixture path");
+    let root = fixture.join("root.conf");
+    let conditional = fixture.join("conditional.conf");
+    let gitdir = fixture.join("selected.git");
+    std::fs::create_dir(&gitdir).expect("gitdir fixture");
+    std::fs::write(
+        &root,
+        format!(
+            "[includeIf \"gitdir:{}\"]\n path = conditional.conf\n",
+            gitdir.display()
+        ),
+    )
+    .expect("conditional fixture");
+    std::fs::write(&conditional, b"[fixture]\n context = admitted\n")
+        .expect("included fixture");
+    let environment = BTreeMap::<OsString, OsString>::new();
+    let mut sources =
+        target_config::Sources::new(None, [root.clone()]).expect("path-only source frontier");
+    for _ in 0..3 {
+        if sources.complete() {
+            break;
+        }
+        let admitted = sources.paths();
+        sources
+            .advance(|path| admitted.contains(path), &environment)
+            .expect("admit fixture config roots and includes");
+    }
+    assert!(sources.complete(), "config bytes are fully admitted");
+    assert!(
+        sources
+            .ordered_host_output(std::slice::from_ref(&root), &environment, Some(&gitdir))
+            .is_err(),
+        "complete config snapshots cannot authorize a new gitdir identity"
+    );
+
+    sources
+        .add_directory_context(&gitdir)
+        .expect("plan separate metadata-only gitdir evidence");
+    assert!(!sources.complete(), "new gitdir identity remains pending");
+    let admitted = sources.paths();
+    sources
+        .advance(|path| admitted.contains(path), &environment)
+        .expect("admit gitdir directory and ancestor identities");
+    let records = sources
+        .ordered_host_output(std::slice::from_ref(&root), &environment, Some(&gitdir))
+        .and_then(|output| super::config_state::parse_host(&output))
+        .expect("interpret config only after gitdir metadata admission");
+    assert_eq!(
+        records
+            .get(b"fixture.context".as_slice())
+            .and_then(|values| values.last()),
+        Some(&Some(b"admitted".to_vec())),
+        "gitdir-matched include must survive admitted source evaluation"
+    );
+}
+
 #[test]
 fn gix_attributes_strict_parse_refuses_malformed_filter_sources() {
     // The locked gix-attributes parser operates solely on admitted bytes.
