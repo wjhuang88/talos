@@ -397,8 +397,8 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
         .expect("write conditional source");
     let environment = BTreeMap::<OsString, OsString>::new();
     let capture = || {
-        let mut sources = target_config::Sources::new(None, [root.clone()])
-            .expect("root path-only source plan");
+        let mut sources =
+            target_config::Sources::new(None, [root.clone()]).expect("root path-only source plan");
         for _ in 0..4 {
             if sources.complete() {
                 break;
