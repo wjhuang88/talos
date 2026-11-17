@@ -294,3 +294,22 @@ The r4 attempt failed before CLI launch due to missing pyte; preserved screensho
 and reran using the existing dependency directory, without installing dependencies.
 Standalone final preflight totals5363passed/0failed/0ignored. Combined gate remains
 running. Recovery exact15bdc03f CI43936276699 is now completed success.
+
+## 2026-11-17 Windows watcher CI failure reproduced and corrected locally
+
+CI43946467676 failed Windows missing_watch_root_reports_failure waiting5s for
+process-global BUSY. UI healthy-watch test holds that same watcher9s under
+TEST_SCAN_LOCK; five direct watcher tests omitted that lock. Original source
+reproduced with full TUI8threads:697passed/5failed, all five watcher start timeouts
+(exec2883, target/watch-isolation-before-parallel-20261117.log). Adding the existing
+shared test lock to those five tests passed702/0/0 under identical8thread execution
+(exec79412,target/watch-isolation-parallel-20261117.log). Production behavior and
+timeouts unchanged; no broad retry or ignored test. Independent review/full gates
+and new exact-head Windows evidence still required. Failure is not claimed resolved
+on Windows solely from Linux reproduction.
+
+
+Watcher isolation follow-up: independent review APPROVE; standard pinned/locked
+release_preflight.sh passed (5363 passed, zero failed/ignored), exit0,8min31.998s,
+peak2G/swap0. Log: target/ui-watch-preflight-20261117.log. Eight-thread red/green
+evidence above remains applicable; fresh exact-head Windows CI remains pending.
