@@ -620,6 +620,39 @@ async fn multiple_declared_images_saturate_budget_instead_of_overflowing() {
 }
 
 #[tokio::test]
+async fn actor_runtime_context_preserves_provenance_during_preparation() {
+    let agent = budget_test_agent();
+    let content = "Runtime background completion: job fixture succeeded";
+    let prepared = agent
+        .prepare_session_messages_at_revision(
+            String::new(),
+            vec![Message::Context {
+                content: content.into(),
+            }],
+            vec![],
+            128_000,
+            42,
+            0,
+            None,
+            None,
+            Default::default(),
+        )
+        .await
+        .expect("prepared runtime context");
+    assert!(matches!(
+        prepared.messages.last(),
+        Some(Message::Context { content: actual }) if actual == content
+    ));
+    assert!(!prepared.messages.iter().any(|message| matches!(
+        message,
+        Message::User { content: actual } if actual == content
+    )));
+    let source = prepared.history_source.expect("history binding");
+    assert_eq!(source.generation(), 42);
+    assert_eq!(source.revision(), 0);
+}
+
+#[tokio::test]
 async fn actor_generation_and_raw_revision_survive_request_preparation() {
     let agent = budget_test_agent();
     let raw = vec![Message::User {

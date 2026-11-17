@@ -1,6 +1,6 @@
 # BG-CONTINUE-001: Default Background Completion Continuation
 
-> Document status: Active / Claimed (proposed atomic activation in #893; ineffective until independently authorized target-branch merge)
+> Document status: Active / Claimed (activation merged in #893; implementation remains Partial)
 > Historical checkpoints below describe their original revisions, not the current proposed disposition.
 > Deliverable: background success, failure and timeout resume the originating live Session without another user message or opt-in flag.
 
@@ -16,12 +16,12 @@
 | Source Issue | None |
 | Governance Claim PR | #893 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | Pending exact-head activation and ADR-101 review; user authorized candidate preparation, not independent approval. Earlier inactive-remediation re-review does not authorize this activation |
-| Implementation PR | Not started |
+| Authorization Evidence | Exact-head activation/ADR-101 review: https://github.com/wjhuang88/talos/pull/893#issuecomment-6757010739; merged as bad94be8151253b7cc4806c3b4e9a449aa74eb69 |
+| Implementation PR | #953 (default-off foundation; depends on #917) |
 | Last Updated | 2026-11-09 |
 | Handoff / Release Condition | Accepted successor decision, effective target claim, tested implementation and exact-head review/CI |
 
-## Proposed atomic activation packet (not effective)
+## Proposed atomic activation packet (historical; merged in #893)
 
 This packet proposes atomic activation in #893 through the header and claim table
 above. Both are ineffective while this PR is open. The proposed claimant
@@ -291,3 +291,108 @@ Only source characterization and intake/design drafts exist. No effective claim,
 production changes, runtime tests, successor ADR approval or completion evidence.
 Next: resolve design, prepare atomic claim/activation and successor decision in a
 governance PR, obtain required authorization, implement from that merge or later.
+
+## 2026-11-15 selected default-off foundation — Partial
+
+The current user instruction prohibits default background continuation. This stage
+implements and tests Actor-owned completion custody, bounded admission, cancellation,
+retirement and provider-consumption bookkeeping with production activation disabled.
+The published acceptance baseline above is retained; automatic production continuation
+and its CLI smoke acceptance are not delivered by this stage. No production opt-in
+flag or installation is introduced. Historical activation authorizes implementation,
+not overriding the subsequent user instruction.
+
+Selected source: ten Agent files relative to recovery candidate55ba5752. Recovery-only
+diagnostic/temp-root test hunks and unrelated UI/approval changes are excluded.
+The isolated locked Agent library gate passed729 tests,0failed/ignored; format passed.
+Evidence: target/background-selected-agent-tests.log and
+target/background-selected-validation-manifest.json in the primary workspace.
+All2447 exported source files matched their recorded hashes before this documentation
+update. Full preflight, exact-candidate review/CI and delivery remain pending.
+Status remains Partial; this stage does not complete the default-continuation story.
+
+
+Preparation-custody regression: the original candidate passed the full standard
+preflight (5526 tests/doctests,0failed/ignored,two external SDK modes), but lacked
+coverage for a noncancelled preparation error. A new actual Actor denial regression
+failed on the original code at the Pending-custody assertion (exit101). The minimal
+fix retains Pending and pauses for noncancelled errors while preserving retirement
+for cancelled/revoked dispatch. The new test and three preparation/cancellation/fork
+regressions passed (4passed,0failed/ignored). Original and corrected logs are
+target/background-preparation-{red,green}.log in the primary workspace.
+Independent source review found no blocker. Later user-driven retry is not covered
+by this test. Corrected full preflight and delivery remain pending; default-off.
+
+
+## 2026-11-15 committed foundation validation — Partial
+
+Implementation commit: d50be16743cf16024f70d1fde870fb43fd6b3005 (Draft PR #953),
+based on recovery PR #917 at55ba5752. The corrected standard preflight passed5527
+tests/doctests,0failed/ignored,and both external Runtime SDK modes. All2447 committed
+blobs matched the validated export. The preparation-failure regression demonstrably
+failed on the old code, then passed with three related regressions after correction.
+Exact-commit independent content review found no blocker and confirmed production
+activation remains test-only. This supersedes earlier pending local-gate wording.
+
+Evidence retained in the primary workspace: target/background-corrected-preflight.log,
+target/background-corrected-preflight-result.json,
+target/background-selected-corrected-manifest.json and
+target/background-preparation-{red,green}.log. Remote/native CI, dependency merge,
+source merge and installed-host acceptance remain open. Production default
+continuation is not delivered or enabled; this owner remains Partial.
+
+
+## 2026-11-16 user-driven retry regression and native results — Partial
+
+The actual Actor preparation-failure regression now covers both shutdown and
+user-driven recovery. After one hook denial it verifies retained Pending and no
+automatic retry; a user submission then completes first, followed by the original
+completion as Context, with two successful turns and zero retained slots. Both
+focused cases passed with locked dependencies (2passed,0failed/ignored), log
+`target/background-resume-regression.log` in the primary workspace. No production
+source or activation changed. The 5527-test full gate above predates this additional
+test and must not be presented as exact-head validation of the new test candidate.
+
+Native run43731413997 atd50be167 finished FAILURE: macOS passed, while Windows
+workspace failed the six-thread first-open binding regression with database locked.
+Raw logs are `target/background-d50be167-{windows-failed,macos}.log`; terminal
+run snapshot is `target/background-d50be167-ci-final.json`. Global Issue ownership
+reconciliation also failed for existing937/947 drift. Recovery PR917 diagnostic
+commit9b38f8e3 is undergoing native validation; cause and fix remain unproven.
+
+
+## 2026-11-16 exact retry-candidate full local gate — Partial
+
+Implementation/test candidate `3a7f1a7c11b79939d33d61f88e19fd610fd408d6` passed
+the standard locked release preflight:5528 tests/doctests,0failed/ignored,and both
+external SDK fixture modes. All2447 committed files matched the validated worktree.
+Evidence in primary workspace: target/background-resume-preflight.log and
+target/background-resume-preflight-result.json. Service exit0, runtime15min26.074s,
+peak2G,swap0. Independent review of the retry test found no blocker and confirmed
+shutdown coverage was preserved. This supersedes the local full-gate limitation
+above for3a7f1a7c; this evidence paragraph itself is a later documentation-only edit.
+
+Recovery diagnostic run43734019253 is still live. The recurring Windows binding
+lock failure is unresolved; no merge, installation or default activation occurred.
+
+## 2026-11-16 recovery dependency integration — Partial
+
+Rebased four existing background patches from55ba5752 onto recovery2beac8f8;
+range-diff confirms each patch unchanged. Original8f9dcc29 retained in
+backup/background-custody-before-recovery-20261116. New tested source:
+f2978d5008a1fba43297ec58ae118dcd8f0e09a0. This incorporates atomic binding-schema
+publication and final logical identity-lease unlock without changing background
+activation: completions defaults None and enable_completions remains cfg(test).
+Independent integration review found no API/lifetime conflict or blocker.
+
+Clean standard pinned1.99.0/locked release_preflight passed5533 unfiltered
+tests/doctests,0failed/ignored, two extra filtered subprocess passes and both
+external SDK modes. All2447 source hashes matched before/after. Session435
+includes both new logical-lock lifetime regressions. Runtime12min47s, peak2G,
+swap0 under existing resource limits and requested TMPDIR. Evidence:
+target/background-recovery-preflight.log, -result.json, -source-manifest.json.
+
+This supersedes old-source local validation only. Fresh exact-head native checks
+are still required; the earlier macOS unavailable failure is not causally closed.
+No default activation, merge, installation or session-data migration performed.
+Foundation and complete handoff remain Partial; all existing residuals retained.

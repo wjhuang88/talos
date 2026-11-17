@@ -610,8 +610,8 @@ mod file_tool_tests {
         assert!(!result.is_error);
         assert!(result.content.contains("edited edit.txt"));
         assert!(result.content.contains("diff:"));
-        assert!(result.content.contains("- foo"));
-        assert!(result.content.contains("+ qux"));
+        assert!(result.content.contains("- 1 | foo"));
+        assert!(result.content.contains("+ 1 | qux"));
         let content = fs::read_to_string(&file).expect("operation should succeed");
         assert_eq!(content, "qux bar foo baz");
     }
@@ -814,6 +814,41 @@ mod file_tool_tests {
         let retry = edit.execute(input).await;
         assert!(retry.is_error);
         assert!(retry.content.contains("SNAPSHOT_NOT_FOUND"));
+    }
+
+    #[tokio::test]
+    async fn anchored_edit_numbers_disjoint_locations_after_line_insertion() {
+        let root = tempfile::tempdir().expect("fixture");
+        let path = root.path().join("lines.txt");
+        fs::write(&path, "head\r\nsecond\r\n中间\r\nlast").expect("write");
+        let (read, _, edit, _) = super::snapshot_aware_file_tools(root.path().into());
+        let source = read.execute(json!({"path":"lines.txt"})).await;
+        let (snapshot, refs) = snapshot_header_and_refs(&source.content);
+        let result = edit
+            .execute(json!({"path":"lines.txt", "snapshot_id":snapshot,
+            "operations":[
+                {"op":"replace", "target":refs[1], "content":"new second\nextra"},
+                {"op":"replace", "target":refs[3], "content":"尾行"}
+            ]}))
+            .await;
+        assert!(!result.is_error, "{}", result.content);
+        for expected in [
+            "- 2 | second",
+            "+ 2 | new second",
+            "+ 3 | extra",
+            "- 4 | last",
+            "+ 5 | 尾行",
+        ] {
+            assert!(
+                result.content.lines().any(|line| line == expected),
+                "{}",
+                result.content
+            );
+        }
+        assert_eq!(
+            fs::read_to_string(path).expect("result"),
+            "head\r\nnew second\nextra\r\n中间\r\n尾行"
+        );
     }
 
     #[tokio::test]

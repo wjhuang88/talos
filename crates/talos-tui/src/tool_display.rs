@@ -1060,6 +1060,35 @@ mod tests {
     }
 
     #[test]
+    fn numbered_diff_preserves_locations_styles_and_raw_result_when_clipped() {
+        let content = "-   42      | removed 中文 long text\n+        57 | inserted 中文 long text";
+        let display = ToolResultDisplay {
+            todo_presentation: None,
+            tool_name: Some("diff".into()),
+            content: content.into(),
+            is_error: false,
+        };
+        for width in [80, 25, 80] {
+            let lines = build_tool_result_scrollback_lines(&display, "", None, width);
+            assert_eq!(lines.len(), 2);
+            assert!(lines[0].text.contains("42"));
+            assert!(lines[1].text.contains("57"));
+            assert_eq!(
+                lines[0].segments[0].fg,
+                to_crossterm_color(semantic::TEXT_ERROR)
+            );
+            assert_eq!(
+                lines[1].segments[0].fg,
+                to_crossterm_color(semantic::TEXT_SUCCESS)
+            );
+            assert_eq!(display.content, content);
+            if width == 25 {
+                assert!(lines.iter().all(|line| line.text.ends_with('…')));
+            }
+        }
+    }
+
+    #[test]
     fn tool_result_prose_with_dash_not_styled_as_diff() {
         let display = ToolResultDisplay {
             todo_presentation: None,
@@ -1073,6 +1102,29 @@ mod tests {
         // All lines use default styling — no diff markers present and tool is not edit/diff
         for line in &lines {
             assert_eq!(line.segments[0].fg, secondary_result_color());
+        }
+    }
+
+    #[test]
+    fn numbered_edit_locations_keep_background_and_clipping() {
+        let content = "- 42 | removed 中文 long text\n+ 57 | inserted 中文 long text";
+        let display = ToolResultDisplay {
+            todo_presentation: None,
+            tool_name: Some("edit".into()),
+            content: content.into(),
+            is_error: false,
+        };
+        for width in [80, 20, 80] {
+            let lines = build_tool_result_scrollback_lines(&display, "", None, width);
+            assert_eq!(lines.len(), 2);
+            assert!(lines[0].text.contains("42"));
+            assert!(lines[1].text.contains("57"));
+            assert_eq!(lines[0].bg, to_crossterm_color(semantic::DIFF_REMOVED_BG));
+            assert_eq!(lines[1].bg, to_crossterm_color(semantic::DIFF_ADDED_BG));
+            if width == 20 {
+                assert!(lines.iter().all(|line| line.text.ends_with('…')));
+            }
+            assert_eq!(display.content, content);
         }
     }
 

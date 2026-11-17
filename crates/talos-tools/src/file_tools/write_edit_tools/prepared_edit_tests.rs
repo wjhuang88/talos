@@ -4,6 +4,61 @@ use talos_permission::{
     PermissionMode, PermissionSessionState,
 };
 
+#[test]
+fn numbered_preview_bounds_do_not_number_omission_markers() {
+    let content = format!(
+        "{}\n{}",
+        "中".repeat(MAX_PREVIEW_CHARS + 20),
+        "row\n".repeat(100)
+    );
+    let preview = bounded_replacement_diff(&content, "", 42, 42);
+    assert!(preview.starts_with("- 42 | "));
+    assert!(preview.contains("... edit content truncated"));
+    assert!(preview.ends_with("+ (empty)"));
+    assert!(preview.chars().count() < MAX_PREVIEW_CHARS + 256);
+    assert!(!preview.contains("| ... edit content truncated"));
+}
+
+#[tokio::test]
+async fn direct_and_prepared_string_edit_number_partial_line_replacements() {
+    for prepared in [false, true] {
+        let root = tempfile::tempdir().expect("root");
+        let path = root.path().join("file.txt");
+        std::fs::write(&path, "first\r\n中文 prefix old tail").expect("write");
+        let tool = EditTool::new(root.path().into());
+        let input = serde_json::json!({"path":"file.txt", "old_string":"old", "new_string":"new\nnext", "retain_backup":prepared});
+        let result = if prepared {
+            let operation = prepare(&tool, &input, ToolProvenance::Native)
+                .expect("prepare")
+                .expect("plan");
+            let proof = admit(root.path(), operation.as_ref(), &input);
+            let PreparedNormalStage::Continue(operation) = operation.execute_stage(proof).await
+            else {
+                panic!("capture");
+            };
+            let proof = admit(root.path(), operation.as_ref(), &input);
+            let PreparedNormalStage::Complete(output) = operation.execute_stage(proof).await else {
+                panic!("commit");
+            };
+            output.result
+        } else {
+            tool.execute(input).await
+        };
+        assert!(!result.is_error, "{}", result.content);
+        for line in ["- 2 | old", "+ 2 | new", "+ 3 | next"] {
+            assert!(
+                result.content.lines().any(|row| row == line),
+                "{}",
+                result.content
+            );
+        }
+        assert_eq!(
+            std::fs::read_to_string(path).expect("result"),
+            "first\r\n中文 prefix new\nnext tail"
+        );
+    }
+}
+
 pub(super) fn admit(
     root: &Path,
     operation: &dyn PreparedNormalToolInvocation,
@@ -148,4 +203,51 @@ async fn capture_requires_admission_and_changed_contents_are_never_overwritten()
         std::fs::read_to_string(&path).expect("preserved"),
         "someone else's update"
     );
+}
+
+#[tokio::test]
+async fn direct_and_prepared_long_second_line_preserve_distinct_preview_locations() {
+    for retained in [false, true] {
+        let root = tempfile::tempdir().expect("root");
+        let path = root.path().join("file.txt");
+        let old = format!("short\n{}", "界".repeat(MAX_PREVIEW_CHARS));
+        let new = "replacement";
+        std::fs::write(&path, format!("header\n{old}")).expect("write");
+        let edit = EditTool::new(root.path().into());
+        let input = serde_json::json!({"path":"file.txt", "old_string":old,
+            "new_string":new, "retain_backup":retained});
+        let result = if retained {
+            let prepared = prepare(&edit, &input, ToolProvenance::Native)
+                .expect("prepare")
+                .expect("plan");
+            let proof = admit(root.path(), prepared.as_ref(), &input);
+            let PreparedNormalStage::Continue(prepared) = prepared.execute_stage(proof).await
+            else {
+                panic!("capture");
+            };
+            let proof = admit(root.path(), prepared.as_ref(), &input);
+            let PreparedNormalStage::Complete(output) = prepared.execute_stage(proof).await else {
+                panic!("commit");
+            };
+            output.result
+        } else {
+            edit.execute(input).await
+        };
+        assert!(!result.is_error, "{}", result.content);
+        let preview = result.content.split_once("diff:\n").expect("diff").1;
+        let lines: Vec<_> = preview.lines().collect();
+        assert_eq!(lines[0], "- 2 | short");
+        assert!(lines[1].starts_with("- 3 | 界"), "{preview}");
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.starts_with("... preview truncated"))
+        );
+        assert!(lines.iter().any(|line| *line == "+ 2 | replacement"));
+        assert!(preview.chars().count() < MAX_PREVIEW_CHARS + 256);
+        assert_eq!(
+            std::fs::read_to_string(path).expect("read result"),
+            "header\nreplacement"
+        );
+    }
 }

@@ -325,6 +325,21 @@ The `[auto] enabled` setting defaults to `true` as an attempted bounded-assistan
 unconditional permission. `/auto`, `/auto on`, and `/auto off` inspect or override the active
 session without writing configuration or transcript state.
 
+In the unreleased rolling-history candidate, built-in approval reviewers receive up to eight
+previous judgments from the same live resolver/session: sanitized tool/review context, available
+public effect summaries and decision points, and correlated fallback outcomes. History is held
+in memory only, with at most 1024 serialized bytes per entry and 8192 bytes per envelope. Older
+entries are removed when the current review's payload budget needs room; current evidence is
+never truncated to fit history. A prior approval cannot override policy or authorize another call.
+`/auto on`, resolver replacement and permission-session rotation discard prior history for new
+requests. A reset cannot retract a request already constructed or sent to a provider.
+
+Human choices are distinguished from legacy-host choices with unknown attribution, unavailable
+approval surfaces and cancelled requests. The candidate uses correlated TUI requests that expire
+on session changes, transport closure or cancellation of the TUI run. Full platform and integrated
+acceptance remain pending; this is not a released completion claim. See the
+[approval-history task](docs/tasks/auto-approval-rolling-history.md) for remaining acceptance.
+
 With an interactive approval surface, registered built-in `delay`, `schedule`, and
 `cancel_scheduled_task` requests can receive one-time model approval after review of
 their exact arguments and current user intent. Scheduling may create recurring model
@@ -849,8 +864,11 @@ killed and the shell remains in a raw or mouse-reporting state, run `reset` or o
 
 If you type a message while the model is still processing, it queues automatically and is sent
 FIFO after the current turn completes. The TUI shows a compact preview of queued messages
-above the composer (up to 6 lines; longer queues show a `+N more` summary). The preview clears
-when the queue empties. If `Esc` cancels the active turn, already-accepted queued input becomes the
+above the composer (up to 6 lines; longer queues show a `+N more` summary). Accepted input remains visible until it appears in history or its matching submission
+resolves; acknowledgement alone does not hide it. When space permits, the queue reserves
+a body row even during long live output. A completed shaded user block is separated from
+live output by an unshaded blank row while following the latest output. Very short terminals
+prioritize required controls and the composer over optional spacing. If `Esc` cancels the active turn, already-accepted queued input becomes the
 next turn in the same session automatically. Model/provider switching remains blocked until that
 queued input is accepted by the session and the queue is drained.
 An idle first submission dispatches directly and does not show the queued-message hint.
@@ -918,6 +936,12 @@ Talos ships with built-in tools for common coding-agent work:
 - Search and inspection: `grep`, `diff`, `stat`
 - Code intelligence: `find_symbol`, `find_references`, `list_symbols`, `list_imports`
 - Git: `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`, `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout`
+
+`diff` displays old and new file line numbers beside each comparison row. A blank
+number means that row does not exist on that side (an insertion or deletion).
+`edit` previews label removed fragments with their original file line numbers and
+inserted fragments with their resulting file line numbers. Multiple anchored edits
+account for earlier line insertions/deletions; long edit previews explicitly report omission.
 
 Structured `git_checkout` and `git_commit` verify tracked file contents with streaming
 SHA-256 evidence rather than retaining complete file bodies. Their tracked-source scan
@@ -1475,3 +1499,10 @@ files are removed when detached or when the composer closes. Files retained for
 submitted messages must remain available for session recovery; they are not
 currently removed by session deletion. Delete them manually only when their
 messages no longer need image recovery.
+
+
+### Background completion behavior
+
+Background job completion does not automatically start another model turn. Use the
+existing `process` tools to inspect or wait for jobs. Internal completion-lifecycle
+tests do not enable automatic continuation in the shipped runtime.

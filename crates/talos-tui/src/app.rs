@@ -34,9 +34,15 @@ pub(crate) use crate::app_stream::{SPINNER_FRAMES, ScrollbackLine, StreamRenderS
 
 mod frame;
 mod input;
+mod observed_approval;
 mod output;
 mod scheduling;
 mod tool_activity;
+
+enum PresentedOutput {
+    Legacy(UiOutput),
+    Observed(crate::ObservedApprovalRequest),
+}
 
 fn history_line(row: &crate::history_projection::RenderedHistoryRow) -> Line<'static> {
     let mut style = Style::default();
@@ -133,6 +139,8 @@ pub struct Tui {
     skill_sidebar: SkillSidebar,
     evolution_panel: EvolutionPanel,
     ui_output_rx: Option<mpsc::UnboundedReceiver<UiOutput>>,
+    observed_approval_rx: Option<mpsc::UnboundedReceiver<crate::ObservedApprovalRequest>>,
+    observed_approval: Option<crate::observed_approval::ObservedResponder>,
     user_input_tx: Option<mpsc::UnboundedSender<UserInput>>,
     /// Logical output awaiting the next application-owned transcript commit.
     pending_transcript: Vec<TranscriptBlock>,
@@ -151,7 +159,7 @@ pub struct Tui {
     last_frame_history_start: usize,
     last_splash_row_count: usize,
     last_history_prefix_row_count: usize,
-    queued_outputs: Vec<UiOutput>,
+    queued_outputs: Vec<PresentedOutput>,
     active_stream: Option<Pin<Box<dyn Stream<Item = String> + Send>>>,
     ordered_content_open: bool,
     stream_render: StreamRenderState,
@@ -237,6 +245,8 @@ impl Tui {
             skill_sidebar: SkillSidebar::new(),
             evolution_panel: EvolutionPanel::new(),
             ui_output_rx: None,
+            observed_approval_rx: None,
+            observed_approval: None,
             user_input_tx: None,
             pending_transcript: Vec::new(),
             transcript: TranscriptStore::default(),
@@ -292,6 +302,8 @@ impl Tui {
             skill_sidebar: SkillSidebar::new(),
             evolution_panel: EvolutionPanel::new(),
             ui_output_rx: None,
+            observed_approval_rx: None,
+            observed_approval: None,
             user_input_tx,
             pending_transcript: Vec::new(),
             transcript: TranscriptStore::default(),
@@ -333,6 +345,15 @@ impl Tui {
             approval_preview_fully_visible: true,
             deferred_reconnecting_status: None,
         }
+    }
+
+    /// Attaches the optional typed approval transport; legacy outputs remain supported.
+    pub fn set_observed_approval_rx(
+        &mut self,
+        rx: mpsc::UnboundedReceiver<crate::ObservedApprovalRequest>,
+    ) {
+        self.retire_observed_approvals();
+        self.observed_approval_rx = Some(rx);
     }
 
     pub fn set_ui_output_rx(&mut self, rx: mpsc::UnboundedReceiver<UiOutput>) {
@@ -559,14 +580,19 @@ impl Tui {
 
     pub(super) fn retire_closed_approval(&mut self) -> bool {
         if !self
-            .state
-            .pending_approval_response
+            .observed_approval
             .as_ref()
-            .is_some_and(|tx| tx.is_closed())
+            .is_some_and(|response| response.expired())
+            && !self
+                .state
+                .pending_approval_response
+                .as_ref()
+                .is_some_and(|tx| tx.is_closed())
         {
             return false;
         }
         self.state.pending_approval_response = None;
+        self.observed_approval = None;
         self.hide_approval();
         if self.state.slash_menu.is_approval() {
             self.state.slash_menu.close();
@@ -603,6 +629,18 @@ impl Tui {
 
     async fn run_with_scanner(
         &mut self,
+        event_stream: impl Stream<Item = io::Result<Event>> + Unpin,
+        start_scan: impl FnMut(String, u64) -> io::Result<Option<crate::git_snapshot_worker::Scan>>,
+    ) -> io::Result<()> {
+        let guard = observed_approval::ApprovalRunGuard(self);
+        guard
+            .0
+            .run_loop_with_scanner(event_stream, start_scan)
+            .await
+    }
+
+    async fn run_loop_with_scanner(
+        &mut self,
         mut event_stream: impl Stream<Item = io::Result<Event>> + Unpin,
         mut start_scan: impl FnMut(String, u64) -> io::Result<Option<crate::git_snapshot_worker::Scan>>,
     ) -> io::Result<()> {
@@ -622,6 +660,7 @@ impl Tui {
         let mut git_watch_retry = None;
         let mut git_change_deadline = None;
         let mut ui_output_rx = self.ui_output_rx.take().expect("ui_output_rx not set");
+        let mut observed_rx = self.observed_approval_rx.take();
         let mut dirty = true;
         let mut stream_frame_deadline = None;
         let mut last_frame_at = scheduling::now();
@@ -630,6 +669,7 @@ impl Tui {
             Deadline,
             Input(Option<io::Result<Event>>),
             Output(Option<UiOutput>),
+            Observed(Option<crate::ObservedApprovalRequest>),
             Stream(Option<String>),
             ApprovalClosed,
             Queued,
@@ -758,6 +798,7 @@ impl Tui {
             // Split field borrows: stream EOF and receiver closure are explicit events.
             let stream = &mut self.active_stream;
             let approval = &mut self.state.pending_approval_response;
+            let observed = &mut self.observed_approval;
             let wake = tokio::select! {
                 change = async {
                     match git_watch.as_mut() {
@@ -774,6 +815,18 @@ impl Tui {
                 _ = scheduling::wait_until(deadline) => Wake::Deadline,
                 event = event_stream.next() => Wake::Input(event),
                 output = ui_output_rx.recv(), if output_open && !queued => Wake::Output(output),
+                request = async {
+                    match observed_rx.as_mut() {
+                        Some(rx) => rx.recv().await,
+                        None => std::future::pending().await,
+                    }
+                }, if !queued => Wake::Observed(request),
+                _ = async {
+                    match observed.as_mut() {
+                        Some(response) => response.closed().await,
+                        None => std::future::pending().await,
+                    }
+                } => Wake::ApprovalClosed,
                 chunk = scheduling::stream_event(stream) => Wake::Stream(chunk),
                 _ = scheduling::approval_closed(approval) => Wake::ApprovalClosed,
                 _ = std::future::ready(()), if queued => Wake::Queued,
@@ -907,17 +960,41 @@ impl Tui {
                     dirty = true;
                     stream_frame_deadline = None;
                 }
-                Wake::Input(Some(Err(error))) => return Err(error),
+                Wake::Input(Some(Err(error))) => {
+                    self.retire_all_approvals();
+                    return Err(error);
+                }
                 Wake::Input(None) => {
                     self.handle_ui_output(UiOutput::Exit);
                     dirty = true;
                 }
-                Wake::Output(None) => output_open = false,
+                Wake::Observed(None) => {
+                    observed_rx = None;
+                    self.retire_observed_approvals();
+                    dirty = true;
+                }
+                Wake::Observed(Some(request)) => {
+                    if !matches!(self.state.approval_state, ApprovalState::Hidden) {
+                        self.queued_outputs.push(PresentedOutput::Observed(request));
+                    } else {
+                        self.handle_observed_approval(request);
+                    }
+                    dirty = true;
+                    stream_frame_deadline = None;
+                }
+                Wake::Output(None) => {
+                    output_open = false;
+                    self.retire_all_approvals();
+                    observed_rx = None;
+                    dirty = true;
+                }
                 Wake::Output(Some(output)) => {
                     git_refresh_requested |= matches!(&output, UiOutput::ToolResult(_));
                     crate::render_metrics::count(crate::render_metrics::Stage::Output);
-                    if !matches!(self.state.approval_state, ApprovalState::Hidden) {
-                        self.queued_outputs.push(output);
+                    if !matches!(self.state.approval_state, ApprovalState::Hidden)
+                        && !matches!(&output, UiOutput::Exit | UiOutput::SessionIdentity { .. })
+                    {
+                        self.queued_outputs.push(PresentedOutput::Legacy(output));
                     } else {
                         let delta =
                             matches!(&output, UiOutput::Content(ContentOutput::Delta { .. }));
@@ -933,9 +1010,16 @@ impl Tui {
                 Wake::Queued => {
                     // One queued business event per select preserves FIFO and lets input compete.
                     let output = self.queued_outputs.remove(0);
-                    git_refresh_requested |= matches!(&output, UiOutput::ToolResult(_));
                     stream_frame_deadline = None;
-                    self.state.should_exit |= self.handle_ui_output(output);
+                    match output {
+                        PresentedOutput::Legacy(output) => {
+                            git_refresh_requested |= matches!(&output, UiOutput::ToolResult(_));
+                            self.state.should_exit |= self.handle_ui_output(output);
+                        }
+                        PresentedOutput::Observed(request) => {
+                            self.handle_observed_approval(request)
+                        }
+                    }
                     dirty |= !self.state.should_exit || !self.pending_transcript.is_empty();
                 }
                 Wake::Stream(chunk) => {
@@ -960,6 +1044,7 @@ impl Tui {
             }
         }
 
+        self.retire_all_approvals();
         let elapsed = session_start.elapsed();
         self.restore()?;
         self.print_exit_summary(elapsed);
