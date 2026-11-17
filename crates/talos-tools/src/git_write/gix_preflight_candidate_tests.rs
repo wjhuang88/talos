@@ -372,6 +372,13 @@ fn gix_gitdir_conditional_requires_admitted_repository_identity() {
         Some(&Some(b"admitted".to_vec())),
         "gitdir-matched include must survive admitted source evaluation"
     );
+    // A previously approved gitdir disappearing before the write invalidates
+    // its captured directory identity, even with unchanged config bytes.
+    std::fs::remove_dir(&gitdir).expect("remove gitdir after metadata admission");
+    assert!(
+        sources.revalidate().is_err(),
+        "stale gitdir metadata must invalidate the prepared source graph"
+    );
 }
 
 #[test]
