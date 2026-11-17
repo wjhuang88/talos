@@ -2020,3 +2020,23 @@ these workloads differ. No zero-frame, full memory, Git-only causality or whole-
 acceptance claim. Source binding uses an installed receipt plus running binary hash;
 geometry/history were not captured. Original479ms and native Windows remain open.
 Status remains Review / Claimed.
+
+
+### Maintainer acceptance of repeated long-tail validation — 2026-11-17
+
+The maintainer explicitly instructed: “重复验证通过就认为通过了，这个问题不过多纠结了”.
+In the immediate discussion this accepts the repeated passing Debug transcript
+input validations and closes further investigation of the historical 479ms sample
+as an acceptance blocker. The same-binary follow-up P99 upper bounds were
+3.422221ms and 3.461222ms against the unchanged 35ms budget; see
+[the preserved diagnosis](evidence/tui-perf-001/bounded-segment/long-tail-diagnosis.md.gz).
+
+Disposition: accepted by maintainer on repeated passing validation. The original
+479.239045ms failed sample remains in the evidence archive; its cause is unknown.
+This decision does not assert a causal fix or erase that observation. No additional
+long-tail rerun or attribution work is required for this task.
+
+This supersedes earlier checkpoints listing original479ms attribution as required
+remaining work. Native Windows terminal acceptance remains unavailable and unwaived;
+the second supported terminal remains explicitly waived, not passed. Overall status
+remains Review / Claimed pending the remaining acceptance and delivery gates.
