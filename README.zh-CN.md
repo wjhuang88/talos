@@ -627,6 +627,10 @@ Talos 自带一组面向编码 Agent 工作流的工具：
 - 图片读取：`read_image`（模型主动调用的图片读取工具，仅面向支持图片输入的模型；通过共享安全校验模块验证 PNG/JPEG/GIF/WebP；精确路径授权；返回安全摘要和一次性 provider continuation artifact（ADR-051）；仅当当前模型 catalog 元数据确认 `image_input = true` 时才呈现给模型）
 - Shell 兜底：Unix 使用 `bash`（通过 `sh -c`），Windows 使用 `powershell`（通过 `powershell.exe -NoProfile -NonInteractive`）；两者都经过执行权限管线
 
+`diff` 在每一行旁显示旧／新文件行号；空列表示该侧没有对应行（新增或删除）。
+`edit` 预览为删除片段标注原文件行号，为新增片段标注结果文件行号；多个锚定修改
+会计入此前增删行的偏移。长编辑预览会明确标示省略，空侧和省略说明不伪造行号。
+
 默认提示词会要求模型优先使用内置工具，只有在原生工具无法覆盖任务时才使用 Shell 命令兜底。
 它也强调准确性优先于迎合：不能奉承、编造引用，证据不足时不能隐藏不确定性。
 

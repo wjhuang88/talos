@@ -919,6 +919,12 @@ Talos ships with built-in tools for common coding-agent work:
 - Code intelligence: `find_symbol`, `find_references`, `list_symbols`, `list_imports`
 - Git: `git_status`, `git_diff`, `git_log`, `git_show`, `git_branch_list`, `git_add`, `git_commit`, `git_push`, `git_pull`, `git_checkout`
 
+`diff` displays old and new file line numbers beside each comparison row. A blank
+number means that row does not exist on that side (an insertion or deletion).
+`edit` previews label removed fragments with their original file line numbers and
+inserted fragments with their resulting file line numbers. Multiple anchored edits
+account for earlier line insertions/deletions; long edit previews explicitly report omission.
+
 Structured `git_checkout` and `git_commit` verify tracked file contents with streaming
 SHA-256 evidence rather than retaining complete file bodies. Their tracked-source scan
 is bounded to 4096 entries and 1 GiB of regular-file content per capture; content changes
