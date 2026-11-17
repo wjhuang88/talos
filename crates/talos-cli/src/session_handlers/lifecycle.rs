@@ -5,6 +5,8 @@ use super::super::*;
 #[cfg(test)]
 tokio::task_local! {
     static FORK_METADATA_CUT: Arc<tokio::sync::Notify>;
+    static FORK_INDEX_FAILURE: bool;
+    static NEW_IDENTITY_CUT: mpsc::UnboundedSender<std::path::PathBuf>;
 }
 
 /// Publish the UI boundary between two successfully committed sessions.
@@ -43,6 +45,27 @@ pub(crate) fn rollback_owned_session_message(
         Err(cleanup_error) => format!(
             "[Error] {operation}: {primary_error}. Cleanup also failed for Session {session_id} at {transcript}: {cleanup_error}. Cleanup is retryable: close open SQLite handles, retry /delete {session_id} while the transcript remains discoverable, or run talos storage maintenance --reconcile for a transcript-less sidecar.\n"
         ),
+    }
+}
+
+fn fork_failure_message(
+    guard: &mut crate::history_restore::StagedForkHistory,
+    preserve_child: bool,
+    manager: &talos_session::SessionManager,
+    child: &talos_session::Session,
+    operation: &str,
+    error: impl std::fmt::Display,
+) -> String {
+    guard.retain();
+    guard.release_child_ownership();
+    if preserve_child {
+        format!(
+            "[Error] {operation}: {error}. Child {} at {} is retained; resume it or reconcile storage before retrying.\n",
+            child.id,
+            child.file_path.display()
+        )
+    } else {
+        rollback_owned_session_message(manager, child, operation, error)
     }
 }
 
@@ -185,7 +208,22 @@ pub(crate) async fn handle_session_new(
         }
     };
 
+    let runtime_lease = match talos_session::SessionRuntimeLease::acquire(&new_session.file_path) {
+        Ok(lease) => lease,
+        Err(error) => {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                format!(
+                    "[Error] Cannot acquire new Session runtime ownership: {error}; artifacts retained.\n"
+                ),
+            );
+            return;
+        }
+    };
+
     if let Err(error) = crate::mode_runtime::ensure_session_runtime_identity(config, &new_session) {
+        drop(runtime_lease);
         let text = rollback_owned_session_message(
             session_manager,
             &new_session,
@@ -196,9 +234,18 @@ pub(crate) async fn handle_session_new(
         return;
     }
 
+    #[cfg(test)]
+    if let Ok(reached) = NEW_IDENTITY_CUT.try_with(Clone::clone) {
+        reached
+            .send(new_session.file_path.clone())
+            .expect("cut receiver");
+        std::future::pending::<()>().await;
+    }
+
     let built_runtime = match runtime_builder.build(config, &new_session, vec![]).await {
         Ok(runtime) => runtime,
         Err(error) => {
+            drop(runtime_lease);
             let text = rollback_owned_session_message(
                 session_manager,
                 &new_session,
@@ -210,10 +257,21 @@ pub(crate) async fn handle_session_new(
         }
     };
     let handle = built_runtime.handle;
-    let actor = built_runtime.actor;
+    let mut actor = built_runtime.actor;
+    if let Err(error) = actor.adopt_runtime_lease(runtime_lease) {
+        send_stream(
+            ui_tx,
+            MessageSource::Error,
+            format!(
+                "[Error] Cannot transfer new Session runtime ownership: {error}; artifacts retained.\n"
+            ),
+        );
+        return;
+    }
     let sched_pending = built_runtime.pending_scheduler;
     if let Err(error) = transition.prepare_mcp_runtime(built_runtime.mcp_runtime) {
         transition.rollback();
+        drop(actor);
         let text = rollback_owned_session_message(
             session_manager,
             &new_session,
@@ -227,6 +285,7 @@ pub(crate) async fn handle_session_new(
     let new_session_for_watch = new_session.clone();
     if let Err(error) = transition.prepare(handle, new_session) {
         transition.rollback();
+        drop(actor);
         let text = rollback_owned_session_message(
             session_manager,
             &new_session_for_watch,
@@ -393,6 +452,18 @@ pub(crate) async fn handle_session_resume(
         }
     };
 
+    let runtime_lease = match talos_session::SessionRuntimeLease::acquire(&target_session.file_path)
+    {
+        Ok(lease) => lease,
+        Err(error) => {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                format!("[Error] Cannot acquire resumed Session runtime ownership: {error}\n"),
+            );
+            return None;
+        }
+    };
     if let Err(error) = crate::mode_runtime::reconcile_session_runtime_state(&target_session) {
         let text = format!("[Error] Cannot resume stopped Session runtime: {error}\n");
         send_stream(ui_tx, MessageSource::Error, text);
@@ -431,7 +502,15 @@ pub(crate) async fn handle_session_resume(
         }
     };
     let handle = built_runtime.handle;
-    let actor = built_runtime.actor;
+    let mut actor = built_runtime.actor;
+    if let Err(error) = actor.adopt_runtime_lease(runtime_lease) {
+        send_stream(
+            ui_tx,
+            MessageSource::Error,
+            format!("[Error] Cannot transfer resumed Session runtime ownership: {error}\n"),
+        );
+        return None;
+    }
     let sched_pending = built_runtime.pending_scheduler;
     if let Err(error) = transition.prepare_mcp_runtime(built_runtime.mcp_runtime) {
         let text = format!("[Error] Failed to retain resumed MCP runtime: {error}\n");
@@ -546,74 +625,205 @@ pub(crate) async fn handle_session_fork(
         send_stream(ui_tx, MessageSource::Error, text);
         return;
     }
-    let staged_path = child_path.with_extension("fork-staging");
-    let (mut staged_history, fork_history, tail) =
-        match crate::history_restore::stage_fork_history(&source_session, staged_path).await {
-            Ok(snapshot) => snapshot,
+    let receipt_required = match crate::history_restore::requires_fork_receipt(&source_session) {
+        Ok(required) => required,
+        Err(error) => {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                format!("[Error] Fork source unavailable: {error}\n"),
+            );
+            return;
+        }
+    };
+    // Receipt publication is irreversible: hold child execution ownership from
+    // before publication through metadata preparation and Actor handoff.
+    let child_runtime_lease = if receipt_required {
+        match talos_session::SessionRuntimeLease::acquire(&child_path) {
+            Ok(lease) => Some(lease),
             Err(error) => {
                 send_stream(
                     ui_tx,
                     MessageSource::Error,
-                    format!("[Error] Failed to stage source Session history: {error:#}\n"),
+                    format!(
+                        "[Error] Cannot acquire fork child runtime ownership: {error}; artifacts retained.\n"
+                    ),
+                );
+                return;
+            }
+        }
+    } else {
+        None
+    };
+    let mut captured_identity = None;
+    let (mut staged_history, fork_history, fork_entry_id) = if receipt_required {
+        let (receipt_tx, mut receipt_rx) = mpsc::unbounded_channel();
+        if transition
+            .bind_active_sender()
+            .send(SessionOp::ForkHistory {
+                child_id: child_id.to_string(),
+                child_branch: child_session.current_branch.clone(),
+                through_entry: None,
+                receipt_tx: Some(receipt_tx),
+            })
+            .await
+            .is_err()
+        {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                "[Error] Source runtime unavailable for fork.\n".into(),
+            );
+            return;
+        }
+        let result =
+            tokio::time::timeout(std::time::Duration::from_secs(35), receipt_rx.recv()).await;
+        let tail = match result {
+            Ok(Some(Ok(tail))) => tail,
+            _ => {
+                send_stream(
+                    ui_tx,
+                    MessageSource::Error,
+                    format!(
+                        "[Error] Fork publication did not complete for child {child_id} at {}; retained artifacts require reconciliation.\n",
+                        child_path.display()
+                    ),
                 );
                 return;
             }
         };
-    let fork_entry_id = tail.id;
-    if let Err(error) = staged_history.install(&child_path) {
-        send_stream(
-            ui_tx,
-            MessageSource::Error,
-            format!("[Error] Failed to install fork history: {error:#}\n"),
-        );
-        return;
-    }
-    staged_history.own_child(session_manager.clone(), child_session.clone());
-
-    let inherited_identity =
-        match talos_session::PendingSubmissionStore::for_session(&source_session).runtime_state() {
-            Ok(Some(state))
-                if state.status == talos_session::SessionRuntimeActivationStatus::Committed =>
-            {
-                state.activation.target
-            }
-            Ok(Some(state)) => {
-                let text = rollback_owned_session_message(
-                    session_manager,
-                    &child_session,
-                    "Source Session activation is not committed",
-                    format_args!("activation {}", state.activation.activation_id),
+        let history = match crate::history_restore::read_session_history_owned(
+            &child_session,
+            child_runtime_lease
+                .as_ref()
+                .expect("receipt child ownership"),
+        )
+        .await
+        {
+            Ok(history) => history,
+            Err(error) => {
+                send_stream(
+                    ui_tx,
+                    MessageSource::Error,
+                    format!(
+                        "[Error] Published child {child_id} history unavailable: {error}; artifacts retained.\n"
+                    ),
                 );
-                send_stream(ui_tx, MessageSource::Error, text);
                 return;
             }
-            Ok(None) => talos_session::SessionRuntimeIdentity::new(
+        };
+        (
+            crate::history_restore::StagedForkHistory::published_receipt(child_path.clone()),
+            history,
+            tail,
+        )
+    } else {
+        let (receipt_tx, mut receipt_rx) = mpsc::unbounded_channel();
+        if transition
+            .bind_active_sender()
+            .send(SessionOp::CaptureOrdinaryFork {
+                through_entry: None,
+                receipt_tx: Some(receipt_tx),
+            })
+            .await
+            .is_err()
+        {
+            send_stream(
+                ui_tx,
+                MessageSource::Error,
+                "[Error] Source runtime unavailable for capture.\n".into(),
+            );
+            return;
+        }
+        let snapshot =
+            match tokio::time::timeout(std::time::Duration::from_secs(35), receipt_rx.recv()).await
+            {
+                Ok(Some(Ok(snapshot))) => snapshot,
+                result => {
+                    let reason = match result {
+                        Ok(Some(Err(error))) => error,
+                        _ => "source capture timed out or disconnected".into(),
+                    };
+                    send_stream(
+                        ui_tx,
+                        MessageSource::Error,
+                        format!("[Error] Cannot capture fork history: {reason}\n"),
+                    );
+                    return;
+                }
+            };
+        let mut staged_history =
+            match crate::history_restore::stage_captured_fork_history(&child_session, &snapshot) {
+                Ok(guard) => guard,
+                Err(error) => {
+                    send_stream(
+                        ui_tx,
+                        MessageSource::Error,
+                        format!("[Error] Failed to install captured fork history: {error}\n"),
+                    );
+                    return;
+                }
+            };
+        staged_history.own_child(session_manager.clone(), child_session.clone());
+        let fork_history = match crate::history_restore::read_session_history(&child_session).await
+        {
+            Ok(history) => history,
+            Err(error) => {
+                send_stream(
+                    ui_tx,
+                    MessageSource::Error,
+                    format!("[Error] Failed to read captured child history: {error}\n"),
+                );
+                return;
+            }
+        };
+        captured_identity = snapshot.runtime_identity;
+        (staged_history, fork_history, snapshot.tail_id)
+    };
+
+    if receipt_required {
+        if let Err(error) = child_session.restore_history_fork_runtime(
+            child_runtime_lease
+                .as_ref()
+                .expect("receipt child ownership"),
+            std::time::Instant::now() + std::time::Duration::from_secs(30),
+        ) {
+            let text = fork_failure_message(
+                &mut staged_history,
+                true,
+                session_manager,
+                &child_session,
+                "Failed to restore captured fork runtime identity",
+                error,
+            );
+            send_stream(ui_tx, MessageSource::Error, text);
+            return;
+        }
+    } else {
+        let inherited_identity = match captured_identity {
+            Some((provider, model, variant)) => {
+                talos_session::SessionRuntimeIdentity::new(&provider, &model, variant.as_deref())
+            }
+            None => talos_session::SessionRuntimeIdentity::new(
                 &config.provider,
                 &config.model,
                 config.variant.as_deref(),
             ),
-            Err(error) => {
-                let text = rollback_owned_session_message(
-                    session_manager,
-                    &child_session,
-                    "Failed to read source Session runtime identity",
-                    error,
-                );
-                send_stream(ui_tx, MessageSource::Error, text);
-                return;
-            }
         };
-    if let Err(error) = talos_session::PendingSubmissionStore::for_session(&child_session)
-        .initialize_runtime_identity(inherited_identity)
-    {
-        let text = rollback_owned_session_message(
-            session_manager,
-            &child_session,
-            "Failed to initialize fork runtime identity",
-            error,
-        );
-        send_stream(ui_tx, MessageSource::Error, text);
-        return;
+        if let Err(error) = talos_session::PendingSubmissionStore::for_session(&child_session)
+            .initialize_runtime_identity(inherited_identity)
+        {
+            let text = fork_failure_message(
+                &mut staged_history,
+                receipt_required,
+                session_manager,
+                &child_session,
+                "Failed to initialize fork runtime identity",
+                error,
+            );
+            send_stream(ui_tx, MessageSource::Error, text);
+            return;
+        }
     }
 
     let index_result = session_manager
@@ -622,8 +832,18 @@ pub(crate) async fn handle_session_fork(
         .and_then(|()| {
             session_manager.record_fork(&source_session.id, &child_session.id, &fork_entry_id)
         });
+    #[cfg(test)]
+    let index_result = if FORK_INDEX_FAILURE.try_with(|fail| *fail).unwrap_or(false) {
+        Err(talos_session::IndexError::IoError(std::io::Error::other(
+            "injected index publication failure",
+        )))
+    } else {
+        index_result
+    };
     if let Err(error) = index_result {
-        let text = rollback_owned_session_message(
+        let text = fork_failure_message(
+            &mut staged_history,
+            receipt_required,
             session_manager,
             &child_session,
             "Failed to publish child Session index/fork ownership",
@@ -635,6 +855,22 @@ pub(crate) async fn handle_session_fork(
 
     let mut fork_config = config.clone();
     apply_session_model_to_config(&mut fork_config, &child_session);
+    // Receipt absence means no inherited identity, not an unrecorded activation.
+    // Persist the effective host selection before constructing the child runtime.
+    if let Err(error) =
+        crate::mode_runtime::ensure_session_runtime_identity(&fork_config, &child_session)
+    {
+        let text = fork_failure_message(
+            &mut staged_history,
+            receipt_required,
+            session_manager,
+            &child_session,
+            "Failed to persist selected fork runtime identity",
+            error,
+        );
+        send_stream(ui_tx, MessageSource::Error, text);
+        return;
+    }
     #[cfg(test)]
     if let Ok(reached) = FORK_METADATA_CUT.try_with(Clone::clone) {
         reached.notify_one();
@@ -646,7 +882,9 @@ pub(crate) async fn handle_session_fork(
     {
         Ok(runtime) => runtime,
         Err(error) => {
-            let text = rollback_owned_session_message(
+            let text = fork_failure_message(
+                &mut staged_history,
+                receipt_required,
                 session_manager,
                 &child_session,
                 "Failed to construct fork runtime",
@@ -657,11 +895,30 @@ pub(crate) async fn handle_session_fork(
         }
     };
     let handle = built_runtime.handle;
-    let actor = built_runtime.actor;
+    let mut actor = built_runtime.actor;
+    let child_runtime_lease = child_runtime_lease.or_else(|| staged_history.take_child_ownership());
+    // Once the Actor receives ownership, cancellation must preserve the child,
+    // regardless of local destruction order or transition progress.
+    staged_history.retain();
+    if let Some(lease) = child_runtime_lease
+        && let Err(error) = actor.adopt_runtime_lease(lease)
+    {
+        send_stream(
+            ui_tx,
+            MessageSource::Error,
+            format!(
+                "[Error] Cannot transfer fork child runtime ownership: {error}; artifacts retained.\n"
+            ),
+        );
+        return;
+    }
     let sched_pending = built_runtime.pending_scheduler;
     if let Err(error) = transition.prepare_mcp_runtime(built_runtime.mcp_runtime) {
         transition.rollback();
-        let text = rollback_owned_session_message(
+        drop(actor);
+        let text = fork_failure_message(
+            &mut staged_history,
+            receipt_required,
             session_manager,
             &child_session,
             "Failed to retain fork MCP runtime",
@@ -674,7 +931,10 @@ pub(crate) async fn handle_session_fork(
     let child_session_for_watch = child_session.clone();
     if let Err(error) = transition.prepare(handle, child_session) {
         transition.rollback();
-        let text = rollback_owned_session_message(
+        drop(actor);
+        let text = fork_failure_message(
+            &mut staged_history,
+            receipt_required,
             session_manager,
             &child_session_for_watch,
             "Failed to prepare fork",
@@ -711,7 +971,9 @@ pub(crate) async fn handle_session_fork(
                 );
             }
             Err(error) => {
-                let text = rollback_owned_session_message(
+                let text = fork_failure_message(
+                    &mut staged_history,
+                    true,
                     session_manager,
                     &child_session_for_watch,
                     "Failed to publish fork runtime",
@@ -722,10 +984,12 @@ pub(crate) async fn handle_session_fork(
         },
         Err(error) => {
             transition.rollback();
-            let text = rollback_owned_session_message(
+            let text = fork_failure_message(
+                &mut staged_history,
+                true,
                 session_manager,
                 &child_session_for_watch,
-                "Failed to commit fork; old Session remains active",
+                "Failed to commit fork",
                 error,
             );
             send_stream(ui_tx, MessageSource::Error, text);
@@ -737,6 +1001,99 @@ pub(crate) async fn handle_session_fork(
 mod tests {
     use super::*;
     use talos_core::message::Message;
+
+    // Lifecycle cancellation tests isolate transition retirement; production capture
+    // admission and contention are separately exercised by real Actor tests.
+    async fn respond_to_ordinary_capture(
+        source: &talos_session::Session,
+        rx: &mut mpsc::Receiver<SessionOp>,
+    ) {
+        let Some(SessionOp::CaptureOrdinaryFork {
+            through_entry,
+            receipt_tx: Some(tx),
+        }) = rx.recv().await
+        else {
+            panic!("expected ordinary capture");
+        };
+        let lease = talos_session::SessionRuntimeLease::acquire(&source.file_path)
+            .expect("source ownership");
+        let snapshot = source
+            .capture_ordinary_fork(
+                &lease,
+                through_entry.as_deref(),
+                std::time::Instant::now() + std::time::Duration::from_secs(5),
+                || false,
+            )
+            .expect("capture");
+        tx.send(Ok(talos_core::session::OrdinaryForkCapture {
+            bytes: snapshot.bytes,
+            tail_id: snapshot.tail.id,
+            runtime_identity: snapshot
+                .runtime_identity
+                .map(|identity| (identity.provider, identity.model, identity.variant)),
+        }))
+        .expect("receipt");
+    }
+
+    #[tokio::test]
+    async fn new_session_identity_preparation_excludes_competitors_until_cancelled() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let parent = manager
+            .create_session("parent", &canonical_workspace_root(root.path()))
+            .expect("parent");
+        let (raw_tx, _raw_rx) = mpsc::channel(4);
+        let transition = Arc::new(Mutex::new(
+            SessionTransition::new(raw_tx.clone(), parent.clone()).expect("owner"),
+        ));
+        let (ui_tx, _ui_rx) = mpsc::unbounded_channel();
+        let (session_tx, session_rx) = watch::channel(parent.clone());
+        let (route_tx, route_rx) = watch::channel(raw_tx);
+        let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel();
+        let builder = TuiRuntimeBuilder::new(
+            build_hook_registry(true),
+            root.path().to_path_buf(),
+            manager.clone(),
+            Arc::new(TuiApprovalHandler::new(
+                ui_tx.clone(),
+                root.path().to_path_buf(),
+            )),
+            Vec::new(),
+            false,
+            true,
+        );
+        let config = Config::default();
+        let (cut_tx, mut cut_rx) = mpsc::unbounded_channel();
+        let child_path;
+        {
+            let operation = NEW_IDENTITY_CUT.scope(
+                cut_tx,
+                handle_session_new(
+                    &transition,
+                    &ui_tx,
+                    &config,
+                    &builder,
+                    &manager,
+                    &session_tx,
+                    &route_tx,
+                    &bridge_tx,
+                ),
+            );
+            tokio::pin!(operation);
+            child_path = tokio::select! {
+                path = cut_rx.recv() => path.expect("identity prepared"),
+                _ = &mut operation => panic!("unexpected completion"),
+                _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => panic!("cut timeout"),
+            };
+            assert!(talos_session::SessionRuntimeLease::acquire(&child_path).is_err());
+        }
+        talos_session::SessionRuntimeLease::acquire(&child_path)
+            .expect("cancel releases ownership");
+        assert_eq!(transition.lock().await.active_session().id, parent.id);
+        assert!(!session_rx.has_changed().expect("session route"));
+        assert!(!route_rx.has_changed().expect("command route"));
+        assert!(bridge_rx.try_recv().is_err());
+    }
 
     #[tokio::test]
     async fn fork_handler_cancel_after_metadata_preserves_parent_and_removes_child() {
@@ -773,6 +1130,12 @@ mod tests {
             true,
         );
         let config = Config::default();
+        let capture_source = parent.clone();
+        let capture_responder = tokio::spawn(async move {
+            respond_to_ordinary_capture(&capture_source, &mut raw_rx).await;
+            raw_rx
+        });
+
         let reached = Arc::new(tokio::sync::Notify::new());
         {
             let operation = FORK_METADATA_CUT.scope(
@@ -816,6 +1179,7 @@ mod tests {
         assert!(!session_rx.has_changed().expect("session watch"));
         assert!(!route_rx.has_changed().expect("route watch"));
         assert!(bridge_rx.try_recv().is_err());
+        let mut raw_rx = capture_responder.await.expect("capture responder");
         route
             .send(SessionOp::Submit {
                 message: "parent remains active".into(),
@@ -846,13 +1210,8 @@ mod tests {
             })
             .expect("history");
         let original = std::fs::read(&parent.file_path).expect("bytes");
-        let (raw_tx, raw_rx) = mpsc::channel(4);
-        drop(raw_rx);
-        let owner = SessionTransition::new(raw_tx.clone(), parent.clone()).expect("owner");
-        let transition = Arc::new(Mutex::new(owner));
         let (ui_tx, _ui_rx) = mpsc::unbounded_channel();
         let (session_tx, session_rx) = watch::channel(parent.clone());
-        let (route_tx, route_rx) = watch::channel(raw_tx);
         let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel();
         let builder = TuiRuntimeBuilder::new(
             build_hook_registry(true),
@@ -867,6 +1226,23 @@ mod tests {
             true,
         );
         let config = Config::default();
+        let built = builder
+            .build(&config, &parent, vec![])
+            .await
+            .expect("parent runtime");
+        let raw_tx = built.handle.sq_tx.clone();
+        let mut actor = built.actor;
+        let mut owner = SessionTransition::new(raw_tx.clone(), parent.clone()).expect("owner");
+        let actor_join = tokio::spawn(async move { actor.run().await });
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let stopped = cancel.clone();
+        let scheduler_join = tokio::spawn(async move { stopped.cancelled().await });
+        owner
+            .attach_active_runtime(actor_join, cancel, scheduler_join)
+            .expect("attach");
+        let transition = Arc::new(Mutex::new(owner));
+        let (route_tx, route_rx) = watch::channel(raw_tx);
+
         tokio::time::timeout(
             std::time::Duration::from_secs(10),
             handle_session_fork(
@@ -916,7 +1292,375 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fork_handler_cancel_during_commit_cleans_child_and_finishes_retirement() {
+    async fn archived_fork_handler_uses_real_actor_and_preserves_all_history() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let workspace = canonical_workspace_root(root.path());
+        let parent = manager
+            .create_session("parent", &workspace)
+            .expect("parent");
+        parent
+            .append(&Message::User {
+                content: "original constraint".into(),
+            })
+            .expect("history");
+        for i in 0..15 {
+            parent
+                .append(&Message::User {
+                    content: format!("archived fact {i}"),
+                })
+                .expect("append");
+        }
+        parent.compact_archived(0).expect("keep0");
+        let original = std::fs::read(&parent.file_path).expect("bytes");
+        let (ui_tx, _ui_rx) = mpsc::unbounded_channel();
+        let (session_tx, session_rx) = watch::channel(parent.clone());
+        let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel();
+        let builder = TuiRuntimeBuilder::new(
+            build_hook_registry(true),
+            root.path().to_path_buf(),
+            manager.clone(),
+            Arc::new(TuiApprovalHandler::new(
+                ui_tx.clone(),
+                root.path().to_path_buf(),
+            )),
+            Vec::new(),
+            false,
+            true,
+        );
+        let config = Config::default();
+        let built = builder
+            .build(&config, &parent, vec![])
+            .await
+            .expect("parent runtime");
+        let raw_tx = built.handle.sq_tx.clone();
+        let mut actor = built.actor;
+        let mut owner = SessionTransition::new(raw_tx.clone(), parent.clone()).expect("owner");
+        let actor_join = tokio::spawn(async move { actor.run().await });
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let stopped = cancel.clone();
+        let scheduler_join = tokio::spawn(async move { stopped.cancelled().await });
+        owner
+            .attach_active_runtime(actor_join, cancel, scheduler_join)
+            .expect("attach");
+        let transition = Arc::new(Mutex::new(owner));
+        let (route_tx, route_rx) = watch::channel(raw_tx);
+
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            handle_session_fork(
+                &transition,
+                &ui_tx,
+                &config,
+                &builder,
+                &manager,
+                &session_tx,
+                &route_tx,
+                &bridge_tx,
+                &session_rx,
+            ),
+        )
+        .await
+        .expect("fork completes");
+        let child = session_rx.borrow().clone();
+        assert_ne!(child.id, parent.id);
+        assert_eq!(transition.lock().await.active_session().id, child.id);
+        let restored = crate::history_restore::read_session_history(&child)
+            .await
+            .expect("child restore");
+        assert_eq!(restored.len(), 16);
+        assert!(restored.iter().any(
+            |message| matches!(message, Message::User { content } if content == "archived fact 0")
+        ));
+        assert_eq!(
+            manager
+                .get_forks(&parent.id.to_string())
+                .expect("lineage")
+                .len(),
+            1
+        );
+        assert!(session_rx.has_changed().expect("session watch"));
+        assert!(route_rx.has_changed().expect("command watch"));
+        assert_eq!(bridge_rx.try_recv().expect("bridge").0.id, child.id);
+        transition.lock().await.shutdown().await;
+        assert!(
+            child.file_path.exists(),
+            "successful child is retained after shutdown"
+        );
+        assert_eq!(
+            std::fs::read(&parent.file_path).expect("parent bytes"),
+            original
+        );
+    }
+
+    #[tokio::test]
+    async fn archived_fork_cancel_after_metadata_retains_published_child() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let workspace = canonical_workspace_root(root.path());
+        let parent = manager
+            .create_session("parent", &workspace)
+            .expect("parent");
+        parent
+            .append(&Message::User {
+                content: "original constraint".into(),
+            })
+            .expect("history");
+        for i in 0..15 {
+            parent
+                .append(&Message::User {
+                    content: format!("archived fact {i}"),
+                })
+                .expect("append");
+        }
+        parent.compact_archived(0).expect("keep0");
+        let original = std::fs::read(&parent.file_path).expect("bytes");
+        let (ui_tx, _ui_rx) = mpsc::unbounded_channel();
+        let (session_tx, session_rx) = watch::channel(parent.clone());
+        let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel();
+        let builder = TuiRuntimeBuilder::new(
+            build_hook_registry(true),
+            root.path().to_path_buf(),
+            manager.clone(),
+            Arc::new(TuiApprovalHandler::new(
+                ui_tx.clone(),
+                root.path().to_path_buf(),
+            )),
+            Vec::new(),
+            false,
+            true,
+        );
+        let config = Config::default();
+        let built = builder
+            .build(&config, &parent, vec![])
+            .await
+            .expect("parent runtime");
+        let raw_tx = built.handle.sq_tx.clone();
+        let mut actor = built.actor;
+        let mut owner = SessionTransition::new(raw_tx.clone(), parent.clone()).expect("owner");
+        let actor_join = tokio::spawn(async move { actor.run().await });
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let stopped = cancel.clone();
+        let scheduler_join = tokio::spawn(async move { stopped.cancelled().await });
+        owner
+            .attach_active_runtime(actor_join, cancel, scheduler_join)
+            .expect("attach");
+        let transition = Arc::new(Mutex::new(owner));
+        let (route_tx, route_rx) = watch::channel(raw_tx);
+
+        let reached = Arc::new(tokio::sync::Notify::new());
+        {
+            let operation = FORK_METADATA_CUT.scope(
+                reached.clone(),
+                handle_session_fork(
+                    &transition,
+                    &ui_tx,
+                    &config,
+                    &builder,
+                    &manager,
+                    &session_tx,
+                    &route_tx,
+                    &bridge_tx,
+                    &session_rx,
+                ),
+            );
+            tokio::pin!(operation);
+            tokio::select! {
+                _ = reached.notified() => {},
+                _ = &mut operation => panic!("must pause after metadata"),
+                _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => panic!("deadline"),
+            }
+            let published_child = std::fs::read_dir(parent.file_path.parent().expect("parent dir"))
+                .expect("inventory")
+                .map(|entry| entry.expect("entry").path())
+                .find(|path| {
+                    path != &parent.file_path
+                        && path.extension().is_some_and(|ext| ext == "tlog")
+                        && path
+                            .file_stem()
+                            .and_then(|stem| stem.to_str())
+                            .is_some_and(|stem| uuid::Uuid::parse_str(stem).is_ok())
+                })
+                .expect("published child");
+            assert!(
+                talos_session::SessionRuntimeLease::acquire(&published_child).is_err(),
+                "published child stays fenced during metadata-to-Actor preparation"
+            );
+        }
+        assert_eq!(session_rx.borrow().id, parent.id);
+        assert_eq!(transition.lock().await.active_session().id, parent.id);
+        let children: Vec<_> = std::fs::read_dir(parent.file_path.parent().expect("directory"))
+            .expect("inventory")
+            .map(|entry| entry.expect("entry").path())
+            .filter(|path| {
+                path != &parent.file_path
+                    && path.extension().is_some_and(|ext| ext == "tlog")
+                    && path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .is_some_and(|s| uuid::Uuid::parse_str(s).is_ok())
+            })
+            .collect();
+        assert_eq!(children.len(), 1, "committed history survives cancellation");
+        let id = uuid::Uuid::parse_str(
+            children[0]
+                .file_stem()
+                .expect("stem")
+                .to_str()
+                .expect("text"),
+        )
+        .expect("id");
+        let child = manager.get_session(&id).expect("retained child");
+        let identity = talos_session::PendingSubmissionStore::for_session(&child)
+            .runtime_state()
+            .expect("child runtime metadata")
+            .expect("selected identity persisted");
+        assert_eq!(
+            identity.status,
+            talos_session::SessionRuntimeActivationStatus::Committed
+        );
+        assert_eq!(
+            identity.activation.target,
+            talos_session::SessionRuntimeIdentity::new(
+                &config.provider,
+                &config.model,
+                config.variant.as_deref()
+            )
+        );
+
+        drop(
+            talos_session::SessionRuntimeLease::acquire(&child.file_path)
+                .expect("cancelled preparation releases child ownership"),
+        );
+        assert_eq!(
+            crate::history_restore::read_session_history(&child)
+                .await
+                .expect("history")
+                .len(),
+            16
+        );
+        assert!(!route_rx.has_changed().expect("old route"));
+        assert!(bridge_rx.try_recv().is_err());
+        assert_eq!(
+            std::fs::read(&parent.file_path).expect("parent bytes"),
+            original
+        );
+        transition.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn archived_fork_metadata_error_retains_published_child() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let workspace = canonical_workspace_root(root.path());
+        let parent = manager
+            .create_session("parent", &workspace)
+            .expect("parent");
+        parent
+            .append(&Message::User {
+                content: "original constraint".into(),
+            })
+            .expect("history");
+        for i in 0..15 {
+            parent
+                .append(&Message::User {
+                    content: format!("archived fact {i}"),
+                })
+                .expect("append");
+        }
+        parent.compact_archived(0).expect("keep0");
+        let original = std::fs::read(&parent.file_path).expect("bytes");
+        let (ui_tx, _ui_rx) = mpsc::unbounded_channel();
+        let (session_tx, session_rx) = watch::channel(parent.clone());
+        let (bridge_tx, mut bridge_rx) = mpsc::unbounded_channel();
+        let builder = TuiRuntimeBuilder::new(
+            build_hook_registry(true),
+            root.path().to_path_buf(),
+            manager.clone(),
+            Arc::new(TuiApprovalHandler::new(
+                ui_tx.clone(),
+                root.path().to_path_buf(),
+            )),
+            Vec::new(),
+            false,
+            true,
+        );
+        let config = Config::default();
+        let built = builder
+            .build(&config, &parent, vec![])
+            .await
+            .expect("parent runtime");
+        let raw_tx = built.handle.sq_tx.clone();
+        let mut actor = built.actor;
+        let mut owner = SessionTransition::new(raw_tx.clone(), parent.clone()).expect("owner");
+        let actor_join = tokio::spawn(async move { actor.run().await });
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let stopped = cancel.clone();
+        let scheduler_join = tokio::spawn(async move { stopped.cancelled().await });
+        owner
+            .attach_active_runtime(actor_join, cancel, scheduler_join)
+            .expect("attach");
+        let transition = Arc::new(Mutex::new(owner));
+        let (route_tx, route_rx) = watch::channel(raw_tx);
+
+        FORK_INDEX_FAILURE
+            .scope(
+                true,
+                handle_session_fork(
+                    &transition,
+                    &ui_tx,
+                    &config,
+                    &builder,
+                    &manager,
+                    &session_tx,
+                    &route_tx,
+                    &bridge_tx,
+                    &session_rx,
+                ),
+            )
+            .await;
+        assert_eq!(session_rx.borrow().id, parent.id);
+        assert_eq!(transition.lock().await.active_session().id, parent.id);
+        let children: Vec<_> = std::fs::read_dir(parent.file_path.parent().expect("directory"))
+            .expect("inventory")
+            .map(|entry| entry.expect("entry").path())
+            .filter(|path| {
+                path != &parent.file_path
+                    && path.extension().is_some_and(|ext| ext == "tlog")
+                    && path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .is_some_and(|s| uuid::Uuid::parse_str(s).is_ok())
+            })
+            .collect();
+        assert_eq!(children.len(), 1, "committed history survives cancellation");
+        let id = uuid::Uuid::parse_str(
+            children[0]
+                .file_stem()
+                .expect("stem")
+                .to_str()
+                .expect("text"),
+        )
+        .expect("id");
+        let child = manager.get_session(&id).expect("retained child");
+        assert_eq!(
+            crate::history_restore::read_session_history(&child)
+                .await
+                .expect("history")
+                .len(),
+            16
+        );
+        assert!(!route_rx.has_changed().expect("old route"));
+        assert!(bridge_rx.try_recv().is_err());
+        assert_eq!(
+            std::fs::read(&parent.file_path).expect("parent bytes"),
+            original
+        );
+        transition.lock().await.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn fork_handler_cancel_during_commit_retains_resumable_child_and_finishes_retirement() {
         let root = tempfile::tempdir().expect("root");
         let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
         let workspace = canonical_workspace_root(root.path());
@@ -940,7 +1684,9 @@ mod tests {
             stop.cancelled().await;
             scheduler_release.notified().await;
         });
+        let capture_source = parent.clone();
         let actor = tokio::spawn(async move {
+            respond_to_ordinary_capture(&capture_source, &mut raw_rx).await;
             assert!(matches!(raw_rx.recv().await, Some(SessionOp::Shutdown)));
         });
         owner
@@ -990,15 +1736,32 @@ mod tests {
                 1
             );
         }
-        assert!(
+        assert_eq!(
             manager
                 .get_forks(&parent.id.to_string())
-                .expect("clean lineage")
-                .is_empty()
+                .expect("retained lineage")
+                .len(),
+            1
         );
         let sessions = manager.list_sessions().expect("sessions");
-        assert_eq!(sessions.len(), 1);
-        assert_eq!(sessions[0].id, parent.id);
+        assert_eq!(sessions.len(), 2);
+        let child_id = sessions
+            .iter()
+            .find(|info| info.id != parent.id)
+            .expect("retained child")
+            .id;
+        let child = manager.get_session(&child_id).expect("discoverable child");
+        let lease = talos_session::SessionRuntimeLease::acquire(&child.file_path)
+            .expect("cancelled Actor releases child ownership");
+        let history = crate::history_restore::read_session_history_owned(&child, &lease)
+            .await
+            .expect("child can resume");
+        assert_eq!(history.len(), 1);
+        assert_eq!(
+            std::fs::read(&child.file_path).expect("child bytes"),
+            original
+        );
+        drop(lease);
         assert_eq!(transition.lock().await.active_session().id, parent.id);
         assert!(!session_rx.has_changed().expect("session watch"));
         assert!(!route_rx.has_changed().expect("route watch"));

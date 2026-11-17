@@ -849,7 +849,7 @@ fn migrate_and_validate_schema(conn: &Connection, db_path: &Path) -> Result<(), 
                 backup_path.display()
             )));
         }
-        conn.backup("main", &backup_path, None)?;
+        conn.backup("main", &backup_path, None::<fn(rusqlite::backup::Progress)>)?;
         let tx = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)?;
         // Legacy databases predate the session/title uniqueness invariant.
         // Collapse duplicate historical rows before validating or upgrading;

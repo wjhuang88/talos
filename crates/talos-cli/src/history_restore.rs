@@ -5,6 +5,24 @@ use talos_core::message::Message;
 use talos_session::Session;
 use tokio_util::sync::CancellationToken;
 
+pub(crate) fn requires_fork_receipt(source: &Session) -> Result<bool> {
+    Ok(if source.file_extension() == "tlog" {
+        let entries = source
+            .read_entries()
+            .context("failed to inspect fork source")?;
+        let has_placeholder = entries.iter().any(|entry| {
+            entry.role == "system" && entry.content.starts_with("[Compaction summary:")
+        });
+        use std::io::Read;
+        let mut marker = [0u8; 1];
+        let mut file = std::fs::File::open(&source.file_path)?;
+        let length = file.read(&mut marker)?;
+        has_placeholder || (length == 1 && marker[0] == 0xff)
+    } else {
+        false
+    })
+}
+
 /// Unpublished fork file. The worker owns cleanup while I/O is in flight, so
 /// dropping the caller cannot race cleanup against an unfinished write.
 pub(crate) struct StagedForkHistory {
@@ -13,9 +31,23 @@ pub(crate) struct StagedForkHistory {
     retained: bool,
     child_cleanup: Option<(talos_session::SessionManager, Session)>,
     extra_path: Option<std::path::PathBuf>,
+    runtime_lease: Option<talos_session::SessionRuntimeLease>,
 }
 
 impl StagedForkHistory {
+    // Receipt commit has succeeded. Caller cancellation must preserve this file;
+    // subsequent explicit metadata rollback remains a separate host operation.
+    pub(crate) fn published_receipt(path: std::path::PathBuf) -> Self {
+        Self {
+            path,
+            file: None,
+            retained: true,
+            child_cleanup: None,
+            extra_path: None,
+            runtime_lease: None,
+        }
+    }
+
     pub(crate) fn install(&mut self, destination: &std::path::Path) -> Result<()> {
         drop(self.file.take());
         // Unlike rename, hard_link cannot overwrite an existing destination.
@@ -26,6 +58,24 @@ impl StagedForkHistory {
             return Err(error.into());
         }
         Ok(())
+    }
+
+    pub(crate) fn acquire_child_ownership(&mut self, child: &Session) -> Result<()> {
+        if self.runtime_lease.is_some() {
+            anyhow::bail!("fork staging already owns a runtime lease");
+        }
+        self.runtime_lease = Some(talos_session::SessionRuntimeLease::acquire(
+            &child.file_path,
+        )?);
+        Ok(())
+    }
+
+    pub(crate) fn take_child_ownership(&mut self) -> Option<talos_session::SessionRuntimeLease> {
+        self.runtime_lease.take()
+    }
+
+    pub(crate) fn release_child_ownership(&mut self) {
+        self.runtime_lease = None;
     }
 
     pub(crate) fn retain(&mut self) {
@@ -49,8 +99,9 @@ impl Drop for StagedForkHistory {
         {
             tracing::warn!(%error, "failed to remove fork staging alias");
         }
-        if let Some((manager, child)) = &self.child_cleanup {
-            if let Err(error) = manager.rollback_session_artifacts(child) {
+        if let Some((manager, child)) = self.child_cleanup.take() {
+            self.release_child_ownership();
+            if let Err(error) = manager.rollback_session_artifacts(&child) {
                 tracing::warn!(%error, session_id = %child.id, "failed to roll back unpublished fork artifacts; storage reconciliation required");
             }
             return;
@@ -63,6 +114,129 @@ impl Drop for StagedForkHistory {
     }
 }
 
+/// Install a fixed Actor capture without consulting the mutable parent transcript.
+pub(crate) fn stage_captured_fork_history(
+    child: &Session,
+    snapshot: &talos_core::session::OrdinaryForkCapture,
+) -> Result<StagedForkHistory> {
+    use std::io::Write;
+    let path = child.file_path.with_extension("fork-staging");
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options.open(&path)?;
+    let mut guard = StagedForkHistory {
+        path,
+        file: Some(file),
+        retained: false,
+        child_cleanup: None,
+        extra_path: None,
+        runtime_lease: None,
+    };
+    guard.acquire_child_ownership(child)?;
+    let file = guard.file.as_mut().context("missing staging file")?;
+    file.write_all(&snapshot.bytes)?;
+    file.sync_all()?;
+    guard.install(&child.file_path)?;
+    Ok(guard)
+}
+
+fn begin_fork_stage(
+    session: &Session,
+    staged_path: std::path::PathBuf,
+    through_entry: Option<&str>,
+) -> Result<(talos_session::SessionMessageScan, StagedForkHistory)> {
+    let scan = match through_entry {
+        Some(id) => session.begin_message_scan_through(id)?,
+        None => session.begin_message_scan()?,
+    };
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options.open(&staged_path)?;
+    Ok((
+        scan,
+        StagedForkHistory {
+            path: staged_path,
+            file: Some(file),
+            retained: false,
+            child_cleanup: None,
+            extra_path: None,
+            runtime_lease: None,
+        },
+    ))
+}
+
+fn copy_fork_page(
+    scan: &mut talos_session::SessionMessageScan,
+    staged: &mut StagedForkHistory,
+    deadline: std::time::Instant,
+    stop: &CancellationToken,
+) -> Result<bool> {
+    use std::io::Write;
+    let page = scan.copy_next_page(deadline, || stop.is_cancelled())?;
+    let copied = page.is_none();
+    if let Some(page) = page {
+        staged
+            .file
+            .as_mut()
+            .context("fork file closed")?
+            .write_all(&page)?;
+    }
+    let decoded = scan.step(deadline, || stop.is_cancelled())?;
+    Ok(copied && decoded)
+}
+
+fn finish_fork_stage(
+    scan: talos_session::SessionMessageScan,
+    staged: StagedForkHistory,
+    stop: &CancellationToken,
+    deadline: std::time::Instant,
+) -> Result<(StagedForkHistory, Vec<Message>, talos_session::SessionEntry)> {
+    let check = || -> Result<()> {
+        if stop.is_cancelled() || std::time::Instant::now() >= deadline {
+            bail!("fork cancelled or deadline exceeded");
+        }
+        Ok(())
+    };
+    check()?;
+    if scan.has_archive_placeholder() {
+        bail!(
+            "cannot fork archived history: preserving archive provenance in the child is not yet supported; continue the original session"
+        );
+    }
+    let (messages, tail, copy_length) = scan.finish_with_record_copy_length()?;
+    let file = staged.file.as_ref().context("fork file closed")?;
+    file.set_len(copy_length)?;
+    check()?;
+    file.sync_all()?;
+    check()?;
+    let tail = tail.context("cannot fork an empty Session")?;
+    Ok((staged, messages, tail))
+}
+
+/// Startup shares TUI's byte capture, source validation and no-overwrite publication.
+pub(crate) fn stage_fork_history_blocking(
+    session: &Session,
+    staged_path: std::path::PathBuf,
+    through_entry: Option<&str>,
+) -> Result<(StagedForkHistory, Vec<Message>, talos_session::SessionEntry)> {
+    let stop = CancellationToken::new();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let (mut scan, mut staged) = begin_fork_stage(session, staged_path, through_entry)?;
+    while !copy_fork_page(&mut scan, &mut staged, deadline, &stop)? {}
+    finish_fork_stage(scan, staged, &stop, deadline)
+}
+
+#[cfg(test)]
 pub(crate) async fn stage_fork_history(
     session: &Session,
     staged_path: std::path::PathBuf,
@@ -70,45 +244,16 @@ pub(crate) async fn stage_fork_history(
     let stop = CancellationToken::new();
     let _cancel_on_drop = stop.clone().drop_guard();
     let session = session.clone();
-    let (mut scan, mut staged) = tokio::task::spawn_blocking(move || {
-        let scan = session.begin_message_scan()?;
-        let mut options = std::fs::OpenOptions::new();
-        options.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        let file = options.open(&staged_path)?;
-        Ok::<_, anyhow::Error>((
-            scan,
-            StagedForkHistory {
-                path: staged_path,
-                file: Some(file),
-                retained: false,
-                child_cleanup: None,
-                extra_path: None,
-            },
-        ))
-    })
-    .await
-    .context("fork capture worker failed")??;
+    let (mut scan, mut staged) =
+        tokio::task::spawn_blocking(move || begin_fork_stage(&session, staged_path, None))
+            .await
+            .context("fork capture worker failed")??;
     loop {
         let worker_stop = stop.clone();
         let result = tokio::task::spawn_blocking(move || {
-            use std::io::Write;
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
-            let page = scan.copy_next_page(deadline, || worker_stop.is_cancelled())?;
-            let copied = page.is_none();
-            if let Some(page) = page {
-                staged
-                    .file
-                    .as_mut()
-                    .context("fork file closed")?
-                    .write_all(&page)?;
-            }
-            let decoded = scan.step(deadline, || worker_stop.is_cancelled())?;
-            Ok::<_, anyhow::Error>((scan, staged, copied && decoded))
+            let done = copy_fork_page(&mut scan, &mut staged, deadline, &worker_stop)?;
+            Ok::<_, anyhow::Error>((scan, staged, done))
         })
         .await
         .context("fork page worker failed")??;
@@ -118,20 +263,30 @@ pub(crate) async fn stage_fork_history(
         }
     }
     tokio::task::spawn_blocking(move || {
-        if stop.is_cancelled() {
-            bail!("fork cancelled");
-        }
-        staged
-            .file
-            .as_ref()
-            .context("fork file closed")?
-            .sync_all()?;
-        let (messages, tail) = scan.finish_with_tail()?;
-        let tail = tail.context("cannot fork an empty Session")?;
-        Ok((staged, messages, tail))
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        finish_fork_stage(scan, staged, &stop, deadline)
     })
     .await
     .context("fork finish worker failed")?
+}
+
+/// Restore under host startup ownership without reacquiring the same OS lock.
+pub(crate) async fn read_session_history_owned(
+    session: &Session,
+    lease: &talos_session::SessionRuntimeLease,
+) -> Result<Vec<Message>> {
+    lease.check_transcript(&session.file_path)?;
+    let cancellation = CancellationToken::new();
+    tokio::select! {
+        biased;
+        signal = tokio::signal::ctrl_c() => {
+            signal.context("failed to observe startup interruption")?;
+            cancellation.cancel();
+            bail!("session history startup cancelled");
+        }
+        result = read_session_snapshot_cancellable(session.clone(), cancellation.clone(), false) =>
+            result.map(|(messages, _)| messages),
+    }
 }
 
 pub(crate) async fn read_session_history(session: &Session) -> Result<Vec<Message>> {
@@ -151,7 +306,7 @@ async fn read_session_history_cancellable(
     session: Session,
     cancellation: CancellationToken,
 ) -> Result<Vec<Message>> {
-    read_session_snapshot_cancellable(session, cancellation)
+    read_session_snapshot_cancellable(session, cancellation, true)
         .await
         .map(|(messages, _)| messages)
 }
@@ -170,7 +325,7 @@ pub(crate) async fn read_session_snapshot(
         reached.notify_one();
         std::future::pending::<()>().await;
     }
-    read_session_snapshot_cancellable(session.clone(), CancellationToken::new()).await
+    read_session_snapshot_cancellable(session.clone(), CancellationToken::new(), false).await
 }
 
 #[cfg(test)]
@@ -181,12 +336,14 @@ tokio::task_local! {
 async fn read_session_snapshot_cancellable(
     session: Session,
     cancellation: CancellationToken,
+    acquire_archive_lease: bool,
 ) -> Result<(Vec<Message>, Option<talos_session::SessionEntry>)> {
     if cancellation.is_cancelled() {
         bail!("session history startup cancelled");
     }
     let worker_cancellation = cancellation.child_token();
     let _cancel_on_drop = worker_cancellation.clone().drop_guard();
+    let recovery_session = session.clone();
     let capture = tokio::task::spawn_blocking(move || session.begin_message_scan());
     let mut scan = tokio::select! {
         biased;
@@ -196,7 +353,7 @@ async fn read_session_snapshot_cancellable(
     };
     loop {
         let stop = worker_cancellation.clone();
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
         let page = tokio::task::spawn_blocking(move || {
             let complete = scan.step(deadline, || stop.is_cancelled())?;
             Ok::<_, talos_session::history_page::HistoryPageError>((scan, complete))
@@ -212,7 +369,32 @@ async fn read_session_snapshot_cancellable(
             break;
         }
     }
-    let finish = tokio::task::spawn_blocking(move || scan.finish_with_tail());
+    let finish = tokio::task::spawn_blocking(move || -> Result<_> {
+        let archived = scan.has_archive_placeholder();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let head =
+            scan.finish_with_tail_cancellable(deadline, || worker_cancellation.is_cancelled())?;
+        if !archived {
+            return Ok(head);
+        }
+        let _lease = if acquire_archive_lease {
+            Some(talos_session::SessionRuntimeLease::acquire(
+                &recovery_session.file_path,
+            )?)
+        } else {
+            None
+        }; // Runtime transitions already own their idle fence/lease.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let evidence = recovery_session
+            .inspect_archive_recovery(deadline, || worker_cancellation.is_cancelled())?;
+        let restored =
+            evidence.into_restored_history(deadline, || worker_cancellation.is_cancelled())?;
+        tracing::info!(
+            messages = restored.0.len(),
+            "restored archive-backed session history; request context remains budgeted separately"
+        );
+        Ok(restored)
+    });
     tokio::select! {
         biased;
         _ = cancellation.cancelled() => bail!("session history startup cancelled"),
@@ -234,6 +416,484 @@ mod tests {
     struct ObserveHistory(mpsc::UnboundedSender<Vec<Message>>);
 
     #[tokio::test]
+    async fn owned_startup_restores_keep_zero_without_reacquiring_runtime_lock() {
+        let temp = tempfile::tempdir().expect("temp");
+        let manager = talos_session::SessionManager::with_dir(temp.path().to_path_buf());
+        let session = manager
+            .create_session("owned startup", "")
+            .expect("session");
+        for i in 0..12 {
+            session
+                .append(&Message::User {
+                    content: format!("original {i}"),
+                })
+                .expect("append");
+        }
+        session.compact_archived(0).expect("keep0");
+        let before = std::fs::read(&session.file_path).expect("head");
+        let lease =
+            talos_session::SessionRuntimeLease::acquire(&session.file_path).expect("host lease");
+        let history = read_session_history_owned(&session, &lease)
+            .await
+            .expect("restore under host lease");
+        assert_eq!(history.len(), 12);
+        assert!(talos_session::SessionRuntimeLease::acquire(&session.file_path).is_err());
+        assert_eq!(std::fs::read(&session.file_path).expect("head"), before);
+        let other = manager.create_session("other", "").expect("other");
+        assert!(read_session_history_owned(&other, &lease).await.is_err());
+    }
+
+    #[test]
+    fn blocking_fork_stage_preserves_bytes_and_refuses_existing_destination() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager.create_session("staging", "").expect("source");
+        source
+            .append(&Message::User {
+                content: "原始\nrecord\tbytes".into(),
+            })
+            .expect("append");
+        let before = source.snapshot_bytes().expect("original");
+        let staging = root.path().join("child.fork-staging");
+        let destination = root.path().join("child.tlog");
+        std::fs::write(&destination, b"existing unrelated child").expect("sentinel");
+        let (mut guard, messages, tail) =
+            stage_fork_history_blocking(&source, staging.clone(), None).expect("stage");
+        assert_eq!(messages.len(), 1);
+        assert_eq!(tail.content, "原始\nrecord\tbytes");
+        assert_eq!(std::fs::read(&staging).expect("staged"), before);
+        assert!(guard.install(&destination).is_err());
+        drop(guard);
+        assert!(!staging.exists());
+        assert_eq!(
+            std::fs::read(&destination).expect("preserved"),
+            b"existing unrelated child"
+        );
+        assert_eq!(source.snapshot_bytes().expect("source unchanged"), before);
+
+        let (mut guard, _, _) =
+            stage_fork_history_blocking(&source, staging, None).expect("restage");
+        let fresh = root.path().join("fresh-child.tlog");
+        guard.install(&fresh).expect("publish");
+        guard.retain();
+        drop(guard);
+        assert_eq!(std::fs::read(fresh).expect("exact published bytes"), before);
+
+        let timed_out = root.path().join("timed-out.fork-staging");
+        let (mut scan, mut guard) =
+            begin_fork_stage(&source, timed_out.clone(), None).expect("capture");
+        let stop = CancellationToken::new();
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !copy_fork_page(&mut scan, &mut guard, deadline, &stop).expect("copy") {}
+        assert!(finish_fork_stage(scan, guard, &stop, std::time::Instant::now()).is_err());
+        assert!(
+            !timed_out.exists(),
+            "expired unpublished copy is cleaned up"
+        );
+        assert_eq!(source.snapshot_bytes().expect("original remains"), before);
+    }
+
+    #[tokio::test]
+    async fn async_fork_stage_excludes_compatibility_tail_before_cold_append() {
+        for extension in ["tlog", "jsonl"] {
+            let root = tempfile::tempdir().expect("root");
+            let id = uuid::Uuid::new_v4();
+            let source = Session::new(
+                id,
+                "staging".into(),
+                String::new(),
+                root.path().join(format!("{id}.{extension}")),
+            );
+            source
+                .append(&Message::User {
+                    content: "original".into(),
+                })
+                .expect("append");
+            let last = source.read_entries().expect("entries").pop().expect("user");
+            let diagnostic = talos_session::SessionEntry {
+                id: "diagnostic-tail".into(),
+                parent_id: Some(last.id),
+                timestamp: last.timestamp,
+                role: "diagnostic".into(),
+                content: "retained control record".into(),
+                metadata: Default::default(),
+            };
+            let store: Box<dyn talos_session::SessionStore> = if extension == "tlog" {
+                Box::new(talos_session::CompactTextSessionStore)
+            } else {
+                Box::new(talos_session::JsonlSessionStore)
+            };
+            store
+                .append_entry(&source.file_path, &diagnostic)
+                .expect("diagnostic append");
+            let prefix = source.snapshot_bytes().expect("valid prefix");
+            let mut before = prefix.clone();
+            before.extend_from_slice(if extension == "tlog" {
+                b"E\t0\t1000\tpartial\t-\t2097153:x"
+            } else {
+                b"invalid legacy suffix\n"
+            });
+            std::fs::write(&source.file_path, &before).expect("compatibility suffix");
+            let child_id = uuid::Uuid::new_v4();
+            let destination = root.path().join(format!("{child_id}.{extension}"));
+            let (mut staged, messages, tail) =
+                stage_fork_history(&source, root.path().join("child.fork-staging"))
+                    .await
+                    .expect("async stage");
+            assert_eq!(messages.len(), 1);
+            assert_eq!(tail.id, diagnostic.id);
+            staged.install(&destination).expect("install");
+            staged.retain();
+            drop(staged);
+            assert_eq!(
+                std::fs::read(&destination).expect("exact valid prefix"),
+                prefix
+            );
+            let child = Session::new(
+                child_id,
+                "staging".into(),
+                String::new(),
+                destination.clone(),
+            );
+            child
+                .append(&Message::User {
+                    content: "continued".into(),
+                })
+                .expect("cold append");
+            let reopened = Session::new(child_id, "staging".into(), String::new(), destination);
+            let entries = reopened.read_entries().expect("reopen");
+            assert_eq!(entries.len(), 3);
+            assert_eq!(entries[1].id, diagnostic.id);
+            assert_eq!(entries[1].content, diagnostic.content);
+            assert_eq!(entries[2].parent_id.as_deref(), Some(tail.id.as_str()));
+            assert_eq!(entries[2].content, "continued");
+            assert_eq!(source.snapshot_bytes().expect("source unchanged"), before);
+        }
+    }
+
+    #[tokio::test]
+    async fn archived_startup_and_transition_restore_original_history_without_rewriting_head() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().into());
+        let session = manager.create_session("restoration", "").expect("session");
+        for i in 0..205 {
+            session
+                .append(&Message::User {
+                    content: format!("original constraint {i}"),
+                })
+                .expect("append");
+        }
+        let original = session.read_messages().expect("original");
+        session.compact_archived(50).expect("archive");
+        let before = session.snapshot_bytes().expect("head");
+        let reopened = manager.get_session(&session.id).expect("reopen");
+        let restored = read_session_history_cancellable(reopened.clone(), CancellationToken::new())
+            .await
+            .expect("startup archive restoration");
+        assert_eq!(restored, original);
+        let _lease = talos_session::SessionRuntimeLease::acquire(&session.file_path)
+            .expect("transition owner");
+        let (switched, tail) = read_session_snapshot(&reopened)
+            .await
+            .expect("fenced transition");
+        assert_eq!(switched, original);
+        assert_eq!(
+            tail.expect("tail").id,
+            session
+                .read_entries()
+                .expect("head")
+                .last()
+                .expect("tail")
+                .id
+        );
+        assert_eq!(session.snapshot_bytes().expect("unchanged"), before);
+    }
+
+    #[tokio::test]
+    async fn missing_archive_is_an_error_not_silent_partial_startup() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().into());
+        let session = manager.create_session("missing", "").expect("session");
+        for i in 0..205 {
+            session
+                .append(&Message::User {
+                    content: format!("fact {i}"),
+                })
+                .expect("append");
+        }
+        session.compact_archived(50).expect("archive");
+        for entry in
+            std::fs::read_dir(session.file_path.parent().expect("parent")).expect("directory")
+        {
+            let path = entry.expect("entry").path();
+            if path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .is_some_and(|s| s.starts_with("s-"))
+            {
+                std::fs::remove_file(path).expect("remove disposable archive");
+            }
+        }
+        assert!(
+            read_session_history_cancellable(session, CancellationToken::new())
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn archive_restoration_reaches_provider_only_within_request_budget() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().into());
+        let session = manager
+            .create_session("budgeted-archive", "")
+            .expect("session");
+        for i in 0..205 {
+            session
+                .append(&Message::User {
+                    content: format!("original-{i} {}", "fact ".repeat(20)),
+                })
+                .expect("append");
+        }
+        session.compact_archived(50).expect("archive");
+        let before = session.snapshot_bytes().expect("before");
+        for capacity in [64, 128_000] {
+            let history =
+                read_session_history_cancellable(session.clone(), CancellationToken::new())
+                    .await
+                    .expect("restore");
+            assert_eq!(history.len(), 205);
+            let (observed, mut requests) = mpsc::unbounded_channel();
+            #[allow(deprecated)]
+            let mut agent = talos_agent::Agent::new(
+                Arc::new(ObserveHistory(observed)),
+                talos_core::tool::ToolRegistry::new(),
+            );
+            agent.set_request_budget_spec(talos_agent::RequestBudgetSpec::new(1));
+            let (mut handle, mut actor) = talos_agent::session::AppServerSession::new(
+                agent,
+                SessionConfig {
+                    runtime_policy: RuntimePolicy::interactive(),
+                    workspace_root: root.path().into(),
+                    initial_history: history,
+                    model_context_limit: capacity,
+                },
+            );
+            let task = tokio::spawn(async move { actor.run().await });
+            handle
+                .sq_tx
+                .send(SessionOp::Submit {
+                    message: "continue restored work".into(),
+                })
+                .await
+                .expect("submit");
+            let status = tokio::time::timeout(Duration::from_secs(10), async {
+                loop {
+                    match handle.eq_rx.recv().await.expect("event") {
+                        SessionEvent::SubmissionContextBudget { budget, .. } => {
+                            assert_eq!(capacity, 64);
+                            assert!(budget.estimated_tokens > budget.limit.expect("limit"));
+                            break None;
+                        }
+                        SessionEvent::TurnEvent {
+                            payload: talos_core::session::TurnEventPayload::Completed { status },
+                            ..
+                        } => break Some(status),
+                        SessionEvent::Error { message } => {
+                            assert_eq!(capacity, 64, "unexpected startup error: {message}");
+                            assert!(message.to_lowercase().contains("budget"), "{message}");
+                            break None;
+                        }
+                        _ => {}
+                    }
+                }
+            })
+            .await
+            .expect("completion");
+            if capacity == 64 {
+                assert!(!matches!(
+                    status,
+                    Some(talos_core::session::TurnCompletionStatus::Success { .. })
+                ));
+                assert!(
+                    requests.try_recv().is_err(),
+                    "over-budget original history must not be dispatched"
+                );
+            } else {
+                assert!(matches!(
+                    status,
+                    Some(talos_core::session::TurnCompletionStatus::Success { .. })
+                ));
+                let request = requests.try_recv().expect("provider request");
+                assert!(request.iter().any(|message| matches!(message, Message::User { content } if content.starts_with("original-0 "))), "archived oldest fact reaches provider when budget permits");
+            }
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+            task.await.expect("actor");
+        }
+        assert_eq!(session.snapshot_bytes().expect("preserved"), before);
+    }
+
+    #[tokio::test]
+    async fn archived_restart_folds_over_budget_history_before_continuation() {
+        struct FoldHistory(mpsc::UnboundedSender<Vec<Message>>);
+        #[async_trait::async_trait]
+        impl LanguageModel for FoldHistory {
+            async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+                self.0.send(messages.to_vec()).expect("capture");
+                let payload = match messages.first() {
+                    Some(Message::User { content }) if content.contains("\nSources: ") => {
+                        let sources: Vec<serde_json::Value> = serde_json::from_str(
+                            content.split("\nSources: ").last().expect("sources"),
+                        )
+                        .expect("source JSON");
+                        let item = serde_json::json!({"text":"Preserve the original recovery constraint", "sources":[sources[0]["source"]]});
+                        serde_json::json!({"schema_version":1,"summary":item,"goal":item,"next_step":item,
+                            "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                            "facts":[],"assumptions":[],"resources":[],"open_loops":[]}).to_string()
+                    }
+                    _ => "continued restored session".into(),
+                };
+                let (tx, rx) = mpsc::channel(2);
+                tx.send(AgentEvent::TextDelta { delta: payload })
+                    .await
+                    .expect("text");
+                tx.send(AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    usage: Usage::default(),
+                })
+                .await
+                .expect("end");
+                Ok(rx)
+            }
+        }
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().into());
+        let session = manager
+            .create_session("folded-archive", "")
+            .expect("session");
+        for index in 0..205 {
+            session
+                .append(&Message::User {
+                    content: format!("original constraint {index}: {}", "detail ".repeat(200)),
+                })
+                .expect("append");
+        }
+        session.compact_archived(50).expect("archive");
+        let before = session.snapshot_bytes().expect("head");
+        let reopened = manager.get_session(&session.id).expect("restart");
+        let history = read_session_history_cancellable(reopened.clone(), CancellationToken::new())
+            .await
+            .expect("restore");
+        assert_eq!(history.len(), 205);
+        let (observed, mut requests) = mpsc::unbounded_channel();
+        #[allow(deprecated)]
+        let mut agent = talos_agent::Agent::new(
+            Arc::new(FoldHistory(observed)),
+            talos_core::tool::ToolRegistry::new(),
+        );
+        agent.set_request_budget_spec(talos_agent::RequestBudgetSpec::new(1));
+        let (mut handle, mut actor) = talos_agent::session::AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: root.path().into(),
+                initial_history: history,
+                model_context_limit: 20_000,
+            },
+        );
+        actor.set_persistence(reopened, Default::default());
+        let task = tokio::spawn(async move { actor.run().await });
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "continue restored work".into(),
+            })
+            .await
+            .expect("submit");
+        let mut applied = false;
+        tokio::time::timeout(Duration::from_secs(30), async {
+            loop {
+                match handle.eq_rx.recv().await.expect("event") {
+                    SessionEvent::AutomaticCompactStatus { state: talos_core::session::AutomaticCompactState::Applied { before, after }, .. } => {
+                        assert!(before > 20_000 && after <= 20_000);
+                        applied = true;
+                    }
+                    SessionEvent::SubmissionContextBudget { .. } => panic!("recoverable history must fold before dispatch"),
+                    SessionEvent::TurnEvent { payload: talos_core::session::TurnEventPayload::Completed { status }, .. } => {
+                        assert!(matches!(status, talos_core::session::TurnCompletionStatus::Success { .. }));
+                        break;
+                    }
+                    SessionEvent::Error { message } => panic!("unexpected error: {message}"),
+                    _ => {}
+                }
+            }
+        }).await.expect("bounded completion");
+        assert!(applied, "must install the validated projection");
+        let mut captured = Vec::new();
+        while let Ok(request) = requests.try_recv() {
+            captured.push(request);
+        }
+        assert!(
+            captured.len() > 2,
+            "history must require multiple bounded summary calls"
+        );
+        let continuation = captured.last().expect("continuation");
+        assert!(continuation.iter().any(|message| matches!(message, Message::Context { content } if content.contains("original recovery constraint"))));
+        assert!(continuation.iter().any(|message| matches!(message, Message::User { content } if content.starts_with("original constraint 204:"))));
+        assert!(!continuation.iter().any(|message| matches!(message, Message::User { content } if content.starts_with("original constraint 0:"))));
+        handle
+            .sq_tx
+            .send(SessionOp::Shutdown)
+            .await
+            .expect("shutdown");
+        task.await.expect("actor");
+        assert!(
+            session
+                .snapshot_bytes()
+                .expect("preserved")
+                .starts_with(&before)
+        );
+        assert_eq!(
+            read_session_history_cancellable(session, CancellationToken::new())
+                .await
+                .expect("restart again")
+                .len(),
+            207
+        );
+    }
+
+    #[tokio::test]
+    async fn archived_fork_refuses_partial_child_and_preserves_source() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager
+            .create_session("source", "workspace")
+            .expect("source");
+        for index in 0..205 {
+            source
+                .append(&Message::User {
+                    content: format!("original-{index}"),
+                })
+                .expect("append");
+        }
+        source.compact_archived(50).expect("archive");
+        let before = source.snapshot_bytes().expect("source bytes");
+        let stage = source.file_path.with_extension("staging");
+        let result = stage_fork_history(&source, stage.clone()).await;
+        assert!(result.is_err(), "must not publish a recent-tail-only child");
+        assert!(!stage.exists(), "failed staging must be cleaned up");
+        assert_eq!(source.snapshot_bytes().expect("unchanged source"), before);
+        let restored = read_session_history_cancellable(source, CancellationToken::new())
+            .await
+            .expect("source still restores");
+        assert_eq!(restored.len(), 205);
+    }
+
+    #[tokio::test]
     async fn staged_fork_preserves_raw_bytes_and_cleans_up_without_overwriting() {
         let root = tempfile::tempdir().expect("root");
         let source = Session::new(
@@ -247,6 +907,7 @@ mod tests {
             bytes.push_str(&serde_json::json!({"type":"message", "data":Message::User { content: format!("{i}:{}", "x".repeat(260)) }}).to_string());
             bytes.push('\n');
         }
+        let valid_end = bytes.len();
         bytes.push_str("invalid trailing record\n");
         std::fs::write(&source.file_path, &bytes).expect("source");
         let stage = root.path().join("staged");
@@ -255,10 +916,7 @@ mod tests {
             .await
             .expect("stage");
         assert_eq!(messages.len(), 8300);
-        assert_eq!(
-            std::fs::read(&stage).expect("staged bytes"),
-            bytes.as_bytes()
-        );
+        assert!(std::fs::read(&stage).expect("staged bytes") == bytes.as_bytes()[..valid_end]);
         std::fs::write(&child, "existing child").expect("collision");
         assert!(guard.install(&child).is_err());
         assert_eq!(
@@ -268,12 +926,48 @@ mod tests {
         let installed = root.path().join("new-child.jsonl");
         guard.install(&installed).expect("install");
         assert!(!stage.exists());
-        assert_eq!(std::fs::read(&installed).expect("child"), bytes.as_bytes());
+        assert!(std::fs::read(&installed).expect("child") == bytes.as_bytes()[..valid_end]);
         drop(guard);
         assert!(!installed.exists(), "unpublished child must be removed");
         assert_eq!(
             std::fs::read(&source.file_path).expect("source retained"),
             bytes.as_bytes()
+        );
+    }
+
+    #[tokio::test]
+    async fn unpublished_fork_direct_cleanup_releases_ownership_after_removal() {
+        let root = tempfile::tempdir().expect("root");
+        let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+        let source = manager
+            .create_session("source", "workspace")
+            .expect("source");
+        source
+            .append(&Message::User {
+                content: "original".into(),
+            })
+            .expect("append");
+        let original = std::fs::read(&source.file_path).expect("source bytes");
+        let child = manager
+            .defer_create_session("child", "workspace")
+            .expect("child");
+        let (mut staged, _, _) =
+            stage_fork_history(&source, child.file_path.with_extension("staging"))
+                .await
+                .expect("stage");
+        staged
+            .acquire_child_ownership(&child)
+            .expect("ownership before install");
+        staged.install(&child.file_path).expect("install");
+        assert!(talos_session::SessionRuntimeLease::acquire(&child.file_path).is_err());
+        // No manager cleanup is registered on the shared startup path.
+        drop(staged);
+        assert!(!child.file_path.exists());
+        let _next_owner = talos_session::SessionRuntimeLease::acquire(&child.file_path)
+            .expect("ownership released after cleanup");
+        assert_eq!(
+            std::fs::read(&source.file_path).expect("source preserved"),
+            original
         );
     }
 
@@ -297,6 +991,10 @@ mod tests {
                 .await
                 .expect("stage");
         staged.install(&child.file_path).expect("install");
+        staged
+            .acquire_child_ownership(&child)
+            .expect("child ownership");
+        assert!(talos_session::SessionRuntimeLease::acquire(&child.file_path).is_err());
         staged.own_child(manager.clone(), child.clone());
         talos_session::PendingSubmissionStore::for_session(&child)
             .initialize_runtime_identity(talos_session::SessionRuntimeIdentity::new(

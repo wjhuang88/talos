@@ -1044,7 +1044,6 @@ mod tests {
         )
         .expect_err("injected error must propagate");
         assert_eq!(error.kind(), io::ErrorKind::Other);
-        drop(backend);
         assert!(writer.failed);
         assert!(writer.flushed);
         assert!(writer.bytes.starts_with(b"\x1b[?2026h"));

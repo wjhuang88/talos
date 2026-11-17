@@ -141,6 +141,11 @@ pub(super) async fn rate_limit() {
 }
 
 #[cfg(test)]
+pub(super) fn clear_cache() {
+    *cache().lock().unwrap_or_else(|e| e.into_inner()) = Cache::default();
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::Arc;
@@ -176,9 +181,4 @@ mod tests {
             );
         }
     }
-}
-
-#[cfg(test)]
-pub(super) fn clear_cache() {
-    *cache().lock().unwrap_or_else(|e| e.into_inner()) = Cache::default();
 }
