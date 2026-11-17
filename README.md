@@ -864,8 +864,11 @@ killed and the shell remains in a raw or mouse-reporting state, run `reset` or o
 
 If you type a message while the model is still processing, it queues automatically and is sent
 FIFO after the current turn completes. The TUI shows a compact preview of queued messages
-above the composer (up to 6 lines; longer queues show a `+N more` summary). The preview clears
-when the queue empties. If `Esc` cancels the active turn, already-accepted queued input becomes the
+above the composer (up to 6 lines; longer queues show a `+N more` summary). Accepted input remains visible until it appears in history or its matching submission
+resolves; acknowledgement alone does not hide it. When space permits, the queue reserves
+a body row even during long live output. A completed shaded user block is separated from
+live output by an unshaded blank row while following the latest output. Very short terminals
+prioritize required controls and the composer over optional spacing. If `Esc` cancels the active turn, already-accepted queued input becomes the
 next turn in the same session automatically. Model/provider switching remains blocked until that
 queued input is accepted by the session and the queue is drained.
 An idle first submission dispatches directly and does not show the queued-message hint.

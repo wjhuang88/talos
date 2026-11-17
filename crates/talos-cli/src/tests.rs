@@ -734,6 +734,103 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn conversation_loop_keeps_processing_between_error_progress_and_terminal() {
+        let engine = ConversationEngine::new("test-model".into(), "test-provider".into());
+        let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);
+        // Send raw envelopes: TestTurnSender::send(Error) also emits Completed,
+        // which would hide a premature stop between provider failure and cleanup.
+        let send = |sequence, payload| {
+            agent_tx
+                .tx
+                .send(SessionEvent::TurnEvent {
+                    session_id: "session_test".into(),
+                    turn_id: "turn_test".into(),
+                    sequence,
+                    payload,
+                })
+                .expect("send lifecycle envelope");
+        };
+        send(0, TurnEventPayload::Started);
+        // Startup model/status snapshots can legitimately be idle. Establish
+        // that Started has been projected before testing the error interval.
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if let UiOutput::Status(status) = ui_rx.recv().await.expect("started status")
+                    && status.is_processing
+                {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("Started reaches UI");
+        send(
+            1,
+            TurnEventPayload::Progress {
+                event: AgentEvent::Error {
+                    message: "provider failed before cleanup".into(),
+                },
+            },
+        );
+        // A later ordered projection is an acknowledgement that the bridge has
+        // consumed Error. No timer-based absence assertion or sleep is needed.
+        send(
+            2,
+            TurnEventPayload::Progress {
+                event: AgentEvent::TextDelta {
+                    delta: "cleanup barrier".into(),
+                },
+            },
+        );
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                match ui_rx
+                    .recv()
+                    .await
+                    .expect("bridge remains open before terminal")
+                {
+                    UiOutput::Status(status) => {
+                        assert!(
+                            status.is_processing,
+                            "progress error must not stop animation"
+                        );
+                    }
+                    UiOutput::Content(talos_conversation::ContentOutput::Delta {
+                        text, ..
+                    }) if text == "cleanup barrier" => {
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        })
+        .await
+        .expect("ordered cleanup barrier reaches UI");
+        send(
+            3,
+            TurnEventPayload::Completed {
+                status: TurnCompletionStatus::Error {
+                    message: "provider failed before cleanup".into(),
+                },
+            },
+        );
+        // Keep the channel open: EOF cleanup must not satisfy this assertion.
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if let UiOutput::Status(status) = ui_rx.recv().await.expect("terminal status")
+                    && !status.is_processing
+                {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("Completed clears processing before channel closure");
+        drop(agent_tx);
+        loop_handle.await.expect("bridge exits cleanly");
+    }
+
+    #[tokio::test]
     async fn conversation_loop_clears_processing_on_provider_error_after_tool_result() {
         let engine = ConversationEngine::new("test-model".to_string(), "test-provider".to_string());
         let (loop_handle, agent_tx, mut ui_rx) = spawn_loop_for_runtime_tests(engine);

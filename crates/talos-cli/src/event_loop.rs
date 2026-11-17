@@ -1112,7 +1112,6 @@ mod approval_queue_tests {
                     task_handle: tokio::spawn(async {}),
                 },
                 first_ctrl_c_time: None,
-                workspace_root: root.path().to_owned(),
                 session,
                 branch_id: None,
                 session_manager: manager,
@@ -1121,6 +1120,8 @@ mod approval_queue_tests {
                 displayed_approval: Some(displayed),
                 approval_rollover_barrier: true,
                 background_tools: HashMap::new(),
+                runtime_generation: 1,
+                input_started: false,
             };
             driver.handle_event(event);
             assert_eq!(

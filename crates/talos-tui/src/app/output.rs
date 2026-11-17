@@ -926,7 +926,23 @@ impl Tui {
     }
 
     pub(super) fn commit_pending_transcript(&mut self) -> io::Result<()> {
+        let user_bg = crate::scrollback::stream_bg_for(Some(&MessageSource::User));
         for block in std::mem::take(&mut self.pending_transcript) {
+            let follows_user = matches!(self.transcript.entries().last().map(|entry| &entry.block),
+                Some(TranscriptBlock::StyledLine(line)) if line.bg.is_some() && line.bg == user_bg);
+            let continues_user_or_separator = matches!(&block,
+                TranscriptBlock::StyledLine(line)
+                    if (line.bg.is_some() && line.bg == user_bg)
+                        || (line.bg.is_none() && line.text.trim().is_empty()));
+            if follows_user && !continues_user_or_separator {
+                // Typed blocks bypass stream_opening_lines. Keep the external
+                // user separator in committed history for every output kind.
+                self.transcript
+                    .append(TranscriptBlock::StyledLine(ScrollbackLine::plain(
+                        String::new(),
+                        None,
+                    )));
+            }
             self.transcript.append(block);
         }
         Ok(())

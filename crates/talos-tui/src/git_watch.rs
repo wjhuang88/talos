@@ -338,6 +338,7 @@ mod tests {
 
     #[tokio::test]
     async fn native_watch_observes_changes_and_quiet_ignored_tree() {
+        let _serial = crate::git_snapshot_worker::TEST_SCAN_LOCK.lock().await;
         let dir = tempfile::tempdir().expect("fixture");
         gix::init(dir.path()).expect("repo");
         std::fs::write(dir.path().join(".gitignore"), "build/\n").expect("ignore");
@@ -357,6 +358,7 @@ mod tests {
 
     #[tokio::test]
     async fn tracked_file_in_ignored_directory_is_watched() {
+        let _serial = crate::git_snapshot_worker::TEST_SCAN_LOCK.lock().await;
         let dir = tempfile::tempdir().expect("fixture");
         gix::init(dir.path()).expect("repo");
         std::fs::create_dir(dir.path().join("build")).expect("directory");
@@ -379,6 +381,7 @@ mod tests {
 
     #[tokio::test]
     async fn replaced_directory_keeps_observing_file_writes() {
+        let _serial = crate::git_snapshot_worker::TEST_SCAN_LOCK.lock().await;
         let dir = tempfile::tempdir().expect("fixture");
         gix::init(dir.path()).expect("repo");
         let nested = dir.path().join("nested");
@@ -408,6 +411,7 @@ mod tests {
 
     #[tokio::test]
     async fn removing_ignore_rule_registers_existing_directory() {
+        let _serial = crate::git_snapshot_worker::TEST_SCAN_LOCK.lock().await;
         let dir = tempfile::tempdir().expect("fixture");
         gix::init(dir.path()).expect("repo");
         let nested = dir.path().join("build");
@@ -438,6 +442,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_watch_root_reports_failure() {
+        let _serial = crate::git_snapshot_worker::TEST_SCAN_LOCK.lock().await;
         let dir = tempfile::tempdir().expect("fixture");
         let mut watch = start(dir.path().join("missing")).await;
         assert!(!next(&mut watch).await.healthy);
