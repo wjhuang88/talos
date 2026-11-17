@@ -1,6 +1,6 @@
 # SEARCH-001-D3-T3: Bing Non-CN-First, CN-Fallback Zero-Key HTML Route
 
-**Status**: In Progress / Claimed — T3a offline candidate; **T3b live/default activation remains BLOCKED**
+**Status**: **T3a offline-only Complete / Closed upon owner-first closeout merge** — Completion Commit `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a` (PR #959); **T3b production/live activation remains BLOCKED / Unclaimed**
 
 | Field | Value |
 |---|---|
@@ -8,16 +8,16 @@
 | Source Issue | [#957](https://github.com/wjhuang88/talos/issues/957) |
 | Parent | [SEARCH-001-D3 / #937](SEARCH-001-D3-bing-direct-html-feasibility.md), [SEARCH-001 / #624](SEARCH-001-zero-config-global-search.md) |
 | Predecessors | D3-T1/#941 and D3-T2/#947 Complete/Closed; L/#901 retired `rust-websearch` |
-| Selected iteration | [I329](../../iterations/I329-search-bing-dual-host-offline.md) — active after governance PR #958 merge |
+| Selected iteration | [I329](../../iterations/I329-search-bing-dual-host-offline.md) — T3a Complete / Closed upon owner-first closeout merge; governance #958 effective |
 | Product direction | Non-CN `www.bing.com/search` first, then existing `cn.bing.com/search` on allowed unavailability |
-| Implemented by this claim | **T3a offline/test-only** failover policy candidate; no newly authorized host, default route, or live query |
+| Implemented by this claim | **T3a offline/test-only** decision policy and synthetic tests accepted/merged via PR #959; no newly authorized host, default route, or live query |
 | Production activation | **T3b BLOCKED** on supplier/result rights, network authority, real independent region tests, and a later separately effective claim |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | D3-T3a / #957: offline pure endpoint-variant selection and fail-closed fallback classification, synthetic deterministic policy tests, bounded design receipt; no production path `www.bing.com` registration or live Bing requests. |
@@ -26,9 +26,9 @@
 | Governance Claim PR | #958 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance PR #958 accepted/merged `58207831675365e35cc80601097b96f9432a68aa` after exact-head [CI #4273](https://github.com/wjhuang88/talos/actions/runs/43805545051) 4 applicable SUCCESS/4 documentation-scoped SKIPPED, independent [no-blocker review](https://github.com/wjhuang88/talos/pull/958#issuecomment-6907540766) and head CAS. |
-| Implementation PR | #959 |
-| Last Updated | 2026-11-16 |
-| Handoff / Release Condition | Do not start source before effective I329 claim. T3a closeout may describe only offline model acceptance, not product route. T3b remains blocked on additional rights/authority/region gates. |
+| Implementation PR | #959 merged as `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a` (Completion Commit) |
+| Last Updated | 2026-11-17 |
+| Handoff / Release Condition | Offline T3a source delivered and I329 claim closed only by this owner-first closeout publication. Keep #957 Open for blocked/unclaimed T3b; do not imply deployed `www` routing or a vendor/access/output rights grant. |
 
 ## Product decision and boundary
 
@@ -63,4 +63,13 @@ After effective claim: `cargo fmt --all -- --check`, `cargo test --locked -p tal
 
 ## T3a implementation checkpoint — 2026-11-16
 
-I329 was activated by governance-only [PR #958](https://github.com/wjhuang88/talos/pull/958), merged at `58207831675365e35cc80601097b96f9432a68aa` after exact-head CI #4273 success and independent no-blocker review. A separate implementation branch from that exact merge introduces a private, **unwired** `search_backend::bing_variants` policy candidate and hand-authored tests. This may be compiled/tested but is not permitted to change the protected SearchRouter or manifest, register `www.bing.com`, perform live requests, activate Browser/CDP or imply Microsoft service/output rights. The [offline contract/evidence note](../../reference/SEARCH-001-D3-T3-OFFLINE-DECISION-2026-11-16.md) pins those boundaries. Completion and CI are **pending**, not accepted here.
+I329 was activated by governance-only [PR #958](https://github.com/wjhuang88/talos/pull/958), merged at `58207831675365e35cc80601097b96f9432a68aa` after exact-head CI #4273 success and independent no-blocker review. A separate implementation branch from that exact merge introduces a private, **unwired** `search_backend::bing_variants` policy candidate and hand-authored tests. This may be compiled/tested but is not permitted to change the protected SearchRouter or manifest, register `www.bing.com`, perform live requests, activate Browser/CDP or imply Microsoft service/output rights. The [offline contract/evidence note](../../reference/SEARCH-001-D3-T3-OFFLINE-DECISION-2026-11-16.md) pins those boundaries. At that source-stage checkpoint completion and CI were pending; **actual delivery and acceptance** are recorded in the 2026-11-17 owner-first closeout below.
+
+## T3a owner-first source closeout — 2026-11-17
+
+- **Completion Commit**: `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a`, existing on target `main`, created by squash merge of implementation [PR #959](https://github.com/wjhuang88/talos/pull/959). Source candidate exact HEAD `71d752880b6ede90c8e8bd89c5a87cc6f2217b9e`, against target main `6d5651df91c9c5fc20ee57517d1c43a1a2e0a338` at merge.
+- **Authority**: separate I329 atomic claim [#958](https://github.com/wjhuang88/talos/pull/958) effective on `58207831675365e35cc80601097b96f9432a68aa`. Only the private, unconnected T3a variant/failover decision and seven synthetic offline unit tests were authorized or delivered.
+- **Exact-head native validation**: [CI #4333 / run 44011362862](https://github.com/wjhuang88/talos/actions/runs/44011362862) **SUCCESS, 8/8 jobs** (native macOS fmt/check/clippy/tests, Windows workspace and aggregate, Linux/Windows Desktop, installer, change-scope and remote issue/owner reconciliation). Earlier exact-head [CI #4284](https://github.com/wjhuang88/talos/actions/runs/43830156419) had one Windows `talos-agent::checkpoint_history` lease-test failure in attempt 1 (648 passed/1 failed, untouched by the SEARCH PR), then passed on the same-head failed-job-only rerun; retain original failure and **do not** assert a proven flaky root cause.
+- **Independent security/API/network review**: [Copilot formal technical APPROVE](https://github.com/wjhuang88/talos/pull/959#issuecomment-6941738278) for exact HEAD `71d752880b6ede90c8e8bd89c5a87cc6f2217b9e`, including later target-main changes, zero blockers, no source/Network/public API interaction. Reviewer is a separate technical reviewer, not legal/rightsholder or human-maintainer sign-off. Final owner/work-slice/overlap, exact-CI, approval and expected-head CAS passed; GitHub [PR #959](https://github.com/wjhuang88/talos/pull/959) returned merged=true and Completion Commit above.
+- **Accepted behavior**: private/unwired `bing_variants` models Non-CN-first with only typed DNS, connect establishment/refusal or source-local timeout eligible for CN **and only with five positive guards**. All HTTP statuses including 403/429/5xx, valid-empty, challenge, access-denial, redirect, parser/encoding faults, cancellation, deadline and budget exhaustion are no-fallback. CN never rotates back. **Existing production** DDG Lite → DDG Instant Answer → DDG HTML → CN Bing chain and query recipients are unchanged; no newly distributed/authorized `www.bing.com` Network manifest, Browser/CDP path, new provider count or user query traffic.
+- **Residual**: T3b remains **BLOCKED, unclaimed and unshipped** pending separate Microsoft automated SERP access **and** result/LLM-output-use determination, effective Network/ADR-090 host/redirect/proxy/budget authority, permitted actual mainland-China + independent comparator evidence, independent review and native CI. **#957 remains Open** for this residual; D3 parent #937 and Epic #624 remain Open; historical #644 ZERO-ADMISSION and E/F/G/I gates unchanged. I329 T3a may be recorded Complete / Closed only as this offline slice. No release activation is implied.
