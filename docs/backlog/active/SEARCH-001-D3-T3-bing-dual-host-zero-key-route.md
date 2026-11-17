@@ -1,6 +1,6 @@
 # SEARCH-001-D3-T3: Bing Non-CN-First, CN-Fallback Zero-Key HTML Route
 
-**Status**: **T3a offline-only Complete / Closed upon owner-first closeout merge** — Completion Commit `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a` (PR #959); **T3b production/live activation remains BLOCKED / Unclaimed**
+**Status**: Complete / Closed for I329 T3a offline-only upon owner-first closeout merge — source Completion Commit `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a` (PR #959); **T3b production/live activation remains BLOCKED / Unclaimed**
 
 | Field | Value |
 |---|---|
@@ -66,6 +66,8 @@ After effective claim: `cargo fmt --all -- --check`, `cargo test --locked -p tal
 I329 was activated by governance-only [PR #958](https://github.com/wjhuang88/talos/pull/958), merged at `58207831675365e35cc80601097b96f9432a68aa` after exact-head CI #4273 success and independent no-blocker review. A separate implementation branch from that exact merge introduces a private, **unwired** `search_backend::bing_variants` policy candidate and hand-authored tests. This may be compiled/tested but is not permitted to change the protected SearchRouter or manifest, register `www.bing.com`, perform live requests, activate Browser/CDP or imply Microsoft service/output rights. The [offline contract/evidence note](../../reference/SEARCH-001-D3-T3-OFFLINE-DECISION-2026-11-16.md) pins those boundaries. At that source-stage checkpoint completion and CI were pending; **actual delivery and acceptance** are recorded in the 2026-11-17 owner-first closeout below.
 
 ## T3a owner-first source closeout — 2026-11-17
+
+Completion Commit: `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a` (actual pre-existing implementation merge to main, PR #959).
 
 - **Completion Commit**: `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a`, existing on target `main`, created by squash merge of implementation [PR #959](https://github.com/wjhuang88/talos/pull/959). Source candidate exact HEAD `71d752880b6ede90c8e8bd89c5a87cc6f2217b9e`, against target main `6d5651df91c9c5fc20ee57517d1c43a1a2e0a338` at merge.
 - **Authority**: separate I329 atomic claim [#958](https://github.com/wjhuang88/talos/pull/958) effective on `58207831675365e35cc80601097b96f9432a68aa`. Only the private, unconnected T3a variant/failover decision and seven synthetic offline unit tests were authorized or delivered.

@@ -1,6 +1,6 @@
 # Iteration I329: Bing Non-CN-First/CN-Fallback Offline Contract
 
-> Status: **Complete / Closed upon owner-first closeout merge** for **T3a offline-only**; T3b is BLOCKED/Unclaimed. Claim #958 merged `58207831675365e35cc80601097b96f9432a68aa`; source Completion Commit `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a` (PR #959).
+> Document status: Complete / Closed upon owner-first closeout merge for I329 T3a offline-only; T3b BLOCKED / Unclaimed. Claim #958 merged `58207831675365e35cc80601097b96f9432a68aa`; source Completion Commit `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a` (PR #959).
 > Selected: 2026-11-16
 > Story: [SEARCH-001-D3-T3 / #957](../backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md)
 > Parent: [D3/#937](https://github.com/wjhuang88/talos/issues/937) / [SEARCH-001/#624](https://github.com/wjhuang88/talos/issues/624)
@@ -52,6 +52,8 @@ No production `www` request, browser/CDP activation, new SearchBackend identity,
 Claim #958 merged at `58207831675365e35cc80601097b96f9432a68aa`, after [CI #4273](https://github.com/wjhuang88/talos/actions/runs/43805545051) and independent exact-head no-blocker review. No source implementation was started before that merge. The new branch includes only private inert Bing variant decision/tests and an evidence note; at that checkpoint source CI, independent security/API review and CAS were **not yet accepted**; all T3a source gates subsequently passed as recorded in the closeout below. Production `www.bing.com` activation T3b remains BLOCKED, no new Network authority was granted.
 
 ## T3a accepted completion and validation — 2026-11-17
+
+Completion Commit: `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a` (actual source PR #959 merge on target main).
 
 1. Governance claim #958 merged `58207831675365e35cc80601097b96f9432a68aa` before source work. Implementation [PR #959](https://github.com/wjhuang88/talos/pull/959) merged with expected HEAD `71d752880b6ede90c8e8bd89c5a87cc6f2217b9e`; **Completion Commit** `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a` exists on target main.
 2. Locked exact-head [CI #4333 / run 44011362862](https://github.com/wjhuang88/talos/actions/runs/44011362862) **8/8 SUCCESS**: macOS fmt/check/clippy/test; Windows workspace and aggregate, Linux/Windows Desktop, installer, scope classification and remote issue/owner reconciliation. Preserve original #4284 attempt-1 Windows `talos-agent` lease-test failure and same-head successful rerun; no flaky-root-cause certification.
