@@ -88,6 +88,29 @@ impl SessionRuntimeLease {
         })
     }
 
+    pub(crate) fn check_session(&self, session: &crate::Session) -> Result<(), SessionError> {
+        self.check_transcript(&session.file_path)
+    }
+
+    /// Verify that this lease owns the exact transcript, resolving parent aliases.
+    /// A matching stem with a different format extension is not sufficient.
+    pub fn check_transcript(&self, transcript: &Path) -> Result<(), SessionError> {
+        let parent = transcript
+            .parent()
+            .ok_or_else(|| SessionError::DurableTurn("Session transcript has no parent".into()))?;
+        let actual = parent
+            .canonicalize()?
+            .join(transcript.file_name().ok_or_else(|| {
+                SessionError::DurableTurn("Session transcript has no filename".into())
+            })?);
+        if actual != self.transcript {
+            return Err(SessionError::DurableTurn(
+                "fork runtime lease identity mismatch".into(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Verify all native transcript records before interpreting missing outcomes.
     /// Corrupt or truncated tails are refused, never silently skipped or rewritten.
     pub fn validate_transcript(&self) -> Result<(), SessionError> {

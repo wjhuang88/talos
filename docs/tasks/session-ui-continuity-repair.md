@@ -313,3 +313,20 @@ Watcher isolation follow-up: independent review APPROVE; standard pinned/locked
 release_preflight.sh passed (5363 passed, zero failed/ignored), exit0,8min31.998s,
 peak2G/swap0. Log: target/ui-watch-preflight-20261117.log. Eight-thread red/green
 evidence above remains applicable; fresh exact-head Windows CI remains pending.
+
+
+## 2026-11-17 main integration validated
+
+Integrated main e1f8c693 into UI8bcb7b47. Only conflict was appended app_tests:
+retained three separator tests and numbered edit/diff resize test with distinct
+#[test] attributes. Independent integration review APPROVE; no API/security or
+default background behavior expansion. Standard pinned/locked preflight passed
+5588/0/0, exit0,15min48.319s,peak2G/swap0; external SDK and SQLite API
+fixtures passed. All2681tracked file hashes unchanged during validation.
+Evidence: target/ui-main-integrated-preflight-20261117.log and
+target/ui-main-integrated-source-manifest-20261117.json.
+
+Old CI43992079353 Windows workspace tests passed, including five watcher tests
+and TUI702/0/0. Its later WAL path diagnostic failed because old UI8bcb7b47 lacked
+wal_path_probe requested by target workflow. This integration includes that main
+example. Raw failure retained; new exact-head CI required, no whole old-run pass.

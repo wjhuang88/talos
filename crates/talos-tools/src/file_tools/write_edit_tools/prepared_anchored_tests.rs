@@ -116,6 +116,8 @@ async fn retained_anchored_plan_reviews_exact_result_and_checks_freshness() {
             continue;
         }
         assert!(!output.result.is_error, "{}", output.result.content);
+        assert!(output.result.content.contains("- 1 | before"));
+        assert!(output.result.content.contains("+ 1 | changed"));
         assert_eq!(
             std::fs::read_to_string(&path).expect("edited"),
             "changed\nafter\n"
@@ -131,5 +133,66 @@ async fn retained_anchored_plan_reviews_exact_result_and_checks_freshness() {
             .await;
         assert!(!result.is_error, "{}", result.content);
         assert_eq!(std::fs::read_to_string(&path).expect("restored"), original);
+    }
+}
+
+#[tokio::test]
+async fn direct_and_prepared_disjoint_deletion_preserve_original_and_result_locations() {
+    for retained in [false, true] {
+        let root = tempfile::tempdir().expect("root");
+        let path = root.path().join("file.txt");
+        let before = "head\r\nremove\r\n中文\r\nlast";
+        let after = "head\r\n中文\r\n尾行";
+        std::fs::write(&path, before).expect("write");
+        let (read, _, edit, _) =
+            crate::file_tools::snapshot_aware_file_tools(root.path().to_owned());
+        let read_result = read.execute(serde_json::json!({"path":"file.txt"})).await;
+        assert!(!read_result.is_error, "{}", read_result.content);
+        let mut lines = read_result.content.lines();
+        let snapshot = lines
+            .next()
+            .expect("snapshot")
+            .strip_prefix("[snapshot:")
+            .and_then(|s| s.strip_suffix(']'))
+            .expect("id");
+        let refs: Vec<_> = lines
+            .filter_map(|line| line.split_once('|').map(|(anchor, _)| anchor))
+            .collect();
+        let input = serde_json::json!({"path":"file.txt", "snapshot_id":snapshot,
+        "retain_backup":retained, "operations":[
+            {"op":"delete", "start":refs[1]},
+            {"op":"replace", "target":refs[3], "content":"尾行"}
+        ]});
+        let result = if retained {
+            let prepared = prepare(&edit, &input, ToolProvenance::Native)
+                .expect("prepare")
+                .expect("plan");
+            let proof = admit(root.path(), prepared.as_ref(), &input);
+            let PreparedNormalStage::Continue(prepared) = prepared.execute_stage(proof).await
+            else {
+                panic!("capture");
+            };
+            let evidence = prepared
+                .prepared_file_mutation_evidence()
+                .expect("evidence");
+            assert_eq!(evidence.description().before, before);
+            assert_eq!(evidence.description().after.as_deref(), Some(after));
+            let proof = admit(root.path(), prepared.as_ref(), &input);
+            let PreparedNormalStage::Complete(output) = prepared.execute_stage(proof).await else {
+                panic!("commit");
+            };
+            output.result
+        } else {
+            edit.execute(input).await
+        };
+        assert!(!result.is_error, "{}", result.content);
+        for expected in ["- 2 | remove", "+ (empty)", "- 4 | last", "+ 3 | 尾行"] {
+            assert!(
+                result.content.lines().any(|row| row == expected),
+                "{}",
+                result.content
+            );
+        }
+        assert_eq!(std::fs::read_to_string(path).expect("read result"), after);
     }
 }

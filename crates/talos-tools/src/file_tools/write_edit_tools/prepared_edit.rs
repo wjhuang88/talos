@@ -190,7 +190,12 @@ impl PreparedEdit {
                 after.push_str(&before[..start]);
                 after.push_str(&edit.new_string);
                 after.push_str(&before[start + edit.old_string.len()..]);
-                self.preview = bounded_replacement_diff(&edit.old_string, &edit.new_string);
+                self.preview = bounded_replacement_diff(
+                    &edit.old_string,
+                    &edit.new_string,
+                    line_at(before.as_bytes(), start),
+                    line_at(before.as_bytes(), start),
+                );
                 after
             }
         };

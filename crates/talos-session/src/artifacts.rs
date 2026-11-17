@@ -202,6 +202,7 @@ pub(crate) fn cleanup_session_with_index(
 ) -> Result<SessionArtifactCleanupReport, SessionError> {
     let set = SessionArtifactSet::for_transcript(transcript)?;
     let _lease = cleanup_lease(transcript, &set.sidecars())?;
+    let _identity = crate::identity_custody::retire_registered_transcript(transcript)?;
     let mut report = remove_paths(&set.sidecars())?;
     remove_index()?;
     report.merge(remove_paths(&[set.transcript])?);
@@ -225,6 +226,7 @@ pub fn remove_session_transcript(
 ) -> Result<SessionArtifactCleanupReport, SessionError> {
     let set = SessionArtifactSet::for_transcript(transcript_path)?;
     let _lease = cleanup_lease(transcript_path, std::slice::from_ref(&set.transcript))?;
+    let _identity = crate::identity_custody::retire_registered_transcript(transcript_path)?;
     remove_paths(&[set.transcript])
 }
 
@@ -234,6 +236,7 @@ pub fn remove_session_artifacts_for_transcript(
 ) -> Result<SessionArtifactCleanupReport, SessionError> {
     let set = SessionArtifactSet::for_transcript(transcript_path)?;
     let _lease = cleanup_lease(transcript_path, &set.sidecars())?;
+    let _identity = crate::identity_custody::retire_registered_transcript(transcript_path)?;
     let mut report = remove_paths(&set.sidecars())?;
     report.merge(remove_paths(&[set.transcript])?);
     Ok(report)
@@ -437,7 +440,13 @@ pub(crate) fn reconcile_orphan_sidecars_in_root(
         };
         let tlog = workspace.join(format!("{id}.tlog"));
         let jsonl = workspace.join(format!("{id}.jsonl"));
-        if fs::symlink_metadata(&tlog).is_ok() || fs::symlink_metadata(&jsonl).is_ok() {
+        // Quarantined fork evidence still owns its sidecars. Automatic orphan
+        // maintenance must not erase data needed for recovery or inspection.
+        let quarantined = workspace.join(format!("{id}.fork-unpublished"));
+        if fs::symlink_metadata(&tlog).is_ok()
+            || fs::symlink_metadata(&jsonl).is_ok()
+            || fs::symlink_metadata(&quarantined).is_ok()
+        {
             report.skipped_sets = report.skipped_sets.saturating_add(1);
             continue;
         }

@@ -508,6 +508,15 @@ impl Agent {
         if observed.call == *call {
             self.record_checkpoint_result(&call.name, &llm_result);
         }
+        let _ = crate::background_consumption::TURN_CONSUMPTION.try_with(|evidence| {
+            evidence.bind_result(
+                &call.id,
+                (observed.call == *call
+                    && observed.result.content == result.content
+                    && observed.result.is_error == result.is_error)
+                    .then_some(&llm_result),
+            );
+        });
         messages.push(Message::Tool { result: llm_result });
         let todo_presentation = if !ui_result.is_error
             && observed.call == *call
@@ -538,6 +547,51 @@ impl Agent {
 
     #[allow(clippy::too_many_arguments)]
     async fn execute_single_tool_with_presentation(
+        &self,
+        hook_ctx: &HookContext,
+        registry: &ToolRegistry,
+        call: &ToolCall,
+        user_intent: Option<&str>,
+        policy: &ToolPresentationPolicy,
+        presented_tool_names: &std::collections::HashSet<String>,
+        read_image_quota: &std::sync::atomic::AtomicUsize,
+        private_tokens: &PrivateTokens,
+    ) -> AgentResult<(ToolExecutionResult, Vec<ContentPart>)> {
+        let execution = self.execute_single_tool_observed(
+            hook_ctx,
+            registry,
+            call,
+            user_intent,
+            policy,
+            presented_tool_names,
+            read_image_quota,
+            private_tokens,
+        );
+        match crate::background_consumption::TURN_CONSUMPTION.try_with(Clone::clone) {
+            Ok(consumption) => {
+                let mut guard = consumption
+                    .begin_call(&call.id)
+                    .map_err(AgentError::ToolError)?;
+                let result = crate::background_consumption::OBSERVATION
+                    .scope(
+                        crate::background_consumption::ToolObservation {
+                            consumption,
+                            call_id: call.id.clone(),
+                        },
+                        execution,
+                    )
+                    .await;
+                if result.is_ok() {
+                    guard.complete();
+                }
+                result
+            }
+            Err(_) => execution.await,
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn execute_single_tool_observed(
         &self,
         hook_ctx: &HookContext,
         registry: &ToolRegistry,

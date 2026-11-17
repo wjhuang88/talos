@@ -28,6 +28,7 @@ silently rewrite the reason or boundary that governed an earlier implementation.
 
 | ADR | State | Current Boundary / Gate |
 |---|---|---|
+| [106: SQLite native upgrade](106-sqlite-native-upgrade-and-error-type-migration.md) | Proposed | Five-consumer dependency/type migration, old-data compatibility, native path comparison; no patch release. |
 | [104: Domain persistence and cross-host composition](104-host-composition-ownership-boundary.md) | Accepted on reviewed #936 merge **for ownership/placement only**; E2/E3 API, runtime wiring, native/local conformance and code separately gated. |
 | [103: Azure OpenAI transport](103-azure-openai-transport-boundary.md) | Accepted on reviewed #918 merge | I323 / #914 atomic claim; Chat/Responses reuse, deployment/v1 paths and explicit credential boundary. |
 | [102: Operation approval presentation](102-operation-approval-presentation.md) | Proposed | Typed operation summary, single-use decisions and in-process UI event migration. |
@@ -159,3 +160,6 @@ All individual ADR documents remain in this directory and are not replaced by th
 
 - [ADR-094: Gemini protocol/authentication](094-google-gemini-protocol-boundary.md) — accepted
   proposal effective only with governance #811; PROVIDER-008-B / I310 / #810.
+
+- [ADR-105: Selected CLI Session History Recovery](105-selected-session-history-recovery.md)
+  — proposed emergency candidate; independent safety/API review pending.

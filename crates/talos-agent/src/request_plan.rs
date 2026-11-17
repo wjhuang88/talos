@@ -205,6 +205,36 @@ impl Agent {
         checkpoint_observer: Option<crate::checkpoint_progress::CheckpointObserver>,
         private_replays: std::sync::Arc<crate::private_replay::PrivateReplayStore>,
     ) -> AgentResult<PreparedSessionTurn> {
+        let (query, inputs) = Self::structured_session_inputs(items);
+        self.prepare_session_messages_at_revision(
+            query,
+            inputs,
+            history,
+            request_context_limit,
+            generation,
+            revision,
+            recovered,
+            checkpoint_observer,
+            private_replays,
+        )
+        .await
+    }
+
+    /// Prepares Actor-owned inputs without converting runtime context to user text.
+    /// Admission and turn ownership remain the caller's responsibility.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn prepare_session_messages_at_revision(
+        &self,
+        query: String,
+        inputs: Vec<Message>,
+        history: Vec<Message>,
+        request_context_limit: u32,
+        generation: u64,
+        revision: u64,
+        recovered: Option<&crate::compaction::HistorySource>,
+        checkpoint_observer: Option<crate::checkpoint_progress::CheckpointObserver>,
+        private_replays: std::sync::Arc<crate::private_replay::PrivateReplayStore>,
+    ) -> AgentResult<PreparedSessionTurn> {
         let source = crate::compaction::HistorySource::bind_recovered_until(
             generation,
             revision,
@@ -213,7 +243,6 @@ impl Agent {
             tokio::time::Instant::now() + std::time::Duration::from_secs(120),
         )
         .await;
-        let (query, inputs) = Self::structured_session_inputs(items);
         self.prepare_turn_start_with_source(
             query,
             inputs,

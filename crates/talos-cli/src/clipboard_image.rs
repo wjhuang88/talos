@@ -238,21 +238,21 @@ mod tests {
         assert!(parse_capture(b"Xdata".to_vec()).is_err());
         assert!(parse_capture(b"F[]".to_vec()).is_err());
         assert!(matches!(
-            parse_capture(b"F[\"/tmp/image.png\"]".to_vec()).unwrap(),
+            parse_capture(b"F[\"/tmp/image.png\"]".to_vec()).expect("valid capture file list"),
             Capture::Files(_)
         ));
     }
     #[test]
     fn staged_files_are_removed_unless_submission_commits_them() {
-        let root = tempfile::tempdir().unwrap();
+        let root = tempfile::tempdir().expect("temporary image directory");
         let mut bytes = std::io::Cursor::new(Vec::new());
         image::DynamicImage::new_rgba8(2, 2)
             .write_to(&mut bytes, image::ImageFormat::Png)
-            .unwrap();
+            .expect("encode PNG fixture");
         let mut staging = Staging::default();
         let part = staging
             .stage_in(root.path(), bytes.get_ref(), 0, 0)
-            .unwrap();
+            .expect("stage valid image");
         let ContentPart::Image { path, .. } = &part else {
             panic!("image")
         };
@@ -261,7 +261,7 @@ mod tests {
         assert!(!path.exists());
         let part = staging
             .stage_in(root.path(), bytes.get_ref(), 0, 0)
-            .unwrap();
+            .expect("stage valid image");
         let ContentPart::Image { path, .. } = &part else {
             panic!("image")
         };
@@ -271,10 +271,15 @@ mod tests {
     }
     #[test]
     fn invalid_stage_is_cleaned_and_existing_limits_apply() {
-        let root = tempfile::tempdir().unwrap();
+        let root = tempfile::tempdir().expect("temporary image directory");
         let mut staging = Staging::default();
         assert!(staging.stage_in(root.path(), b"invalid", 0, 0).is_err());
-        assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+        assert_eq!(
+            std::fs::read_dir(root.path())
+                .expect("inspect image directory")
+                .count(),
+            0
+        );
         assert!(
             staging
                 .stage_in(
@@ -285,7 +290,12 @@ mod tests {
                 )
                 .is_err()
         );
-        assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+        assert_eq!(
+            std::fs::read_dir(root.path())
+                .expect("inspect image directory")
+                .count(),
+            0
+        );
     }
     #[test]
     fn png_encoder_sink_is_bounded() {
@@ -312,7 +322,8 @@ mod tests {
     #[tokio::test]
     async fn timeout_and_cancellation_reap_clipboard_worker() {
         for cancelled in [false, true] {
-            let mut command = tokio::process::Command::new(std::env::current_exe().unwrap());
+            let mut command =
+                tokio::process::Command::new(std::env::current_exe().expect("test executable"));
             command
                 .args([
                     "--exact",
@@ -324,21 +335,24 @@ mod tests {
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null())
                 .kill_on_drop(true);
-            let mut child = command.spawn().unwrap();
+            let mut child = command.spawn().expect("spawn clipboard worker fixture");
             let cancel = tokio_util::sync::CancellationToken::new();
             if cancelled {
                 cancel.cancel();
             }
             let error = read_child(&mut child, cancel, Duration::from_millis(100))
                 .await
-                .unwrap_err();
+                .expect_err("clipboard worker must time out or cancel");
             assert!(
                 error
                     .to_string()
                     .contains(if cancelled { "cancelled" } else { "timed out" })
             );
             assert!(
-                child.try_wait().unwrap().is_some(),
+                child
+                    .try_wait()
+                    .expect("query clipboard worker exit")
+                    .is_some(),
                 "worker must be reaped before return"
             );
         }

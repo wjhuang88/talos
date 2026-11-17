@@ -70,6 +70,16 @@ pub struct SessionEntry {
     pub metadata: SessionMetadata,
 }
 
+impl SessionEntry {
+    /// Whether this entry matches the legacy synthetic archive count marker.
+    ///
+    /// A match requires archive recovery before treating the head as complete
+    /// history. It does not itself prove archive ownership or authorize omission.
+    pub fn is_compaction_placeholder(&self) -> bool {
+        crate::archive_recovery::placeholder(self)
+    }
+}
+
 /// A linear branch within a session.
 ///
 /// A branch is a sequence of entries sharing a common root. Branches are created
@@ -172,6 +182,13 @@ impl Session {
         let dir = self.file_path.parent().ok_or_else(|| {
             SessionError::ParseError("session file has no parent directory".into())
         })?;
+        let mut tip = self
+            .last_entry_id
+            .lock()
+            .map_err(|_| SessionError::LockPoisoned)?;
+        // Compaction can replace the entire head (including when keeping zero
+        // entries), or fail after a partial rewrite. Never retain a stale tip.
+        *tip = None;
         engine.compact_segment(&self.file_path, dir, max_entries)
     }
     /// Create a new session with a single empty root branch.
@@ -270,13 +287,34 @@ impl Session {
     /// # Errors
     ///
     /// Returns [`SessionError::EntryNotFound`] if the entry ID doesn't exist.
+    /// Returns [`SessionError::ParseError`] for receipt-bound history (use
+    /// [`Session::publish_history_fork`]) or a legacy archive count placeholder:
+    /// copying that head cannot preserve the child's complete source history.
     pub fn fork(&mut self, from_entry_id: &str) -> Result<String, SessionError> {
+        if crate::fork_receipt::published_branch(
+            self,
+            std::time::Instant::now() + std::time::Duration::from_secs(10),
+        )?
+        .is_some()
+        {
+            return Err(SessionError::ParseError(
+                "receipt-bound history requires publish_history_fork into a fresh child; its committed branch cannot be replaced in memory".into(),
+            ));
+        }
         let all_entries = self.read_entries()?;
 
         let pos = all_entries
             .iter()
             .position(|e| e.id == from_entry_id)
             .ok_or_else(|| SessionError::EntryNotFound(from_entry_id.to_string()))?;
+
+        // Enforce this at the shared storage boundary, including REPL and SDK
+        // callers that do not pass through CLI startup/TUI staging guards.
+        if all_entries.iter().any(crate::archive_recovery::placeholder) {
+            return Err(SessionError::ParseError(
+                "cannot fork archived history: preserving archive provenance in the child is not yet supported; continue the original session".into(),
+            ));
+        }
 
         let entries_up_to_fork: Vec<SessionEntry> = all_entries[..=pos].to_vec();
 
@@ -314,6 +352,9 @@ impl Session {
         self.id = new_id;
         self.file_path = new_file_path;
         self.current_branch = branch_id;
+        // A fork has a different persisted tip. Do not share its cache with
+        // handles that continue appending to the original session.
+        self.last_entry_id = Arc::new(Mutex::new(None));
     }
 
     /// Get a reference to a branch by its ID.

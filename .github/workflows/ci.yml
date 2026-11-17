@@ -519,6 +519,25 @@ jobs:
             exit 1
           }
 
+      - name: Diagnose concurrent SQLite WAL path spelling
+        # Run after workspace tests even when they failed; retain both outcomes.
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          cargo run --locked -p talos-session --example wal_path_probe 2>&1 |
+            Tee-Object -FilePath windows-wal-path-probe.log
+          exit $LASTEXITCODE
+
+      - name: Upload SQLite WAL path diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-wal-path-probe-${{ github.event.pull_request.head.sha || github.sha }}
+          path: windows-wal-path-probe.log
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload Windows workspace failure logs
         if: failure()
         uses: actions/upload-artifact@v4
