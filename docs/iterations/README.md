@@ -2,7 +2,7 @@
 
 [I329](I329-search-bing-dual-host-offline.md) / [owner](../backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [#957](https://github.com/wjhuang88/talos/issues/957): governance-only proposed **Active / Claimed** test-only candidate, ineffective until its claim PR merges. One Bing family; non-CN `www.bing.com` preferred over existing `cn.bing.com` only if unavailable and permitted. **No** production route, newly admitted host, live Bing query, rights/region acceptance, default priority change or new independent provider.
 
-## I323 Azure — proposed claim and activation
+## I323 Azure — Active / Claimed
 
 ## I327 / SEARCH-001-D3-T2 — Complete / Closed upon owner-first closeout
 
@@ -13,8 +13,9 @@
 [I326](I326-search-bing-synthetic-negative-conformance.md) / [owner](../backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): **Complete / Closed upon owner-first closeout publication**; governance #943 merged `2f43e7d7`, synthetic-only implementation [#944](https://github.com/wjhuang88/talos/pull/944) merged Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606`. Exact-head CI43428872719 8/8 and independent no-blocker review/CAS. No production search logic, endpoint, permission, new provider or China evidence. #941 to close after owner-first docs merge; D3/#937 and Epic/#624 remain Open.
 
 
-[I323](I323-provider008c-azure-openai.md) / #914 proposes Azure C after completed A/B.
-Claim and activation have no effect before governance merge; D and parent #724 remain open.
+[I323](I323-provider008c-azure-openai.md) / #914 is Active / Claimed after #918. Azure implementation
+is in validation; full preflight, exact-head CI, final independent review and merge CAS remain.
+A/B remain Complete; D and parent #724 remain open.
 
 # Iterations
 

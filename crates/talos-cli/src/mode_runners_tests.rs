@@ -187,6 +187,8 @@ async fn handle_connect_with_credential_preserves_unrelated_provider_fields() {
                         reasoning: None,
                         reasoning_supported: None,
                         image_input: None,
+                        azure_deployment: None,
+                        azure_shape: None,
                     },
                 )]),
                 ..Default::default()

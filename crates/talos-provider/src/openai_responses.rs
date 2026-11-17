@@ -28,6 +28,14 @@ pub struct OpenAIResponsesProvider {
 }
 
 impl OpenAIResponsesProvider {
+    pub(crate) fn with_azure(
+        mut self,
+        azure: crate::azure_transport::AzureConnection,
+    ) -> ProviderResult<Self> {
+        self.client = self.client.with_azure(azure)?;
+        Ok(self)
+    }
+
     /// Create a Responses provider for one model.
     #[must_use]
     pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
@@ -304,7 +312,14 @@ async fn forward_protocol_stream(
         return;
     }
     let mut text = String::new();
-    while let Some(output) = source.recv().await {
+    loop {
+        let output = tokio::select! {
+            _ = sink.closed() => return,
+            output = source.recv() => match output {
+                Some(output) => output,
+                None => return,
+            },
+        };
         match output {
             ResponsesStreamOutput::Agent(AgentEvent::TextDelta { delta }) => {
                 text.push_str(&delta);

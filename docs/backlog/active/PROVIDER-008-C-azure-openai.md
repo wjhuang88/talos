@@ -1,6 +1,6 @@
 # PROVIDER-008-C: Azure OpenAI transport and shape routing
 
-**Status**: In Progress / Claimed (proposed; effective only on #918 merge)
+**Status**: In Progress / Claimed (#918 merged; implementation acceptance pending)
 **Source Issue**: #914
 **Parent Epic**: PROVIDER-008 / #724
 **Selected Iteration**: I323
@@ -19,7 +19,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly authorized continuous #724 implementation, testing, independent review, merge and child closure. Distinct human approver unavailable; independent Agent protocol/auth/API review, exact-head CI, validators and CAS remain mandatory. Shared GitHub identity is not independent natural-person approval. |
 | Implementation PR | Not started |
-| Last Updated | 2026-11-11 |
+| Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Close only after merged implementation evidence and all published acceptance; retain failures and resume gate. |
 
 ## Published scope and acceptance
@@ -90,10 +90,22 @@ found only parent/A/B and adjacent #132/#362, not a duplicate child. Explicit us
 complete #724 authorizes this independently owned non-overlapping child alongside other owners.
 Parent/derived summary drift about B is repaired in this governance batch; historical records remain.
 
-## Execution gate
+## Published activation gate (historical)
 
 This governance-only proposal has no ownership or activation effect until finalized exact-head
 review/CI/CAS and merge. No implementation branch, production changes or dependencies yet.
 Completion Commit: Pending.
 
 #915 intake registration was inspected at main 6c81390a; it is the same unclaimed owner, not a competing claim. #918 supersedes intake only upon reviewed merge.
+
+
+## Current implementation state — 2026-11-16
+
+Claim #918 merged as `f61a15cd3f0be81489e69f92d374fc8ee41eddec`, establishing activation before
+implementation. Recovery checkpoint `cda7a031217b914ac45753b756fa28d6504034a9` contains explicit
+Azure transport, model body/deployment routing, supplied-token authentication, destination-bound
+opaque replay, bounded catalog admission, browser provenance and user/SDK migration documentation.
+I323 retains focused Agent/image/tool/reasoning/usage results and all historical failures. Added
+HTTP replay/negative-stream and random chunk acceptance is undergoing execution and review.
+Full latest-main preflight, exact-head native CI, final independent review and merge CAS remain
+required; no implementation PR or Completion Commit exists yet. C, D and #724 remain unfinished.
