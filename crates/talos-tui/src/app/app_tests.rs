@@ -6254,3 +6254,26 @@ fn numbered_edit_and_diff_locations_survive_actual_frame_resize() {
             &entry.block, TranscriptBlock::ToolResult(result) if result.content == content)));
     }
 }
+
+#[test]
+fn compaction_activity_remains_visible_after_tip_expires_without_a_fake_turn() {
+    let mut tui = crate::app::Tui::for_test(TuiState::new(), None);
+    tui.terminal
+        .set_test_size(ratatui::layout::Size::new(100, 24));
+    tui.handle_ui_output(talos_conversation::UiOutput::CompactionPending(true));
+    tui.state.tip = None; // Ordinary tip has expired; activity has not terminated.
+    tui.draw_frame().expect("active compaction frame");
+    assert!(
+        tui.terminal
+            .test_rendered_text()
+            .contains("Compacting context")
+    );
+    assert!(!tui.state.status.is_processing);
+    tui.handle_ui_output(talos_conversation::UiOutput::CompactionPending(false));
+    tui.draw_frame().expect("terminal compaction frame");
+    assert!(
+        !tui.terminal
+            .test_rendered_text()
+            .contains("Compacting context")
+    );
+}

@@ -371,6 +371,30 @@ mod tests {
                 }
             }
         }
+        agent_tx
+            .send(SessionEvent::AutomaticCompactStatus {
+                session_id: "fixture".into(),
+                session_generation: 42,
+                state: talos_core::session::AutomaticCompactState::Started { before: 42 },
+            })
+            .expect("automatic start");
+        let mut saw_activity = false;
+        loop {
+            let output = tokio::time::timeout(std::time::Duration::from_secs(3), ui_rx.recv())
+                .await
+                .expect("activity deadline")
+                .expect("activity output");
+            match output {
+                UiOutput::CompactionPending(true) => saw_activity = true,
+                UiOutput::Tip { text, .. } if text.contains("Automatic compaction started") => {
+                    break;
+                }
+                _ => {}
+            }
+        }
+        assert!(saw_activity);
+        let mut saw_terminal_activity = false;
+        let mut saw_terminal_history = false;
         for generation in [41, 42] {
             agent_tx
                 .send(SessionEvent::AutomaticCompactStatus {
@@ -388,6 +412,15 @@ mod tests {
                 .await
                 .expect("automatic display deadline")
                 .expect("output");
+            match &output {
+                UiOutput::CompactionPending(false) => saw_terminal_activity = true,
+                UiOutput::Content(talos_conversation::ContentOutput::Block { text, .. }) => {
+                    assert!(!text.contains("41 →"));
+                    saw_terminal_history |=
+                        text.contains("Automatic compaction applied: estimated tokens 42 → 12");
+                }
+                _ => {}
+            }
             if let UiOutput::Tip { text, .. } = output {
                 assert!(
                     !text.contains("41 →"),
@@ -398,6 +431,34 @@ mod tests {
                 }
             }
         }
+        assert!(saw_terminal_activity && saw_terminal_history);
+        agent_tx
+            .send(SessionEvent::AutomaticCompactStatus {
+                session_id: "fixture".into(),
+                session_generation: 42,
+                state: talos_core::session::AutomaticCompactState::Failed {
+                    before: 42,
+                    reason: talos_core::session::AutomaticCompactFailure::Provider,
+                },
+            })
+            .expect("automatic failure");
+        let mut failure_cleared_activity = false;
+        let mut failure_retained_reason = false;
+        loop {
+            let output = tokio::time::timeout(std::time::Duration::from_secs(3), ui_rx.recv())
+                .await
+                .expect("failure display deadline")
+                .expect("failure output");
+            match output {
+                UiOutput::CompactionPending(false) => failure_cleared_activity = true,
+                UiOutput::Content(talos_conversation::ContentOutput::Block { text, .. }) => {
+                    failure_retained_reason |= text.contains("provider failure");
+                }
+                UiOutput::Tip { text, .. } if text.contains("provider failure") => break,
+                _ => {}
+            }
+        }
+        assert!(failure_cleared_activity && failure_retained_reason);
         agent_tx
             .send(SessionEvent::CompactStatus {
                 session_id: "session".into(),

@@ -1904,3 +1904,61 @@ Exit0,17min53.301s,peak2GiB/swap0; all2686tracked file hashes unchanged througho
 Log: target/windows-init-preflight-20261117.log; source manifest: matching
 windows-init-preflight-source-manifest-20261117.json in the primary workspace.
 Native Windows exact-head CI and independent review remain required before merge.
+
+
+## 2026-11-17 native recovery latency and visible lifecycle follow-up (Partial)
+
+Authorization Mode: Emergency override.
+Authorizing maintainer: current user; original-session recovery incident and full handoff closure.
+Branch: fix/session-native-recovery-failure-20261117, based on b2a7d471.
+Scope: bounded checkpoint batching and automatic-compaction presentation only.
+Original installed candidate failed original-session admission after restoring 2724 messages.
+Exact original error category is unknown; delayed-provider regression proves a matching
+shared-deadline failure mechanism, not conclusive attribution of the original failure.
+
+Replaced fixed 64-entry batches with geometric serialized-byte admission, preserving
+complete tool groups, whole-request checks, 120-second deadline, 64-call bound,
+source verification and recent history. The previously failing 2724-message/4-second
+provider regression and all 33 checkpoint_request tests pass. Packing-only CLI passed
+both delayed current-session-copy cold resumes in 42.64 seconds, with history detail,
+fresh Applied, source hashes and archive/head preservation verified. That executable
+predates the presentation edits and is not installed.
+
+Automatic preparation now keeps a visible activity indicator after tip expiry;
+typed terminal reasons remain in presentation history, without transcript writes.
+Focused frame test and bridge test passed (one each); bridge test additionally checks
+provider failure clears activity and retains the bounded failure reason, plus stale
+generation rejection. Extended bridge test rerun passed 1/0 on 2026-11-17.
+Primary evidence: target/recovery-ui-focused-20261117.log and
+ target/handoff-delayed-provider-green-20261117/delayed-current-session/case/report.json
+in the preserved primary workspace. No original session or installed executable changed.
+
+Validation remaining: complete preflight, combined CLI isolated acceptance, independent
+review, exact-head CI, authorized delivery and original-session reacceptance.
+Rollback: revert this follow-up only; retain session/archive/pending files and snapshots.
+Residual owner: this document; full handoff remains Partial. No release or background
+continuation enabled. Existing primary dirty edits and missing old /tmp provenance
+remain preserved/tracked, not silently reconciled by overwriting documents.
+
+
+## 2026-11-17 combined recovery candidate full validation (Partial)
+
+Full pinned/locked release_preflight exited0: workspace check/Clippy,5626 tests
+(0failed/0ignored; TUI716), Runtime SDK default and coding configurations, external
+SQLite API fixture all passed. Log target/recovery-combined-preflight-20261117.log;
+26m15.937s, peak2G/swap0. Combined CLI SHA256
+934e742b2534b60ae44f7e6299f26325add888ae28b1f16e92af4c8e5601c40f.
+Same binary passed delayed current-session snapshot two cold resumes/history/fresh
+Applied (40.99s), real ANSI TUI automatic-compaction activity after tip expiry,
+retained provider-failure reason and cleared activity, queue/history spacing,
+approval history and edit-line display. No transcript-copy mutation on failed
+admission; preserved originals and archive copies checked unchanged.
+Evidence: target/handoff-combined-recovery-20261117/result.json and
+ target/handoff-combined-recovery-20261117-r2/result.json in primary workspace.
+Initial status harness failed on pyte display empty-character IndexError, before
+assertions. Original artifacts retained; changed screen extraction to the existing
+buffer-cell approach and ran remaining checks, without rerunning passed latency case.
+
+Not installed, merged, released or original-session reaccepted. Independent review,
+exact-head CI and authorized delivery remain open. Missing Nov11 evidence provenance
+and low-auto-approval causality remain handoff residuals, not erased by these passes.
