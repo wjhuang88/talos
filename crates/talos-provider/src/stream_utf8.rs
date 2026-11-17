@@ -71,6 +71,18 @@ mod tests {
     }
 
     #[test]
+    fn reassembles_every_single_byte_boundary() {
+        let text = "data: 你好🌍é\r\n\r\n";
+        let mut decoder = Utf8StreamDecoder::default();
+        let mut decoded = String::new();
+        for byte in text.as_bytes().chunks(1) {
+            decoded.push_str(&decoder.push(byte).expect("single-byte UTF-8 chunk"));
+        }
+        assert_eq!(decoded, text);
+        assert_eq!(decoder.finish(), Ok(()));
+    }
+
+    #[test]
     fn rejects_an_invalid_byte_sequence() {
         let mut decoder = Utf8StreamDecoder::default();
         assert_eq!(

@@ -1,6 +1,6 @@
 # Iteration I323: Azure OpenAI transport and shape routing
 
-> Document status: Active (proposed; effective only on #918 merge)
+> Document status: Active (#918 merged; implementation acceptance pending)
 > Published plan date: 2026-11-11
 > Planned objective: complete PROVIDER-008-C / #914, child of #724.
 > Baseline rule: preserve this objective; changed objectives require a new iteration.
@@ -20,7 +20,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly authorized continuous #724 implementation, testing, independent review, merge and child closure. Distinct human approver unavailable; independent Agent protocol/auth/API review, exact-head CI, validators and CAS remain mandatory. Shared GitHub identity is not independent natural-person approval. |
 | Implementation PR | Not started |
-| Last Updated | 2026-11-11 |
+| Last Updated | 2026-11-16 |
 | Handoff / Release Condition | Close only after merged implementation evidence and all published acceptance; retain failures and resume gate. |
 
 ## Published scope and acceptance
@@ -121,3 +121,253 @@ has not begun. Next: address review findings, validate/review the final exact he
 Completion Commit: Pending.
 
 #915 intake registration was inspected at main 6c81390a; it is the same unclaimed owner, not a competing claim. #918 supersedes intake only upon reviewed merge.
+
+## Implementation checkpoint — 2026-11-12
+
+Claim #918 merged f61a15cd3f0be81489e69f92d374fc8ee41eddec. Implementation worktree
+`talos-azure`, branch `feat/provider008c-azure`, starts from main 2f5da14d.
+Initial config types and endpoint/deployment validation are local work in progress; not yet wired
+into ProviderConfig/factory, no delivered Azure runtime. Focused locked tests started; dependency
+index acquisition pending, no test pass claimed. Next: integrate config precedence and shared
+Chat/Responses transport dispatch, complete tests/docs/local convergence before candidate push.
+
+Config checkpoint: ProviderConfig.azure merge and model-local azure_deployment/azure_shape are
+implemented locally. First integration compile failed E0063 on existing exhaustive config literals;
+updated builtins, OpenCode conversion and test fixtures with explicit absent fields. Subsequent
+`cargo test --locked -p talos-config azure` passed 3 tests (273 library tests filtered; integration
+suites filtered to zero). This is focused config evidence only, not workspace/runtime acceptance.
+Runtime/factory routing, catalog activation, SDK migration and full acceptance remain pending.
+
+## Recovery checkpoint — 2026-11-13
+
+Workspace again restored to config-only source at 2f5da14d. Later transport, Agent/HTTP tests,
+security fixes and logs from the previous execution are absent. Historical conversation results
+are not validation of this recovered tree. Preserve this configuration stage as a recovery commit;
+this is not a stable merge candidate or Completion Commit. Restore runtime work only after durable
+checkpointing. Review previously found two required boundaries: Azure Chat capability identity must
+include resource/deployment; Responses opaque replay must be bound to the same identity. Also
+restore stream-error redaction and isolated token/redirect negative tests. C/D and #724 remain open.
+
+Recovery continuation: verified remote backup ef94abf12337a716e83f61eacde8fefa1809416f
+has the same tree as local 143dc9c1. Rebased configuration onto main f2e30d99 without
+conflicts. Restored model body/deployment resolution, endpoint-override refusal and token-env
+name validation. `cargo test --locked -p talos-config azure`: 4 passed, 273 library tests
+filtered; all integration suites filtered to zero. This does not validate runtime transport.
+
+Transport recovery: restored private AzureConnection request/header/deployment construction,
+redacted previews and endpoint/deployment identity hashing, with a focused unit test authored.
+Not yet wired into adapters/factory; redirect policy, replay binding and stream redaction remain
+required integration work. Locked provider compilation started; no current test pass claimed.
+
+Recovered from remote 8421f1c6 into talos-azure-restored and rebased onto main a07b466d.
+Restored private Chat/Responses Azure dispatch, redirect refusal, HTTP error-body suppression,
+redacted previews and Chat capability identity binding. Factory exposure remains intentionally
+pending replay binding and stream-error safety integration. Compilation is in progress; this is
+an incomplete recovery checkpoint, not a reviewed implementation candidate.
+
+Restored explicit azure-openai factory dispatch for Chat/Responses; private adapters now bind
+Responses opaque replay to resource/deployment, and redact Azure stream errors on legacy and
+original invocation paths. Bounded forwarding closes on consumer cancellation. Locked provider
+compilation rerun; full HTTP/Agent regression, supplied-token host handling, catalog/UI and SDK
+acceptance are still pending. No implementation merge or completion claimed.
+
+Restored supplied-token host handling: Config::api_key returns no API-key credential for explicit
+Azure Entra profiles, leaving acquisition to dispatch; missing API key no longer blocks that mode.
+Added host regression test and restored five factory-routed Responses HTTP tests (tool association,
+image continuation, no image repost, semantic terminal and text protocols). Test compilation is
+in progress; no pass claimed at checkpoint. Catalog/UI, further safety/Agent tests and full gates
+remain pending. Remote recovery checkpoints are not merge candidates.
+
+Added Chat HTTP matrix across v1/deployment and Native/Compat/TalosStrict, asserting exact URL,
+exclusive api-key header, deployment model and terminal event. Added Responses redirect/no-forward
+and success-status SSE error redaction regressions. Dependency compilation remains in progress;
+these authored tests have no pass receipt yet. Preserve remotely before further recovery risk.
+
+HTTP receipt: initial restored Responses suite failed its inherited error-text assertion (4 pass,
+1 fail): Azure deliberately redacts the server message. Corrected only the expected error text;
+kept bounded semantic-terminal/HTTP-EOF assertions. Rerun passed Chat matrix (1 test, six cases)
+and all 7 Responses tests, including redirect and SSE error safety. Full Agent/native CI remains
+pending; this is focused local evidence, not complete C acceptance.
+
+Resumed exact remote dda7a60d after local worktree loss; retained old dirty directory. Added
+isolated-child Entra HTTP test for both Chat and Responses, asserting Bearer-only requests despite
+configured API key, dispatch-owned credentials and redacted authentication errors. Test compilation
+started in restored environment; no token-test pass claimed. Latest fetched main is d92aabaa;
+rebase and fresh full validation remain required before any merge candidate.
+
+Resumed remote ffcb2c6a after another workspace reset; missing token logs cannot establish a pass.
+Added real Responses envelope encode/bind/project/decode regression for same destination and
+changed resource/deployment, preserving normal assistant content while dropping foreign opaque
+blocks. Locked transport unit and isolated-token HTTP tests started; still compiling at checkpoint.
+Latest fetched main 8e32fcad is not yet rebased into this test checkpoint; final candidate requires
+latest-main integration and all published acceptance. No A/B work reopened.
+
+Added actual Agent Responses native two-round read fixture using PermissionEngine and ReadTool;
+asserts tool-call association, deployment body, final answer, successful tool history and absence
+of API key in serialized history. This complements adapter-only tests but does not cover the whole
+published Agent/image/mode matrix. Test queued behind dependency compilation; no pass claimed.
+
+Verification receipt: locked azure_transport unit selection passed 2 tests (292 filtered),
+including actual Responses envelope binding. Isolated Entra HTTP test passed 1 test covering both
+bodies. Actual permission-gated Responses Agent read test passed 1 test (7 HTTP tests filtered).
+These are current local results, not native CI/full matrix acceptance. Added protocol configuration,
+credential limitations and next-minor SDK migration documentation. Full acceptance remains open.
+
+### 2026-11-14 cancellation review recovery
+
+Independent Agent source review found that dropping an Azure Responses receiver did not stop a
+silent HTTP stream until its first-packet/idle timeout. The parser and both native/text forwarding
+loops now select downstream closure, allowing cancellation to reach and release the response.
+A controlled TCP test covers Native/Compat/TalosStrict, demands disconnect within two seconds,
+and uses a five-second provider timeout. Reviewer source/design recheck found this correction
+addresses the blocker; this is not full candidate approval or natural-person GitHub approval.
+
+Before another environment reset, the local Azure HTTP suite passed Chat 1 / Responses 9 / token 1,
+and config Azure tests passed 5. Those results included a two-image Responses Agent test. The reset
+lost that image extension, pending Chat Agent/UI changes and local logs before remote save. This
+checkpoint restores the cancellation correction/test only on the durable 3b921558 baseline; rerun
+its tests before assigning current-head evidence. Do not treat lost UI/Chat tests as passed or
+claim this checkpoint contains the lost image extension. Remaining acceptance and #724 stay open.
+
+The next recovery checkpoint restores the two ordered images in the actual Responses Agent read
+round and the UI body-shape/source plus lazy supplied-token configuration display/test. It also
+replays onto main 5704bb66. Current rebase testing is in progress; the UI regression has not yet
+completed. The earlier lost Chat Agent matrix and README/architecture/release additions still
+need restoration. No full local preflight, exact-head CI or final review is claimed.
+
+### 2026-11-14 current-main focused validation
+
+On the 5704bb66 main replay, the restored Azure HTTP suites passed: Chat 1 test (six transport/tool
+mode combinations), Responses 9 tests (including ordered-image actual Agent continuation and
+three-mode silent-connection cancellation), and supplied Entra token 1 test (both body shapes).
+This is locked local evidence, not full preflight or native CI. UI review identified a fixture
+that could not appear in the built-in-only browser and missing provider-base-url conflict checks;
+both were corrected, with the UI test using a real Azure catalog model and asserting the conflict.
+UI regression execution and the newly restored six-case actual Chat Agent read test are pending
+at this checkpoint. The Chat Agent test currently covers tools, not ordered images/reasoning.
+README en/zh, architecture and unreleased notes are restored. Browser ready means authentication
+configuration is selected, not that the supplied token has been read or validated.
+
+The actual Chat Agent test subsequently passed all six combinations (one matrix test), checking
+permission-gated read execution, native tool-call association and returned output on the second
+request. The UI test initially could not compile because mode_runners_tests.rs contained an old
+exhaustive ModelConfig literal (E0063); adding azure_deployment/azure_shape=None preserves that
+fixture's old behavior. The retry passed the Azure browser test (1 passed / 422 filtered).
+Governance's first invocation failed because cargo was absent from PATH; the fixed-toolchain retry
+is tracked separately. Collaboration-claim validation passed with one existing SEARCH-001-D3
+Unclaimed documentation-intake warning. These local results do not replace exact-head native CI.
+
+### 2026-11-15 ordered-image matrix recovery
+
+Restored the previously tested extension lost in another workspace reset: actual Chat Agent read
+rounds now retain two distinct ordered images across both requests in all six transport/tool-mode
+combinations; actual Responses Agent read rounds cover Native/Compat/TalosStrict with the same
+image-order/path-leak assertions. Prior Chat matrix passed; initial Responses matrix failed because
+the fixture assumed text-mode tool results used native function_call_output. Corrected the matcher
+to check the returned tool content for all modes and enforce native call_id only in Native; the
+retry passed all three modes. These are historical observations until this restored tree reruns.
+No production encoder or tool semantics were changed to make the fixture pass.
+
+The preceding fixed-PATH governance retry passed with zero warnings. Current catalog audit found
+models.dev's HTTP API returned 403; Git checkout succeeded at a5458bdc8326d995619413b54425db97e911f4d4.
+Its Azure schema-2 entries contain multiple wire families and per-API overrides, so the old blanket
+SDK-name inference is not justified. The evidence fixture/audit is being restored separately;
+no new automatic inference, catalog regeneration or vendor endpoint substitution is claimed.
+
+### 2026-11-16 catalog recovery and admission checkpoint
+
+Restored fixed upstream 888c250133b38839c2018d66fe687cb03c03a8f2 and exact fixture hashes after
+workspace reset. Independent review rejected the initial blanket explicit-only conclusion:
+translator toV1Api selects the first authored API and toV1Shape recognizes Azure Responses default.
+All 27 Responses-bearing records select it first without endpoint/SDK override; 22 intersect the
+packaged catalog unchanged. Runtime now gates that exact intersection on azure provider, valid
+explicit v1 profile and no endpoint overrides. Explicit protocol/shape remains higher priority.
+Factory and browser share body-shape resolution. Dotted deployment names work; dot segments and
+path escape characters remain rejected, and api-version retains its separate strict validation.
+
+Prior local catalog tests passed after correcting the overly narrow deployment validator; the
+new external-crate recovery matrix adds model endpoint, invalid/missing profile, non-Azure model
+protocol, custom/alias and legacy exclusions. Current source audit passed. Current Rust execution
+and factory HTTP inference/override tests remain pending. This checkpoint is not a merge candidate
+or final independent approval. No full preflight/CI/closure/release is claimed.
+
+The recovered external-crate Azure config matrix passed both tests (22 actual catalog admissions,
+all added exclusions, overrides, schema and serialization). Added a four-case controlled
+factory→HTTP test for inferred Responses and provider/model Chat/Responses shape overrides,
+checking explicit resource, deployment alias and api-key exclusivity. Its execution is pending.
+README en/zh, ADR-103, SDK contract and unreleased notes now describe bounded catalog inference;
+the fixture README names all 22 current effective IDs. Prior full-catalog rejection is preserved
+as review history, not the final behavior. This is still not the stable implementation candidate.
+
+Current factory→HTTP catalog/override matrix passed all four cases (one test). Actual Agent
+reasoning/image/tool matrices now pass Chat 2 tests (including six-case Agent matrix) and Responses
+9 tests (including three-case Agent matrix): explicit high effort reaches the wire; Chat reasoning
+and completed Responses opaque items reach Agent history; the second Responses request replays
+the same-bound opaque item; accumulated provider TurnEnd usage is asserted (Chat 8/4, Responses
+12/3). This is local controlled evidence, not live vendor or final CI. Cross-destination HTTP replay,
+Chat stream property/negative cases, latest-main preflight and final review remain pending.
+
+### 2026-11-16 boundary acceptance recovery
+
+The next resume again found no restored worktree or previous boundary-test logs. Restored remote
+`a727dc2b275bebc5b4719e32236b931c93b67b62`; the two unpushed boundary tests were lost and their
+outcomes are unknown, not passed. Recreated real HTTP opaque replay checks across resource and
+deployment changes, preserving ordinary history; added Chat missing/unknown terminal, HTTP-200
+error, truncated UTF-8 and length termination cases. Added 32-case Chat SSE proptest with random
+HTTP byte chunks, Unicode, LF/CRLF, exact terminal count and usage. Pinned/locked execution and
+independent read-only review are in progress; this is a recovery checkpoint, not a merge candidate.
+Current fetched main is `58207831`; latest-main integration and full preflight remain next gates.
+
+
+Independent Agent source review found no new blocking production or boundary-test issue; this was
+not final exact-candidate approval and not independent natural-person GitHub approval. Added its
+suggested length usage assertion and deterministic one-byte UTF-8 test. Expanded supplied-token
+child-process matrix to absent/empty/invalid-header/oversized credentials, requiring failure before
+HTTP with no API-key fallback, for both bodies. Execution remains pending. Source catalog audit
+passed (99/27/22); governance passed with zero warnings; claim validation passed with one existing
+SEARCH-001-D3 documentation-intake warning. Existing historical failure records remain unchanged.
+
+The first random-chunk test failed: minimal `widths=[1], crlf=true` produced a missing-terminal
+error because the reused Chat parser recognized only LF blank lines. Fixed CRLF normalization on
+the accumulated buffer, including CR/LF split across chunks; retained the proptest regression seed.
+Independent incremental review found no blocker in this production fix. Review also found that
+mockito Any header matchers excluded missing headers in the token negative test; removed all
+invalid-case header constraints and matched every POST path, so expect(0) proves no dispatch.
+The initial token test passed before this correction but was not sufficient zero-request evidence.
+After both fixes, `cargo test --locked -p talos-provider` exited 0: 345 passed across 15 result
+groups, including 32 randomized cases plus the saved failure seed, all Azure HTTP/Agent tests,
+invalid-token matrix and deterministic byte decoder. No ignored/failed tests in this run.
+These results precede latest-main integration and do not substitute for full workspace preflight.
+
+
+Latest-main integration: replaying the old recovery chain encountered duplicate-change conflicts
+in models_browser/config/I323. Aborted that rebase, preserved the pre-integration branch, consolidated
+the final Azure delta and rebased it onto `58207831` without conflicts. Cargo.lock is byte-identical
+to main; no dependency upgrade. The prior 345-test pass remains pre-integration evidence. Standard
+`release_preflight.sh` now validates the integrated tree, not assumed equivalent old results.
+
+Integrated-tree preflight attempt 1 passed governance, claim validation, catalog audit, format and
+workspace check, then failed Clippy on Azure's collapsible token-env validation condition. The
+focused retry exposed two further Azure-only lints (needless body borrow and redundant must_use
+on a Result-returning builder). Applied semantics-preserving corrections without lint suppression;
+`cargo clippy --locked --workspace -- -D warnings` then exited 0. These failures remain historical.
+Independent exact-source review approved remote `24f8df4db24c2be8136bb4b4e084714970df6c22` against
+base `58207831675365e35cc80601097b96f9432a68aa`, with shared-account/non-human limits disclosed.
+The subsequent lint and UI provenance documentation corrections require refreshed candidate review.
+Full standard preflight is rerunning; no workspace-test/CI/merge acceptance is claimed yet.
+
+### 2026-11-17 workspace test failure recovery
+
+Standard preflight retry on f29bf8df passed governance, audits, format, workspace check and Clippy,
+then stopped in talos-agent: 671 passed / 2 failed. durable_discovery_searches_beyond_compaction_source_limit
+failed at replacement scope (checkpoint_tools.rs:894); real_registered_git_mutations_execute_only_after_operation_specific_auto_review
+failed because the maintenance executable differed from the bound Git binary (git_auto.rs:512).
+These are failures, not a full workspace pass. No Azure change touches either failing source file.
+The subsequent isolated test logs were lost during another workspace reset, so their outcomes are
+unknown. Restored f29bf8df and restarted isolated locked tests with /usr/bin before /usr/local/bin
+in PATH (system Git 2.47.3 instead of 2.52.0); do not weaken executable-binding validation. Compilation
+is still in progress. Current fetched main 0cf52249 includes substantial checkpoint-history changes;
+recheck their ownership and integrate the latest base before final preflight and candidate CI.
+No implementation PR, merge, closure or release has occurred. Resume from this owner and the latest
+remote backup; preserve dirty legacy worktrees. Next gate: inspect both isolated test logs, integrate
+main, run standard preflight, then stable PR/exact-head CI/independent review/CAS.

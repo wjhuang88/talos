@@ -90,6 +90,8 @@ pub fn import_opencode_providers(
 
         for (model_name, model) in op.models {
             let model_config = ModelConfig {
+                azure_deployment: None,
+                azure_shape: None,
                 base_url: None,
                 context_limit: model.limit.context,
                 output_limit: model.limit.output,

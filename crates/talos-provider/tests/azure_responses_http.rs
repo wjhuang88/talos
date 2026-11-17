@@ -1,0 +1,819 @@
+use std::time::Duration;
+
+use serde_json::{Value, json};
+use std::sync::Arc;
+use talos_config::{
+    AzureApiMode, AzureAuthentication, AzureBodyShape, AzureTransportConfig, Config, ModelConfig,
+    ProviderConfig, ProviderProtocol,
+};
+use talos_core::message::{
+    AgentEvent, ContentDigest, ContentPart, Message, MessageToolResult, StopReason, ToolCall,
+};
+use talos_core::provider::{LanguageModel, ToolDefinition};
+fn responses_provider(endpoint: String) -> Arc<dyn LanguageModel> {
+    azure_provider(endpoint, 0)
+}
+fn azure_provider(endpoint: String, retries: u32) -> Arc<dyn LanguageModel> {
+    azure_provider_with_reasoning(endpoint, retries, false)
+}
+fn azure_provider_with_reasoning(
+    endpoint: String,
+    retries: u32,
+    reasoning: bool,
+) -> Arc<dyn LanguageModel> {
+    azure_bound_provider(endpoint, retries, reasoning, "azure-deployment")
+}
+fn azure_bound_provider(
+    endpoint: String,
+    retries: u32,
+    reasoning: bool,
+    deployment: &str,
+) -> Arc<dyn LanguageModel> {
+    let mut config = Config::default();
+    config.provider = "azure-fixture".into();
+    config.model = "gpt-test".into();
+    config.providers.insert(
+        config.provider.clone(),
+        ProviderConfig {
+            protocol: ProviderProtocol::AzureOpenAI,
+            azure: Some(AzureTransportConfig {
+                endpoint,
+                api: AzureApiMode::V1,
+                shape: Some(AzureBodyShape::Responses),
+                authentication: AzureAuthentication::ApiKey,
+            }),
+            models: [(
+                config.model.clone(),
+                ModelConfig {
+                    azure_deployment: Some(deployment.into()),
+                    reasoning_supported: reasoning.then_some(true),
+                    reasoning: reasoning.then(|| talos_config::ReasoningOptions {
+                        effort: Some(talos_core::model::ReasoningEffort::High),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+            )]
+            .into(),
+            timeout: talos_config::ProviderTimeoutConfig {
+                dispatch_timeout_secs: 5,
+                first_packet_timeout_secs: 5,
+                stream_idle_timeout_secs: 5,
+                max_attempts: retries,
+                backoff_base_ms: 1,
+                backoff_max_ms: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+    talos_provider::openai_responses::factory::build_configured_provider(&config, "sk-test")
+        .expect("Azure provider")
+}
+
+async fn collect_events(mut rx: tokio::sync::mpsc::Receiver<AgentEvent>) -> Vec<AgentEvent> {
+    tokio::time::timeout(Duration::from_secs(5), async move {
+        let mut events = Vec::new();
+        while let Some(event) = rx.recv().await {
+            events.push(event);
+        }
+        events
+    })
+    .await
+    .expect("Responses stream should finish within fixture timeout")
+}
+
+#[tokio::test]
+async fn mock_http_two_round_function_call_preserves_call_id() {
+    let mut server = mockito::Server::new_async().await;
+    let tool = ToolDefinition::new(
+        "probe",
+        "read-only fixture",
+        json!({"type": "object", "properties": {"value": {"type": "integer"}}}),
+    );
+
+    let first = server
+        .mock("POST", "/openai/v1/responses")
+        .match_header("api-key", "sk-test")
+        .match_header("authorization", mockito::Matcher::Missing)
+        .match_request(|request| {
+            let body: Value = serde_json::from_slice(request.body().expect("request body"))
+                .expect("Responses request JSON");
+            body["model"] == "azure-deployment" && body["store"] == false
+                && body["stream"] == true
+                && body["tools"][0]["type"] == "function"
+                && body["tools"][0]["name"] == "probe"
+                && body.get("previous_response_id").is_none()
+        })
+        .with_status(200)
+        .with_header("content-type", "text/event-stream")
+        .with_body(concat!(
+            "data: {\"type\":\"response.created\"}\n\n",
+            "data: {\"type\":\"response.output_item.added\",\"item\":{\"id\":\"fc_1\",\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"probe\",\"arguments\":\"\"}}\n\n",
+            "data: {\"type\":\"response.function_call_arguments.done\",\"item_id\":\"fc_1\",\"arguments\":\"{\\\"value\\\":1}\"}\n\n",
+            "data: {\"type\":\"response.output_item.done\",\"item\":{\"id\":\"fc_1\",\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"probe\",\"arguments\":\"{\\\"value\\\":1}\"}}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n"
+        ))
+        .expect(1)
+        .create_async()
+        .await;
+
+    let provider = responses_provider(server.url());
+    let user = Message::User {
+        content: "probe value".into(),
+    };
+    let first_events = collect_events(
+        provider
+            .stream_with_tools(std::slice::from_ref(&user), std::slice::from_ref(&tool))
+            .await
+            .expect("first Responses round"),
+    )
+    .await;
+
+    let call = first_events
+        .iter()
+        .find_map(|event| match event {
+            AgentEvent::ToolCall { call, .. } => Some(call.clone()),
+            _ => None,
+        })
+        .expect("native function call event");
+    assert_eq!(call.id, "call_1");
+    assert_eq!(call.name, "probe");
+    assert_eq!(call.input, json!({"value": 1}));
+    assert!(first_events.iter().any(|event| matches!(
+        event,
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::ToolUse,
+            ..
+        }
+    )));
+    first.assert_async().await;
+
+    let second = server
+        .mock("POST", "/openai/v1/responses")
+        .match_header("api-key", "sk-test")
+        .match_header("authorization", mockito::Matcher::Missing)
+        .match_request(|request| {
+            let body: Value = serde_json::from_slice(request.body().expect("request body"))
+                .expect("Responses request JSON");
+            let Some(input) = body["input"].as_array() else {
+                return false;
+            };
+            let replayed_call = input.iter().any(|item| {
+                item["type"] == "function_call"
+                    && item["call_id"] == "call_1"
+                    && item["name"] == "probe"
+            });
+            let output = input.iter().any(|item| {
+                item["type"] == "function_call_output"
+                    && item["call_id"] == "call_1"
+                    && item["output"] == "tool-ok"
+            });
+            replayed_call && output && body.get("previous_response_id").is_none()
+        })
+        .with_status(200)
+        .with_header("content-type", "text/event-stream")
+        .with_body(concat!(
+            "data: {\"type\":\"response.created\"}\n\n",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"done\"}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":8,\"output_tokens\":1}}}\n\n"
+        ))
+        .expect(1)
+        .create_async()
+        .await;
+
+    let messages = vec![
+        user,
+        Message::Assistant {
+            content: String::new(),
+            tool_calls: vec![ToolCall {
+                id: call.id,
+                name: call.name,
+                input: call.input,
+            }],
+            reasoning: None,
+        },
+        Message::Tool {
+            result: MessageToolResult {
+                tool_use_id: "call_1".into(),
+                content: "tool-ok".into(),
+                is_error: false,
+            },
+        },
+    ];
+    let second_events = collect_events(
+        provider
+            .stream_with_tools(&messages, &[tool])
+            .await
+            .expect("second Responses round"),
+    )
+    .await;
+    assert!(second_events.iter().any(|event| matches!(
+        event,
+        AgentEvent::TextDelta { delta } if delta == "done"
+    )));
+    assert!(second_events.iter().any(|event| matches!(
+        event,
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            ..
+        }
+    )));
+    second.assert_async().await;
+}
+
+#[tokio::test]
+async fn mock_http_accepts_adr051_multimodal_continuation_without_path_leak() {
+    let temp = tempfile::tempdir().expect("temporary image directory");
+    let path = temp.path().join("continuation.png");
+    image::RgbaImage::from_pixel(1, 1, image::Rgba([1, 2, 3, 255]))
+        .save(&path)
+        .expect("fixture png");
+
+    // Durable image parts carry grant-time canonical paths. Exercise an alias on Unix so Linux
+    // also covers the precondition exposed by macOS's temporary-directory aliases.
+    #[cfg(unix)]
+    let path = {
+        let alias = temp.path().join("continuation-alias.png");
+        std::os::unix::fs::symlink(&path, &alias).expect("fixture image alias");
+        alias
+    };
+    let path = path
+        .canonicalize()
+        .expect("grant-time canonical image path");
+
+    let mut server = mockito::Server::new_async().await;
+    let path_text = path.to_string_lossy().into_owned();
+    let mock = server
+        .mock("POST", "/openai/v1/responses")
+        .match_header("api-key", "sk-test")
+        .match_header("authorization", mockito::Matcher::Missing)
+        .match_request(move |request| {
+            let raw = request.body().expect("request body");
+            let body_text = String::from_utf8_lossy(raw);
+            if body_text.contains(&path_text)
+                || body_text.contains("continuation.png")
+                || body_text.contains("continuation-alias.png")
+            {
+                return false;
+            }
+            let body: Value = serde_json::from_slice(raw).expect("Responses request JSON");
+            body["input"].as_array().is_some_and(|input| {
+                input.iter().any(|item| {
+                    item["content"].as_array().is_some_and(|content| {
+                        content.iter().any(|part| {
+                            part["type"] == "input_image"
+                                && part["image_url"]
+                                    .as_str()
+                                    .is_some_and(|url| url.starts_with("data:image/png;base64,"))
+                        })
+                    })
+                })
+            })
+        })
+        .with_status(200)
+        .with_header("content-type", "text/event-stream")
+        .with_body(concat!(
+            "data: {\"type\":\"response.created\"}\n\n",
+            "data: {\"type\":\"response.output_text.delta\",\"delta\":\"image received\"}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":6,\"output_tokens\":2}}}\n\n"
+        ))
+        .expect(1)
+        .create_async()
+        .await;
+
+    let provider = responses_provider(server.url());
+    let messages = vec![Message::Multimodal {
+        parts: vec![
+            ContentPart::Text {
+                text: "describe this".into(),
+            },
+            ContentPart::Image {
+                path,
+                mime: "image/png".into(),
+                byte_count: 0,
+                content_digest: ContentDigest::default(),
+            },
+        ],
+    }];
+    let events = collect_events(
+        provider
+            .stream(&messages)
+            .await
+            .expect("Responses multimodal round"),
+    )
+    .await;
+    assert!(events.iter().any(|event| matches!(
+        event,
+        AgentEvent::TextDelta { delta } if delta == "image received"
+    )));
+    assert!(events.iter().any(|event| matches!(
+        event,
+        AgentEvent::TurnEnd {
+            stop_reason: StopReason::EndTurn,
+            ..
+        }
+    )));
+    mock.assert_async().await;
+}
+
+#[tokio::test]
+async fn semantic_terminal_closes_stream_without_waiting_for_http_eof() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    for failed in [false, true] {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("fixture listener");
+        let address = listener.local_addr().expect("fixture address");
+        let terminal = if failed {
+            r#"{"type":"response.failed","response":{"error":{"message":"fixture failure"}}}"#
+        } else {
+            r#"{"type":"response.completed","response":{"usage":{"input_tokens":1,"output_tokens":2}}}"#
+        };
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("fixture connection");
+            let mut request = [0; 8192];
+            let received = socket.read(&mut request).await.expect("fixture request");
+            assert!(received > 0, "fixture request must contain bytes");
+            let body = format!("data: {terminal}\n\n");
+            socket
+                .write_all(format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n{body}\r\n",
+                    body.len(),
+                ).as_bytes())
+                .await
+                .expect("fixture terminal chunk");
+            // Deliberately omit the terminating HTTP chunk and keep the socket alive.
+            std::future::pending::<()>().await;
+        });
+        let provider = responses_provider(format!("http://{address}"));
+        let mut events = provider
+            .stream(&[Message::User {
+                content: "test".into(),
+            }])
+            .await
+            .expect("fixture stream");
+        let result = tokio::time::timeout(Duration::from_secs(2), async {
+            let mut received = Vec::new();
+            while let Some(event) = events.recv().await {
+                received.push(event);
+            }
+            received
+        })
+        .await;
+        server.abort();
+        let received =
+            result.expect("semantic terminal must close before idle timeout or HTTP EOF");
+        assert_eq!(received.len(), 1);
+        if failed {
+            assert!(
+                matches!(&received[0], AgentEvent::Error { message } if message == "Azure response stream failed")
+            );
+        } else {
+            assert!(
+                matches!(&received[0], AgentEvent::TurnEnd { stop_reason: StopReason::EndTurn, usage } if usage.input_tokens == 1 && usage.output_tokens == 2)
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn tool_image_is_never_automatically_reposted_after_503() {
+    use talos_core::provider::EphemeralImage;
+    use talos_core::tool::ToolProtocol;
+    let mut server = mockito::Server::new_async().await;
+    let mock = server
+        .mock("POST", "/openai/v1/responses")
+        .match_header("api-key", "sk-test")
+        .match_header("authorization", mockito::Matcher::Missing)
+        .with_status(503)
+        .with_body("unavailable")
+        .expect(1)
+        .create_async()
+        .await;
+    let provider = azure_provider(server.url(), 3);
+    let image = EphemeralImage::png(
+        b"\x89PNG\r\n\x1a\nfixture".to_vec(),
+        std::time::Instant::now() + Duration::from_secs(120),
+    )
+    .expect("image");
+    let (progress, _) = tokio::sync::mpsc::unbounded_channel();
+    let result = provider
+        .stream_with_ephemeral_images(
+            &[Message::User {
+                content: "fixture".into(),
+            }],
+            &[],
+            ToolProtocol::Native,
+            progress,
+            &[],
+            vec![image],
+        )
+        .await;
+    assert!(matches!(
+        result,
+        Err(talos_core::provider::ProviderError::ServerError(_))
+    ));
+    mock.assert_async().await;
+}
+
+#[tokio::test]
+async fn explicit_text_protocols_dispatch_and_parse_tools_on_responses() {
+    use talos_core::tool::ToolProtocol;
+    for (protocol, truncated) in [
+        (ToolProtocol::Compat, false),
+        (ToolProtocol::TalosStrict, false),
+        (ToolProtocol::Compat, true),
+        (ToolProtocol::TalosStrict, true),
+    ] {
+        let mut server = mockito::Server::new_async().await;
+        let text = "<tool_call>{\"name\":\"probe\",\"args\":{\"value\":1}}</tool_call>";
+        let terminal = if truncated {
+            json!({"type":"response.incomplete","response":{"incomplete_details":{"reason":"max_output_tokens"},"usage":{"input_tokens":4,"output_tokens":2}}})
+        } else {
+            json!({"type":"response.completed","response":{"usage":{"input_tokens":4,"output_tokens":2}}})
+        };
+        let body = format!(
+            "data: {}\n\ndata: {}\n\n",
+            json!({"type":"response.output_text.delta","delta":text}),
+            terminal
+        );
+        let mock = server
+            .mock("POST", "/openai/v1/responses")
+            .match_header("api-key", "sk-test")
+            .match_header("authorization", mockito::Matcher::Missing)
+            .match_request(|r| {
+                let body: Value =
+                    serde_json::from_slice(r.body().expect("request body")).expect("request JSON");
+                body["tools"].as_array().is_none_or(Vec::is_empty)
+                    && body["model"] == "azure-deployment"
+                    && body["store"] == false
+            })
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(body)
+            .expect(1)
+            .create_async()
+            .await;
+        let provider = responses_provider(server.url());
+        let (progress, _) = tokio::sync::mpsc::unbounded_channel();
+        let events = collect_events(
+            provider
+                .stream_with_protocol(
+                    &[Message::User {
+                        content: "fixture".into(),
+                    }],
+                    &[],
+                    protocol,
+                    progress,
+                )
+                .await
+                .expect("text protocol dispatch"),
+        )
+        .await;
+        assert!(events.iter().any(|event| matches!(event, AgentEvent::ToolCall { call, .. } if call.name == "probe" && call.input == json!({"value":1}))));
+        let expected = if truncated {
+            StopReason::MaxTokens
+        } else {
+            StopReason::ToolUse
+        };
+        assert!(events.iter().any(|event| matches!(event, AgentEvent::TurnEnd { stop_reason, .. } if *stop_reason == expected)));
+        mock.assert_async().await;
+    }
+}
+
+#[tokio::test]
+async fn azure_redirect_does_not_relocate_credentials() {
+    let mut origin = mockito::Server::new_async().await;
+    let mut destination = mockito::Server::new_async().await;
+    let leak = destination
+        .mock("POST", "/capture")
+        .expect(0)
+        .create_async()
+        .await;
+    let redirect = origin
+        .mock("POST", "/openai/v1/responses")
+        .match_header("api-key", "sk-test")
+        .with_status(307)
+        .with_header("location", &format!("{}/capture", destination.url()))
+        .with_body("sk-test echoed credential")
+        .expect(1)
+        .create_async()
+        .await;
+    let error = responses_provider(origin.url())
+        .stream(&[Message::User {
+            content: "fixture".into(),
+        }])
+        .await
+        .expect_err("redirect refused");
+    assert!(!error.to_string().contains("sk-test"));
+    redirect.assert_async().await;
+    leak.assert_async().await;
+}
+
+#[tokio::test]
+async fn azure_success_status_error_event_is_redacted() {
+    let mut server = mockito::Server::new_async().await;
+    let fixture = server
+        .mock("POST", "/openai/v1/responses")
+        .with_status(200)
+        .with_header("content-type", "text/event-stream")
+        .with_body("data: {\"type\":\"error\",\"message\":\"sk-test echoed credential\"}\n\n")
+        .expect(1)
+        .create_async()
+        .await;
+    let events = collect_events(
+        responses_provider(server.url())
+            .stream(&[Message::User {
+                content: "fixture".into(),
+            }])
+            .await
+            .expect("HTTP response"),
+    )
+    .await;
+    assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { message } if message == "Azure response stream failed")));
+    assert!(!format!("{events:?}").contains("sk-test"));
+    fixture.assert_async().await;
+}
+
+#[tokio::test]
+async fn azure_responses_actual_agent_completes_permission_gated_read() {
+    use talos_core::tool::{ToolProtocol, ToolRegistry};
+    for protocol in [
+        ToolProtocol::Native,
+        ToolProtocol::Compat,
+        ToolProtocol::TalosStrict,
+    ] {
+        let directory = tempfile::tempdir().expect("workspace");
+        let workspace = directory.path().canonicalize().expect("canonical");
+        std::fs::write(workspace.join("fixture.txt"), "AZURE_AGENT_READ_OK").expect("fixture");
+        use base64::Engine as _;
+        use sha2::Digest as _;
+        let mut parts = vec![ContentPart::Text {
+            text: "Inspect these images in order".into(),
+        }];
+        let mut urls = Vec::new();
+        for (index, color) in [[255, 0, 0, 255], [0, 0, 255, 255]].into_iter().enumerate() {
+            let path = workspace.join(format!("private-image-{index}.png"));
+            image::RgbaImage::from_pixel(1, 1, image::Rgba(color))
+                .save(&path)
+                .expect("PNG");
+            let bytes = std::fs::read(&path).expect("image bytes");
+            urls.push(format!(
+                "data:image/png;base64,{}",
+                base64::engine::general_purpose::STANDARD.encode(&bytes)
+            ));
+            parts.push(ContentPart::Image {
+                path,
+                mime: "image/png".into(),
+                byte_count: bytes.len() as u64,
+                content_digest: ContentDigest::from_raw(sha2::Sha256::digest(&bytes).into()),
+            });
+        }
+        let expected_images = urls.clone();
+        let mut server = mockito::Server::new_async().await;
+        let first = server.mock("POST", "/openai/v1/responses")
+        .match_header("api-key", "sk-test")
+        .match_header("authorization", mockito::Matcher::Missing)
+        .match_request(move |request| {
+            let raw = String::from_utf8_lossy(request.body().expect("body"));
+            let body: Value = serde_json::from_str(&raw).expect("JSON");
+            let images: Vec<&str> = body["input"].as_array().expect("input").iter()
+                .filter_map(|item| item["content"].as_array()).flatten()
+                .filter(|part| part["type"] == "input_image").filter_map(|part| part["image_url"].as_str()).collect();
+            !raw.contains("AZURE_AGENT_READ_OK") && !raw.contains("private-image-")
+                && images == expected_images && body["reasoning"]["effort"] == "high" && body["model"] == "azure-deployment"
+        })
+        .with_status(200).with_header("content-type", "text/event-stream")
+        .with_body(format!("data: {}\n\n{}", json!({"type":"response.output_item.done","item":{"type":"reasoning","id":"rs_azure","encrypted_content":"opaque-azure-reasoning","summary":[]}}), if protocol == ToolProtocol::Native { concat!(
+            "data: {\"type\":\"response.created\"}\n\n",
+            "data: {\"type\":\"response.output_item.added\",\"item\":{\"id\":\"fc_read\",\"type\":\"function_call\",\"call_id\":\"call_read\",\"name\":\"read\",\"arguments\":\"\"}}\n\n",
+            "data: {\"type\":\"response.function_call_arguments.done\",\"item_id\":\"fc_read\",\"arguments\":\"{\\\"path\\\":\\\"fixture.txt\\\"}\"}\n\n",
+            "data: {\"type\":\"response.output_item.done\",\"item\":{\"id\":\"fc_read\",\"type\":\"function_call\",\"call_id\":\"call_read\",\"name\":\"read\",\"arguments\":\"{\\\"path\\\":\\\"fixture.txt\\\"}\"}}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n"
+        ).to_owned() } else { format!("data: {}\n\ndata: {}\n\n",
+            json!({"type":"response.output_text.delta","delta":"<tool_call>{\"name\":\"read\",\"args\":{\"path\":\"fixture.txt\"}}</tool_call>"}),
+            json!({"type":"response.completed","response":{"usage":{"input_tokens":4,"output_tokens":2}}}))
+        })).expect(1).create_async().await;
+        let second = server.mock("POST", "/openai/v1/responses")
+        .match_header("api-key", "sk-test")
+        .match_header("authorization", mockito::Matcher::Missing)
+        .match_request(move |request| {
+            let body: Value = serde_json::from_slice(request.body().expect("body")).expect("JSON");
+            let images: Vec<&str> = body["input"].as_array().expect("input").iter()
+                .filter_map(|item| item["content"].as_array()).flatten()
+                .filter(|part| part["type"] == "input_image").filter_map(|part| part["image_url"].as_str()).collect();
+            let reasoning_replayed = body["input"].as_array().expect("input").iter().any(|item| item["type"] == "reasoning" && item["id"] == "rs_azure" && item["encrypted_content"] == "opaque-azure-reasoning");
+            reasoning_replayed && images == urls && !body.to_string().contains("private-image-") && body["reasoning"]["effort"] == "high" && body["model"] == "azure-deployment" && body.to_string().contains("AZURE_AGENT_READ_OK")
+                && (protocol != ToolProtocol::Native || body["input"].as_array().expect("input").iter().any(|item|
+                    item["type"] == "function_call_output" && item["call_id"] == "call_read" && item["output"].as_str().is_some_and(|s| s.contains("AZURE_AGENT_READ_OK"))))
+        }).with_status(200).with_header("content-type", "text/event-stream")
+        .with_body("data: {\"type\":\"response.created\"}\n\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"done\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":8,\"output_tokens\":1}}}\n\n")
+        .expect(1).create_async().await;
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(talos_tools::file_tools::ReadTool::new(
+            workspace.clone(),
+        )));
+        let engine = talos_permission::PermissionEngine::with_workspace_root(workspace.clone());
+        let mut agent = talos_agent::Agent::with_security(
+            azure_provider_with_reasoning(server.url(), 0, true),
+            registry,
+            Some(Arc::new(engine)),
+            None,
+            workspace,
+        )
+        .with_reasoning_identity(
+            Some("azure-fixture".into()),
+            Some("gpt-test".into()),
+            true,
+        );
+        agent.set_tool_protocol(protocol);
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (answer, history) = tokio::time::timeout(
+            Duration::from_secs(20),
+            agent.run_streaming(
+                "Read fixture.txt".into(),
+                vec![Message::Multimodal { parts }],
+                tx,
+            ),
+        )
+        .await
+        .expect("bounded Agent")
+        .expect("Agent round");
+        assert_eq!(answer, "done");
+        assert!(history.iter().any(
+            |m| matches!(m, Message::Assistant { reasoning: Some(r), .. } if !r.blocks.is_empty())
+        ));
+        let mut input = 0;
+        let mut output = 0;
+        while let Ok(event) = rx.try_recv() {
+            if let AgentEvent::TurnEnd { usage, .. } = event {
+                input += usage.input_tokens;
+                output += usage.output_tokens;
+            }
+        }
+        assert_eq!((input, output), (12, 3));
+        assert!(history.iter().any(|message| matches!(message, Message::Tool { result } if !result.is_error && result.content.contains("AZURE_AGENT_READ_OK"))));
+        assert!(
+            !serde_json::to_string(&history)
+                .expect("history")
+                .contains("sk-test")
+        );
+        first.assert_async().await;
+        second.assert_async().await;
+    }
+}
+
+#[tokio::test]
+async fn azure_cancel_releases_silent_http_connection_in_all_tool_modes() {
+    use talos_core::tool::ToolProtocol;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    for protocol in [
+        ToolProtocol::Native,
+        ToolProtocol::Compat,
+        ToolProtocol::TalosStrict,
+    ] {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener");
+        let address = listener.local_addr().expect("address");
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("connection");
+            let mut request = Vec::new();
+            let mut buffer = [0; 4096];
+            loop {
+                let count = socket.read(&mut buffer).await.expect("request");
+                assert!(count > 0);
+                request.extend_from_slice(&buffer[..count]);
+                assert!(request.len() < 65536);
+                if let Some(end) = request.windows(4).position(|bytes| bytes == b"\r\n\r\n") {
+                    let headers = String::from_utf8_lossy(&request[..end]);
+                    let length: usize = headers
+                        .lines()
+                        .find_map(|line| {
+                            let (key, value) = line.split_once(':')?;
+                            key.eq_ignore_ascii_case("content-length")
+                                .then(|| value.trim().parse().expect("length"))
+                        })
+                        .expect("content length");
+                    if request.len() >= end + 4 + length {
+                        break;
+                    }
+                }
+            }
+            socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n").await.expect("headers");
+            // Keep the body quiet: cancellation must not wait for the five-second timeout.
+            let closed = tokio::time::timeout(Duration::from_secs(2), socket.read(&mut buffer))
+                .await
+                .expect("prompt disconnect");
+            assert!(matches!(closed, Ok(0) | Err(_)));
+        });
+        let provider = responses_provider(format!("http://{address}"));
+        let (progress, _) = tokio::sync::mpsc::unbounded_channel();
+        let receiver = provider
+            .stream_with_protocol(
+                &[Message::User {
+                    content: "cancel".into(),
+                }],
+                &[],
+                protocol,
+                progress,
+            )
+            .await
+            .expect("stream");
+        drop(receiver);
+        tokio::time::timeout(Duration::from_secs(3), server)
+            .await
+            .expect("bounded server")
+            .expect("fixture task");
+    }
+}
+
+#[tokio::test]
+async fn opaque_reasoning_replay_is_bound_to_resource_and_deployment_over_http() {
+    use talos_core::message::AssistantReasoning;
+    let mut origin = mockito::Server::new_async().await;
+    let mut other = mockito::Server::new_async().await;
+    let initial = origin.mock("POST", "/openai/v1/responses")
+        .with_header("content-type", "text/event-stream")
+        .with_body(concat!(
+            "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"reasoning\",\"id\":\"rs_bound\",\"encrypted_content\":\"bound-ciphertext\",\"summary\":[]}}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{}}\n\n"))
+        .expect(1).create_async().await;
+    let events = collect_events(
+        azure_bound_provider(origin.url(), 0, true, "one")
+            .stream(&[Message::User {
+                content: "initial".into(),
+            }])
+            .await
+            .expect("dispatch"),
+    )
+    .await;
+    let blocks = events
+        .into_iter()
+        .find_map(|event| match event {
+            AgentEvent::ReasoningComplete { blocks } => Some(blocks),
+            _ => None,
+        })
+        .expect("opaque reasoning captured through transport");
+    assert!(!blocks.is_empty());
+    initial.assert_async().await;
+    initial.remove_async().await;
+    let history = [
+        Message::Assistant {
+            content: "prior answer".into(),
+            tool_calls: vec![],
+            reasoning: Some(AssistantReasoning {
+                provider: "azure-fixture".into(),
+                model: "gpt-test".into(),
+                blocks,
+            }),
+        },
+        Message::User {
+            content: "continue".into(),
+        },
+    ];
+    for (server, deployment, replay) in [(&mut origin, "one", true), (&mut other, "one", false)] {
+        for (deployment, replay) in [(deployment, replay), ("two", false)] {
+            let fixture = server
+                .mock("POST", "/openai/v1/responses")
+                .match_request(move |request| {
+                    let body: Value =
+                        serde_json::from_slice(request.body().expect("body")).expect("JSON");
+                    let input = body["input"].as_array().expect("input");
+                    let opaque = input.iter().any(|item| {
+                        item["type"] == "reasoning"
+                            && item["encrypted_content"] == "bound-ciphertext"
+                    });
+                    let text = body.to_string();
+                    body["model"] == deployment
+                        && opaque == replay
+                        && text.contains("prior answer")
+                        && text.contains("continue")
+                })
+                .with_header("content-type", "text/event-stream")
+                .with_body("data: {\"type\":\"response.completed\",\"response\":{}}\n\n")
+                .expect(1)
+                .create_async()
+                .await;
+            let events = collect_events(
+                azure_bound_provider(server.url(), 0, true, deployment)
+                    .stream(&history)
+                    .await
+                    .expect("dispatch"),
+            )
+            .await;
+            assert!(events.iter().any(|e| matches!(
+                e,
+                AgentEvent::TurnEnd {
+                    stop_reason: StopReason::EndTurn,
+                    ..
+                }
+            )));
+            assert!(!events.iter().any(|e| matches!(e, AgentEvent::Error { .. })));
+            fixture.assert_async().await;
+            fixture.remove_async().await;
+        }
+    }
+}

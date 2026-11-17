@@ -140,7 +140,9 @@ pub(crate) fn resolve_model_provider_protocol(
                 )
         )
         && crate::catalog_protocol::has_unoverridden_model(provider, model);
-    let catalog_model = if reviewed {
+    let catalog_model = if crate::azure_catalog::reviewed(config, provider, model) {
+        Some(ProviderProtocol::AzureOpenAI)
+    } else if reviewed {
         Some(ProviderProtocol::GoogleGemini)
     } else {
         builtin_model_protocol(provider, model, endpoint)

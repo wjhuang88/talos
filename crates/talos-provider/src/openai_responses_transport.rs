@@ -151,7 +151,10 @@ pub(crate) async fn parse_response_stream(
         } else {
             idle_timeout
         };
-        let next = tokio::time::timeout(timeout, bytes.next()).await;
+        let next = tokio::select! {
+            _ = tx.closed() => return,
+            next = tokio::time::timeout(timeout, bytes.next()) => next,
+        };
         match next {
             Err(_) => {
                 let phase = if first_packet {
