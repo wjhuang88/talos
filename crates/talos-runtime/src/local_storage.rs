@@ -303,10 +303,12 @@ mod tests {
             // The unreadable absent path must remain a no-op, not be redirected
             // to another database or silently converted with to_string_lossy().
             if cfg!(target_os = "macos") && error.raw_os_error() == Some(92) {
-                assert!(profile
-                    .learned_knowledge_if_exists()
-                    .expect("missing learned index stays optional")
-                    .is_none());
+                assert!(
+                    profile
+                        .learned_knowledge_if_exists()
+                        .expect("missing learned index stays optional")
+                        .is_none()
+                );
                 assert!(!selected_db.exists());
                 assert!(!dir.path().join("index.db").exists());
                 return;
