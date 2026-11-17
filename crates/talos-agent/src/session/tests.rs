@@ -390,7 +390,7 @@ fn structured_submission_rejects_unbounded_image_metadata() {
 
 #[cfg(windows)]
 #[tokio::test]
-async fn actor_interrupt_and_shutdown_release_recovery_source_before_persistence() {
+async fn actor_idle_recovery_allows_writes_and_cancellation_persists() {
     struct HeldModel(Arc<tokio::sync::Notify>);
     #[async_trait]
     impl LanguageModel for HeldModel {
@@ -445,8 +445,8 @@ async fn actor_interrupt_and_shutdown_release_recovery_source_before_persistence
             std::fs::OpenOptions::new()
                 .write(true)
                 .open(durable.file_path())
-                .is_err(),
-            "live recovery must retain source"
+                .is_ok(),
+            "provider await must not retain a write-excluding recovery lease"
         );
         handle
             .sq_tx
@@ -1155,13 +1155,14 @@ async fn test_multi_turn() {
 
 #[tokio::test]
 async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1230,13 +1231,14 @@ async fn structured_batch_preserves_distinct_user_messages_and_correlation() {
 
 #[tokio::test]
 async fn duplicate_submission_reconciles_and_executes_at_most_once() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1292,13 +1294,14 @@ async fn duplicate_submission_reconciles_and_executes_at_most_once() {
 
 #[tokio::test]
 async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1357,13 +1360,14 @@ async fn closed_eq_does_not_revoke_actor_custody_or_duplicate_execution() {
 
 #[tokio::test]
 async fn context_budget_terminalizes_before_submission_started() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let agent = make_agent(CapturingModel {
         captured: captured.clone(),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 64,
     };
@@ -1486,13 +1490,14 @@ async fn context_budget_terminalizes_before_submission_started() {
 
 #[tokio::test]
 async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let agent = make_agent(SlowModel {
         delay: Duration::from_secs(30),
         events: success_events("too late"),
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -1560,6 +1565,7 @@ async fn aggregate_queue_limit_counts_running_and_pending_submissions() {
 
 #[tokio::test]
 async fn paused_user_submission_runs_before_retained_scheduler_work() {
+    let isolated_workspace = tempfile::tempdir().expect("isolated actor workspace");
     let captured = Arc::new(Mutex::new(Vec::new()));
     let responses = Arc::new(Mutex::new(VecDeque::from(vec![
         vec![AgentEvent::Error {
@@ -1574,7 +1580,7 @@ async fn paused_user_submission_runs_before_retained_scheduler_work() {
     });
     let config = SessionConfig {
         runtime_policy: RuntimePolicy::interactive(),
-        workspace_root: "/tmp".into(),
+        workspace_root: isolated_workspace.path().to_path_buf(),
         initial_history: vec![],
         model_context_limit: 128_000,
     };
@@ -5542,7 +5548,27 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                             }),
                         _ => None,
                     })
-                    .expect("installed checkpoint in actual provider request");
+                    .unwrap_or_else(|| {
+                        let outcomes: Vec<_> = messages
+                            .iter()
+                            .filter_map(|message| match message {
+                                Message::Multimodal { parts } => Some(parts),
+                                _ => None,
+                            })
+                            .flatten()
+                            .filter_map(|part| match part {
+                                talos_core::message::ContentPart::Text { text } => {
+                                    serde_json::from_str::<serde_json::Value>(text)
+                                        .ok()
+                                        .filter(|value| value.get("checkpoint_operation").is_some())
+                                }
+                                _ => None,
+                            })
+                            .collect();
+                        panic!(
+                            "installed checkpoint missing in provider step {step}; terminal outcomes: {outcomes:?}"
+                        );
+                    });
                 assert_task_state(&checkpoint);
             }
             let events = match step {
@@ -6637,11 +6663,146 @@ fn model_checkpoint_enable_reports_collision_without_partial_registration() {
     assert!(agent.tools.get("compact_context").is_none());
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 #[tokio::test]
 async fn durable_actor_history_search_and_detail_reach_real_provider_continuation() {
+    actor_history_search_and_detail(false, false).await;
+}
+
+#[cfg(any(unix, windows))]
+#[tokio::test]
+async fn cli_persistence_history_search_and_detail_reach_real_provider_continuation() {
+    actor_history_search_and_detail(true, false).await;
+}
+
+#[cfg(any(unix, windows))]
+#[tokio::test]
+async fn archived_cli_history_search_and_detail_reach_real_provider_continuation() {
+    actor_history_search_and_detail(true, true).await;
+}
+
+#[cfg(any(unix, windows))]
+#[tokio::test]
+async fn archived_history_does_not_hold_other_session_writes_during_provider_await() {
+    struct PausedModel {
+        entered: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+    }
+    #[async_trait]
+    impl LanguageModel for PausedModel {
+        async fn stream(&self, _: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+            assert!(
+                crate::checkpoint_history::HISTORY
+                    .try_with(|history| history.as_ref().is_some_and(|history| history.available()))
+                    .expect("prepared history scope"),
+                "must exercise actual prepared recovery"
+            );
+            self.entered.notify_one();
+            self.release.notified().await;
+            let (tx, rx) = mpsc::channel(16);
+            for event in success_events("continued after concurrent session write") {
+                tx.send(event).await.expect("receiver");
+            }
+            Ok(rx)
+        }
+    }
+    let root = tempfile::tempdir().expect("root");
+    let first = talos_session::DurableSession::open_or_create(root.path(), "first").expect("first");
+    let second =
+        talos_session::DurableSession::open_or_create(root.path(), "second").expect("second");
+    assert_eq!(first.file_path().parent(), second.file_path().parent());
+    for i in 0..205 {
+        first
+            .session()
+            .append(&Message::User {
+                content: format!("original {i}"),
+            })
+            .expect("append");
+    }
+    first.session().compact_archived(50).expect("archive");
+    second
+        .commit_turn(
+            "seed",
+            &[Message::User {
+                content: "independent fact".into(),
+            }],
+            &Default::default(),
+        )
+        .expect("seed second");
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let mut agent = make_agent(PausedModel {
+        entered: entered.clone(),
+        release: release.clone(),
+    });
+    agent
+        .enable_model_checkpoint_tools()
+        .expect("enable recovery preparation");
+    let (mut handle, mut actor) = AppServerSession::new(
+        agent,
+        SessionConfig {
+            workspace_root: root.path().into(),
+            runtime_policy: RuntimePolicy::interactive(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(first.session().clone(), Default::default());
+    let task = tokio::spawn(async move { actor.run().await });
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "continue".into(),
+        })
+        .await
+        .expect("submit");
+    tokio::time::timeout(Duration::from_secs(10), entered.notified())
+        .await
+        .expect("provider paused with prepared history");
+    second
+        .commit_turn(
+            "concurrent",
+            &[Message::User {
+                content: "durable concurrent append".into(),
+            }],
+            &Default::default(),
+        )
+        .expect("other session remains writable while provider awaits");
+    release.notify_one();
+    let events = tokio::time::timeout(
+        Duration::from_secs(10),
+        collect_until_completions(&mut handle.eq_rx, 1),
+    )
+    .await
+    .expect("completion");
+    assert!(events.iter().any(|event| matches!(
+        completed_status(event),
+        Some(TurnCompletionStatus::Success { .. })
+    )));
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    task.await.expect("actor");
+    assert_eq!(
+        first
+            .session()
+            .read_terminal_diagnostics()
+            .expect("diagnostics")
+            .len(),
+        1
+    );
+    let reopened = talos_session::DurableSession::open_or_create(root.path(), "second")
+        .expect("reopen second");
+    assert!(reopened.read_messages().expect("second history").iter().any(|message| matches!(message, Message::User { content } if content == "durable concurrent append")));
+}
+
+#[cfg(any(unix, windows))]
+async fn actor_history_search_and_detail(cli: bool, archived: bool) {
     struct RecoveryModel {
         step: AtomicUsize,
+        compact: bool,
     }
     #[async_trait]
     impl LanguageModel for RecoveryModel {
@@ -6717,12 +6878,64 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
                         usage: Default::default(),
                     },
                 ]
-            } else {
-                assert_eq!(step, 4);
+            } else if self.compact && step == 4 {
+                let discovery = result("recover-0");
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "checkpoint-source-detail".into(),
+                            name: "history_search".into(),
+                            input: serde_json::json!({"mode":"source_detail", "snapshot":discovery["snapshot"], "reference":discovery["sources"][0]}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else if self.compact && step == 5 {
                 assert_eq!(
                     result("recover-3")["text"],
                     "originalfact unique constraint"
                 );
+                let discovery = result("recover-0");
+                let source = result("checkpoint-source-detail");
+                assert_eq!(source["text"], "originalfact unique constraint");
+                assert_eq!(source["reference"], discovery["sources"][0]);
+                assert_eq!(source["checkpoint_source"], true);
+                let item =
+                    serde_json::json!({"text":source["text"], "sources":[source["reference"]]});
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "archive-compact".into(),
+                            name: "compact_context".into(),
+                            input: serde_json::json!({"snapshot":discovery["snapshot"],"checkpoint":{
+                            "schema_version":1,"summary":item,"goal":item,"next_step":item,
+                            "constraints":[],"completed":[],"in_progress":[],"pending":[],"decisions":[],
+                            "facts":[],"assumptions":[],"resources":[],"open_loops":[]}}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else {
+                assert_eq!(step, if self.compact { 6 } else { 4 });
+                if self.compact {
+                    assert_eq!(result("archive-compact")["status"], "Admitted");
+                    assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.contains("originalfact unique constraint"))), "installed source-backed checkpoint is present");
+                } else {
+                    assert_eq!(
+                        result("recover-3")["text"],
+                        "originalfact unique constraint"
+                    );
+                }
                 success_events("recovered and continued")
             };
             let (tx, rx) = mpsc::channel(16);
@@ -6740,7 +6953,7 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             content: if i == 0 {
                 "originalfact unique constraint".into()
             } else {
-                format!("other {i}")
+                format!("other {i} ").repeat(if archived { 80 } else { 1 })
             },
         })
         .collect();
@@ -6777,16 +6990,22 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             },
         },
     ]);
-    durable
-        .commit_turn(
-            "prior",
-            &raw,
-            &talos_session::PersistencePolicy {
-                persist_reasoning: true,
-                persist_raw_tool_output: true,
-            },
-        )
-        .expect("commit");
+    if cli {
+        for message in &raw {
+            durable.session().append(message).expect("CLI append");
+        }
+    } else {
+        durable
+            .commit_turn(
+                "prior",
+                &raw,
+                &talos_session::PersistencePolicy {
+                    persist_reasoning: true,
+                    persist_raw_tool_output: true,
+                },
+            )
+            .expect("commit");
+    }
     durable
         .session()
         .append_with_metadata(
@@ -6804,8 +7023,10 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             .expect("serialized persisted evidence");
     assert!(persisted.contains("originalfact hidden input sentinel"));
     assert!(persisted.contains("originalfact unverified output sentinel"));
-    assert!(!persisted.contains("originalfact credential sentinel"));
-    assert!(persisted.contains("[REDACTED]"));
+    assert_eq!(persisted.contains("originalfact credential sentinel"), cli);
+    if !cli {
+        assert!(persisted.contains("[REDACTED]"));
+    }
     for marker in [
         "originalfact private reasoning sentinel",
         "originalfact opaque signature sentinel",
@@ -6817,6 +7038,24 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             "private metadata must actually be persisted: {marker}"
         );
     }
+    if archived {
+        durable
+            .session()
+            .compact_archived(10)
+            .expect("archive original fact out of head");
+        assert!(
+            !durable
+                .session()
+                .read_entries()
+                .expect("head")
+                .iter()
+                .any(|entry| entry.content == "originalfact unique constraint")
+        );
+    }
+    drop(durable);
+    let durable = talos_session::DurableSession::open_existing(root.path(), "recovery")
+        .expect("cold reopen")
+        .expect("existing owner");
     let mut engine = talos_permission::PermissionEngine::empty();
     engine.set_workspace_root(root.path().into());
     engine.add_rule(talos_permission::PermissionRule::new_nature(
@@ -6828,6 +7067,7 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
     let mut agent = Agent::with_security_and_hooks(
         Arc::new(RecoveryModel {
             step: AtomicUsize::new(0),
+            compact: archived,
         }),
         ToolRegistry::new(),
         Some(Arc::new(engine)),
@@ -6845,8 +7085,22 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
             model_context_limit: 128_000,
         },
     );
-    actor.set_durable_persistence(durable.clone(), Default::default());
-    actor.set_recovered_history_sources(durable.read_history_snapshot().expect("snapshot"));
+    let original_head = std::fs::read(durable.session().file_path.clone()).expect("head bytes");
+    actor.set_session_paths(
+        durable.session().file_path.clone(),
+        durable
+            .session()
+            .file_path
+            .parent()
+            .expect("directory")
+            .to_path_buf(),
+    );
+    if cli {
+        actor.set_persistence(durable.session().clone(), Default::default());
+    } else {
+        actor.set_durable_persistence(durable.clone(), Default::default());
+        actor.set_recovered_history_sources(durable.read_history_snapshot().expect("snapshot"));
+    }
     let task = tokio::spawn(async move {
         actor.run().await;
         actor
@@ -6868,13 +7122,54 @@ async fn durable_actor_history_search_and_detail_reach_real_provider_continuatio
         completed_status(event),
         Some(TurnCompletionStatus::Success { .. })
     )));
+    if archived {
+        assert!(events.iter().any(|event| matches!(event,
+            SessionEvent::ModelCheckpointTerminal { outcome: talos_core::session::CompactOutcome::Applied { before, after }, .. } if after < before
+        )), "checkpoint must actually be Applied, not merely admitted");
+    }
     handle
         .sq_tx
         .send(SessionOp::Shutdown)
         .await
         .expect("shutdown");
     let actor = task.await.expect("actor");
+    if cli {
+        let diagnostics = durable
+            .session()
+            .read_terminal_diagnostics()
+            .expect("persisted diagnostics");
+        assert_eq!(
+            diagnostics.len(),
+            if archived { 7 } else { 5 },
+            "every provider response terminal must survive prepared recovery"
+        );
+        let reopened = talos_session::Session::new(
+            durable.id(),
+            durable.session().project.clone(),
+            String::new(),
+            durable.session().file_path.clone(),
+        );
+        let restored = reopened.read_messages().expect("restart transcript");
+        assert!(
+            restored.iter().any(|message| matches!(message,
+                Message::Assistant { content, .. } if content == "recovered and continued"
+            )),
+            "successful final response must be durable after restart"
+        );
+        assert!(
+            restored.iter().any(|message| matches!(message,
+                Message::Tool { result } if result.tool_use_id == "recover-3" && !result.is_error
+            )),
+            "tool exchange must survive restart"
+        );
+    }
     assert_eq!(&actor.history[..raw.len()], raw.as_slice());
+    assert!(
+        std::fs::read(&durable.session().file_path)
+            .expect("persisted head")
+            .starts_with(&original_head),
+        "turn startup must preserve the original head even with legacy archival paths configured"
+    );
 }
 
 #[cfg(any(unix, windows))]
@@ -7206,4 +7501,396 @@ async fn cooperative_recovered_sources_bind_long_history_and_refuse_foreign_or_e
         source.resolve(0, revision, last, &actor.history[last]),
         Some(last_id.as_str())
     );
+}
+
+#[tokio::test]
+async fn idle_actor_publishes_archived_history_under_its_runtime_lease() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+    let source = manager.create_session("actor-fork", "").expect("source");
+    for i in 0..8 {
+        source
+            .append(&Message::User {
+                content: format!("fact {i}"),
+            })
+            .expect("append");
+    }
+    source.compact_archived(0).expect("compact");
+    let (handle, mut actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: Arc::new(AtomicUsize::new(0)),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(source.clone(), Default::default());
+    let task = tokio::spawn(async move { actor.run().await });
+    let child = uuid::Uuid::new_v4();
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkHistory {
+            child_id: child.to_string(),
+            child_branch: uuid::Uuid::new_v4().to_string(),
+            through_entry: None,
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("request");
+    let tail = tokio::time::timeout(Duration::from_secs(10), result.recv())
+        .await
+        .expect("deadline")
+        .expect("receipt")
+        .expect("published");
+    let child_session = talos_session::Session::new(
+        child,
+        String::new(),
+        String::new(),
+        source
+            .file_path
+            .parent()
+            .expect("directory")
+            .join(format!("{child}.tlog")),
+    );
+    let entries = child_session.read_entries().expect("child history");
+    assert_eq!(entries.len(), 8);
+    assert_eq!(entries.last().expect("tail").id, tail);
+    assert!(talos_session::SessionRuntimeLease::acquire(&source.file_path).is_err());
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("joined")
+        .expect("actor");
+}
+
+#[tokio::test]
+async fn history_fork_worker_interrupt_preserves_source_and_allows_retry() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+    let source = manager.create_session("actor-fork", "").expect("source");
+    for i in 0..8 {
+        source
+            .append(&Message::User {
+                content: format!("fact {i}"),
+            })
+            .expect("append");
+    }
+    source.compact_archived(0).expect("compact");
+    let (mut handle, mut actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: Arc::new(AtomicUsize::new(0)),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(source.clone(), Default::default());
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    actor.fork_worker_gate = Some((reached.clone(), release.clone()));
+    let task = tokio::spawn(async move { actor.run().await });
+    let child = uuid::Uuid::new_v4();
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkHistory {
+            child_id: child.to_string(),
+            child_branch: uuid::Uuid::new_v4().to_string(),
+            through_entry: None,
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("request");
+    tokio::time::timeout(Duration::from_secs(2), reached.notified())
+        .await
+        .expect("worker entered");
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 913,
+        })
+        .await
+        .expect("compact");
+    let event = tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+        .await
+        .expect("event")
+        .expect("status");
+    assert!(matches!(
+        event,
+        SessionEvent::CompactStatus {
+            operation_id: 913,
+            state: talos_core::session::CompactState::Busy,
+            ..
+        }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("interrupt");
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), result.recv())
+            .await
+            .expect("cancelled")
+            .expect("receipt")
+            .is_err()
+    );
+    assert!(
+        !source
+            .file_path
+            .parent()
+            .expect("directory")
+            .join(format!("{child}.tlog"))
+            .exists()
+    );
+    assert_eq!(
+        source
+            .inspect_archive_recovery(std::time::Instant::now() + Duration::from_secs(5), || false)
+            .expect("source intact")
+            .entries()
+            .len(),
+        8
+    );
+    release.store(true, Ordering::SeqCst);
+    let (receipt, mut result) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::ForkHistory {
+            child_id: child.to_string(),
+            child_branch: uuid::Uuid::new_v4().to_string(),
+            through_entry: None,
+            receipt_tx: Some(receipt),
+        })
+        .await
+        .expect("retry");
+    let tail = tokio::time::timeout(Duration::from_secs(10), result.recv())
+        .await
+        .expect("deadline")
+        .expect("receipt")
+        .expect("published");
+    let child_session = talos_session::Session::new(
+        child,
+        String::new(),
+        String::new(),
+        source
+            .file_path
+            .parent()
+            .expect("directory")
+            .join(format!("{child}.tlog")),
+    );
+    let entries = child_session.read_entries().expect("child history");
+    assert_eq!(entries.len(), 8);
+    assert_eq!(entries.last().expect("tail").id, tail);
+    assert!(talos_session::SessionRuntimeLease::acquire(&source.file_path).is_err());
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("joined")
+        .expect("actor");
+}
+
+#[tokio::test]
+async fn prepared_runtime_lease_handoff_preserves_exclusion_and_rejects_mismatch() {
+    for matching in [true, false] {
+        let temp = tempfile::tempdir().expect("temp");
+        let manager = talos_session::SessionManager::with_dir(temp.path().to_path_buf());
+        let session = manager.create_session("handoff", "").expect("session");
+        let other = manager.create_session("other", "").expect("other");
+        let leased = if matching { &session } else { &other };
+        let lease =
+            talos_session::SessionRuntimeLease::acquire(&leased.file_path).expect("host lease");
+        assert!(talos_session::SessionRuntimeLease::acquire(&leased.file_path).is_err());
+        let agent = make_agent(MockModel::new(vec![success_events("handoff response")]));
+        let (mut handle, mut actor) = AppServerSession::new(
+            agent,
+            SessionConfig {
+                runtime_policy: RuntimePolicy::interactive(),
+                workspace_root: temp.path().to_path_buf(),
+                initial_history: vec![],
+                model_context_limit: 128_000,
+            },
+        );
+        actor.set_persistence(session.clone(), talos_session::SessionMetadata::default());
+        handle
+            .sq_tx
+            .send(SessionOp::Submit {
+                message: "handoff request".into(),
+            })
+            .await
+            .expect("submit");
+        let task = if matching {
+            actor
+                .adopt_runtime_lease(lease)
+                .expect("adopt prepared ownership");
+            assert!(talos_session::SessionRuntimeLease::acquire(&session.file_path).is_err());
+            tokio::spawn(async move { actor.run().await })
+        } else {
+            tokio::spawn(async move { actor.run_with_runtime_lease(lease).await })
+        };
+        if matching {
+            let events = collect_until_completions(&mut handle.eq_rx, 1).await;
+            assert!(events.iter().any(is_turn_started));
+            assert!(talos_session::SessionRuntimeLease::acquire(&session.file_path).is_err());
+            handle
+                .sq_tx
+                .send(SessionOp::Shutdown)
+                .await
+                .expect("shutdown");
+        }
+        tokio::time::timeout(std::time::Duration::from_secs(10), task)
+            .await
+            .expect("actor exits")
+            .expect("join");
+        let entries = session.read_entries().expect("entries");
+        assert_eq!(
+            entries
+                .iter()
+                .any(|entry| entry.content == "handoff response"),
+            matching
+        );
+        talos_session::SessionRuntimeLease::acquire(&leased.file_path)
+            .expect("released after exit");
+    }
+}
+
+#[tokio::test]
+async fn ordinary_fork_capture_excludes_turns_and_compaction_and_can_retry_cancel() {
+    let root = tempfile::tempdir().expect("root");
+    let manager = talos_session::SessionManager::with_dir(root.path().join("sessions"));
+    let source = manager.create_session("ordinary", "").expect("source");
+    source
+        .append(&Message::User {
+            content: "original".into(),
+        })
+        .expect("append");
+    let before = std::fs::read(&source.file_path).expect("bytes");
+    let identity = talos_session::SessionRuntimeIdentity::new("provider", "model", Some("variant"));
+    talos_session::PendingSubmissionStore::for_session(&source)
+        .initialize_runtime_identity(identity.clone())
+        .expect("identity");
+    let calls = Arc::new(AtomicUsize::new(0));
+    let (mut handle, mut actor) = AppServerSession::new(
+        make_agent(CountingModel {
+            calls: calls.clone(),
+        }),
+        SessionConfig {
+            runtime_policy: RuntimePolicy::interactive(),
+            workspace_root: root.path().into(),
+            initial_history: vec![],
+            model_context_limit: 128_000,
+        },
+    );
+    actor.set_persistence(source.clone(), Default::default());
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    actor.fork_worker_gate = Some((reached.clone(), release.clone()));
+    let task = tokio::spawn(async move { actor.run().await });
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::CaptureOrdinaryFork {
+            through_entry: None,
+            receipt_tx: Some(tx),
+        })
+        .await
+        .expect("capture");
+    tokio::time::timeout(Duration::from_secs(2), reached.notified())
+        .await
+        .expect("capture running");
+    handle
+        .sq_tx
+        .send(SessionOp::Submit {
+            message: "must not start".into(),
+        })
+        .await
+        .expect("submit");
+    assert!(matches!(
+        tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+            .await
+            .expect("event")
+            .expect("busy"),
+        SessionEvent::Error { .. }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Compact {
+            session_generation: 0,
+            operation_id: 914,
+        })
+        .await
+        .expect("compact");
+    assert!(matches!(
+        tokio::time::timeout(Duration::from_secs(2), handle.eq_rx.recv())
+            .await
+            .expect("event")
+            .expect("busy"),
+        SessionEvent::CompactStatus {
+            operation_id: 914,
+            state: talos_core::session::CompactState::Busy,
+            ..
+        }
+    ));
+    handle
+        .sq_tx
+        .send(SessionOp::Interrupt)
+        .await
+        .expect("interrupt");
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .expect("deadline")
+            .expect("receipt")
+            .is_err()
+    );
+    release.store(true, Ordering::SeqCst);
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    handle
+        .sq_tx
+        .send(SessionOp::CaptureOrdinaryFork {
+            through_entry: None,
+            receipt_tx: Some(tx),
+        })
+        .await
+        .expect("retry");
+    let snapshot = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+        .await
+        .expect("deadline")
+        .expect("receipt")
+        .expect("capture");
+    assert_eq!(snapshot.bytes, before);
+    assert_eq!(
+        snapshot.runtime_identity,
+        Some((identity.provider, identity.model, identity.variant))
+    );
+    assert_eq!(
+        snapshot.tail_id,
+        source.read_entries().expect("entries")[0].id
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_eq!(std::fs::read(&source.file_path).expect("unchanged"), before);
+    handle
+        .sq_tx
+        .send(SessionOp::Shutdown)
+        .await
+        .expect("shutdown");
+    tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("joined")
+        .expect("actor");
 }
