@@ -32,6 +32,8 @@ pub(crate) use production::production_search_router_tool_with_search_configurati
 pub(crate) mod integration_test;
 // Controlled response parsing prerequisites.
 mod bing_parser;
+// Offline-only Bing endpoint variant policy; NOT wired to production routing or Network authority.
+mod bing_variants;
 mod ddg_parser;
 mod instant_answer;
 // Upstream-parity private helpers owned by the protected zero-key compatibility path.
