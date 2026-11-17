@@ -151,14 +151,20 @@ impl LocalStorageProfile {
         if !path.exists() {
             return Ok(None);
         }
-        let path_str = path.to_str().ok_or_else(|| {
-            talos_evolution::EvolutionError::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "learned index path cannot be represented as UTF-8",
-            ))
-        })?;
-        KnowledgeStore::open(path_str).map(Some)
+        KnowledgeStore::open(learned_index_path_utf8(&path)?).map(Some)
     }
+}
+
+// Keep the existing fallible conversion after the absent-file check. Separating
+// it makes the typed error testable even when macOS rejects non-UTF-8 names
+// before they can be created on disk (EILSEQ).
+fn learned_index_path_utf8(path: &Path) -> EvolutionResult<&str> {
+    path.to_str().ok_or_else(|| {
+        talos_evolution::EvolutionError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "learned index path cannot be represented as UTF-8",
+        ))
+    })
 }
 
 #[cfg(test)]
@@ -280,16 +286,41 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let non_utf8 = std::ffi::OsString::from_vec(b"broken-\xff".to_vec());
         let profile = LocalStorageProfile::under_talos_root(dir.path().join(non_utf8));
-        std::fs::create_dir_all(profile.talos_root()).expect("create selected dir");
-        std::fs::write(profile.learned_index_db(), b"non-sqlite fixture")
-            .expect("write selected DB fixture");
+        let selected_db = profile.learned_index_db();
+        assert!(selected_db.to_str().is_none());
+
+        // Exercise the same typed conversion independently of filesystem name
+        // support, including macOS volumes that reject invalid UTF-8 at mkdir.
+        match learned_index_path_utf8(&selected_db) {
+            Err(talos_evolution::EvolutionError::Io(error)) => {
+                assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+            }
+            _ => panic!("non-UTF-8 path conversion must return InvalidInput"),
+        }
+
+        if let Err(error) = std::fs::create_dir_all(profile.talos_root()) {
+            // macOS commonly rejects non-UTF-8 directory names with EILSEQ (92).
+            // The unreadable absent path must remain a no-op, not be redirected
+            // to another database or silently converted with to_string_lossy().
+            if cfg!(target_os = "macos") && error.raw_os_error() == Some(92) {
+                assert!(profile
+                    .learned_knowledge_if_exists()
+                    .expect("missing learned index stays optional")
+                    .is_none());
+                assert!(!selected_db.exists());
+                assert!(!dir.path().join("index.db").exists());
+                return;
+            }
+            panic!("unexpected failure creating selected dir: {error}");
+        }
+        std::fs::write(&selected_db, b"non-sqlite fixture").expect("write selected DB fixture");
 
         match profile.learned_knowledge_if_exists() {
             Err(talos_evolution::EvolutionError::Io(error)) => {
                 assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
             }
-            _ => panic!("non-UTF-8 path must fail with a typed invalid-input error"),
+            _ => panic!("existing non-UTF-8 path must fail with InvalidInput"),
         }
-        assert!(profile.learned_index_db().exists());
+        assert!(selected_db.exists());
     }
 }
