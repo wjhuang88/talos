@@ -393,8 +393,7 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
     let matched_config = b"[includeIf \"hasconfig:remote.*.url:https://example.invalid/allowed\"]\n path = conditional.conf\n[remote \"origin\"]\n url = https://example.invalid/allowed\n";
     let unmatched_config = b"[includeIf \"hasconfig:remote.*.url:https://example.invalid/allowed\"]\n path = conditional.conf\n[remote \"origin\"]\n url = https://example.invalid/other\n";
     std::fs::write(&root, matched_config).expect("write root");
-    std::fs::write(&conditional, b"[fixture]\n marker = conditional\n")
-        .expect("write conditional source");
+    std::fs::write(&conditional, b"[fixture]\n marker = conditional\n").expect("write conditional source");
     let environment = BTreeMap::<OsString, OsString>::new();
     let capture = || {
         let mut sources = target_config::Sources::new(None, [root.clone()])
