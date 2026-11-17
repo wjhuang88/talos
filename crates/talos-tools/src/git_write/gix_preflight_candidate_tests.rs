@@ -332,8 +332,7 @@ fn gix_gitdir_conditional_requires_admitted_repository_identity() {
         ),
     )
     .expect("conditional fixture");
-    std::fs::write(&conditional, b"[fixture]\n context = admitted\n")
-        .expect("included fixture");
+    std::fs::write(&conditional, b"[fixture]\n context = admitted\n").expect("included fixture");
     let environment = BTreeMap::<OsString, OsString>::new();
     let mut sources =
         target_config::Sources::new(None, [root.clone()]).expect("path-only source frontier");
