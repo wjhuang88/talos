@@ -143,6 +143,17 @@ jobs:
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         run: ./scripts/release_preflight.sh
 
+      # I328 E: workspace defaults do not enable the optional local-storage feature.
+      # Exercise its constructors and no-create/error regression tests on native CI.
+      - name: STORE-002 E explicit local-storage feature validation
+        if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p talos-runtime --features local-storage
+          cargo clippy --locked -p talos-runtime --features local-storage --all-targets -- -D warnings
+          cargo test --locked -p talos-runtime --features local-storage --lib
+
       - name: Pending-store permission-denial regression
         if: needs.classify-changes.result != 'success' || needs.classify-changes.outputs.full_validation != 'false'
         shell: bash
