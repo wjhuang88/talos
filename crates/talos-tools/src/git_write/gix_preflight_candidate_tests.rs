@@ -382,6 +382,86 @@ fn gix_gitdir_conditional_requires_admitted_repository_identity() {
 }
 
 #[test]
+fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
+    // hasconfig:remote.*.url must see later root records but must never infer
+    // authorization for an included source. Every root/child read remains in
+    // the separately admitted, immutable exact-Path Read frontier.
+    let dir = tempfile::tempdir().expect("fixture");
+    let fixture = dir.path().canonicalize().expect("canonical fixture");
+    let root = fixture.join("root.conf");
+    let conditional = fixture.join("conditional.conf");
+    let matched_config = b"[includeIf \"hasconfig:remote.*.url:https://example.invalid/allowed\"]\n path = conditional.conf\n[remote \"origin\"]\n url = https://example.invalid/allowed\n";
+    let unmatched_config = b"[includeIf \"hasconfig:remote.*.url:https://example.invalid/allowed\"]\n path = conditional.conf\n[remote \"origin\"]\n url = https://example.invalid/other\n";
+    std::fs::write(&root, matched_config).expect("write root");
+    std::fs::write(&conditional, b"[fixture]\n marker = conditional\n")
+        .expect("write conditional source");
+    let environment = BTreeMap::<OsString, OsString>::new();
+    let capture = || {
+        let mut sources = target_config::Sources::new(None, [root.clone()])
+            .expect("root path-only source plan");
+        for _ in 0..4 {
+            if sources.complete() {
+                break;
+            }
+            let admitted = sources.paths();
+            sources
+                .advance(|path| admitted.contains(path), &environment)
+                .expect("separately admit all config and include paths");
+        }
+        assert!(sources.complete(), "all conditional sources must be captured");
+        assert!(
+            sources.captured_paths().any(|path| path == &conditional),
+            "includeIf destination remains a candidate Read even before the URL match"
+        );
+        sources
+    };
+
+    let sources = capture();
+    let matched = sources
+        .ordered_host_output(std::slice::from_ref(&root), &environment, None)
+        .and_then(|output| super::config_state::parse_host(&output))
+        .expect("evaluate admitted bytes without a Git process");
+    assert_eq!(
+        matched
+            .get(b"fixture.marker".as_slice())
+            .and_then(|values| values.last()),
+        Some(&Some(b"conditional".to_vec())),
+        "later remote URL must participate in admitted includeIf lookahead"
+    );
+
+    std::fs::write(&root, unmatched_config).expect("change root URL after admission");
+    assert!(
+        sources.revalidate().is_err(),
+        "a changed remote URL cannot reuse the earlier admitted source graph"
+    );
+    let sources = capture();
+    let unmatched = sources
+        .ordered_host_output(std::slice::from_ref(&root), &environment, None)
+        .and_then(|output| super::config_state::parse_host(&output))
+        .expect("evaluate nonmatching admitted URLs");
+    assert!(
+        !unmatched.contains_key(b"fixture.marker".as_slice()),
+        "a nonmatching remote URL must not activate an includeIf record"
+    );
+
+    // Git forbids remote URLs in hasconfig-conditional included files: they
+    // would recursively influence the condition that selected the file.
+    std::fs::write(&root, matched_config).expect("restore matching root");
+    std::fs::write(
+        &conditional,
+        b"[remote \"injected\"]\n url = https://example.invalid/unapproved\n",
+    )
+    .expect("replace conditional source");
+    let sources = capture();
+    assert!(
+        sources
+            .ordered_host_output(std::slice::from_ref(&root), &environment, None)
+            .is_err(),
+        "remote URL in a hasconfig-conditional include must fail closed"
+    );
+}
+
+#[test]
 fn gix_attributes_strict_parse_refuses_malformed_filter_sources() {
     // The locked gix-attributes parser operates solely on admitted bytes.
     // A future filter-effect resolver must not use Search's lenient parsing
