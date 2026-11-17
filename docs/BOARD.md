@@ -125,6 +125,9 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
   accepted, failure 2s polling retained; bounded watcher and early-exit scan delivered.
   Exact-head code/platform CI `43861152146` and independent Agent review passed;
   native gates and original 479ms tail remain open. macOS retains polling.
+  Ghostty external Git and replay workspace/approval observations are recorded;
+  second-terminal testing is maintainer-waived, not passed. Native Windows, source
+  binding and original479ms attribution remain open.
   Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001

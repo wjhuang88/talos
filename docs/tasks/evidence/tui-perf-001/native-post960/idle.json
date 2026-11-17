@@ -1,0 +1,180 @@
+{
+  "identity": {
+    "exe": "/home/wjhuang/WorkSpace/personal/talos/target/debug/talos",
+    "sha256": "997c18e2f5cbe10b3b7428e34c6634bb9c37e3426d8af701c80bd0f5ef12979f",
+    "cwd": "/home/wjhuang/WorkSpace/personal/talos"
+  },
+  "pids": {
+    "talos": 3213596,
+    "ghostty": 2160365
+  },
+  "duration_seconds": 30.02278334402945,
+  "samples": [
+    {
+      "elapsed": 3.0659139156341553e-06,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 513,
+          "start_ticks": 72419607,
+          "memory_kib": {
+            "Rss": 145124,
+            "Pss": 142485,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 86884,
+          "start_ticks": 70572443,
+          "memory_kib": {
+            "Rss": 294172,
+            "Pss": 246135,
+            "Swap": 11764
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 5.003681547008455,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 513,
+          "start_ticks": 72419607,
+          "memory_kib": {
+            "Rss": 145124,
+            "Pss": 142485,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 86923,
+          "start_ticks": 70572443,
+          "memory_kib": {
+            "Rss": 294172,
+            "Pss": 246135,
+            "Swap": 11764
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 10.007601973949932,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 514,
+          "start_ticks": 72419607,
+          "memory_kib": {
+            "Rss": 145124,
+            "Pss": 142471,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 86960,
+          "start_ticks": 70572443,
+          "memory_kib": {
+            "Rss": 294180,
+            "Pss": 246143,
+            "Swap": 11764
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 15.011388013954274,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 514,
+          "start_ticks": 72419607,
+          "memory_kib": {
+            "Rss": 145124,
+            "Pss": 142472,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 86996,
+          "start_ticks": 70572443,
+          "memory_kib": {
+            "Rss": 294180,
+            "Pss": 246148,
+            "Swap": 11764
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 20.015253574005328,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 515,
+          "start_ticks": 72419607,
+          "memory_kib": {
+            "Rss": 145124,
+            "Pss": 142485,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 87035,
+          "start_ticks": 70572443,
+          "memory_kib": {
+            "Rss": 294180,
+            "Pss": 246148,
+            "Swap": 11764
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 25.018967477953993,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 515,
+          "start_ticks": 72419607,
+          "memory_kib": {
+            "Rss": 145124,
+            "Pss": 142472,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 87078,
+          "start_ticks": 70572443,
+          "memory_kib": {
+            "Rss": 294180,
+            "Pss": 246148,
+            "Swap": 11764
+          }
+        }
+      }
+    },
+    {
+      "elapsed": 30.022786409943365,
+      "processes": {
+        "talos": {
+          "cpu_ticks": 534,
+          "start_ticks": 72419607,
+          "memory_kib": {
+            "Rss": 145124,
+            "Pss": 142485,
+            "Swap": 0
+          }
+        },
+        "ghostty": {
+          "cpu_ticks": 87116,
+          "start_ticks": 70572443,
+          "memory_kib": {
+            "Rss": 294180,
+            "Pss": 246148,
+            "Swap": 11764
+          }
+        }
+      }
+    }
+  ],
+  "cpu_percent_one_core": {
+    "talos": 0.6994687920624193,
+    "ghostty": 7.72746475040387
+  },
+  "scope": "current native debug binary; terminal includes other surfaces; no child-process accounting"
+}

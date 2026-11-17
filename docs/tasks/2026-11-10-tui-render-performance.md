@@ -1978,3 +1978,32 @@ macOS still uses the explicit bounded-backend fallback; change-driven macOS is
 unimplemented. The host check found Ghostty but no Talos process, so no new native
 resource acceptance is claimed. Next: resume these rows with source-bound evidence,
 without repeating unchanged matrices or overwriting other sessions' binaries.
+
+### Native acceptance and maintainer waiver — 2026-11-16
+
+The maintainer explicitly instructed “跳过第二终端，直接放行”. The second
+supported-terminal gate is therefore waived by the maintainer for this task; it
+is not tested or passed. This supersedes that outstanding row in earlier records
+without removing historical scope. No other gate is waived by this decision.
+
+The maintainer confirmed the new native Ghostty instance remained idle during the
+30.023s sample: Talos CPU 0.6995% of one core, final PSS142,485KiB, swap0. This
+is a mixed primary-tree binary with a sampling-time source snapshot, not strict
+build-time source attestation or a controlled comparison with the old sample.
+External creation of a fixture file showed the dirty star almost immediately;
+deleting it restored clean display; external branch switching updated the name.
+All three were confirmed by the maintainer without input-triggered refresh.
+
+Native real-TUI replay (binary SHA256
+`e0d3317920d77f7baa79fa026c6f8d02c5ab605b7b192c53b0ed22dc78562fac`)
+passed maintainer observation of workspace-switch branch alternation/responsiveness
+and approval-panel display/cursor/reject response. Workspace switching used the
+replay status interface, not an interactive CLI workspace command; approval was
+a display-only fixture, not production permission/tool execution acceptance.
+
+Whole-task status remains Review / Claimed: original479ms tail attribution, strict
+native build/source evidence and native Windows acceptance remain unresolved.
+The macOS bounded notification backend remains unavailable with polling fallback.
+
+Raw native samples, source snapshot and confirmation limits are archived in
+[evidence/native-post960](evidence/tui-perf-001/native-post960/README.md).

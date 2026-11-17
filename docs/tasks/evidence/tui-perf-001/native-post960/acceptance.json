@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-16",
+  "terminal": "Ghostty; Linux Wayland+niri (user reported)",
+  "idle": {
+    "user_confirmed_idle": true,
+    "sample": "idle.json",
+    "cpu_percent_one_core": 0.6994687920624193,
+    "source_limit": "mixed primary tree; sampling-time source snapshot, not build-time attestation"
+  },
+  "external_git": {
+    "fixture": "/tmp/talos-native-git-acceptance-0wwIpY",
+    "clean_display": "user confirmed",
+    "untracked_creation": "star appeared almost immediately, user confirmed",
+    "untracked_removal": "clean restored, user confirmed",
+    "branch_switch": "acceptance-switched updated, user confirmed"
+  },
+  "workspace_switch": {
+    "method": "native terminal real-TUI replay, not interactive CLI command",
+    "binary_sha256": "e0d3317920d77f7baa79fa026c6f8d02c5ab605b7b192c53b0ed22dc78562fac",
+    "scenario": "workspace-switch 100 30",
+    "alternate": "/tmp/talos-native-git-second-SSy4Fs",
+    "user_confirmation": "是这样的",
+    "result": "alternating branch display and responsive interface confirmed; precise refresh latency not measured"
+  },
+  "remaining": [
+    "native Windows",
+    "original 479ms tail attribution",
+    "strict native build-time source attestation"
+  ],
+  "approval": {
+    "method": "native real-TUI display-only approval replay, 100 history entries, 60 seconds",
+    "user_confirmation": "正常的",
+    "scope": "panel display, cursor and reject response; no production tool execution"
+  },
+  "second_terminal": {
+    "status": "waived",
+    "authority": "maintainer instruction: 跳过第二终端，直接放行",
+    "tested": false
+  }
+}
