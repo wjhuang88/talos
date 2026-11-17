@@ -1,0 +1,60 @@
+{
+  "elapsed_seconds": 30.00011289900067,
+  "before": [
+    {
+      "pid": 614051,
+      "start_ticks": "1737157",
+      "cpu_seconds": 0.64,
+      "Pss": 140317,
+      "Swap": 0
+    },
+    {
+      "pid": 12986,
+      "start_ticks": "175501",
+      "cpu_seconds": 1208.4,
+      "Pss": 200885,
+      "Swap": 0
+    }
+  ],
+  "after": [
+    {
+      "pid": 614051,
+      "start_ticks": "1737157",
+      "cpu_seconds": 0.67,
+      "Pss": 140321,
+      "Swap": 0,
+      "cpu_percent_one_core": 0.0999996236714141
+    },
+    {
+      "pid": 12986,
+      "start_ticks": "175501",
+      "cpu_seconds": 1211.88,
+      "Pss": 200884,
+      "Swap": 0,
+      "cpu_percent_one_core": 11.599956345884085
+    }
+  ],
+  "binary_sha256": "5347488615ef9be965fa5a156dde541dca9eea098084698577d10941ed39c49c",
+  "executable": "/home/wjhuang/.talos/bin/talos",
+  "limitations": [
+    "User confirmed idle before sample",
+    "Ghostty resources may include other tabs",
+    "Binary hash alone does not attest build source"
+  ],
+  "source_binding": {
+    "commit": "b2a7d4716350321423ef999640795ccf81225e50",
+    "profile": "dev local acceptance; not release",
+    "receipt": "target/handoff-installed-candidate-20261117/receipt.json",
+    "method": "running executable SHA256 equals installed candidate receipt; candidate build record names source commit",
+    "limitations": "Receipt-based provenance from other session; no reconstruction of historical build inputs performed here"
+  },
+  "environment": {
+    "ghostty": "1.4.0-arch1",
+    "niri": "26.04 (8ed0da4)",
+    "kernel": "Linux 7.3.4-arch1-2",
+    "geometry": "not captured",
+    "history_size": "not captured"
+  },
+  "scenario": "fresh mock session, empty non-repository workspace; differs from earlier continued real session in history/provider/workspace",
+  "acceptance": "One30s sample CPU0.10% meets debug0.20% CPU threshold; not three-round acceptance, no draw/diff/flush instrumentation, no causal attribution to Git alone."
+}
