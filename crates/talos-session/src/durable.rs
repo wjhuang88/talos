@@ -1827,6 +1827,66 @@ thread_local! {
     static BINDING_INIT_RETRY_OBSERVER: std::cell::RefCell<Option<Box<dyn FnMut()>>> = const { std::cell::RefCell::new(None) };
 }
 
+// Record fixed labels only: never retain SQL, bound values, paths or IDs.
+// Statement events describe execution, not preparation; absent events must not
+// be interpreted as proof that preparation succeeded.
+#[cfg(test)]
+fn trace_binding_initialization(connection: &mut Connection) -> rusqlite::Result<()> {
+    use rusqlite::trace::{TraceEvent, TraceEventCodes};
+    connection.trace_v2(
+        TraceEventCodes::SQLITE_TRACE_STMT | TraceEventCodes::SQLITE_TRACE_PROFILE,
+        Some(|event: TraceEvent<'_>| {
+            let (sql, finished) = match event {
+                TraceEvent::Stmt(statement, _) => (statement.sql().into_owned(), false),
+                TraceEvent::Profile(statement, _) => (statement.sql().into_owned(), true),
+                _ => return,
+            };
+            let sql = sql.trim_start();
+            let stage = if sql.starts_with("PRAGMA journal_mode") {
+                if finished {
+                    "journal-mode-returned"
+                } else {
+                    "journal-mode"
+                }
+            } else if sql.starts_with("PRAGMA synchronous") {
+                if finished {
+                    "synchronous-returned"
+                } else {
+                    "synchronous"
+                }
+            } else if sql.starts_with("BEGIN") {
+                if finished {
+                    "schema-begin-returned"
+                } else {
+                    "schema-begin"
+                }
+            } else if sql.starts_with("CREATE") {
+                if finished {
+                    "schema-ddl-returned"
+                } else {
+                    "schema-ddl"
+                }
+            } else if sql.starts_with("COMMIT") {
+                if finished {
+                    "schema-commit-returned"
+                } else {
+                    "schema-commit"
+                }
+            } else if sql.starts_with("ROLLBACK") {
+                if finished {
+                    "schema-rollback-returned"
+                } else {
+                    "schema-rollback"
+                }
+            } else {
+                return;
+            };
+            // PROFILE means the statement returned, not that it succeeded.
+            binding_open_stage(stage);
+        }),
+    )
+}
+
 pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, SessionError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -1834,6 +1894,8 @@ pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, Sessio
     #[cfg(test)]
     binding_open_stage("connection-open");
     let mut connection = open_binding_connection(path)?;
+    #[cfg(test)]
+    trace_binding_initialization(&mut connection).map_err(sql_error)?;
     // rusqlite opens connections with a five-second busy handler. Disable it
     // during initialization so each explicit retry cannot inherit that wait.
     connection
@@ -1860,7 +1922,16 @@ pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, Sessio
                 trace.init_attempts += 1;
             }
         });
-        match initialize_binding_schema(&mut connection) {
+        let initialized = initialize_binding_schema(&mut connection);
+        #[cfg(test)]
+        if initialized.is_err() {
+            binding_open_stage(if connection.is_autocommit() {
+                "init-error-autocommit"
+            } else {
+                "init-error-transaction-active"
+            });
+        }
+        match initialized {
             Ok(()) => break,
             Err(error @ rusqlite::Error::SqliteFailure(_, _))
                 if connection.is_autocommit()
@@ -1894,6 +1965,13 @@ pub(crate) fn open_bindings(path: &std::path::Path) -> Result<Connection, Sessio
             Err(e) => return Err(sql_error(e)),
         }
     }
+    #[cfg(test)]
+    connection
+        .trace_v2(
+            rusqlite::trace::TraceEventCodes::empty(),
+            None::<fn(rusqlite::trace::TraceEvent<'_>)>,
+        )
+        .map_err(sql_error)?;
     connection
         .busy_timeout(std::time::Duration::from_secs(5))
         .map_err(sql_error)?;
@@ -1907,6 +1985,12 @@ fn initialize_binding_schema(connection: &mut Connection) -> rusqlite::Result<()
     // writer. A failed attempt drops/rolls back the transaction before retry;
     // the caller refuses to retry if rollback did not restore autocommit.
     let transaction = connection.transaction()?;
+    // Start a read snapshot before preparing IF NOT EXISTS DDL. A connection
+    // opened before another initializer published may still cache an empty
+    // schema; preparing against it can request a write lock unnecessarily.
+    transaction.query_row("SELECT count(*) FROM sqlite_schema", [], |row| {
+        row.get::<_, i64>(0)
+    })?;
     let init_sql = "CREATE TABLE IF NOT EXISTS durable_bindings \
          (external_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE); \
          CREATE TABLE IF NOT EXISTS durable_recovery_scans \
@@ -4273,6 +4357,52 @@ mod tests {
     }
 
     #[test]
+    fn binding_initialization_trace_covers_real_statements_and_rollback() {
+        for reject_commit in [false, true] {
+            let directory = tempfile::tempdir().expect("directory");
+            let mut connection =
+                Connection::open(directory.path().join("bindings.sqlite")).expect("connection");
+            BINDING_OPEN_TRACE.with(|trace| {
+                *trace.borrow_mut() = Some(BindingOpenTrace {
+                    started: std::time::Instant::now(),
+                    stage: "start",
+                    stage_elapsed_us: 0,
+                    milestones: Vec::new(),
+                    init_attempts: 0,
+                    sqlite_codes: None,
+                });
+            });
+            trace_binding_initialization(&mut connection).expect("trace");
+            if reject_commit {
+                connection
+                    .commit_hook(Some(|| true))
+                    .expect("reject commit");
+            }
+            let result = initialize_binding_schema(&mut connection);
+            let trace = BINDING_OPEN_TRACE
+                .with(|trace| trace.borrow_mut().take())
+                .expect("trace result");
+            assert_eq!(result.is_err(), reject_commit);
+            assert!(
+                connection.is_autocommit(),
+                "failed commit must release transaction"
+            );
+            for stage in [
+                "journal-mode",
+                "synchronous",
+                "schema-begin",
+                "schema-ddl",
+                "schema-commit",
+            ] {
+                assert!(
+                    trace.milestones.iter().any(|(seen, _)| *seen == stage),
+                    "missing {stage}: {trace:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn binding_schema_initialization_publishes_one_transaction() {
         let directory = tempfile::tempdir().expect("directory");
         let path = directory.path().join("durable-bindings.sqlite");
@@ -4363,6 +4493,35 @@ mod tests {
             [], |row| row.get(0),
         ).expect("cleanup effect");
         assert_eq!(remaining, 0, "both reconstructed triggers must execute");
+    }
+
+    #[test]
+    fn binding_initializer_refreshes_schema_cached_before_other_connection_published() {
+        let directory = tempfile::tempdir().expect("directory");
+        let path = directory.path().join("durable-bindings.sqlite");
+        let mut stale = Connection::open(&path).expect("early connection");
+        stale
+            .busy_timeout(std::time::Duration::ZERO)
+            .expect("fail fast");
+        stale
+            .execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;")
+            .expect("configure early connection");
+        let count: i64 = stale
+            .query_row("SELECT count(*) FROM sqlite_schema", [], |r| r.get(0))
+            .expect("cache empty schema");
+        assert_eq!(count, 0);
+        let holder = open_bindings(&path).expect("publish schema elsewhere");
+        holder
+            .execute_batch(
+                "BEGIN IMMEDIATE; INSERT INTO durable_bindings VALUES ('held', 'identity');",
+            )
+            .expect("hold ordinary writer after schema publication");
+        let initialized = initialize_binding_schema(&mut stale);
+        holder.execute_batch("ROLLBACK").expect("release writer");
+        assert!(
+            initialized.is_ok(),
+            "already-published schema must not require the ordinary writer: {initialized:?}"
+        );
     }
 
     #[test]

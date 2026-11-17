@@ -54,6 +54,11 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 ## Session recovery integration
 
+- Windows concurrent binding initialization follow-up remains Partial: deterministic
+  stale-schema contention reproduced; Linux package tests and full preflight5624/0/0
+  passed. Native Windows validation and review pending. PR #965 remains blocked
+  until a validated repair merge SHA is available. See the recovery owner below.
+
 - Partial / Emergency override: [recovery owner](tasks/session-archive-recovery-emergency.md) and
   [checkpoint admission](tasks/compact-context-admission-emergency.md). Isolated CLI/Actor candidate
   builds and passes three provider-path regressions; full validation and independent review pending.
