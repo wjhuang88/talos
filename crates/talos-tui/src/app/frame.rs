@@ -172,6 +172,7 @@ impl Tui {
         };
         let tips = crate::scrollback::TipsComponent {
             tip: state.tip.as_ref(),
+            compaction_pending: state.compaction_pending,
             history_scrolled: !matches!(
                 self.history_scroll.mode,
                 crate::history_projection::HistoryScrollMode::FollowTail

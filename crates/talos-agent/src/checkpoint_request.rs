@@ -350,28 +350,45 @@ impl Agent {
                 let mut sources = Vec::new();
                 let mut next = cursor;
                 let mut next_offset = text_offset;
+                let mut admitted_len = 0;
+                let mut admitted_next = cursor;
+                let mut packed_bytes = 0usize;
+                let mut next_check_bytes = 1usize;
                 while next < eligible.len() && text_offset == 0 {
                     tokio::task::yield_now().await;
                     check_checkpoint_deadline(deadline)?;
                     let group_end = checkpoint_group_end(&plan.messages, &eligible, next)?;
-                    // Bound repeated whole-prompt serialization during greedy packing.
-                    // A complete parallel batch (at most 33 entries) stays together.
-                    if !sources.is_empty() && sources.len() + group_end - next > 64 {
-                        break;
-                    }
-                    let old_len = sources.len();
                     for (position, &index) in eligible[next..group_end].iter().enumerate() {
                         let reference = &references[next + position];
-                        sources.push(
-                            serde_json::json!({"source":reference,"message":projected.message(index, &plan.messages[index])}),
+                        let source = serde_json::json!({"source":reference,"message":projected.message(index, &plan.messages[index])});
+                        packed_bytes = packed_bytes.saturating_add(
+                            serde_json::to_vec(&source)
+                                .map_err(|_| {
+                                    CompactionError::CompactionFailed(
+                                        "checkpoint source serialization failed".into(),
+                                    )
+                                })?
+                                .len(),
                         );
-                    }
-                    let prompt = checkpoint_prompt(&schema, &rendered, &sources, context_limit)?;
-                    if self.estimate_provider_request_tokens(&prompt, &[]) > context_limit {
-                        sources.truncate(old_len);
-                        break;
+                        sources.push(source);
                     }
                     next = group_end;
+                    // Check geometrically by serialized bytes, rather than forcing a
+                    // provider round-trip after 64 entries. Repeated whole-prompt work
+                    // stays bounded even when entries have very different sizes.
+                    // Admission and rollback always end at a complete tool batch.
+                    if packed_bytes >= next_check_bytes || next == eligible.len() {
+                        let prompt =
+                            checkpoint_prompt(&schema, &rendered, &sources, context_limit)?;
+                        if self.estimate_provider_request_tokens(&prompt, &[]) > context_limit {
+                            sources.truncate(admitted_len);
+                            next = admitted_next;
+                            break;
+                        }
+                        admitted_len = sources.len();
+                        admitted_next = next;
+                        next_check_bytes = packed_bytes.saturating_mul(2).max(1);
+                    }
                 }
                 if sources.is_empty() {
                     let index = eligible[cursor];
@@ -1407,6 +1424,81 @@ mod tests {
         );
         assert_eq!(plan.messages, messages);
     }
+    #[tokio::test(start_paused = true)]
+    async fn restored_history_with_provider_latency_fits_shared_checkpoint_deadline() {
+        struct DelayedSummary(SummaryProvider);
+        #[async_trait]
+        impl LanguageModel for DelayedSummary {
+            async fn stream(&self, messages: &[Message]) -> ProviderResult<Receiver<AgentEvent>> {
+                tokio::time::sleep(Duration::from_secs(4)).await;
+                self.0.stream(messages).await
+            }
+        }
+        let provider = Arc::new(DelayedSummary(SummaryProvider {
+            requests: Mutex::new(vec![]),
+            invalid: false,
+            fail_after: None,
+        }));
+        let agent = Agent::new(provider.clone(), ToolRegistry::new());
+        let original: Vec<_> = (0..1362)
+            .flat_map(|index| {
+                [
+                    Message::User {
+                        content: format!("archived task {index}: {}", "x".repeat(2400)),
+                    },
+                    Message::Assistant {
+                        content: "acknowledged".into(),
+                        tool_calls: vec![],
+                        reasoning: None,
+                    },
+                ]
+            })
+            .collect();
+        let limit = 302_000;
+        let mut plan = ProviderRequestPlan {
+            estimated_tokens: agent.estimate_provider_request_tokens(&original, &[]),
+            messages: original.clone(),
+            tool_definitions: vec![],
+            ephemeral_image_tokens: 0,
+            omitted_tool_exchanges: 0,
+            tool_protocol: ToolProtocol::Native,
+        };
+        assert!(plan.estimated_tokens > limit);
+        let started = tokio::time::Instant::now();
+        agent
+            .checkpoint_request(&mut plan, limit, &PrivateTokens::default())
+            .await
+            .expect("restored history must fit without enlarging the 120s deadline");
+        assert!(started.elapsed() < Duration::from_secs(120));
+        assert!(plan.estimated_tokens <= limit);
+        assert_eq!(
+            &plan.messages[plan.messages.len() - 20..],
+            &original[original.len() - 20..]
+        );
+        let requests = provider.0.requests.lock().expect("requests");
+        let mut seen = Vec::new();
+        for request in requests.iter() {
+            assert!(agent.estimate_provider_request_tokens(request, &[]) <= limit);
+            let Message::User { content } = &request[0] else {
+                panic!("summary request")
+            };
+            let sources: Vec<serde_json::Value> =
+                serde_json::from_str(content.split("\nSources: ").last().expect("sources"))
+                    .expect("source JSON");
+            seen.extend(
+                sources
+                    .iter()
+                    .map(|s| s["source"].as_str().expect("source").to_owned()),
+            );
+        }
+        assert_eq!(
+            seen,
+            (0..original.len() - 20)
+                .map(|i| format!("raw:{i}"))
+                .collect::<Vec<_>>()
+        );
+    }
+
     #[tokio::test]
     async fn oversized_history_folds_in_order_and_keeps_raw_history() {
         let provider = Arc::new(SummaryProvider {
