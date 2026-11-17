@@ -182,9 +182,110 @@ impl BuiltinInvocationReviewEvidence<'_> {
     }
 }
 
+/// Attribution of a fallback response; this is advisory evidence, never a grant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ApprovalAttribution {
+    /// A surface observed a human selecting this exact response.
+    ObservedHuman,
+    /// A legacy host returned a choice without proving a human interaction.
+    LegacyHostUnknown,
+    /// The surface could not obtain a response.
+    Unavailable,
+    /// The surface observed an explicit user cancellation.
+    ExplicitUserCancellation,
+}
+
+/// An approval response with independently attributed origin.
+///
+/// Constructors for unavailable/cancelled responses always deny. Attribution does
+/// not alter permission admission, validate scope, or create reusable authority.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApprovalObservation {
+    choice: ApprovalChoice,
+    attribution: ApprovalAttribution,
+}
+
+impl ApprovalObservation {
+    /// Records a choice observed at the actual human-input boundary.
+    #[must_use]
+    pub fn observed_human(choice: ApprovalChoice) -> Self {
+        Self {
+            choice,
+            attribution: ApprovalAttribution::ObservedHuman,
+        }
+    }
+
+    /// Preserves a legacy host choice without asserting human attribution.
+    #[must_use]
+    pub fn legacy(choice: ApprovalChoice) -> Self {
+        Self {
+            choice,
+            attribution: ApprovalAttribution::LegacyHostUnknown,
+        }
+    }
+
+    /// Records an unavailable surface without granting permission.
+    #[must_use]
+    pub fn unavailable() -> Self {
+        Self {
+            choice: ApprovalChoice::Deny,
+            attribution: ApprovalAttribution::Unavailable,
+        }
+    }
+
+    /// Records explicit user cancellation without granting permission.
+    /// Dropping a caller's future is not evidence of this user action.
+    #[must_use]
+    pub fn user_cancelled() -> Self {
+        Self {
+            choice: ApprovalChoice::Deny,
+            attribution: ApprovalAttribution::ExplicitUserCancellation,
+        }
+    }
+
+    /// Returns the original response without upgrading its authority.
+    #[must_use]
+    pub fn choice(&self) -> &ApprovalChoice {
+        &self.choice
+    }
+
+    /// Returns the independently recorded response origin.
+    #[must_use]
+    pub fn attribution(&self) -> ApprovalAttribution {
+        self.attribution
+    }
+
+    /// Projects into the existing response contract for legacy callers.
+    #[must_use]
+    pub fn into_choice(self) -> ApprovalChoice {
+        self.choice
+    }
+}
+
 /// Surface adapter that resolves an already-evaluated `Ask`.
 #[async_trait]
 pub trait ApprovalResolver: Send + Sync {
+    /// Resolves while retaining response attribution for advisory history.
+    ///
+    /// Existing adapters preserve their exact legacy call path and remain unknown
+    /// rather than being assumed human. An explanation is passed through unchanged.
+    async fn resolve_observed(
+        &self,
+        request: PermissionApprovalRequest,
+        remaining: Duration,
+        explanation: Option<&str>,
+    ) -> Result<ApprovalObservation, ApprovalResolverError> {
+        let choice = match explanation {
+            Some(text) => {
+                self.resolve_with_explanation(request, remaining, text)
+                    .await?
+            }
+            None => self.resolve(request, remaining).await?,
+        };
+        Ok(ApprovalObservation::legacy(choice))
+    }
+
     /// Reviews a trusted retained file mutation. Legacy surfaces preserve their
     /// ordinary exact-input approval behavior; this default adds no Auto allowance.
     async fn resolve_builtin_file_mutation(
@@ -1200,6 +1301,56 @@ mod tests {
             _remaining: Duration,
         ) -> Result<ApprovalChoice, ApprovalResolverError> {
             Ok(self.0.clone())
+        }
+    }
+
+    struct LegacyExplanationResolver;
+
+    #[async_trait]
+    impl ApprovalResolver for LegacyExplanationResolver {
+        async fn resolve(
+            &self,
+            _request: PermissionApprovalRequest,
+            _remaining: Duration,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            Ok(ApprovalChoice::Deny)
+        }
+        async fn resolve_with_explanation(
+            &self,
+            _request: PermissionApprovalRequest,
+            _remaining: Duration,
+            explanation: &str,
+        ) -> Result<ApprovalChoice, ApprovalResolverError> {
+            assert_eq!(explanation, "bounded explanation");
+            Ok(ApprovalChoice::ApproveOnce)
+        }
+    }
+
+    #[tokio::test]
+    async fn observed_default_preserves_legacy_dispatch_without_claiming_human() {
+        let root = tempfile::tempdir().expect("workspace");
+        let state =
+            PermissionSessionState::new(PermissionEngine::with_workspace_root(root.path().into()));
+        let request = matrix_approval_request(root.path(), &state, "target.txt");
+        for (explanation, expected) in [
+            (None, ApprovalChoice::Deny),
+            (Some("bounded explanation"), ApprovalChoice::ApproveOnce),
+        ] {
+            let observation = LegacyExplanationResolver
+                .resolve_observed(request.clone(), Duration::from_secs(1), explanation)
+                .await
+                .expect("legacy result");
+            assert_eq!(
+                observation.attribution(),
+                ApprovalAttribution::LegacyHostUnknown
+            );
+            assert_eq!(observation.into_choice(), expected);
+        }
+        for observation in [
+            ApprovalObservation::unavailable(),
+            ApprovalObservation::user_cancelled(),
+        ] {
+            assert_eq!(observation.into_choice(), ApprovalChoice::Deny);
         }
     }
 

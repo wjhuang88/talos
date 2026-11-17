@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use talos_agent::permission_pipeline::ApprovalObservation;
 #[cfg(test)]
 use talos_agent::permission_pipeline::PermissionBinding;
 use talos_core::background_job::BackgroundJobTerminalSummary;
@@ -360,7 +361,7 @@ impl EventLoop {
                     self.approval_queue.push_back(*request);
                     self.render_active_approval();
                 } else {
-                    let _ = request.response.send(talos_core::ApprovalChoice::Deny);
+                    let _ = request.response.send(ApprovalObservation::unavailable());
                 }
                 return;
             }
@@ -438,7 +439,7 @@ impl EventLoop {
                 });
                 // Abort the dummy task handle (no-op, but keeps the enum contract).
                 task_handle.abort();
-                self.deny_pending_approvals();
+                self.deny_pending_approvals(true);
                 self.background_tools.clear();
                 eprintln!("Turn cancelled.");
                 self.state = AppState::WaitingForInput;
@@ -480,7 +481,7 @@ impl EventLoop {
             }
 
             (AppState::AgentRunning { .. }, AgentCompleted) => {
-                self.deny_pending_approvals();
+                self.deny_pending_approvals(false);
                 self.background_tools.clear();
                 println!();
                 if let Err(e) = self.session_manager.update_index(&self.session) {
@@ -490,7 +491,7 @@ impl EventLoop {
             }
 
             (AppState::AgentRunning { .. }, AgentError(msg)) => {
-                self.deny_pending_approvals();
+                self.deny_pending_approvals(false);
                 self.background_tools.clear();
                 eprintln!("Error: {msg}");
                 self.state = AppState::WaitingForInput;
@@ -535,11 +536,16 @@ impl EventLoop {
         }
     }
 
-    fn deny_pending_approvals(&mut self) {
+    fn deny_pending_approvals(&mut self, user_cancelled: bool) {
         self.displayed_approval = None;
         self.approval_rollover_barrier = false;
         while let Some(request) = self.approval_queue.pop_front() {
-            let _ = request.response.send(talos_core::ApprovalChoice::Deny);
+            let observation = if user_cancelled {
+                ApprovalObservation::user_cancelled()
+            } else {
+                ApprovalObservation::unavailable()
+            };
+            let _ = request.response.send(observation);
         }
     }
 
@@ -563,7 +569,7 @@ impl EventLoop {
             && let Some(request) = self.approval_queue.pop_front()
         {
             self.displayed_approval = None;
-            let _ = request.response.send(talos_core::ApprovalChoice::Deny);
+            let _ = request.response.send(ApprovalObservation::unavailable());
         }
     }
 
@@ -983,7 +989,9 @@ fn resolve_displayed_approval(
     };
     let request = queue.pop_front().expect("displayed request is present");
     *displayed = None;
-    let _ = request.response.send(choice);
+    let _ = request
+        .response
+        .send(ApprovalObservation::observed_human(choice));
     ApprovalInputOutcome::Resolved
 }
 
@@ -1023,7 +1031,7 @@ mod approval_queue_tests {
 
     fn queued_request() -> (
         TerminalApprovalRequest,
-        tokio::sync::oneshot::Receiver<talos_core::ApprovalChoice>,
+        tokio::sync::oneshot::Receiver<ApprovalObservation>,
     ) {
         let root = tempfile::tempdir().expect("tempdir");
         let target = root.path().join("target.txt");
@@ -1076,6 +1084,86 @@ mod approval_queue_tests {
         )
     }
 
+    #[tokio::test]
+    async fn actual_terminal_teardown_distinguishes_interrupt_from_completion_and_error() {
+        for (event, expected) in [
+            (UserInterrupt, ApprovalObservation::user_cancelled()),
+            (AgentCompleted, ApprovalObservation::unavailable()),
+            (
+                AgentError("fixture failure".into()),
+                ApprovalObservation::unavailable(),
+            ),
+        ] {
+            let root = tempfile::tempdir().expect("isolated storage");
+            let manager = SessionManager::with_dir(root.path().join("sessions"));
+            let session = manager
+                .create_session("fixture", &root.path().to_string_lossy())
+                .expect("fixture session");
+            let (event_tx, event_rx) = mpsc::unbounded_channel();
+            let (sq_tx, mut sq_rx) = mpsc::channel(8);
+            let (request, mut response) = queued_request();
+            let displayed = request.id;
+            let cancel = CancellationToken::new();
+            let mut driver = EventLoop {
+                event_tx,
+                event_rx,
+                state: AppState::AgentRunning {
+                    cancel_token: cancel.clone(),
+                    task_handle: tokio::spawn(async {}),
+                },
+                first_ctrl_c_time: None,
+                workspace_root: root.path().to_owned(),
+                session,
+                branch_id: None,
+                session_manager: manager,
+                sq_tx,
+                approval_queue: VecDeque::from([request]),
+                displayed_approval: Some(displayed),
+                approval_rollover_barrier: true,
+                background_tools: HashMap::new(),
+            };
+            driver.handle_event(event);
+            assert_eq!(
+                response.try_recv().expect("actual teardown response"),
+                expected
+            );
+            assert!(driver.approval_queue.is_empty());
+            assert!(driver.displayed_approval.is_none());
+            assert!(!driver.approval_rollover_barrier);
+            assert!(matches!(driver.state, AppState::WaitingForInput));
+            if expected == ApprovalObservation::user_cancelled() {
+                assert!(cancel.is_cancelled());
+                assert!(matches!(sq_rx.recv().await, Some(SessionOp::Interrupt)));
+            } else {
+                assert!(!cancel.is_cancelled());
+                assert!(sq_rx.try_recv().is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn actual_terminal_choice_is_attributed_to_the_displayed_request() {
+        use talos_agent::permission_pipeline::ApprovalAttribution;
+        for (input, choice) in [
+            ("1", talos_core::ApprovalChoice::ApproveOnce),
+            ("2", talos_core::ApprovalChoice::AlwaysApprove),
+            ("3", talos_core::ApprovalChoice::Deny),
+        ] {
+            let (request, mut response) = queued_request();
+            let mut displayed = Some(request.id);
+            let mut queue = VecDeque::from([request]);
+            let mut barrier = false;
+            assert!(matches!(
+                resolve_displayed_approval(&mut queue, &mut displayed, &mut barrier, input),
+                ApprovalInputOutcome::Resolved
+            ));
+            let observed = response.try_recv().expect("real input response");
+            assert_eq!(observed.attribution(), ApprovalAttribution::ObservedHuman);
+            assert_eq!(observed.into_choice(), choice);
+            assert!(queue.is_empty());
+        }
+    }
+
     #[test]
     fn input_for_expired_displayed_request_never_approves_next_request() {
         let (expired, expired_rx) = queued_request();
@@ -1108,7 +1196,10 @@ mod approval_queue_tests {
             ApprovalInputOutcome::Resolved
         ));
         assert_eq!(
-            current_rx.try_recv().expect("current request response"),
+            current_rx
+                .try_recv()
+                .expect("current request response")
+                .into_choice(),
             talos_core::ApprovalChoice::ApproveOnce
         );
     }
@@ -1151,7 +1242,10 @@ mod approval_queue_tests {
             ApprovalInputOutcome::Resolved
         ));
         assert_eq!(
-            current_rx.try_recv().expect("current request response"),
+            current_rx
+                .try_recv()
+                .expect("current request response")
+                .into_choice(),
             talos_core::ApprovalChoice::ApproveOnce
         );
     }

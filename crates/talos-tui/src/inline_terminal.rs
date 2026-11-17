@@ -203,6 +203,8 @@ pub struct TerminalSession {
     #[cfg(test)]
     test_draw_count: usize,
     #[cfg(test)]
+    test_fail_next_draw: bool,
+    #[cfg(test)]
     test_frame_ansi: Vec<u8>,
     #[cfg(test)]
     test_last_draw_at: Option<tokio::time::Instant>,
@@ -319,6 +321,8 @@ impl TerminalSession {
             #[cfg(test)]
             test_draw_count: 0,
             #[cfg(test)]
+            test_fail_next_draw: false,
+            #[cfg(test)]
             test_frame_ansi: Vec::new(),
             #[cfg(test)]
             test_last_draw_at: None,
@@ -349,10 +353,17 @@ impl TerminalSession {
             #[cfg(test)]
             test_draw_count: 0,
             #[cfg(test)]
+            test_fail_next_draw: false,
+            #[cfg(test)]
             test_frame_ansi: Vec::new(),
             test_last_draw_at: None,
             test_frame_observer: None,
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fail_next_test_draw(&mut self) {
+        self.test_fail_next_draw = true;
     }
 
     #[cfg(test)]
@@ -468,6 +479,11 @@ impl TerminalSession {
         render_height: u16,
         cursor: Option<Position>,
     ) -> io::Result<()> {
+        #[cfg(test)]
+        if std::mem::take(&mut self.test_fail_next_draw) {
+            return Err(io::Error::other("injected terminal draw failure"));
+        }
+
         let area = self.frame_area;
         let prev_idx = 1 - self.current;
 
