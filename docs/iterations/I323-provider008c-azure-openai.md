@@ -355,3 +355,19 @@ Independent exact-source review approved remote `24f8df4db24c2be8136bb4b4e084714
 base `58207831675365e35cc80601097b96f9432a68aa`, with shared-account/non-human limits disclosed.
 The subsequent lint and UI provenance documentation corrections require refreshed candidate review.
 Full standard preflight is rerunning; no workspace-test/CI/merge acceptance is claimed yet.
+
+### 2026-11-17 workspace test failure recovery
+
+Standard preflight retry on f29bf8df passed governance, audits, format, workspace check and Clippy,
+then stopped in talos-agent: 671 passed / 2 failed. durable_discovery_searches_beyond_compaction_source_limit
+failed at replacement scope (checkpoint_tools.rs:894); real_registered_git_mutations_execute_only_after_operation_specific_auto_review
+failed because the maintenance executable differed from the bound Git binary (git_auto.rs:512).
+These are failures, not a full workspace pass. No Azure change touches either failing source file.
+The subsequent isolated test logs were lost during another workspace reset, so their outcomes are
+unknown. Restored f29bf8df and restarted isolated locked tests with /usr/bin before /usr/local/bin
+in PATH (system Git 2.47.3 instead of 2.52.0); do not weaken executable-binding validation. Compilation
+is still in progress. Current fetched main 0cf52249 includes substantial checkpoint-history changes;
+recheck their ownership and integrate the latest base before final preflight and candidate CI.
+No implementation PR, merge, closure or release has occurred. Resume from this owner and the latest
+remote backup; preserve dirty legacy worktrees. Next gate: inspect both isolated test logs, integrate
+main, run standard preflight, then stable PR/exact-head CI/independent review/CAS.
