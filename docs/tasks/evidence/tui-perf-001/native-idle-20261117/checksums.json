@@ -1,0 +1,22 @@
+{
+  "talos-native-idle-20261117.json": "0d1f20aaf16a1e230380eb0b7c18a71e90a31ac545f59fc0df561a3d1a75f7fc",
+  "talos-thread-idle-20261117.json": "d85b3167251b05554e811d40ca173e9e38cbdefaa416fdc05ead09f27f9392e0",
+  "talos-native-quiet-20261117.json": "6f3fc7d19282edb28d7d8748eb7558acec43e1048228d12aed1c7526d7b794ca",
+  "talos-native-quiet-round2.json": "51a05dd6f60697b0d70ac225c10505ea0e14ae7c44aeaac47558df8437aaeb29",
+  "talos-native-quiet-round3.json": "540b6546f479413b1bb0b37c61fa223efed6656dad4e87ed6720c0a1327928f8",
+  "quiet-summary.json": "f4dd87c23bc8ef16e247a9b84bdbf1eafec22ad2c21a8bf391d04b5af64f7576",
+  "watch-controls.json": "b8d8c75e430584f0a131b1ede5ffaa6d0f2a10a78d1cf08b71725f0fd12ea871",
+  "watch-receipt.json": "5ac2892ed46eace22429c9e47bd96b708f475cb2aa582633e92a31a0382cb973",
+  "watch-decision.md": "87392e27e04319556391b6af6227a048bac7c7259c432f32b33da1b99f65244a",
+  "README.md": "8fa0f5cac2bd1a5b033f057b241968551fe6822d531c774c4d2eb2875b86e3ca",
+  "talos-native-idle-20261117.py": "1ae86c29fc239c2a2d0de2a6f3fafc878c184921b96bc0cc3e56c61bf52ab6cc",
+  "talos-thread-idle-20261117.py": "3b49aec1a84c939b58356d69d3861d96942ef3332df4d766fbbc89e461558922",
+  "talos-native-quiet-20261117.py": "0e145621a677a8b9a6ccabe0ba269fc4cb0a30c058fa6da0370fcc34ac89d8e8",
+  "build-current-watch-probe.py": "151e70002ad9755cebb60f2f7c42d782c22f51eacfa98423e50a59ad2d5398bb",
+  "run-current-watch-controls.py": "36d3c11580ee9946b782aa3ae7c27ec61ad6a62e2f0e383b7cc8cf1cb721ecf1",
+  "watch-main.rs": "a7cffb8c46fb190e6c84526a2e79e812c772cb4eae7d954f5ef9d64597e1efeb",
+  "watch-git_watch.rs": "d018e3ddba202a7a92ba7b3bcb5c3e6641dc8857b284dc34094b4d62aedb266c",
+  "talos-native-quiet-round2.py": "8a59207e584460b597bf93d7958cafa09c68bea4719466fdc4aec1d85ec01a04",
+  "talos-native-quiet-round3.py": "bfbca128e82f9d1f6a22031b3356bc4d6aba5b0b4fb8ffc0c9ea8852ab18fb9b",
+  "installed-source-receipt.json": "486576709ce6f8ce742b0beb476f734eb11c1c0efb1033dd0f6c46229cac7e88"
+}

@@ -1,0 +1,24 @@
+{
+  "source_commit": "6d5651df91c9c5fc20ee57517d1c43a1a2e0a338",
+  "source_sha256": "d018e3ddba202a7a92ba7b3bcb5c3e6641dc8857b284dc34094b4d62aedb266c",
+  "binary_sha256": "d4157ec6d4cc2770f83548c9395ba501fdd9378d0a24683036f0e5a9d3e25283",
+  "command": [
+    "rustc",
+    "+1.99.0",
+    "--edition=2024",
+    "/tmp/talos-current-watch-probe/main.rs",
+    "-L",
+    "dependency=/home/wjhuang/WorkSpace/personal/talos/target/tui-idle-git-validation/debug/deps",
+    "-o",
+    "/tmp/talos-current-watch-probe/probe",
+    "--extern",
+    "tokio=/home/wjhuang/WorkSpace/personal/talos/target/tui-idle-git-validation/debug/deps/libtokio-de9001edb06e003d.rlib",
+    "--extern",
+    "gix=/home/wjhuang/WorkSpace/personal/talos/target/tui-idle-git-validation/debug/deps/libgix-7c90989c65e15593.rlib",
+    "--extern",
+    "ignore=/home/wjhuang/WorkSpace/personal/talos/target/tui-idle-git-validation/debug/deps/libignore-659959475a8cbcf3.rlib",
+    "--extern",
+    "notify=/home/wjhuang/WorkSpace/personal/talos/target/tui-idle-git-validation/debug/deps/libnotify-8b8c878af4867246.rlib"
+  ],
+  "scope": "Current watcher source linked against preserved dependency artifacts; diagnostic only, not full Cargo build"
+}

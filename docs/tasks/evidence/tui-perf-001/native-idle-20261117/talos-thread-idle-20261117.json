@@ -1,0 +1,172 @@
+{
+  "pid": 518450,
+  "elapsed_seconds": 30.00098610600253,
+  "threads": [
+    {
+      "tid": "520353",
+      "name": "talos-git-watch",
+      "cpu_percent": 0.3999868523521321,
+      "runtime_ms": 118.246087,
+      "runqueue_wait_ms": 0.079963,
+      "slices": 1734
+    },
+    {
+      "tid": "518467",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.16666118848005504,
+      "runtime_ms": 45.364805,
+      "runqueue_wait_ms": 0.208621,
+      "slices": 258
+    },
+    {
+      "tid": "520355",
+      "name": "notify-rs inoti",
+      "cpu_percent": 0.09999671308803303,
+      "runtime_ms": 25.523337,
+      "runqueue_wait_ms": 0.005464,
+      "slices": 2044
+    },
+    {
+      "tid": "518450",
+      "name": "talos",
+      "cpu_percent": 0.033332237696011006,
+      "runtime_ms": 5.327021,
+      "runqueue_wait_ms": 0.012673,
+      "slices": 18
+    },
+    {
+      "tid": "518454",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518455",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518456",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518457",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518458",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518459",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518461",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518462",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518464",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518465",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518466",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518468",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518469",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518470",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "518471",
+      "name": "tokio-rt-worker",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    },
+    {
+      "tid": "520229",
+      "name": "talos",
+      "cpu_percent": 0.0,
+      "runtime_ms": 0.0,
+      "runqueue_wait_ms": 0.0,
+      "slices": 0
+    }
+  ],
+  "created": [],
+  "exited": [],
+  "limitations": [
+    "Two endpoint samples miss threads created and exited within interval",
+    "Thread names do not prove call stack attribution"
+  ]
+}
