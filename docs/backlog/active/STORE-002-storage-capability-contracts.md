@@ -1,6 +1,6 @@
 # STORE-002: Storage And Retrieval Capability Contracts
 
-**Status**: I328 E Complete / Closed; E claim Closed; A/B, C and D accepted; F unclaimed; parent #670 Open
+**Status**: Complete / Closed — I328 E bounded claim only; A/B, C and D accepted; STORE-002 parent #670 remains Open for unclaimed F
 
 **Type**: Architecture / Contract Convergence
 
