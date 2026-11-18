@@ -34,7 +34,7 @@
 
 ### Selection-time non-terminal inventory and disposition — 2026-11-18
 
-**Snapshot:** `main@bc4a37eeafff5e0e172764e861fac6cb6341fd86`, after accepted #956 code and #972 I328 closeout. Source-of-truth check: `docs/iterations/README.md` Current Operating Set/Recent Non-Terminal entries, individual iteration owners, `docs/BOARD.md` current top sections, `docs/backlog/PRODUCT-BACKLOG.md`, effective GitHub PRs and #897/#670. This is a **select-or-retain/no-overlap decision for every applicable non-terminal owner**, not a new claim, scope transfer, completion assertion or endorsement of proposed states. Dated historical text in some index rows is qualified by the corresponding current source owner/Board.
+**Snapshot:** `main@bc4a37eeafff5e0e172764e861fac6cb6341fd86`, after accepted #956 code and #972 I328 closeout. Source-of-truth check: `docs/iterations/README.md` Current Operating Set/Recent Non-Terminal entries, individual iteration owners, `docs/BOARD.md` current top sections, `docs/backlog/PRODUCT-BACKLOG.md`, effective GitHub PRs and #897/#670. This is a **select-or-retain/no-overlap decision for every applicable non-terminal owner**, not a new claim, scope transfer, completion assertion or endorsement of proposed states. Dated historical text in some index/owner rows is qualified by the current source owner/Board **and the actual GitHub merge status**. In particular, governance claims #918 (Azure) and #920 (Git compatibility) have already merged and must not be treated as still ineffective merely because older owner prose says proposed.
 
 | Existing iteration / owner | Source-recorded status at I330 selection | Disposition relative to E2 |
 |---|---|---|
@@ -44,17 +44,17 @@
 | ARCH-035 E3/E4 / #897 | **Blocked / Unclaimed**, multi-host migration and full equivalence | **Defer**, no CLI/TUI/Desktop/SDK mass migration, no overall #897 closure |
 | SERVER-001 / #142 and SERVER-001-C / #361 | **Blocked** on ARCH-035 accepted Host composition | **Retain Blocked**; no new ServerHost binary/protocol/runtime |
 | I329 / SEARCH-001-D3-T3 / #957 | Current I329 owner/Board: T3a offline **Complete / Closed**, T3b production **Blocked / Unclaimed** (some iteration-index proposal text is historical) | **Retain separate search ownership**, no endpoint/browser/permission/network change |
-| I323 / PROVIDER-008-C / #914 | **Active proposed** by #918, ineffective until its own governance merge (source iteration/index) | **Retain separate proposed Azure claim**, no model/provider transport overlap |
-| I324 / GIT-COMPAT-001 / #919 | **Active / Claimed proposed** by #920, ineffective until governance merge (source iteration/Board) | **Retain separate Git-native/preflight scope** and protected review/Windows 2.36 gates |
+| I323 / PROVIDER-008-C / #914 | **Active / Claimed effective**: governance #918 merged `f61a15cd3f0be81489e69f92d374fc8ee41eddec`; iteration/owner still preserve earlier proposed wording, not current merge truth | **Retain effective Azure claimant**, no model/provider transport scope or acceptance transferred |
+| I324 / GIT-COMPAT-001 / #919 | **Active / Claimed effective**: governance #920 merged `067dd3d4f5fd0fac910ac7f52bd23ee7f8f5bb80`; old owner/Board proposal wording is historical | **Retain effective Git-native/preflight owner** and protected review/Windows 2.36 gates |
 | I318 / TUI-054 / #269 | **Review / Claimed**, native repeat-safe key handling, physical/IME acceptance deferred | **Retain Review**, do not touch TUI renderer/input or claim its native evidence |
 | I302 / TEST-003 / #717 | **Review / Claimed**, Windows current-process handle/resource acceptance residual | **Retain Review**, no process-boundary or Windows native test claim |
 | I277 / DESKTOP-001-D3 / #29 | **Review / Claimed**, human/device acceptance deferred (Current Operating Set) | **Retain Review**, E2 cannot transfer Desktop acceptance or change Desktop defaults |
 | I249 / dependency upgrade pilot | **Planned / Unclaimed** | **Defer**, no Cargo/dependency upgrade beyond independently reviewed strictly necessary E2 selection |
 | I164 / startup composer continuity | **Paused**, superseded layout target with no completion claim | **Retain Paused**, no TUI layout/composer work |
 | MODEL-007 / deferred model picker | **Deferred / Unclaimed** behind Desktop schedule | **Defer**, no provider/model menu or reasoning variant admission |
-| AUTO-HISTORY-001 / #916 | Board **Review / Claimed**, draft #964, native CI/cross-host acceptance unresolved | **Retain Review**, no approval history/cross-turn permission behavior change |
-| EDIT-LOCATIONS-001 / #921 | Board **Review / Claimed**, draft #963 terminal acceptance outstanding | **Retain Review**, no edit/diff line-location or tool output work |
-| SESSION-UI-001 / #952 | Board **Review / Claimed**, draft #962 with PTY/native acceptance remaining | **Retain Review**, no new session actor/queue UI behavior; E2 consumes existing authority |
+| AUTO-HISTORY-001 / #916 | Owner **Review / Claimed**, implementation #964 merged `0cf52249dbd227bcd8357806326d32d0f3a5408b` but owner does not claim Complete | **Retain Review** and its residual acceptance, no approval history or permission change |
+| EDIT-LOCATIONS-001 / #921 | Owner **Review / Claimed**, implementation #963 merged `e1f8c693d276ea046b7d6d7dfa3a6797dac02338` but owner acceptance remains open | **Retain Review**, no edit/diff line-location or tool output work |
+| SESSION-UI-001 / #952 | Owner **Review / Claimed**, implementation #962 merged `08a302eaf22cc51166a1a8bc399aec443b8b5eae`; owner acceptance remains separately pending | **Retain Review**, no session actor/queue UI behavior changes; E2 consumes existing authority |
 | Session recovery integration / archive+checkpoint emergency | Board **Partial / Emergency override**, integration PR #965/native evidence pending | **Retain Partial**, E2 must neither overwrite recovery rules nor claim its validation |
 | Session recovery storage prerequisite | Board **Partial / Emergency override**, storage integration/review pending | **Retain Partial**, no shared Session recovery implementation or authority transfer |
 | TUI-APPROVAL-001 | Board **Review / Claimed**, local emergency display candidate | **Retain Review**, no permission/approval presentation or authority change |
