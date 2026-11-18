@@ -387,7 +387,19 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
     // authorization for an included source. Every root/child read remains in
     // the separately admitted, immutable exact-Path Read frontier.
     let dir = tempfile::tempdir().expect("fixture");
-    let fixture = dir.path().canonicalize().expect("canonical fixture");
+    // Git for Windows may refuse the canonical \\?\ path spelling even though
+    // the Rust snapshot capture accepts it. Use the ordinary path in the
+    // native Git oracle; keep the same physical fixture and admission checks.
+    let fixture = {
+        #[cfg(windows)]
+        {
+            dir.path().to_path_buf()
+        }
+        #[cfg(not(windows))]
+        {
+            dir.path().canonicalize().expect("canonical fixture")
+        }
+    };
     let root = fixture.join("root.conf");
     let conditional = fixture.join("conditional.conf");
     let matched_config = b"[includeIf \"hasconfig:remote.*.url:https://example.invalid/allowed\"]\n path = conditional.conf\n[remote \"origin\"]\n url = https://example.invalid/allowed\n";
@@ -397,8 +409,8 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
         .expect("write conditional source");
     let environment = BTreeMap::<OsString, OsString>::new();
     let capture = || {
-        let mut sources = target_config::Sources::new(None, [root.clone()])
-            .expect("root path-only source plan");
+        let mut sources =
+            target_config::Sources::new(None, [root.clone()]).expect("root path-only source plan");
         for _ in 0..4 {
             if sources.complete() {
                 break;
