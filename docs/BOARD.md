@@ -118,16 +118,18 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
   Follow-up PR #929 merged as `a8dc7fb0`, exact candidate `4d9e5cfc`; code CI
   `43360750041` and independent Agent review passed. Bounded scan passes three
   Debug and three Release resize/input rounds. Corrected heap coverage570/570
-  and finite allocation-path evidence are archived. Original Debug479ms tail
-  and native/resource/platform acceptance remain open in #923. Basic Ghostty
+  and finite allocation-path evidence are archived. Original Debug479ms tail was accepted on repeated passing validation by the
+  maintainer (#970); native/platform evidence limits remain tracked in #923. Basic Ghostty
   operations and Git display passed maintainer retest; missing platforms are not passed.
   Git notification follow-up #960 merged as `3b1b1f67`: healthy 30s reconciliation
   accepted, failure 2s polling retained; bounded watcher and early-exit scan delivered.
   Exact-head code/platform CI `43861152146` and independent Agent review passed;
-  native gates and original 479ms tail remain open. macOS retains polling.
+  native platform gates remain open. macOS retains polling.
   Ghostty external Git and replay workspace/approval observations are recorded;
-  second-terminal testing is maintainer-waived, not passed. Native Windows, source
-  binding and original479ms attribution remain open.
+  second-terminal testing is maintainer-waived, not passed. Installed binary/source
+  receipt and three quiet CPU windows are archived (#967); production approval
+  deny/resume and approve-once stat passed (#971, `773b480a`). Native Windows
+  remains unavailable/unwaived; observation limits remain in the owner evidence.
   Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001
