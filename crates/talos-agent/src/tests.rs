@@ -1203,7 +1203,9 @@ async fn normal_prepared_operation_requires_pipeline_and_refuses_replay() {
         let names = std::collections::HashSet::from(["normal_prepared_fixture".to_string()]);
         let private = crate::transient_text::PrivateTokens::default();
         let (results, _) = agent
-            .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+            .execute_tools_with_presentation(
+                None, &context, &calls, None, &policy, &names, &private,
+            )
             .await
             .expect("execution");
         assert_eq!(
@@ -1217,7 +1219,9 @@ async fn normal_prepared_operation_requires_pipeline_and_refuses_replay() {
             usize::from(with_pipeline && expose_identity)
         );
         let (results, _) = agent
-            .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+            .execute_tools_with_presentation(
+                None, &context, &calls, None, &policy, &names, &private,
+            )
             .await
             .expect("replay");
         assert!(results[0].is_error);
@@ -1268,7 +1272,9 @@ async fn normal_prepared_continuations_are_bounded_and_require_fresh_identity() 
         let names = std::collections::HashSet::from(["normal_prepared_fixture".to_string()]);
         let private = crate::transient_text::PrivateTokens::default();
         let (results, _) = agent
-            .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+            .execute_tools_with_presentation(
+                None, &context, &calls, None, &policy, &names, &private,
+            )
             .await
             .expect("staged execution");
         assert_eq!(
@@ -1278,7 +1284,9 @@ async fn normal_prepared_continuations_are_bounded_and_require_fresh_identity() 
         );
         assert_eq!(executions.load(Ordering::SeqCst), expected_effects);
         let (replay, _) = agent
-            .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+            .execute_tools_with_presentation(
+                None, &context, &calls, None, &policy, &names, &private,
+            )
             .await
             .expect("replay refusal");
         assert!(replay[0].is_error);
@@ -1320,14 +1328,14 @@ async fn normal_prepared_stages_share_one_deadline() {
     let names = std::collections::HashSet::from(["normal_prepared_fixture".to_string()]);
     let private = crate::transient_text::PrivateTokens::default();
     let (results, _) = agent
-        .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+        .execute_tools_with_presentation(None, &context, &calls, None, &policy, &names, &private)
         .await
         .expect("bounded execution");
     assert!(results[0].is_error);
     assert!(results[0].content.contains("deadline exceeded"));
     assert_eq!(executions.load(Ordering::SeqCst), 2);
     let (replay, _) = agent
-        .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+        .execute_tools_with_presentation(None, &context, &calls, None, &policy, &names, &private)
         .await
         .expect("replay refusal");
     assert!(replay[0].is_error);
@@ -1368,7 +1376,7 @@ async fn normal_prepared_execution_has_cumulative_wall_clock_budget() {
     let names = std::collections::HashSet::from(["normal_prepared_fixture".to_string()]);
     let private = crate::transient_text::PrivateTokens::default();
     let (results, _) = agent
-        .execute_tools_with_presentation(&context, &calls, None, &policy, &names, &private)
+        .execute_tools_with_presentation(None, &context, &calls, None, &policy, &names, &private)
         .await
         .expect("bounded execution");
     assert!(results[0].is_error);
