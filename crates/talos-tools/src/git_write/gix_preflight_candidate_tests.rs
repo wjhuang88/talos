@@ -397,8 +397,8 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
         .expect("write conditional source");
     let environment = BTreeMap::<OsString, OsString>::new();
     let capture = || {
-        let mut sources =
-            target_config::Sources::new(None, [root.clone()]).expect("root path-only source plan");
+        let mut sources = target_config::Sources::new(None, [root.clone()])
+            .expect("root path-only source plan");
         for _ in 0..4 {
             if sources.complete() {
                 break;
@@ -419,6 +419,22 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
         sources
     };
 
+    // Test-only native Git oracle: this invocation belongs exclusively to
+    // a fixture after path admission, not to prepared-operation preflight.
+    let native_fixture = || {
+        let native = std::process::Command::new("git")
+            .args(["config", "--file"])
+            .arg(&root)
+            .args(["--show-origin", "--null", "--list", "--includes"])
+            .output()
+            .expect("installed native Git fixture oracle");
+        assert!(
+            native.status.success(),
+            "native Git rejected a valid admitted hasconfig fixture"
+        );
+        super::config_state::parse_host(&native.stdout).expect("parse native config records")
+    };
+
     let sources = capture();
     let matched = sources
         .ordered_host_output(std::slice::from_ref(&root), &environment, None)
@@ -430,6 +446,11 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
             .and_then(|values| values.last()),
         Some(&Some(b"conditional".to_vec())),
         "later remote URL must participate in admitted includeIf lookahead"
+    );
+    assert_eq!(
+        matched,
+        native_fixture(),
+        "admitted hasconfig evaluation differs from native Git fixture values"
     );
 
     std::fs::write(&root, unmatched_config).expect("change root URL after admission");
@@ -445,6 +466,11 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
     assert!(
         !unmatched.contains_key(b"fixture.marker".as_slice()),
         "a nonmatching remote URL must not activate an includeIf record"
+    );
+    assert_eq!(
+        unmatched,
+        native_fixture(),
+        "nonmatching hasconfig evaluation differs from native Git fixture values"
     );
 
     // Git forbids remote URLs in hasconfig-conditional included files: they
