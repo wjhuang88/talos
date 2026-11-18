@@ -44,7 +44,7 @@ struct State {
     receipt: Option<(u64, oneshot::Receiver<CompactOutcome>)>,
     admitting: bool,
     source_reads: BTreeMap<String, source_reads::PreparedRead>,
-    source_cursor: Option<(String, String, usize)>,
+    source_cursors: BTreeMap<String, (String, usize)>,
 }
 #[derive(Clone)]
 struct Snapshot {
@@ -148,7 +148,7 @@ impl Execution {
                 state.issued = None;
                 state.recovery = None;
                 state.cursor = None;
-                state.source_cursor = None;
+                state.source_cursors.clear();
             }
             state.generation = generation;
         }
@@ -281,7 +281,7 @@ impl AgentTool for HistorySearchTool {
         "history_search"
     }
     fn description(&self) -> &str {
-        "Discover a checkpoint snapshot; source_search finds eligible checkpoint sources by case-sensitive literal text in safe projections (up to 8192 bytes per source, five bounded previews per page; repeat the same query with next_cursor). source_detail reads an eligible checkpoint source UUID. Search/detail read permitted durable history using separate references that cannot be submitted to compact_context. All reads require the discovered snapshot; durable search/detail require a prepared host index."
+        "Discover a checkpoint snapshot for the older prefix. The suffix starting at the tenth most recent user message is retained unchanged and excluded from these sources; do not seek older citations solely to duplicate that retained suffix. source_search finds eligible checkpoint sources by case-sensitive literal text in safe projections (up to 8192 bytes per source, five bounded previews per page; repeat the same query with next_cursor). source_detail reads an eligible checkpoint source UUID. Search/detail read permitted durable history using separate references that cannot be submitted to compact_context. All reads require the discovered snapshot; durable search/detail require a prepared host index."
     }
     fn parameters(&self) -> Value {
         serde_json::to_value(schemars::schema_for!(HistoryInput)).unwrap_or_else(|_| json!({}))
@@ -348,11 +348,9 @@ impl AgentTool for HistorySearchTool {
             if input.mode == "source_search"
                 && input.cursor.as_ref().is_some_and(|cursor| {
                     !state
-                        .source_cursor
-                        .as_ref()
-                        .is_some_and(|(expected, query, _)| {
-                            cursor == expected && input.query.as_ref() == Some(query)
-                        })
+                        .source_cursors
+                        .get(cursor)
+                        .is_some_and(|(query, _)| input.query.as_ref() == Some(query))
                 })
             {
                 return ToolResult::error("stale checkpoint source cursor");
@@ -405,8 +403,16 @@ impl AgentTool for HistorySearchTool {
                         return unavailable_reason("delivery_cancelled_or_expired");
                     }
                     if input.mode == "source_search" {
-                        state.source_cursor =
-                            prepared.as_ref().and_then(|read| read.next_cursor.clone());
+                        let next = prepared.as_ref().and_then(|read| read.next_cursor.clone());
+                        if next.is_some() && input.cursor.is_none() && state.source_cursors.len() >= 16 {
+                            return ToolResult::error("checkpoint source cursor capacity reached; finish an outstanding search or discover again");
+                        }
+                        if let Some(cursor) = &input.cursor {
+                            state.source_cursors.remove(cursor);
+                        }
+                        if let Some((token, query, index)) = next {
+                            state.source_cursors.insert(token, (query, index));
+                        }
                     }
                     state.source_reads.remove(&read_key);
                     ToolResult::success(value.to_string())
@@ -636,7 +642,7 @@ impl AgentTool for HistorySearchTool {
         }
         if rediscover {
             state.source_reads.clear();
-            state.source_cursor = None;
+            state.source_cursors.clear();
             let reset = crate::checkpoint_history::HISTORY
                 .try_with(|history| history.as_ref().map(|history| history.reset_queries()))
                 .ok()
@@ -671,7 +677,7 @@ impl AgentTool for CompactContextTool {
         "compact_context"
     }
     fn description(&self) -> &str {
-        "Submit a structured checkpoint using a discovered snapshot and sources read with history_search source_detail. Durable search/detail references are not checkpoint sources. Admitted reserves an operation; only a later Applied receipt confirms installation after the complete tool batch."
+        "Submit a structured checkpoint replacing the discovered older prefix, using sources read with history_search source_detail. Preserve significant goals, constraints, decisions, unresolved work and risks from that prefix; the runtime retains the recent ten-user-message suffix unchanged. Do not cite an old source for newer facts or discard significant older state merely to obtain Applied. Durable search/detail references are not checkpoint sources. Admitted reserves an operation; only a later Applied receipt confirms installation after the complete tool batch."
     }
     fn parameters(&self) -> Value {
         serde_json::to_value(schemars::schema_for!(CompactInput)).unwrap_or_else(|_| json!({}))
@@ -1135,6 +1141,29 @@ mod tests {
                 }],
             )
             .await;
+    }
+
+    #[tokio::test]
+    async fn checkpoint_source_search_interleaved_pages_remain_available() {
+        let (execution, _, raw) = fixture().await;
+        EXECUTION.scope(execution.clone(), async {
+            let discovery = HistorySearchTool.execute(json!({"mode":"discover"})).await;
+            let discovery: Value = serde_json::from_str(&discovery.content).expect("discovery");
+            let mut calls = ["authorized", "source"].map(|query| talos_core::message::ToolCall {
+                id: query.into(), name: "history_search".into(),
+                input: json!({"mode":"source_search","snapshot":discovery["snapshot"],"query":query}),
+            });
+            for _ in 0..2 {
+                execution.prepare_source_reads(&raw, &calls).await;
+                for call in &mut calls {
+                    let response = HistorySearchTool.execute(call.input.clone()).await;
+                    assert!(!response.is_error, "{}", response.content);
+                    let page: Value = serde_json::from_str(&response.content).expect("page");
+                    assert!(page["next_cursor"].is_string());
+                    call.input["cursor"] = page["next_cursor"].clone();
+                }
+            }
+        }).await;
     }
 
     #[tokio::test]

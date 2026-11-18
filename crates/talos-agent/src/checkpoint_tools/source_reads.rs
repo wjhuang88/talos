@@ -77,7 +77,7 @@ impl Execution {
             (
                 issued.clone(),
                 state.refresh_epoch,
-                state.source_cursor.clone(),
+                state.source_cursors.clone(),
             )
         };
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
@@ -102,10 +102,10 @@ impl Execution {
                 continue;
             }
             let start = if let Some(token) = &input.cursor {
-                let Some((expected, query, start)) = &cursor else {
+                let Some((query, start)) = cursor.get(token) else {
                     continue;
                 };
-                if token != expected || input.query.as_ref() != Some(query) {
+                if input.query.as_ref() != Some(query) {
                     continue;
                 }
                 *start
