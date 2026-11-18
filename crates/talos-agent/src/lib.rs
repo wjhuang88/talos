@@ -1819,6 +1819,9 @@ impl Agent {
                     execution
                         .refresh_cooperative(valid.then_some(&*source), &messages)
                         .await;
+                    execution
+                        .prepare_source_reads(&messages, &effective_tool_calls)
+                        .await;
                 }
             }
             messages.push(assistant_msg);

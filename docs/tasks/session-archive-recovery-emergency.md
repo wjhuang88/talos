@@ -2293,3 +2293,62 @@ that automatic success or model wording closes manual acceptance. Full independe
 read-only review authorization requested for existing reviewer; earlier authorization
 was #969-specific. Exact-head CI and delivery not yet performed; no source merge,
 install, PATH/config change or original host launch. Overall Partial.
+
+### 2026-11-18 request-directed eligible-source search implementation (local, Partial)
+
+Within the same recovery emergency scope, added source_search for case-sensitive
+literal matching of safe checkpoint-source projections, five bounded previews per
+page, with snapshot/query-bound cursors. Source_detail can now project a requested
+late source from the runtime-owned exact message view before tool delivery. This
+does not translate durable-history query tokens into compact authority. Existing
+source identity, prefix/generation, permission/cancellation and durable identity
+delivery checks remain in force; raw message views are not retained by this step.
+
+Reserve16KiB of the existing2MiB text budget for request-directed responses; the
+initial detail cache uses the remainder. Preparation is cooperative and bounded to
+2s/16 history calls; unsupported or over-budget projections explicitly fail. Search
+covers existing safe bounded text projections, not hidden fields or unlimited text.
+No background continuation, storage/schema changes, original-data writes or install.
+
+New late-source regression failed on91ce6f25 (invalid discovery input), then passed
+after implementation; it locates/reads raw-260 beyond the initial cache, checks its
+canonical mapping and retained text budget. Added pagination, stale/query-changed
+cursor, rediscovery, revoked-permission-at-delivery, generation/prefix and refresh
+regressions. Real archived CLI Actor fixture now searches eligible sources, reads
+one and submits; it retains the121s source-age case and typed Applied/raw/restart
+assertions. First broader run114passed/1failed only at old terminal-record count
+(8 actual vs7 expected after adding a provider round); expectation updated to8.
+Initial test compile typo and failing run logs retained. Agent full tests running
+in target/recovery-source-read-agent-tests-20261118.log. Full preflight, native CI,
+independent review and real-provider fresh Applied remain required for this local
+follow-up. PR974 head91ce6f25 CI cannot validate these uncommitted edits.
+
+### 2026-11-18 source-navigation validation and remaining actual acceptance
+
+Standard pinned/locked release_preflight passed5644/0/0 (including child tests),
+agent767/0/0, check/Clippy and external SDK/SQLite fixtures passed. Source manifest
+target/recovery-source-navigation-preflight-manifest-20261118.json records2717
+unchanged files; log target/recovery-source-navigation-preflight-20261118.log.
+CLI SHA256 df6f79bc271b0045e3c725ff008fbab487dd594a04fcf428d42bc81434b3abea.
+Old head91ce6f25 CI44246634552 all eight checks passed, not evidence for this follow-up.
+
+Actual provider navigation run returned normally after12 successful history calls
+and0compact calls: model declined for missing latest-state citations. Read-only
+fixture audit proves cited88%/handoff facts occur at head records118-120 with only
+one subsequent fixture user; these facts are retained-tail, not eligible-prefix.
+A corrected instruction on the same binary then made27history calls/0compact in
+the600s observer window; harness closed the isolated host. Neither run proves fresh
+Applied or semantic preservation. Product120s checkpoint budget was not reached by
+a submission. Both preserve snapshots, transcript prefixes and archive hashes.
+
+Evidence: target/recovery-real-provider-source-navigation-20261118/result.json,
+target/recovery-real-provider-prefix-aware-20261118/result.json, and
+target/recovery-source-navigation-retained-tail-audit-20261118.json. Cancelled turn
+was not committed to TLOG; audit explicitly rejects the older fixture's last user
+as acceptance evidence. Do not mistake harness exit0 or old transcript for success.
+
+Source-navigation implementation is ready for exact-head review/CI, with actual
+manual Applied, semantic audit, original-host acceptance and versioned delivery
+remaining open. New review scope authorization is pending; no merge/install.
+Full original handoff residuals, including low-approval causal diagnosis, missing
+Nov11 evidence and intermittent highlighter attribution, remain Partial.

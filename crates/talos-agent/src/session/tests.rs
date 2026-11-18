@@ -8189,13 +8189,12 @@ async fn actor_history_search_and_detail_with_source_age(
                     },
                 ]
             } else if self.compact && step == 4 {
-                let discovery = result("recover-0");
                 vec![
                     AgentEvent::ToolCall {
                         call: talos_core::message::ToolCall {
-                            id: "checkpoint-source-detail".into(),
+                            id: "checkpoint-source-search".into(),
                             name: "history_search".into(),
-                            input: serde_json::json!({"mode":"source_detail", "snapshot":discovery["snapshot"], "reference":discovery["sources"][0]}),
+                            input: serde_json::json!({"mode":"source_search", "snapshot":result("recover-0")["snapshot"], "query":"originalfact"}),
                         },
                         provenance: talos_core::tool::ToolProvenance::Native,
                         summary_fields: vec![],
@@ -8206,6 +8205,33 @@ async fn actor_history_search_and_detail_with_source_age(
                     },
                 ]
             } else if self.compact && step == 5 {
+                let found = result("checkpoint-source-search");
+                assert_eq!(
+                    found["results"].as_array().expect("eligible results").len(),
+                    1,
+                    "private fields and unverified tool output cannot be checkpoint search hits"
+                );
+                assert_eq!(
+                    found["results"][0]["text"],
+                    "originalfact unique constraint"
+                );
+                let discovery = result("recover-0");
+                vec![
+                    AgentEvent::ToolCall {
+                        call: talos_core::message::ToolCall {
+                            id: "checkpoint-source-detail".into(),
+                            name: "history_search".into(),
+                            input: serde_json::json!({"mode":"source_detail", "snapshot":discovery["snapshot"], "reference":found["results"][0]["reference"]}),
+                        },
+                        provenance: talos_core::tool::ToolProvenance::Native,
+                        summary_fields: vec![],
+                    },
+                    AgentEvent::TurnEnd {
+                        stop_reason: StopReason::ToolUse,
+                        usage: Default::default(),
+                    },
+                ]
+            } else if self.compact && step == 6 {
                 if !self.source_age.is_zero() {
                     // Exercise a long provider/source-reading interval without a
                     // wall-clock sleep or modifying the operation's 120s budget.
@@ -8243,7 +8269,7 @@ async fn actor_history_search_and_detail_with_source_age(
                     },
                 ]
             } else {
-                assert_eq!(step, if self.compact { 6 } else { 4 });
+                assert_eq!(step, if self.compact { 7 } else { 4 });
                 if self.compact {
                     assert_eq!(result("archive-compact")["status"], "Admitted");
                     assert!(messages.iter().any(|message| matches!(message, Message::Context { content } if content.contains("originalfact unique constraint"))), "installed source-backed checkpoint is present");
@@ -8458,7 +8484,7 @@ async fn actor_history_search_and_detail_with_source_age(
             .expect("persisted diagnostics");
         assert_eq!(
             diagnostics.len(),
-            if archived { 7 } else { 5 },
+            if archived { 8 } else { 5 },
             "every provider response terminal must survive prepared recovery"
         );
         let reopened = talos_session::Session::new(
