@@ -33,6 +33,30 @@ pub(crate) struct Execution {
     #[cfg(test)]
     before_source_delivery: Arc<Mutex<Option<SourceDeliveryHook>>>,
 }
+/// Source preparation shared by hook-admitted tools in one model batch.
+pub(crate) struct BatchPreparation<'a> {
+    pub execution: Execution,
+    pub source: Option<&'a HistorySource>,
+    pub calls: &'a [talos_core::message::ToolCall],
+    pub message_count: usize,
+    pub ready: tokio::sync::OnceCell<()>,
+}
+
+impl BatchPreparation<'_> {
+    pub(crate) async fn prepare(&self, messages: &[Message]) {
+        self.ready
+            .get_or_init(|| async {
+                let prefix = &messages[..self.message_count];
+                self.execution
+                    .refresh_cooperative(self.source, prefix)
+                    .await;
+                self.execution
+                    .prepare_source_reads(prefix, self.calls)
+                    .await;
+            })
+            .await;
+    }
+}
 #[derive(Default)]
 struct State {
     refresh_epoch: Option<uuid::Uuid>,
@@ -108,9 +132,18 @@ impl PermissionLease {
             .flatten()
     }
     pub(crate) fn valid(&self) -> bool {
-        self.state
-            .state_snapshot()
-            .is_ok_and(|snapshot| snapshot == self.snapshot)
+        let Ok(current) = self.state.state_snapshot() else {
+            tracing::warn!("checkpoint permission snapshot read failed");
+            return false;
+        };
+        if current != self.snapshot {
+            tracing::warn!(previous = ?self.snapshot.revisions.as_array(),
+                current = ?current.revisions.as_array(),
+                same_session = current.session_id == self.snapshot.session_id,
+                "checkpoint permission snapshot changed");
+            return false;
+        }
+        true
     }
 }
 tokio::task_local! {

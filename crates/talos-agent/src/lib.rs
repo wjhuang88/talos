@@ -1805,9 +1805,10 @@ impl Agent {
             {
                 break 'turn_loop (Err(error), TurnStatus::Denied);
             }
-            if checkpoint_tools::EXECUTION.try_with(|_| ()).is_ok()
-                && let Some(source) = history_source.as_mut()
-            {
+            let preparation = if let (Ok(execution), Some(source)) = (
+                checkpoint_tools::EXECUTION.try_with(Clone::clone),
+                history_source.as_mut(),
+            ) {
                 let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
                 let valid = tokio::time::timeout(
                     std::time::Duration::from_secs(2),
@@ -1815,15 +1816,16 @@ impl Agent {
                 )
                 .await
                 .unwrap_or(false);
-                if let Ok(execution) = checkpoint_tools::EXECUTION.try_with(Clone::clone) {
-                    execution
-                        .refresh_cooperative(valid.then_some(&*source), &messages)
-                        .await;
-                    execution
-                        .prepare_source_reads(&messages, &effective_tool_calls)
-                        .await;
-                }
-            }
+                Some(checkpoint_tools::BatchPreparation {
+                    execution,
+                    source: valid.then_some(&*source),
+                    calls: &effective_tool_calls,
+                    message_count: messages.len(),
+                    ready: Default::default(),
+                })
+            } else {
+                None
+            };
             messages.push(assistant_msg);
 
             let tool_results = if !original_calls.is_empty() {
@@ -1878,6 +1880,7 @@ impl Agent {
                         );
                         match self
                             .execute_tools_for_ui_with_presentation(
+                                preparation.as_ref(),
                                 &hook_ctx,
                                 &pending,
                                 tx,
@@ -1911,6 +1914,7 @@ impl Agent {
                     .map(str::to_owned);
                 match self
                     .execute_tools_for_ui_with_presentation(
+                        preparation.as_ref(),
                         &hook_ctx,
                         &effective_pending,
                         tx,
@@ -1942,6 +1946,9 @@ impl Agent {
                 });
                 let (tool_results, parts) = match self
                     .execute_tools_with_presentation(
+                        preparation
+                            .as_ref()
+                            .map(|batch| (batch, messages.as_slice())),
                         &hook_ctx,
                         &effective_tool_calls,
                         user_intent,
