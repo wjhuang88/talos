@@ -1,6 +1,8 @@
 //! Fixed-size child resource-limit evidence; never wait for descriptor EOF.
 
-use std::io::{Read, Write};
+#[cfg(any(test, feature = "shell"))]
+use std::io::Read;
+use std::io::Write;
 use std::os::unix::net::UnixStream;
 
 const RECORD_LEN: usize = 18;
@@ -32,8 +34,10 @@ pub(super) fn send_record(
     Err(std::io::Error::from_raw_os_error(libc::EINTR))
 }
 
+#[cfg(any(test, feature = "shell"))]
 pub(crate) struct MemoryEvidence(UnixStream);
 
+#[cfg(any(test, feature = "shell"))]
 impl MemoryEvidence {
     pub(super) fn prepare() -> std::io::Result<(Self, UnixStream)> {
         let (reader, writer) = UnixStream::pair()?;

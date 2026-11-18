@@ -651,6 +651,11 @@ impl RuntimeFinalizer for BackgroundJobsRuntimeFinalizer {
 #[doc(hidden)]
 pub mod composition;
 
+/// Optional, explicit STORE-002 E composition of current local domain stores.
+/// Does not rewire RuntimeBuilder or product hosts.
+#[cfg(feature = "local-storage")]
+pub mod local_storage;
+
 pub use talos_agent::auto_resolver::AutoDecisionReport;
 pub use talos_agent::evaluator::{
     EvaluatorAdmission, EvaluatorAssessor, EvaluatorError, EvaluatorFailure, EvaluatorOutcome,

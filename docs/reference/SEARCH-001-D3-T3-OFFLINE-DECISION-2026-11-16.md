@@ -17,8 +17,9 @@ source admission.
   merge executed with expected-head CAS.
 - Separate implementation branch
   `feat/i329-search-bing-offline-failover` starts at that governance merge.
-  Implementation CI, independent code review, CAS and source Completion Commit
-  **PENDING**. No claim of tested source before CI.
+  This was an initial source checkpoint: validation and Completion Commit were
+  **PENDING at that time**. The accepted source gate and actual merged SHA are
+  recorded in the final verification section below.
 
 ## Code seam
 
@@ -86,8 +87,22 @@ independent search providers; E/F/G/I remain blocked. Parent #937 and Epic
 
 ## Verification status
 
-The source PR must show focused `bing_variants` test results, locked
-workspace validation, exact-head native Linux/macOS/Windows CI, independent
-API/Network/security review, and merge-time expected-head CAS **before** an
-implementation Completion Commit may be recorded. This research receipt is
-not itself verification.
+The offline T3a source reached the accepted gate. [PR #959](https://github.com/wjhuang88/talos/pull/959) source HEAD
+`71d752880b6ede90c8e8bd89c5a87cc6f2217b9e` passed [exact-head CI #4333](https://github.com/wjhuang88/talos/actions/runs/44011362862)
+**8/8 SUCCESS** (macOS, Windows workspace + aggregate, Linux/Windows Desktop,
+change-scope, installer, remote owner reconciliation); includes the synthetic
+`bing_variants` decision tests. Independent [Copilot technical APPROVE](https://github.com/wjhuang88/talos/pull/959#issuecomment-6941738278)
+covered API/network/security and target-main interplay with zero blocker; the
+review is not a service-access/license or human-maintainer determination.
+Expected-head CAS passed and the implementation PR merged with actual
+**Completion Commit `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a`** on main.
+
+Historical [CI #4284](https://github.com/wjhuang88/talos/actions/runs/43830156419)
+attempt 1 had one Windows-only `talos-agent` checkpoint lease test failure
+in untouched code (648 passed / 1 failed); the same-head failed-job-only rerun
+passed, with original failure retained. No proven root-cause/flakiness claim.
+All results remain synthetic/offline; **no** approved new production query host,
+automated Bing SERP rights, result/LLM-output-use rights, provider count, proxy,
+redirect or Network manifest authority, or genuine China/comparator observation.
+The existing DDG-first/CN-only production path is unchanged. T3b BLOCKED,
+#957 and parent #937/#624 Open, #644 historical ZERO-ADMISSION unchanged.
