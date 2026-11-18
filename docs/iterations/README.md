@@ -1,6 +1,6 @@
-## I331 / SEARCH-001-D2 — hosted keyless MCP rights-source delta (governance PR #980)
+## I331 / SEARCH-001-D2 — hosted keyless MCP rights-source delta (Review / Claimed)
 
-[I331](I331-search-keyless-mcp-rights-evidence.md) / [SEARCH-001-D2](../backlog/active/SEARCH-001-D2-keyless-mcp-admission.md) / [Issue #848](https://github.com/wjhuang88/talos/issues/848): proposed **Active / Claimed only after the atomic #980 claim merges**. Non-duplicative D2.2 official published-source applicability, output/LLM-use, tool-contract and vendor-clarification *questions only*; no actual vendor outreach or live MCP traffic. Exa/Parallel remain BLOCKED / NOT ADMITTED; parent #624 stays Open. **I330 remains independently assigned to ARCH-035 E2 / #897**, not this Search work.
+[I331](I331-search-keyless-mcp-rights-evidence.md) / [SEARCH-001-D2](../backlog/active/SEARCH-001-D2-keyless-mcp-admission.md) / [Issue #848](https://github.com/wjhuang88/talos/issues/848): effective **documentary-only** claim [#980](https://github.com/wjhuang88/talos/pull/980) merged `e290e8882e5a8be23e90f962f444d71861c6eca6`. D2.2 official published-source rights, output/LLM-use and tool-contract delta is **Review / Claimed** in [source PR #981](https://github.com/wjhuang88/talos/pull/981), not merged or Complete. Vendor clarification *questions only*; no outreach, MCP query, network-authority change or default provider admission. Exa/Parallel remain BLOCKED / NOT ADMITTED; #848 and parent #624 remain Open. **I330 is separately claimed by ARCH-035 E2 / #897**, not this Search work.
 
 ## I329 / SEARCH-001-D3-T3 — proposed offline Bing non-CN→CN fallback contract
 
