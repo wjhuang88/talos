@@ -32,16 +32,39 @@
 - **Current Host authority**: CLI `AppServerSession::new` and `set_persistence` remain the authoritative CLI actor integration; `SessionManager::new` runs default startup index/reconciliation while `with_dir` does not; Todo opens within the existing host closure; Memory is first-query lazy with caching and existing-path guard. Desktop and embedded SDK use `RuntimeBuilder::new` and optional `durable_session(DurableSession)`; unbound memory-only path remains valid. TUI is presentation, not a database factory.
 - **Data roots / failure modes**: Session TLOG/JSONL and index, Pending fences/receipts, Memory SQLite+FTS5, Evolution hook `evolution/knowledge.db`, learned index `index.db`, Exploration database and typed/no-create optional semantics remain domain-owned. `LocalStorageProfile::memory_if_exists` itself opens when called; do **not** move it into an eager Host constructor.
 
-### Selection-time non-terminal disposition
+### Selection-time non-terminal inventory and disposition — 2026-11-18
 
-| Owner / work | State at selection | I330 E2 disposition |
+**Snapshot:** `main@bc4a37eeafff5e0e172764e861fac6cb6341fd86`, after accepted #956 code and #972 I328 closeout. Source-of-truth check: `docs/iterations/README.md` Current Operating Set/Recent Non-Terminal entries, individual iteration owners, `docs/BOARD.md` current top sections, `docs/backlog/PRODUCT-BACKLOG.md`, effective GitHub PRs and #897/#670. This is a **select-or-retain/no-overlap decision for every applicable non-terminal owner**, not a new claim, scope transfer, completion assertion or endorsement of proposed states. Dated historical text in some index rows is qualified by the corresponding current source owner/Board.
+
+| Existing iteration / owner | Source-recorded status at I330 selection | Disposition relative to E2 |
 |---|---|---|
-| I328 / STORE-002 E #670 | Complete/Closed, #956 implemented and #972 owner-first closed | **Accepted prerequisite only**; do not reopen or duplicate local profile/traits |
-| STORE-002 F #670 | Open, unclaimed | **Defer**, no wide crash/recovery/behavior conformance or backend changes |
-| I320 / ARCH-035 E0/E1 | Documentation Complete/Closed, former claim Released | **Retain history**, propose separate I330 E2 claim |
-| ARCH-035 E3/E4 #897 | Blocked/unclaimed, same Story future slices | **Defer** CLI/TUI/Desktop/SDK migrations and full multi-host equivalence |
-| SERVER-001 / SERVER-001-C #142/#361 | Dependent, no accepted Host composition | **Remain blocked**, no ServerHost or protocol implementation |
-| Concurrent SEARCH, TUI, Session, Git, Windows and Provider owners | Independently claimed/reviewed or proposed | **Retain without transfer**; no shared protected implementation code or claim |
+| I320 / ARCH-035 E0/E1 #897 | **Complete / Closed** documentary slice; prior claim #905 Released, ADR-104 accepted placement-only | **Reuse accepted decision**, preserve old claim history; proposed I330 E2 is separately bounded |
+| I328 / STORE-002 E #670 | **Complete / Closed**, #956 implementation and #972 owner closure accepted | **Prerequisite satisfied**, do not duplicate E `LocalStorageProfile`, domain contracts or tests |
+| STORE-002 F / #670 | **Open / Unclaimed** full fault/recovery parity residual | **Retain Unclaimed**, no F conformance/backend work within E2 |
+| ARCH-035 E3/E4 / #897 | **Blocked / Unclaimed**, multi-host migration and full equivalence | **Defer**, no CLI/TUI/Desktop/SDK mass migration, no overall #897 closure |
+| SERVER-001 / #142 and SERVER-001-C / #361 | **Blocked** on ARCH-035 accepted Host composition | **Retain Blocked**; no new ServerHost binary/protocol/runtime |
+| I329 / SEARCH-001-D3-T3 / #957 | Current I329 owner/Board: T3a offline **Complete / Closed**, T3b production **Blocked / Unclaimed** (some iteration-index proposal text is historical) | **Retain separate search ownership**, no endpoint/browser/permission/network change |
+| I323 / PROVIDER-008-C / #914 | **Active proposed** by #918, ineffective until its own governance merge (source iteration/index) | **Retain separate proposed Azure claim**, no model/provider transport overlap |
+| I324 / GIT-COMPAT-001 / #919 | **Active / Claimed proposed** by #920, ineffective until governance merge (source iteration/Board) | **Retain separate Git-native/preflight scope** and protected review/Windows 2.36 gates |
+| I318 / TUI-054 / #269 | **Review / Claimed**, native repeat-safe key handling, physical/IME acceptance deferred | **Retain Review**, do not touch TUI renderer/input or claim its native evidence |
+| I302 / TEST-003 / #717 | **Review / Claimed**, Windows current-process handle/resource acceptance residual | **Retain Review**, no process-boundary or Windows native test claim |
+| I277 / DESKTOP-001-D3 / #29 | **Review / Claimed**, human/device acceptance deferred (Current Operating Set) | **Retain Review**, E2 cannot transfer Desktop acceptance or change Desktop defaults |
+| I249 / dependency upgrade pilot | **Planned / Unclaimed** | **Defer**, no Cargo/dependency upgrade beyond independently reviewed strictly necessary E2 selection |
+| I164 / startup composer continuity | **Paused**, superseded layout target with no completion claim | **Retain Paused**, no TUI layout/composer work |
+| MODEL-007 / deferred model picker | **Deferred / Unclaimed** behind Desktop schedule | **Defer**, no provider/model menu or reasoning variant admission |
+| AUTO-HISTORY-001 / #916 | Board **Review / Claimed**, draft #964, native CI/cross-host acceptance unresolved | **Retain Review**, no approval history/cross-turn permission behavior change |
+| EDIT-LOCATIONS-001 / #921 | Board **Review / Claimed**, draft #963 terminal acceptance outstanding | **Retain Review**, no edit/diff line-location or tool output work |
+| SESSION-UI-001 / #952 | Board **Review / Claimed**, draft #962 with PTY/native acceptance remaining | **Retain Review**, no new session actor/queue UI behavior; E2 consumes existing authority |
+| Session recovery integration / archive+checkpoint emergency | Board **Partial / Emergency override**, integration PR #965/native evidence pending | **Retain Partial**, E2 must neither overwrite recovery rules nor claim its validation |
+| Session recovery storage prerequisite | Board **Partial / Emergency override**, storage integration/review pending | **Retain Partial**, no shared Session recovery implementation or authority transfer |
+| TUI-APPROVAL-001 | Board **Review / Claimed**, local emergency display candidate | **Retain Review**, no permission/approval presentation or authority change |
+| GIT-SNAPSHOT-001 | Board **Review / Claimed**, tracked-source capacity candidate | **Retain Review**, no Git snapshot code/source-fence changes |
+| TUI-PERF-001 | Board **Review / Claimed**, native/performance acceptance residual | **Retain Review**, no TUI frame/render scheduling and no reuse of pending acceptance as E2 proof |
+| CLIPBOARD-IMAGE-001 / #894 | Board **Review / Claimed**, native clipboard ingestion candidate | **Retain Review**, no image/clipboard/TUI input change |
+| WORKTREE-SANDBOX-001 | Board **Planned / Unclaimed** separate sandbox owner | **Retain Planned**, no sandbox or protected permission-boundary change |
+| I305 / TEST-004 and I300 / structured Git repair | **Complete / Closed** per current iteration source (older index entries may describe earlier Review) | **Retain completed**, not reopened by E2 |
+
+**Non-overlap conclusion:** the sole proposed E2 owner on this branch is ARCH-035 / I330 / #975. Accepted I320 E0/E1 and STORE-002 E are prerequisites; proposed/Review/Planned/Paused/Blocked owners above keep their own source, PR, native and manual acceptance. E2 is only an opt-in runtime-facing **selection** over accepted delegates. Implementation is not authorized until this governance-only claim+activation PR itself is reviewed and merged; E3/E4, F, and ServerHost remain separately gated. Future relevant main-branch owner changes must be rechecked during merge-time CAS.
 
 ## Proposed bounded E2 Work Slice
 
