@@ -37,6 +37,10 @@ Claim and activation have no effect before governance merge; D and parent #724 r
 ## I321 / STORE-002 A/B — Complete / Closed (bounded slice)
 
 [I321](I321-store-002-capability-contract-foundation.md): governance #908 and implementation #909 merged; exactly seven typed capability IDs, metadata-only registry requests and authority inventory, no functional provider binding or local storage migration. #670 OPEN for C/D/E/F.
+## I330 / ARCH-035 E2 — proposed host-local storage selection claim #975
+
+[I330](I330-arch-035-e2-host-storage-selection.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: accepted #670 E `LocalStorageProfile` implementation #956 (`a28c1ccc`) and owner-first #972 (`bc4a37ee`) permit a fresh, bounded opt-in Host-selection claim. [Draft governance #975](https://github.com/wjhuang88/talos/pull/975) atomically proposes **Active / Claimed** owner @wjhuang88; **ineffective until merged** after exact-head docs CI, validators, review and CAS. No E2 implementation, API binding, E3/E4 multi-host migration, STORE-002 F broad parity or ServerHost is authorized by this proposal.
+
 ## I320 / ARCH-035 E0/E1 — Complete / Closed (docs-only)
 
 [I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: E0 code-truth and E1 owner/placement decision **Complete / Closed for the bounded documentation slice**, claim #905, E0 #906, contract-review #934, accepted [ADR-104](../decisions/104-host-composition-ownership-boundary.md) #936 merge and I320 documentary **Completion Commit `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`**. The parent remains **Open / Blocked / Released** with no E2/E3 effective code claim or runtime parity proof. #670 D/E and #897 E2-E4 remain separately gated.
