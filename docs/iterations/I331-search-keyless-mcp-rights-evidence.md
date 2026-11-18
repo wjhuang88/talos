@@ -18,7 +18,7 @@
 | Source Issue | #848 |
 | Governance Claim PR | #980 |
 | Authorization Mode | Independent review |
-| Authorization Evidence | PR #980 requires exact-head docs/governance CI, read-only independent review and expected-head CAS. The claim is **ineffective** until this PR merges. |
+| Authorization Evidence | Merged claim PR #980, activation SHA `e290e8882e5a8be23e90f962f444d71861c6eca6`, exact-head [CI #4387](https://github.com/wjhuang88/talos/actions/runs/44255790659), [independent read-only APPROVE](https://github.com/wjhuang88/talos/pull/980#issuecomment-6971707928) and merge-time CAS. This is effective **documentary-only** authority, not a provider/MCP request or code grant. |
 | Implementation PR | [#981](https://github.com/wjhuang88/talos/pull/981) — proposed dated official-source D2.2 evidence; Draft / unmerged |
 | Last Updated | 2026-11-18 |
 | Handoff / Release Condition | Only documentary D2.2 can be delivered/closed with actual pre-existing evidence Completion Commit and owner-first closeout. Exa and Parallel remain BLOCKED/NOT ADMITTED, #848 stays Open for external/region gates, Epic #624 Open. |
@@ -44,8 +44,8 @@ D2.1's November 4/10 material already recorded Exa's `https://mcp.exa.ai/mcp` an
 
 ## Gate / execution order
 
-1. Merge this **governance-only claim + iteration + derived Board/index** PR #980 after exact-head applicable CI, both governance validators, independent review and head CAS. Until effective, this document is a proposal and must not be used as authorization.
-2. After merge, produce a separate reviewed **D2.2 source-documentary evidence PR**, with exact dates/source versions, negative/UNKNOWN outcomes, no live calls; publish an accepted evidence commit before any completion status.
+1. **Completed:** merged the atomic governance-only claim + iteration + Board/index PR #980 as `e290e8882e5a8be23e90f962f444d71861c6eca6` after exact-head CI, independent review and merge-time CAS. The effective authority is **only** the bounded D2.2 official-source documentary Work Slice.
+2. **In Review:** source-only D2.2 evidence candidate PR #981 contains the dated contract/tool-surface and rights/independence matrix. It needs its own exact-head CI, independent review and merge **before** any Completion Commit or Complete owner status is permitted.
 3. Complete owner-first closure with actual evidence Completion Commit, CI and review evidence. Keep #848 Open for the blocked admission/rights/region residual; parent #624 and E/F remain Open/Blocked; no default production admission.
 
 ## D2.2 implementation/documentary evidence checkpoint — 2026-11-18
