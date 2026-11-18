@@ -1,6 +1,6 @@
 # Iteration I328: STORE-002 Default Local Storage Composition (E)
 
-> Document status: Active / Claimed proposed by governance #955 — **ineffective until target-branch merge**
+> Document status: Complete / Closed — I328 E accepted; parent #670 Open for F; #897 E2/E3 separate claim required
 > Published plan date: 2026-11-16
 > Parent: [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / [Issue #670](https://github.com/wjhuang88/talos/issues/670)
 > Delivery target: one verifiable, behavior-preserving **local-default composition** over accepted concrete stores/domain delegates; not cross-host injection, new engines, or F-wide equivalence.
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | STORE-002 E only: explicit local-default composition/selection of already accepted Session/Pending/Todo, Memory, Evolution and Exploration domain stores and trait delegation; preserve current paths, constructor timing, unavailable categories, error/recovery semantics and call sites. No F broad conformance, ARCH-035 Host/runtime/SDK injection, ServerHost, new SQL/vector/object engines, provider registry or speculative public framework. |
@@ -17,10 +17,10 @@
 | Source Issue | #670 |
 | Governance Claim PR | #955 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | D #935 implementation merged `027b8a59194f5ba496b0048c7183ad236e2e2dd2`; owner-first I325 D closeout #951 merged `8cb0f97a44259b4c7f4caee24c06ab02fc542ad7`. User authorized continuing parent #670; separate E claim must merge before code. |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-16 |
-| Handoff / Release Condition | E requires selected local profile/assembly with source-backed operational checks, applicable exact-head native CI and independent API/semantics review, then owner-first closeout; F remains unclaimed and #897 E2/E3 blocked until accepted usable E and its own claim. |
+| Authorization Evidence | Governance #955 merged `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184`; implementation #956 accepted and merged **Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`** following [exact-head CI #4339](https://github.com/wjhuang88/talos/actions/runs/44040504951) 8/8 Success, independent API/storage and protected-source reviews, and [merge-time CAS](https://github.com/wjhuang88/talos/pull/956#issuecomment-6946993092). Single-maintainer path; no separate human reviewer claimed. |
+| Implementation PR | #956 (merged; Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`) |
+| Last Updated | 2026-11-17 |
+| Handoff / Release Condition | I328 E Complete / Closed, claim Closed. STORE-002 F remains unclaimed, parent #670 Open. ARCH-035 / #897 E2/E3 is now eligible for a separate new claim, but still blocked/unclaimed until that activation; no implicit Host work authorized. |
 
 ## Published Baseline
 
@@ -31,6 +31,24 @@
 - CLI Memory opt-in prompt checks `~/.talos/memory.db` existence and lazily opens an existing file, skipping missing/unavailable storage instead of creating it. Exploration ingest opens on demand; query of missing DB remains informational/no creation.
 - `RuntimeBuilder::durable_session(DurableSession)` is optional under ADR-042, leaving the unbound in-memory runtime intact. ADR-104 is **ownership/placement only**, not an approved Host/RuntimeBuilder injection API.
 - `SessionIndex` is a derived metadata/search projection with bounded reconciliation; durable external-ID mapping, pending receipts and Todo/Memory/Exploration records remain domain-owned authority. Existing storage categories Object, VectorSearch, Embedding and standalone Rerank remain **unavailable** as generic operational providers.
+
+### Selection-time non-terminal inventory and disposition — 2026-11-16
+
+Source: `docs/iterations/README.md` and effective owners on `main@b524c7a9a0833cf9293c0fd77a730e1fb7fc1184`. This is a **non-overlap / select-or-retain record**, not a transfer of ownership or an assertion that unrelated iterations are completed.
+
+| Existing iteration / owner | Recorded state at I328 selection | Disposition for I328 E |
+|---|---|---|
+| I325 / STORE-002 D | Accepted and closed (#935 implementation, #951 closeout) | Dependency **satisfied**, not reopened |
+| I320 E0/E1 / ARCH-035 #897 | Bounded docs Complete / Closed; parent E2/E3 Blocked / Released | **Keep blocked** until accepted E and separate Host claim; E has no Host API mandate |
+| I318 / TUI-054 #269 | Review with physical terminal / IME acceptance deferred | **Retain Review**, no TUI input/terminal changes in E |
+| I302 / TEST-003 #717 | Review / Claimed with native Windows handle/resource residual | **Retain Review**, E neither asserts nor modifies native-process validation |
+| I323 / PROVIDER-008-C #914 | Proposed governance activation | **Defer/retain separate claim**; Azure provider unrelated to storage E |
+| I324 / GIT-COMPAT-001 #919 | Proposed governance claim (not effective at inventory snapshot) | **Defer/retain separate claim**; Git 2.36 preflight and protected review unaffected |
+| I277, I249, I164 | Review, Planned, Paused respectively as recorded in README | **Retain Review / defer Planned / retain Paused**; no Desktop/device/release acceptance transfer |
+| SEARCH-001 D3 and other separately owned search work | Independently owned source/research work; #957/I329 intake proposed separately | **Retain separate governance**, no shared search implementation source or provider admission |
+| STORE-002 F / #670 | Unclaimed, next broad crash/recovery/parity slice | **Defer** until independently claimed after E implementation and closeout |
+
+**Selection / non-overlap conclusion:** I328 E has the sole effective STORE-002 local-default composition claim through merged #955. No other non-terminal iteration owns this Work Slice; #956 changes only opt-in existing-store selection and its tests, bounded documentation and explicit feature CI. Concurrent search, provider, TUI, Git-compat, Windows diagnostics, Desktop and Host owners are retained, not superseded. No second active iteration or cross-owner implementation claim is inferred by this inventory.
 
 ### Work Slice
 
@@ -62,4 +80,18 @@
 
 ## Activation / verification / completion
 
-Governance-only #955 claim and activation must merge on main first; this proposed Active/Claimed record has no ownership effect until then. It is not authority to write production E implementation. Record actual claim PR SHA, implementation CI/review/merge and pre-existing Completion Commit in later append-only execution evidence. Parent #670 remains Open for E/F and #897 Host E2/E3 remains blocked.
+Governance-only #955 activation merged at `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184`. **Implementation #956 has since merged as Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`**, following exact-head CI #4339 and independent review/CAS. This document closes only E; #670 remains Open for F, and #897 Host E2/E3 requires its own new claim.
+
+## I328 E implementation checkpoint — 2026-11-16
+
+- [PR #956](https://github.com/wjhuang88/talos/pull/956) proposes feature-gated concrete `LocalStorageProfile` selection in runtime-facing composition layer without changing RuntimeBuilder, CLI/TUI/Desktop/SDK or ServerHost. It reuses accepted C domain traits and existing store constructors; paths are explicit, missing read-side optional DBs are skipped, write/ingest only on explicit call, and Evolution hook/learned query path distinction remains.
+- **Historical pre-acceptance failure:** the first candidate omitted optional dependencies in `Cargo.lock`, and locked CI failed; later candidates encountered a macOS non-UTF-8 fixture and formatting drift, corrected without changing operational Host behavior. Exact-head #4339 subsequently succeeded. These former failed/cancelled runs are retained as historical evidence, not counted as green.
+
+## I328 E completion evidence and residuals — 2026-11-17
+
+- **Completion Commit: `a28c1cccebad71eb5785d149129a640ceec3d098`** — actual #956 squash implementation merge already on `main` before this documentation closeout.
+- Exact reviewed head `6ee9229cd9d4b22e40703895116daa2dbf3f7bde`, [CI #4339](https://github.com/wjhuang88/talos/actions/runs/44040504951): **8/8 jobs SUCCESS** on macOS, Windows and Desktop including Rust format/check/Clippy/workspace tests and explicit `local-storage` check, Clippy, and focused tests. Project governance validator 0 warnings; collaboration validator 1 unrelated SEARCH intake warning. Remote reconciliation job success.
+- Independent read-only [technical/API/integration APPROVE](https://github.com/wjhuang88/talos/pull/956#issuecomment-6941991031), separately approved protected source/FNV source inventory review, and [single-maintainer merge-time CAS](https://github.com/wjhuang88/talos/pull/956#issuecomment-6946993092). No separate human approval claimed.
+- Accepted feature-gated `LocalStorageProfile` delegates to existing concrete Session, Pending/Todo, Memory, Knowledge and Exploration domain stores. Selection alone creates no files; missing optional read-side DBs remain absent; Unix invalid UTF-8 paths return typed errors without using a substitute DB; Session `new()` reconciliation remains distinct from `with_dir()`. Existing product/default callers and source data formats remain unchanged.
+- Historical #4305/#4327 errors and #4332 Windows cache-save cancellation do not count as green. The final #4339 success provides current native evidence without skipping tests or disabling fail-closed native inventory.
+- **Remaining:** STORE-002 F broad fault/recovery/conformance is separately unclaimed and #670 stays Open. ARCH-035 / #897 E2/E3 Host composition may now request its own effective claim and E4 parity; E did not implement Host injection or ServerHost.

@@ -794,8 +794,22 @@ async fn handle_session_event(
             if authoritative_generation_for_sender(&sq_tx_watch.borrow())
                 == Some(session_generation)
             {
+                let active = matches!(
+                    state,
+                    talos_core::session::AutomaticCompactState::Started { .. }
+                );
+                let text = talos_conversation::format_automatic_compact_status(state);
+                let _ = ui_tx.send(UiOutput::CompactionPending(active));
+                if !active {
+                    // Keep the typed terminal reason visible after transient tips expire.
+                    // This is presentation only, not an authoritative transcript write.
+                    let _ = ui_tx.send(UiOutput::Content(ContentOutput::Block {
+                        source: MessageSource::System,
+                        text: format!("{text}\n"),
+                    }));
+                }
                 let _ = ui_tx.send(UiOutput::Tip {
-                    text: talos_conversation::format_automatic_compact_status(state),
+                    text,
                     kind: TipKind::Info,
                 });
             }

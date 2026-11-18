@@ -2007,3 +2007,49 @@ The macOS bounded notification backend remains unavailable with polling fallback
 
 Raw native samples, source snapshot and confirmation limits are archived in
 [evidence/native-post960](evidence/tui-perf-001/native-post960/README.md).
+
+### Native idle follow-up — 2026-11-17
+
+Evidence PR #965 merged as6d5651df after all8 CI jobs passed and exact-head Agent
+review; original SQLite concurrency regression passed419session tests.
+New installed-source-bound Ghostty observations are archived in
+[native-idle-20261117](evidence/tui-perf-001/native-idle-20261117/README.md).
+Fresh mock empty-workspace CPU0.1000/0.1667/0.1667% meets the debug0.20% threshold
+for three30s windows. Real-session2.6667% remains preserved and unexplained;
+these workloads differ. No zero-frame, full memory, Git-only causality or whole-task
+acceptance claim. Source binding uses an installed receipt plus running binary hash;
+geometry/history were not captured. Original479ms and native Windows remain open.
+Status remains Review / Claimed.
+
+
+### Maintainer acceptance of repeated long-tail validation — 2026-11-17
+
+The maintainer explicitly instructed: “重复验证通过就认为通过了，这个问题不过多纠结了”.
+In the immediate discussion this accepts the repeated passing Debug transcript
+input validations and closes further investigation of the historical 479ms sample
+as an acceptance blocker. The same-binary follow-up P99 upper bounds were
+3.422221ms and 3.461222ms against the unchanged 35ms budget; see
+[the preserved diagnosis](evidence/tui-perf-001/bounded-segment/long-tail-diagnosis.md.gz).
+
+Disposition: accepted by maintainer on repeated passing validation. The original
+479.239045ms failed sample remains in the evidence archive; its cause is unknown.
+This decision does not assert a causal fix or erase that observation. No additional
+long-tail rerun or attribution work is required for this task.
+
+This supersedes earlier checkpoints listing original479ms attribution as required
+remaining work. Native Windows terminal acceptance remains unavailable and unwaived;
+the second supported terminal remains explicitly waived, not passed. Overall status
+remains Review / Claimed pending the remaining acceptance and delivery gates.
+
+
+### Native production approval acceptance — 2026-11-17
+
+Maintainer confirmed complete panel text and normal cursor; denying an actual
+outside-workspace write closed the panel and restored input. Approving the
+subsequent stat with key1 returned file-not-found, confirming the denied write
+was absent. Screenshots show production tool/permission execution with auto off;
+this closes the previously display-only approval observation for these operations.
+Installed binary hash matches source-b2a7d471 receipt; post-operation geometry92x47.
+See [operation evidence and limits](evidence/tui-perf-001/native-approval-20261117/README.md).
+No long-tail reruns. Native Windows remains unavailable/unwaived; full task remains
+Review / Claimed. This checkpoint does not claim all native operation paths passed.

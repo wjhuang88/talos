@@ -1,0 +1,22 @@
+[
+  {
+    "mode": "read",
+    "setup": "setup_seconds=0.002660571,healthy=true",
+    "result": "observed_seconds=3,notifications=0\n"
+  },
+  {
+    "mode": "ignored-write",
+    "setup": "setup_seconds=0.002852538,healthy=true",
+    "result": "observed_seconds=3,notifications=5\n"
+  },
+  {
+    "mode": "tracked-ignored-write",
+    "setup": "setup_seconds=0.004198712,healthy=true",
+    "result": "observed_seconds=3,notifications=7\n"
+  },
+  {
+    "mode": "visible-write",
+    "setup": "setup_seconds=0.002806639,healthy=true",
+    "result": "observed_seconds=3,notifications=6\n"
+  }
+]

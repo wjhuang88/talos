@@ -1,0 +1,6 @@
+{
+  "commit": "b2a7d4716350321423ef999640795ccf81225e50",
+  "sha256": "5347488615ef9be965fa5a156dde541dca9eea098084698577d10941ed39c49c",
+  "profile": "dev local acceptance; not release",
+  "binary": "/home/wjhuang/.talos/bin/talos"
+}

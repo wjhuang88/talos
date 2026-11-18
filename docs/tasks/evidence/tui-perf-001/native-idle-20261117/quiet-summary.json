@@ -1,0 +1,15 @@
+{
+  "cpu_percent_one_core": [
+    0.0999996236714141,
+    0.16666606607994233,
+    0.16666593125880175
+  ],
+  "median": 0.16666593125880175,
+  "all_below_debug_0_20": true,
+  "scope": "Three separate30s windows of one fresh mock native Ghostty instance, empty nonrepo; not interleaved baseline comparison, zero-frame proof, growing-history memory or original479ms closure",
+  "pss_final_kib": [
+    140321,
+    140330,
+    140334
+  ]
+}

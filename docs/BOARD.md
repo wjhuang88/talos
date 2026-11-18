@@ -1,6 +1,10 @@
-## SEARCH-001-D3-T3 / I329 — proposed offline Bing variant/failover claim
+## SEARCH-001-D2 / I331 — hosted keyless MCP rights-source delta (claim PR #980 proposed)
 
-[Owner](backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](iterations/I329-search-bing-dual-host-offline.md) / [Issue #957](https://github.com/wjhuang88/talos/issues/957): proposed **Active / Claimed after governance merge** for offline-only non-CN→CN variant decision/negative-test candidate. No production endpoint, permission, Browser integration, new native provider, region or usage-rights admission. Parent D3/#937 and Epic #624 remain open; D/#644 ZERO-ADMISSION, E/F/G/I blocked.
+[Owner](backlog/active/SEARCH-001-D2-keyless-mcp-admission.md) / [I331](iterations/I331-search-keyless-mcp-rights-evidence.md) / [Issue #848](https://github.com/wjhuang88/talos/issues/848): proposed **Active / Claimed only after atomic governance PR #980 merges**. New source-only D2.2 tracks current Exa/Parallel anonymous MCP rights applicability and contract deltas, supplier clarification questions (no outreach), independence and later separately authorized fixture-region gates. Historical D2.1 source packet #849 already published; no duplicate study. **Both vendors BLOCKED / NOT ADMITTED**. No MCP call, Network change, Auto provider, regional claim or E/F/G/I activation. Parent #624 remains Open; #644 historical ZERO-ADMISSION stays Closed.
+
+## SEARCH-001-D3-T3 / I329 — T3a offline Complete / Closed; T3b production BLOCKED
+
+[Owner](backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](iterations/I329-search-bing-dual-host-offline.md) / [Issue #957](https://github.com/wjhuang88/talos/issues/957): **T3a Complete / Closed upon owner-first closeout merge**. Offline-only failover policy and seven synthetic tests accepted via source [PR #959](https://github.com/wjhuang88/talos/pull/959), actual **Completion Commit `18c3ce58553b8e2c4b6ac37f056e536aa2cc2e8a`**, exact-head CI #4333 8/8 SUCCESS and independent APPROVE/CAS. **T3b BLOCKED / Unclaimed**: no production `www.bing.com` request, new Network/redirect budget permission, Browser/CDP, vendor access/output rights, or real mainland-China/comparator evidence. Keep #957, parent D3/#937 and Epic #624 Open; #644 ZERO-ADMISSION and E/F/G/I gates unchanged.
 
 ## AUTO-HISTORY-001 — Review / Claimed
 
@@ -84,9 +88,13 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
 
 [STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I325](iterations/I325-store-002-local-delegation.md) / [#670](https://github.com/wjhuang88/talos/issues/670): D claim #932 merged; D implementation [#935](https://github.com/wjhuang88/talos/pull/935) accepted with **Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2`**, [CI #4223](https://github.com/wjhuang88/talos/actions/runs/43552408748) all seven applicable jobs success, independent no-blocker technical/Copilot review and final CAS. Real SQLite/FTS5/TLOG/JSONL trait delegation tested; no production/API/SQL/schema/default/Host change. **I325 D Complete / Closed, D parent claim Released; #670 Open for E/F, #897 Host gated.** Failed global #941/#947 remote matrix job is separately corrected in this governance batch, not counted green on #935.
 
-## STORE-002 / I328 E — default-local composition claim proposed (#955)
+## STORE-002 / I328 E — Complete / Closed (#956)
 
-[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I328](iterations/I328-store-002-default-local-composition.md) / [#670](https://github.com/wjhuang88/talos/issues/670): C/D accepted, I325 D closed via #951. Draft [governance #955](https://github.com/wjhuang88/talos/pull/955) proposes **I328 E Active / Claimed (ineffective until merge)** for one behavior-preserving default-local selection of existing TLOG/JSONL/SQLite/FTS5 domain implementations. No new executable provider, production caller/default change, #897 Host/runtime/SDK wiring or F broad parity. Parent #670 stays Open; #897 E2/E3 blocked.
+[STORE-002](backlog/active/STORE-002-storage-capability-contracts.md) / [I328](iterations/I328-store-002-default-local-composition.md) / [#670](https://github.com/wjhuang88/talos/issues/670): governance #955 effective; [implementation #956](https://github.com/wjhuang88/talos/pull/956) merged **Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`**, [exact-head CI #4339](https://github.com/wjhuang88/talos/actions/runs/44040504951) **8/8 Success**, independent API/protected review and merge CAS. **I328 E Complete / Closed**, released E owner; opt-in local-default Session/Pending/Todo/Memory/Evolution/Exploration selection only. No Host/SDK/default/SQL/schema/format change. Parent #670 stays **Open for F**, not fully Complete; #897 E2/E3 requires a separate effective Host implementation claim, not implicitly activated.
+
+## ARCH-035 / I330 E2 — Active / Claimed proposed by #975 (ineffective until merge)
+
+[ARCH-035](backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [I330](iterations/I330-arch-035-e2-host-storage-selection.md) / [#897](https://github.com/wjhuang88/talos/issues/897): accepted [ADR-104](decisions/104-host-composition-ownership-boundary.md) ownership/placement and [STORE-002 I328 E #956](https://github.com/wjhuang88/talos/pull/956) Completion Commit `a28c1ccc`, [owner closeout #972](https://github.com/wjhuang88/talos/pull/972) `bc4a37ee`. Proposed **atomic E2 claim+activation [draft #975](https://github.com/wjhuang88/talos/pull/975)** — owner @wjhuang88, bounded opt-in real Host-facing delegation with unchanged default/SDK and Session/Memory/Todo startup/timing/errors. **Not effective until #975 merge**, no code. E3/E4, STORE-002 F and ServerHost separately gated; #897 and #670 remain Open.
 
 ## ARCH-035 / I320 — E0/E1 Complete; parent E2/E3 Blocked
 
@@ -119,16 +127,18 @@ is a proposal, not an activated repair. Owner statuses and manual/native residua
   Follow-up PR #929 merged as `a8dc7fb0`, exact candidate `4d9e5cfc`; code CI
   `43360750041` and independent Agent review passed. Bounded scan passes three
   Debug and three Release resize/input rounds. Corrected heap coverage570/570
-  and finite allocation-path evidence are archived. Original Debug479ms tail
-  and native/resource/platform acceptance remain open in #923. Basic Ghostty
+  and finite allocation-path evidence are archived. Original Debug479ms tail was accepted on repeated passing validation by the
+  maintainer (#970); native/platform evidence limits remain tracked in #923. Basic Ghostty
   operations and Git display passed maintainer retest; missing platforms are not passed.
   Git notification follow-up #960 merged as `3b1b1f67`: healthy 30s reconciliation
   accepted, failure 2s polling retained; bounded watcher and early-exit scan delivered.
   Exact-head code/platform CI `43861152146` and independent Agent review passed;
-  native gates and original 479ms tail remain open. macOS retains polling.
+  native platform gates remain open. macOS retains polling.
   Ghostty external Git and replay workspace/approval observations are recorded;
-  second-terminal testing is maintainer-waived, not passed. Native Windows, source
-  binding and original479ms attribution remain open.
+  second-terminal testing is maintainer-waived, not passed. Installed binary/source
+  receipt and three quiet CPU windows are archived (#967); production approval
+  deny/resume and approve-once stat passed (#971, `773b480a`). Native Windows
+  remains unavailable/unwaived; observation limits remain in the owner evidence.
   Stage delivery was authorized by the maintainer; whole-task completion is not claimed.
 
 ## Interrupted session recovery / SESSION-CRASH-001

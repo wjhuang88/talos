@@ -4,10 +4,10 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Blocked / Released — E0/E1 architecture documentation accepted in I320; E2/E3 and E4 still require STORE-002 and separate implementation claim |
+| Status | Active / Claimed — I330 bounded E2 host-facing local storage selection; E3/E4 unclaimed, #897 Open (effective only after governance #975 merge) |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
-| Selected Iteration | [I320](../../iterations/I320-arch-035-host-composition-baseline.md) — Complete / Closed **E0/E1 only**, effective #905 and accepted #906/#934/#936; E2/E3 no effective claim |
+| Selected Iteration | [I330](../../iterations/I330-arch-035-e2-host-storage-selection.md) — E2 proposed Active / Claimed by governance #975 (effective only after merge); [I320](../../iterations/I320-arch-035-host-composition-baseline.md) E0/E1 documentary slice already Complete / Closed |
 | Parent / consumer | [SERVER-001](SERVER-001-serve-connect-protocol-adapters.md) / #142; [SERVER-001-C](SERVER-001-C-standalone-server-host-composition.md) / #361 |
 | Depends On | [STORE-002](STORE-002-storage-capability-contracts.md) / #670: accepted capability/domain seam; RUNTIME-001 SDK compatibility |
 | Coordinates | SESSION-009 / #46; SESSION-011 / #612; DATA-002 / #141; SERVER-002 / #360 |
@@ -19,18 +19,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Released |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
-| Work Slice | E0 code-truth inventory and E1 ADR / cross-host composition API placement only; no production code, no STORE-002 capability contracts or adapters |
-| Claimed At | 2026-11-10 |
+| Work Slice | ARCH-035 E2 only: minimal functional opt-in host-facing storage selection/injection by direct delegation to accepted STORE-002 E LocalStorageProfile and domain stores; preserve existing RuntimeBuilder/CLI/SDK source-compatible defaults, lazy optional openings, Session reconciliation, error/permission/cancellation/settlement. No E3 multi-host migration, E4 full equivalence, #670 F, ServerHost, new providers/SQL/schema/format or product behavior change. |
+| Claimed At | 2026-11-18 |
 | Source Issue | #897 |
-| Governance Claim PR | #905 |
+| Governance Claim PR | #975 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | #905 merged `b211e590f6b1180af0679be8b1b03d77b0a19615` following exact-head [CI #3992](https://github.com/wjhuang88/talos/actions/runs/42784639228), both governance validators with 0 warnings, recorded single-maintainer documentation-only fallback and passing merge-time CAS; this authorizes E0/E1 only. |
-| Implementation PR | #906 (E0/E1 docs), #934 (contract reconciliation), #936 (ADR-104); **no production implementation PR** |
-| Last Updated | 2026-11-13 |
-| Handoff / Release Condition | I320 E0/E1 evidence accepted; **Released 2026-11-13** after #936. Parent #897 remains Open / Blocked. Resume only after STORE-002 D/E accepted operational composition, fresh E2/E3 claim+activation, and exact host call-site/API review. |
+| Authorization Evidence | I320 E0/E1 documentation #905/#906/#934/#936 accepted; ADR-104 placement only. Upstream STORE-002 E implementation #956 Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`, bounded I328 closure #972 merged `bc4a37eeafff5e0e172764e861fac6cb6341fd86`. I330 E2 atomic claim+activation **proposed by draft #975**, ineffective until exact-head docs CI, both governance validators, independent scope/API review and guarded merge-time CAS; no E2 implementation authorized by this PR alone. |
+| Implementation PR | Not started (I330 E2; prior I320 documentary PRs #906, #934, #936 accepted) |
+| Last Updated | 2026-11-18 |
+| Handoff / Release Condition | Proposed I330 E2 active claimant becomes effective **only after #975 merges**. Before implementation: approved scope/API and source-compatible Host constructor baseline; E3/E4, #670 F, and ServerHost remain unclaimed/gated. Parent #897 stays Open until later E2/E3/E4 acceptance. |
 
 ## Requirement and value
 
@@ -137,3 +137,11 @@ ADR-104's **host/domain ownership and composition-layer placement only** may be 
 - **I320 documentation slice Completion Commit: `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`** (pre-existing merged evidence for architecture decisions, *not a production implementation or #897 Completion Commit*).
 
 **Residual and next gate:** #670 I325 D [#935](https://github.com/wjhuang88/talos/pull/935) remains independently owned/open at this checkpoint despite an exact-head CI result; #670 E default local composition and F behavior parity are not delivered. No runtime host factory, new `RuntimeBuilder` injection signature, SQLite-free binary or E2/E3/E4 regression result was shipped. **No production E2/E3 work may start** until accepted usable STORE-002 integration evidence, new effective bounded ARCH-035 claim, SDK compatibility review and native before/after baseline. Keep #897 Open / Blocked, #142/#361 ServerHost production blocked; the completed I320 documentation claimant is explicitly **Released**.
+
+## I330 E2 atomic claim+activation proposal — 2026-11-18
+
+- **Owner-first selection:** [I330](../../iterations/I330-arch-035-e2-host-storage-selection.md) proposes only ARCH-035 **E2**. [Governance draft #975](https://github.com/wjhuang88/talos/pull/975) contains the same-branch `Claim State: Claimed` + `Active / Claimed` proposal with complete Work Slice, claimant and actual PR number; **no ownership or activation is effective until its authorized target-branch merge**. The claim PR carries no implementation code, tests, Cargo/API changes or new SQL.
+- **Upstream acceptance**: STORE-002 C/D accepted; E feature-gated `LocalStorageProfile` accepted via #956 implementation Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`, I328 owner-first closure #972 `bc4a37eeafff5e0e172764e861fac6cb6341fd86`. Parent STORE-002 #670 remains Open for unclaimed F broader recovery/conformance. ADR-104 #936 is placement only; no E2 injection method has been approved.
+- **Historical claimant:** I320 E0/E1 governance #905 authorized documentary E0/E1 only; I320 docs and [ADR-104](../../decisions/104-host-composition-ownership-boundary.md) accepted via #906/#934/#936, then the old claim **Released** on 2026-11-13 and documented in #945. This prior `Claim State: Released` is historical, **not** a second current effective claim or an E2 implementation authorization.
+- **Source-grounded non-overlap inventory:** CLI `AppServerSession::set_persistence`, `SessionManager::new` startup reconciliation vs `with_dir`, lazy cached Memory first query, Todo provider closure; Desktop/SDK optional `RuntimeBuilder::durable_session(DurableSession)` and in-memory unbound mode. E2 requires **one real opt-in functional Host selection/delegation** and targeted API+negative-path fixtures, without rewiring production defaults or migrating all Hosts. E3 multi-host migration and E4 overall equivalence remain separate, as do STORE-002 F and ServerHost. Concurrent SEARCH/TUI/Session/Provider/Git owners keep existing claims and protected source boundaries.
+- **Next gate:** after a reviewed #975 governance-only exact-head docs CI (both validators and no-overlap CAS) and guarded merge, E2 may start on a new implementation branch from the claim merge. Do not count a proposed PR, Issue comment or an ADR-only placement decision as effective claim; #897 and #670 remain OPEN.

@@ -278,7 +278,7 @@ pub enum UiOutput {
     ClipboardPastePending(bool),
     /// Request manual compaction through the active typed session transport.
     CompactRequest,
-    /// Transient manual-operation activity, independent of transcript turn status.
+    /// Transient context-compaction activity, independent of transcript turn status.
     CompactionPending(bool),
     /// Canonical FIFO content path. All in-tree live runtime output uses this
     /// variant so text cannot race lifecycle/tool outputs on a nested channel.

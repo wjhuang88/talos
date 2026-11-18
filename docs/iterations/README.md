@@ -1,3 +1,7 @@
+## I331 / SEARCH-001-D2 — hosted keyless MCP rights-source delta (governance PR #980)
+
+[I331](I331-search-keyless-mcp-rights-evidence.md) / [SEARCH-001-D2](../backlog/active/SEARCH-001-D2-keyless-mcp-admission.md) / [Issue #848](https://github.com/wjhuang88/talos/issues/848): proposed **Active / Claimed only after the atomic #980 claim merges**. Non-duplicative D2.2 official published-source applicability, output/LLM-use, tool-contract and vendor-clarification *questions only*; no actual vendor outreach or live MCP traffic. Exa/Parallel remain BLOCKED / NOT ADMITTED; parent #624 stays Open. **I330 remains independently assigned to ARCH-035 E2 / #897**, not this Search work.
+
 ## I329 / SEARCH-001-D3-T3 — proposed offline Bing non-CN→CN fallback contract
 
 [I329](I329-search-bing-dual-host-offline.md) / [owner](../backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [#957](https://github.com/wjhuang88/talos/issues/957): governance-only proposed **Active / Claimed** test-only candidate, ineffective until its claim PR merges. One Bing family; non-CN `www.bing.com` preferred over existing `cn.bing.com` only if unavailable and permitted. **No** production route, newly admitted host, live Bing query, rights/region acceptance, default priority change or new independent provider.
@@ -31,13 +35,17 @@ A/B remain Complete; D and parent #724 remain open.
 
 [I325](I325-store-002-local-delegation.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance #932 effective; D implementation [#935](https://github.com/wjhuang88/talos/pull/935) merged **Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2`**, exact-head [CI #4223](https://github.com/wjhuang88/talos/actions/runs/43552408748) applicable jobs SUCCESS, independent no-blocker review/Copilot and final CAS. Actual SessionStore TLOG/JSONL, Pending/Todo, Memory+FTS/content dedup/graph, Evolution, Exploration tests. No default E profile, F parity, #897 Host or backend change. Separate remote Issue matrix reconciliation job FAILED #941/#947 and is recorded as unrelated ADR-071 governance residual, corrected in this docs batch. I325 D Complete / Closed; parent #670 Open for E/F.
 
-## I328 / STORE-002 E — governance claim/activation proposed (#955)
+## I328 / STORE-002 E — Complete / Closed (#956)
 
-[I328](I328-store-002-default-local-composition.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance Draft [#955](https://github.com/wjhuang88/talos/pull/955) proposes atomic Active / Claimed E **ineffective before merge**. I325 D #935/#951 is Complete/Closed, parent #670 Open for E/F. E chooses an explicit default-local composition over existing SQLite/FTS5/TLOG/JSONL domain delegates with identical constructors/paths/errors/optional loading; no SQL/schema, new engine, Host/SDK/RuntimeBuilder wiring or F conformance. ARCH-035/#897 E2/E3 remains separately Blocked.
+[I328](I328-store-002-default-local-composition.md) / [STORE-002](../backlog/active/STORE-002-storage-capability-contracts.md) / #670: governance #955 merged/effective; [implementation #956](https://github.com/wjhuang88/talos/pull/956) accepted as **Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`**, with [exact-head CI #4339](https://github.com/wjhuang88/talos/actions/runs/44040504951) 8/8 success, independent technical/protected review and CAS. I328 E Complete / Closed, E claim Closed; I325 D already Complete/Closed. Parent #670 Open for F; opt-in SQLite/FTS5/TLOG/JSONL local composition preserves existing constructors, paths, typed errors and optional loading. ARCH-035/#897 E2/E3 requires a new independent activation; no Host/SDK/RuntimeBuilder wiring or F parity delivered.
 
 ## I321 / STORE-002 A/B — Complete / Closed (bounded slice)
 
 [I321](I321-store-002-capability-contract-foundation.md): governance #908 and implementation #909 merged; exactly seven typed capability IDs, metadata-only registry requests and authority inventory, no functional provider binding or local storage migration. #670 OPEN for C/D/E/F.
+## I330 / ARCH-035 E2 — proposed host-local storage selection claim #975
+
+[I330](I330-arch-035-e2-host-storage-selection.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: accepted #670 E `LocalStorageProfile` implementation #956 (`a28c1ccc`) and owner-first #972 (`bc4a37ee`) permit a fresh, bounded opt-in Host-selection claim. [Draft governance #975](https://github.com/wjhuang88/talos/pull/975) atomically proposes **Active / Claimed** owner @wjhuang88; **ineffective until merged** after exact-head docs CI, validators, review and CAS. No E2 implementation, API binding, E3/E4 multi-host migration, STORE-002 F broad parity or ServerHost is authorized by this proposal.
+
 ## I320 / ARCH-035 E0/E1 — Complete / Closed (docs-only)
 
 [I320](I320-arch-035-host-composition-baseline.md) / [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / #897: E0 code-truth and E1 owner/placement decision **Complete / Closed for the bounded documentation slice**, claim #905, E0 #906, contract-review #934, accepted [ADR-104](../decisions/104-host-composition-ownership-boundary.md) #936 merge and I320 documentary **Completion Commit `07c99a8c2aeff615caeb62d38318cc2ca3c7bb3b`**. The parent remains **Open / Blocked / Released** with no E2/E3 effective code claim or runtime parity proof. #670 D/E and #897 E2-E4 remain separately gated.
