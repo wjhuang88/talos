@@ -1,6 +1,6 @@
 # Iteration I331: Hosted No-Key MCP Rights Applicability and Contract Delta (D2.2)
 
-> Document status: **Active / Claimed on governance PR #980 merge ONLY** — research/documentation work, no production provider admission
+> Document status: **Review / Claimed** — claim #980 effective, source-documentary PR #981 under review; no production provider admission
 > Selected: 2026-11-18
 > Source Story: [SEARCH-001-D2 / #848](../backlog/active/SEARCH-001-D2-keyless-mcp-admission.md)
 > Parent: [SEARCH-001 / #624](https://github.com/wjhuang88/talos/issues/624)
@@ -19,7 +19,7 @@
 | Governance Claim PR | #980 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | PR #980 requires exact-head docs/governance CI, read-only independent review and expected-head CAS. The claim is **ineffective** until this PR merges. |
-| Implementation PR | Not started — must be separately prepared AFTER claim merge |
+| Implementation PR | [#981](https://github.com/wjhuang88/talos/pull/981) — proposed dated official-source D2.2 evidence; Draft / unmerged |
 | Last Updated | 2026-11-18 |
 | Handoff / Release Condition | Only documentary D2.2 can be delivered/closed with actual pre-existing evidence Completion Commit and owner-first closeout. Exa and Parallel remain BLOCKED/NOT ADMITTED, #848 stays Open for external/region gates, Epic #624 Open. |
 
@@ -47,3 +47,10 @@ D2.1's November 4/10 material already recorded Exa's `https://mcp.exa.ai/mcp` an
 1. Merge this **governance-only claim + iteration + derived Board/index** PR #980 after exact-head applicable CI, both governance validators, independent review and head CAS. Until effective, this document is a proposal and must not be used as authorization.
 2. After merge, produce a separate reviewed **D2.2 source-documentary evidence PR**, with exact dates/source versions, negative/UNKNOWN outcomes, no live calls; publish an accepted evidence commit before any completion status.
 3. Complete owner-first closure with actual evidence Completion Commit, CI and review evidence. Keep #848 Open for the blocked admission/rights/region residual; parent #624 and E/F remain Open/Blocked; no default production admission.
+
+## D2.2 implementation/documentary evidence checkpoint — 2026-11-18
+
+- Effective I331 claim [#980](https://github.com/wjhuang88/talos/pull/980) merged `e290e8882e5a8be23e90f962f444d71861c6eca6` before this source branch was created. It authorizes **only** the published-source rights/contract delta and future non-executable protocol-plan scope.
+- Source/documentary [PR #981](https://github.com/wjhuang88/talos/pull/981) proposes [2026-11-18 rights and MCP tool-surface source packet](../reference/SEARCH-001-D2-HOSTED-MCP-RIGHTS-DELTA-2026-11-18.md), with dated vendor official links and Exa public repo SHA. Prior D2.1's [#849](https://github.com/wjhuang88/talos/pull/849) triage is a baseline and is not copied as new research output.
+- Material new finding: official current Parallel docs list **six** anonymous MCP tool types versus the **three** enumerated in the Nov 5 launch/D2.1 supplement; no real `tools/list` verification has been made. Exa optional tools and query-based `tools` selection also require strict search-only tool pinning. Supplier access and output/LLM-use, privacy, index independence and genuine region evidence remain **BLOCKED / UNKNOWN**.
+- This is **Review, not acceptance**. Exact-head CI, independent technical/governance review and source PR merge/CAS are pending. A later owner-first closeout must cite the actual *prior* source Completion Commit, never an unmerged PR head. No live MCP/vendor request, code, Network/Auto, default provider or new rights grant is claimed.
