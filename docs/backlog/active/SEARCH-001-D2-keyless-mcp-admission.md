@@ -92,3 +92,9 @@ remains a legacy endpoint; see the [dated source supplement](../../reference/SEA
 This is source-only triage: no live request, no applicability-of-terms approval,
 no provider admission and no change to default Auto or claimed ownership.
 **Exa and Parallel both remain BLOCKED / NOT ADMITTED.**
+
+## Proposed next bounded slice — D2.2 / I331 (2026-11-18; NOT YET CLAIMED)
+
+The 2026-11-10 D2.1 publication already documents official hosted no-key MCP surfaces, a source matrix and **BLOCKED / NOT ADMITTED** decisions. Do not repeat that research or treat publication as an effective execution claim. A non-overlapping D2.2 source-only follow-up is proposed for `I331` on a **separate governance-only claim PR**. Before its claim merges this proposal is INEFFECTIVE.
+
+Scope: pin current vendor MCP 2.0/Exa official tool-contract deltas, source-date and applicable anonymous/paid service and output-use terms; produce a vendor-specific published-source versus unverified-wire/rights decision table, independent failure-domain limitations, a concrete vendor clarification questionnaire, and a gated future bounded MCP observer/region test plan. Do **not** send MCP `initialize/tools/list/tools/call` requests or any search query, capture live results, implement a harness/adapter, add Network authority or modify Auto. Distinguish anonymous personal/manual MCP use from default distributed embedding. The D2.1 evidence packet is historical baseline; D2.2 would publish a separate dated assessment only if effectively claimed.
