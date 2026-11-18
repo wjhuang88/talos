@@ -1,0 +1,85 @@
+# SEARCH-001-D2.2 / I331: Hosted Keyless MCP Rights and Tool-Surface Delta (2026-11-18)
+
+**Decision: EXA BLOCKED / NOT ADMITTED; PARALLEL BLOCKED / NOT ADMITTED.**
+
+**Evidence class:** dated *public vendor-source* and repository-source comparison only. **No remote MCP `initialize`, `tools/list`, `tools/call`, provider endpoint probe, query, result fixture or mainland-China/comparator observation occurred.** No legal/rightsholder determination, contract acceptance, permission grant, product release or production provider admission is inferred.
+
+## Provenance and what this packet does not repeat
+
+- Parent [SEARCH-001 / #624](https://github.com/wjhuang88/talos/issues/624), child [SEARCH-001-D2 / #848](https://github.com/wjhuang88/talos/issues/848).
+- Effective I331/D2.2 documentary-only claim [#980](https://github.com/wjhuang88/talos/pull/980), merged to main at `e290e8882e5a8be23e90f962f444d71861c6eca6` after exact-head CI #4387, independent technical approval and merge CAS. This claim permits **published-source analysis only**. It does not authorize an adapter or live MCP acquisition.
+- Existing D2.1 initial [official-source triage](SEARCH-001-D2-MCP-TRIAGE-2026-11-04.md) and its 2026-11-10 Parallel MCP 2.0 supplement were accepted via [PR #849](https://github.com/wjhuang88/talos/pull/849). They already established Exa and Parallel anonymous hosted MCP candidates and an **initial BLOCKED** decision. This D2.2 record only captures later/current **differences**, applicability uncertainty, vendor-specific questions and a non-executable future acquisition protocol.
+- Source collection/checkpoint: **2026-11-18**. Undated or mutable pages are pinned to this *read date*, not falsely assigned a vendor publication date. A publicly visible feature list is **not** an observed wire negotiation or entitlement.
+
+## D2.2 current-official-source delta register
+
+| Source / scope | Public source and pin | Published fact as of 2026-11-18 | Unproven boundary |
+|---|---|---|---|
+| Exa hosted MCP | [Exa MCP landing page](https://exa.ai/mcp), read 2026-11-18 | `https://mcp.exa.ai/mcp` is offered as a no-API-key, remotely configurable MCP connection | No grant proven for **Talos automatically distributing and activating** this endpoint for unrelated end users |
+| Exa source-defined tools | [Exa official MCP repository README](https://github.com/exa-labs/exa-mcp-server/blob/a02cd621534313b8f01dbb03b829dac448decb8b/README.md), pinned public `main` SHA `a02cd621534313b8f01dbb03b829dac448decb8b` | Default `web_search_exa` and `web_fetch_exa`; optional `web_search_advanced_exa` and `agent_run`; `?tools=` replaces rather than merely extends defaults; `agent_run` requires OAuth/API key | Documentation is not a verified current `tools/list`, schema, version compatibility, quota or anonymous rights/availability |
+| Exa transport and optional auth | Same README and [public MCP server implementation](https://github.com/exa-labs/exa-mcp-server/blob/a02cd621534313b8f01dbb03b829dac448decb8b/api/mcp.ts), source pin as above | Hosted Streamable HTTP; anonymous rate limits; OAuth/Bearer/header-key options. Source advertises URL-key compatibility | URL-embedded credentials can leak via logs/tracing; Talos has **not** approved any credential flow or new Network authority. No key was used |
+| Parallel MCP 2.0 release | [Parallel announcement](https://parallel.ai/blog/parallel-mcp-2), **published 2026-11-05** | Preferred keyless `https://mcp.parallel.ai/mcp`; older `https://search.parallel.ai/mcp` is legacy; announcement enumerates free `web_search`, `web_fetch`, `web_decisions`; `web_research` behind authenticated/billed use | These facts were **already documented in D2.1 on 2026-11-10**; not counted as newly discovered D2.2 proof or live results |
+| Parallel 2.0 **current tool-surface delta** | [Official installation](https://docs.parallel.ai/integrations/mcp/installation) and [programmatic use](https://docs.parallel.ai/integrations/mcp/programmatic-use), both read 2026-11-18 (pages do not state a publication date for this list) | Documentation now lists **six** anonymous tool types: `web_search`, `web_fetch`, `web_decisions`, `image_search` (fast only), `find_verticals`, `search_vertical`; `web_research` needs a key/OAuth | A vendor may add/change tools; the list is **published documentation**, not a real anonymous MCP handshake/entitlement guarantee. Only a future reviewed `web_search` adapter could be considered; `tools/list` must not dynamically authorize the other tools |
+| Parallel MCP connection and scope | Same official pages, read 2026-11-18 | `?login` uses OAuth and associates requests with an account; optional Bearer auth adds `web_research` and higher quotas. Override-setting headers require authentication | Anonymous usage is not evidence that an unregistered **distributed built-in default** may consume the service or that provider policies permit a shared scale/quota footprint |
+| Parallel 2026 contracted use terms | [Customer Terms](https://parallel.ai/customer-terms), **effective 2026-11-10** | The published text describes purchased customer access, authorized/end-customer use and explicit limits on per-query output copying, reuse, third-party sharing and substantial cache/database creation | Applicability of the customer contract to **unregistered anonymous hosted MCP users** and a client embedded by Talos is **UNKNOWN**. The document is not a general license for this proposed model |
+| Parallel usage-wide and website terms | [AUP](https://parallel.ai/acceptable-use-policy), **effective 2026-08-11**; separate [website terms](https://parallel.ai/terms-of-service), effective same date | AUP expressly covers AI-agent interactions and excludes unauthorized extraction/security/rights violations; website terms govern website use | The separate website terms do not substitute for a qualified anonymous MCP/API-use interpretation |
+| Exa rights baseline | [Exa Terms PDF](https://exa.ai/assets/Exa_Labs_Terms_of_Service.pdf), as already linked in D2.1 | Earlier D2.1 text characterizes §1.1 as documentation-bound API use and §4.2 as output redistribution/use restrictions | **Fresh version/effective-date and scope confirmation missing**; do **not** assert that this PDF grants global anonymous default-client access, snippet redistribution or LLM-context caching |
+
+The most material **new** D2.2 contract mismatch is the **Parallel six-tool current published list versus the three-anonymous-tool Nov 5 announcement and Nov 10 D2.1 snapshot**. This is not an issue with Talos source code (none was changed); it is a reason to require **strict allowed search-tool identity and output-schema pinning**, not forwarding an arbitrary remote MCP tool catalog into `web_search`.
+
+## Distributed Talos default: rights, privacy, independence and risk decision
+
+| Gate | Exa | Parallel | D2.2 disposition |
+|---|---|---|---|
+| Anonymous keyless documented endpoint | Published yes, conditional rate limits | Published yes, conditional rate limits | **FACT ONLY**, not approval or guaranteed free capacity |
+| Distributed automatic default use by unrelated local installations | No explicit applicable grant pinned | Customer Terms discuss contracted purchaser/end users; anonymous applicability unclear | **BLOCKED / vendor/legal clarification** |
+| Source result title, URL and snippet display to end users | Not separately granted for proposed distribution | Conditional output provisions may apply to paying customers; anonymous applicability unclear | **BLOCKED / rightsholder decision** |
+| Results in LLM context and generated user responses | Not separately determined | Conditional per-query/end-customer terms do not settle unregistered service use | **BLOCKED / explicit use assessment** |
+| Caching, storage, dedup across users, training or redistribution | No specific permitted scope established | Contracted output provisions constrain cross-end-user reuse/cache and related products | **BLOCKED**, no cross-user cache or training assumed |
+| Attribution, source links and output provenance | Published examples insufficient to qualify exact obligations | Published examples insufficient to qualify anonymous license obligations | **UNKNOWN / required vendor clarification** |
+| Rate, payment and denial boundaries | Anonymous limit unspecified for distributed default; optional OAuth/API key | Anonymous lower limits; authenticated research/billing and increased rate not allowed implicitly | **NO implicit paid upgrade**, 429/denial/challenge must stop |
+| Query text, user IP, retention and data processing | External recipient and actual retention/opt-out unknown for default use | External recipient, account distinctions, customer data clauses and actual retention need scoped review | **BLOCKED / privacy and disclosure review** |
+| Independent indices and correlated upstream failure domains | No authoritative evidence proving independence relative to existing DDG/Bing chain and Parallel | Distinct hostname does not prove independent indexing/network/hosting | **UNKNOWN**; not counted as 2 native zero-key providers |
+| Real mainland-China and external comparator query-level success | Not observed, no licensed live test | Not observed, no licensed live test | **UNKNOWN**; no national routing or reachability assertion |
+| Network/permission/tool/schema change authority in Talos | None authorized by I331 | None authorized by I331 | **BLOCKED** until separate accepted implementation/acquisition claim |
+
+**Threat model boundary:** A remote MCP endpoint is untrusted external software and data. Any future candidate would need a pinned per-vendor URL/redirect allowlist, source/proxy Network approval (ADR-090), a locked search-only tool name/schema, strict request timeout and physical-call budget, untrusted text/URL sanitization, no dynamic hidden tool exposure, typed 401/403/429/challenge handling, cancellation, query secrecy and an explicit privacy/consent policy. A documentation list, `tools/list` response or successful HTTP request cannot create new authority. Tool-list mismatch cannot silently widen the LLM-visible tool schema or model tool registry. Do not map `web_fetch`, `image_search`, `web_decisions`, vertical tools or billed `web_research` into native `web_search` eligibility.
+
+## Vendor clarification questions ONLY (not sent)
+
+For **Exa**, obtain written, scope-specific responses before live acquisition or admission:
+
+1. Is anonymous `https://mcp.exa.ai/mcp` expressly allowed to be **preconfigured in a distributed, automatically invoked** local open-source product (no per-user login or separate opt-in), including ordinary user/organization and shared-network use?
+2. Which current Exa Terms, MCP service policy and API documentation govern that anonymous distribution versus a manually user-added MCP connection? State version/effective date and whether usage is permitted for commercial and non-commercial distributions.
+3. May each end user see title/link/snippet, send returned text to their chosen LLM, retain short-term cache, retain per-user session history, attribute original publishers and quote or summarize? What deletion/retention rules apply?
+4. What are anonymous per-user/IP/rate and concurrency limits, permissible retry on DNS/connect failures, no-retry responses and throttling, and are those limits tied to downstream clients or the network egress IP?
+5. What index/provenance and third-party dependencies are disclosed? Are billing/upgrade or tool-surface changes possible without notice?
+6. What input telemetry, query retention, external data transfers and privacy/opt-out controls apply to anonymous clients?
+
+For **Parallel**, independently seek written answers:
+
+1. Does the **2026-11-10 Customer Terms** govern anonymous keyless MCP access? If not, identify the precise contract/license governing a preconfigured distributed default, including end-user rights, commercial embedding and billing responsibility without an account.
+2. Confirm permitted per-end-user URL/title/snippet, LLM-context use, attribution, per-session cache and prohibitions on cross-user reuse, retention/training and reselling, separately from a purchased API customer contract.
+3. Confirm canonical live MCP anonymous tool list and stable `web_search` search-only schema/version, including why current docs list six anonymous tools while the Nov 5 launch and D2.1 snapshot listed three; clarify whether the URL `?tools=web_search` is a stable, supported restriction.
+4. Describe anonymous rate/quotas by IP or client, denial/429 semantics, use from multiple unrelated Talos installations and whether a no-key default can incur fees or auto-enable authenticated features.
+5. State query/PII retention, use to improve models, accountless consent notices, applicable geography/data protection and any data-processing terms.
+6. Disclose search index/third-party upstream and failure-domain independence evidence, plus a legitimate protocol/regional acquisition method under a bounded agreement.
+
+**No supplier outreach has occurred.** These questions are a future handoff only, not a claim of vendor confirmation.
+
+## Future MCP fixture and real-region acquisition — separate work, NOT authorized in I331
+
+1. **First** obtain applicable rights for automated access, result/use permissions, privacy constraints and allowed controlled test requests. If absent, stop; do not issue even an uncredentialed `initialize` probe as an attempted workaround.
+2. Register a **new effective owner/iteration** for an MCP-specific bounded observation harness or provider fixture layer, independently reviewed under ADR-090 and MCP/Network security. Existing [I294 observation tool](SEARCH-001-D2-MCP-TRIAGE-2026-11-04.md) only captures non-MCP HTTPS metadata and is insufficient; do not misuse it for MCP wire or infer schemas.
+3. Prepare immutable vendor URL, explicit per-tool `web_search`-only selection, API/no-auth mode, per-hop redirects, origin/proxy permission, cancellation/deadline, request budget, error/data/PII redaction, HTTP/MCP success-typed and auth/429/challenge stopping rules. No startup probing, no GeoIP/country-based selection, no unsolicited paid quota use.
+4. On **genuine mainland-China egress** and a separately controlled comparator outside China, with provenance and legal approval, capture bounded version/tool-schema metadata, sanitized successful query-level results, effective host, latency and failure classifications; preserve per-region source/time, query redaction and absence of invented observations. If no access to that real egress exists, record **UNKNOWN**.
+5. Independently review supplier terms and fixtures; prove source identity, result cap/ordering/parser, URL/SSRF defenses, privacy/log controls, separate hosting/upstream independence, cancellation and budget by actual tests; exact-head native CI before any subsequent integration claim.
+6. Only then consider **separately claimed** SearchBackend/source-admission design. Never interpret a free hosted MCP marketing claim, a `tools/list` response or two DNS names as acceptance of SEARCH-001-E/F independent default providers.
+
+## Final binary D2.2 documentary disposition
+
+- **Exa: BLOCKED / NOT ADMITTED**. Published hosted MCP and default search tool names are known, but default distribution, output/LLM-use, privacy, independence and true-region facts are not cleared.
+- **Parallel: BLOCKED / NOT ADMITTED**. The MCP 2.0 tool surface and separate Customer Terms/AUP/website terms are documented, but anonymous distributed-default rights and true regional/independence evidence are absent; current documented six-tool list must not be elevated to Talos tool authority.
+- **Next gate:** explicitly applicable vendor/rightsholder access+output-use determination and *independently governed* bounded MCP acquisition. These unknowns cannot be satisfied by this source-only packet. Historical D/#644 ZERO-ADMISSION remains Complete/Closed, parent Epic #624 and D2/#848 remain Open, no E/F/G/I activation; I329 T3a offline closure and T3b Bing production blocker unchanged.
+
+This record can be accepted as a **documentary research result only after its own exact-head CI, independent review and source PR merge**; until then it is a candidate and cannot be cited as an accepted Completion Commit.
