@@ -61,9 +61,9 @@ impl BatchPreparation<'_> {
 struct State {
     refresh_epoch: Option<uuid::Uuid>,
     generation: Option<u64>,
-    current: Option<Snapshot>,
+    current: Option<Arc<Snapshot>>,
     recovery: Option<(String, String, PermissionLease)>,
-    issued: Option<Snapshot>,
+    issued: Option<Arc<Snapshot>>,
     cursor: Option<(String, usize)>,
     receipt: Option<(u64, oneshot::Receiver<CompactOutcome>)>,
     admitting: bool,
@@ -259,7 +259,7 @@ impl Execution {
         if let Ok(mut state) = self.state.lock()
             && state.refresh_epoch == Some(epoch)
         {
-            state.current = snapshot;
+            state.current = snapshot.map(Arc::new);
         }
     }
     pub(crate) async fn terminal(&self) -> Option<(String, bool)> {
@@ -819,11 +819,11 @@ impl AgentTool for CompactContextTool {
                 submission: crate::ModelBoundarySubmission {
                     checkpoint: crate::SubmittedCheckpoint {
                         payload: payload.to_string(),
-                        source: snapshot.source,
+                        source: snapshot.source.clone(),
                         covered_end: snapshot.end,
                     },
                     receipt,
-                    authority: Some(snapshot.authority),
+                    authority: Some(snapshot.authority.clone()),
                 },
                 response,
             })

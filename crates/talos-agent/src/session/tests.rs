@@ -6859,8 +6859,16 @@ async fn registered_model_checkpoint_discovers_admits_and_applies_through_actor(
                                 _ => None,
                             })
                             .collect();
+                        let submission = messages.iter().rev().find_map(|message| {
+                            if let Message::Tool { result } = message
+                                && result.tool_use_id == format!("checkpoint-{}", step - 1)
+                            {
+                                return Some((&result.content, result.is_error));
+                            }
+                            None
+                        });
                         panic!(
-                            "installed checkpoint missing in provider step {step}; terminal outcomes: {outcomes:?}"
+                            "installed checkpoint missing in provider step {step}; submission: {submission:?}; terminal outcomes: {outcomes:?}"
                         );
                     });
                 assert_task_state(&checkpoint);
