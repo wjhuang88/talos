@@ -17,7 +17,7 @@
 | Claimed At | 2026-11-18 |
 | Source Issue | #848 |
 | Governance Claim PR | #977 |
-| Authorization Mode | Single-maintainer merge with required independent technical governance review |
+| Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | PR #977 requires exact-head docs/governance CI, read-only independent review and expected-head CAS. The claim is **ineffective** until this PR merges. |
 | Implementation PR | Not started — must be separately prepared AFTER claim merge |
 | Last Updated | 2026-11-18 |

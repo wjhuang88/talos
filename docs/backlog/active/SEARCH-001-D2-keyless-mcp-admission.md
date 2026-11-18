@@ -23,7 +23,7 @@
 | Claimed At | 2026-11-18 |
 | Source Issue | #848 |
 | Governance Claim PR | #977 |
-| Authorization Mode | Single-maintainer merge with required independent technical governance review |
+| Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Proposed atomic I330 claim in PR #977; exact-head native documentation CI, independent read-only review and merge-time expected-head CAS required BEFORE activation. No acceptance asserted while this PR is open. |
 | Implementation PR | Not started — may begin only after effective #977 merge |
 | Last Updated | 2026-11-18 |
