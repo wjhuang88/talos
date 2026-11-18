@@ -23,7 +23,7 @@
 | Claimed At | 2026-11-18 |
 | Source Issue | #848 |
 | Governance Claim PR | #980 |
-| Authorization Mode | Single-maintainer merge |
+| Authorization Mode | Independent review |
 | Authorization Evidence | Proposed atomic I331 claim in PR #980; exact-head native documentation CI, independent read-only review and merge-time expected-head CAS required BEFORE activation. No acceptance asserted while this PR is open. |
 | Implementation PR | Not started — may begin only after effective #980 merge |
 | Last Updated | 2026-11-18 |

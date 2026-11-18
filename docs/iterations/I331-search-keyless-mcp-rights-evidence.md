@@ -17,7 +17,7 @@
 | Claimed At | 2026-11-18 |
 | Source Issue | #848 |
 | Governance Claim PR | #980 |
-| Authorization Mode | Single-maintainer merge |
+| Authorization Mode | Independent review |
 | Authorization Evidence | PR #980 requires exact-head docs/governance CI, read-only independent review and expected-head CAS. The claim is **ineffective** until this PR merges. |
 | Implementation PR | Not started — must be separately prepared AFTER claim merge |
 | Last Updated | 2026-11-18 |
@@ -25,7 +25,7 @@
 
 ## Motivation / preflight
 
-D2.1's November 4/10 material already recorded Exa's `https://mcp.exa.ai/mcp` and Parallel's November 5 MCP 2.0 `https://mcp.parallel.ai/mcp`, legacy `https://search.parallel.ai/mcp`, candidate tools and keyless/public claims. **Do not repeat the prior documentary triage or represent keyless access as default-client authorization.** There is no effective parallel D2 claim and no overlapping open D2 implementation PR at selection. The existing I294/#644 ZERO-ADMISSION disposition is Complete/Closed and not reopened. Main's other Active/Review I328/STORE E, I324/GIT-COMPAT, TUI/session and provider iterations retain their scopes.
+D2.1's November 4/10 material already recorded Exa's `https://mcp.exa.ai/mcp` and Parallel's November 5 MCP 2.0 `https://mcp.parallel.ai/mcp`, legacy `https://search.parallel.ai/mcp`, candidate tools and keyless/public claims. **Do not repeat the prior documentary triage or represent keyless access as default-client authorization.** There is no effective parallel D2 claim and no overlapping open D2 implementation PR at selection. The existing I294/#644 ZERO-ADMISSION disposition is Complete/Closed and not reopened. I328/STORE-002 E is Complete/Closed (source #956); I330/ARCH-035 E2 is separately claimed/effective via #975. Other I324/GIT-COMPAT, TUI/session and provider Active/Review scopes remain independent.
 
 ## Bounded D2.2 deliverables
 
