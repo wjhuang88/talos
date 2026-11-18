@@ -1,6 +1,6 @@
 # SEARCH-001-D2: Hosted Keyless MCP Search Admission Triage
 
-**Status**: Active / Claimed for I331 D2.2 documentary evidence only (effective on governance #980 merge); **Exa/Parallel production BLOCKED / NOT ADMITTED**
+**Status**: Review / Claimed — I331 D2.2 documentary evidence PR #981 under review; **Exa/Parallel production BLOCKED / NOT ADMITTED**
 
 | Field | Value |
 |---|---|
@@ -25,7 +25,7 @@
 | Governance Claim PR | #980 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Proposed atomic I331 claim in PR #980; exact-head native documentation CI, independent read-only review and merge-time expected-head CAS required BEFORE activation. No acceptance asserted while this PR is open. |
-| Implementation PR | Not started — may begin only after effective #980 merge |
+| Implementation PR | [#981](https://github.com/wjhuang88/talos/pull/981) — Draft source-documentary evidence candidate; NOT YET MERGED or accepted |
 | Last Updated | 2026-11-18 |
 | Handoff / Release Condition | I331 D2.2 may publish reviewed documentary gate evidence only after #980 merge; close its claimed slice owner-first with actual prior evidence Completion Commit. Exa/Parallel production stay BLOCKED until independent rights, protocol/region and Security/Network gates; #848 remains Open for residuals. No E/F admission. |
 
@@ -98,3 +98,11 @@ no provider admission and no change to default Auto or claimed ownership.
 The 2026-11-10 D2.1 publication already documents official hosted no-key MCP surfaces, a source matrix and **BLOCKED / NOT ADMITTED** decisions. Do not repeat that research or treat publication as an effective execution claim. A non-overlapping D2.2 source-only follow-up is proposed for `I331` in **governance-only claim PR #980**. Its Claimed row above and Active delivery status are **only branch proposals until #980 merges**; no research-output or implementation commit is authorized before that.
 
 Scope: pin current vendor MCP 2.0/Exa official tool-contract deltas, source-date and applicable anonymous/paid service and output-use terms; produce a vendor-specific published-source versus unverified-wire/rights decision table, independent failure-domain limitations, a concrete vendor clarification questionnaire, and a gated future bounded MCP observer/region test plan. Do **not** send MCP `initialize/tools/list/tools/call` requests or any search query, capture live results, implement a harness/adapter, add Network authority or modify Auto. Distinguish anonymous personal/manual MCP use from default distributed embedding. The D2.1 evidence packet is historical baseline; D2.2 will publish a separate dated assessment only after this claim is effectively merged.
+
+## I331 D2.2 source-documentary checkpoint — 2026-11-18 (Review only)
+
+Effective I331 governance claim [PR #980](https://github.com/wjhuang88/talos/pull/980) **merged** on target main at `e290e8882e5a8be23e90f962f444d71861c6eca6` after exact-head [CI #4387](https://github.com/wjhuang88/talos/actions/runs/44255790659) 4 applicable SUCCESS/4 SKIPPED, independent [APPROVE](https://github.com/wjhuang88/talos/pull/980#issuecomment-6971707928) and merge-time CAS. The earlier invalid I330/Search claim [PR #977](https://github.com/wjhuang88/talos/pull/977) closed UNMERGED; I330 belongs to ARCH-035 E2, I331 only to D2.2.
+
+A separate **source-documentary** [PR #981](https://github.com/wjhuang88/talos/pull/981) now proposes one dated [official-source contract/rights delta](../../reference/SEARCH-001-D2-HOSTED-MCP-RIGHTS-DELTA-2026-11-18.md). Distinct from completed D2.1/#849, it documents the current Exa public default/optional tools and auth; Parallel's 2026-11-05 MCP 2.0 launch versus 2026-11-18 *six-anonymous-tool* official docs; November 10 contracted terms vs anonymous distributed-default rights applicability UNKNOWN; result/LLM-context/cache/privacy/independence matrix, supplier clarification **questions only**, and separately governed future MCP fixture and genuine China/comparator evidence criteria.
+
+**Current state: Review / Claimed; no accepted Completion Commit.** PR #981 still needs exact-head docs CI, independent review, final CAS and source merge; only after actual merge may an owner-first closeout record the prior source Completion Commit. Neither vendor is admitted, no vendor contact/live MCP/HTTP query occurred, no Network/Auto/provider/Browser change is authorized. Exa and Parallel **BLOCKED / NOT ADMITTED**; parent #624 and child #848 remain Open. D/#644 terminal ZERO-ADMISSION, I329 T3a/T3b and E/F/G/I unchanged.
