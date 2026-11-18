@@ -1,6 +1,6 @@
 # STORE-002: Storage And Retrieval Capability Contracts
 
-**Status**: Review / Claimed — I328 E implementation #956 candidate; A/B, C and D accepted; F unclaimed; parent #670 Open
+**Status**: Complete / Closed — I328 E bounded claim only; A/B, C and D accepted; STORE-002 parent #670 remains Open for unclaimed F
 
 **Type**: Architecture / Contract Convergence
 
@@ -31,7 +31,7 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | STORE-002 I328 E only: select one explicit behavior-preserving default-local composition over accepted SessionStore, PendingSubmissionPersistence, TodoPersistence, MemoryPersistence, KnowledgePersistence and ExplorationPersistence with current TLOG/JSONL/SQLite/FTS5 stores. Preserve existing paths, default-vs-custom Session startup reconciliation, lazy optional opens, typed errors, pending fences and domain authority. No duplicate domain traits, SQL/schema/formats, generic CRUD/registry, runtime/CLI/TUI/Desktop/SDK/Server Host wiring, new backend, F-wide parity or #897 E2/E3. |
@@ -39,10 +39,10 @@ Vector search, embedding, and other unavailable capabilities must have explicit 
 | Source Issue | #670 |
 | Governance Claim PR | #955 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Governance #955 merged/effective on main `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184` after exact-head CI #4256 and independent no-blocker review/CAS. D #935 implementation Completion Commit `027b8a59194f5ba496b0048c7183ad236e2e2dd2` and #951 closeout accepted. E candidate #956 still requires exact-head CI, independent public API/constructor review, and guarded merge; no E acceptance/Completion Commit claimed yet. |
-| Implementation PR | #956 (Review / Claimed; not merged) |
-| Last Updated | 2026-11-16 |
-| Handoff / Release Condition | I328 E claim #955 is effective. #956 requires locked/native validation, independent API and behavior review, and a new owner-first completion record only after actual implementation merge. Parent #670 Open for F; #897 E2/E3 Host/SDK and ServerHost remain blocked. |
+| Authorization Evidence | Governance #955 merged `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184`; implementation #956 merged **Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`** after [exact-head CI #4339](https://github.com/wjhuang88/talos/actions/runs/44040504951) SUCCESS 8/8, independent [exact-head API/integration APPROVE](https://github.com/wjhuang88/talos/pull/956#issuecomment-6941991031), separately approved protected source/hash review, and [single-maintainer merge-time CAS](https://github.com/wjhuang88/talos/pull/956#issuecomment-6946993092). No separate human approval is asserted. |
+| Implementation PR | #956 (merged; Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`) |
+| Last Updated | 2026-11-17 |
+| Handoff / Release Condition | I328 E implementation accepted and claim Closed. Parent #670 stays Open for separately claimed F broad conformance. ARCH-035 #897 E2/E3 Host composition is now **eligible for its own fresh claim**, not implemented or implicitly activated by E; ServerHost remains blocked until its separate gates. |
 
 ## Governance
 
@@ -106,13 +106,21 @@ Initially registered as Intake / Unclaimed on 2026-10-07; narrow I321 A/B claim 
 
 ## I328 E governance activation history — 2026-11-16 (#955 merged)
 
-- **Historical proposal-time record:** [I328](../../iterations/I328-store-002-default-local-composition.md) selected only E following accepted #935 implementation and #951 D closeout. Governance [#955](https://github.com/wjhuang88/talos/pull/955) was initially a draft, then merged as `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184`; the E claim/activation is **now effective**. This paragraph records the earlier selection, not current implementation status; current opt-in E candidate is [PR #956](https://github.com/wjhuang88/talos/pull/956) in Review / Claimed (not Complete).
+- **Historical proposal-time record:** [I328](../../iterations/I328-store-002-default-local-composition.md) selected only E following accepted #935 implementation and #951 D closeout. Governance [#955](https://github.com/wjhuang88/talos/pull/955) was initially a draft, then merged as `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184`; the E claim/activation became effective at that time and is now **Closed** after #956's accepted implementation. This paragraph records the historical selection and superseded Review phase; current completion evidence is recorded below.
 - E must select/assemble existing concrete local Session, Pending/Todo, Memory, Evolution and Exploration stores through accepted C/D delegate contracts, retaining all lazy/optional constructors and typed semantics. The seven `StorageCapabilityKind` entries remain metadata; Object/VectorSearch/Embedding/standalone Rerank remain explicitly unavailable. Do not invent a generic operational provider or SQL abstraction.
 - `SessionManager::new()` must preserve its startup reconciliation that `with_dir()` lacks. Memory must not create absent `memory.db` merely to assemble a profile. Exploration read-only search must not create absent DB. No runtime `RuntimeBuilder` / Desktop / TUI / SDK / Server Host consumption: #897 owns those independently after accepted E. F owns broader fault/recovery/behavior parity.
 
-## I328 E implementation candidate — PR #956 (Review / Claimed)
+## I328 E implementation history — PR #956 (accepted 2026-11-17)
 
-- E governance claim #955 is effective on main after merge `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184`. [Implementation #956](https://github.com/wjhuang88/talos/pull/956) is **review only**; no completion evidence until current-head code CI, independent API/constructor review and guarded merge.
+- E governance claim #955 became effective on main at `b524c7a9a0833cf9293c0fd77a730e1fb7fc1184`. [Implementation #956](https://github.com/wjhuang88/talos/pull/956) was then accepted and merged at **`a28c1cccebad71eb5785d149129a640ceec3d098`**; the prior Review state is historical.
 - Opt-in feature `talos-runtime/local-storage` adds `LocalStorageProfile` as a bounded concrete-path and on-demand constructor selector for current Session, Pending/Todo, Memory, Evolution-path and Exploration delegates. The feature is OFF by default. No Host/CLI/TUI/Desktop/SDK/Server runtime caller is migrated in E; #897 retains those separate ownership/acceptance gates.
 - Tests must prove missing optional Memory/Exploration/legacy learned DBs do not get created, explicit opens retain existing typed operations, Session default `new()` versus custom `with_dir()` reconciliation remains distinct, and evolution hook `evolution/knowledge.db` is not conflated with legacy learned `index.db`. No new SQL/schema, capability registry, backend, public RuntimeBuilder signature or cross-resource atomicity.
-- **Current evidence pending:** first CI #4258 exposed a real missing `Cargo.lock` update after optional manifest dependencies; this was corrected on the same PR in a new exact head. Historical failing Linux/Windows jobs are not claimed passing. Subsequent exact-head native CI and independent review determine acceptance. #670 remains OPEN for F after E, #897 Host E2/E3 blocked.
+- **Historical CI failures retained:** CI #4258 exposed the missing optional `Cargo.lock` entries; CI #4305 failed on the macOS non-UTF-8 fixture; CI #4327 exposed rustfmt and an old-base Windows WAL example; CI #4332 was cancelled by Windows' 45-minute limit during cache save after functional steps passed. These were **not** green. Final #4339 passed 8/8 on the exact head, independent review and CAS accepted. #670 remains OPEN for F; #897 E2/E3 is not yet claimed.
+
+## I328 E owner-first completion record — 2026-11-17
+
+- **Completion Commit: `a28c1cccebad71eb5785d149129a640ceec3d098`** — the pre-existing #956 squash implementation merge already present on `main` before this owner-first documentation closeout; never confuse the closeout commit with implementation delivery.
+- Review candidate `6ee9229cd9d4b22e40703895116daa2dbf3f7bde`: [exact-head native CI #4339](https://github.com/wjhuang88/talos/actions/runs/44040504951) **SUCCESS 8/8**. Locked fmt/check/Clippy/tests and explicit opt-in `talos-runtime --features local-storage` check/Clippy/unit tests passed, including Windows workspace/installer/Desktop and Linux Desktop. Project governance validator: **0 warnings**. Collaboration validator: **1 unrelated SEARCH-001 intake warning**, not concealed; remote Issue/owner reconciliation job **SUCCESS**.
+- Independent read-only [API/storage/integration APPROVE](https://github.com/wjhuang88/talos/pull/956#issuecomment-6941991031) on the exact head, including current `rusqlite 0.43` contract compatibility. Protected `memory_evidence.rs` conditional-compilation change and updated FNV protected inventory reviewed separately; all seven native fingerprint checks stayed fail-closed and passed. [Single-maintainer final CAS](https://github.com/wjhuang88/talos/pull/956#issuecomment-6946993092) recorded effective #955, resolved reviewer findings, no overlapping E claimant and the unrelated seven post-base main commits; the squash merge used the expected GitHub head SHA. No separate human reviewer is claimed.
+- Delivered **opt-in** `talos-runtime::local_storage::LocalStorageProfile` constructor/path selection and narrow real-domain tests, reusing existing Session/Pending/Todo, Memory, Evolution and Exploration implementations. RuntimeBuilder/CLI/TUI/Desktop/SDK/ServerHost default consumers remain **unchanged**; no new provider, SQL/schema/TLOG/JSONL format, eager optional DB creation, permissions or source-of-truth change.
+- **Residual boundaries:** broad crash/recovery/fault conformance is STORE-002 F and remains unclaimed; SessionIndex/durable-binding and unsupported Object/VectorSearch/Embedding/Rerank operational capabilities remain explicit. ARCH-035 / #897 E2/E3 can proceed **only through a separate effective claim/activation** with current API/native baseline; not delivered by I328 E. Parent #670 remains OPEN for F.
