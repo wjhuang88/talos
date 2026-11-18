@@ -1,6 +1,6 @@
 # Iteration I330: ARCH-035 E2 — Behavior-Preserving Host Storage Selection
 
-> Document status: Planned / Blocked — governance draft only, not active
+> Document status: Active / Claimed — atomic E2 claim+activation proposed by #975, ineffective until merge
 > Published plan date: 2026-11-18
 > Parent: [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [Issue #897](https://github.com/wjhuang88/talos/issues/897)
 > Baseline rule: preserve accepted STORE-002 E, ADR-104 and original host behavior; new implementation requires a separately effective atomic claim
@@ -10,18 +10,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | ARCH-035 E2 only: minimally expose and exercise host-facing storage selection/injection by direct delegation to the accepted STORE-002 E LocalStorageProfile/domain stores, with source-compatible current RuntimeBuilder/CLI entrypoints, no default behavior changes. E3 multi-host call-site migration, E4 broad equivalence, STORE-002 F, ServerHost, new database/storage adapters, SQL/schema/formats and product behavior changes are excluded. |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-18 |
 | Source Issue | #897 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Draft only; STORE-002 E implementation #956 merged a28c1cccebad71eb5785d149129a640ceec3d098 and owner-first closeout #972 merged bc4a37eeafff5e0e172764e861fac6cb6341fd86; no ARCH-035 E2 activation yet. |
+| Governance Claim PR | #975 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Accepted STORE-002 E implementation #956 Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`; I328 owner-first #972 merge `bc4a37eeafff5e0e172764e861fac6cb6341fd86`; I320 E0/E1 ADR-104 accepted. E2 claim proposed by governance PR #975, **not effective until exact-head docs CI, both validators, independent read-only scope/Host API review, single-maintainer CAS and target merge**. No independent human review or implementation claimed. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-18 |
-| Handoff / Release Condition | E2 may begin only after a separately merged, exact-head-reviewed atomic claim+activation PR. Keep E3/E4 and STORE-002 F unclaimed; #897 and dependent ServerHost remain Open. |
+| Handoff / Release Condition | E2 claim becomes effective only after reviewed #975 merges. Code implementation cannot start until that merge; E3/E4 and STORE-002 F remain independently unclaimed, #897 and dependent ServerHost Open. |
 
 ## Published Baseline
 
@@ -73,7 +73,7 @@
 
 ## Activation / execution / verification
 
-**Governance draft only**. No effective owner/activation, implementation, tests, or acceptance exists for I330 E2 until its finalized claim is merged to main. Record the actual claim PR, final review, exact-head CI, and authorized merge here before creating an implementation branch.
+**Finalized proposal in governance-only PR #975**: source ARCH-035 owner, this I330 record and derived Board/index/backlog jointly propose Claimed / Active. These states are **ineffective until reviewed exact-head CI/validators/CAS and merge to main**. No E2 implementation branch, production code, API, tests or acceptance exists in this governance PR; preserve effective-claim-first rule.
 
 ## Completion evidence
 
