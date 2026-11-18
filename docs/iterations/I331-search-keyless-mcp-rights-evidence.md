@@ -1,6 +1,6 @@
 # Iteration I331: Hosted No-Key MCP Rights Applicability and Contract Delta (D2.2)
 
-> Document status: **Complete / Closed for I331 D2.2 published-source evidence only** — Exa/Parallel BLOCKED / NOT ADMITTED; #848 remains Open for external admission gates
+> Document status: Complete / Closed — I331 D2.2 published-source evidence only; Exa/Parallel BLOCKED / NOT ADMITTED; #848 remains Open for external admission gates
 > Completion Commit: `74caf947521bca51f7e3ff0a71509da78a237365` (accepted pre-existing source PR #981 squash merge)
 > Selected: 2026-11-18
 > Source Story: [SEARCH-001-D2 / #848](../backlog/active/SEARCH-001-D2-keyless-mcp-admission.md)
