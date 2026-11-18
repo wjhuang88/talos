@@ -1,6 +1,6 @@
 # SEARCH-001-D2: Hosted Keyless MCP Search Admission Triage
 
-**Status**: Intake / Proposed / Unclaimed — no production provider admitted
+**Status**: Active / Claimed for I331 D2.2 documentary evidence only (effective on governance #980 merge); **Exa/Parallel production BLOCKED / NOT ADMITTED**
 
 | Field | Value |
 |---|---|
@@ -9,25 +9,25 @@
 | Parent | [SEARCH-001 / #624](https://github.com/wjhuang88/talos/issues/624) |
 | Issue | [#848](https://github.com/wjhuang88/talos/issues/848) |
 | Historical predecessor | SEARCH-001-D / #644, I294: **Complete / Closed — BLOCKED / ZERO-ADMISSION** |
-| Selected iteration | None |
+| Selected iteration | [I331](../../iterations/I331-search-keyless-mcp-rights-evidence.md) — claim proposal #980, ineffective before merge |
 | Intake evidence | [D2 hosted MCP triage — 2026-11-04](../../reference/SEARCH-001-D2-MCP-TRIAGE-2026-11-04.md) |
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | None — research intake only |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
+| Work Slice | D2.2 / #848: published-source-only Exa/Parallel current MCP contract delta and anonymous/default-distribution rights applicability review; dated compliance/independence matrix, supplier clarification questions and **future** bounded MCP fixture/region acquisition preconditions. No live MCP, API, SERP requests, harness/provider code, default Auto or Network authority. |
+| Claimed At | 2026-11-18 |
 | Source Issue | #848 |
-| Governance Claim PR | Not applicable |
-| Authorization Mode | Not applicable |
-| Authorization Evidence | Not applicable |
-| Implementation PR | None |
-| Last Updated | 2026-11-10 |
-| Handoff / Release Condition | Intake-only; remain Proposed / Unclaimed with both providers BLOCKED until policy/use rights, live protocol and regional evidence are verified. Any activation requires separately approved claim and iteration; no Auto or E/F admission. |
+| Governance Claim PR | #980 |
+| Authorization Mode | Independent review |
+| Authorization Evidence | Proposed atomic I331 claim in PR #980; exact-head native documentation CI, independent read-only review and merge-time expected-head CAS required BEFORE activation. No acceptance asserted while this PR is open. |
+| Implementation PR | Not started — may begin only after effective #980 merge |
+| Last Updated | 2026-11-18 |
+| Handoff / Release Condition | I331 D2.2 may publish reviewed documentary gate evidence only after #980 merge; close its claimed slice owner-first with actual prior evidence Completion Commit. Exa/Parallel production stay BLOCKED until independent rights, protocol/region and Security/Network gates; #848 remains Open for residuals. No E/F admission. |
 
 ## Objective
 
@@ -92,3 +92,9 @@ remains a legacy endpoint; see the [dated source supplement](../../reference/SEA
 This is source-only triage: no live request, no applicability-of-terms approval,
 no provider admission and no change to default Auto or claimed ownership.
 **Exa and Parallel both remain BLOCKED / NOT ADMITTED.**
+
+## I331 D2.2 proposed claim and bounded Work Slice — 2026-11-18
+
+The 2026-11-10 D2.1 publication already documents official hosted no-key MCP surfaces, a source matrix and **BLOCKED / NOT ADMITTED** decisions. Do not repeat that research or treat publication as an effective execution claim. A non-overlapping D2.2 source-only follow-up is proposed for `I331` in **governance-only claim PR #980**. Its Claimed row above and Active delivery status are **only branch proposals until #980 merges**; no research-output or implementation commit is authorized before that.
+
+Scope: pin current vendor MCP 2.0/Exa official tool-contract deltas, source-date and applicable anonymous/paid service and output-use terms; produce a vendor-specific published-source versus unverified-wire/rights decision table, independent failure-domain limitations, a concrete vendor clarification questionnaire, and a gated future bounded MCP observer/region test plan. Do **not** send MCP `initialize/tools/list/tools/call` requests or any search query, capture live results, implement a harness/adapter, add Network authority or modify Auto. Distinguish anonymous personal/manual MCP use from default distributed embedding. The D2.1 evidence packet is historical baseline; D2.2 will publish a separate dated assessment only after this claim is effectively merged.

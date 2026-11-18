@@ -1,3 +1,7 @@
+## I331 / SEARCH-001-D2 — hosted keyless MCP rights-source delta (governance PR #980)
+
+[I331](I331-search-keyless-mcp-rights-evidence.md) / [SEARCH-001-D2](../backlog/active/SEARCH-001-D2-keyless-mcp-admission.md) / [Issue #848](https://github.com/wjhuang88/talos/issues/848): proposed **Active / Claimed only after the atomic #980 claim merges**. Non-duplicative D2.2 official published-source applicability, output/LLM-use, tool-contract and vendor-clarification *questions only*; no actual vendor outreach or live MCP traffic. Exa/Parallel remain BLOCKED / NOT ADMITTED; parent #624 stays Open. **I330 remains independently assigned to ARCH-035 E2 / #897**, not this Search work.
+
 ## I329 / SEARCH-001-D3-T3 — proposed offline Bing non-CN→CN fallback contract
 
 [I329](I329-search-bing-dual-host-offline.md) / [owner](../backlog/active/SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [#957](https://github.com/wjhuang88/talos/issues/957): governance-only proposed **Active / Claimed** test-only candidate, ineffective until its claim PR merges. One Bing family; non-CN `www.bing.com` preferred over existing `cn.bing.com` only if unavailable and permitted. **No** production route, newly admitted host, live Bing query, rights/region acceptance, default priority change or new independent provider.
