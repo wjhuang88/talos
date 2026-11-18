@@ -2398,7 +2398,10 @@ mod tests {
             .expect("explicit host-owned local durable binding");
         let (bound, _) = selected.durable_session.as_ref().expect("durable binding");
         assert_eq!(bound.external_id(), "host-session");
-        assert_eq!(bound.file_path().parent(), Some(sessions_root.as_path()));
+        // The existing durable binding index is at the Sessions root, while
+        // UUID-named TLOG transcripts live under its durable/ subdirectory.
+        let durable_root = sessions_root.join("durable");
+        assert_eq!(bound.file_path().parent(), Some(durable_root.as_path()));
         assert!(sessions_root.join("durable-bindings.sqlite").is_file());
 
         let direct = profile
