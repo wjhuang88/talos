@@ -1,6 +1,6 @@
 # Iteration I330: ARCH-035 E2 — Behavior-Preserving Host Storage Selection
 
-> Document status: Active / Claimed — atomic E2 claim+activation proposed by #975, ineffective until merge
+> Document status: Review / Claimed — #975 atomic E2 claim effective; implementation #979 not accepted
 > Published plan date: 2026-11-18
 > Parent: [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [Issue #897](https://github.com/wjhuang88/talos/issues/897)
 > Baseline rule: preserve accepted STORE-002 E, ADR-104 and original host behavior; new implementation requires a separately effective atomic claim
@@ -18,10 +18,10 @@
 | Source Issue | #897 |
 | Governance Claim PR | #975 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Accepted STORE-002 E implementation #956 Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`; I328 owner-first #972 merge `bc4a37eeafff5e0e172764e861fac6cb6341fd86`; I320 E0/E1 ADR-104 accepted. E2 claim proposed by governance PR #975, **not effective until exact-head docs CI, both validators, independent read-only scope/Host API review, single-maintainer CAS and target merge**. No independent human review or implementation claimed. |
-| Implementation PR | Not started |
+| Authorization Evidence | I320 E0/E1/ADR-104 accepted placement-only, STORE-002 E #956 Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`, I328 #972 closed. I330 E2 atomic claim #975 merged/effective `799e3c35e6a5f9b2adb8ce2346762b148be940c0` following docs CI #4377, independent scope review and CAS. #979 implementation is Review; first CI #4383 FAILED on a new TLOG path test oracle, later source-only test repair requires fresh native exact-head validation and independent Host/SDK API review before merge. No separate human approval or E2 Completion Commit claimed. |
+| Implementation PR | #979 (Review / Claimed; no Completion Commit) |
 | Last Updated | 2026-11-18 |
-| Handoff / Release Condition | E2 claim becomes effective only after reviewed #975 merges. Code implementation cannot start until that merge; E3/E4 and STORE-002 F remain independently unclaimed, #897 and dependent ServerHost Open. |
+| Handoff / Release Condition | E2 implementation #979 remains Review / Claimed until exact-head native CI, independent Host/SDK public API/storage review and guarded merge; separate owner-first closeout cites pre-existing implementation SHA. E3/E4, STORE-002 F and ServerHost remain separately unclaimed, #897 Open. |
 
 ## Published Baseline
 
@@ -96,8 +96,15 @@
 
 ## Activation / execution / verification
 
-**Finalized proposal in governance-only PR #975**: source ARCH-035 owner, this I330 record and derived Board/index/backlog jointly propose Claimed / Active. These states are **ineffective until reviewed exact-head CI/validators/CAS and merge to main**. No E2 implementation branch, production code, API, tests or acceptance exists in this governance PR; preserve effective-claim-first rule.
+**Effective claim after governance-only #975 merge `799e3c35e6a5f9b2adb8ce2346762b148be940c0`:** owner and I330 Claimed / Active became effective together on main after CI #4377, independent scope review and guarded CAS. The governance PR had no code. Subsequently a distinct bounded implementation PR #979 started from that merge; it is Review / Claimed pending native validation and public Host API review, not accepted.
 
 ## Completion evidence
 
-Not started. Never use this governance draft/claim commit as an implementation Completion Commit. #897 stays Open.
+**Review / Claimed; not Complete.** Implementation PR #979 has no Completion Commit. Governance #975 merge `799e3c35e6a5f9b2adb8ce2346762b148be940c0` is an effective **claim**, not an implementation completion. #897 stays Open; E3/E4 and #670 F remain separate.
+
+## I330 E2 initial implementation evidence — 2026-11-18
+
+- [PR #979](https://github.com/wjhuang88/talos/pull/979) introduces one opt-in `RuntimeBuilder::durable_session_from_custom_local_profile` path using the accepted `LocalStorageProfile` and existing `DurableSession` delegates. Existing default/in-memory and explicit `durable_session` APIs remain source-compatible and unmodified; no production host caller is migrated.
+- [Native CI #4383](https://github.com/wjhuang88/talos/actions/runs/44253925717) **FAILED** only in macOS `local-storage` test: the new assertion assumed a TLOG parent `sessions/`, but current `DurableSession::create_or_open` writes UUID TLOG in `sessions/durable/` and keeps `durable-bindings.sqlite` in `sessions/`. Other seven jobs passed. A narrow feature-gated test correction uses the actual accepted layout; new exact-head CI is required and no historical failed run is reused as green.
+- Negative-path test expects typed `SessionError::InvalidExternalId` with no directory creation; accepted direct Session API supplies canonical ID and path. No changes to Session, SQL, index migration, default reconciliation, Memory/Todo/Exploration, permissions or other Host work.
+- **Gate:** independent exact-head Host public API/SDK compatibility review, both governance validators, native feature-on and workspace checks, and merge-time CAS. Source owner stays Review / Claimed; E3/E4/F/ServerHost unclaimed. Do not close #897.
