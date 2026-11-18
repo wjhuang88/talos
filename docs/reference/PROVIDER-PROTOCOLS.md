@@ -303,7 +303,7 @@ in body `model`. Model shape overrides provider shape; reviewed catalog evidence
 The frozen Azure audit admits 22 exact packaged azure/model pairs for Responses with a valid
 explicit v1 profile and no provider/model endpoint replacement. Explicit protocol/shape wins;
 custom providers, aliases, legacy mode and unreviewed models remain excluded. A deployment alias defaults to the logical model.
-For explicit dated Chat compatibility, add `[providers.azure-work.azure.api]`, `mode = "deployment"`
+For explicit dated Chat compatibility, change the example provider shape to `chat`, remove any model-level Responses override, then add `[providers.azure-work.azure.api]`, `mode = "deployment"`
 and `api_version = "2024-10-21"`. This routes through
 `/openai/deployments/{deployment}/chat/completions?api-version=...`; Responses is rejected in this mode.
 The example version is not a declaration of the latest Azure service version.
