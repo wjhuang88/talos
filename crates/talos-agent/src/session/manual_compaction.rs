@@ -361,6 +361,15 @@ impl ManualCompaction {
             .ledger
             .finish_from(actor.session_generation, origin, id, outcome)
         {
+            tracing::info!(
+                stage = "checkpoint_terminal",
+                session_id = %actor.session_id,
+                generation = actor.session_generation,
+                operation_id = id,
+                ?origin,
+                ?outcome,
+                "checkpoint operation completed"
+            );
             self.model_authority = None;
             if let Some(receipt) = self.model_receipt.take() {
                 let _ = receipt.send(outcome);

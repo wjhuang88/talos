@@ -8094,9 +8094,25 @@ async fn archived_history_does_not_hold_other_session_writes_during_provider_awa
 
 #[cfg(any(unix, windows))]
 async fn actor_history_search_and_detail(cli: bool, archived: bool) {
+    actor_history_search_and_detail_with_source_age(cli, archived, Duration::ZERO).await;
+}
+
+#[cfg(any(unix, windows))]
+#[tokio::test]
+async fn model_checkpoint_after_long_source_read_gets_fresh_preparation_budget() {
+    actor_history_search_and_detail_with_source_age(true, true, Duration::from_secs(121)).await;
+}
+
+#[cfg(any(unix, windows))]
+async fn actor_history_search_and_detail_with_source_age(
+    cli: bool,
+    archived: bool,
+    source_age: Duration,
+) {
     struct RecoveryModel {
         step: AtomicUsize,
         compact: bool,
+        source_age: Duration,
     }
     #[async_trait]
     impl LanguageModel for RecoveryModel {
@@ -8190,6 +8206,13 @@ async fn actor_history_search_and_detail(cli: bool, archived: bool) {
                     },
                 ]
             } else if self.compact && step == 5 {
+                if !self.source_age.is_zero() {
+                    // Exercise a long provider/source-reading interval without a
+                    // wall-clock sleep or modifying the operation's 120s budget.
+                    tokio::time::pause();
+                    tokio::time::advance(self.source_age).await;
+                    tokio::time::resume();
+                }
                 assert_eq!(
                     result("recover-3")["text"],
                     "originalfact unique constraint"
@@ -8362,6 +8385,7 @@ async fn actor_history_search_and_detail(cli: bool, archived: bool) {
         Arc::new(RecoveryModel {
             step: AtomicUsize::new(0),
             compact: archived,
+            source_age,
         }),
         ToolRegistry::new(),
         Some(Arc::new(engine)),
@@ -8407,7 +8431,7 @@ async fn actor_history_search_and_detail(cli: bool, archived: bool) {
         .await
         .expect("submit");
     let events = tokio::time::timeout(
-        Duration::from_secs(15),
+        Duration::from_secs(15) + source_age,
         collect_until_completions(&mut handle.eq_rx, 1),
     )
     .await

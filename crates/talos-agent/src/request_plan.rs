@@ -567,6 +567,13 @@ impl Agent {
                         None => progress.cancel(),
                     }
                 } else {
+                    if let Err(error) = &prepared {
+                        tracing::warn!(
+                            stage = "automatic_checkpoint_preparation",
+                            reason = crate::checkpoint_progress::failure_diagnostic(error),
+                            "automatic checkpoint rejected; canonical history retained"
+                        );
+                    }
                     let reason = prepared
                         .as_ref()
                         .err()

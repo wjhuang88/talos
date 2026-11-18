@@ -1962,3 +1962,334 @@ buffer-cell approach and ran remaining checks, without rerunning passed latency 
 Not installed, merged, released or original-session reaccepted. Independent review,
 exact-head CI and authorized delivery remain open. Missing Nov11 evidence provenance
 and low-auto-approval causality remain handoff residuals, not erased by these passes.
+
+## 2026-11-18 original-host rejection diagnostic follow-up (Partial)
+
+Authorization Mode: Emergency override. Authorizing maintainer: current user,
+continuing the original-session recovery incident after failed PR969 reacceptance.
+Branch: fix/session-checkpoint-rejection-20261118 (isolated existing worktree,
+based on d97ddcb2). Scope: content-free checkpoint rejection diagnostics, isolated
+real-provider reproduction and regression for the observed cause. No unrelated
+Search/Git/SQLite dependency work. Preserve all primary dirty edits and original data.
+
+User confirmed host exit; process check found no versioned host and all non-database
+snapshot files remain byte-identical. Diagnostic logs admit only audited constant
+reasons; unknown preparation errors and provider strings are not echoed. Tests cover
+known schema/source/budget/tool-group distinctions and unknown/private-text masking.
+Diagnostic build and focused test running under pinned/locked/resource-bounded flow.
+No functional recovery fix, merge, installation or new original-host attempt claimed.
+Next: one real-provider attempt on isolated snapshot; inspect exact rejection and add
+causal regression before changing behavior. Keep privacy/source/budget gates intact.
+
+### 2026-11-18 isolated real-provider findings and bounded correction (Partial)
+
+Diagnostic binary 0838a9be reproduced `checkpoint exceeds rendered token budget`
+on the verified original-session snapshot with the actual configured provider.
+Evidence: target/recovery-real-provider-diagnostic-20261118 (source snapshot unchanged).
+This proves the isolated-run cause; old screenshot lacks exact detail, so attribution
+of the earlier original-host failure remains bounded.
+
+Candidate adds a conservative whole-JSON byte target and one correction only for
+parsed/source-valid RenderLimit. It shares original 120s deadline, 64-call cap,
+256KiB aggregate generated output, whole-request admission and source validation;
+no raw truncation or threshold enlargement. Regression checks correction success,
+persistent oversize refusal, invalid-source no-retry and shared deadline. Old d97ddcb2
+fails this regression; corrected implementation passes. 114 checkpoint-filtered tests
+passed; full preflight/independent review/CI/merge/install are not yet complete.
+
+First real corrected run obtained three actual successful history_search tool results,
+but the PTY harness mistook a quoted `> ` for the final prompt and stopped early.
+Preserved as incomplete evidence, not a passed run. Anchored prompt matching was fixed.
+Second run returned provider-category failure around 120s with no history calls;
+not accepted. Added content-free fold counts, sizes, remaining-time and differentiated
+provider/deadline labels before another diagnostic run. Do not repeat runs merely to
+get green or claim robustness from a single successful tool sequence.
+
+All attempts use isolated snapshots/config/workspace; installed executable and original
+session remain unchanged. Source changes only in isolated fix/session-checkpoint-rejection-20261118.
+
+### Follow-up diagnostic and correction request size
+
+Detailed isolated run `target/recovery-real-provider-render-diag-20261118` identified
+first fold: 2578 sources, estimated 258698 request tokens, ~90.75s provider latency,
+18201 output bytes / 4551 estimated tokens. Render cap remained 4096. Original
+correction resent full sources (258791 request tokens) with 28553ms left and hit
+`checkpoint deadline exceeded`. This is observed evidence, not inferred network failure.
+
+Candidate now shortens only the parsed/source-validated oversized checkpoint with
+no raw-source replay, retaining source whitelist, prior semantics instruction and
+all shared bounds. First edit missed the prompt wiring; regression caught it
+(113passed/1failed), preserved log, corrected before any real run. Updated114 tests
+and CLI build passed, including empty raw Sources on correction, reduced prompt size,
+source retention, rejection and deadline assertions. Real changed-candidate check pending.
+No public API change or provider-specific reasoning override introduced. Existing
+stream_decision provider API was inspected but is a bounded decision contract with
+unsupported-provider refusal; not repurposed silently for all checkpoint providers.
+
+### Latest real-provider result: incomplete, no delivery
+
+`target/recovery-real-provider-small-correction-20261118`: first fold admitted with
+2578 sources /258698 estimated tokens, no successful summary within shared120s;
+exact diagnostic `checkpoint deadline exceeded`. Correction was never entered.
+Original transcript/archive non-database files still match prelaunch snapshot.
+Stop repeating provider runs to seek green. Candidate is NOT a complete recovery fix:
+render-budget correction unit coverage passed, but real-provider first-fold latency
+remains unresolved and correction's live execution was not observed. No merge,
+install or original-session restart authorized by this result. Overall Partial.
+Next work: research/test a bounded preparation path that can complete the large
+source corpus under the existing deadline, retaining complete source coverage and
+privacy/budget rules. Do not increase timeout or silently drop history. Full preflight,
+independent review and exact-head CI remain gates after the implementation converges.
+
+### 2026-11-18 latency diagnosis research before further redesign
+
+Primary source consulted: https://developers.openai.com/api/docs/guides/latency-optimization
+(retrieved 2026-11-18; local HTML/text under target/recovery-latency-reference-20261118.*).
+Guidance distinguishes time to first visible text from generation duration, warns
+that output token caps can yield incomplete responses, and limits parallelization
+to independent work. Applicable to diagnosis, not evidence that this third-party
+OpenAI-compatible endpoint implements all OpenAI options. Do not silently switch
+models, use provider-specific compaction, enable background continuation, trim
+source coverage or raise the shared deadline on this basis.
+
+Read-only config inspection: selected model already uses reasoning effort low;
+provider timeout max_attempts=3. Existing logs lack dispatch/first-text/generation
+separation, so total120s alone does not establish large input as root cause.
+Added content-free stream-open and stream-drop timing, first nonempty text delay,
+byte/event counts and success flag; drop covers timeout cancellation. Added paused
+clock test for timing/UTF-8 byte counters. Candidate build and focused tests running.
+Next controlled real-provider diagnostic only after this instrumentation passes;
+no installation or original-session mutation.
+
+### Stream timing result: generation duration, not connection stall
+
+`target/recovery-real-provider-stream-timing-20261118/timing-evidence.json`:
+stream opened ~15.67s after admission; first nonempty text 8ms later. Stream
+continued for103730ms,14746bytes/5123text events, then shared deadline cancelled
+before successful terminal. Original snapshot unchanged, history not executed.
+This discriminates this run from slow dispatch; no claim that all runs share it.
+The existing conservative8192-byte target was not obeyed by the provider. Raising
+timeouts, adding parallel input folds or only reducing input is not justified by
+this evidence. Next examine how to enforce/communicate bounded summary generation
+without consuming truncated output or discarding source coverage; account for
+reasoning-inclusive limits and provider compatibility. Do not install current candidate.
+Validation:114 checkpoint tests +4 summary-stream tests passed, CLI build passed;
+full preflight/CI/review remain pending implementation convergence. Overall Partial.
+
+### 2026-11-18 prompt-format experiment scope
+
+Inspected checkpoint prompt and provider messages: controls and source data share a
+user message, but no observed evidence currently proves historical-instruction
+interference. Do not label that the cause or widen role/API changes without evidence.
+Existing prompt did not ask for minified JSON. Add only explicit no-indentation,
+no-formatting-newline/no-Markdown output wording, retaining string whitespace,
+complete schema, semantics and all validation. This is a latency experiment, not
+proof that formatting caused prior timeout, and not a delivered fix. Focused tests
+and build precede a measured isolated run. No model/config/timeout changes.
+
+### Minified-format experiment rejected; bounded-provider API inventory
+
+Actual isolated run `target/recovery-real-provider-minified-20261118` still failed:
+stream opened after21.35s, first text1ms later,14004bytes/4855events over98.044s,
+then deadline before normal terminal. No history calls. Prompt-only minification
+has no proven acceptance benefit; removed the experiment from candidate source,
+retained executable/log/result evidence. Do not retry the same experiment for green.
+
+Inspected existing `LanguageModel::stream_decision` contract and implementations:
+OpenAI Chat, Responses, Anthropic (provider lib.rs) and Gemini implement bounded
+output and transport retries; default third-party implementation rejects before
+dispatch. It is tool-free, System/User only and strips inherited reasoning settings.
+Thus directly replacing checkpoint `stream_with_protocol` would change model
+reasoning/compatibility semantics and may turn recovery into unsupported-provider
+refusal. A mere output cap also leaves MaxTokens/partial JSON, which current stream
+reader correctly rejects. These are design constraints for the next implementation,
+not justification to weaken checks or silently use the decision API as a fallback.
+
+Next: design a checkpoint-specific bounded-generation contract with explicit
+capability/compatibility behavior, and verify useful complete output under bounds;
+retain source-bound semantic coverage tests and old refusal behavior for incomplete
+streams. Current candidate remains Partial/unpublished/uninstalled; source snapshots
+unchanged. No unrelated tasks introduced. Existing114 checkpoint +4 stream tests and
+CLI build passed before the removed prompt-only experiment; no full delivery claim.
+
+### 2026-11-18 request-local source identifier experiment
+
+Implementation evidence: HistorySource::stable_entry_id and bind_content_until use
+`generation:{generation}:entry:{ordinal}:<64hex digest>`; repeated generated citations
+can be long. Prior stream logs do not quantify citation share, so this is a measured
+optimization candidate, not a proven explanation of every timeout.
+
+Private CheckpointWire maps identifiers longer than32 bytes to request-local refN,
+skipping collisions with any selected canonical ID. Short IDs stay unchanged.
+Only prior checkpoint sources and current source fields are rewritten; source text
+and raw-source metadata remain untouched. Decode accepts only this request's issued
+IDs, expands to canonical IDs, checks existing allowed coverage, then runs original
+canonical render budget. Wire aliases never become stored checkpoint identities.
+Public API, schema and on-disk format unchanged. Packing remains conservatively
+budgeted with original identifiers; actual wire request is also fully admitted.
+
+Added regressions for collision avoidance, unchanged source body, unknown/raw-only
+reference refusal, revoked canonical coverage, prior-checkpoint roundtrip and canonical
+budget expansion. Initial112passed/2failed were old wire-format assertions; adjusted
+only transport expectation, retained original-output identity check. New targeted
+round running. No installation or original-session attempt; overall Partial.
+
+### Wire-alias measured result and canonical citation budget
+
+116 checkpoint tests +4 summary-stream tests and CLI build passed. Isolated actual
+provider run `target/recovery-real-provider-wire-20261118`: request estimate dropped
+258698 ->193443 tokens without removing source records; first fold completed in
+~87.51s total,13613 output bytes/2717 estimated wire tokens. Canonical expansion
+still exceeded render budget. Correction used only validated checkpoint (37213
+request tokens including reserve) but expired with ~31.85s remaining. Thus wire
+aliases improve measured request overhead and one first-fold completion, not full
+acceptance or proof of robust latency.
+
+Generation now explains canonical citation expansion (up to128bytes per reference)
+and targets <=render_limit/128 total reference occurrences, with minimal sufficient
+evidence and duplicate-statement consolidation. It explicitly retains distinct active
+constraints, unresolved work, failures and decisions. This is generation guidance;
+canonical parse/source/render gates remain authoritative and unchanged. All original
+source entries still supplied.116+4 tests/build passed; changed-candidate actual
+provider check running. No source merge/install/original-session attempt.
+
+### Real history path passed and byte-rate regression proved red/green
+
+`target/recovery-real-provider-wire-budget-20261118/result.json` actual provider
+history path passed: automatic preparation first fold completed normally (~73.35s),
+three history_search calls returned success, final anchored REPL prompt observed,
+original snapshot hashes unchanged. Binary7de15665450356b8bfdb50ff97e8f3040fd6aa4b1f13873a81083f89f8a49dbe.
+Model answer honestly notes history detail lacks independent role/time fields; this
+is not broad completeness or original-host acceptance. Fresh manual Applied pending.
+
+Added deterministic paused-clock byte-rate provider regression: fixed100s preparation
+plus10ms per generated byte; eight distinct long references across required fields.
+Old d97ddcb2 fails shared120s deadline; candidate passes with restored exact canonical
+references, retained recent20 messages and admitted final request. Evidence:
+ target/recovery-wire-red-test-20261118.json and recovery-wire-regression-20261118.log.
+117 checkpoint tests +4 stream tests pass. Old-source red check restored candidate
+source byte-for-byte. No installed binary or primary implementation files replaced.
+
+Fresh manual checkpoint check now runs on a new isolated copy of the closed successful
+history fixture; requires independently verified typed Applied receipt, not model
+wording or Admitted. Full preflight/review/CI/merge/install/original-host acceptance
+remain outstanding. Overall Partial.
+
+### Fresh manual Applied harness observation incomplete
+
+First manual check `target/recovery-real-provider-fresh-applied-20261118` completed
+second cold-start automatic compaction (~82.28s, normal terminal) then seven actual
+history_search successes. The harness's180s whole-dialog observation expired before
+any compact_context call; it closed the isolated process. This is incomplete manual
+acceptance, not product checkpoint timeout and not Applied. Failed artifacts retained.
+
+A corrected harness uses600s for the entire multi-tool dialog, explicitly separate
+from unchanged product120s per automatic preparation. It starts a fresh isolated
+copy of the previous successful closed fixture, not the interrupted one. No model
+request retry loop is introduced. Unit talos-wire-applied-r2-20261118 and exec handle
+85210 track the current run; inspect this exact handle before restarting anything.
+Original session and installed program untouched. Overall Partial.
+
+### Fresh manual response requires runtime receipt verification
+
+Corrected600s observer run `target/recovery-real-provider-fresh-applied-r2-20261118`
+returned normally after5history calls and1compact_context success. Persisted tool
+result proves operation0 Admitted; model reported Applied844089->92987. No independent
+typed receipt was retained by that harness (only model prose), so do NOT mark Applied
+verified from this artifact. Keep passed=false pending stronger evidence.
+
+Added content-free `checkpoint_terminal` tracing only after ledger.finish_from accepts
+the runtime terminal: session/generation/operation ID, origin, typed outcome. No payload,
+provider errors, or transcript content logged; no outcome/control-flow change.
+117 checkpoint +4 stream tests and CLI build passed. Actual receipt-focused isolated
+run tracks exec81361/unit talos-wire-receipt-real-20261118. No original data touched.
+
+### Runtime terminal exposed fresh manual preparation failure
+
+`target/recovery-real-provider-terminal-receipt-20261118` normal final prompt,
+6history calls and1compact tool success; actual runtime ledger terminal for
+session4404450a... generation0 operation0 originModel is
+FailedWithEstimate{before:844383,reason:Preparation}. This contradicts any assumption
+that source-query success or Admitted establishes fresh Applied. First automatic
+fold succeeded (~100.14s), so keep automatic/history progress separate from manual
+failure. Original non-database transcript/archive snapshot hashes still match.
+
+Extracted submitted checkpoint only into chmod600 private artifact; raw submitted
+JSON5237bytes/estimated1015tokens,3references. Its translated canonical coverage,
+source age and final request remain to be checked; small raw payload does not prove
+it valid. Code inspection found submitted source's stored preparation deadline is
+min-combined with the fresh operation deadline after multiple model/tool calls.
+Possible expired-work-budget versus live-identity-lifetime confusion is a hypothesis,
+not proven cause of this runtime result. Do not remove expiration checks speculatively.
+
+Added content-free submitted-preparation diagnostic and booleans for current/submitted
+source budget expiration; build/test running as talos-submitted-diag-build-20261118,
+exec9535. No new real-provider run started until the instrumentation passes. Next
+reproduce via focused paused-time Actor test, then check actual submitted failure
+category before changing semantics. Full preflight/review/CI/delivery remain pending.
+
+### 2026-11-18 source discovery age regression red/green
+
+New real Actor archived/CLI source_detail -> compact_context regression advances
+Tokio clock121s between reading source and submitting a valid checkpoint. Existing
+implementation fails installed-checkpoint/turn success assertions; same fixture
+passes after removing only submitted.source's OLD preparation deadline from the
+new operation min-deadline. Logs: recovery-source-age-red/green-20261118.log.
+Green asserts actual ModelCheckpointTerminal Applied, after<before, preserved
+original history/head/restart, not merely model text or Admitted.
+
+Current source bind_continuation_until already establishes this operation's120s
+budget. matches_source revalidates every covered identity/generation under it;
+current source deadline, authority/permission checks and atomic commit checks remain.
+Submitted discovery binding is identity evidence, not a lease on old work budget.
+Existing source_binding_deadline_is_not_reset_before_checkpointing continues to
+verify same-operation expiration is not reset. No deadline constant increased.
+
+This proves a matching real-path defect deterministically; original provider-run
+terminal lacked the specific old-expiration diagnostic, so do not overstate exact
+attribution of that earlier run. Broader checkpoint tests/build now running in
+unit talos-source-age-build-20261118/exec13164, followed by typed-receipt actual
+provider acceptance. Overall Partial; no merge/install/original-session launch.
+
+### 2026-11-18 source-age fix validation and live acceptance limit
+
+118 checkpoint tests +4 stream tests and CLI build passed. Actual provider candidate
+bdd0d08132c2787a2d63df3ec1e64ffa7cc9f4c7ec3ee0da8506457b61fb438d run
+`target/recovery-real-provider-source-age-20261118` completed automatic summary
+normally, then47history_search calls within600s; no compact_context invocation.
+Harness observation expired and closed only isolated process. No new manual terminal
+exists to verify; fresh Applied remains unverified. Do not call this a product120s
+checkpoint timeout, and do not rerun merely seeking green. Original snapshot hashes
+unchanged. Source-age regression red/green proves defect independently; live outcome
+is limited by model not submitting before observation end.
+
+README English/Chinese now explain request-local source IDs/canonical validation,
+one bounded shortening attempt, incomplete-response refusal and fresh preparation
+budget after revalidated source/authority. Full pinned/locked release_preflight starts
+next sequentially under existing resource limits. No merge/install or original host
+restart. Entire handoff stays Partial with original acceptance and all earlier
+residuals retained.
+
+### 2026-11-18 converged source candidate full local preflight passed
+
+Pinned Rust1.99.0/locked standard release_preflight completed exit0 in13min44.553s,
+peak2GiB/swap0: workspace check/Clippy/tests and external Runtime SDK default/coding
+passed. Log test totals including child-process tests5633passed/0failed/0ignored.
+Evidence target/recovery-source-age-full-preflight-20261118.log and source manifest
+ target/recovery-source-age-preflight-manifest-20261118.json;2686 tracked files
+unchanged throughout validation.118 focused checkpoint +4 stream tests also passed.
+
+Candidate includes reversible short wire references with canonical restore/validation,
+canonical citation budget guidance, one bounded RenderLimit correction using only
+validated summary, content-free stage/terminal diagnostics, and fresh manual operation
+budget independent of old discovery-work deadline. Three regressions demonstrate
+old failure/new success: generated render overflow, long-ID generation byte cost,
+and Actor manual checkpoint after121s source reading. Existing source identity,
+privacy, complete tool batches, recent history and120s per-operation budget retained.
+
+Actual automatic/history query acceptance passed; manual fresh Applied remains
+UNVERIFIED (latest600s provider run47history calls/no compact submission). No claim
+that automatic success or model wording closes manual acceptance. Full independent
+read-only review authorization requested for existing reviewer; earlier authorization
+was #969-specific. Exact-head CI and delivery not yet performed; no source merge,
+install, PATH/config change or original host launch. Overall Partial.
