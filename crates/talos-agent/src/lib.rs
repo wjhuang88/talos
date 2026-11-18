@@ -1819,6 +1819,9 @@ impl Agent {
                     execution
                         .refresh_cooperative(valid.then_some(&*source), &messages)
                         .await;
+                    execution
+                        .prepare_source_reads(&messages, &effective_tool_calls)
+                        .await;
                 }
             }
             messages.push(assistant_msg);
@@ -2186,13 +2189,26 @@ impl Agent {
                                     },
                                 );
                             }
+                            tracing::info!(
+                                stage = "submitted_checkpoint_budget",
+                                current_source_expired = source
+                                    .deadline()
+                                    .is_some_and(|bound| tokio::time::Instant::now() >= bound),
+                                submitted_source_expired = submitted
+                                    .source
+                                    .deadline()
+                                    .is_some_and(|bound| tokio::time::Instant::now() >= bound),
+                                "checking submitted checkpoint preparation budget"
+                            );
                             let deadline = source
                                 .deadline()
                                 .map_or(deadline, |bound| bound.min(deadline));
-                            let deadline = submitted
-                                .source
-                                .deadline()
-                                .map_or(deadline, |bound| bound.min(deadline));
+                            // The submitted binding describes source identity, not a
+                            // lease on the earlier discovery's preparation budget.
+                            // matches_source revalidated that identity above under this
+                            // operation's deadline; live authority is checked at commit.
+                            // Do not expire a new operation because reading those sources
+                            // took longer than an earlier operation's work budget.
                             let before = plan.estimated_tokens;
                             let mut projection = None;
                             let result = self
@@ -2207,6 +2223,13 @@ impl Agent {
                                     &mut projection,
                                 )
                                 .await;
+                            if let Err(error) = &result {
+                                tracing::warn!(
+                                    stage = "submitted_checkpoint_preparation",
+                                    reason = crate::checkpoint_progress::failure_diagnostic(error),
+                                    "submitted checkpoint rejected; canonical history retained"
+                                );
+                            }
                             match (result, projection) {
                                 (Ok(()), Some(projection)) => {
                                     checkpoint_manual::ManualCheckpointResult::Candidate {

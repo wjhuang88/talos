@@ -672,6 +672,10 @@ raw history. See the I313 owner for current implementation and validation status
 ### Model checkpoint tool registration (I313, next minor)
 
 RuntimeBuilder registers `compact_context` and `history_search` by default.
+Applying a checkpoint replaces the covered older prefix. The suffix starting
+with the oldest of the ten most recent user messages remains verbatim when
+that boundary exists. Carry forward active goals, constraints and unresolved
+work from the covered prefix using eligible source references.
 `history_search` discovery returns eligible checkpoint source UUIDs. Read their
 bounded text with `mode: "source_detail"`, the snapshot, and a source UUID as
 `reference`; cite that same UUID in `compact_context`. Durable `search`/`detail`
