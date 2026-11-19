@@ -452,3 +452,7 @@ interaction logic while retaining Talos ingestion and permission boundaries.
 ## Prior intake registration
 
 #915 registered this same owner before #918; no competing implementation claim.
+
+## PROVIDER-008-D / I332
+
+Bedrock #985 proposed Active / Claimed upon governance merge. Owner: PROVIDER-008-D-amazon-bedrock.md. ADR-107. Parent #724 open.

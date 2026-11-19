@@ -368,3 +368,7 @@ technical/document review and merge CAS passed. A is Complete; C/D and #724 rema
 ## Prior intake registration
 
 #915 registered this same owner before #918; no competing implementation claim.
+
+## PROVIDER-008-D / I332
+
+Bedrock #985 proposed Active / Claimed upon governance merge. Owner: PROVIDER-008-D-amazon-bedrock.md. ADR-107. Parent #724 open.
