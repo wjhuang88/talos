@@ -1,6 +1,6 @@
 # Iteration I323: Azure OpenAI transport and shape routing
 
-> Document status: Active (#918 merged; implementation acceptance pending)
+> Document status: Complete
 > Published plan date: 2026-11-11
 > Planned objective: complete PROVIDER-008-C / #914, child of #724.
 > Baseline rule: preserve this objective; changed objectives require a new iteration.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6 |
 | Work Slice | PROVIDER-008-C Azure transport and per-model Chat/Responses routing only |
@@ -19,8 +19,8 @@
 | Governance Claim PR | #918 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly authorized continuous #724 implementation, testing, independent review, merge and child closure. Distinct human approver unavailable; independent Agent protocol/auth/API review, exact-head CI, validators and CAS remain mandatory. Shared GitHub identity is not independent natural-person approval. |
-| Implementation PR | #978 |
-| Last Updated | 2026-11-16 |
+| Implementation PR | #978 (merged) |
+| Last Updated | 2026-11-19 |
 | Handoff / Release Condition | Close only after merged implementation evidence and all published acceptance; retain failures and resume gate. |
 
 ## Published scope and acceptance
@@ -118,7 +118,7 @@ Fresh clean clone at 55617ad75c84db75718f287d6c05b84cfe55085e; GitHub main indep
 No C/D effective claim found. Rust installation started in isolated local build directory.
 Claim PR #918 is backfilled. Governance validation and independent review are in progress. Implementation
 has not begun. Next: address review findings, validate/review the final exact head, CAS and merge before T2.
-Completion Commit: Pending.
+Completion Commit: d1e07b59a814acc838a39ca4dc2717b7e40547f2.
 
 #915 intake registration was inspected at main 6c81390a; it is the same unclaimed owner, not a competing claim. #918 supersedes intake only upon reviewed merge.
 
@@ -375,3 +375,9 @@ main, run standard preflight, then stable PR/exact-head CI/independent review/CA
 ## 2026-11-18 implementation review
 
 Draft implementation PR #978 contains source commit 9b2f575e. Independent Agent source review passed. Local workspace check and Clippy passed. The locked no-fail-fast workspace run recorded 5647 passes and 11 failures, all at Unix socket fixture creation (EPERM), independently reproduced by a bind probe. Both prior Agent failures passed on this tree. The external runtime SDK fixture passed. The local SQLite external fixture outcome is unavailable. CI4375 was still running at backfill. Completion Commit remains pending.
+
+## Final acceptance — 2026-11-19
+
+Completion Commit: d1e07b59a814acc838a39ca4dc2717b7e40547f2
+
+Implementation #978 merged after CI4411/run44457009706 passed all eight jobs on b818846d089e7bf18559f5f99ae1f6ceef56a468, independent Agent review and merge CAS. Controlled Agent and HTTP tests cover both bodies, authentication, images, tool continuation, reasoning, usage and catalog precedence. CI4379 failed on the missing local-storage feature after preflight passed. CI4396 failed the long-history checkpoint assertion. Both historical failures remain recorded. No live Azure service or release acceptance. Bedrock and #724 remain open.
