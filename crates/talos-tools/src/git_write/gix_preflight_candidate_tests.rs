@@ -513,6 +513,50 @@ fn gix_hasconfig_remote_url_lookahead_is_bounded_to_admitted_source_bytes() {
 }
 
 #[test]
+fn git_var_legacy_path_query_support_is_classified_per_command() {
+    // Test-only native oracle. Git 2.40 documentation does not enumerate
+    // these variables; Git 2.42 does. An older writer may reject some of
+    // them with usage, while a supported query may have no value. Neither
+    // outcome authorizes a production fallback or any new filesystem reads.
+    let dir = tempfile::tempdir().expect("isolated Git variable fixture");
+    for variable in [
+        "GIT_ATTR_SYSTEM",
+        "GIT_ATTR_GLOBAL",
+        "GIT_CONFIG_SYSTEM",
+        "GIT_CONFIG_GLOBAL",
+        "GIT_SHELL_PATH",
+    ] {
+        let native = std::process::Command::new("git")
+            .current_dir(dir.path())
+            .args(["--no-pager", "var", variable])
+            .output()
+            .expect("selected test Git variable oracle");
+        let outcome = if native.status.success() {
+            "supported"
+        } else if native.status.code() == Some(1)
+            && native.stdout.is_empty()
+            && native.stderr.is_empty()
+        {
+            "supported-but-unset"
+        } else if native.stderr.windows(b"usage: git var".len()).any(|part| {
+            part.eq_ignore_ascii_case(b"usage: git var")
+        }) {
+            "unsupported-variable"
+        } else {
+            panic!(
+                "Git var {variable} failed for another reason: code={:?}, stdout_bytes={}, stderr_bytes={}",
+                native.status.code(),
+                native.stdout.len(),
+                native.stderr.len()
+            );
+        };
+        // Preserve a *value-free* native compatibility receipt. Do not log
+        // paths or configuration values returned by any Git variable.
+        eprintln!("I324_GIT_VAR_NATIVE variable={variable} outcome={outcome}");
+    }
+}
+
+#[test]
 fn gix_attributes_strict_parse_refuses_malformed_filter_sources() {
     // The locked gix-attributes parser operates solely on admitted bytes.
     // A future filter-effect resolver must not use Search's lenient parsing
