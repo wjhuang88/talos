@@ -119,6 +119,17 @@ impl InvocationExecutionContext {
 }
 
 impl Agent {
+    pub(crate) fn activate_session_workspace(registry: &ToolRegistry) {
+        for shell in ["bash", "powershell"] {
+            if registry.is_builtin_instance(shell)
+                && let Some(host) = registry.get(shell)
+                && let Err(error) = host.activate_session_workspace()
+            {
+                tracing::warn!(%error, "additional workspace activation unavailable; using normal path authorization");
+            }
+        }
+    }
+
     /// Executes a batch of tool calls, running read-only tools concurrently
     /// (up to [`MAX_CONCURRENT_READ_ONLY`]) and write tools serially.
     ///
@@ -129,6 +140,7 @@ impl Agent {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn execute_tools_with_presentation(
         &self,
+        preparation: Option<(&crate::checkpoint_tools::BatchPreparation<'_>, &[Message])>,
         hook_ctx: &HookContext,
         calls: &[ToolCall],
         user_intent: Option<&str>,
@@ -193,6 +205,7 @@ impl Agent {
                         let _permit = sem.acquire().await.expect("semaphore closed");
                         let result = agent
                             .execute_single_tool_with_presentation(
+                                preparation,
                                 &ctx,
                                 registry,
                                 call,
@@ -219,6 +232,7 @@ impl Agent {
             let call = &calls[idx];
             let (result, parts) = self
                 .execute_single_tool_with_presentation(
+                    preparation,
                     hook_ctx,
                     &self.tools,
                     call,
@@ -351,6 +365,7 @@ impl Agent {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn execute_tools_for_ui_with_presentation(
         &self,
+        preparation: Option<&crate::checkpoint_tools::BatchPreparation<'_>>,
         hook_ctx: &HookContext,
         calls: &[PendingToolCall],
         event_tx: &mpsc::UnboundedSender<AgentEvent>,
@@ -380,6 +395,7 @@ impl Agent {
 
             let (result, parts) = self
                 .execute_single_tool_with_presentation(
+                    preparation.map(|batch| (batch, messages.as_slice())),
                     hook_ctx,
                     &self.tools,
                     &pending.call,
@@ -548,6 +564,7 @@ impl Agent {
     #[allow(clippy::too_many_arguments)]
     async fn execute_single_tool_with_presentation(
         &self,
+        preparation: Option<(&crate::checkpoint_tools::BatchPreparation<'_>, &[Message])>,
         hook_ctx: &HookContext,
         registry: &ToolRegistry,
         call: &ToolCall,
@@ -558,6 +575,7 @@ impl Agent {
         private_tokens: &PrivateTokens,
     ) -> AgentResult<(ToolExecutionResult, Vec<ContentPart>)> {
         let execution = self.execute_single_tool_observed(
+            preparation,
             hook_ctx,
             registry,
             call,
@@ -593,6 +611,7 @@ impl Agent {
     #[allow(clippy::too_many_arguments)]
     async fn execute_single_tool_observed(
         &self,
+        preparation: Option<(&crate::checkpoint_tools::BatchPreparation<'_>, &[Message])>,
         hook_ctx: &HookContext,
         registry: &ToolRegistry,
         call: &ToolCall,
@@ -629,13 +648,9 @@ impl Agent {
         };
         let mut call = effective_call.expect("tool call should be present");
 
-        for shell in ["bash", "powershell"] {
-            if registry.is_builtin_instance(shell)
-                && let Some(host) = registry.get(shell)
-                && let Err(error) = host.activate_session_workspace()
-            {
-                tracing::warn!(%error, "additional workspace activation unavailable; using normal path authorization");
-            }
+        Self::activate_session_workspace(registry);
+        if let Some((batch, messages)) = preparation {
+            batch.prepare(messages).await;
         }
         let tool = match registry.get(&call.name) {
             Some(t) => t,
