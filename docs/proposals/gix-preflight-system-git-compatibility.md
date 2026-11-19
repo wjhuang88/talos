@@ -6,7 +6,7 @@
 
 ## 背景与实证
 
-原始 Windows Git 2.36.1.windows.1（Scoop）中，`git var GIT_ATTR_SYSTEM` 与 `git var GIT_ATTR_GLOBAL` 直接返回 usage，属性路径发现阻塞 Prepared Checkout/Commit。2026-11-17 测试：纯 gix 候选 12/12；全套原环境 272 pass / 113 fail；仅移除测试进程中的 `GIT_INSTALL_ROOT` 时 305 pass / 80 fail。17 MiB 真实 Checkout/Commit 验收失败，不能据此宣布兼容。见 [原始证据](../reference/WINDOWS-VALIDATION-2026-11-17-I324.md)。
+原始 Windows Git 2.36.1.windows.1（Scoop）中，`git var GIT_ATTR_SYSTEM` 与 `git var GIT_ATTR_GLOBAL` 直接返回 usage，属性路径发现阻塞 Prepared Checkout/Commit。2026-11-17 测试：纯 gix 候选 12/12；全套原环境 272 pass / 113 fail；仅移除测试进程中的 `GIT_INSTALL_ROOT` 时 305 pass / 80 fail。17 MiB 真实 Checkout/Commit 验收失败，不能据此宣布兼容。见 [原始证据](https://github.com/wjhuang88/talos/blob/fb5ee9809ddd4c1c63684157f6b5d35444df8173/docs/reference/WINDOWS-VALIDATION-2026-11-17-I324.md)。
 
 **这些结果只能证明属性查询确实不兼容，不证明整个 Git CLI 预检不兼容。** 配置路径失效 5 项、URL rewrite/tracking 3 项及其他接收端、测试夹具错误必须独立判因。
 
