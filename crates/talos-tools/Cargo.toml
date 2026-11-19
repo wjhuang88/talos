@@ -123,6 +123,7 @@ windows-sys = { version = "0.61.2", optional = true, features = [
 ] }
 
 [dev-dependencies]
+gix-attributes = { version = "=0.37.1", default-features = false }
 jsonschema = { version = "0.58.6", default-features = false }
 talos-plugin = { version = "0.10.1", path = "../talos-plugin", features = ["wasm", "code-intelligence"] }
 talos-permission = { version = "0.10.1", path = "../talos-permission" }
