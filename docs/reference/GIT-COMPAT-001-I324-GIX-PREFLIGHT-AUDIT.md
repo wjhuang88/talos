@@ -169,3 +169,26 @@ A stronger provenance step than latest-upstream T0c: identified the upstream **2
 | [gix-attributes pattern_matching_relative_path lines 103-120, 199-252](https://github.com/GitoxideLabs/gitoxide/blob/dd39fb66e3b1551c9fe849043e39b357a9799ca1/gix-attributes/src/search/attributes.rs#L199-L252) | Traverses already-loaded pattern lists and updates Outcome without process or source read in the direct implementation | Match only frozen supplied-buffer patterns; precedence and macro semantics still need native differential proof |
 
 **T0f decision:** Retain strict parse, add_patterns_buffer, and buffer-backed match only in the experimental pure candidate. Do not use Search::new_globals, add_patterns_file or List::from_file to find sources or decide missing-file outcomes. The released source matches Cargo.lock package versions but not independently verified crates.io archive bytes/checksums. Full feature/callgraph audit, zero-child end-to-end, selected Git compiled-default profile, independent ADR review and genuine Windows Git 2.36 acceptance remain separate gates. No production authorization is granted by this document.
+
+## T0g: command-by-command old-Git compatibility correction (2026-11-19)
+
+The maintainer's **current** requirement is to retain Git CLI preflight queries when supported and replace only individual unsupported old-Git query forms, not all 14 production Git command constructors. The source inventory above is a historical audit, not a full replacement checklist.
+
+**Independent versioned command documentation:**
+
+- [Official `git-var` manual for Git 2.40.0](https://git-scm.com/docs/git-var/2.40.0) lists `GIT_AUTHOR_IDENT`, `GIT_COMMITTER_IDENT`, `GIT_EDITOR`, `GIT_SEQUENCE_EDITOR`, `GIT_PAGER` and `GIT_DEFAULT_BRANCH`, but *not* `GIT_ATTR_SYSTEM`, `GIT_ATTR_GLOBAL`, `GIT_CONFIG_SYSTEM`, `GIT_CONFIG_GLOBAL` or `GIT_SHELL_PATH`.
+- [Official `git-var` manual for Git 2.42.0](https://git-scm.com/docs/git-var/2.42.0) adds all **five** names and clarifies that system/global attribute/configuration paths may be reported even when files do not exist. This is a historical API-availability indication; the exact **Git 2.36.1.windows.1** binary remains the acceptance oracle.
+- The original [native Git 2.36.1 I324 report](WINDOWS-VALIDATION-2026-11-17-I324.md) already confirms that both **attribute** queries return usage. Five configuration path-discovery failures and receiver shell-selection failures are consistent with the additional three historical missing-variable names but **not yet directly proven** by an exact-command original-environment matrix.
+
+| Native `git var` query | Source classification | Scope rule |
+|---|---|---|
+| `GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL` | Actual Git 2.36.1 usage failure; absent from 2.40 manual | First two confirmed compatibility replacements |
+| `GIT_CONFIG_SYSTEM` and `GIT_CONFIG_GLOBAL` | Absent from 2.40, present by 2.42; aggregated native config failures | Test each exact query before adding to replacement implementation |
+| `GIT_SHELL_PATH` | Absent from 2.40, present by 2.42; native receiver shell failures | Test exact query; preserve other supported receiver CLI and command authority |
+| Retained `git config --show-origin --null --list --includes`, `git --exec-path`, `git check-attr`, `git rev-parse` | No general incompatibility established by these five `git var` names | Leave existing authorization and CLI path unchanged unless separately proven unsupported |
+
+**New test-only evidence:** `git_var_legacy_path_query_support_is_classified_per_command` executes the five exact `git var` forms against the native selected test Git, classifies success, supported-but-unset and usage/unsupported without logging any path/configuration value. Other failures remain failures, not aliases for unsupported. This is **not** production capability detection, a new preflight probe or an authorized CLI fallback; reproduce it on original Windows Git 2.36.1 and a newer Git to obtain runtime evidence.
+
+The existing `ConfigState::capture_host` already places explicit `core.attributesFile` and frozen XDG/HOME global-attribute defaults into stable auxiliary candidate paths. The new `global_attribute_default_uses_frozen_xdg_and_home_evidence_without_git_var` test covers those roots and content-change invalidation without changing production. It does **not** establish the selected Git's **system** attribute compiled fallback. Missing that relevant selected-writer fact still means explicit Unsupported on the affected replacement; it is **not** a blanket blocker for retained, working, authorized CLI.
+
+This subsection supplies **scoping/test evidence only**, no independent ADR-089 approval or native Git 2.36 Checkout/Commit success. Source values, exact source rights, alternative executable effects, `GIT_INSTALL_ROOT` semantics and genuine native acceptance remain under their existing gates.
