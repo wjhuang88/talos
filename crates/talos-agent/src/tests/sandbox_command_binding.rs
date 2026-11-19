@@ -38,6 +38,7 @@ async fn real_exec_preserves_sequentially_created_working_directory() {
     );
     let (results, _) = agent
         .execute_tools_with_presentation(
+            None,
             &HookContext::new(TurnId::new(), root.path().to_owned()),
             &[ToolCall {
                 id: "dynamic-directory".into(),
@@ -326,6 +327,7 @@ async fn sandbox_fallback_approval_cannot_change_execution_context() {
         };
         let (results, _) = agent
             .execute_tools_with_presentation(
+                None,
                 &HookContext::new(TurnId::new(), root.clone()),
                 &[call],
                 None,
@@ -445,6 +447,7 @@ async fn final_permission_hook_cannot_retarget_or_invalidate_process_approval() 
         };
         let (results, _) = agent
             .execute_tools_with_presentation(
+                None,
                 &HookContext::new(TurnId::new(), root.clone()),
                 &[call],
                 None,

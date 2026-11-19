@@ -9,9 +9,11 @@ pub(crate) async fn read_summary_stream(
     rx: &mut talos_core::provider::Receiver<AgentEvent>,
 ) -> CompactionResult<String> {
     const MAX_SUMMARY_BYTES: usize = 32 * 1024;
+    let mut timing = SummaryTiming::new();
     let mut summary = String::new();
     let mut completed = false;
     while let Some(event) = rx.recv().await {
+        timing.event(&event);
         match event {
             AgentEvent::TextDelta { delta } if !completed => {
                 if delta.len() > MAX_SUMMARY_BYTES.saturating_sub(summary.len()) {
@@ -50,7 +52,53 @@ pub(crate) async fn read_summary_stream(
             "summary missing successful terminal or content".into(),
         ));
     }
+    timing.completed = true;
     Ok(summary)
+}
+
+// Drop also records deadline cancellation; counters never retain streamed text.
+struct SummaryTiming {
+    started: tokio::time::Instant,
+    first_text_ms: Option<u64>,
+    text_bytes: usize,
+    text_events: usize,
+    completed: bool,
+}
+
+impl SummaryTiming {
+    fn new() -> Self {
+        Self {
+            started: tokio::time::Instant::now(),
+            first_text_ms: None,
+            text_bytes: 0,
+            text_events: 0,
+            completed: false,
+        }
+    }
+
+    fn event(&mut self, event: &AgentEvent) {
+        if let AgentEvent::TextDelta { delta } = event {
+            if !delta.is_empty() && self.first_text_ms.is_none() {
+                self.first_text_ms = Some(self.started.elapsed().as_millis() as u64);
+            }
+            self.text_bytes = self.text_bytes.saturating_add(delta.len());
+            self.text_events = self.text_events.saturating_add(1);
+        }
+    }
+}
+
+impl Drop for SummaryTiming {
+    fn drop(&mut self) {
+        tracing::info!(
+            stage = "checkpoint_summary_stream",
+            elapsed_ms = self.started.elapsed().as_millis() as u64,
+            first_text_ms = ?self.first_text_ms,
+            text_bytes = self.text_bytes,
+            text_events = self.text_events,
+            completed = self.completed,
+            "checkpoint summary stream finished"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -76,6 +124,21 @@ mod summary_stream_tests {
             stop_reason: reason,
             usage: Usage::default(),
         }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn summary_timing_counts_bytes_without_retaining_content() {
+        let mut timing = SummaryTiming::new();
+        timing.event(&text(""));
+        assert_eq!(timing.first_text_ms, None);
+        tokio::time::advance(std::time::Duration::from_millis(25)).await;
+        timing.event(&text("界"));
+        tokio::time::advance(std::time::Duration::from_millis(75)).await;
+        timing.event(&text("abc"));
+        assert_eq!(timing.first_text_ms, Some(25));
+        assert_eq!(timing.text_bytes, 6);
+        assert_eq!(timing.text_events, 3);
+        assert!(!timing.completed);
     }
 
     #[tokio::test]
