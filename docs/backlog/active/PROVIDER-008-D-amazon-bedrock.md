@@ -15,7 +15,7 @@
 | Work Slice | PROVIDER-008-D Bedrock ConverseStream, destination-bound SigV4, catalog and host integration |
 | Claimed At | 2026-11-19 |
 | Source Issue | #985 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #986 |
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | User explicitly authorized continuous #724 implementation, testing, independent review, merge and child closure. Distinct human approver unavailable; independent Agent protocol/auth/API review, exact-head CI, validators and CAS remain mandatory. Shared GitHub identity is not independent natural-person approval. |
 | Implementation PR | Not started |
