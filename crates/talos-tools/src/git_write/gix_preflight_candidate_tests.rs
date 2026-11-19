@@ -312,14 +312,23 @@ fn gix_host_candidate_retains_missing_root_and_rejects_later_appearance() {
     );
 }
 
-#[cfg(unix)]
 #[test]
 fn gix_gitdir_conditional_requires_admitted_repository_identity() {
     // Capturing the exact config/include bytes does NOT authorize reading or
     // resolving an unadmitted repository gitdir. The gitdir is a separate
     // metadata-only frontier, even though the source values are complete.
     let dir = tempfile::tempdir().expect("fixture");
-    let fixture = dir.path().canonicalize().expect("fixture path");
+    let fixture = {
+        #[cfg(windows)]
+        {
+            // Keep Windows native paths free of the verbatim \\?\ prefix.
+            dir.path().to_path_buf()
+        }
+        #[cfg(not(windows))]
+        {
+            dir.path().canonicalize().expect("fixture path")
+        }
+    };
     let root = fixture.join("root.conf");
     let conditional = fixture.join("conditional.conf");
     let gitdir = fixture.join("selected.git");
@@ -328,7 +337,8 @@ fn gix_gitdir_conditional_requires_admitted_repository_identity() {
         &root,
         format!(
             "[includeIf \"gitdir:{}\"]\n path = conditional.conf\n",
-            gitdir.display()
+            // Git's gitdir: patterns use '/' even on native Windows.
+            gitdir.to_string_lossy().replace('\\', "/")
         ),
     )
     .expect("conditional fixture");
