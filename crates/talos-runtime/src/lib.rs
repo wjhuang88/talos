@@ -1490,6 +1490,30 @@ impl RuntimeBuilder {
         self
     }
 
+    /// Explicitly bind a host-selected durable session from a custom local profile.
+    ///
+    /// This optional host-selection path delegates to the existing
+    /// `SessionManager::with_dir` constructor and durable binding, without
+    /// changing `RuntimeBuilder::new()`, `Self::durable_session`, or any product
+    /// host. The call may create the selected Session binding and transcript,
+    /// but does not open optional Memory, Exploration, or Todo databases.
+    ///
+    /// A custom profile intentionally does **not** perform the default
+    /// `SessionManager::new()` startup index/orphan reconciliation. Hosts that
+    /// need default startup behavior must keep their existing default manager
+    /// selection. Invalid external identities retain the Session domain error.
+    #[cfg(feature = "local-storage")]
+    pub fn durable_session_from_custom_local_profile(
+        self,
+        profile: &crate::local_storage::LocalStorageProfile,
+        external_id: &str,
+    ) -> Result<Self, talos_session::SessionError> {
+        let selected = profile
+            .custom_session_manager()
+            .create_or_open_session(external_id)?;
+        Ok(self.durable_session(selected))
+    }
+
     /// Sets the filtering policy for a durable session binding.
     #[must_use]
     pub fn durable_session_with_policy(
@@ -2356,6 +2380,63 @@ mod tests {
     use tokio::sync::Notify;
 
     use super::*;
+
+    #[cfg(feature = "local-storage")]
+    #[test]
+    fn explicit_host_storage_binding_reuses_selected_session_without_optional_database_creation() {
+        let dir = tempfile::tempdir().expect("isolated host home");
+        let profile = crate::local_storage::LocalStorageProfile::under_home_dir(dir.path());
+        let root = profile.talos_root();
+        let sessions_root = profile.sessions_dir();
+
+        let unbound = RuntimeBuilder::new();
+        assert!(unbound.durable_session.is_none());
+        assert!(!root.exists(), "unbound runtime must remain in-memory");
+
+        let selected = RuntimeBuilder::new()
+            .durable_session_from_custom_local_profile(&profile, "host-session")
+            .expect("explicit host-owned local durable binding");
+        let (bound, _) = selected.durable_session.as_ref().expect("durable binding");
+        assert_eq!(bound.external_id(), "host-session");
+        // The existing durable binding index is at the Sessions root, while
+        // UUID-named TLOG transcripts live under its durable/ subdirectory.
+        let durable_root = sessions_root.join("durable");
+        assert_eq!(bound.file_path().parent(), Some(durable_root.as_path()));
+        assert!(sessions_root.join("durable-bindings.sqlite").is_file());
+
+        let direct = profile
+            .custom_session_manager()
+            .create_or_open_session("host-session")
+            .expect("existing direct Session API");
+        assert_eq!(bound.id(), direct.id());
+        assert_eq!(bound.file_path(), direct.file_path());
+        assert!(
+            !profile.memory_db().exists()
+                && !profile.exploration_db().exists()
+                && !sessions_root.join("todos.sqlite").exists(),
+            "host session selection must not eagerly open optional stores"
+        );
+
+        let unchanged = RuntimeBuilder::new().durable_session(direct);
+        assert!(unchanged.durable_session.is_some());
+    }
+
+    #[cfg(feature = "local-storage")]
+    #[test]
+    fn rejected_host_identity_never_creates_selected_local_storage() {
+        let dir = tempfile::tempdir().expect("isolated host home");
+        let profile = crate::local_storage::LocalStorageProfile::under_home_dir(dir.path());
+        let selected = RuntimeBuilder::new()
+            .durable_session_from_custom_local_profile(&profile, "../not-a-host-key");
+        assert!(matches!(
+            selected,
+            Err(talos_session::SessionError::InvalidExternalId(_))
+        ));
+        assert!(
+            !profile.talos_root().exists(),
+            "Session domain validation precedes all directory creation"
+        );
+    }
 
     #[tokio::test]
     async fn reopened_large_history_automatically_compacts_before_normal_dispatch() {
