@@ -18,8 +18,9 @@ No default background continuation or product release authorization.
 
 ## Azure C / PROVIDER-008-C
 
-[Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 proposes atomic claim+activation;
-ineffective until governance merge. A/B remain Complete; D and #724 remain unfinished.
+[Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 is Active / Claimed after #918.
+Azure implementation is in local validation; full preflight, exact-head CI, final independent review
+and merge CAS remain pending. A/B remain Complete; D and #724 remain unfinished.
 
 # Talos Board
 

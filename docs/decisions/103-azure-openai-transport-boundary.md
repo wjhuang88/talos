@@ -1,6 +1,6 @@
 # ADR-103: Azure OpenAI transport and body-shape boundary
 
-**Status**: Accepted (proposed; effective only upon reviewed #918 merge)
+**Status**: Accepted (#918 merged `f61a15cd3f0be81489e69f92d374fc8ee41eddec`)
 **Date**: 2026-11-11
 **Owner**: PROVIDER-008-C / #914 / I323; parent #724
 
@@ -88,3 +88,15 @@ misroute current Responses. Two explicit modes retain both without silent migrat
 A full Azure identity SDK now would expand #132 and require a dependency/native audit; explicit
 supplied tokens keep this child bounded and accurately documented. Deployment aliases must not
 accidentally change reasoning support or replay identity; regressions must test that separation.
+
+## 2026-11-16 confirmed catalog admission
+
+The frozen models.dev 888c250133b38839c2018d66fe687cb03c03a8f2 source and translator confirm
+27 Responses-first defaults; 22 intersect unchanged packaged Azure records. Exact azure/model
+pairs with a valid explicit v1 resource profile and no endpoint replacement may infer Azure and
+Responses. Explicit model/provider protocol and shape take priority. Custom providers, legacy
+alias providers, deployment mode, Messages and special /models endpoints remain outside inference.
+The source fixture README lists all 22 effective IDs; offline audit verifies the runtime allowlist
+and packaged intersection. No endpoint/deployment/credential is inferred or catalog regenerated.
+The initial blanket explicit-only assessment was rejected by independent review and superseded
+by these bounded rules. Live vendor acceptance and general authentication work remain separate.

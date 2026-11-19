@@ -13,6 +13,7 @@
 //! concrete provider structs as pre-1.0 adapters and prefer the `talos-core` provider traits for
 //! long-lived integration code.
 
+mod azure_transport;
 mod copilot;
 mod gemini_auth;
 mod gemini_compat;
