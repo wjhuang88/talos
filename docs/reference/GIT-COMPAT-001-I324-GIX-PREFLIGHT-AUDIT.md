@@ -5,11 +5,15 @@
 > Owner [GIT-COMPAT-001](../backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) · [Issue #919](https://github.com/wjhuang88/talos/issues/919) · [I324](../iterations/I324-git-236-preflight-compatibility.md).
 > Binding ADR: [089](../decisions/089-structured-git-effect-authorization.md); [change proposal](../proposals/adr-089-gix-native-preflight-amendment.md) remains **Proposed / not accepted**.
 
-## Required architecture
+## Current architecture scope — maintainer correction 2026-11-19
 
-Use **gix native interpretation for all preflight** across Git versions; retain the bound system Git **only for approved mutations**. Never dispatch by `git --version` nor add hardcoded Scoop/Windows installation paths, `git var` / `git config` CLI fallback, unbound gix-internal Git process, undocumented ambient `PATH` search or process-global host-state cache.
+The 2026-11-12 **all preflight must be gix / zero Git CLI** target is **SUPERSEDED** by [Issue #919](https://github.com/wjhuang88/talos/issues/919). Existing, supported, ADR-089-approved Git CLI preflight remains legal. Replace only **verified unsupported older-Git queries**, initially `git var GIT_ATTR_SYSTEM/GLOBAL`. The CLI inventory and pure-gix release-call-path findings below are historical source evidence, **not** a requirement to replace every command constructor. Continue each approved CLI command with its original permission, selected executable, bounded time/output and stale-plan binding; new substitute code must not perform unapproved I/O or spawn hidden, unapproved children.
 
-**A Rust API is not automatically an authorized pure computation.** It must consume frozen invocation data or specifically admitted snapshots, not independently read or execute. No expansion of `git:configuration-chain` into general filesystem read. If selected system Git installation defaults cannot be proven equivalent, this is a **real unsupported profile** requiring fail-closed refusal, not a silently skipped input.
+A gix/Talos substitution may only use approved frozen invocation data and exact admitted byte/metadata snapshots; it must not infer Read/Execute authority from a Rust API. If a substitute cannot prove the bound writer's relevant attribute defaults, refuse **that specific operation**; this does not globally require an external trust-profile for unaffected approved CLI. No blanket `GIT_*` relaxation, hardcoded Scoop/Windows install root, or guessed Git-version dispatch. Revised [ADR-089 PR #931](https://github.com/wjhuang88/talos/pull/931) is Proposed / NOT ACCEPTED.
+
+## Historical full-gix source inventory (2026-11-12 to 2026-11-18)
+
+The following rows describe what the former full-replacement work **would have needed**, not today's scope. For `git var GIT_CONFIG_SYSTEM/GLOBAL` the five config failures warrant direct classification rather than an assumed incompatibility. Retain other CLI commands unless exact old-Git test evidence supports replacing them.
 
 ## Code-truth inventory: CLI work still used by preflight
 
