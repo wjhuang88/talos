@@ -1,6 +1,6 @@
 # GIT-COMPAT-001: gix-Native Prepared Preflight (Git 2.36 and Newer)
 
-**Status:** In Progress / Claimed proposed by #920, ineffective until its merge.
+**Status:** In Progress / Claimed — #920 merged to main `067dd3d4f5fd0fac910ac7f52bd23ee7f8f5bb80`; implementation and ADR-089 amendment not yet accepted.
 
 **Type:** Git Tools / Security-Preserving Compatibility Repair
 
@@ -49,8 +49,8 @@ Replace Git CLI preflight discovery/interpretation with auditable gix-native ana
 | Source Issue | #919 |
 | Governance Claim PR | #920 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer requested implementation of the 2026-11-10 gix design on 2026-11-11 (conversation). Single-maintainer fallback is proposed for documentation-only claim because no separate reviewing maintainer is available; exact-head CI, both governance validators and no-overlap merge-time CAS are mandatory. No source implementation or security acceptance is claimed by this PR. Subsequent implementation requires independent Git authorization/security/API review and native Windows evidence. |
-| Implementation PR | Not started |
+| Authorization Evidence | Claim PR #920 merged as `067dd3d4f5fd0fac910ac7f52bd23ee7f8f5bb80` after exact-head CI #4123 (`43248451893`) passed remote owner reconciliation and both governance validators (0 warnings). Single-maintainer documentation-only claim; **no** source implementation, accepted ADR amendment or independent Git security/API review is implied. |
+| Implementation PR | Draft #928 (T0 source/API audit only; no production implementation yet) |
 | Last Updated | 2026-11-12 |
 | Handoff / Release Condition | Independent security/API review and native Windows acceptance before delivery; exact-head CI and governance CAS for claim/implementation. |
 
@@ -61,3 +61,22 @@ Replace Git CLI preflight discovery/interpretation with auditable gix-native ana
 ## Architecture clarification — 2026-11-12
 
 Maintainer explicitly clarified that **gix must replace Git CLI for preflight**, not that Talos should add hardcoded version/installation compatibility branches. This supersedes the original proposal's suggestion to use host probes. The final system Git writer and Talos admission/stale-evidence checks remain unchanged. No CLI preflight fallback is approved. Any `gix::config_path` or related convenience API that internally invokes Git or captures global ambient state is disallowed in this plan unless reworked into a pure, per-invocation, externally admitted interface. Open decision: how to prove compiled installation default attribute paths match the selected system Git without a host subprocess; if unprovable, stop safely instead of guessing. See Issue #919.
+
+## T0 implementation follow-up — 2026-11-12
+
+The governance claim is effective on `main@067dd3d4`. The [source/API audit](../../reference/GIT-COMPAT-001-I324-GIX-PREFLIGHT-AUDIT.md) on implementation branch inventories all preflight CLI families and the existing `target_config::Sources` staged exact-Read implementation. The gix 0.90.0 `Repository::attribute_global_paths` API exists but **may read ambient config**; `gix::config_path` may spawn Git. Neither API may be blindly called before admission. Installation-compiled defaults remain an unproven binding and must fail closed until an independently reviewed source of truth exists. ADR-089 amendment remains Proposed, not Accepted; production behavior change is gated. No implementation SHA/native pass/review evidence yet.
+
+## Native validation follow-up — 2026-11-17
+
+Claim #920 is effective; Draft implementation #928 and Proposed ADR review #931
+remain unmerged. [Native Windows evidence](../../reference/WINDOWS-VALIDATION-2026-11-17-I324.md)
+tests #928 at `71c923b95e4aff29ac7a7d71703d26f8d42ff530` with Rust 1.99.0 MSVC
+and Git 2.36.1.windows.1: candidate primitives 12/12 pass; full Git suite in the
+original Scoop environment is 272 passed / 113 failed. Removing only
+`GIT_INSTALL_ROOT` in the test process yields 305 passed / 80 failed. The controlled
+17 MiB stale-source rejection passes; actual large Checkout/Commit still fails
+attribute discovery. Unix-only sentinel/gitdir tests supply no Windows coverage.
+Formatting and full preflight/governance gates did not pass (details and raw
+evidence linked above). No production replacement, compatibility acceptance,
+independent security approval or completion is claimed. Preserve the published
+scope and existing claim; remaining acceptance is open under #919.
