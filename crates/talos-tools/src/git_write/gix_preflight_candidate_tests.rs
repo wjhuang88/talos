@@ -586,10 +586,12 @@ fn git_check_attr_source_is_not_interchangeable_with_cached() {
         output
     };
     git(&["init", "-q"]);
-    std::fs::write(dir.path().join(".gitattributes"), b"*.txt filter=committed\n")
-        .expect("original attributes");
-    std::fs::write(dir.path().join("tracked.txt"), b"tracked")
-        .expect("tracked fixture");
+    std::fs::write(
+        dir.path().join(".gitattributes"),
+        b"*.txt filter=committed\n",
+    )
+    .expect("original attributes");
+    std::fs::write(dir.path().join("tracked.txt"), b"tracked").expect("tracked fixture");
     git(&["add", "--", ".gitattributes", "tracked.txt"]);
     git(&[
         "-c",
@@ -605,11 +607,21 @@ fn git_check_attr_source_is_not_interchangeable_with_cached() {
     std::fs::write(dir.path().join(".gitattributes"), b"*.txt filter=index\n")
         .expect("index attributes");
     git(&["add", "--", ".gitattributes"]);
-    std::fs::write(dir.path().join(".gitattributes"), b"*.txt filter=worktree\n")
-        .expect("worktree attributes");
+    std::fs::write(
+        dir.path().join(".gitattributes"),
+        b"*.txt filter=worktree\n",
+    )
+    .expect("worktree attributes");
 
     let current = git(&["check-attr", "-z", "filter", "--", "tracked.txt"]);
-    let cached = git(&["check-attr", "-z", "--cached", "filter", "--", "tracked.txt"]);
+    let cached = git(&[
+        "check-attr",
+        "-z",
+        "--cached",
+        "filter",
+        "--",
+        "tracked.txt",
+    ]);
     assert_eq!(current.stdout, b"tracked.txt\0filter\0worktree\0");
     assert_eq!(cached.stdout, b"tracked.txt\0filter\0index\0");
     assert_ne!(
@@ -648,7 +660,14 @@ fn git_check_attr_source_is_not_interchangeable_with_cached() {
 
     let source = std::process::Command::new("git")
         .current_dir(dir.path())
-        .args(["check-attr", "-z", "--source=HEAD", "filter", "--", "tracked.txt"])
+        .args([
+            "check-attr",
+            "-z",
+            "--source=HEAD",
+            "filter",
+            "--",
+            "tracked.txt",
+        ])
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_ATTR_NOSYSTEM", "1")
         .env("HOME", dir.path())
@@ -666,8 +685,7 @@ fn git_check_attr_source_is_not_interchangeable_with_cached() {
         let stderr = String::from_utf8_lossy(&source.stderr).to_ascii_lowercase();
         assert!(
             source.status.code() == Some(129)
-                && (stderr.contains("usage: git check-attr")
-                    || stderr.contains("unknown option")),
+                && (stderr.contains("usage: git check-attr") || stderr.contains("unknown option")),
             "unexpected native check-attr failure: exit={:?}, stdout_bytes={}, stderr_bytes={}",
             source.status.code(),
             source.stdout.len(),
