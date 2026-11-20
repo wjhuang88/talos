@@ -5,6 +5,15 @@
 Record reusable lessons from failures, corrections, and unexpected successes. Check here before
 repeating known mistakes.
 
+## 2026-11-17 - Candidate test counts do not prove platform acceptance
+
+- Trigger: #919 native Windows validation ran 12 candidate tests successfully while full Git acceptance failed.
+- Symptom: the zero-child sentinel and gitdir conditional tests were Unix-only; a controlled-environment stale-source test passed while original-environment Checkout/Commit failed.
+- Root cause: test-module success excludes platform-gated cases and does not establish production wiring or original-environment behavior. Sandbox Git ownership variables also differ from the native Scoop environment.
+- Fix: bind evidence to the exact candidate, compiler and native environment; enumerate excluded tests, retain original and controlled results separately, and classify failures before claiming acceptance.
+- Prevention: inspect platform gates and individual large-file outcomes; record failed format/preflight checks even when focused tests pass.
+- Promoted to rule/check: none; findings and remaining gates are recorded in `docs/reference/WINDOWS-VALIDATION-2026-11-17-I324.md`.
+
 ## 2026-11-16 - Truncation must preserve row separators and their budget
 
 - Trigger: independent review of numbered edit previews found two file locations joined on one output row.

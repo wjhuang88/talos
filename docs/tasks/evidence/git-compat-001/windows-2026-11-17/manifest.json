@@ -1,0 +1,67 @@
+{
+    "SchemaVersion":  1,
+    "SourceIssue":  919,
+    "PullRequest":  928,
+    "TestedCommit":  "71c923b95e4aff29ac7a7d71703d26f8d42ff530",
+    "MainAtRefresh":  "a28c1cccebad71eb5785d149129a640ceec3d098",
+    "Date":  "2026-11-17",
+    "Host":  "x86_64-pc-windows-msvc",
+    "Rust":  "1.99.0",
+    "Git":  "2.36.1.windows.1",
+    "CompatibilityAcceptance":  "FAILED",
+    "Archive":  "native-logs.zip",
+    "ArchiveSha256":  "716e55a8a3fc466de27221cc1c8c541c7240ecbeeb063a2472a94efff616e37f",
+    "Encoding":  "UTF-8 without BOM; normalized from PowerShell captures",
+    "Members":  [
+                    {
+                        "Name":  "windows-i324-candidate.log",
+                        "Bytes":  14215,
+                        "Sha256":  "199fa99a47ce694e4c06322e2c1d900e4cd2652a45159a815b8978862d796693"
+                    },
+                    {
+                        "Name":  "windows-i324-git-original.log",
+                        "Bytes":  101197,
+                        "Sha256":  "e9d1041c3f14c2c1796ce28febb059d95535925456ccf4fe8c378dfe3f77fedf"
+                    },
+                    {
+                        "Name":  "windows-i324-git-controlled.log",
+                        "Bytes":  88052,
+                        "Sha256":  "c9841c5cb61a2967853e79bea9c0784d4feb90565ff51a1b609298bd73e077ed"
+                    },
+                    {
+                        "Name":  "windows-i324-focused-controlled.log",
+                        "Bytes":  4738,
+                        "Sha256":  "639e350d2591954841766a5cb9d111e1769386984c3b877d07f4a147e216b3f0"
+                    },
+                    {
+                        "Name":  "windows-i324-focused-results.json",
+                        "Bytes":  1066,
+                        "Sha256":  "d32bdab3e21824de1b2f6a1f161d86bdecd9dc8f312044ef2d8805885054aa46"
+                    },
+                    {
+                        "Name":  "windows-i324-failure-classification.json",
+                        "Bytes":  30391,
+                        "Sha256":  "605f0b007771e37bac5d3b5303dd69489ce25c0b90656708dd413e8067850a42"
+                    },
+                    {
+                        "Name":  "windows-i324-fmt.log",
+                        "Bytes":  620,
+                        "Sha256":  "4a7bf72870b10e79c557025525fecec4e592bfd1db739ba97cb948b38585f3e4"
+                    },
+                    {
+                        "Name":  "windows-i324-preflight.log",
+                        "Bytes":  62,
+                        "Sha256":  "46461144b760f089afae44d9d5d727e365384566438d4249a82bdc11c2c81897"
+                    },
+                    {
+                        "Name":  "windows-i324-governance-native.log",
+                        "Bytes":  206,
+                        "Sha256":  "a74104006a43118e991d8a8c52d85182bf6600812a9c25676ad1145353a63b52"
+                    },
+                    {
+                        "Name":  "windows-i324-claims-native.log",
+                        "Bytes":  218,
+                        "Sha256":  "363ff4033368af2a198c51196bc059f80094c824344809074783e5a1911e05e4"
+                    }
+                ]
+}
