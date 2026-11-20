@@ -1,6 +1,6 @@
 # Iteration I334: ARCH-035 E3a — CLI Actor And Embedded SDK Host Composition Parity
 
-> Document status: Planned / Unclaimed — candidate atomic E3a claim, ineffective until reviewed governance PR merge
+> Document status: Active / Claimed proposed by atomic governance PR #995 — ineffective until reviewed target-main merge
 > Published plan date: 2026-11-20
 > Parent: [ARCH-035](../backlog/active/ARCH-035-behavior-preserving-host-composition.md) / [Issue #897](https://github.com/wjhuang88/talos/issues/897)
 > Objective: verify and minimally converge the actually supported CLI/TUI canonical Session actor path and embedded SDK RuntimeBuilder opt-in local binding on accepted STORE-002 E + ARCH-035 E2 concrete delegates without changing host defaults, startup/recovery, Session/permission authority, SDK source compatibility or storage paths/formats
@@ -11,18 +11,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
-| Work Slice | Proposed only: ARCH-035 E3a CLI/TUI canonical actor and embedded SDK local binding integration/parity checks, with Desktop read-only inventory. No product default change; no Desktop production migration, full E3/E4 conformance, STORE-002 F, ServerHost, new DB or permission changes. |
-| Claimed At | Not applicable |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
+| Work Slice | ARCH-035 E3a only: deterministic CLI/TUI canonical AppServerSession and embedded SDK RuntimeBuilder local host-composition parity and justified no-op/direct-delegate decisions; preserve startup reconciliation, existing Session identity/path, lazy Memory/Todo/Exploration opens, typed errors, permission/settlement/cancellation and source-compatible feature-on/off SDK. Inventory Desktop Create/Existing/unbound read-only, no Desktop migration. Excludes E3b, E4, STORE-002 F, ServerHost, providers/SQL/schema/default behavior and protected authority changes. |
+| Claimed At | 2026-11-20 (proposed; main merge required) |
 | Source Issue | #897 |
-| Governance Claim PR | Pending |
-| Authorization Mode | Not applicable until finalized review |
-| Authorization Evidence | E0/E1 via I320/ADR-104 #936; STORE-002 E #956 Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`; ARCH-035 E2 #979 Completion Commit `21589346d99263c5675ad0b648df684801d2e861`, I330 owner-first #987 merged `9f07fc6b8975939a4b54ddd40ba688fb9efa9f22`. E3a not activated before its own reviewed atomic claim. |
-| Implementation PR | Not started |
+| Governance Claim PR | #995 |
+| Authorization Mode | Single-maintainer merge (proposed; independent Host/API/non-overlap review, exact-head docs CI, validators and CAS required) |
+| Authorization Evidence | I320 E0/E1/ADR-104 #936 accepted; STORE-002 E #956 Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`; E2 #979 Completion Commit `21589346d99263c5675ad0b648df684801d2e861` with native CI #4412 8/8 and independent API/SDK review; I330 owner-first #987 merged `9f07fc6b8975939a4b54ddd40ba688fb9efa9f22` with docs CI #4455, independent review and CAS. #995 is governance-only: no E3a code/acceptance. Claim/activation require exact-head docs CI, both validators, independent Host/API/non-overlap review, single-maintainer authorization and merge-time CAS. |
+| Implementation PR | Not started (implementation forbidden before #995 main merge) |
 | Last Updated | 2026-11-20 |
-| Handoff / Release Condition | After review and merge of finalized atomic claim, implement only bounded E3a; E3b Desktop and E4 full equivalence separately gated. #897 stays Open; #670 F and ServerHost independent. |
+| Handoff / Release Condition | E3a only effective after reviewed #995 claim+activation merge; E3b, E4, STORE-002 F, ServerHost and #897 closure separately gated |
 
 ## Published Baseline
 
@@ -64,7 +64,7 @@
 
 ## Actual Activation And Execution
 
-Candidate only. Claim and Active status are **ineffective** until final governance-only PR with actual number, both validators, independent read-only scope/SDK review, single-maintainer CAS and merge.
+Finalized governance **proposal on Draft PR #995**: the ARCH-035 source owner and I334 together propose E3a `Claimed`/`Active`. Neither is effective before exact-head docs CI, both validators, independent Host/SDK/non-overlap review, single-maintainer CAS and target-main merge. No E3a implementation, API, tests, production Host change or Completion Commit in #995.
 
 ## Completion Evidence
 

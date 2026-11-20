@@ -4,10 +4,10 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Blocked / Released — I330 E2 Complete / Closed; E3/E4 not claimed; parent #897 OPEN pending further host integration and equivalence |
+| Status | Active / Claimed — proposed I334 E3a CLI actor and embedded SDK host-composition parity under #995, ineffective until reviewed merge; E3b/E4 unclaimed, #897 Open |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
-| Selected Iteration | [I330](../../iterations/I330-arch-035-e2-host-storage-selection.md) — E2 Complete / Closed via implementation #979; E3/E4 separately unclaimed. [I320](../../iterations/I320-arch-035-host-composition-baseline.md) E0/E1 documentation Complete / Closed |
+| Selected Iteration | [I334](../../iterations/I334-arch-035-e3a-cli-sdk-host-parity.md) — E3a proposed atomic claim+activation #995, ineffective before merge; I330 E2 and I320 E0/E1 Complete / Closed |
 | Parent / consumer | [SERVER-001](SERVER-001-serve-connect-protocol-adapters.md) / #142; [SERVER-001-C](SERVER-001-C-standalone-server-host-composition.md) / #361 |
 | Depends On | [STORE-002](STORE-002-storage-capability-contracts.md) / #670: accepted capability/domain seam; RUNTIME-001 SDK compatibility |
 | Coordinates | SESSION-009 / #46; SESSION-011 / #612; DATA-002 / #141; SERVER-002 / #360 |
@@ -19,18 +19,18 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Released |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
-| Work Slice | ARCH-035 E2 only: minimal functional opt-in host-facing storage selection/injection by direct delegation to accepted STORE-002 E LocalStorageProfile and domain stores; preserve existing RuntimeBuilder/CLI/SDK source-compatible defaults, lazy optional openings, Session reconciliation, error/permission/cancellation/settlement. No E3 multi-host migration, E4 full equivalence, #670 F, ServerHost, new providers/SQL/schema/format or product behavior change. |
-| Claimed At | 2026-11-18 |
+| Work Slice | ARCH-035 E3a only: deterministic CLI/TUI canonical AppServerSession and embedded SDK RuntimeBuilder local host-composition parity and justified no-op/direct-delegate decisions; preserve startup reconciliation, existing Session identity/path, lazy Memory/Todo/Exploration opens, typed errors, permission/settlement/cancellation and source-compatible feature-on/off SDK. Inventory Desktop Create/Existing/unbound read-only, no Desktop migration. Excludes E3b, E4, STORE-002 F, ServerHost, providers/SQL/schema/default behavior and protected authority changes. |
+| Claimed At | 2026-11-20 (proposed; effective on reviewed #995 merge only) |
 | Source Issue | #897 |
-| Governance Claim PR | #975 |
-| Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | I330 E2 governance #975 merged/effective `799e3c35e6a5f9b2adb8ce2346762b148be940c0`; implementation [#979](https://github.com/wjhuang88/talos/pull/979) merged **Completion Commit `21589346d99263c5675ad0b648df684801d2e861`** after exact-head native [CI #4412](https://github.com/wjhuang88/talos/actions/runs/44457476055) **8/8 SUCCESS**, project governance **0 warnings**, collaboration validator PASS with **1 unrelated SEARCH-001 intake warning**, independent read-only [Copilot exact-head APPROVE](https://github.com/wjhuang88/talos/pull/979#issuecomment-6999596024) and [single-maintainer merge-time CAS](https://github.com/wjhuang88/talos/pull/979#issuecomment-7002828221). Initial CI #4383 FAILED on a new TLOG-path test oracle and remains historical; repaired CI #4402 also passed 8/8. No separate human approval asserted. |
-| Implementation PR | #979 (merged; E2 Completion Commit `21589346d99263c5675ad0b648df684801d2e861`) |
-| Last Updated | 2026-11-19 |
-| Handoff / Release Condition | I330 E2 accepted and **Released 2026-11-19** after #979 merge; its bounded iteration is Complete / Closed. Parent #897 remains **OPEN / Blocked** for independently claimed E3 host integration and E4 conformance; #670 F and ServerHost/#361 independently gated. No E3 claim or product Host migration is authorized by this E2 closure. |
+| Governance Claim PR | #995 |
+| Authorization Mode | Single-maintainer merge (proposed; independent review, exact-head docs CI, validators and CAS required) |
+| Authorization Evidence | I320 E0/E1/ADR-104 #936 accepted; STORE-002 E #956 Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`; E2 #979 Completion Commit `21589346d99263c5675ad0b648df684801d2e861` with native CI #4412 8/8 and independent API/SDK review; I330 owner-first #987 merged `9f07fc6b8975939a4b54ddd40ba688fb9efa9f22` with docs CI #4455, independent review and CAS. #995 is governance-only: no E3a code/acceptance. Claim/activation require exact-head docs CI, both validators, independent Host/API/non-overlap review, single-maintainer authorization and merge-time CAS. |
+| Implementation PR | Not started (E3a; #979 is completed E2 code, not E3a) |
+| Last Updated | 2026-11-20 |
+| Handoff / Release Condition | Claim/Active E3a effective only after reviewed #995 merge. Implementation then separately staged; E3b Desktop, E4 full parity, STORE-002 F, ServerHost and #897 closure separately gated. Until merge target main remains Released from E2. |
 
 ## Requirement and value
 
@@ -160,3 +160,10 @@ ADR-104's **host/domain ownership and composition-layer placement only** may be 
 - **Independent/authorization:** read-only [Copilot APPROVE on the final exact head](https://github.com/wjhuang88/talos/pull/979#issuecomment-6999596024) confirmed source-compatible opt-in API, with_dir vs new() startup distinction, typed invalid-ID/no-create and unchanged Session TLOG path, optional-store laziness and current SDK behavior. [Final single-maintainer authorization + CAS](https://github.com/wjhuang88/talos/pull/979#issuecomment-7002828221) recorded no overlapping E2 owner, mergeable branch, full validation, and unrelated Provider/Azure main movement per ADR-071. No separate human approval is claimed.
 - **Accepted E2 only:** feature-gated `RuntimeBuilder::durable_session_from_custom_local_profile` delegates to accepted STORE-002 E `LocalStorageProfile::custom_session_manager().create_or_open_session` and unchanged `durable_session`. Tests compare Session ID/path with the direct constructor, validate the `sessions/durable/` transcript and `durable-bindings.sqlite` index, absence of eager Memory/Exploration/Todo DBs, typed invalid identity without creating root directories, and legacy unbound/bound API. Existing CLI/TUI/Desktop/SDK production callers, Session reconciliation, permissions, cancellation, SQL/schema, format and defaults remain unchanged; there is no SQLite-free binary or completed global Host equivalence claim.
 - **Residual and release:** bounded I330 E2 is **Complete / Closed** and this parent's former E2 claim is **Released**. The parent ARCH-035 / #897 remains **Open / Blocked / Released** until separately authorized E3 product-host composition and E4 equivalence evidence and acceptance. STORE-002 F remains independently unclaimed under #670; ServerHost #361 cannot treat E2 as full architecture acceptance.
+
+## I334 E3a atomic claim and activation proposal — 2026-11-20 (ineffective until #995 merge)
+
+- **Accepted prior boundary:** I330 E2 owner-first [#987](https://github.com/wjhuang88/talos/pull/987) merged `9f07fc6b8975939a4b54ddd40ba688fb9efa9f22`; underlying [#979](https://github.com/wjhuang88/talos/pull/979) E2 Completion Commit `21589346d99263c5675ad0b648df684801d2e861`. Historical I330 claim is Closed and must not be reopened.
+- **Separate proposed claim:** [I334](../../iterations/I334-arch-035-e3a-cli-sdk-host-parity.md) / governance [#995](https://github.com/wjhuang88/talos/pull/995) proposes E3a only. Its `Claimed` and `Active` values are **ineffective until a reviewed and authorized main merge**. This PR does not implement E3a or approve a public API.
+- **Source-backed non-overlap:** CLI `AppServerSession::new` / `set_persistence` retains Session/Agent authority; `SessionManager::new()` startup reconciliation must not be replaced with E2's custom `with_dir`. Memory lookup is query-time lazy; Todo prompt open is callback-time. Embedded `RuntimeBuilder::new` / `durable_session(DurableSession)` / unbound mode remain source-compatible. Desktop Create/Existing/unbound is inventoried but **not migrated** (E3b separately gated). E4, STORE-002 F, ServerHost and the parent #897 remain Open.
+- **Next gate:** independent read-only Host/SDK and non-overlap review, exact-head docs CI, both governance validators, single-maintainer authorization and merge-time CAS, then an independent E3a implementation branch; no permission/SQL/schema/default behavior changes in this claim.
