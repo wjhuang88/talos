@@ -2454,7 +2454,7 @@ mod tests {
         .expect("bounded turn deadline")
         .expect("turn completion");
         assert!(
-            matches!(status, TurnCompletionStatus::Success { .. }),
+            matches!(&status, TurnCompletionStatus::Success { .. }),
             "selected local SDK turn must settle successfully: {status:?}"
         );
         runtime.shutdown().await.expect("SDK runtime shutdown");
