@@ -98,7 +98,9 @@ C waits for B delivery. D remains separately unclaimed. No release is authorized
 
 ## Completion Evidence
 
-- Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f` (PR #660 squash merge; exact-head CI run 37409618084)
+- Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f` (PR #660 squash merge)
+
+  Exact-head CI run 37409618084.
 
 ## Variance And Residuals
 
@@ -112,4 +114,6 @@ C waits for B delivery. D remains separately unclaimed. No release is authorized
 
 ## Historical completion claim reconciliation — 2026-11-19
 
-**Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f`**, the **actual accepted final fixture source merge** [PR #660](https://github.com/wjhuang88/talos/pull/660), not the earlier adapter #656 merge or the new governance-only closeout. Original exact-head [CI #3009/run 37409618084](https://github.com/wjhuang88/talos/actions/runs/37409618084) SUCCESS; prior owner/iteration closeout [#663](https://github.com/wjhuang88/talos/pull/663) merged as `e55d86cb1e7b045248e0cbec396a8b3388f8b2e1` and recorded Complete, but the `Claim State | Claimed` was never made terminal. This change corrects that stale collaboration state only. The I292 completed work is private SearchBackend normalization and deterministic no-network fixtures for prior compatible sources, **not** the later SearchRouter product behavior or independent provider admission. #642 may close after this owner-first reconciliation PR merges; parent #624 remains Open, D/#644 ZERO-ADMISSION, E/F/G/I blocked.
+**Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f`**, the **actual accepted final fixture source merge** [PR #660](https://github.com/wjhuang88/talos/pull/660), not the earlier adapter #656 merge or the new governance-only closeout.
+
+Original exact-head [CI #3009/run 37409618084](https://github.com/wjhuang88/talos/actions/runs/37409618084) SUCCESS; prior owner/iteration closeout [#663](https://github.com/wjhuang88/talos/pull/663) merged as `e55d86cb1e7b045248e0cbec396a8b3388f8b2e1` and recorded Complete, but the `Claim State | Claimed` was never made terminal. This change corrects that stale collaboration state only. The I292 completed work is private SearchBackend normalization and deterministic no-network fixtures for prior compatible sources, **not** the later SearchRouter product behavior or independent provider admission. #642 may close after this owner-first reconciliation PR merges; parent #624 remains Open, D/#644 ZERO-ADMISSION, E/F/G/I blocked.
