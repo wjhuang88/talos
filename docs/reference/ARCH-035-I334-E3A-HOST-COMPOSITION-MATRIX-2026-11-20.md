@@ -27,10 +27,11 @@
 ## Proposed deterministic evidence and required gates
 
 1. `cargo test -p talos-runtime --locked --features local-storage e3a_explicit_local_sdk_binding_roundtrips_without_optional_store_open`: persisted assistant turn, stable external ID/UUID/TLOG path on reopen, no eager Memory/Exploration/Todo DB.
-2. `cargo test -p talos-cli --locked e3a_cli_todo_registration_preserves_callback_time_local_open`: existing canonical CLI registers a Todo callback without creating the SQLite DB; explicit domain on-demand open creates the same expected file.
-3. `cargo test -p talos-runtime --locked`, `cargo test -p talos-cli --locked`, external SDK default/coding fixture, `cargo fmt --all -- --check`, workspace check/clippy/tests, both governance validators and exact-head native CI. All results must be recorded from a **specific implementation HEAD**, not inferred from accepted E2 or initial claim docs.
-4. Independent API/SDK and host-permission review must verify the no-op disposition is justified and that these tests do not substitute for native Desktop or E4 end-to-end cancellation/permission/fault matrix.
-5. This document is a **candidate** until implementation is reviewed and merged. E3a's Completion Commit must be an actual pre-existing source merge SHA; I334 owner-first closeout follows separately. Parent #897 stays OPEN for E3b/E4, #670 stays OPEN for F, and ServerHost remains gated.
+2. `cargo test -p talos-runtime --locked --features local-storage --test i334_local_host_sdk`: separate Rust integration crate imports only public `talos_runtime` symbols to compile feature-on builder selector, legacy durable API, stable domain binding and typed no-create identity errors. **This still uses the workspace lock**, not the independent Cargo-root SDK fixture.
+3. `cargo test -p talos-cli --locked e3a_cli_todo_registration_preserves_callback_time_local_open`: existing canonical CLI registers a Todo callback without creating the SQLite DB; explicit domain on-demand open creates the same expected file.
+4. `cargo test -p talos-runtime --locked`, `cargo test -p talos-cli --locked`, external SDK default/coding fixture, `cargo fmt --all -- --check`, workspace check/clippy/tests, both governance validators and exact-head native CI. All results must be recorded from a **specific implementation HEAD**, not inferred from accepted E2 or initial claim docs.
+5. Independent API/SDK and host-permission review must verify the no-op disposition is justified and that these tests do not substitute for native Desktop or E4 end-to-end cancellation/permission/fault matrix.
+6. This document is a **candidate** until implementation is reviewed and merged. E3a's Completion Commit must be an actual pre-existing source merge SHA; I334 owner-first closeout follows separately. Parent #897 stays OPEN for E3b/E4, #670 stays OPEN for F, and ServerHost remains gated.
 
 ## Explicit outstanding acceptance
 
