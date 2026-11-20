@@ -64,7 +64,7 @@
 
 ## Actual Activation And Execution
 
-Finalized governance **proposal on Draft PR #995**: the ARCH-035 source owner and I334 together propose E3a `Claimed`/`Active`. Neither is effective before exact-head docs CI, both validators, independent Host/SDK/non-overlap review, single-maintainer CAS and target-main merge. No E3a implementation, API, tests, production Host change or Completion Commit in #995.
+Finalized governance **proposal on governance PR #995**: the ARCH-035 source owner and I334 together propose E3a `Claimed`/`Active`. Neither is effective before exact-head docs CI, both validators, independent Host/SDK/non-overlap review, single-maintainer CAS and target-main merge. No E3a implementation, API, tests, production Host change or Completion Commit in #995.
 
 ## Completion Evidence
 

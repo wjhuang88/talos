@@ -34,7 +34,7 @@
 
 ## ARCH-035 / I334 E3a — proposed CLI/SDK parity claim #995
 
-[ARCH-035](active/ARCH-035-behavior-preserving-host-composition.md) / [I334](../iterations/I334-arch-035-e3a-cli-sdk-host-parity.md) / #897: bounded E3a **Claimed/Active proposed in Draft [#995](https://github.com/wjhuang88/talos/pull/995)**, **ineffective until reviewed main merge**. E2 #979 implementation Completion Commit `21589346d99263c5675ad0b648df684801d2e861` and I330 owner-first #987 are accepted, not replayed. E3a proves existing CLI/TUI actor + embedded SDK construction parity and retains authority/lazy/default semantics; Desktop is only inventoried, not migrated. No E3b/E4, #670 F, ServerHost, provider, SQL/schema or default production changes; parent #897 Open.
+[ARCH-035](active/ARCH-035-behavior-preserving-host-composition.md) / [I334](../iterations/I334-arch-035-e3a-cli-sdk-host-parity.md) / #897: bounded E3a **Claimed/Active proposed in governance [#995](https://github.com/wjhuang88/talos/pull/995)**, **ineffective until reviewed main merge**. E2 #979 implementation Completion Commit `21589346d99263c5675ad0b648df684801d2e861` and I330 owner-first #987 are accepted, not replayed. E3a proves existing CLI/TUI actor + embedded SDK construction parity and retains authority/lazy/default semantics; Desktop is only inventoried, not migrated. No E3b/E4, #670 F, ServerHost, provider, SQL/schema or default production changes; parent #897 Open.
 
 ## ARCH-035 / I330 E2 — Complete / Closed; parent #897 Open
 
