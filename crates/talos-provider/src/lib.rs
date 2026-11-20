@@ -14,9 +14,11 @@
 //! long-lived integration code.
 
 mod azure_transport;
-mod copilot;
 mod bedrock_endpoint;
+mod bedrock_frames;
+mod bedrock_response;
 mod bedrock_transport;
+mod copilot;
 mod gemini_auth;
 mod gemini_compat;
 mod gemini_endpoint;

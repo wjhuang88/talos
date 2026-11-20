@@ -10068,6 +10068,7 @@ dependencies = [
  "aws-smithy-eventstream",
  "aws-smithy-types",
  "base64 0.23.1",
+ "bytes",
  "futures-util",
  "google-cloud-auth",
  "image",
