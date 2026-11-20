@@ -16,8 +16,10 @@
 mod azure_transport;
 mod bedrock_endpoint;
 mod bedrock_frames;
+mod bedrock_provider;
 mod bedrock_request;
 mod bedrock_response;
+mod bedrock_stream;
 mod bedrock_transport;
 mod copilot;
 mod gemini_auth;

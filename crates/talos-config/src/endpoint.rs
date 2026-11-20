@@ -88,6 +88,7 @@ pub fn validate_provider_protocol(protocol: &str) -> Result<ProviderProtocol, St
     match protocol {
         "openai-chat" => Ok(ProviderProtocol::OpenAIChat),
         "openai-responses" => Ok(ProviderProtocol::OpenAIResponses),
+        "amazon-bedrock" => Ok(ProviderProtocol::AmazonBedrock),
         "azure-openai" => Ok(ProviderProtocol::AzureOpenAI),
         "google-gemini" => Ok(ProviderProtocol::GoogleGemini),
         "anthropic-messages" => Ok(ProviderProtocol::AnthropicMessages),
