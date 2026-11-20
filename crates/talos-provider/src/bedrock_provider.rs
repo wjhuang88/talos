@@ -9,7 +9,12 @@ use talos_core::message::{AgentEvent, Message};
 use talos_core::provider::{LanguageModel, ProviderError, ProviderResult, ToolDefinition};
 use tokio::sync::mpsc;
 
+#[cfg(test)]
+tokio::task_local! { pub(crate) static FIXTURE: reqwest::Url; }
+
 pub(crate) struct BedrockProvider {
+    #[cfg(test)]
+    fixture: Option<reqwest::Url>,
     model: String,
     region: String,
     limit: Option<u32>,
@@ -26,6 +31,8 @@ impl BedrockProvider {
         bedrock_endpoint::converse_stream(&region, model)
             .map_err(|e| ProviderError::InvalidResponse(e.into()))?;
         Ok(Self {
+            #[cfg(test)]
+            fixture: FIXTURE.try_with(Clone::clone).ok(),
             model: model.into(),
             region,
             limit,
@@ -82,7 +89,13 @@ impl BedrockProvider {
             .map_err(|_| ProviderError::InvalidResponse("invalid Bedrock request body".into()))?;
         let response = tokio::time::timeout(
             Duration::from_secs(self.timeout.dispatch_timeout_secs),
-            bedrock_transport::dispatch(&self.region, &self.model, payload),
+            bedrock_transport::dispatch(
+                &self.region,
+                &self.model,
+                payload,
+                #[cfg(test)]
+                self.fixture.as_ref(),
+            ),
         )
         .await
         .map_err(|_| ProviderError::InvalidResponse("Bedrock dispatch timed out".into()))??;

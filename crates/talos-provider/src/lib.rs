@@ -14,6 +14,8 @@
 //! long-lived integration code.
 
 mod azure_transport;
+#[cfg(test)]
+mod bedrock_agent_tests;
 mod bedrock_endpoint;
 mod bedrock_frames;
 mod bedrock_provider;

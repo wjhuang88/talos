@@ -36,8 +36,18 @@ pub(crate) async fn dispatch(
     region: &str,
     model: &str,
     payload: Vec<u8>,
+    #[cfg(test)] fixture: Option<&reqwest::Url>,
 ) -> ProviderResult<reqwest::Response> {
     let url = crate::bedrock_endpoint::converse_stream(region, model).map_err(invalid)?;
+    #[cfg(test)]
+    let url = fixture.map_or_else(
+        || url.clone(),
+        |endpoint| {
+            let mut endpoint = endpoint.clone();
+            endpoint.set_path(url.path());
+            endpoint
+        },
+    );
     let client = Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()
@@ -49,7 +59,20 @@ pub(crate) async fn dispatch(
         .body(payload)
         .build()
         .map_err(|_| invalid("invalid Bedrock request"))?;
-    sign_request(&mut request, region, env_credentials()?, SystemTime::now())?;
+    #[cfg(test)]
+    let credentials = match fixture {
+        Some(_) => Credentials::new(
+            "FIXTURE",
+            "fixture-secret",
+            Some("fixture-token".into()),
+            None,
+            "fixture",
+        ),
+        None => env_credentials()?,
+    };
+    #[cfg(not(test))]
+    let credentials = env_credentials()?;
+    sign_request(&mut request, region, credentials, SystemTime::now())?;
     client
         .execute(request)
         .await
