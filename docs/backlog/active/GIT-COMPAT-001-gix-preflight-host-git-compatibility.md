@@ -84,3 +84,8 @@ scope and existing claim; remaining acceptance is open under #919.
 ## Current maintainer correction — 2026-11-19
 
 The latest [Issue #919](https://github.com/wjhuang88/talos/issues/919) is authoritative: this is a **query-level older-Git compatibility repair**, not a full gix-native, zero-Git-CLI preflight conversion. The revised [ADR-089 proposal PR #931](https://github.com/wjhuang88/talos/pull/931) remains Proposed / NOT ACCEPTED. Existing test-only pure-gix work in Draft #928 is retained as reusable evidence; it does not authorize eliminating approved CLI, changing production policy or declaring native Git 2.36 acceptance.
+
+
+## 2026-11-20 target-tree compatibility finding
+
+A second independently documented old-Git-incompatible **query option**, `git check-attr --source=<tree-ish>`, was introduced in Git 2.40. The existing I324 prepared Checkout target analysis uses `--source=<target.commit>` in addition to a separate, older-compatible `--cached` query. They cannot be interchanged when committed target, staged index and worktree differ. See [T0h audit](../../reference/GIT-COMPAT-001-I324-GIX-PREFLIGHT-AUDIT.md) and [Git 2.40 release notes](https://github.com/git/git/blob/master/Documentation/RelNotes/2.40.0.adoc). **Current scope remains command/option-level compatibility, not all-CLI removal**: retain normal/cached check-attr where supported; investigate an admitted, byte-fed gix target-tree substitute. Test-only candidate is on Draft #928, with no accepted runtime authorization or native Git 2.36.1 Checkout/Commit success. Additional `git var` config/shell names still require exact native classification.

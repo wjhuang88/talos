@@ -94,3 +94,8 @@ Historical note, superseded on 2026-11-19: the November 11 baseline mentioned bo
 ## Updated work-slice boundary — 2026-11-19
 
 Authoritative [Issue #919](https://github.com/wjhuang88/talos/issues/919) correction restricts I324 to **unsupported old-Git command forms**. Continue supported approved CLI; do not treat T0 inventory of 14 Git command constructors as a replacement checklist. Source/audit candidates from the previous broad program remain reusable but historical. Revised [ADR #931](https://github.com/wjhuang88/talos/pull/931) is Proposed / NOT ACCEPTED; native Git 2.36.1 large Checkout/Commit and independent security/API review remain open. No production switch or completion claim.
+
+
+## 2026-11-20 newly confirmed compatibility surface — target attributes
+
+The official [Git 2.40 release notes](https://github.com/git/git/blob/master/Documentation/RelNotes/2.40.0.adoc) introduce `git check-attr --source`; Git 2.36 cannot use this to read target-commit attributes. The current `prepared_add.rs` target-tree filter prediction invokes that option, separately from compatible current-worktree and `--cached` inspections. A new **test-only** native fixture in Draft #928 differentiates committed tree/index/worktree and checks a supplied-byte gix target selection. On older Git, keep the approved existing `check-attr` modes where supported, replacing **only the unsupported target-tree option** after exact tree/object/path Read, precedence/effect and stale-plan validation. Do not treat `--cached` as a target-tree synonym; no temporary index/extra subprocess without separately accepted authorization. This is source-backed scope, not native 2.36 verification or accepted ADR.
