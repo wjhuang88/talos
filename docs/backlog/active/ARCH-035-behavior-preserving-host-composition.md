@@ -4,10 +4,10 @@
 |---|---|
 | Story ID | ARCH-035 |
 | Source Issue | [#897](https://github.com/wjhuang88/talos/issues/897) |
-| Status | Review / Claimed — I330 E2 opt-in Host local storage binding implementation #979 under native validation; E3/E4 unclaimed, #897 Open |
+| Status | Blocked / Released — I330 E2 Complete / Closed; E3/E4 not claimed; parent #897 OPEN pending further host integration and equivalence |
 | Priority | P1 — blocking architectural prerequisite for SERVER-001 / SERVER-001-C implementation |
 | Type | Architecture / Runtime Composition / Equivalence Migration |
-| Selected Iteration | [I330](../../iterations/I330-arch-035-e2-host-storage-selection.md) — effective E2 claim #975, implementation #979 Review / Claimed; [I320](../../iterations/I320-arch-035-host-composition-baseline.md) E0/E1 documentation Complete / Closed |
+| Selected Iteration | [I330](../../iterations/I330-arch-035-e2-host-storage-selection.md) — E2 Complete / Closed via implementation #979; E3/E4 separately unclaimed. [I320](../../iterations/I320-arch-035-host-composition-baseline.md) E0/E1 documentation Complete / Closed |
 | Parent / consumer | [SERVER-001](SERVER-001-serve-connect-protocol-adapters.md) / #142; [SERVER-001-C](SERVER-001-C-standalone-server-host-composition.md) / #361 |
 | Depends On | [STORE-002](STORE-002-storage-capability-contracts.md) / #670: accepted capability/domain seam; RUNTIME-001 SDK compatibility |
 | Coordinates | SESSION-009 / #46; SESSION-011 / #612; DATA-002 / #141; SERVER-002 / #360 |
@@ -19,7 +19,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Released |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | ARCH-035 E2 only: minimal functional opt-in host-facing storage selection/injection by direct delegation to accepted STORE-002 E LocalStorageProfile and domain stores; preserve existing RuntimeBuilder/CLI/SDK source-compatible defaults, lazy optional openings, Session reconciliation, error/permission/cancellation/settlement. No E3 multi-host migration, E4 full equivalence, #670 F, ServerHost, new providers/SQL/schema/format or product behavior change. |
@@ -27,10 +27,10 @@
 | Source Issue | #897 |
 | Governance Claim PR | #975 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | I320 E0/E1 and placement-only ADR-104 accepted; STORE-002 E #956 implementation Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098` and I328 #972 owner closeout `bc4a37eeafff5e0e172764e861fac6cb6341fd86` accepted. I330 E2 atomic governance claim #975 **merged/effective** `799e3c35e6a5f9b2adb8ce2346762b148be940c0` after exact-head docs CI #4377, independent scope APPROVE and guarded CAS. Code PR #979 remains **Review**, initial exact-head CI #4383 failed on an incorrect new durable-directory test expectation; corrected candidate needs fresh full native CI, independent public Host/SDK API review, and final CAS. No separate human approval or E2 Completion Commit claimed. |
-| Implementation PR | #979 (Review / Claimed; no Completion Commit; I320 documentary #906/#934/#936 accepted separately) |
-| Last Updated | 2026-11-18 |
-| Handoff / Release Condition | E2 effective claimant remains @wjhuang88 until #979 passes exact-head native feature/workspace CI, independent Host/SDK API review and guarded implementation merge, followed by separate owner-first closeout. E3/E4, #670 F and ServerHost remain unclaimed/gated; #897 Open. |
+| Authorization Evidence | I330 E2 governance #975 merged/effective `799e3c35e6a5f9b2adb8ce2346762b148be940c0`; implementation [#979](https://github.com/wjhuang88/talos/pull/979) merged **Completion Commit `21589346d99263c5675ad0b648df684801d2e861`** after exact-head native [CI #4412](https://github.com/wjhuang88/talos/actions/runs/44457476055) **8/8 SUCCESS**, project governance **0 warnings**, collaboration validator PASS with **1 unrelated SEARCH-001 intake warning**, independent read-only [Copilot exact-head APPROVE](https://github.com/wjhuang88/talos/pull/979#issuecomment-6999596024) and [single-maintainer merge-time CAS](https://github.com/wjhuang88/talos/pull/979#issuecomment-7002828221). Initial CI #4383 FAILED on a new TLOG-path test oracle and remains historical; repaired CI #4402 also passed 8/8. No separate human approval asserted. |
+| Implementation PR | #979 (merged; E2 Completion Commit `21589346d99263c5675ad0b648df684801d2e861`) |
+| Last Updated | 2026-11-19 |
+| Handoff / Release Condition | I330 E2 accepted and **Released 2026-11-19** after #979 merge; its bounded iteration is Complete / Closed. Parent #897 remains **OPEN / Blocked** for independently claimed E3 host integration and E4 conformance; #670 F and ServerHost/#361 independently gated. No E3 claim or product Host migration is authorized by this E2 closure. |
 
 ## Requirement and value
 
@@ -152,3 +152,11 @@ ADR-104's **host/domain ownership and composition-layer placement only** may be 
 - **Implementation scope:** additive `#[cfg(feature = "local-storage")]` `RuntimeBuilder::durable_session_from_custom_local_profile(&LocalStorageProfile, &str) -> Result<RuntimeBuilder, SessionError>`, calls accepted `profile.custom_session_manager().create_or_open_session(external_id)` and existing `durable_session`. Unbound in-memory/old builder API remain intact; no default SessionManager reconciliation, optional DB eager opening, CLI/TUI/Desktop/SDK/ServerHost call-site rewire, new SQL or storage engine.
 - **First native [CI #4383](https://github.com/wjhuang88/talos/actions/runs/44253925717) FAILED** on macOS explicit `local-storage` feature regression: new test incorrectly expected UUID TLOG under `sessions/` rather than the existing `sessions/durable/` subtree. This is a **test oracle error**, confirmed by `talos-session::durable::create_or_open`, while `durable-bindings.sqlite` remains at `sessions/`. The other seven native jobs succeeded. Source-only test fix was pushed on #979; first failure is retained and no CI green claim is made for its newer head.
 - **Next gates:** exact-head macOS/Windows locked fmt/check/Clippy/tests and explicit feature tests, both governance validators and independent technical review of public builder API, source-compatible SDK and error/no-create semantics, plus owner/no-overlap merge-time CAS. E2 is not Complete. E3/E4, #670 F, ServerHost and entire #897 remain separately open.
+
+## I330 E2 owner-first bounded completion — 2026-11-19 (parent #897 remains OPEN)
+
+- **Completion Commit: `21589346d99263c5675ad0b648df684801d2e861`** — the actual pre-existing implementation merge of [PR #979](https://github.com/wjhuang88/talos/pull/979) on main, preceding this documentary closeout. Governance claim #975 `799e3c35` was the authorization, **not** an implementation completion commit.
+- **Exact-head evidence:** final implementation HEAD `99d6ecf303a6ebb0d54f700de6613f857360ccc3` passed [native CI #4412](https://github.com/wjhuang88/talos/actions/runs/44457476055) **SUCCESS 8/8**. macOS locked release preflight, fmt/check/Clippy/workspace test and feature-on `talos-runtime --features local-storage`, Windows workspace/Rust and Desktop, Linux Desktop, installer and remote owner checks all passed. Project governance validator **0 warnings**, collaboration claim validator **PASSED with one unrelated SEARCH-001-D3 unclaimed intake warning**; the warning remains independently owned. Earlier [CI #4383](https://github.com/wjhuang88/talos/actions/runs/44253925717) FAILED one new mislocated TLOG assertion (95/96 passed); narrowed test-only repair led to old-head CI #4402 success 8/8 and final #4412 success, not a rewritten historical result.
+- **Independent/authorization:** read-only [Copilot APPROVE on the final exact head](https://github.com/wjhuang88/talos/pull/979#issuecomment-6999596024) confirmed source-compatible opt-in API, with_dir vs new() startup distinction, typed invalid-ID/no-create and unchanged Session TLOG path, optional-store laziness and current SDK behavior. [Final single-maintainer authorization + CAS](https://github.com/wjhuang88/talos/pull/979#issuecomment-7002828221) recorded no overlapping E2 owner, mergeable branch, full validation, and unrelated Provider/Azure main movement per ADR-071. No separate human approval is claimed.
+- **Accepted E2 only:** feature-gated `RuntimeBuilder::durable_session_from_custom_local_profile` delegates to accepted STORE-002 E `LocalStorageProfile::custom_session_manager().create_or_open_session` and unchanged `durable_session`. Tests compare Session ID/path with the direct constructor, validate the `sessions/durable/` transcript and `durable-bindings.sqlite` index, absence of eager Memory/Exploration/Todo DBs, typed invalid identity without creating root directories, and legacy unbound/bound API. Existing CLI/TUI/Desktop/SDK production callers, Session reconciliation, permissions, cancellation, SQL/schema, format and defaults remain unchanged; there is no SQLite-free binary or completed global Host equivalence claim.
+- **Residual and release:** bounded I330 E2 is **Complete / Closed** and this parent's former E2 claim is **Released**. The parent ARCH-035 / #897 remains **Open / Blocked / Released** until separately authorized E3 product-host composition and E4 equivalence evidence and acceptance. STORE-002 F remains independently unclaimed under #670; ServerHost #361 cannot treat E2 as full architecture acceptance.
