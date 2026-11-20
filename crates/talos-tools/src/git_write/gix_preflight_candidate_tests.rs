@@ -559,6 +559,98 @@ fn git_var_legacy_path_query_support_is_classified_per_command() {
 }
 
 #[test]
+fn git_check_attr_source_is_not_interchangeable_with_cached() {
+    // Git 2.40 introduced check-attr --source. Git 2.36 still supports
+    // --cached, but cached reads the CURRENT index, not an arbitrary
+    // Checkout target tree. This test-only native oracle must never cause
+    // production to substitute one for the other.
+    let dir = tempfile::tempdir().expect("isolated Git attribute fixture");
+    let git = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .current_dir(dir.path())
+            .args(args)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_ATTR_NOSYSTEM", "1")
+            .env("HOME", dir.path())
+            .env("XDG_CONFIG_HOME", dir.path().join("xdg"))
+            .output()
+            .expect("Git fixture command");
+        assert!(
+            output.status.success(),
+            "Git attribute fixture setup failed: command={:?}, exit={:?}, stdout_bytes={}, stderr_bytes={}",
+            args,
+            output.status.code(),
+            output.stdout.len(),
+            output.stderr.len()
+        );
+        output
+    };
+    git(&["init", "-q"]);
+    std::fs::write(dir.path().join(".gitattributes"), b"*.txt filter=committed\n")
+        .expect("original attributes");
+    std::fs::write(dir.path().join("tracked.txt"), b"tracked")
+        .expect("tracked fixture");
+    git(&["add", "--", ".gitattributes", "tracked.txt"]);
+    git(&[
+        "-c",
+        "user.name=I324 Fixture",
+        "-c",
+        "user.email=i324@example.invalid",
+        "commit",
+        "-q",
+        "-m",
+        "fixture",
+    ]);
+
+    std::fs::write(dir.path().join(".gitattributes"), b"*.txt filter=index\n")
+        .expect("index attributes");
+    git(&["add", "--", ".gitattributes"]);
+    std::fs::write(dir.path().join(".gitattributes"), b"*.txt filter=worktree\n")
+        .expect("worktree attributes");
+
+    let current = git(&["check-attr", "-z", "filter", "--", "tracked.txt"]);
+    let cached = git(&["check-attr", "-z", "--cached", "filter", "--", "tracked.txt"]);
+    assert_eq!(current.stdout, b"tracked.txt\0filter\0worktree\0");
+    assert_eq!(cached.stdout, b"tracked.txt\0filter\0index\0");
+    assert_ne!(
+        cached.stdout, current.stdout,
+        "cached and worktree attributes cannot be conflated"
+    );
+
+    let source = std::process::Command::new("git")
+        .current_dir(dir.path())
+        .args(["check-attr", "-z", "--source=HEAD", "filter", "--", "tracked.txt"])
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_ATTR_NOSYSTEM", "1")
+        .env("HOME", dir.path())
+        .env("XDG_CONFIG_HOME", dir.path().join("xdg"))
+        .output()
+        .expect("native target-tree attribute oracle");
+    let outcome = if source.status.success() {
+        assert_eq!(source.stdout, b"tracked.txt\0filter\0committed\0");
+        assert_ne!(
+            source.stdout, cached.stdout,
+            "HEAD attributes must not be replaced by the current index"
+        );
+        "supported"
+    } else {
+        let stderr = String::from_utf8_lossy(&source.stderr).to_ascii_lowercase();
+        assert!(
+            source.status.code() == Some(129)
+                && (stderr.contains("usage: git check-attr")
+                    || stderr.contains("unknown option")),
+            "unexpected native check-attr failure: exit={:?}, stdout_bytes={}, stderr_bytes={}",
+            source.status.code(),
+            source.stdout.len(),
+            source.stderr.len()
+        );
+        "unsupported-option"
+    };
+    // Do not print returned configuration, path values, or attributes.
+    eprintln!("I324_CHECK_ATTR_SOURCE_NATIVE outcome={outcome}");
+}
+
+#[test]
 fn gix_attributes_strict_parse_refuses_malformed_filter_sources() {
     // The locked gix-attributes parser operates solely on admitted bytes.
     // A future filter-effect resolver must not use Search's lenient parsing
