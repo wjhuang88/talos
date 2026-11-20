@@ -1,6 +1,6 @@
 # PROVIDER-008: Complete Wire-Protocol Family Coverage And Protocol Mode Configuration
 
-**Status**: Refinement / Unclaimed (children A/B Complete / Closed; C/D unfinished)
+**Status**: Refinement / Unclaimed (children A/B/C Complete / Closed; D pending)
 **Type**: Provider / Config / Model-Catalog Epic (child Stories decompose at claim time)
 **Parent Epic**: None
 **Source Issue**: [#724](https://github.com/wjhuang88/talos/issues/724)
@@ -10,8 +10,8 @@ Children:
 
 - [PROVIDER-008-A](PROVIDER-008-A-openai-responses-protocol.md) / [#748](https://github.com/wjhuang88/talos/issues/748): protocol architecture (enum/factory dispatch/model-level protocol/catalog signals) + OpenAI Responses adapter (ADR-093); I306 / effective governance claim #747; Complete / Closed after #806; implementation chain recorded in child owner.
 - [PROVIDER-008-B](PROVIDER-008-B-google-gemini.md) / #810 / I310: Complete / Closed; implementation #838, closeout #913.
-- [PROVIDER-008-C](PROVIDER-008-C-azure-openai.md) / #914 / I323: Azure transport + shape routing; governance proposal, ineffective until merge.
-- PROVIDER-008-D: Amazon Bedrock Converse + SigV4 credential decision — unclaimed.
+- [PROVIDER-008-C](PROVIDER-008-C-azure-openai.md) / #914 / I323: Complete / Closed via implementation #978 and closeout #984.
+- [PROVIDER-008-D](PROVIDER-008-D-amazon-bedrock.md) / #985 / I332: ConverseStream and SigV4, claim effective upon #986 merge.
 
 ## Collaboration Claim
 

@@ -475,3 +475,7 @@ Parent #724 remains open for unimplemented/unclaimed Gemini, Azure and Bedrock s
 Completion Commit `dbcf6163f34d73def923484ad409814fd4a98039` (#838), exact-head CI4046 all eight
 jobs passed, independent technical/document review and merge CAS recorded in the owner.
 Azure C, Bedrock D and parent #724 remain open.
+
+## PROVIDER-008-D / I332
+
+Bedrock #985 proposed Active / Claimed upon governance merge. Owner: PROVIDER-008-D-amazon-bedrock.md. ADR-107. Parent #724 open.
