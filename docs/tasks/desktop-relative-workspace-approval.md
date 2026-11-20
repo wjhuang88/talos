@@ -1,6 +1,6 @@
 # Desktop approval for a relative workspace
 
-Document status: Planned.
+Document status: Active upon merge of #989.
 
 Desktop accepts a workspace path when opening a live session. With a relative path,
 the shell tool can receive a relative working directory while the ordinary invocation
@@ -11,13 +11,13 @@ requested one human approval for pwd where its configured evaluator allows the c
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex |
 | Work Slice | Resolve the Desktop live runtime's workspace path for shell review and execution, and cover the relative-path case in the host test |
 | Claimed At | 2026-11-20 |
 | Source Issue | None |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #989 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Session recovery investigation requested by maintainer. Independent permission review pending. |
 | Implementation PR | Not started |
