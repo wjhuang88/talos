@@ -15,10 +15,10 @@
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | ARCH-035 E3a only: deterministic CLI/TUI canonical AppServerSession and embedded SDK RuntimeBuilder local host-composition parity and justified no-op/direct-delegate decisions; preserve startup reconciliation, existing Session identity/path, lazy Memory/Todo/Exploration opens, typed errors, permission/settlement/cancellation and source-compatible feature-on/off SDK. Inventory Desktop Create/Existing/unbound read-only, no Desktop migration. Excludes E3b, E4, STORE-002 F, ServerHost, providers/SQL/schema/default behavior and protected authority changes. |
-| Claimed At | 2026-11-20 (proposed; main merge required) |
+| Claimed At | 2026-11-20 |
 | Source Issue | #897 |
 | Governance Claim PR | #995 |
-| Authorization Mode | Single-maintainer merge (proposed; independent Host/API/non-overlap review, exact-head docs CI, validators and CAS required) |
+| Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | I320 E0/E1/ADR-104 #936 accepted; STORE-002 E #956 Completion Commit `a28c1cccebad71eb5785d149129a640ceec3d098`; E2 #979 Completion Commit `21589346d99263c5675ad0b648df684801d2e861` with native CI #4412 8/8 and independent API/SDK review; I330 owner-first #987 merged `9f07fc6b8975939a4b54ddd40ba688fb9efa9f22` with docs CI #4455, independent review and CAS. #995 is governance-only: no E3a code/acceptance. Claim/activation require exact-head docs CI, both validators, independent Host/API/non-overlap review, single-maintainer authorization and merge-time CAS. |
 | Implementation PR | Not started (implementation forbidden before #995 main merge) |
 | Last Updated | 2026-11-20 |
