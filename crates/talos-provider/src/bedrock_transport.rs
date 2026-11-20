@@ -72,7 +72,13 @@ pub(crate) async fn dispatch(
     };
     #[cfg(not(test))]
     let credentials = env_credentials()?;
-    sign_request(&mut request, region, credentials, SystemTime::now())?;
+    sign_request(
+        &mut request,
+        "bedrock",
+        region,
+        credentials,
+        SystemTime::now(),
+    )?;
     client
         .execute(request)
         .await
@@ -81,6 +87,7 @@ pub(crate) async fn dispatch(
 
 fn sign_request(
     request: &mut Request,
+    service: &str,
     region: &str,
     credentials: Credentials,
     now: SystemTime,
@@ -89,7 +96,7 @@ fn sign_request(
     let params = v4::SigningParams::builder()
         .identity(&identity)
         .region(region)
-        .name("bedrock")
+        .name(service)
         .settings(SigningSettings::default())
         .time(now)
         .build()
@@ -130,6 +137,32 @@ fn sign_request(
 mod tests {
     use super::*;
 
+    // AWS aws-signing-test-suite/v4/post-vanilla, distributed with aws-sigv4 1.6.6.
+    #[test]
+    fn matches_aws_post_vanilla_signature() {
+        let mut request = Client::new()
+            .post("https://example.amazonaws.com/")
+            .body(Vec::new())
+            .build()
+            .unwrap();
+        let credentials = Credentials::new(
+            "AKIDEXAMPLE",
+            "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+            None,
+            None,
+            "aws-test-suite",
+        );
+        let now = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1440938160);
+        sign_request(&mut request, "service", "us-east-1", credentials, now).unwrap();
+        assert_eq!(
+            request.headers()[header::AUTHORIZATION],
+            concat!(
+                "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/service/aws4_request, ",
+                "SignedHeaders=host;x-amz-date, Signature=5da7c1a2acd57cee7505fc6676e4e544621c30862966e37dddb68e92efbe5d6b"
+            )
+        );
+    }
+
     #[tokio::test]
     async fn temporary_credentials_sign_the_final_request_sent_to_fixture() {
         let mut server = mockito::Server::new_async().await;
@@ -159,6 +192,7 @@ mod tests {
         );
         sign_request(
             &mut request,
+            "bedrock",
             "us-east-1",
             credentials,
             SystemTime::UNIX_EPOCH,
