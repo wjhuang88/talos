@@ -206,3 +206,9 @@ This does **not** reorder DDG vs Bing, count as a second native provider, enable
 new query recipient, or waive D3/#937's Microsoft access/output-use and region
 qualification gates. I329 proposes strictly offline policy tests only; E/F/G/I
 remain blocked and this Epic remains Open.
+
+## Bing technical GO handoff — 2026-11-20 (not Epic acceptance)
+
+Maintainer decision: Bing direct HTML is a **technical GO candidate**; existing Talos-owned parser and accepted synthetic T1/T2/T3a policy permit a separately governed engineering integration. [New bounded D3-T4 / #991](SEARCH-001-D3-T4-bing-prepared-dual-host-integration.md) proposes [I333](../../iterations/I333-search-bing-prepared-dual-host-integration.md), governance [PR #992](https://github.com/wjhuang88/talos/pull/992), for offline prepared dual-host request/permission mock integration without changing deployed DDG-first CN-only behavior. Claim not effective until main merge. Do not redo A/B, C, L, or I329.
+
+Technical feasibility does not imply confirmed distributed search/result-use rights, real `www.bing.com` or mainland-China reachability, or **two independent native providers**. #957 real/default activation and external evidence remain unverified; original #644 ZERO-ADMISSION and parent #624 Open remain unchanged. Network permission, redirect/SSRF, proxy, cancellation, deadline and physical send budget cannot be loosened to compensate for missing evidence.

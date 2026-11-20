@@ -188,3 +188,11 @@ ADR-090 authority/budget, actual permitted mainland-China/comparator evidence,
 separate effective source/activation claim, exact-head CI and security/API review.
 D3/#937 stays Intake / Unclaimed; Epic #624 stays Open, D/#644 ZERO-ADMISSION and
 E/F/G/I are unchanged.
+
+## Maintainer technical GO and separately owned I333 handoff — 2026-11-20
+
+The maintainer explicitly chooses **technical feasibility** as the GO criterion for the existing Bing HTML approach, per [#937](https://github.com/wjhuang88/talos/issues/937#issuecomment-7029524685) and [#957](https://github.com/wjhuang88/talos/issues/957#issuecomment-7029525278). The existing accepted `bing_parser.rs`, protected search transport, T1/T2 fixtures and I329/T3a fail-closed variant policy suffice to proceed with **bounded engineering** rather than repeat documentary feasibility research. Preferred same-family route remains `www.bing.com/search` first and `cn.bing.com/search` only on permitted typed source-local unavailability. The DDG-first production-family order remains intact.
+
+New independent [D3-T4 / #991](SEARCH-001-D3-T4-bing-prepared-dual-host-integration.md) and [I333](../../iterations/I333-search-bing-prepared-dual-host-integration.md) propose **offline/mocked prepared-request and permission-aware integration** under governance [PR #992](https://github.com/wjhuang88/talos/pull/992). Claim and activation are ineffective until #992 merges; no T4 source change or newly activated Bing request originates from this documentary decision. Already-closed I329/T3a and historical #644 ZERO-ADMISSION remain unchanged.
+
+**Fact separation:** technical GO is not a Microsoft access/reuse license, evidence of measured live `www` operation, or mainland-China/comparator reachability. #957 T3b live/default activation and external rights/real-region evidence remain separately unverified; no E/F/G/I admission or Epic #624 closure follows. Do not bypass access controls, 403/429/CAPTCHA/5xx restrictions, per-host prepared Network authority, or invocation budgets.
