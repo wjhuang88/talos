@@ -45,6 +45,38 @@ impl LanguageModel for BedrockProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        self.dispatch(messages, tools, talos_core::tool::ToolProtocol::Native)
+            .await
+    }
+
+    async fn stream_with_protocol(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: talos_core::tool::ToolProtocol,
+        _progress: mpsc::UnboundedSender<talos_core::provider::ProviderProgress>,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
+        use talos_core::tool::ToolProtocol;
+        match protocol {
+            ToolProtocol::Native => self.stream_with_tools(messages, tools).await,
+            ToolProtocol::Compat | ToolProtocol::TalosStrict => {
+                let projected = crate::compatibility_messages(messages);
+                self.dispatch(&projected, &[], protocol).await
+            }
+            ToolProtocol::Auto => Err(ProviderError::InvalidResponse(
+                "resolve the Bedrock tool protocol before dispatch".into(),
+            )),
+        }
+    }
+}
+
+impl BedrockProvider {
+    async fn dispatch(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: talos_core::tool::ToolProtocol,
+    ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let body = bedrock_request::build(messages, tools, self.limit)?;
         let payload = serde_json::to_vec(&body)
             .map_err(|_| ProviderError::InvalidResponse("invalid Bedrock request body".into()))?;
@@ -59,7 +91,7 @@ impl LanguageModel for BedrockProvider {
         let first = Duration::from_secs(self.timeout.first_packet_timeout_secs);
         let idle = Duration::from_secs(self.timeout.stream_idle_timeout_secs);
         tokio::spawn(async move {
-            let mut stream = ConverseStream::default();
+            let mut stream = ConverseStream::new(protocol);
             let mut timeout = first;
             let result: ProviderResult<()> = async {
                 loop {

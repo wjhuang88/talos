@@ -93,7 +93,7 @@ pub fn validate_provider_protocol(protocol: &str) -> Result<ProviderProtocol, St
         "google-gemini" => Ok(ProviderProtocol::GoogleGemini),
         "anthropic-messages" => Ok(ProviderProtocol::AnthropicMessages),
         other => Err(format!(
-            "Unknown protocol '{other}'. Allowed: openai-chat, openai-responses, anthropic-messages, google-gemini, azure-openai."
+            "Unknown protocol '{other}'. Allowed: openai-chat, openai-responses, anthropic-messages, google-gemini, azure-openai, amazon-bedrock."
         )),
     }
 }

@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::collections::{BTreeMap, HashSet};
 use talos_core::message::{AgentEvent, StopReason, ToolCall, Usage};
 use talos_core::provider::{ProviderError, ProviderResult};
-use talos_core::tool::ToolProvenance;
+use talos_core::tool::{ToolProtocol, ToolProvenance};
 
 fn invalid(message: &'static str) -> ProviderError {
     ProviderError::InvalidResponse(message.into())
@@ -21,6 +21,7 @@ enum Block {
 
 #[derive(Default)]
 pub(crate) struct ConverseStream {
+    textual: Option<(ToolProtocol, String)>,
     started: bool,
     open: BTreeMap<u32, Block>,
     closed: HashSet<u32>,
@@ -42,6 +43,14 @@ struct TokenCounts {
 }
 
 impl ConverseStream {
+    pub(crate) fn new(protocol: ToolProtocol) -> Self {
+        Self {
+            textual: matches!(protocol, ToolProtocol::Compat | ToolProtocol::TalosStrict)
+                .then(|| (protocol, String::new())),
+            ..Self::default()
+        }
+    }
+
     pub(crate) fn accept(
         &mut self,
         event: &str,
@@ -93,6 +102,9 @@ impl ConverseStream {
         }
         match event {
             "contentBlockStart" => {
+                if self.textual.is_some() {
+                    return Err(invalid("unexpected native tool in Bedrock textual mode"));
+                }
                 let tool = &body["start"]["toolUse"];
                 let id = tool["toolUseId"]
                     .as_str()
@@ -122,6 +134,12 @@ impl ConverseStream {
                 if let Some(text) = delta["text"].as_str() {
                     if !matches!(self.open.entry(index).or_insert(Block::Text), Block::Text) {
                         return Err(invalid("Bedrock block kind changed"));
+                    }
+                    if let Some((_, buffer)) = &mut self.textual {
+                        if buffer.len().saturating_add(text.len()) > 8 * 1024 * 1024 {
+                            return Err(invalid("Bedrock textual tool response too large"));
+                        }
+                        buffer.push_str(text);
                     }
                     return Ok(Some(AgentEvent::TextDelta { delta: text.into() }));
                 }
@@ -160,12 +178,28 @@ impl ConverseStream {
     }
 
     pub(crate) fn finish(self) -> ProviderResult<Vec<AgentEvent>> {
-        let stop_reason = self
+        let mut stop_reason = self
             .stop
             .ok_or_else(|| invalid("Bedrock stream ended before messageStop"))?;
-        let mut events: Vec<_> = self
-            .calls
-            .into_values()
+        let calls = if let Some((protocol, text)) = self.textual {
+            let mut parsed = Vec::new();
+            if stop_reason == StopReason::EndTurn {
+                parsed = crate::anthropic_stream::parse_protocol_text_calls(&text, protocol)
+                    .map_err(invalid)?;
+                let mut ids = HashSet::new();
+                if parsed.iter().any(|call| !ids.insert(&call.id)) {
+                    return Err(invalid("duplicate Bedrock textual tool ID"));
+                }
+                if !parsed.is_empty() {
+                    stop_reason = StopReason::ToolUse;
+                }
+            }
+            parsed
+        } else {
+            self.calls.into_values().collect()
+        };
+        let mut events: Vec<_> = calls
+            .into_iter()
             .map(|call| AgentEvent::ToolCall {
                 call,
                 provenance: ToolProvenance::Native,
@@ -220,6 +254,47 @@ mod tests {
         assert!(
             matches!(&events[..],[AgentEvent::ToolCall{call:a,..},AgentEvent::ToolCall{call:b,..},AgentEvent::TurnEnd{stop_reason:StopReason::ToolUse,usage}] if a.id=="first" && b.id=="second" && usage.input_tokens==11 && usage.cache_read_tokens==7)
         );
+    }
+
+    #[test]
+    fn textual_calls_require_a_complete_successful_turn() {
+        let text = r#"<tool_call>{"name":"read","id":"r","args":{"path":"note"}}</tool_call>"#;
+        for protocol in [ToolProtocol::Compat, ToolProtocol::TalosStrict] {
+            for reason in ["end_turn", "max_tokens"] {
+                let mut stream = ConverseStream::new(protocol);
+                stream
+                    .accept("messageStart", json!({"role":"assistant"}))
+                    .unwrap();
+                for fragment in [&text[..10], &text[10..]] {
+                    stream
+                        .accept(
+                            "contentBlockDelta",
+                            json!({"contentBlockIndex":0,"delta":{"text":fragment}}),
+                        )
+                        .unwrap();
+                }
+                stream
+                    .accept("contentBlockStop", json!({"contentBlockIndex":0}))
+                    .unwrap();
+                stream
+                    .accept("messageStop", json!({"stopReason":reason}))
+                    .unwrap();
+                let events = stream.finish().unwrap();
+                if reason == "end_turn" {
+                    assert!(
+                        matches!(&events[..], [AgentEvent::ToolCall{call,..},AgentEvent::TurnEnd{stop_reason:StopReason::ToolUse,..}] if call.id=="r" && call.name=="read")
+                    );
+                } else {
+                    assert!(matches!(
+                        &events[..],
+                        [AgentEvent::TurnEnd {
+                            stop_reason: StopReason::MaxTokens,
+                            ..
+                        }]
+                    ));
+                }
+            }
+        }
     }
 
     #[test]
