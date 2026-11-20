@@ -1,3 +1,7 @@
+## Desktop relative workspace approval (2026-11-21)
+
+Complete / Closed. Desktop shell approval and execution resolve the same workspace. Implementation commit `4462a35b` merged in #990. [Task and acceptance](tasks/desktop-relative-workspace-approval.md)
+
 ## SEARCH-001-D3-T4 / I333 — Bing technical GO; prepared dual-host integration claim proposed (2026-11-20)
 
 [Canonical owner](backlog/active/SEARCH-001-D3-T4-bing-prepared-dual-host-integration.md) / [I333](iterations/I333-search-bing-prepared-dual-host-integration.md) / [Issue #991](https://github.com/wjhuang88/talos/issues/991) / [governance PR #992](https://github.com/wjhuang88/talos/pull/992). **PROPOSED Active / Claimed, ineffective until accepted claim merge**. New separate work slice targets private, **offline/mocked prepared** WWW-first/CN fallback with both endpoints authorized up front; no production traffic or default/Network permission change. Existing I329 T3a is Completed/Closed; #957 T3b real/default remains blocked/unclaimed pending independent rights and real-region evidence. Existing Bing technical candidate is GO, not a license or second independent native provider. #624 Open and #644 ZERO-ADMISSION remain unchanged.
