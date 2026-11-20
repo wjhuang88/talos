@@ -538,9 +538,11 @@ fn git_var_legacy_path_query_support_is_classified_per_command() {
             && native.stderr.is_empty()
         {
             "supported-but-unset"
-        } else if native.stderr.windows(b"usage: git var".len()).any(|part| {
-            part.eq_ignore_ascii_case(b"usage: git var")
-        }) {
+        } else if native
+            .stderr
+            .windows(b"usage: git var".len())
+            .any(|part| part.eq_ignore_ascii_case(b"usage: git var"))
+        {
             "unsupported-variable"
         } else {
             panic!(

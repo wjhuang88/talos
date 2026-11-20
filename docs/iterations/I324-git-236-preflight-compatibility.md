@@ -19,7 +19,7 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Maintainer requested implementation of the 2026-11-10 gix design on 2026-11-11 (conversation). Single-maintainer fallback is proposed for documentation-only claim because no separate reviewing maintainer is available; exact-head CI, both governance validators and no-overlap merge-time CAS are mandatory. No source implementation or security acceptance is claimed by this PR. Subsequent implementation requires independent Git authorization/security/API review and native Windows evidence. |
 | Implementation PR | Draft #928 (T0 source/API audit only; no production implementation yet) |
-| Last Updated | 2026-11-19 — maintainer scope correction |
+| Last Updated | 2026-11-20 |
 | Handoff / Release Condition | Exact-head independent Git authorization/security review, both governance validators, native Windows acceptance, no scope overlap; retain Review until actual evidence. |
 
 ## Selection inventory and non-overlap (2026-11-11)
