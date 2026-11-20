@@ -23,6 +23,7 @@
 |---|---|
 | `git var GIT_ATTR_SYSTEM/GLOBAL` | 2.36 已证实不支持：优先设计单一、受限的替代属性路径求值 |
 | `git var GIT_CONFIG_SYSTEM/GLOBAL` | 有配置路径失败证据，但需单独记录精准命令及原因后再决定 |
+| `git check-attr --source=<target>` | Git 2.40 才加入该选项；Git 2.36 无法可靠执行目标树查询 | 仅替换 target-tree 这一查询为获准的 gix/字节解析，必须证明树对象与路径来源、优先级和 effect；保留普通与 `--cached` CLI，不允许拿当前索引冒充目标提交 |
 | 其余已接受且兼容的 CLI 命令 | 保留；不改变固定 argv、授权、预算和重验 |
 | gix/Talos 替代 API | 只能处理已经获准的输入/内存字节；严格禁止隐藏的未授权读取、执行、路径猜测及进程全局状态 |
 | Windows `GIT_INSTALL_ROOT` | 与查询替代分开评估，不 blanket-allow `GIT_*` |

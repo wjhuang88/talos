@@ -17,6 +17,9 @@
 - 不将继续执行已批准的 CLI 误判为违规；检查重点是**不兼容命令的替代处理是否新增未授权文件读取或隐藏子进程**。
 - 如果其他命令也被原始 Git 2.36 证据证实不支持，再逐一扩充替代范围并补充 ADR 与测试；不能根据版本号和安装路径推测支持情况。
 
+
+**Added older-Git command gap (Git 2.40 release evidence):** `git check-attr --source=<tree-ish>` was introduced in 2.40. Talos uses `--source=<target.commit>` to predict target-tree filter attributes; it separately queries `--cached` against the current index. Those sources can disagree, so **retain existing compatible normal/cached `git check-attr` CLI but substitute only the unsupported target-tree `--source` option** using explicitly admitted tree and `.gitattributes` bytes, with exact Git precedence and mutation revalidation. [Git 2.40 official release notes](https://github.com/git/git/blob/master/Documentation/RelNotes/2.40.0.adoc). This does not authorize a new temporary-index trick, hidden helper command, `GIT_INDEX_FILE` redirection, source omission, generic filesystem reads or full gix replacement. The Draft #928 supplied-buffer candidate is not native Windows Git 2.36 product acceptance.
+
 ## 只替换哪些能力
 
 首先以经审计的 gix/Talos-native 路径或获单独批准的受控替代方案处理 GIT_ATTR_SYSTEM/GLOBAL 属性来源。要求：选定系统 Git 的来源语义一致；系统/全局属性、缺失/空路径、HOME/XDG、include 与工作树覆盖关系均有证据；每个新文件/祖先元数据只在精确 Read/metadata admission 后读取；快照变化必须在写入前拒绝。
