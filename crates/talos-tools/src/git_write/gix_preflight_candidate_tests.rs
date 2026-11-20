@@ -617,6 +617,35 @@ fn git_check_attr_source_is_not_interchangeable_with_cached() {
         "cached and worktree attributes cannot be conflated"
     );
 
+    // A bounded gix-native primitive can evaluate TARGET attributes from
+    // externally supplied, already admitted bytes instead of asking old
+    // Git to interpret --source. The real adapter must still prove tree
+    // reads, ordering, macros, includes and filter effects separately.
+    let mut search = gix_attributes::Search::default();
+    let mut metadata = gix_attributes::search::MetadataCollection::default();
+    search
+        .add_patterns_buffer(
+            b"*.txt filter=committed\n",
+            ".gitattributes".into(),
+            None,
+            &mut metadata,
+            true,
+        )
+        .expect("in-memory target-tree attributes");
+    let mut outcome = gix_attributes::search::Outcome::default();
+    outcome.initialize_with_selection(&metadata, ["filter"]);
+    assert!(search.pattern_matching_relative_path(
+        "tracked.txt".into(),
+        gix_attributes::glob::pattern::Case::Sensitive,
+        Some(false),
+        &mut outcome,
+    ));
+    let selected = outcome
+        .iter_selected()
+        .map(|value| value.assignment.to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(selected, vec!["filter=committed".to_owned()]);
+
     let source = std::process::Command::new("git")
         .current_dir(dir.path())
         .args(["check-attr", "-z", "--source=HEAD", "filter", "--", "tracked.txt"])
