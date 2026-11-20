@@ -102,3 +102,48 @@ fn sign_request(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn temporary_credentials_sign_the_final_request_sent_to_fixture() {
+        let mut server = mockito::Server::new_async().await;
+        let path = "/model/example%2Fprofile/converse-stream";
+        let payload = r#"{"messages":[{"role":"user","content":[{"text":"hello"}]}]}"#;
+        let fixture = server.mock("POST",path)
+            .match_header("authorization",mockito::Matcher::Regex(
+                r"^AWS4-HMAC-SHA256 Credential=TEST/19700101/us-east-1/bedrock/aws4_request, SignedHeaders=accept;content-type;host;x-amz-date;x-amz-security-token, Signature=[0-9a-f]{64}$".into()))
+            .match_header("x-amz-security-token","fixture-session")
+            .match_header("x-amz-date","19700101T000000Z")
+            .match_body(payload)
+            .with_status(200).create_async().await;
+        let client = Client::new();
+        let mut request = client
+            .post(format!("{}{path}", server.url()))
+            .header(header::ACCEPT, "application/vnd.amazon.eventstream")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(payload)
+            .build()
+            .unwrap();
+        let credentials = Credentials::new(
+            "TEST",
+            "fixture-secret",
+            Some("fixture-session".into()),
+            None,
+            "fixture",
+        );
+        sign_request(
+            &mut request,
+            "us-east-1",
+            credentials,
+            SystemTime::UNIX_EPOCH,
+        )
+        .unwrap();
+        assert!(request.headers()[header::AUTHORIZATION].is_sensitive());
+        assert!(request.headers()["x-amz-security-token"].is_sensitive());
+        assert!(client.execute(request).await.unwrap().status().is_success());
+        fixture.assert_async().await;
+    }
+}
