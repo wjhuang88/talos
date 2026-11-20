@@ -1,6 +1,6 @@
 # Iteration I333: Prepared Bing Dual-Host Technical Integration (Offline)
 
-> Document status: Planned / Unclaimed — proposed claim and activation ineffective until governance PR merges
+> Document status: Active / Claimed (PROPOSED; effective only after #992 is accepted and merged into main)
 > Published plan date: 2026-11-20
 > Planned objective: Integrate the accepted Bing WWW-first/CN-fallback pure decision into a safely prepared, mocked end-to-end request/permission execution seam, WITHOUT live/default traffic activation.
 > Baseline rule: once committed, preserve this objective; change scope via a new iteration.
@@ -10,15 +10,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | I333 / SEARCH-001-D3-T4/#991 — inactive, offline-only prepared dual-host Bing integration + deterministic mock execution; not #957 live/default T3b |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-20 |
 | Source Issue | #991 |
-| Governance Claim PR | Pending — Draft only |
-| Authorization Mode | Single-maintainer merge (proposed) |
-| Authorization Evidence | Maintainer #937/#957 technical GO; exact-head CI/review/CAS required before effective claim |
+| Governance Claim PR | #992 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer #937/#957 technical GO; PR #992 atomic owner/iteration claim (ineffective before target merge), exact-head CI and governance validators, independent Agent review, expected-head CAS required; no distinct human approver claimed. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-20 |
 | Handoff / Release Condition | Claim effective only after reviewed governance merge; source may then start, live/default activation remains separate |

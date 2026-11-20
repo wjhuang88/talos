@@ -1,26 +1,26 @@
 # SEARCH-001-D3-T4: Prepared Dual-Host Bing Technical Integration (Offline)
 
-**Status**: Refinement / Unclaimed — technical GO only; activation ineffective until governance PR merge
+**Status**: In Progress / Claimed (PROPOSED, effective only after governance PR #992 merges; technical offline integration only)
 **Type**: Technical / Test Story
 **Parent Epic**: [SEARCH-001 / #624](SEARCH-001-zero-config-global-search.md)
 **Source Issue**: [#991](https://github.com/wjhuang88/talos/issues/991)
 **Predecessor**: [SEARCH-001-D3-T3 / #957](SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md), I329 T3a Complete / Closed
-**Selected Iteration**: [I333](../../iterations/I333-search-bing-prepared-dual-host-integration.md) — proposed, inactive until claim merge
+**Selected Iteration**: [I333](../../iterations/I333-search-bing-prepared-dual-host-integration.md) — proposed Active / Claimed, ineffective until #992 merges
 **Technical decision**: Maintainer [2026-11-20 Bing GO on technical feasibility](https://github.com/wjhuang88/talos/issues/957), distinct from permission to distribute automated search use
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
-| Responsible Actor | Not assigned |
-| Executing Agent | Not assigned |
+| Claim State | Claimed |
+| Responsible Actor | @wjhuang88 |
+| Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | D3-T4/#991: offline, prepared, per-invocation permission-aware Bing dual-variant request-plan integration and mock execution; **no newly active network host or production default route** |
-| Claimed At | Not applicable |
+| Claimed At | 2026-11-20 |
 | Source Issue | #991 |
-| Governance Claim PR | Pending — Draft only |
-| Authorization Mode | Single-maintainer merge (proposed; ineffective until reviewed claim merge) |
-| Authorization Evidence | Maintainer technical GO decision in #957/#937; final exact-head CI, independent Agent review, and merge CAS still required |
+| Governance Claim PR | #992 |
+| Authorization Mode | Single-maintainer merge |
+| Authorization Evidence | Maintainer selected technical GO on 2026-11-20 (#957/#937); independent Agent API/Network/security review + exact-head CI/governance validators + merge CAS are mandatory. PR #992 proposed and **ineffective until merge**; single-maintainer process does not imply independent human approval. |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-20 |
 | Handoff / Release Condition | Claim only effective on target-main merge; subsequent implementation must be independently reviewed and measured; #957 T3b live/default remains unclaimed and #624 Open |
