@@ -1093,7 +1093,8 @@ impl RuntimeHost {
         // This test observer must not replace a durable session's artifact hooks.
         #[cfg(test)]
         assert!(observer.is_none() || durable_identity.is_none());
-        let workspace_root = workspace_root.into();
+        let workspace_root = std::path::absolute(workspace_root.into())
+            .map_err(|error| format!("cannot resolve Desktop workspace: {error}"))?;
         let (commands, mut command_rx) = mpsc::channel(COMMAND_CAPACITY);
         let (outputs, output_rx) = mpsc::channel(EVENT_CAPACITY);
         let (terminal_tx, terminal_rx) = tokio::sync::oneshot::channel();

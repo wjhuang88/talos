@@ -1,6 +1,6 @@
 # Desktop approval for a relative workspace
 
-Document status: Active upon merge of #989.
+Document status: Review. Claim #989 merged at 216708c2.
 
 Desktop accepts a workspace path when opening a live session. With a relative path,
 the shell tool can receive a relative working directory while the ordinary invocation
@@ -20,7 +20,7 @@ requested one human approval for pwd where its configured evaluator allows the c
 | Governance Claim PR | #989 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Session recovery investigation requested by maintainer. Independent permission review pending. |
-| Implementation PR | Not started |
+| Implementation PR | #990 |
 | Last Updated | 2026-11-20 |
 | Handoff / Release Condition | Merge after review and CI, with regression evidence and durable session compatibility checked |
 
