@@ -131,7 +131,12 @@ impl Drop for Workspace {
 
 async fn exercise_auto(enabled: bool, allow: bool) {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
-    let workspace = Workspace(std::env::temp_dir().join(format!(
+    let parent = if enabled && allow {
+        PathBuf::from(".")
+    } else {
+        std::env::temp_dir()
+    };
+    let workspace = Workspace(parent.join(format!(
         "talos-desktop-auto-{}-{}",
         std::process::id(),
         NEXT.fetch_add(1, Ordering::SeqCst)
