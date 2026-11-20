@@ -123,7 +123,7 @@ This architecture phase does not advertise new features. It owns the documentati
 
 ## Post-delivery owner-first terminal reconciliation — 2026-11-19
 
-**Completion Commit: `4567bf85ef1fb151fbb07a30e1f5f26a81feeed7`**, accepted [architecture/ADR/test-only source PR #629](https://github.com/wjhuang88/talos/pull/629) already merged on `main`. This is pre-existing implementation/evidence, **not** the SHA of the later status-only reconciliation PR. 
+**Completion Commit: `4567bf85ef1fb151fbb07a30e1f5f26a81feeed7`**, accepted [architecture/ADR/test-only source PR #629](https://github.com/wjhuang88/talos/pull/629) already merged on `main`. This is pre-existing implementation/evidence, **not** the SHA of the later status-only reconciliation PR.
 
 Exact-head [CI #2965/run 37124297317](https://github.com/wjhuang88/talos/actions/runs/37124297317) completed SUCCESS on #629's original source head; ADR-085 was subsequently recorded Accepted for I288. Historical single-maintainer governance claim [#627](https://github.com/wjhuang88/talos/pull/627) merged `6f651a28fe901a894942ab1c56015a60491a054e`. No newly inferred historical independent review is claimed.
 

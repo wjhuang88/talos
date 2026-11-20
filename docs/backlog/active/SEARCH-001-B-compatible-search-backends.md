@@ -66,7 +66,7 @@ migration is allowed to depend on B alone.
 
 ## Post-delivery owner-first terminal reconciliation — 2026-11-19
 
-**Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f`**, accepted final source/fixture [PR #660](https://github.com/wjhuang88/talos/pull/660), already merged on `main`; **not** the earlier adapter-wiring PR #656 merge `44cdab8a1f2f3f367b3603bf0e294e39f854dd0b` and **not** this status-only PR. The private typed seam came via [#653](https://github.com/wjhuang88/talos/pull/653) `65066376cc6622b84e11d1f6c45facd27412b92a`; compatibility adapters via [#656](https://github.com/wjhuang88/talos/pull/656); deterministic no-network fixture gap closure via #660. 
+**Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f`**, accepted final source/fixture [PR #660](https://github.com/wjhuang88/talos/pull/660), already merged on `main`; **not** the earlier adapter-wiring PR #656 merge `44cdab8a1f2f3f367b3603bf0e294e39f854dd0b` and **not** this status-only PR. The private typed seam came via [#653](https://github.com/wjhuang88/talos/pull/653) `65066376cc6622b84e11d1f6c45facd27412b92a`; compatibility adapters via [#656](https://github.com/wjhuang88/talos/pull/656); deterministic no-network fixture gap closure via #660.
 
 Exact final source-head [CI #3009/run 37409618084](https://github.com/wjhuang88/talos/actions/runs/37409618084) completed SUCCESS; previous source-documentary closeout [#663](https://github.com/wjhuang88/talos/pull/663) merged `e55d86cb1e7b045248e0cbec396a8b3388f8b2e1` but retained a stale `Claimed` marker. This is the bounded, owner-first terminal-claim reconciliation, not a second implementation.
 
