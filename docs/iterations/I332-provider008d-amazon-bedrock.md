@@ -26,8 +26,6 @@ Deliver a stateless Bedrock tool round with ordered images, reasoning where supp
 
 ## Iteration inventory at 19809207
 
-- I141-model-variant-picker-and-status-bar — retain with current owner.
-- I150-capability-content-types-persistence — retain with current owner.
 - I249-dependency-upgrade-pilot — retain with current owner.
 - I277-desktop-mock-visual-i18n — retain with current owner.
 - I302-windows-owned-handle-evidence — retain with current owner.
@@ -36,3 +34,5 @@ Deliver a stateless Bedrock tool round with ordered images, reasoning where supp
 - I330-arch-035-e2-host-storage-selection — retain with current owner.
 
 I323 closed via #984. Implementation starts after this atomic claim and activation reach main.
+
+I141 and I150 are Complete. At main 21589346, I330 has merged its separate host-binding implementation #979. No Bedrock code is in that slice.
