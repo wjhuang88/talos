@@ -179,3 +179,60 @@ async fn round(protocol: ToolProtocol) {
     first.assert_async().await;
     second.assert_async().await;
 }
+
+#[tokio::test]
+async fn dropping_receiver_closes_incomplete_http_response() {
+    use crate::bedrock_provider::{BedrockProvider, FIXTURE};
+    use std::time::Duration;
+    use talos_core::{message::Message as History, provider::LanguageModel};
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap())
+        .parse()
+        .unwrap();
+    let server = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let mut socket = BufReader::new(socket);
+        let mut length = None;
+        loop {
+            let mut line = String::new();
+            assert_ne!(socket.read_line(&mut line).await.unwrap(), 0);
+            if line == "\r\n" {
+                break;
+            }
+            if let Some((key, value)) = line.split_once(':')
+                && key.eq_ignore_ascii_case("content-length")
+            {
+                length = Some(value.trim().parse::<usize>().unwrap());
+            }
+        }
+        socket
+            .read_exact(&mut vec![0; length.unwrap()])
+            .await
+            .unwrap();
+        socket.get_mut().write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/vnd.amazon.eventstream\r\nContent-Length: 1024\r\n\r\n\x00").await.unwrap();
+        // Hold a partial frame open until the client's cancellation reaches the wire.
+        match socket.read(&mut [0]).await {
+            Ok(0) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => {}
+            other => panic!("expected client disconnect, got {other:?}"),
+        }
+    });
+    let provider = FIXTURE
+        .scope(endpoint, async {
+            BedrockProvider::new("example", "us-east-1".into(), None, Default::default()).unwrap()
+        })
+        .await;
+    let receiver = provider
+        .stream(&[History::User {
+            content: "hello".into(),
+        }])
+        .await
+        .unwrap();
+    drop(receiver);
+    tokio::time::timeout(Duration::from_secs(5), server)
+        .await
+        .unwrap()
+        .unwrap();
+}
