@@ -518,8 +518,8 @@ mod tests {
     fn mock_replay_charges_one_shared_send_and_response_budget() {
         let (manifest, plan) = frozen();
         let authority = fixture_authority(&manifest);
-        let request_limit = TransportBudget::new(Duration::from_secs(5), 1, 1_048_576)
-            .expect("one request");
+        let request_limit =
+            TransportBudget::new(Duration::from_secs(5), 1, 1_048_576).expect("one request");
         let mut sends = 0;
         let outcome = plan.replay(&authority, &request_limit, ALLOWED, |_, _| {
             sends += 1;
@@ -534,8 +534,8 @@ mod tests {
 
         let (manifest, plan) = frozen();
         let authority = fixture_authority(&manifest);
-        let response_limit = TransportBudget::new(Duration::from_secs(5), 4, 1)
-            .expect("one response byte");
+        let response_limit =
+            TransportBudget::new(Duration::from_secs(5), 4, 1).expect("one response byte");
         let mut sends = 0;
         let outcome = plan.replay(&authority, &response_limit, ALLOWED, |_, _| {
             sends += 1;
