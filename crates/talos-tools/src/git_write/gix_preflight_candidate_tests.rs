@@ -698,6 +698,130 @@ fn git_check_attr_source_is_not_interchangeable_with_cached() {
 }
 
 #[test]
+fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
+    // Test-only source oracle. A future replacement for the unsupported old
+    // Git check-attr --source option must evaluate *every* admitted ancestor
+    // from the target tree; a root-only pattern can miss nested filter effects.
+    // No gix API in this test opens a Git file, executes a child or discovers
+    // an ambient attribute location. Git CLI here is a TEST-ONLY oracle.
+    let dir = tempfile::tempdir().expect("isolated target attributes fixture");
+    let root = dir.path();
+    std::fs::create_dir_all(root.join("src/deep")).expect("nested fixture");
+    std::fs::write(root.join(".gitattributes"), b"*.txt filter=root\n")
+        .expect("root target attributes");
+    std::fs::write(root.join("src/.gitattributes"), b"*.txt filter=nested\n")
+        .expect("nested target attributes");
+    std::fs::write(root.join("src/deep/.gitattributes"), b"*.txt -filter\n")
+        .expect("deep target attributes");
+    for path in ["outside.txt", "src/inside.txt", "src/deep/inside.txt"] {
+        std::fs::write(root.join(path), b"fixture\n").expect("tracked target");
+    }
+    let git = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .current_dir(root)
+            .args(args)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_ATTR_NOSYSTEM", "1")
+            .env("HOME", root)
+            .env("XDG_CONFIG_HOME", root.join("xdg"))
+            .output()
+            .expect("native test-only Git command");
+        assert!(
+            output.status.success(),
+            "target fixture command failed: exit={:?}, stdout_bytes={}, stderr_bytes={}",
+            output.status.code(),
+            output.stdout.len(),
+            output.stderr.len()
+        );
+        output
+    };
+    git(&["init", "-q"]);
+    git(&["add", "--", ".gitattributes", "src/.gitattributes", "src/deep/.gitattributes",
+        "outside.txt", "src/inside.txt", "src/deep/inside.txt"]);
+    git(&["-c", "user.name=I324 Fixture", "-c", "user.email=i324@example.invalid",
+        "commit", "-q", "-m", "frozen target"]);
+
+    // Mutate the current worktree after committing: target-tree evaluation
+    // must continue to match the recorded source bytes, not these new rules.
+    std::fs::write(root.join("src/deep/.gitattributes"), b"*.txt filter=worktree\n")
+        .expect("mutated worktree attributes");
+
+    let sources: [(&str, &[u8]); 3] = [
+        (".gitattributes", b"*.txt filter=root\n"),
+        ("src/.gitattributes", b"*.txt filter=nested\n"),
+        ("src/deep/.gitattributes", b"*.txt -filter\n"),
+    ];
+    let mut search = gix_attributes::Search::default();
+    let mut metadata = gix_attributes::search::MetadataCollection::default();
+    for (path, bytes) in sources {
+        assert!(
+            gix_attributes::parse(bytes).all(|line| {
+                let Ok((_, assignments, _)) = line else {
+                    return false;
+                };
+                assignments.into_iter().all(|assignment| assignment.is_ok())
+            }),
+            "refuse malformed target attribute bytes"
+        );
+        search
+            .add_patterns_buffer(bytes, path.into(), Some(std::path::Path::new("")),
+                &mut metadata, true)
+            .expect("evaluate only provided target source bytes");
+    }
+
+    let paths = [
+        ("outside.txt", "filter=root", "root"),
+        ("src/inside.txt", "filter=nested", "nested"),
+        ("src/deep/inside.txt", "-filter", "unset"),
+    ];
+    for (path, expected_gix, expected_native) in paths {
+        let mut outcome = gix_attributes::search::Outcome::default();
+        outcome.initialize_with_selection(&metadata, ["filter"]);
+        assert!(
+            search.pattern_matching_relative_path(
+                path.into(),
+                gix_attributes::glob::pattern::Case::Sensitive,
+                Some(false),
+                &mut outcome,
+            ),
+            "the selected target tree contains a matching attribute at {path}"
+        );
+        let assignments = outcome
+            .iter_selected()
+            .map(|assignment| assignment.assignment.to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(assignments, vec![expected_gix.to_owned()],
+            "in-memory target tree precedence differs at {path}");
+
+        let native = std::process::Command::new("git")
+            .current_dir(root)
+            .args(["check-attr", "-z", "--source=HEAD", "filter", "--", path])
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_ATTR_NOSYSTEM", "1")
+            .env("HOME", root)
+            .env("XDG_CONFIG_HOME", root.join("xdg"))
+            .output()
+            .expect("native committed-target oracle");
+        if native.status.success() {
+            let expected = format!("{path}\0filter\0{expected_native}\0");
+            assert_eq!(native.stdout, expected.as_bytes(),
+                "newer Git target-tree precedence differs at {path}");
+        } else {
+            // Git for Windows 2.36 has no --source option; this must not
+            // be treated as evidence that --cached answers the same query.
+            let stderr = String::from_utf8_lossy(&native.stderr).to_ascii_lowercase();
+            assert!(
+                native.status.code() == Some(129)
+                    && (stderr.contains("usage: git check-attr")
+                        || stderr.contains("unknown option")),
+                "unexpected old-Git target query: exit={:?}, stdout_bytes={}, stderr_bytes={}",
+                native.status.code(), native.stdout.len(), native.stderr.len()
+            );
+        }
+    }
+}
+
+#[test]
 fn gix_attributes_strict_parse_refuses_malformed_filter_sources() {
     // The locked gix-attributes parser operates solely on admitted bytes.
     // A future filter-effect resolver must not use Search's lenient parsing
