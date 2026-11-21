@@ -10,7 +10,7 @@
 
 **这些结果只能证明属性查询确实不兼容，不证明整个 Git CLI 预检不兼容。** 配置路径失效 5 项、URL rewrite/tracking 3 项及其他接收端、测试夹具错误必须独立判因。
 
-2026-11-21 [原生 Windows 逐命令报告](../reference/WINDOWS-VALIDATION-2026-11-21-I324.md)：官方 pinned MinGit 2.36.1 与 Scoop Git 2.36.1 的五种 `git var` 查询全部 129 / unsupported-variable，`check-attr --source=HEAD` 为 129 / unsupported-option；普通与 `--cached` 模式通过。验证使用隔离的子进程环境，不能证明原始 Scoop 环境、安装系统属性根或最终 Checkout/Commit 已兼容。Rust gix 候选 15/15 通过；17 MiB Checkout/Commit 仍在环境变量门禁前失败。ADR 尚未通过独立审查，不允许生产接通。
+2026-11-21 [原生 Windows 逐命令报告](https://github.com/wjhuang88/talos/blob/374df343ed4c089e636676a23cc14ac0ff60278f/docs/reference/WINDOWS-VALIDATION-2026-11-21-I324.md)：官方 pinned MinGit 2.36.1 与 Scoop Git 2.36.1 的五种 `git var` 查询全部 129 / unsupported-variable，`check-attr --source=HEAD` 为 129 / unsupported-option；普通与 `--cached` 模式通过。验证使用隔离的子进程环境，不能证明原始 Scoop 环境、安装系统属性根或最终 Checkout/Commit 已兼容。Rust gix 候选 15/15 通过；17 MiB Checkout/Commit 仍在环境变量门禁前失败。ADR 尚未通过独立审查，不允许生产接通。
 
 ## 目标与保留行为
 

@@ -8,7 +8,7 @@
 
 **保留兼容旧版 Git 的现有受控 Git CLI 预检；仅替换旧版不支持的具体查询动作。** 系统 Git 仍负责最终经过审批的写操作。拒绝自动升级为全量 gix 重写、Git 版本硬编码分支、环境变量放宽或未经审批的新 CLI 探测。
 
-2026-11-21 [Windows 原生报告](../reference/WINDOWS-VALIDATION-2026-11-21-I324.md) 在官方 SHA-256 固定的 MinGit 2.36.1 与选定的 Scoop Git 2.36.1 上逐命令复现：`git var GIT_ATTR_SYSTEM/GLOBAL`、`GIT_CONFIG_SYSTEM/GLOBAL`、`GIT_SHELL_PATH` **五项均返回 129 / unsupported-variable**，`git check-attr --source=HEAD` 返回 **129 / unsupported-option**。普通 `git check-attr` 和 `--cached` 各自可用，且语义不同。**六项为候选最小替换范围**，不能推导所有 `git var`、`git config`、`git --exec-path`、ref 检查都不可用；11 月 17 日的配置/receiver 失败仍需单独判根因。固定脚本在隔离的 HOME/config 下执行，**不代表**原始 Scoop 环境产品验收；17 MiB Checkout/Commit 仍在 `GIT_INSTALL_ROOT` 安全门禁处失败。
+2026-11-21 [Windows 原生报告](https://github.com/wjhuang88/talos/blob/374df343ed4c089e636676a23cc14ac0ff60278f/docs/reference/WINDOWS-VALIDATION-2026-11-21-I324.md) 在官方 SHA-256 固定的 MinGit 2.36.1 与选定的 Scoop Git 2.36.1 上逐命令复现：`git var GIT_ATTR_SYSTEM/GLOBAL`、`GIT_CONFIG_SYSTEM/GLOBAL`、`GIT_SHELL_PATH` **五项均返回 129 / unsupported-variable**，`git check-attr --source=HEAD` 返回 **129 / unsupported-option**。普通 `git check-attr` 和 `--cached` 各自可用，且语义不同。**六项为候选最小替换范围**，不能推导所有 `git var`、`git config`、`git --exec-path`、ref 检查都不可用；11 月 17 日的配置/receiver 失败仍需单独判根因。固定脚本在隔离的 HOME/config 下执行，**不代表**原始 Scoop 环境产品验收；17 MiB Checkout/Commit 仍在 `GIT_INSTALL_ROOT` 安全门禁处失败。
 
 ## 保留哪些 CLI
 
