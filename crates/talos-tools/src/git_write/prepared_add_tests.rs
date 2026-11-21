@@ -260,10 +260,7 @@ fn i324_scoop_install_root_and_other_git_overrides_still_require_separate_author
         let mut frozen = allowed.clone();
         frozen.insert(OsString::from(rejected), OsString::from("i324-test-only"));
         assert!(
-            matches!(
-                validate_environment(&frozen),
-                Err(GitToolError::InvalidInput(_))
-            ),
+            matches!(validate_environment(&frozen), Err(GitToolError::InvalidInput(_))),
             "inherited {rejected} cannot silently gain Git authority"
         );
     }
@@ -271,15 +268,9 @@ fn i324_scoop_install_root_and_other_git_overrides_still_require_separate_author
     #[cfg(windows)]
     {
         let mut frozen = allowed;
-        frozen.insert(
-            OsString::from("git_install_root"),
-            OsString::from("i324-test-only"),
-        );
+        frozen.insert(OsString::from("git_install_root"), OsString::from("i324-test-only"));
         assert!(
-            matches!(
-                validate_environment(&frozen),
-                Err(GitToolError::InvalidInput(_))
-            ),
+            matches!(validate_environment(&frozen), Err(GitToolError::InvalidInput(_))),
             "Windows environment names are case-insensitive"
         );
     }
