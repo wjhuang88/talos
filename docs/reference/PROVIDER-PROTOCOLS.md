@@ -373,3 +373,8 @@ base ID is absent. These matches establish API support only. Region availability
 inference-profile routing and account access require separate verification.
 The other 119 rows have no admission from this table, including prefixed IDs.
 See [AWS Nova v1 Converse API](https://docs.aws.amazon.com/nova/latest/userguide/using-converse-api.html).
+
+For those three exact IDs, a configured `[providers.amazon-bedrock]` table
+with no model or provider endpoint override allows catalog protocol inference.
+Explicit model and provider protocols take precedence. Inference reads no
+credentials and uses the same regional destination as explicit configuration.
