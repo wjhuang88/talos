@@ -260,6 +260,17 @@ mod tests {
             if let Err(error) = check() {
                 return (Err(error), BingAttempt::PermissionDenied);
             }
+            // Mirror the protected transport's accounting before an outbound attempt:
+            // even a failed DNS lookup consumes one physical request unit. Proxy
+            // CONNECT accounting belongs to the real transport, not this mock.
+            if let Err(error) = TransportBudget::reserve(
+                &budget.attempts,
+                1,
+                budget.max_requests,
+                TransportError::RequestLimit,
+            ) {
+                return (Err(error.into()), BingAttempt::RequestBudgetExhausted);
+            }
             let outcome = send(variant, request);
             if let Err(error) = budget.check_live() {
                 return (Err(error.into()), BingAttempt::DeadlineExceeded);
@@ -281,6 +292,17 @@ mod tests {
                     BingAttempt::Unavailable(BingAvailabilityFailure::SourceLocalTimeout),
                 ),
                 SyntheticOutcome::Response(status, body) => {
+                    // A received body must charge the same shared response budget
+                    // before parsing; an over-budget response cannot become a winner
+                    // or spuriously authorize switching to CN.
+                    if let Err(error) = TransportBudget::reserve(
+                        &budget.bytes,
+                        body.len(),
+                        budget.max_bytes,
+                        TransportError::ResponseLimit,
+                    ) {
+                        return (Err(error.into()), BingAttempt::InvalidResponse);
+                    }
                     let response = TransportResponse { status, body };
                     let result = super::super::finish_response(
                         CompatibilityProtocol::Bing,
@@ -490,6 +512,42 @@ mod tests {
             SyntheticOutcome::Transport(error) => SyntheticOutcome::Transport(*error),
             SyntheticOutcome::SourceLocalTimeout => SyntheticOutcome::SourceLocalTimeout,
         }
+    }
+
+    #[test]
+    fn mock_replay_charges_one_shared_send_and_response_budget() {
+        let (manifest, plan) = frozen();
+        let authority = fixture_authority(&manifest);
+        let request_limit = TransportBudget::new(Duration::from_secs(5), 1, 1_048_576)
+            .expect("one request");
+        let mut sends = 0;
+        let outcome = plan.replay(&authority, &request_limit, ALLOWED, |_, _| {
+            sends += 1;
+            SyntheticOutcome::Transport(TransportError::Dns)
+        });
+        assert!(matches!(
+            outcome,
+            Err(CompatibilityError::Transport(TransportError::RequestLimit))
+        ));
+        assert_eq!(sends, 1, "no CN callback after the shared send limit");
+        assert_eq!(request_limit.attempts.load(Ordering::Relaxed), 1);
+
+        let (manifest, plan) = frozen();
+        let authority = fixture_authority(&manifest);
+        let response_limit = TransportBudget::new(Duration::from_secs(5), 4, 1)
+            .expect("one response byte");
+        let mut sends = 0;
+        let outcome = plan.replay(&authority, &response_limit, ALLOWED, |_, _| {
+            sends += 1;
+            SyntheticOutcome::Response(200, organic())
+        });
+        assert!(matches!(
+            outcome,
+            Err(CompatibilityError::Transport(TransportError::ResponseLimit))
+        ));
+        assert_eq!(sends, 1, "over-budget response must never rotate hosts");
+        assert_eq!(response_limit.attempts.load(Ordering::Relaxed), 1);
+        assert_eq!(response_limit.bytes.load(Ordering::Relaxed), 0);
     }
 
     #[test]
