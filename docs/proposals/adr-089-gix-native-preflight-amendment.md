@@ -8,7 +8,7 @@
 
 **保留兼容旧版 Git 的现有受控 Git CLI 预检；仅替换旧版不支持的具体查询动作。** 系统 Git 仍负责最终经过审批的写操作。拒绝自动升级为全量 gix 重写、Git 版本硬编码分支、环境变量放宽或未经审批的新 CLI 探测。
 
-2026-11-17 原始 Windows Git 2.36.1.windows.1 证据直接确认 `git var GIT_ATTR_SYSTEM`、`git var GIT_ATTR_GLOBAL` 返回 usage。这两个属性路径查询是优先兼容替换对象。配置路径不可用的五项测试、URL rewrite/tracking 等失败需分别定位，不能推导全部 `git var`、`git config`、`git --exec-path`、`git check-attr`、ref 检查都不可用。
+2026-11-21 [Windows 原生报告](../reference/WINDOWS-VALIDATION-2026-11-21-I324.md) 在官方 SHA-256 固定的 MinGit 2.36.1 与选定的 Scoop Git 2.36.1 上逐命令复现：`git var GIT_ATTR_SYSTEM/GLOBAL`、`GIT_CONFIG_SYSTEM/GLOBAL`、`GIT_SHELL_PATH` **五项均返回 129 / unsupported-variable**，`git check-attr --source=HEAD` 返回 **129 / unsupported-option**。普通 `git check-attr` 和 `--cached` 各自可用，且语义不同。**六项为候选最小替换范围**，不能推导所有 `git var`、`git config`、`git --exec-path`、ref 检查都不可用；11 月 17 日的配置/receiver 失败仍需单独判根因。固定脚本在隔离的 HOME/config 下执行，**不代表**原始 Scoop 环境产品验收；17 MiB Checkout/Commit 仍在 `GIT_INSTALL_ROOT` 安全门禁处失败。
 
 ## 保留哪些 CLI
 
@@ -22,7 +22,7 @@
 
 ## 只替换哪些能力
 
-首先以经审计的 gix/Talos-native 路径或获单独批准的受控替代方案处理 GIT_ATTR_SYSTEM/GLOBAL 属性来源。要求：选定系统 Git 的来源语义一致；系统/全局属性、缺失/空路径、HOME/XDG、include 与工作树覆盖关系均有证据；每个新文件/祖先元数据只在精确 Read/metadata admission 后读取；快照变化必须在写入前拒绝。
+首先以经审计的 gix/Talos-native 路径或获单独批准的受控替代方案处理已实测不支持的六种具体形式：五个 `git var` 变量查询与目标树 `check-attr --source`。配置根、shell 路径和属性根必须分别设计与审查，保留受支持的 `git check-attr --cached`、`git config --show-origin --null --list --includes`、`git --exec-path`。要求：选定系统 Git 的来源语义一致；系统/全局属性、缺失/空路径、HOME/XDG、include 与工作树覆盖关系均有证据；每个新文件/祖先元数据只在精确 Read/metadata admission 后读取；快照变化必须在写入前拒绝。
 
 高层 gix 初始化/默认路径 API 可能隐式调用 Git、扫描未授权路径或使用进程级缓存，**仍不得**作为隐式授权通道。必要的可信编译默认来源证明仅针对需要它的**替代动作**；不得将它扩散为所有正常 CLI 操作的普遍阻塞条件。如果某项替代无法证明来源，明确报告该项不受支持、拒绝写入，而不是猜路径或跳过 attributes。
 
