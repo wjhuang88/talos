@@ -757,6 +757,17 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
         "frozen target",
     ]);
 
+    // Capture actual committed tree attribute blob bytes through the existing
+    // checkout target snapshot, not a duplicated hand-authored rule list.
+    // This is TEST-ONLY object discovery, not a new production Read grant.
+    let head = git(&["rev-parse", "HEAD"]);
+    let commit_id = std::str::from_utf8(&head.stdout)
+        .expect("fixture commit oid")
+        .trim();
+    let target = super::checkout_state::TargetTree::capture(root, commit_id)
+        .expect("test-only committed target tree capture");
+    assert_eq!(target.attributes.len(), 3);
+
     // Mutate the current worktree after committing: target-tree evaluation
     // must continue to match the recorded source bytes, not these new rules.
     std::fs::write(
@@ -765,14 +776,9 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
     )
     .expect("mutated worktree attributes");
 
-    let sources: [(&str, &[u8]); 3] = [
-        (".gitattributes", b"*.txt filter=root\n"),
-        ("src/.gitattributes", b"*.txt filter=nested\n"),
-        ("src/deep/.gitattributes", b"*.txt -filter\n"),
-    ];
     let mut search = gix_attributes::Search::default();
     let mut metadata = gix_attributes::search::MetadataCollection::default();
-    for (path, bytes) in sources {
+    for (path, bytes) in &target.attributes {
         assert!(
             gix_attributes::parse(bytes).all(|line| {
                 let Ok((_, assignments, _)) = line else {
@@ -785,7 +791,7 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
         search
             .add_patterns_buffer(
                 bytes,
-                path.into(),
+                path.as_str().into(),
                 Some(std::path::Path::new("")),
                 &mut metadata,
                 true,
