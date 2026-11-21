@@ -644,9 +644,14 @@ mod tests {
         let todo_db = sessions_dir.join("todos.sqlite");
         assert!(!todo_db.exists());
 
-        let mut agent = Agent::new(
+        let mut agent = Agent::with_security(
             Arc::new(talos_provider::mock::MockProvider::new()),
             talos_core::tool::ToolRegistry::new(),
+            Some(Arc::new(
+                talos_permission::PermissionEngine::with_workspace_root(home.path().to_path_buf()),
+            )),
+            None,
+            home.path().to_path_buf(),
         );
         set_todo_prompt_provider(&mut agent, &manager, &session);
         assert!(
