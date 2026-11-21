@@ -68,6 +68,21 @@ $nativeLog = Join-Path $env:TEMP 'i324-selected-git-result.txt'
 
 注意：此模式也会隔离环境，不会重现 Scoop 的全部动态语义。若机器的 `git --version` 并非 2.36.1，将其标注为“新版 Git 对照样本”，不能当旧版验收。
 
+
+## 3a. Scoop 的 GIT_INSTALL_ROOT 只读差异诊断（可选）
+
+本阶段**仅针对原始 Windows 机器的 Scoop 安装问题**，不属于前面固定 MinGit 命令分类，也不是运行 17 MiB 写操作的许可。若宿主环境中的 `GIT_INSTALL_ROOT` 不存在，不应注入猜测路径；直接跳过本项。诊断脚本只在新建 TEMP 仓库中执行只读 Git 查询（初始化该临时仓库除外），每次启动的子进程仅改变是否继承原有 `GIT_INSTALL_ROOT`，冻结 HOME/XDG，其他 Git 覆盖均移除。不会修改 PowerShell 父进程环境或用户 Git 配置。
+
+```powershell
+if ([bool]$env:GIT_INSTALL_ROOT) {
+    $selectedGit = (Get-Command git.exe -CommandType Application).Source
+    ./scripts/test_i324_install_root_effect.ps1 -GitExecutable $selectedGit |
+        Tee-Object -FilePath (Join-Path $env:TEMP 'i324-install-root-effect.txt')
+}
+```
+
+记录 `exec-path`、系统/全局配置、工作区配置和 attributes 查询的**相等性标记**及退出码；脚本不会打印环境值、路径或配置内容。**相等只是这几次查询在隔离环境中的观察一致，绝不代表 GIT_INSTALL_ROOT 对真实 Git 的所有写操作、hook、filter、Git wrapper 或外部配置均无影响，更不是放宽 `validate_environment` 的证据。** 任一差异都应阻止无条件忽略此变量。任何生产兼容方案仍须独立安全/API 审查和真实环境 Prepared Checkout/Commit 测试。
+
 ## 4. 第三阶段：Rust 回归与 Prepared Checkout / Commit（可选）
 
 **这一步不需要强行让当前 Draft 通过**：目前 #928 只有诊断候选，尚未替换生产预检。必须在上一阶段明确保存实际 SHA、所选 Git 版本和测试环境。
