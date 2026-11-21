@@ -53,3 +53,7 @@ Mid-implementation Agent review of 82b66ae7 found that textual projection hid
 orphan tool results from validation and that fresh CLI catalog selection could
 prompt for an unrelated API key. The first correction is dbed0dcb; 14 Bedrock
 provider tests passed, including both textual protocols rejecting orphan results.
+
+At f4c14075 the fresh Bedrock CLI catalog selection regression passed. Standard
+preflight stopped in Clippy at the nested unmatched-result check in
+bedrock_request.rs (collapsible_match) before workspace tests.

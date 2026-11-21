@@ -62,10 +62,8 @@ pub(crate) fn validate_tool_history(messages: &[Message]) -> ProviderResult<()> 
                     }
                 }
             }
-            Message::Tool { result } => {
-                if !pending.remove(result.tool_use_id.as_str()) {
-                    return Err(invalid("Bedrock tool result has no matching call"));
-                }
+            Message::Tool { result } if !pending.remove(result.tool_use_id.as_str()) => {
+                return Err(invalid("Bedrock tool result has no matching call"));
             }
             _ => {}
         }
