@@ -2422,6 +2422,69 @@ mod tests {
     }
 
     #[cfg(feature = "local-storage")]
+    #[tokio::test]
+    async fn e3a_explicit_local_sdk_binding_roundtrips_without_optional_store_open() {
+        let home = tempfile::tempdir().expect("isolated SDK home");
+        let profile = crate::local_storage::LocalStorageProfile::under_home_dir(home.path());
+        let manager = profile.custom_session_manager();
+        let direct = manager
+            .create_or_open_session("e3a-sdk-session")
+            .expect("domain-owned direct durable binding");
+        let original_id = direct.id();
+        let original_path = direct.file_path().to_path_buf();
+
+        let mut runtime = RuntimeBuilder::new()
+            .provider(Arc::new(
+                MockProvider::new().with_response("durable e3a SDK response"),
+            ))
+            .durable_session_from_custom_local_profile(&profile, "e3a-sdk-session")
+            .expect("existing local Session selection")
+            .build_async()
+            .await
+            .expect("feature-on SDK runtime");
+        runtime
+            .submit("record an SDK continuation")
+            .await
+            .expect("SDK request accepted");
+        let status = tokio::time::timeout(
+            Duration::from_secs(15),
+            collect_until_turn_completed(&mut runtime),
+        )
+        .await
+        .expect("bounded turn deadline")
+        .expect("turn completion");
+        assert!(
+            matches!(&status, TurnCompletionStatus::Success { .. }),
+            "selected local SDK turn must settle successfully: {status:?}"
+        );
+        runtime.shutdown().await.expect("SDK runtime shutdown");
+
+        let reopened = manager
+            .create_or_open_session("e3a-sdk-session")
+            .expect("domain-owned recovery binding");
+        assert_eq!(reopened.id(), original_id);
+        assert_eq!(reopened.file_path(), original_path.as_path());
+        let messages = reopened.read_messages().expect("durable transcript");
+        assert!(
+            messages.iter().any(|message| matches!(
+                message,
+                Message::Assistant { content, .. } if content == "durable e3a SDK response"
+            )),
+            "selected SDK binding must use the existing durable transcript"
+        );
+        assert!(
+            !profile.memory_db().exists()
+                && !profile.exploration_db().exists()
+                && !profile.sessions_dir().join("todos.sqlite").exists(),
+            "durable Session selection must not eagerly open optional databases"
+        );
+
+        // The old external SDK entrypoint stays available after the opt-in path.
+        let legacy = RuntimeBuilder::new().durable_session(reopened);
+        assert!(legacy.durable_session.is_some());
+    }
+
+    #[cfg(feature = "local-storage")]
     #[test]
     fn rejected_host_identity_never_creates_selected_local_storage() {
         let dir = tempfile::tempdir().expect("isolated host home");
