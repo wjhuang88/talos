@@ -78,6 +78,13 @@ Cross-check with `cargo xwin` per LOCAL-DEV; native Windows tool tests/CI remain
 
 Update README/README.zh-CN Git compatibility language, this iteration and Story, documentation index, Board, and proposal status only after evidence. Revert this bounded compatibility patch to restore known conservative refusals if review identifies an authority regression; do not touch existing user worktrees.
 
+## Native Windows handoff runbook
+
+The reproducible Windows Git 2.36.1 command matrix, selected-Git comparison,
+Rust regression commands and redacted evidence handoff are documented in
+[the I324 Windows validation SOP](../sop/GIT-COMPAT-001-I324-WINDOWS-VALIDATION.md).
+This is **a test procedure, not implementation/security acceptance**.
+
 ## Actual execution (active — implementation not yet delivered)
 
 - 2026-11-11: requirement intake Issue #919 and governance-only selection baseline. Proposed claim/activation not effective until PR merges. T0 source investigation is read-only; no production implementation, validation pass or Completion Commit.
