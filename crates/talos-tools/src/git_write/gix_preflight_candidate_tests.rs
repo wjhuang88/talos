@@ -736,15 +736,34 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
         output
     };
     git(&["init", "-q"]);
-    git(&["add", "--", ".gitattributes", "src/.gitattributes", "src/deep/.gitattributes",
-        "outside.txt", "src/inside.txt", "src/deep/inside.txt"]);
-    git(&["-c", "user.name=I324 Fixture", "-c", "user.email=i324@example.invalid",
-        "commit", "-q", "-m", "frozen target"]);
+    git(&[
+        "add",
+        "--",
+        ".gitattributes",
+        "src/.gitattributes",
+        "src/deep/.gitattributes",
+        "outside.txt",
+        "src/inside.txt",
+        "src/deep/inside.txt",
+    ]);
+    git(&[
+        "-c",
+        "user.name=I324 Fixture",
+        "-c",
+        "user.email=i324@example.invalid",
+        "commit",
+        "-q",
+        "-m",
+        "frozen target",
+    ]);
 
     // Mutate the current worktree after committing: target-tree evaluation
     // must continue to match the recorded source bytes, not these new rules.
-    std::fs::write(root.join("src/deep/.gitattributes"), b"*.txt filter=worktree\n")
-        .expect("mutated worktree attributes");
+    std::fs::write(
+        root.join("src/deep/.gitattributes"),
+        b"*.txt filter=worktree\n",
+    )
+    .expect("mutated worktree attributes");
 
     let sources: [(&str, &[u8]); 3] = [
         (".gitattributes", b"*.txt filter=root\n"),
@@ -764,8 +783,13 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
             "refuse malformed target attribute bytes"
         );
         search
-            .add_patterns_buffer(bytes, path.into(), Some(std::path::Path::new("")),
-                &mut metadata, true)
+            .add_patterns_buffer(
+                bytes,
+                path.into(),
+                Some(std::path::Path::new("")),
+                &mut metadata,
+                true,
+            )
             .expect("evaluate only provided target source bytes");
     }
 
@@ -790,8 +814,11 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
             .iter_selected()
             .map(|assignment| assignment.assignment.to_string())
             .collect::<Vec<_>>();
-        assert_eq!(assignments, vec![expected_gix.to_owned()],
-            "in-memory target tree precedence differs at {path}");
+        assert_eq!(
+            assignments,
+            vec![expected_gix.to_owned()],
+            "in-memory target tree precedence differs at {path}"
+        );
 
         let native = std::process::Command::new("git")
             .current_dir(root)
@@ -804,8 +831,11 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
             .expect("native committed-target oracle");
         if native.status.success() {
             let expected = format!("{path}\0filter\0{expected_native}\0");
-            assert_eq!(native.stdout, expected.as_bytes(),
-                "newer Git target-tree precedence differs at {path}");
+            assert_eq!(
+                native.stdout,
+                expected.as_bytes(),
+                "newer Git target-tree precedence differs at {path}"
+            );
         } else {
             // Git for Windows 2.36 has no --source option; this must not
             // be treated as evidence that --cached answers the same query.
@@ -815,7 +845,9 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
                     && (stderr.contains("usage: git check-attr")
                         || stderr.contains("unknown option")),
                 "unexpected old-Git target query: exit={:?}, stdout_bytes={}, stderr_bytes={}",
-                native.status.code(), native.stdout.len(), native.stderr.len()
+                native.status.code(),
+                native.stdout.len(),
+                native.stderr.len()
             );
         }
     }
