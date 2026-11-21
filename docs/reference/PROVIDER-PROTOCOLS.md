@@ -378,3 +378,8 @@ For those three exact IDs, a configured `[providers.amazon-bedrock]` table
 with no model or provider endpoint override allows catalog protocol inference.
 Explicit model and provider protocols take precedence. Inference reads no
 credentials and uses the same regional destination as explicit configuration.
+
+The Bedrock Agent tests cover ordinary registered tools and conversation images.
+A plan containing protected browser tools or a follow-up with a private
+temporary image currently fails before dispatch through the shared SDK replay
+guard. These paths require provider support for private invocation context.

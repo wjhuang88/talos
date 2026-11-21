@@ -44,18 +44,47 @@ fn encode_part(part: &ContentPart) -> ProviderResult<Value> {
     }
 }
 
-pub(crate) fn build(
-    messages: &[Message],
-    tools: &[ToolDefinition],
-    max_tokens: Option<u32>,
-) -> ProviderResult<Value> {
-    let mut system = Vec::new();
-    let mut turns = Vec::<Turn>::new();
+pub(crate) fn validate_tool_history(messages: &[Message]) -> ProviderResult<()> {
     let mut pending = HashSet::new();
     for message in messages {
         if !pending.is_empty() && !matches!(message, Message::Tool { .. }) {
             return Err(invalid("Bedrock history has unresolved tool calls"));
         }
+        match message {
+            Message::Assistant { tool_calls, .. } => {
+                for call in tool_calls {
+                    if call.name.is_empty()
+                        || call.id.is_empty()
+                        || !call.input.is_object()
+                        || !pending.insert(call.id.as_str())
+                    {
+                        return Err(invalid("invalid or duplicate Bedrock tool use"));
+                    }
+                }
+            }
+            Message::Tool { result } => {
+                if !pending.remove(result.tool_use_id.as_str()) {
+                    return Err(invalid("Bedrock tool result has no matching call"));
+                }
+            }
+            _ => {}
+        }
+    }
+    if !pending.is_empty() {
+        return Err(invalid("Bedrock history has unresolved tool calls"));
+    }
+    Ok(())
+}
+
+pub(crate) fn build(
+    messages: &[Message],
+    tools: &[ToolDefinition],
+    max_tokens: Option<u32>,
+) -> ProviderResult<Value> {
+    validate_tool_history(messages)?;
+    let mut system = Vec::new();
+    let mut turns = Vec::<Turn>::new();
+    for message in messages {
         let (role, blocks) = match message {
             Message::System { content, .. } => {
                 system.push(json!({"text":content}));
@@ -86,21 +115,11 @@ pub(crate) fn build(
                     blocks.push(json!({"text":content}));
                 }
                 for call in tool_calls {
-                    if call.name.is_empty()
-                        || call.id.is_empty()
-                        || !call.input.is_object()
-                        || !pending.insert(call.id.as_str())
-                    {
-                        return Err(invalid("invalid or duplicate Bedrock tool use"));
-                    }
                     blocks.push(json!({"toolUse":{"toolUseId":call.id,"name":call.name,"input":call.input}}));
                 }
                 ("assistant", blocks)
             }
             Message::Tool { result } => {
-                if !pending.remove(result.tool_use_id.as_str()) {
-                    return Err(invalid("Bedrock tool result has no matching call"));
-                }
                 let status = if result.is_error { "error" } else { "success" };
                 (
                     "user",
@@ -121,9 +140,6 @@ pub(crate) fn build(
                 content: blocks,
             });
         }
-    }
-    if !pending.is_empty() {
-        return Err(invalid("Bedrock history has unresolved tool calls"));
     }
     let mut body = json!({"messages":turns});
     if !system.is_empty() {

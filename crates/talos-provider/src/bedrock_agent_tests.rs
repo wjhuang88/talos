@@ -236,3 +236,29 @@ async fn dropping_receiver_closes_incomplete_http_response() {
         .unwrap()
         .unwrap();
 }
+
+#[tokio::test]
+async fn textual_modes_reject_orphan_results_before_dispatch() {
+    use crate::bedrock_provider::BedrockProvider;
+    use talos_core::{
+        message::{Message as History, MessageToolResult},
+        provider::LanguageModel,
+    };
+    let provider =
+        BedrockProvider::new("example", "us-east-1".into(), None, Default::default()).unwrap();
+    let history = [History::Tool {
+        result: MessageToolResult {
+            tool_use_id: "orphan".into(),
+            content: "unused".into(),
+            is_error: false,
+        },
+    }];
+    for mode in [ToolProtocol::Compat, ToolProtocol::TalosStrict] {
+        let (progress, _) = tokio::sync::mpsc::unbounded_channel();
+        let error = provider
+            .stream_with_protocol(&history, &[], mode, progress)
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("no matching call"));
+    }
+}

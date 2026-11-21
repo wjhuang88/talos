@@ -67,6 +67,7 @@ impl LanguageModel for BedrockProvider {
         match protocol {
             ToolProtocol::Native => self.stream_with_tools(messages, tools).await,
             ToolProtocol::Compat | ToolProtocol::TalosStrict => {
+                bedrock_request::validate_tool_history(messages)?;
                 let projected = crate::compatibility_messages(messages);
                 self.dispatch(&projected, &[], protocol).await
             }
