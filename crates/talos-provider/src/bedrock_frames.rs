@@ -1,6 +1,7 @@
 //! Incrementally assemble a single AWS event-stream frame across HTTP chunks.
 use aws_smithy_eventstream::frame::read_message_from;
 use aws_smithy_types::event_stream::Message;
+use bytes::Buf;
 use talos_core::provider::{ProviderError, ProviderResult};
 
 const PRELUDE_SIZE: usize = 12;
@@ -20,8 +21,9 @@ impl FrameReader {
         if self.pending.len() < PRELUDE_SIZE {
             return Ok(None);
         }
-        let total = u32::from_be_bytes(self.pending[..4].try_into().unwrap()) as usize;
-        let headers = u32::from_be_bytes(self.pending[4..8].try_into().unwrap()) as usize;
+        let mut prelude = self.pending.as_slice();
+        let total = prelude.get_u32() as usize;
+        let headers = prelude.get_u32() as usize;
         let payload = total
             .checked_sub(FRAME_OVERHEAD)
             .and_then(|n| n.checked_sub(headers));

@@ -36,3 +36,9 @@ Deliver a stateless Bedrock tool round with ordered images, reasoning where supp
 I323 closed via #984. Implementation starts after this atomic claim and activation reach main.
 
 I141 and I150 are Complete. At main 21589346, I330 has merged its separate host-binding implementation #979. No Bedrock code is in that slice.
+
+At development head `567a6267`, the locked Bedrock provider filter passed
+13 tests, including cancellation during a partial HTTP frame. The standard
+local preflight passed governance and workspace check, then stopped at
+workspace Clippy on three unwrap_used findings in the frame and response
+readers. Workspace tests and SDK fixture checks were not reached by that run.

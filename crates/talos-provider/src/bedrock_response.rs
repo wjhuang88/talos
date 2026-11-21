@@ -80,7 +80,9 @@ impl ResponseReader {
                 {
                     Some(chunk) => self.chunk = chunk,
                     None => {
-                        self.frames.take().unwrap().finish()?;
+                        if let Some(reader) = self.frames.take() {
+                            reader.finish()?;
+                        }
                         return Ok(None);
                     }
                 }
