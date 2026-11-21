@@ -33,6 +33,17 @@
 5. Independent API/SDK and host-permission review must verify the no-op disposition is justified and that these tests do not substitute for native Desktop or E4 end-to-end cancellation/permission/fault matrix.
 6. This document is a **candidate** until implementation is reviewed and merged. E3a's Completion Commit must be an actual pre-existing source merge SHA; I334 owner-first closeout follows separately. Parent #897 stays OPEN for E3b/E4, #670 stays OPEN for F, and ServerHost remains gated.
 
+## Native CI history and acceptance evidence (2026-11-21, candidate only)
+
+| Candidate HEAD / run | Observed outcome | Interpretation and ownership |
+|---|---|---|
+| `68a7beee` / [#4474](https://github.com/wjhuang88/talos/actions/runs/44689343313) | **FAILED** | The added public-SDK integration test had two rustfmt diffs; macOS format and Windows aggregate workspace failed. They were fixed in `5bae0f5b`. Never reclassify this run as successful. |
+| `5bae0f5b` / [#4476](https://github.com/wjhuang88/talos/actions/runs/44726217198) | **FAILED** | Windows workspace/Rust, Linux/Windows Desktop, remote issue-owner and installer/classifier passed. On macOS, `talos-agent::session::tests::cooperative_recovered_sources_bind_long_history_and_refuse_foreign_or_expired` failed 1 of 768 with `elapsed_ms=2000 deadline_expired=true` during recovered-source binding. This test is in unchanged Agent recovery source; cause and baseline reproducibility are *not established*. Do not edit another owner's deadline or waive the exact-head CI gate. |
+| `687cafc4` / [#4485](https://github.com/wjhuang88/talos/actions/runs/44869496972) | **CANCELLED with no jobs** | No validation was performed on this head. GitHub rejected a failed-jobs rerun of the cancelled workflow. Copilot's [read-only exact-head code APPROVE](https://github.com/wjhuang88/talos/pull/996#issuecomment-7057839121) applies to review only, not CI/merge acceptance. |
+| Current implementation candidate | **NOT ACCEPTED** | The added CLI test now constructs `Agent::with_security` and an isolated-home permission engine instead of deprecated `Agent::new`. It also preserves default actor authority and does not modify product Host/permissions. A **new exact-head full native CI**, specific feature-on and CLI test evidence, independent no-blocker review and final CAS are still required before implementation merge. |
+
+This table preserves evidence from their actual commits; rerunning a previous head, a status comment, or a code-only review must not be used as a surrogate for a fresh exact-head CI. Any macOS Agent recovery failure needs independent owner-led diagnosis with history and deadline evidence; it is not automatically attributable to either E3a or a runner.
+
 ## Explicit outstanding acceptance
 
 The new tests cover **specific positive and lazy-open boundaries**, not all default-startup reconciliation, permission-denial, receipt loss, crash/recovery, multi-host shutdown or SDK external feature-on compatibility scenarios. Those remaining cases must be run/assigned before treating the I334 E3a scope as Complete, or remain in Review as a documented blocker. Do not silently roll them into E4 without a recorded owner decision.
