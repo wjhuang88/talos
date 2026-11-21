@@ -102,6 +102,12 @@ try {
     Write-Output 'I324_LEGACY_ENV mode=isolated host_environment_unchanged=true'
 
     $unexpected = 0
+    # Exact 2.36.1 results were independently reproduced with official pinned
+    # MinGit and selected Scoop Git on Windows (2026-11-21). Enforce the
+    # six-command invariant on this version only; other versions remain an
+    # exploratory per-command matrix, not a production version switch.
+    $verifiedLegacy236 = $versionString -ceq 'git version 2.36.1.windows.1'
+    $legacyMismatch = 0
     foreach ($name in @(
         'GIT_ATTR_SYSTEM', 'GIT_ATTR_GLOBAL',
         'GIT_CONFIG_SYSTEM', 'GIT_CONFIG_GLOBAL', 'GIT_SHELL_PATH'
@@ -121,6 +127,10 @@ try {
             $unexpected++
         }
         Write-Output "I324_LEGACY_VAR name=$name exit=$($result.ExitCode) classification=$kind"
+        if ($verifiedLegacy236 -and
+            ($result.ExitCode -ne 129 -or $kind -cne 'unsupported-variable')) {
+            $legacyMismatch++
+        }
     }
 
     [void](Assert-I324Git -GitArguments @('-C', $fixture, 'init', '-q'))
@@ -165,6 +175,15 @@ try {
         $unexpected++
     }
     Write-Output "I324_LEGACY_CHECK_ATTR worktree=ok index=ok source=$sourceKind exit=$($source.ExitCode)"
+    if ($verifiedLegacy236) {
+        if ($source.ExitCode -ne 129 -or $sourceKind -cne 'unsupported-option') {
+            $legacyMismatch++
+        }
+        Write-Output "I324_LEGACY_236_ASSERT expected_unsupported=6 mismatches=$legacyMismatch"
+        if ($legacyMismatch -ne 0) {
+            throw 'Git 2.36.1 command behavior diverged from native pinned/Scoop evidence.'
+        }
+    }
     Write-Output "I324_LEGACY_QUERY_MATRIX unexpected=$unexpected status=$(if ($unexpected -eq 0) {'complete'} else {'investigate'})"
     if ($unexpected -ne 0) {
         throw 'Unexpected Git command outcome; preserve classified results for I324 investigation.'
