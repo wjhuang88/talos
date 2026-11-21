@@ -41,6 +41,7 @@ Choose the original workspace before opening **Recent tasks**, then select **Res
   The displayed turn ID comes from Runtime, not a fixture identifier.
 - Live mode registers shared Runtime tools. Tool calls and results display their
   actual call IDs; execution remains subject to Runtime permission and sandbox checks.
+- Desktop resolves a relative workspace against its launch directory for live tool execution and approval review.
 - Auto follows the existing `auto.enabled` configuration. Its reported decision,
   reason and evaluator are displayed; a report does not imply model consultation.
 - A pending approval offers Allow once, Allow session and Deny for the displayed
@@ -118,6 +119,8 @@ On Linux a usable X11/Wayland display is required.
 对话；关闭窗口会先请求清理 Runtime。内容超过窗口时整页滚动，输出区随内容增高，
 不再嵌套纵向滚动。恢复历史前先选择原工作区，再进入“最近任务”点击“恢复”。
 审批面板显示实际 JSON 参数；会话授权不跨执行服务重启保留。
+
+实时会话中的工具执行和审批评估均以 Desktop 启动目录为基准解析相对工作区路径。
 
 真实模式使用共享 Runtime 工具和现有权限、沙箱门禁。Auto 遵循 `auto.enabled`
 配置并显示实际决策；需要人工批准时，可选择单次允许、会话允许或拒绝。
