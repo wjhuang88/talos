@@ -634,6 +634,39 @@ mod tests {
     }
 
     #[test]
+    fn e3a_cli_todo_registration_preserves_callback_time_local_open() {
+        let home = tempfile::tempdir().expect("isolated CLI host home");
+        let sessions_dir = home.path().join("sessions");
+        let manager = SessionManager::with_dir(sessions_dir.clone());
+        let session = manager
+            .create_session("e3a-cli-host", "")
+            .expect("ordinary CLI Session selection");
+        let todo_db = sessions_dir.join("todos.sqlite");
+        assert!(!todo_db.exists());
+
+        let mut agent = Agent::with_security(
+            Arc::new(talos_provider::mock::MockProvider::new()),
+            talos_core::tool::ToolRegistry::new(),
+            Some(Arc::new(
+                talos_permission::PermissionEngine::with_workspace_root(home.path().to_path_buf()),
+            )),
+            None,
+            home.path().to_path_buf(),
+        );
+        set_todo_prompt_provider(&mut agent, &manager, &session);
+        assert!(
+            !todo_db.exists(),
+            "registering CLI prompt callback must not open Todo SQLite"
+        );
+
+        let repo = manager
+            .todo_repository()
+            .expect("explicit on-demand Todo opening");
+        assert_eq!(repo.db_path(), todo_db.as_path());
+        assert!(todo_db.is_file());
+    }
+
+    #[test]
     fn todo_prompt_includes_only_active_items() {
         let dir = tempfile::tempdir().expect("operation should succeed");
         let manager = SessionManager::with_dir(dir.path().to_path_buf());
