@@ -47,12 +47,12 @@ try {
     Write-Host "I324_LEGACY_FIXTURE version=$version pinned=$($UsePinnedMinGit.IsPresent)"
 
     $fixture = Join-Path $root 'fixture'
-    $home = Join-Path $root 'isolated-home'
+    $isolatedHome = Join-Path $root 'isolated-home'
     $xdg = Join-Path $root 'isolated-xdg'
-    foreach ($dir in @($fixture, $home, $xdg)) {
+    foreach ($dir in @($fixture, $isolatedHome, $xdg)) {
         [IO.Directory]::CreateDirectory($dir) | Out-Null
     }
-    [Environment]::SetEnvironmentVariable('HOME', $home, 'Process')
+    [Environment]::SetEnvironmentVariable('HOME', $isolatedHome, 'Process')
     [Environment]::SetEnvironmentVariable('XDG_CONFIG_HOME', $xdg, 'Process')
     [Environment]::SetEnvironmentVariable('GIT_CONFIG_NOSYSTEM', '1', 'Process')
     [Environment]::SetEnvironmentVariable('GIT_ATTR_NOSYSTEM', '1', 'Process')
