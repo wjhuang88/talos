@@ -42,3 +42,14 @@ At development head `567a6267`, the locked Bedrock provider filter passed
 local preflight passed governance and workspace check, then stopped at
 workspace Clippy on three unwrap_used findings in the frame and response
 readers. Workspace tests and SDK fixture checks were not reached by that run.
+
+The next preflight retry passed workspace Clippy and reached workspace tests.
+The talos-agent library reported 768 passes and one git_auto failure: the Git
+maintenance executable path differed from the bound executable. Running that
+same test binary with /usr/local/libexec/git-core first on PATH passed the
+isolated case (Git 2.56.1). The complete preflight still requires a fresh run.
+
+Mid-implementation Agent review of 82b66ae7 found that textual projection hid
+orphan tool results from validation and that fresh CLI catalog selection could
+prompt for an unrelated API key. The first correction is dbed0dcb; 14 Bedrock
+provider tests passed, including both textual protocols rejecting orphan results.
