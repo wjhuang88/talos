@@ -1136,3 +1136,18 @@ Implementation acceptance, catalog/UI and full SDK validation remain tracked in 
 Configured/CatalogInferred/Default source without reading credentials. Hosts should use this
 resolver for display instead of treating an omitted profile shape as always Chat. The 22 reviewed
 exact Azure pairs require valid explicit v1 profiles; resource destinations are never inferred.
+
+### Bedrock SDK migration (I332 development branch)
+
+Hosts selecting `ProviderProtocol::AmazonBedrock` can use the existing
+`build_configured_provider` factory. Set `AWS_REGION` before construction.
+Pass the result of `Config::api_key()` through to the factory even when it is
+empty. For Bedrock the empty string indicates that the transport acquires AWS
+credentials at dispatch. Hosts displaying model availability can use
+`model_authentication_configured` to check configuration without reading
+credentials. A successful configuration check does not verify AWS access.
+
+Existing configurations can opt in per provider or per model. SDK consumers
+matching on the non-exhaustive protocol enum should handle the new variant
+and retain a fallback for future variants. See the
+[Bedrock configuration example](PROVIDER-PROTOCOLS.md#amazon-bedrock-conversestream).

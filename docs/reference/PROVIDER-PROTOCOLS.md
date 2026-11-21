@@ -336,3 +336,29 @@ provider configuration, confirmed catalog evidence or the conservative default. 
 profile selection only: the browser does not read the token or verify authentication. Missing
 or invalid tokens still fail at request dispatch. Conflicting provider/model endpoint overrides
 are invalid profiles and must be removed instead of relocating the profile credential.
+
+## Amazon Bedrock ConverseStream
+
+On the I332 development branch, select a model or inference profile that supports
+ConverseStream in your chosen region. Replace the placeholder with its Bedrock ID.
+
+```toml
+provider = "regional"
+model = "<bedrock-model-or-inference-profile-id>"
+
+[providers.regional]
+protocol = "amazon-bedrock"
+```
+
+Set `AWS_REGION` before constructing the provider. At dispatch, Talos reads
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Temporary credentials also
+require their matching `AWS_SESSION_TOKEN`. Supply these through the process
+environment. Talos builds the regional Bedrock Runtime URL, signs the serialized
+request with SigV4 and disables redirects. Omit provider and model `base_url`
+overrides for this protocol.
+
+Native tool requests use Converse tool specifications. Compat and TalosStrict
+use textual calls over the same signed transport. Tool execution follows the
+Agent permission policy. The adapter drains trailing usage and checks for stream
+errors before delivering calls. Controlled local HTTP tests exercise all three
+modes with ordered PNGs and a file-read round trip.
