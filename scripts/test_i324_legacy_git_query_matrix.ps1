@@ -171,6 +171,14 @@ try {
     }
 } finally {
     if ([IO.Directory]::Exists($root)) {
-        [IO.Directory]::Delete($root, $true)
+        # Git creates read-only object files on Windows. Force removes those
+        # fixture files; constrain recursive cleanup to our generated temp root.
+        $cleanupRoot = [IO.Path]::GetFullPath($root)
+        $tempParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/')
+        if ([IO.Path]::GetDirectoryName($cleanupRoot) -cne $tempParent -or
+            [IO.Path]::GetFileName($cleanupRoot) -notmatch '^talos-i324-[0-9a-f]{32}$') {
+            throw 'Refusing cleanup outside the generated I324 temporary fixture.'
+        }
+        Remove-Item -LiteralPath $cleanupRoot -Recurse -Force
     }
 }

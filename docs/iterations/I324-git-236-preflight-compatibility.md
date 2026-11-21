@@ -106,3 +106,14 @@ Authoritative [Issue #919](https://github.com/wjhuang88/talos/issues/919) correc
 ## 2026-11-20 newly confirmed compatibility surface — target attributes
 
 The official [Git 2.40 release notes](https://github.com/git/git/blob/master/Documentation/RelNotes/2.40.0.adoc) introduce `git check-attr --source`; Git 2.36 cannot use this to read target-commit attributes. The current `prepared_add.rs` target-tree filter prediction invokes that option, separately from compatible current-worktree and `--cached` inspections. A new **test-only** native fixture in Draft #928 differentiates committed tree/index/worktree and checks a supplied-byte gix target selection. On older Git, keep the approved existing `check-attr` modes where supported, replacing **only the unsupported target-tree option** after exact tree/object/path Read, precedence/effect and stale-plan validation. Do not treat `--cached` as a target-tree synonym; no temporary index/extra subprocess without separately accepted authorization. This is source-backed scope, not native 2.36 verification or accepted ADR.
+
+## 2026-11-21 Windows machine execution
+
+Executed the repository runbook from `2bbd3c3441ea14e3ac853ced8101de6424463cf8`.
+[Results](../reference/WINDOWS-VALIDATION-2026-11-21-I324.md): pinned and installed
+Git 2.36.1 matrices match, confirming five unsupported var queries and unsupported
+target-tree source option, while normal/cached work. Fixed test-only read-only
+object cleanup after initial exit-1 runs; repaired reruns exit 0. Format and 15
+candidate tests pass; original-environment 17 MiB preparation fails on the Git
+environment guard. No runtime implementation, acceptance or completion asserted;
+preserve all review/provenance and original-environment mutation gates.

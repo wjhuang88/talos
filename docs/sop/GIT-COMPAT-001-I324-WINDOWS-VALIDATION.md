@@ -105,3 +105,8 @@ $checkoutExit = $LASTEXITCODE
 日志写在 `$env:TEMP`，**不要提交原始日志、HOME、令牌、凭据、绝对路径、Git 配置内容或工作区敏感数据到仓库**。出现异常时保留原始日志在本机；反馈前人工脱敏。命令矩阵只能说明**具体命令形式**支持与否；真正的系统 attributes 编译默认来源、permission/Read/Execute 权限边界、变更后重验和原始环境 Checkout/Commit 仍须单独审查。
 
 历史本地 Windows 失败证据见 [2026-11-17 原生验证报告](../reference/WINDOWS-VALIDATION-2026-11-17-I324.md)。此手册本身不修改生产实现、不接受 ADR-089 新权限、不关闭 #919。
+
+2026-11-21 已执行的本机矩阵及清理修复见
+[原生验证反馈](../reference/WINDOWS-VALIDATION-2026-11-21-I324.md)：固定 MinGit
+与 Scoop Git 的分类一致，修复只读对象清理后脚本均退出 0；15 项候选测试通过，
+17 MiB 实际 Checkout/Commit 验收仍失败。

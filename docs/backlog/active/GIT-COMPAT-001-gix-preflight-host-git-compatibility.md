@@ -89,3 +89,15 @@ The latest [Issue #919](https://github.com/wjhuang88/talos/issues/919) is author
 ## 2026-11-20 target-tree compatibility finding
 
 A second independently documented old-Git-incompatible **query option**, `git check-attr --source=<tree-ish>`, was introduced in Git 2.40. The existing I324 prepared Checkout target analysis uses `--source=<target.commit>` in addition to a separate, older-compatible `--cached` query. They cannot be interchanged when committed target, staged index and worktree differ. See [T0h audit](../../reference/GIT-COMPAT-001-I324-GIX-PREFLIGHT-AUDIT.md) and [Git 2.40 release notes](https://github.com/git/git/blob/master/Documentation/RelNotes/2.40.0.adoc). **Current scope remains command/option-level compatibility, not all-CLI removal**: retain normal/cached check-attr where supported; investigate an admitted, byte-fed gix target-tree substitute. Test-only candidate is on Draft #928, with no accepted runtime authorization or native Git 2.36.1 Checkout/Commit success. Additional `git var` config/shell names still require exact native classification.
+
+## 2026-11-21 native runbook feedback
+
+[Native report](../../reference/WINDOWS-VALIDATION-2026-11-21-I324.md) for #928
+`2bbd3c3441ea14e3ac853ced8101de6424463cf8`: official pinned MinGit and selected
+Scoop Git 2.36.1 both classify all five var queries unsupported (129), normal/cached
+attributes working, source option unsupported (129). Initial scripts failed only
+at fixture cleanup; bounded read-only-file cleanup repair reran both modes to
+exit 0. Format passes; 15/15 gix candidates pass including Windows gitdir identity;
+17 MiB actual Checkout/Commit still fails preparation in the original environment
+on the Git-variable guard (101). Raw logs remain local TEMP. Scope stays targeted;
+no product acceptance, production authority change, ADR acceptance or Complete.
