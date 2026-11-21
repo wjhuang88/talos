@@ -104,7 +104,10 @@ impl PreparedBingDualHost {
             BingVariant::Cn => "zh-CN",
         };
         let encoded = encode_form_with_limit(
-            &[("q".to_owned(), query.to_owned()), ("mkt".to_owned(), market.to_owned())],
+            &[
+                ("q".to_owned(), query.to_owned()),
+                ("mkt".to_owned(), market.to_owned()),
+            ],
             4096,
         )?;
         url.set_query(Some(
@@ -123,10 +126,11 @@ mod tests {
         },
         transport::{TransportBudget, TransportResponse},
     };
-    use std::{sync::atomic::{AtomicUsize, Ordering}, time::Duration};
-    use talos_core::tool::{
-        ToolNetworkAuthority, ToolNetworkAuthorizationError, ToolNetworkScope,
+    use std::{
+        sync::atomic::{AtomicUsize, Ordering},
+        time::Duration,
     };
+    use talos_core::tool::{ToolNetworkAuthority, ToolNetworkAuthorizationError, ToolNetworkScope};
 
     struct FixtureAuthority {
         manifest: ToolNetworkManifest,
@@ -183,8 +187,7 @@ mod tests {
     }
 
     fn fixture_budget() -> TransportBudget {
-        TransportBudget::new(Duration::from_secs(5), 4, 1_048_576)
-            .expect("bounded mock budget")
+        TransportBudget::new(Duration::from_secs(5), 4, 1_048_576).expect("bounded mock budget")
     }
 
     fn organic() -> Vec<u8> {
@@ -224,7 +227,8 @@ mod tests {
             if next_variant(BingVariant::NonCn, observed, guards) != BingNext::TryCn {
                 return first;
             }
-            self.simulate(BingVariant::Cn, &self.cn, authority, budget, &mut send).0
+            self.simulate(BingVariant::Cn, &self.cn, authority, budget, &mut send)
+                .0
         }
 
         fn simulate<F>(
@@ -291,8 +295,12 @@ mod tests {
                         Err(_) if status == 429 => BingAttempt::RateLimited,
                         Err(_) if (300..400).contains(&status) => BingAttempt::UnsupportedRedirect,
                         Err(_) if status != 200 => BingAttempt::HttpStatus(status),
-                        Err(CompatibilityError::Bing(crate::search_backend::bing_parser::BingParseError::Empty)) => BingAttempt::ValidEmpty,
-                        Err(CompatibilityError::Bing(crate::search_backend::bing_parser::BingParseError::Challenge)) => BingAttempt::Challenge,
+                        Err(CompatibilityError::Bing(
+                            crate::search_backend::bing_parser::BingParseError::Empty,
+                        )) => BingAttempt::ValidEmpty,
+                        Err(CompatibilityError::Bing(
+                            crate::search_backend::bing_parser::BingParseError::Challenge,
+                        )) => BingAttempt::Challenge,
                         Err(_) => BingAttempt::InvalidResponse,
                     };
                     (result, observed)
@@ -311,11 +319,35 @@ mod tests {
         assert_eq!(plan.cn.url.host_str(), Some("cn.bing.com"));
         assert_eq!(plan.www.url.path(), "/search");
         assert_eq!(plan.cn.url.path(), "/search");
-        assert!(plan.www.url.query().unwrap_or_default().contains("q=user+query+%26+privacy"));
-        assert!(plan.www.url.query().unwrap_or_default().contains("mkt=en-US"));
-        assert!(plan.cn.url.query().unwrap_or_default().contains("mkt=zh-CN"));
-        assert_eq!(plan.www.headers.expect("header").user_agent(), "Synthetic Bing/1.0");
-        assert_eq!(plan.cn.headers.expect("header").user_agent(), "Synthetic Bing/1.0");
+        assert!(
+            plan.www
+                .url
+                .query()
+                .unwrap_or_default()
+                .contains("q=user+query+%26+privacy")
+        );
+        assert!(
+            plan.www
+                .url
+                .query()
+                .unwrap_or_default()
+                .contains("mkt=en-US")
+        );
+        assert!(
+            plan.cn
+                .url
+                .query()
+                .unwrap_or_default()
+                .contains("mkt=zh-CN")
+        );
+        assert_eq!(
+            plan.www.headers.expect("header").user_agent(),
+            "Synthetic Bing/1.0"
+        );
+        assert_eq!(
+            plan.cn.headers.expect("header").user_agent(),
+            "Synthetic Bing/1.0"
+        );
         assert_eq!(manifest.scope().redirect_limit(), 0);
         assert_eq!(manifest.scope().endpoints().len(), 2);
         assert!(!format!("{plan:?}").contains("user query"));
@@ -338,7 +370,10 @@ mod tests {
             calls.fetch_add(1, Ordering::Relaxed);
             "Synthetic Bing/1.0"
         });
-        assert!(matches!(outcome, Err(CompatibilityError::Transport(TransportError::Unauthorized))));
+        assert!(matches!(
+            outcome,
+            Err(CompatibilityError::Transport(TransportError::Unauthorized))
+        ));
         assert_eq!(calls.load(Ordering::Relaxed), 0);
         assert_eq!(full.scope().endpoints().len(), 2);
     }
@@ -357,11 +392,14 @@ mod tests {
                 None,
                 vec![],
                 1,
-            ).expect("scope")
+            )
+            .expect("scope"),
         );
         assert!(matches!(
             PreparedBingDualHost::prepare(&redirecting, "private query", 2),
-            Err(CompatibilityError::Transport(TransportError::InvalidRequest))
+            Err(CompatibilityError::Transport(
+                TransportError::InvalidRequest
+            ))
         ));
     }
 
@@ -380,7 +418,10 @@ mod tests {
         assert_eq!(calls, vec![BingVariant::NonCn]);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].url, "https://result.invalid/one");
-        assert_eq!(result[0].backend, crate::search_backend::SearchBackendId::DuckDuckGo);
+        assert_eq!(
+            result[0].backend,
+            crate::search_backend::SearchBackendId::DuckDuckGo
+        );
         assert_eq!(authority.checks.load(Ordering::Relaxed), 1);
     }
 
@@ -390,18 +431,20 @@ mod tests {
             let (manifest, plan) = frozen();
             let authority = fixture_authority(&manifest);
             let mut calls = Vec::new();
-            let result = plan.replay(&authority, &fixture_budget(), ALLOWED, |variant, _| {
-                calls.push(variant);
-                if variant == BingVariant::NonCn {
-                    match mode {
-                        0 => SyntheticOutcome::Transport(TransportError::Dns),
-                        1 => SyntheticOutcome::Transport(TransportError::ConnectionRefused),
-                        _ => SyntheticOutcome::SourceLocalTimeout,
+            let result = plan
+                .replay(&authority, &fixture_budget(), ALLOWED, |variant, _| {
+                    calls.push(variant);
+                    if variant == BingVariant::NonCn {
+                        match mode {
+                            0 => SyntheticOutcome::Transport(TransportError::Dns),
+                            1 => SyntheticOutcome::Transport(TransportError::ConnectionRefused),
+                            _ => SyntheticOutcome::SourceLocalTimeout,
+                        }
+                    } else {
+                        SyntheticOutcome::Response(200, organic())
                     }
-                } else {
-                    SyntheticOutcome::Response(200, organic())
-                }
-            }).expect("permitted fallback");
+                })
+                .expect("permitted fallback");
             assert_eq!(result.into_results().len(), 1);
             assert_eq!(calls, vec![BingVariant::NonCn, BingVariant::Cn]);
             assert_eq!(authority.checks.load(Ordering::Relaxed), 2);
@@ -424,17 +467,26 @@ mod tests {
             let (manifest, plan) = frozen();
             let authority = fixture_authority(&manifest);
             let mut calls = 0;
-            assert!(plan.replay(&authority, &fixture_budget(), ALLOWED, |_, _| {
-                calls += 1;
-                if calls == 1 { first_response_clone(&first) } else { SyntheticOutcome::Response(200, organic()) }
-            }).is_err());
+            assert!(
+                plan.replay(&authority, &fixture_budget(), ALLOWED, |_, _| {
+                    calls += 1;
+                    if calls == 1 {
+                        first_response_clone(&first)
+                    } else {
+                        SyntheticOutcome::Response(200, organic())
+                    }
+                })
+                .is_err()
+            );
             assert_eq!(calls, 1);
         }
     }
 
     fn first_response_clone(outcome: &SyntheticOutcome) -> SyntheticOutcome {
         match outcome {
-            SyntheticOutcome::Response(status, body) => SyntheticOutcome::Response(*status, body.clone()),
+            SyntheticOutcome::Response(status, body) => {
+                SyntheticOutcome::Response(*status, body.clone())
+            }
             SyntheticOutcome::Transport(error) => SyntheticOutcome::Transport(*error),
             SyntheticOutcome::SourceLocalTimeout => SyntheticOutcome::SourceLocalTimeout,
         }
@@ -452,10 +504,13 @@ mod tests {
             let (manifest, plan) = frozen();
             let authority = fixture_authority(&manifest);
             let mut attempts = 0;
-            assert!(plan.replay(&authority, &fixture_budget(), ALLOWED, |_, _| {
-                attempts += 1;
-                SyntheticOutcome::Transport(error)
-            }).is_err());
+            assert!(
+                plan.replay(&authority, &fixture_budget(), ALLOWED, |_, _| {
+                    attempts += 1;
+                    SyntheticOutcome::Transport(error)
+                })
+                .is_err()
+            );
             assert_eq!(attempts, 1, "ambiguous failure must not rotate hosts");
         }
     }
@@ -464,12 +519,18 @@ mod tests {
     fn fallback_refused_without_guards_or_cn_authority_or_live_budget() {
         let (manifest, plan) = frozen();
         let authority = fixture_authority(&manifest);
-        let denied = BingFallbackGuards { send_budget_remaining: false, ..ALLOWED };
+        let denied = BingFallbackGuards {
+            send_budget_remaining: false,
+            ..ALLOWED
+        };
         let mut calls = 0;
-        assert!(plan.replay(&authority, &fixture_budget(), denied, |_, _| {
-            calls += 1;
-            SyntheticOutcome::Transport(TransportError::Dns)
-        }).is_err());
+        assert!(
+            plan.replay(&authority, &fixture_budget(), denied, |_, _| {
+                calls += 1;
+                SyntheticOutcome::Transport(TransportError::Dns)
+            })
+            .is_err()
+        );
         assert_eq!(calls, 1);
 
         let authority = FixtureAuthority {
@@ -478,19 +539,25 @@ mod tests {
             checks: AtomicUsize::new(0),
         };
         let mut calls = 0;
-        assert!(plan.replay(&authority, &fixture_budget(), ALLOWED, |_, _| {
-            calls += 1;
-            SyntheticOutcome::Transport(TransportError::Dns)
-        }).is_err());
+        assert!(
+            plan.replay(&authority, &fixture_budget(), ALLOWED, |_, _| {
+                calls += 1;
+                SyntheticOutcome::Transport(TransportError::Dns)
+            })
+            .is_err()
+        );
         assert_eq!(calls, 1, "CN must not send on permission denial");
 
         let expired = TransportBudget::new(Duration::from_nanos(1), 4, 1_048_576).expect("budget");
         std::thread::sleep(Duration::from_millis(1));
         let mut calls = 0;
-        assert!(plan.replay(&fixture_authority(&manifest), &expired, ALLOWED, |_, _| {
-            calls += 1;
-            SyntheticOutcome::Response(200, organic())
-        }).is_err());
+        assert!(
+            plan.replay(&fixture_authority(&manifest), &expired, ALLOWED, |_, _| {
+                calls += 1;
+                SyntheticOutcome::Response(200, organic())
+            })
+            .is_err()
+        );
         assert_eq!(calls, 0, "expired invocation must not send");
     }
 }
