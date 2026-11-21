@@ -362,3 +362,14 @@ use textual calls over the same signed transport. Tool execution follows the
 Agent permission policy. The adapter drains trailing usage and checks for stream
 errors before delivering calls. Controlled local HTTP tests exercise all three
 modes with ordered PNGs and a file-read round trip.
+
+### Frozen Bedrock catalog evidence
+
+The packaged models.toml (Git blob `72d28dafde10a7940b4d6cbc1e488a9cca1ab0d6`)
+contains 122 amazon-bedrock rows. Three exact IDs in that snapshot appear in
+AWS's Nova v1 ConverseStream table: `amazon.nova-micro-v1:0`,
+`amazon.nova-lite-v1:0` and `amazon.nova-pro-v1:0`. The documented Premier
+base ID is absent. These matches establish API support only. Region availability,
+inference-profile routing and account access require separate verification.
+The other 119 rows have no admission from this table, including prefixed IDs.
+See [AWS Nova v1 Converse API](https://docs.aws.amazon.com/nova/latest/userguide/using-converse-api.html).

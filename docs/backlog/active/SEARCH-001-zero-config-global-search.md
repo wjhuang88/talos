@@ -115,8 +115,8 @@ accepted claims before executable work.
 
 | Child | Outcome | Depends on | Issue / State |
 |---|---|---|---|
-| SEARCH-001-A | Code-truth audit, migration matrix, architecture ADR, provider qualification gates | None | [#625](https://github.com/wjhuang88/talos/issues/625), Complete / Claimed; ADR-085 accepted in #629 (`4567bf85`) |
-| SEARCH-001-B | Domain extraction with current-behavior-compatible adapters | A ADR accepted | [#642](https://github.com/wjhuang88/talos/issues/642), Complete / Claimed; I292; #653/#656 plus closeout evidence merged |
+| SEARCH-001-A | Code-truth audit, migration matrix, architecture ADR, provider qualification gates | None | [#625](https://github.com/wjhuang88/talos/issues/625), **Complete / Closed (I288 only)**; accepted ADR-085 and source Completion Commit `4567bf85ef1fb151fbb07a30e1f5f26a81feeed7` (#629), after owner-first governance reconciliation |
+| SEARCH-001-B | Domain extraction with current-behavior-compatible adapters | A ADR accepted | [#642](https://github.com/wjhuang88/talos/issues/642), **Complete / Closed (I292 only)**; [canonical owner](SEARCH-001-B-compatible-search-backends.md), private seam #653, compatibility adapters #656, final fixture source Completion Commit `7728f7681df11a9d715a0e479590c1002c53a26f` (#660), prior docs #663, after owner-first reconciliation |
 | SEARCH-001-C | Talos-owned auto router, deadlines, error semantics, #199 integration | B / A | [#643](https://github.com/wjhuang88/talos/issues/643), Complete / Closed; I293; Completion Commit `eb870cdf0a63f45f20d89f1a50eba276f9198643` (#808) |
 | SEARCH-001-D | Provider feasibility and real multi-region (incl. mainland China) evidence gate | A; research may overlap B | [#644](https://github.com/wjhuang88/talos/issues/644), Complete / Closed with **BLOCKED / ZERO-ADMISSION** outcome; I294; #831 merge `bdb98b2b47dbb76111f5b053a226efbb033c6b34` |
 | SEARCH-001-D3-T3 | Preferred non-CN Bing HTML → CN failover *within one family*; separately governed offline decision/tests, **no production admission** | D3/#937 research, existing parser, explicit rights/ADR-090 gate | [#957](https://github.com/wjhuang88/talos/issues/957) / [owner](SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md) / [I329](../../iterations/I329-search-bing-dual-host-offline.md): proposed claim, **ineffective until merge**; live/default activation blocked |
@@ -206,3 +206,9 @@ This does **not** reorder DDG vs Bing, count as a second native provider, enable
 new query recipient, or waive D3/#937's Microsoft access/output-use and region
 qualification gates. I329 proposes strictly offline policy tests only; E/F/G/I
 remain blocked and this Epic remains Open.
+
+## Bing technical GO handoff — 2026-11-20 (not Epic acceptance)
+
+Maintainer decision: Bing direct HTML is a **technical GO candidate**; existing Talos-owned parser and accepted synthetic T1/T2/T3a policy permit a separately governed engineering integration. [New bounded D3-T4 / #991](SEARCH-001-D3-T4-bing-prepared-dual-host-integration.md) proposes [I333](../../iterations/I333-search-bing-prepared-dual-host-integration.md), governance [PR #992](https://github.com/wjhuang88/talos/pull/992), for offline prepared dual-host request/permission mock integration without changing deployed DDG-first CN-only behavior. Claim not effective until main merge. Do not redo A/B, C, L, or I329.
+
+Technical feasibility does not imply confirmed distributed search/result-use rights, real `www.bing.com` or mainland-China reachability, or **two independent native providers**. #957 real/default activation and external evidence remain unverified; original #644 ZERO-ADMISSION and parent #624 Open remain unchanged. Network permission, redirect/SSRF, proxy, cancellation, deadline and physical send budget cannot be loosened to compensate for missing evidence.

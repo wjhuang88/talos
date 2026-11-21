@@ -1,6 +1,6 @@
 # SEARCH-001-A: Search Architecture Audit, Migration Matrix & ADR
 
-**Status**: Complete / Claimed
+**Status**: Complete / Closed — I288 architecture/evidence-only delivery; #624 remains Open
 **Type**: Architecture / Governance Story and evidence-led Spike
 **Parent Epic**: [SEARCH-001](SEARCH-001-zero-config-global-search.md) / [Issue #624](https://github.com/wjhuang88/talos/issues/624)
 
@@ -16,7 +16,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Sol / talos开发 session |
 | Work Slice | SEARCH-001-A architecture audit, deterministic current-behavior characterization, provider-admission/multi-region evidence plan, ADR and B–I migration matrix only; no production search implementation |
@@ -26,8 +26,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance claim PR #627 merged as `6f651a28fe901a894942ab1c56015a60491a054e` after exact-head reduced CI, both governance validators, remote Issue reconciliation and merge-time CAS. I288 is architecture-only and non-overlapping with other active slices. |
 | Implementation PR | #629 |
-| Last Updated | 2026-10-03 |
-| Handoff / Release Condition | ADR-085 accepted; B/C/D are dependency-ready and separately unclaimed |
+| Last Updated | 2026-11-19 |
+| Handoff / Release Condition | I288 architecture scope accepted in source #629. A complete; B/C/D subsequently governed as independent children. Epic #624 remains Open; original D/#644 ZERO-ADMISSION and E/F/G/I provider admission gates remain binding. |
 
 ## Identity / Goal / Value
 
@@ -120,3 +120,11 @@ This architecture phase does not advertise new features. It owns the documentati
   `cargo test -p talos-tools --features network --locked` (105 passed)
 - Residual: provider feasibility and regional evidence remain SEARCH-001-D / #644; no native
   provider is admitted by this architecture decision.
+
+## Post-delivery owner-first terminal reconciliation — 2026-11-19
+
+**Completion Commit: `4567bf85ef1fb151fbb07a30e1f5f26a81feeed7`**, accepted [architecture/ADR/test-only source PR #629](https://github.com/wjhuang88/talos/pull/629) already merged on `main`. This is pre-existing implementation/evidence, **not** the SHA of the later status-only reconciliation PR.
+
+Exact-head [CI #2965/run 37124297317](https://github.com/wjhuang88/talos/actions/runs/37124297317) completed SUCCESS on #629's original source head; ADR-085 was subsequently recorded Accepted for I288. Historical single-maintainer governance claim [#627](https://github.com/wjhuang88/talos/pull/627) merged `6f651a28fe901a894942ab1c56015a60491a054e`. No newly inferred historical independent review is claimed.
+
+I288 / SEARCH-001-A **Complete / Closed** for its architecture, characterization and B–I migration gates only. The source has not admitted a native zero-key provider or established automatic global/China access. The separately effective implementation for B/C and accepted negative evidence D/#644 do not retroactively expand A. [Issue #625](https://github.com/wjhuang88/talos/issues/625) may close as Completed only **after** this owner-first reconciliation reaches `main`. Parent [Epic #624](https://github.com/wjhuang88/talos/issues/624) remains **Open** pending downstream qualifying-provider, rights and genuine regional acceptance; no E/F/G/I activation follows from this closure.

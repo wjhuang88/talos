@@ -1,6 +1,6 @@
 # Iteration I292: Search Compatible Backend Boundary
 
-> Document status: Complete
+> Document status: Complete / Closed — I292 compatible backend/fixture slice only
 > Published plan date: 2026-10-04
 > Planned objective: Implement SEARCH-001-B's private SearchBackend compatibility boundary without changing production search behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-6 Sol / talos开发 session |
 | Work Slice | SEARCH-001-B compatibility boundary only; no router behavior change |
@@ -18,10 +18,10 @@
 | Source Issue | #642 |
 | Governance Claim PR | #651 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Governance-only claim+activation PR #651; exact-head CI, both governance validators and merge-time CAS required. |
+| Authorization Evidence | Effective governed I292 claim #651 merged as `6490118fed913521ac9d1875ccd63fb5e3914af1`; #653 and #656 merged; final source #660 merged with exact-head [CI #3009](https://github.com/wjhuang88/talos/actions/runs/37409618084) SUCCESS. |
 | Implementation PR | #653 and #656 merged |
-| Last Updated | 2026-10-04 |
-| Handoff / Release Condition | Atomic claim+activation before implementation |
+| Last Updated | 2026-11-19 |
+| Handoff / Release Condition | Private compatibility seam/adapter/fixture implementation completed through #653/#656/#660, prior documentation closeout #663 accepted. #642 closes after current owner-first claim reconciliation; #624 Open and native provider gates E/F/G/I remain blocked. |
 
 ## Published Baseline
 
@@ -98,7 +98,9 @@ C waits for B delivery. D remains separately unclaimed. No release is authorized
 
 ## Completion Evidence
 
-- Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f` (PR #660 squash merge; exact-head CI run 37409618084)
+- Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f` (PR #660 squash merge)
+
+  Exact-head CI run 37409618084.
 
 ## Variance And Residuals
 
@@ -109,3 +111,9 @@ C waits for B delivery. D remains separately unclaimed. No release is authorized
 - Outcome: Complete; the private boundary and compatibility adapters are covered by deterministic parser/normalization characterization with no production routing change.
 - Documentation: completion evidence recorded here and in SEARCH-001-B.
 - Lessons: keep the private seam separate from platform Provider terminology and retain the existing optional-provider and Wikipedia fallback policy until router work is separately claimed.
+
+## Historical completion claim reconciliation — 2026-11-19
+
+**Completion Commit: `7728f7681df11a9d715a0e479590c1002c53a26f`**, the **actual accepted final fixture source merge** [PR #660](https://github.com/wjhuang88/talos/pull/660), not the earlier adapter #656 merge or the new governance-only closeout.
+
+Original exact-head [CI #3009/run 37409618084](https://github.com/wjhuang88/talos/actions/runs/37409618084) SUCCESS; prior owner/iteration closeout [#663](https://github.com/wjhuang88/talos/pull/663) merged as `e55d86cb1e7b045248e0cbec396a8b3388f8b2e1` and recorded Complete, but the `Claim State | Claimed` was never made terminal. This change corrects that stale collaboration state only. The I292 completed work is private SearchBackend normalization and deterministic no-network fixtures for prior compatible sources, **not** the later SearchRouter product behavior or independent provider admission. #642 may close after this owner-first reconciliation PR merges; parent #624 remains Open, D/#644 ZERO-ADMISSION, E/F/G/I blocked.

@@ -1,6 +1,6 @@
 # Iteration I288: Search Architecture Audit And Migration Contract
 
-> Document status: Complete / Claimed
+> Document status: Complete / Closed — I288 accepted architecture/evidence-only work, no native-provider admission
 > Published plan date: 2026-09-30
 > Planned objective: Establish the reviewed Talos-owned search architecture, compatibility baseline, provider-admission evidence contract, and rollbackable migration matrix for SEARCH-001-A without changing production search behavior.
 > Baseline rule: once committed, preserve this target; changed targets use a new iteration ID.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | GPT-5.6 Sol / talos开发 session |
 | Work Slice | SEARCH-001-A architecture audit, deterministic current-behavior characterization, provider-admission/multi-region evidence plan, ADR and B–I migration matrix only; no production search implementation |
@@ -20,8 +20,8 @@
 | Authorization Mode | Single-maintainer merge |
 | Authorization Evidence | Governance claim #627 merged as `6f651a28fe901a894942ab1c56015a60491a054e` after exact-head reduced CI, both governance validators, remote Issue reconciliation and merge-time CAS. |
 | Implementation PR | #629 |
-| Last Updated | 2026-09-30 |
-| Handoff / Release Condition | ADR-085 accepted; B/C/D are dependency-ready and separately unclaimed |
+| Last Updated | 2026-11-19 |
+| Handoff / Release Condition | Accepted architecture/ADR and behavior-only test evidence; later B/C/D separately governed; D/#644 completed as BLOCKED / ZERO-ADMISSION. Epic #624 and E/F/G/I admission gates remain open/blocked. |
 
 Claim and activation became effective when governance PR #627 merged as `6f651a28fe901a894942ab1c56015a60491a054e`. I288 remains architecture/evidence-only: production search behavior, dependencies, configuration and provider implementation are still outside this iteration.
 
@@ -122,3 +122,9 @@ Claim and activation became effective when governance PR #627 merged as `6f651a2
 ## Retrospective
 
 - Pending.
+
+## Historical completion claim reconciliation — 2026-11-19
+
+**Completion Commit: `4567bf85ef1fb151fbb07a30e1f5f26a81feeed7`**, accepted architecture/test-only source PR #629, already merged in target main before this status correction.
+
+Original exact-head [CI #2965](https://github.com/wjhuang88/talos/actions/runs/37124297317) SUCCESS; ADR-085 accepted 2026-10-03; effective governance claim #627 merged `6f651a28fe901a894942ab1c56015a60491a054e`. Original `Claimed` state remained stale even though the completion evidence and accepted decision were published. Current corrected `Closed` is **I288-only**, not completion of #624 or qualifying provider/real-region behavior. #625 closes only after this owner-first governance PR merges. B/C/D followed independently; original D/#644 ended ZERO-ADMISSION, E/F/G/I remain gated.
