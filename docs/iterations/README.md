@@ -1,3 +1,7 @@
+## I335 / SEARCH-001-D3-T5 — proposed real Bing transport / explicit opt-in
+
+[Iteration](I335-search-bing-dual-runtime.md) / [owner](../backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [#1001](https://github.com/wjhuang88/talos/issues/1001): Active / Claimed PROPOSED via #1002, no code before effective merge; I333 fully complete and not replayed, Gate-0/#1000 independent; zero default WWW exposure.
+
 ## I333 / SEARCH-001-D3-T4 — Complete / Closed on owner-first closeout (offline-only)
 
 [Iteration](I333-search-bing-prepared-dual-host-integration.md) / [canonical owner](../backlog/active/SEARCH-001-D3-T4-bing-prepared-dual-host-integration.md) / [Issue #991](https://github.com/wjhuang88/talos/issues/991): effective claim #992; [source PR #994](https://github.com/wjhuang88/talos/pull/994) merged **Completion Commit `c3b75e1e118dff37f29d7f028c99ac2336ba7b59`**; exact-head [CI #4483](https://github.com/wjhuang88/talos/actions/runs/44868769900) attempt 4 **8/8 SUCCESS**, [independent Agent APPROVE](https://github.com/wjhuang88/talos/pull/994#issuecomment-7075229507) and CAS. Private WWW-first/CN dual-host prepared plan + nine synthetic tests Complete/Closed upon owner-first closeout. No real/live WWW Bing calls, permissions, provider admission, vendor-use rights or China availability verification. #957 T3b BLOCKED/Unclaimed; #937/#624 Open and historical #644 ZERO-ADMISSION unchanged.
