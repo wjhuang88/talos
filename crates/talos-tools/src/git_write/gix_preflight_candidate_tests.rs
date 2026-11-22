@@ -776,28 +776,42 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
     )
     .expect("mutated worktree attributes");
 
-    let mut search = gix_attributes::Search::default();
-    let mut metadata = gix_attributes::search::MetadataCollection::default();
-    for (path, bytes) in &target.attributes {
-        assert!(
-            gix_attributes::parse(bytes).all(|line| {
-                let Ok((_, assignments, _)) = line else {
-                    return false;
-                };
-                assignments.into_iter().all(|assignment| assignment.is_ok())
-            }),
-            "refuse malformed target attribute bytes"
-        );
-        search
-            .add_patterns_buffer(
-                bytes,
-                path.as_str().into(),
-                Some(std::path::Path::new("")),
-                &mut metadata,
-                true,
-            )
-            .expect("evaluate only provided target source bytes");
-    }
+    // A pure evaluator must fail closed on corrupt supplied bytes or an
+    // untrusted source spelling, without probing the filesystem to recover.
+    let mut corrupt = target.attributes.clone();
+    corrupt.insert(
+        "src/.gitattributes".to_owned(),
+        b"*.txt filter=lfs invalid$name\n".to_vec(),
+    );
+    assert!(
+        super::checkout_state::select_captured_target_filter(
+            &corrupt,
+            "src/inside.txt",
+            gix_attributes::glob::pattern::Case::Sensitive,
+        )
+        .is_err()
+    );
+    corrupt.remove("src/.gitattributes");
+    corrupt.insert(
+        "../outside/.gitattributes".to_owned(),
+        b"*.txt filter=untrusted\n".to_vec(),
+    );
+    assert!(
+        super::checkout_state::select_captured_target_filter(
+            &corrupt,
+            "src/inside.txt",
+            gix_attributes::glob::pattern::Case::Sensitive,
+        )
+        .is_err()
+    );
+    assert!(
+        super::checkout_state::select_captured_target_filter(
+            &target.attributes,
+            "../escape.txt",
+            gix_attributes::glob::pattern::Case::Sensitive,
+        )
+        .is_err()
+    );
 
     let paths = [
         ("outside.txt", "filter=root", "root"),
@@ -805,25 +819,16 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
         ("src/deep/inside.txt", "-filter", "unset"),
     ];
     for (path, expected_gix, expected_native) in paths {
-        let mut outcome = gix_attributes::search::Outcome::default();
-        outcome.initialize_with_selection(&metadata, ["filter"]);
-        assert!(
-            search.pattern_matching_relative_path(
-                path.into(),
-                gix_attributes::glob::pattern::Case::Sensitive,
-                Some(false),
-                &mut outcome,
-            ),
-            "the selected target tree contains a matching attribute at {path}"
-        );
-        let assignments = outcome
-            .iter_selected()
-            .map(|assignment| assignment.assignment.to_string())
-            .collect::<Vec<_>>();
+        let selection = super::checkout_state::select_captured_target_filter(
+            &target.attributes,
+            path,
+            gix_attributes::glob::pattern::Case::Sensitive,
+        )
+        .expect("only admitted target tree bytes are interpreted");
         assert_eq!(
-            assignments,
-            vec![expected_gix.to_owned()],
-            "in-memory target tree precedence differs at {path}"
+            selection.as_deref(),
+            Some(expected_gix),
+            "target-tree rule component disagrees at {path}"
         );
 
         let native = std::process::Command::new("git")
