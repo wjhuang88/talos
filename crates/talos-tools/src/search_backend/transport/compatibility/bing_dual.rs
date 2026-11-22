@@ -141,6 +141,16 @@ impl PreparedBingDualHost {
         self,
         transport: &SearchTransport,
     ) -> Result<super::admission::AdmittedCompatibilityResults, CompatibilityError> {
+        self.execute_with_source_timeout(transport, BING_SOURCE_TIMEOUT).await
+    }
+
+    // A private deterministic timeout seam permits fast local coverage of source-local
+    // expiry without waiting fifteen seconds. The real tool always uses BING_SOURCE_TIMEOUT.
+    async fn execute_with_source_timeout(
+        self,
+        transport: &SearchTransport,
+        source_timeout: Duration,
+    ) -> Result<super::admission::AdmittedCompatibilityResults, CompatibilityError> {
         let Self {
             manifest,
             www,
@@ -152,7 +162,7 @@ impl PreparedBingDualHost {
             return Err(TransportError::Unauthorized.into());
         }
         let (first, availability) =
-            Self::attempt(www, &query, max_results, transport).await;
+            Self::attempt(www, &query, max_results, transport, source_timeout).await;
         let error = match first {
             Ok(results) => return Ok(results),
             Err(error) => error,
@@ -187,7 +197,7 @@ impl PreparedBingDualHost {
         {
             return Err(error);
         }
-        Self::attempt(cn, &query, max_results, transport).await.0
+        Self::attempt(cn, &query, max_results, transport, source_timeout).await.0
     }
 
     /// Only DNS, refused connect and a strictly source-local timer can classify WWW unavailable.
@@ -198,6 +208,7 @@ impl PreparedBingDualHost {
         query: &str,
         max_results: u32,
         transport: &SearchTransport,
+        source_timeout: Duration,
     ) -> (
         Result<super::admission::AdmittedCompatibilityResults, CompatibilityError>,
         Option<BingAvailabilityFailure>,
@@ -206,7 +217,7 @@ impl PreparedBingDualHost {
             return (Err(error.into()), None);
         }
         let source_deadline =
-            std::cmp::min(Instant::now() + BING_SOURCE_TIMEOUT, transport.budget.deadline);
+            std::cmp::min(Instant::now() + source_timeout, transport.budget.deadline);
         let result = timeout_at(source_deadline, transport.execute_prepared(request)).await;
         match result {
             Ok(Ok(response)) => (
