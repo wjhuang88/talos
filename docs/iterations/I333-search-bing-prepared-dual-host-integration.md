@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Closed (upon owner-first closeout merge) |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | I333 / SEARCH-001-D3-T4/#991 — inactive, offline-only prepared dual-host Bing integration + deterministic mock execution; not #957 live/default T3b |
