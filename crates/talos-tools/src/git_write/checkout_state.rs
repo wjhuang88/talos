@@ -190,6 +190,7 @@ impl TargetTree {
 ///
 /// This function does not discover repositories, open files or invoke Git and
 /// is deliberately not wired to the production checkout dispatcher.
+#[cfg(test)]
 pub(super) fn select_captured_target_filter(
     attributes: &BTreeMap<String, Vec<u8>>,
     path: &str,
