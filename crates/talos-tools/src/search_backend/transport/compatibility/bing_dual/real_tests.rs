@@ -240,3 +240,60 @@ async fn real_source_local_timeout_uses_same_budget_and_reaches_cn_only_when_liv
     assert_eq!(dns.calls.load(Ordering::Relaxed), 0);
     assert_eq!(t.budget.attempts.load(Ordering::Relaxed), 0);
 }
+
+struct SharedProxyDnsFailure {
+    calls: AtomicUsize,
+}
+
+#[async_trait]
+impl SearchDns for SharedProxyDnsFailure {
+    async fn resolve(&self, _: &str, _: u16) -> Result<Vec<SocketAddr>, TransportError> {
+        self.calls.fetch_add(1, Ordering::Relaxed);
+        Err(TransportError::Dns)
+    }
+}
+
+#[tokio::test]
+async fn proxy_dns_failure_is_shared_infrastructure_and_must_not_rotate_bing_host() {
+    use crate::search_backend::transport::TransportProxy;
+
+    let endpoints = PreparedBingDualHost::destinations().expect("two frozen hosts");
+    let proxy = TransportProxy::from_snapshot(
+        "http://proxy-fixture.invalid:3128",
+        "",
+        &endpoints,
+    )
+    .expect("proxy policy")
+    .expect("both hosts use proxy");
+    let scope = ToolNetworkScope::new_configuration(
+        endpoints.to_vec(),
+        Some(proxy.endpoint().clone()),
+        vec![],
+        0,
+    )
+    .expect("both hosts plus proxy approved before query");
+    let manifest = ToolNetworkManifest::new(scope);
+    let plan = PreparedBingDualHost::prepare_with(
+        &manifest, "proxy secret query", 2, || "Local-Fixture/1"
+    ).expect("both query-bearing requests frozen");
+    let dns = Arc::new(SharedProxyDnsFailure {
+        calls: AtomicUsize::new(0),
+    });
+    let budget = Arc::new(
+        TransportBudget::new(Duration::from_secs(5), 4, 4096).expect("two proxy sends")
+    );
+    let t = SearchTransport::new_with_proxy(
+        manifest.clone(),
+        Arc::new(LocalAuthority { manifest, deny_cn: false }),
+        budget.clone(),
+        dns.clone(),
+        Some(proxy),
+    ).expect("prepared proxy transport");
+    assert_eq!(
+        plan.execute(&t).await.expect_err("proxy DNS cannot authorize CN rotation"),
+        CompatibilityError::Transport(TransportError::Dns),
+    );
+    assert_eq!(dns.calls.load(Ordering::Relaxed), 1);
+    assert_eq!(budget.attempts.load(Ordering::Relaxed), 2);
+    assert_eq!(budget.bytes.load(Ordering::Relaxed), 0);
+}
