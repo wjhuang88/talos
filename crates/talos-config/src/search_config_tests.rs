@@ -59,10 +59,10 @@ url = "{endpoint}"
     assert!(!format!("{:?}", config.search).contains(endpoint));
     let serialized = toml::to_string(&config).expect("config serializes");
     assert!(serialized.contains(endpoint));
-    }
+}
 
-    #[test]
-    fn explicit_bing_dual_is_opt_in_and_does_not_accept_optional_provider_options() {
+#[test]
+fn explicit_bing_dual_is_opt_in_and_does_not_accept_optional_provider_options() {
         let config: Config = toml::from_str(
             r#"
 provider = "openai"
@@ -78,5 +78,4 @@ backend = "bing-dual"
         let serialized = toml::to_string(&config).expect("persist");
         assert!(serialized.contains("backend = \"bing-dual\""));
         assert!(!serialized.contains("api_key"));
-    }
-}
+  }
