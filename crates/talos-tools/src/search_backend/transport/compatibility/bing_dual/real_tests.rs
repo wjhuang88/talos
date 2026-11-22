@@ -54,7 +54,7 @@ impl ToolNetworkAuthority for LocalAuthority {
 
 fn http(status: u16, body: &str) -> String {
     format!(
-        "HTTP/1.1 {status} Fixture\\r\\nContent-Length: {}\\r\\nConnection: close\\r\\n\\r\\n{body}",
+        "HTTP/1.1 {status} Fixture\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     )
 }
@@ -133,7 +133,7 @@ async fn real_www_first_wins_without_cn_connection_and_preserves_frozen_query() 
     assert_eq!(rows[0].url, "https://result.invalid/one");
     assert_eq!(server.count(), 1);
     assert_eq!(dns.calls.load(Ordering::Relaxed), 1);
-    assert!(server.request(0).contains("Host: www-fixture.invalid"));
+    assert!(server.request(0).to_ascii_lowercase().contains("host: www-fixture.invalid"));
     assert!(server.request(0).contains("q=private+query+%26+fixture"));
 }
 
@@ -146,7 +146,7 @@ async fn real_dns_unavailability_rotates_only_to_prepared_cn_once() {
     assert_eq!(rows.len(), 1);
     assert_eq!(server.count(), 1);
     assert_eq!(dns.calls.load(Ordering::Relaxed), 2);
-    assert!(server.request(0).contains("Host: cn-fixture.invalid"));
+    assert!(server.request(0).to_ascii_lowercase().contains("host: cn-fixture.invalid"));
     assert!(server.request(0).contains("mkt=zh-CN"));
     assert_eq!(t.budget.attempts.load(Ordering::Relaxed), 2);
 }
@@ -189,9 +189,13 @@ async fn real_source_local_timeout_uses_same_budget_and_reaches_cn_only_when_liv
     let server = Server::new(vec![http(200, organic())]);
     let (manifest, plan) = local_plan(&server);
     let (t, dns) = transport(manifest, true, false, 2, 4096);
-    // Deterministic source-local WWW timeout is already covered in synthetic replay; use a
-    // zero-duration test seam here to assert no enclosing deadline gets reset or CN sent.
-    assert!(plan.execute_with_source_timeout(&t, Duration::ZERO).await.is_err());
+    // A caller-cancelled/expired invocation must never start or reset a new host budget.
+    // The dedicated I333 synthetic tests cover source-local expiry without sleeping 15s.
+    let mut t = t;
+    Arc::get_mut(&mut t.budget)
+        .expect("unique test budget")
+        .deadline = Instant::now() - Duration::from_millis(1);
+    assert!(plan.execute_with_source_timeout(&t, Duration::from_millis(1)).await.is_err());
     assert_eq!(server.count(), 0);
     assert_eq!(dns.calls.load(Ordering::Relaxed), 0);
     assert_eq!(t.budget.attempts.load(Ordering::Relaxed), 0);
