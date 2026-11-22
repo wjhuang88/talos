@@ -280,6 +280,14 @@ jobs:
           Get-Item -LiteralPath $transportShell -ErrorAction Stop |
             Select-Object FullName, LinkType, Target
 
+      # I324: test-only 2.36 CLI oracle, pinned to the upstream Git for Windows
+      # SHA-256 release receipt. Does not replace host Git or adjust PATH.
+      - name: I324 pinned Git 2.36 query compatibility
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 928
+        shell: pwsh
+        timeout-minutes: 6
+        run: ./scripts/test_i324_legacy_git_query_matrix.ps1 -UsePinnedMinGit
+
       - name: Probe native recovery writable mapping boundary
         shell: pwsh
         run: ./scripts/probe_windows_recovery_mapping.ps1
