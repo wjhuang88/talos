@@ -5,6 +5,7 @@
 //! Real requests remain reachable only through a separately selected protected BingDual tool;
 //! the deployed Auto chain is unchanged. CI tests use local-only fixtures, not Bing network.
 
+use super::SearchTransport;
 use super::{
     BodyFormat, CompatibilityError, CompatibilityProtocol, Method, PreparedTransportRequest,
     ToolNetworkEndpoint, ToolNetworkManifest, TransportError, Url, encode_form_with_limit,
@@ -13,11 +14,7 @@ use super::{
 use crate::search_backend::bing_variants::{
     BingAttempt, BingAvailabilityFailure, BingFallbackGuards, BingNext, BingVariant, next_variant,
 };
-use super::SearchTransport;
-use std::{
-    sync::atomic::Ordering,
-    time::Duration,
-};
+use std::{sync::atomic::Ordering, time::Duration};
 use tokio::time::{Instant, timeout_at};
 
 pub(in crate::search_backend) mod tool;
@@ -128,7 +125,6 @@ impl PreparedBingDualHost {
     }
 }
 
-
 const BING_SOURCE_TIMEOUT: Duration = Duration::from_secs(15);
 
 impl PreparedBingDualHost {
@@ -141,7 +137,8 @@ impl PreparedBingDualHost {
         self,
         transport: &SearchTransport,
     ) -> Result<super::admission::AdmittedCompatibilityResults, CompatibilityError> {
-        self.execute_with_source_timeout(transport, BING_SOURCE_TIMEOUT).await
+        self.execute_with_source_timeout(transport, BING_SOURCE_TIMEOUT)
+            .await
     }
 
     // A private deterministic timeout seam permits fast local coverage of source-local
@@ -197,7 +194,9 @@ impl PreparedBingDualHost {
         {
             return Err(error);
         }
-        Self::attempt(cn, &query, max_results, transport, source_timeout).await.0
+        Self::attempt(cn, &query, max_results, transport, source_timeout)
+            .await
+            .0
     }
 
     /// Only DNS, refused connect and a strictly source-local timer can classify WWW unavailable.

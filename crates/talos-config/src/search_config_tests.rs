@@ -63,19 +63,19 @@ url = "{endpoint}"
 
 #[test]
 fn explicit_bing_dual_is_opt_in_and_does_not_accept_optional_provider_options() {
-        let config: Config = toml::from_str(
-            r#"
+    let config: Config = toml::from_str(
+        r#"
 provider = "openai"
 model = "gpt-test"
 
 [search]
 backend = "bing-dual"
 "#,
-        )
-        .expect("explicit protected Bing selection");
-        assert_eq!(config.search.backend, SearchBackendConfig::BingDual);
-        assert!(!config.search.fallback_to_auto);
-        let serialized = toml::to_string(&config).expect("persist");
-        assert!(serialized.contains("backend = \"bing-dual\""));
-        assert!(!serialized.contains("api_key"));
-  }
+    )
+    .expect("explicit protected Bing selection");
+    assert_eq!(config.search.backend, SearchBackendConfig::BingDual);
+    assert!(!config.search.fallback_to_auto);
+    let serialized = toml::to_string(&config).expect("persist");
+    assert!(serialized.contains("backend = \"bing-dual\""));
+    assert!(!serialized.contains("api_key"));
+}

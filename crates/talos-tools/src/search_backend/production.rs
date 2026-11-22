@@ -21,8 +21,8 @@ use super::composition::SearchCompositionConfiguration;
 use super::router::SearchRouterPolicy;
 use super::router_tool::GuardedSearchRouterTool;
 use super::selection::SearchBackendSelection;
-use super::transport::compatibility::{searxng::SearXngConfiguration, tavily::TavilyConfiguration};
 use super::transport::compatibility::bing_dual::tool::GuardedBingDualSearchTool;
+use super::transport::compatibility::{searxng::SearXngConfiguration, tavily::TavilyConfiguration};
 use super::transport::{TransportError, TransportLimits};
 
 // Legacy zero-key compatibility first performs parallel query-free DDG/Bing reachability probes:
@@ -355,16 +355,32 @@ mod tests {
     #[test]
     fn explicit_bing_dual_requires_explicit_intent_and_scopes_both_hosts() {
         let auto = selected_configuration(&SearchToolConfiguration::Auto).expect("auto");
-        assert!(!auto.scope().endpoints().iter().any(|endpoint| endpoint.host() == "www.bing.com"));
+        assert!(
+            !auto
+                .scope()
+                .endpoints()
+                .iter()
+                .any(|endpoint| endpoint.host() == "www.bing.com")
+        );
         let tool = production_search_router_tool_with_search_configuration(
             SearchToolConfiguration::BingDual,
-        ).expect("bounded opt-in Bing tool");
-        let prepared = tool.prepare_network_invocation(&serde_json::json!({
-            "query": "opt in",
-            "max_results": 2,
-            "include_snippets": true
-        })).expect("prepare").expect("protected invocation");
-        let hosts: Vec<_> = prepared.manifest().scope().endpoints().iter().map(|x| x.host()).collect();
+        )
+        .expect("bounded opt-in Bing tool");
+        let prepared = tool
+            .prepare_network_invocation(&serde_json::json!({
+                "query": "opt in",
+                "max_results": 2,
+                "include_snippets": true
+            }))
+            .expect("prepare")
+            .expect("protected invocation");
+        let hosts: Vec<_> = prepared
+            .manifest()
+            .scope()
+            .endpoints()
+            .iter()
+            .map(|x| x.host())
+            .collect();
         assert!(hosts.len() >= 2);
         assert!(hosts.contains(&"www.bing.com"));
         assert!(hosts.contains(&"cn.bing.com"));

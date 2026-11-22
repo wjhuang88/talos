@@ -1,13 +1,14 @@
 //! Deterministic real socket / fake DNS execution conformance; no public Bing HTTP requests.
 
 use super::*;
-use crate::search_backend::transport::{
-    SearchDns, TransportBudget, tests::Server,
-};
+use crate::search_backend::transport::{SearchDns, TransportBudget, tests::Server};
 use async_trait::async_trait;
 use std::{
     net::SocketAddr,
-    sync::{Arc, atomic::{AtomicUsize, Ordering}},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Duration,
 };
 use talos_core::tool::{
@@ -69,12 +70,19 @@ fn local_plan(server: &Server) -> (ToolNetworkManifest, PreparedBingDualHost) {
     let fixed = ToolNetworkManifest::new(
         ToolNetworkScope::new_configuration(
             PreparedBingDualHost::destinations().unwrap().to_vec(),
-            None, vec![], 0,
-        ).unwrap()
+            None,
+            vec![],
+            0,
+        )
+        .unwrap(),
     );
     let mut plan = PreparedBingDualHost::prepare_with(
-        &fixed, "private query & fixture", 2, || "Local-Fixture/1"
-    ).expect("both production requests frozen");
+        &fixed,
+        "private query & fixture",
+        2,
+        || "Local-Fixture/1",
+    )
+    .expect("both production requests frozen");
     let mut www_url = server.url("/search");
     www_url.set_host(Some("www-fixture.invalid")).expect("host");
     www_url.set_query(plan.www.url.query());
@@ -90,13 +98,14 @@ fn local_plan(server: &Server) -> (ToolNetworkManifest, PreparedBingDualHost) {
             None,
             vec!["127.0.0.1".parse().expect("loopback")],
             0,
-        ).expect("only two local targets")
+        )
+        .expect("only two local targets"),
     );
     for (request, url) in [(&mut plan.www, www_url), (&mut plan.cn, cn_url)] {
         let headers = request.headers;
-        let mut relocated = PreparedTransportRequest::new(
-            &manifest, url, Method::GET, None, BodyFormat::Form
-        ).expect("test-local frozen payload");
+        let mut relocated =
+            PreparedTransportRequest::new(&manifest, url, Method::GET, None, BodyFormat::Form)
+                .expect("test-local frozen payload");
         relocated.headers = headers;
         assert_eq!(relocated.url.query(), request.url.query());
         *request = relocated;
@@ -112,14 +121,20 @@ fn transport(
     max_requests: usize,
     max_bytes: usize,
 ) -> (SearchTransport, Arc<LocalDns>) {
-    let dns = Arc::new(LocalDns { fail_www, calls: AtomicUsize::new(0) });
+    let dns = Arc::new(LocalDns {
+        fail_www,
+        calls: AtomicUsize::new(0),
+    });
     let t = SearchTransport::new(
         manifest.clone(),
         Arc::new(LocalAuthority { manifest, deny_cn }),
-        Arc::new(TransportBudget::new(Duration::from_secs(5), max_requests, max_bytes)
-            .expect("bounded transport")),
+        Arc::new(
+            TransportBudget::new(Duration::from_secs(5), max_requests, max_bytes)
+                .expect("bounded transport"),
+        ),
         dns.clone(),
-    ).expect("local protected HTTP transport");
+    )
+    .expect("local protected HTTP transport");
     (t, dns)
 }
 
@@ -128,12 +143,21 @@ async fn real_www_first_wins_without_cn_connection_and_preserves_frozen_query() 
     let server = Server::new(vec![http(200, organic())]);
     let (manifest, plan) = local_plan(&server);
     let (t, dns) = transport(manifest, false, false, 2, 4096);
-    let rows = plan.execute(&t).await.expect("real WWW result").into_results();
+    let rows = plan
+        .execute(&t)
+        .await
+        .expect("real WWW result")
+        .into_results();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].url, "https://result.invalid/one");
     assert_eq!(server.count(), 1);
     assert_eq!(dns.calls.load(Ordering::Relaxed), 1);
-    assert!(server.request(0).to_ascii_lowercase().contains("host: www-fixture.invalid"));
+    assert!(
+        server
+            .request(0)
+            .to_ascii_lowercase()
+            .contains("host: www-fixture.invalid")
+    );
     assert!(server.request(0).contains("q=private+query+%26+fixture"));
 }
 
@@ -142,11 +166,20 @@ async fn real_dns_unavailability_rotates_only_to_prepared_cn_once() {
     let server = Server::new(vec![http(200, organic())]);
     let (manifest, plan) = local_plan(&server);
     let (t, dns) = transport(manifest, true, false, 2, 4096);
-    let rows = plan.execute(&t).await.expect("real CN fallback").into_results();
+    let rows = plan
+        .execute(&t)
+        .await
+        .expect("real CN fallback")
+        .into_results();
     assert_eq!(rows.len(), 1);
     assert_eq!(server.count(), 1);
     assert_eq!(dns.calls.load(Ordering::Relaxed), 2);
-    assert!(server.request(0).to_ascii_lowercase().contains("host: cn-fixture.invalid"));
+    assert!(
+        server
+            .request(0)
+            .to_ascii_lowercase()
+            .contains("host: cn-fixture.invalid")
+    );
     assert!(server.request(0).contains("mkt=zh-CN"));
     assert_eq!(t.budget.attempts.load(Ordering::Relaxed), 2);
 }
@@ -165,7 +198,10 @@ async fn real_http_denials_all_5xx_and_valid_empty_never_rotate_host() {
         let server = Server::new(vec![http(status, body)]);
         let (manifest, plan) = local_plan(&server);
         let (t, dns) = transport(manifest, false, false, 2, 4096);
-        assert!(plan.execute(&t).await.is_err(), "status {status} must be terminal");
+        assert!(
+            plan.execute(&t).await.is_err(),
+            "status {status} must be terminal"
+        );
         assert_eq!(server.count(), 1, "no CN send on status {status}");
         assert_eq!(dns.calls.load(Ordering::Relaxed), 1);
     }
@@ -195,7 +231,11 @@ async fn real_source_local_timeout_uses_same_budget_and_reaches_cn_only_when_liv
     Arc::get_mut(&mut t.budget)
         .expect("unique test budget")
         .deadline = Instant::now() - Duration::from_millis(1);
-    assert!(plan.execute_with_source_timeout(&t, Duration::from_millis(1)).await.is_err());
+    assert!(
+        plan.execute_with_source_timeout(&t, Duration::from_millis(1))
+            .await
+            .is_err()
+    );
     assert_eq!(server.count(), 0);
     assert_eq!(dns.calls.load(Ordering::Relaxed), 0);
     assert_eq!(t.budget.attempts.load(Ordering::Relaxed), 0);
