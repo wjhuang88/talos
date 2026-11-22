@@ -215,6 +215,10 @@ impl PreparedBingDualHost {
         if let Err(error) = transport.budget.check_live() {
             return (Err(error.into()), None);
         }
+        // Proxied requests resolve/connect to the SHARED proxy peer, not the Bing origin.
+        // A proxy DNS/refusal/timeout cannot prove source-local WWW unavailability and must
+        // never cause disclosure of the same query to a second Bing host.
+        let proxied = transport.uses_proxy(&request.url);
         let source_deadline =
             std::cmp::min(Instant::now() + source_timeout, transport.budget.deadline);
         let result = timeout_at(source_deadline, transport.execute_prepared(request)).await;
@@ -231,11 +235,11 @@ impl PreparedBingDualHost {
             ),
             Ok(Err(TransportError::Dns)) => (
                 Err(TransportError::Dns.into()),
-                Some(BingAvailabilityFailure::Dns),
+                (!proxied).then_some(BingAvailabilityFailure::Dns),
             ),
             Ok(Err(TransportError::ConnectionRefused)) => (
                 Err(TransportError::ConnectionRefused.into()),
-                Some(BingAvailabilityFailure::ConnectionRefused),
+                (!proxied).then_some(BingAvailabilityFailure::ConnectionRefused),
             ),
             Ok(Err(error)) => (Err(error.into()), None),
             Err(_) => {
@@ -243,7 +247,7 @@ impl PreparedBingDualHost {
                     // This is NOT the global deadline. No retry and no reset of the budget clock.
                     (
                         Err(TransportError::Network.into()),
-                        Some(BingAvailabilityFailure::SourceLocalTimeout),
+                        (!proxied).then_some(BingAvailabilityFailure::SourceLocalTimeout),
                     )
                 } else {
                     (Err(TransportError::Deadline.into()), None)
