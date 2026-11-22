@@ -1,26 +1,26 @@
 # SEARCH-001-D3-T5: Bing WWW-first/CN-fallback Real Transport Implementation
 
-**Status**: Proposed / Unclaimed (implementation activation pending governance claim)
+**Status**: Active / Claimed PROPOSED; effective only after governance PR #1002 merge, source work not yet started
 **Type**: Bounded Rust implementation and offline verification
 **Parent**: [SEARCH-001 / #624](SEARCH-001-zero-config-global-search.md); [D3 / #937](SEARCH-001-D3-bing-direct-html-feasibility.md)
 **Source Issue**: [#1001](https://github.com/wjhuang88/talos/issues/1001)
 **Predecessors**: [I329/T3a](SEARCH-001-D3-T3-bing-dual-host-zero-key-route.md), [I333/T4](SEARCH-001-D3-T4-bing-prepared-dual-host-integration.md) Complete / Closed
-**Selected Iteration**: [I335](../../iterations/I335-search-bing-dual-runtime.md), proposed until governance claim merges
+**Selected Iteration**: [I335](../../iterations/I335-search-bing-dual-runtime.md), Active / Claimed PROPOSED until governance #1002 merges
 **External release gate**: [Gate-0 / #1000](https://github.com/wjhuang88/talos/issues/1000) unresolved; T3b/#957 real live/default activation is still BLOCKED / Unclaimed
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | D3-T5/#1001: real, Rust-native prepared dual Bing host transport and **explicit opt-in** invocation path; existing default compatibility/Network authority unchanged; no live Bing CI, no default distribution admission |
-| Claimed At | Pending |
+| Claimed At | 2026-11-22 |
 | Source Issue | #1001 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #1002 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer 2026-11-22 instructed implementation first; exact-head CI, independent API/Network/security review and final CAS mandatory; no vendor rights grant claimed |
+| Authorization Evidence | Maintainer 2026-11-22 instructed implementation first; [governance claim PR #1002](https://github.com/wjhuang88/talos/pull/1002) proposed; exact-head CI, independent API/Network/security review and CAS mandatory before source merge; no vendor rights grant or independent human approval claimed |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-22 |
 | Handoff / Release Condition | Active only after governance claim merge. Source requires exact-head CI and protected independent review. Gate-0/#1000 remains separate from code completion; default/live route not admitted. |
