@@ -192,7 +192,7 @@ impl TargetTree {
 /// is deliberately not wired to the production checkout dispatcher.
 #[cfg(test)]
 pub(super) fn select_captured_target_filter(
-    attributes: &BTreeMap<String, Vec<u8>>,
+    target: &TargetTree,
     path: &str,
     case: gix_attributes::glob::pattern::Case,
 ) -> Result<Option<String>, GitToolError> {
@@ -211,9 +211,36 @@ pub(super) fn select_captured_target_filter(
         ));
     }
 
+    // A supplied snapshot is incomplete if its tree index lists a regular
+    // .gitattributes blob whose bytes are absent. Do not silently treat that
+    // absence as "no filter" or accept invented extra rule sources.
+    // This checks internal consistency only; object Read authority and
+    // snapshot authenticity must be proven at the caller's admitted frontier.
+    let mut expected_sources = 0usize;
+    for (source, (mode, _)) in &target.entries {
+        if source == ".gitattributes" || source.ends_with("/.gitattributes") {
+            if !matches!(*mode, 0o100644 | 0o100755) {
+                return Err(GitToolError::InvalidInput(
+                    "Unsupported target attribute entry mode".into(),
+                ));
+            }
+            expected_sources += 1;
+            if !target.attributes.contains_key(source) {
+                return Err(GitToolError::InvalidInput(
+                    "Target attribute blob bytes missing from captured tree".into(),
+                ));
+            }
+        }
+    }
+    if expected_sources != target.attributes.len() {
+        return Err(GitToolError::InvalidInput(
+            "Target attribute source set does not match captured tree".into(),
+        ));
+    }
+
     let mut search = gix_attributes::Search::default();
     let mut metadata = gix_attributes::search::MetadataCollection::default();
-    for (source, bytes) in attributes {
+    for (source, bytes) in &target.attributes {
         let valid_source = source == ".gitattributes"
             || source
                 .strip_suffix("/.gitattributes")

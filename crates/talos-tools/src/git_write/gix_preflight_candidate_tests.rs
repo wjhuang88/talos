@@ -778,8 +778,13 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
 
     // A pure evaluator must fail closed on corrupt supplied bytes or an
     // untrusted source spelling, without probing the filesystem to recover.
-    let mut corrupt = target.attributes.clone();
-    corrupt.insert(
+    let mut corrupt = super::checkout_state::TargetTree {
+        commit: target.commit.clone(),
+        tree: target.tree.clone(),
+        entries: target.entries.clone(),
+        attributes: target.attributes.clone(),
+    };
+    corrupt.attributes.insert(
         "src/.gitattributes".to_owned(),
         b"*.txt filter=lfs invalid$name\n".to_vec(),
     );
@@ -791,8 +796,17 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
         )
         .is_err()
     );
-    corrupt.remove("src/.gitattributes");
-    corrupt.insert(
+    corrupt.attributes.remove("src/.gitattributes");
+    assert!(
+        super::checkout_state::select_captured_target_filter(
+            &corrupt,
+            "src/inside.txt",
+            gix_attributes::glob::pattern::Case::Sensitive,
+        )
+        .is_err(),
+        "missing committed nested attribute bytes must be rejected"
+    );
+    corrupt.attributes.insert(
         "../outside/.gitattributes".to_owned(),
         b"*.txt filter=untrusted\n".to_vec(),
     );
@@ -806,11 +820,28 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
     );
     assert!(
         super::checkout_state::select_captured_target_filter(
-            &target.attributes,
+            &target,
             "../escape.txt",
             gix_attributes::glob::pattern::Case::Sensitive,
         )
         .is_err()
+    );
+
+    // An invented source absent from the tree entry index cannot override
+    // committed rules, even if its text is syntactically well formed.
+    corrupt.attributes = target.attributes.clone();
+    corrupt.attributes.insert(
+        "src/other/.gitattributes".to_owned(),
+        b"*.txt filter=invented\n".to_vec(),
+    );
+    assert!(
+        super::checkout_state::select_captured_target_filter(
+            &corrupt,
+            "src/inside.txt",
+            gix_attributes::glob::pattern::Case::Sensitive,
+        )
+        .is_err(),
+        "unrecorded attribute sources must be refused"
     );
 
     let paths = [
@@ -820,7 +851,7 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
     ];
     for (path, expected_gix, expected_native) in paths {
         let selection = super::checkout_state::select_captured_target_filter(
-            &target.attributes,
+            &target,
             path,
             gix_attributes::glob::pattern::Case::Sensitive,
         )
