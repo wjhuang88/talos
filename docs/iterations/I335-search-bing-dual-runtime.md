@@ -1,6 +1,6 @@
 # I335: Bing Dual Host Real Transport + Explicit Opt-in (SEARCH-001-D3-T5)
 
-> Document status: Proposed / Unclaimed, not effective before atomic governance merge.
+> Document status: Active / Claimed PROPOSED; effective only when atomic governance PR #1002 merges.
 > Selection: 2026-11-22. Maintainer prioritizes working functionality over supplier-rights research.
 > Goal: Complete an executable, secure, permission-aware WWW-first/CN-fallback search path without changing the default network route or equating implementation with licensing.
 
@@ -8,15 +8,15 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Unclaimed |
+| Claim State | Claimed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | I335 / D3-T5 #1001: real transport, explicit opt-in, deterministic offline transport fixtures; no default/live admission |
-| Claimed At | Pending |
+| Claimed At | 2026-11-22 |
 | Source Issue | #1001 |
-| Governance Claim PR | Pending |
+| Governance Claim PR | #1002 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer directs implementation 2026-11-22; independent API/Network/security review and exact-head CI/CAS required |
+| Authorization Evidence | Maintainer directs implementation 2026-11-22; governance #1002 claim proposed; independent API/Network/security review and exact-head CI/CAS required; rights #1000 separate |
 | Implementation PR | Not started |
 | Last Updated | 2026-11-22 |
 | Handoff / Release Condition | Effective claim before implementation; source review/CI/owner-first closeout after; supplier rights Gate-0/#1000 separate |

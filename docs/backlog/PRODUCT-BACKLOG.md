@@ -1,6 +1,6 @@
 ## SEARCH-001-D3-T5 / I335 / #1001 — proposed bounded real Bing transport
 
-[Owner](active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](../iterations/I335-search-bing-dual-runtime.md): technical source implementation first, explicit opt-in only after claim, no default/public Bing WWW activation; #1000 supplier/LLM output rights remain separate and unproven, #957 T3b Blocked / Unclaimed.
+[Owner](active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](../iterations/I335-search-bing-dual-runtime.md): Active / Claimed PROPOSED through governance #1002; technical source implementation first, explicit opt-in only after claim merge, no default/public Bing WWW activation; #1000 supplier/LLM output rights remain separate and unproven, #957 T3b Blocked / Unclaimed.
 
 ## SEARCH-001-D3-T4 / I333 / #991 — Complete / Closed (offline-only technical integration)
 

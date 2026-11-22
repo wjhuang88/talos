@@ -1,6 +1,6 @@
 ## I335 / SEARCH-001-D3-T5 — proposed real Bing transport / explicit opt-in
 
-[Iteration](I335-search-bing-dual-runtime.md) / [owner](../backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [#1001](https://github.com/wjhuang88/talos/issues/1001): proposed claim, no code before effective merge; I333 fully complete and not replayed, Gate-0/#1000 independent; zero default WWW exposure.
+[Iteration](I335-search-bing-dual-runtime.md) / [owner](../backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [#1001](https://github.com/wjhuang88/talos/issues/1001): Active / Claimed PROPOSED via #1002, no code before effective merge; I333 fully complete and not replayed, Gate-0/#1000 independent; zero default WWW exposure.
 
 ## I333 / SEARCH-001-D3-T4 — Complete / Closed on owner-first closeout (offline-only)
 

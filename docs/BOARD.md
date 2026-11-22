@@ -1,6 +1,6 @@
 ## SEARCH-001-D3-T5 / I335 — proposed real Bing dual-host implementation (no production admission)
 
-[Owner](backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](iterations/I335-search-bing-dual-runtime.md) / [Issue #1001](https://github.com/wjhuang88/talos/issues/1001): **Proposed / Unclaimed** until governance claim PR merges. Real approved opt-in `SearchTransport` WWW→CN code and deterministic offline fixtures; default DDG-first/CN-only unchanged. External rights [#1000](https://github.com/wjhuang88/talos/issues/1000) and T3b/#957 live/default admission remain blocked.
+[Owner](backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](iterations/I335-search-bing-dual-runtime.md) / [Issue #1001](https://github.com/wjhuang88/talos/issues/1001): **Active / Claimed PROPOSED under governance PR #1002**; ineffective until main merge. Real approved opt-in `SearchTransport` WWW→CN code and deterministic offline fixtures; default DDG-first/CN-only unchanged. External rights [#1000](https://github.com/wjhuang88/talos/issues/1000) and T3b/#957 live/default admission remain blocked.
 
 ## SEARCH-001-D3-T4 / I333 — Complete / Closed upon owner-first closeout (offline-only)
 
