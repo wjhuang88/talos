@@ -12,7 +12,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Closed (upon owner-first closeout merge) |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | D3-T4/#991: offline, prepared, per-invocation permission-aware Bing dual-variant request-plan integration and mock execution; **no newly active network host or production default route** |
