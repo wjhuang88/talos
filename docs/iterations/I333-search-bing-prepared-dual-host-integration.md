@@ -1,6 +1,6 @@
 # Iteration I333: Prepared Bing Dual-Host Technical Integration (Offline)
 
-> Document status: Active / Claimed (PROPOSED; effective only after #992 is accepted and merged into main)
+> Document status: Complete / Closed for I333 private, offline-only integration upon owner-first closeout merge; NOT a live/default Bing route
 > Published plan date: 2026-11-20
 > Planned objective: Integrate the accepted Bing WWW-first/CN-fallback pure decision into a safely prepared, mocked end-to-end request/permission execution seam, WITHOUT live/default traffic activation.
 > Baseline rule: once committed, preserve this objective; change scope via a new iteration.
@@ -10,7 +10,7 @@
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed (upon owner-first closeout merge) |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | ChatGPT / GPT-6 |
 | Work Slice | I333 / SEARCH-001-D3-T4/#991 — inactive, offline-only prepared dual-host Bing integration + deterministic mock execution; not #957 live/default T3b |
@@ -18,10 +18,10 @@
 | Source Issue | #991 |
 | Governance Claim PR | #992 |
 | Authorization Mode | Single-maintainer merge |
-| Authorization Evidence | Maintainer #937/#957 technical GO; PR #992 atomic owner/iteration claim (ineffective before target merge), exact-head CI and governance validators, independent Agent review, expected-head CAS required; no distinct human approver claimed. |
-| Implementation PR | Not started |
-| Last Updated | 2026-11-20 |
-| Handoff / Release Condition | Claim effective only after reviewed governance merge; source may then start, live/default activation remains separate |
+| Authorization Evidence | Effective governance #992 merged `510bfa71a43a37a8273c58df82450f233cbebb11`; exact-head CI #4483 attempt 4 8/8 SUCCESS; independent Agent [APPROVE](https://github.com/wjhuang88/talos/pull/994#issuecomment-7075229507); single-maintainer CAS and source merge #994 `c3b75e1e118dff37f29d7f028c99ac2336ba7b59`. No independent human approval claimed. |
+| Implementation PR | #994 merged at Completion Commit `c3b75e1e118dff37f29d7f028c99ac2336ba7b59` |
+| Last Updated | 2026-11-22 |
+| Handoff / Release Condition | I333 offline-only Complete/Closed upon owner-first merge; #957 live/default and #937/#624 external rights/region gates remain separate and blocked/open |
 
 ## Published baseline
 
@@ -58,15 +58,18 @@ Risk: fallbacks accidentally gain unapproved new host, extra request budget, rei
 
 | Date | Type | Record |
 |---|---|---|
-| 2026-11-20 | Draft selection | Proposed I333 technical GO under #991. Claim Pending is a GitHub condition only; owner/iteration stay Unclaimed until finalized governance PR exact-head reaches target main. |
+| 2026-11-20 | Draft selection (historical) | Proposed I333 technical GO under #991, subsequently activated by #992 source-independent claim merge. |
+| 2026-11-20 | Effective claim | #992 merged `510bfa71a43a37a8273c58df82450f233cbebb11`, valid before source work. |
+| 2026-11-22 | Accepted source | #994 merged as existing source Completion Commit `c3b75e1e118dff37f29d7f028c99ac2336ba7b59` after exact-head 8/8 native CI, Agent APPROVE and CAS. |
+| 2026-11-22 | Owner-first closeout | Canonical D3-T4 owner updated before iteration, Board, backlog, parent and Issue #991. Status effective upon closeout merge. |
 
 ## Verification evidence
 
-Not started; this governance-only stage contains **no source or fixtures**.
+Nine offline synthetic Rust tests in [#994](https://github.com/wjhuang88/talos/pull/994); [CI #4483 attempt 4](https://github.com/wjhuang88/talos/actions/runs/44868769900) **8/8 SUCCESS** across Windows workspace/Rust gate, macOS and Linux/Windows Desktop plus governance. [Independent Agent APPROVE](https://github.com/wjhuang88/talos/pull/994#issuecomment-7075229507) no blockers; old red/cancelled attempts retained. #141 tracks unrelated WAL contention.
 
 ## Completion evidence
 
-Not available. Do not mark Complete before a separate actual source implementation is accepted and merged.
+**Completion Commit: `c3b75e1e118dff37f29d7f028c99ac2336ba7b59`** ([#994](https://github.com/wjhuang88/talos/pull/994) merged on main; exact source HEAD `bcc1014186d0ae883da7474c93a1597b989f9988`). The status-only closeout commit is not its own Completion Commit. Offline-only I333 is Complete/Closed upon owner-first merge, **not** #957 T3b production activation.
 
 ## Variance and residuals
 
