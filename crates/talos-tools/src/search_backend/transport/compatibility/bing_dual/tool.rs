@@ -13,7 +13,7 @@ use talos_core::tool::{
 use super::super::scope_with_proxy;
 use super::PreparedBingDualHost;
 use crate::search_backend::transport::{
-    SearchTransport, SystemSearchDns, TransportBudget, TransportError, TransportLimits,
+    SearchTransport, SystemSearchDns, TransportError, TransportLimits,
     TransportProxy,
 };
 use crate::web_search::{WebSearchInput, format_compatibility_results};
