@@ -16,7 +16,8 @@ pub(super) struct Installation {
 pub(super) struct Binding {
     mapping: snapshot::PathIdentity,
     _mapping_guard: ProgramEvidence,
-    shim: ProgramEvidence,
+    shim_identity: snapshot::PathIdentity,
+    _shim_guard: ProgramEvidence,
     target: snapshot::PathIdentity,
 }
 
@@ -135,7 +136,8 @@ impl Installation {
         self.evidence = Some(Binding {
             mapping: identity,
             _mapping_guard: guard,
-            shim,
+            shim_identity: shim_id,
+            _shim_guard: shim,
             target: target_identity,
         });
         self.revalidate()
@@ -145,7 +147,7 @@ impl Installation {
         if let Some(binding) = &self.evidence
             && (binding.mapping.revalidate(&self.mapping).is_err()
                 || binding.target.revalidate(&self.target).is_err()
-                || capture_program(&self.shim)? != binding.shim)
+                || binding.shim_identity.revalidate(&self.shim).is_err())
         {
             return Err(GitToolError::InvalidInput(
                 "Scoop Git installation changed after admission".into(),
