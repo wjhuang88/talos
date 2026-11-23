@@ -18,6 +18,30 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Temporary bootstrap-only job on the I334 external SDK fixture branch.
+  # It emits the independently resolved Cargo.lock for review; the job MUST
+  # be deleted before final exact-head acceptance and must not be merged.
+  i334-external-sdk-lock-bootstrap:
+    name: I334 TEMPORARY independent SDK lock generation (not acceptance)
+    if: github.event_name == 'pull_request' && github.head_ref == 'test/arch-035-i334-e3a-external-sdk-lock-20261122'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.99.0
+      - name: Resolve independent Cargo-root optional dependencies, emit lock for source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --manifest-path tests/fixtures/runtime-sdk-external/Cargo.toml \\
+            --features local-storage --format-version 1 >/dev/null
+          echo "__I334_EXTERNAL_SDK_LOCK_BEGIN__"
+          cat tests/fixtures/runtime-sdk-external/Cargo.lock
+          echo "__I334_EXTERNAL_SDK_LOCK_END__"
+
   classify-changes:
     name: Classify CI change scope
     runs-on: ubuntu-latest
