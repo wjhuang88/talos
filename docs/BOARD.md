@@ -34,7 +34,7 @@ No default background continuation or product release authorization.
 
 ## Azure C / PROVIDER-008-C
 
-[Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 is Complete / Closed via #978 (d1e07b59), CI4411 8/8. A/B remain Complete; D and #724 remain unfinished.
+[Owner](backlog/active/PROVIDER-008-C-azure-openai.md) / #914 / I323 is Complete / Closed via #978 (d1e07b59), CI4411 8/8. All four child implementations are merged, ending with Bedrock #1009.
 
 # Talos Board
 
@@ -284,7 +284,7 @@ PR #682 merged as `a3a4753d6e42123e33ead1d7e6f769a96f85f37e`, with final accepta
 | Explicit search provider overrides / SEARCH-001-H | Complete / Closed | [SEARCH-001-H](backlog/active/SEARCH-001-H-explicit-search-overrides.md) / [I314](iterations/I314-search-explicit-overrides.md) / #832 | Completion Commit `9ba327728bfc87775ed31740d58636ba73a5c68e` (#842); CI3800 8/8, independent security review no blockers, CAS passed. Parent #624 and E/F/G/I remain separate. |
 | Whole-request compaction / T4 | Complete / Closed | [I312](iterations/I312-whole-request-compaction.md) | #818 merged `65500a869`; eight CI jobs, independent review and CAS passed. |
 | Actor checkpoint/history / T5 | Complete / Closed | [I313](iterations/I313-model-checkpoint-history.md) | Completion Commit `322574bc9707492ea6e9d5232794f73e687071d9` (#837); CI41608342151 and independent API/privacy/storage/security review passed. Later quality repairs are separately owned by QUALITY-001. |
-| Protocol architecture / OpenAI Responses | Complete / Closed | [PROVIDER-008-A](backlog/active/PROVIDER-008-A-openai-responses-protocol.md) / [I306](iterations/I306-provider008a-openai-responses.md) / #748 | Implementation through #803 `dd6c5f8`; all 52 reviewed HTTP pairs active. CI3570 8/8 and technical acceptance review passed. #748 closes after owner closure merge; #724 stays open for unimplemented B/C/D. |
+| Protocol architecture / OpenAI Responses | Complete / Closed | [PROVIDER-008-A](backlog/active/PROVIDER-008-A-openai-responses-protocol.md) / [I306](iterations/I306-provider008a-openai-responses.md) / #748 | Implementation through #803 `dd6c5f8`; all 52 reviewed HTTP pairs active. CI3570 8/8 and technical acceptance review passed. All four child implementations are merged, ending with Bedrock #1009. |
 | Windows known-resource acceptance | Complete / Closed | [TEST-004](backlog/active/TEST-004-windows-known-resource-acceptance.md) / [I305](iterations/I305-windows-known-resource-acceptance.md) / #729 | #716 merged `b5b8241e`; I305/TEST004 cite existing Completion Commit. CI3221 all6jobs and protected review/CAS passed; only known-resource criterion closed, #717 residual open. |
 | Absent-journal pause without initialization | Complete / Closed | [RUNTIME-011](backlog/active/RUNTIME-011-absent-journal-pause.md) / [I304](iterations/I304-absent-journal-pause.md) | #726 implementation `aa1c477f` merged `c869a9af`; CI3203/review/CAS and CI3206 post-repair2220/2220 passed. I304 retains local failures; #705 retains broader timeout residuals. |
 | Embedded Skill progressive disclosure | Complete / Closed | [SKILL-006](backlog/active/SKILL-006-embedded-skill-progressive-disclosure.md) / [I303](iterations/I303-embedded-skill-progressive-disclosure.md) / #719 | #721 merged as `6d72975e`; exact-head CI, independent security/API review and CAS passed. |
@@ -450,7 +450,7 @@ owner for scope, acceptance and complete active/review/planned inventory.
 PROVIDER-008-B / #810 / I310 is Complete / Closed.
 Owner: [Gemini](backlog/active/PROVIDER-008-B-google-gemini.md); implementation #838 merged
 as `dbcf6163f34d73def923484ad409814fd4a98039`. CI4046 all eight jobs passed; independent technical/document
-review and merge CAS passed. Azure C, Bedrock D and parent #724 remain open.
+review and merge CAS passed. All four child implementations are merged, ending with Bedrock #1009.
 
 ## Session-owned worktrees / WORKTREE-001
 
@@ -474,4 +474,4 @@ interaction logic while retaining Talos ingestion and permission boundaries.
 
 ## PROVIDER-008-D / I332
 
-Bedrock #985 proposed Active / Claimed upon governance merge. Owner: PROVIDER-008-D-amazon-bedrock.md. ADR-107. Parent #724 open.
+Bedrock #985 / I332 Complete / Closed via #1009. Completion Commit: 1745cd3c4d29dd375e680822ffc86f9cc6a3379e. All four #724 protocol families are complete.

@@ -26,7 +26,7 @@
 
 
 [I323](I323-provider008c-azure-openai.md) / #914 is Complete / Closed via #978 (d1e07b59), CI4411 8/8.
-A/B remain Complete; D and parent #724 remain open.
+All four child implementations are merged, ending with Bedrock #1009.
 
 # Iterations
 
@@ -479,15 +479,15 @@ Owner acceptance and #748 closure remain pending; parent #724 and unclaimed B/C/
 with existing implementation `dd6c5f82ed88cc963b47758dee06fa506cb407a1` (#803) and earlier
 merged evidence. Full child acceptance, all 52 reviewed HTTP endpoint pairs, CI3570 8/8 and
 independent technical review are recorded owner-first. #748 closes after this closure merges.
-Parent #724 remains open for unimplemented/unclaimed Gemini, Azure and Bedrock siblings.
+All four child implementations are merged, ending with Bedrock #1009.
 
 ## I310 Gemini — 2026-10-30
 
 [I310](I310-provider008b-google-gemini.md) is Complete / Closed for #810.
 Completion Commit `dbcf6163f34d73def923484ad409814fd4a98039` (#838), exact-head CI4046 all eight
 jobs passed, independent technical/document review and merge CAS recorded in the owner.
-Azure C, Bedrock D and parent #724 remain open.
+All four child implementations are merged, ending with Bedrock #1009.
 
 ## PROVIDER-008-D / I332
 
-Bedrock #985 proposed Active / Claimed upon governance merge. Owner: PROVIDER-008-D-amazon-bedrock.md. ADR-107. Parent #724 open.
+Bedrock #985 / I332 Complete / Closed via #1009. Completion Commit: 1745cd3c4d29dd375e680822ffc86f9cc6a3379e. All four #724 protocol families are complete.

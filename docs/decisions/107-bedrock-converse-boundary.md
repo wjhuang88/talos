@@ -1,6 +1,6 @@
 # ADR-107: Bedrock ConverseStream transport and credentials
 
-**Status**: Proposed for #985 / I332
+**Status**: Accepted and implemented in #1009 for #985 / I332
 
 Use the regional Bedrock Runtime ConverseStream endpoint. Encode modelId as a URI path parameter. Sign the final method, path, headers and payload for the bedrock service and selected region. Read an explicitly selected AWS environment credential pair at dispatch, including the session token for temporary credentials. Disable redirects. Bind credential use to the selected regional service endpoint. Use isolated injected transport for fixtures. General profile, instance-role discovery and credential refresh remain with #132. Prefer maintained Rust signing and event-stream primitives subject to dependency review.
 
