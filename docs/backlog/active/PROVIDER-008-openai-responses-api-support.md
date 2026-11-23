@@ -1,6 +1,6 @@
 # PROVIDER-008: Complete Wire-Protocol Family Coverage And Protocol Mode Configuration
 
-**Status**: Refinement / Unclaimed (children A/B/C Complete / Closed; D pending)
+**Status**: Complete / Closed
 **Type**: Provider / Config / Model-Catalog Epic (child Stories decompose at claim time)
 **Parent Epic**: None
 **Source Issue**: [#724](https://github.com/wjhuang88/talos/issues/724)
@@ -11,7 +11,7 @@ Children:
 - [PROVIDER-008-A](PROVIDER-008-A-openai-responses-protocol.md) / [#748](https://github.com/wjhuang88/talos/issues/748): protocol architecture (enum/factory dispatch/model-level protocol/catalog signals) + OpenAI Responses adapter (ADR-093); I306 / effective governance claim #747; Complete / Closed after #806; implementation chain recorded in child owner.
 - [PROVIDER-008-B](PROVIDER-008-B-google-gemini.md) / #810 / I310: Complete / Closed; implementation #838, closeout #913.
 - [PROVIDER-008-C](PROVIDER-008-C-azure-openai.md) / #914 / I323: Complete / Closed via implementation #978 and closeout #984.
-- [PROVIDER-008-D](PROVIDER-008-D-amazon-bedrock.md) / #985 / I332: ConverseStream and SigV4, claim effective upon #986 merge.
+- [PROVIDER-008-D](PROVIDER-008-D-amazon-bedrock.md) / #985 / I332: Complete / Closed through #1009 after governance #986.
 
 ## Collaboration Claim
 
@@ -20,15 +20,15 @@ Children:
 | Claim State | Unclaimed |
 | Responsible Actor | Not assigned |
 | Executing Agent | Not assigned |
-| Work Slice | Parent epic remains unclaimed; child A (#748) is separately claimed by effective #747. |
+| Work Slice | Aggregate epic only. Each child has its own governed claim and implementation. |
 | Claimed At | Not applicable |
 | Source Issue | #724 |
 | Governance Claim PR | Not applicable |
 | Authorization Mode | Not applicable |
 | Authorization Evidence | Not applicable |
-| Implementation PR | Not started |
-| Last Updated | 2026-10-28 |
-| Handoff / Release Condition | Child Stories are independently claimed. #747 activates only PROVIDER-008-A/#748; B/C/D stay unclaimed. |
+| Implementation PR | None (child-owned) |
+| Last Updated | 2026-11-23 |
+| Handoff / Release Condition | All four child implementations are merged. Close the tracking issue after owner closeout reaches main. |
 
 ## Identity / Goal / Value
 
@@ -184,3 +184,11 @@ A/B are Complete / Closed. B implementation dbcf6163f34d73def923484ad409814fd4a9
 55617ad75c84db75718f287d6c05b84cfe55085e are existing evidence. Earlier B/C/D-unimplemented text
 is historical. C / #914 / I323 now proposes independent Azure claim+activation and ADR-103;
 D remains unclaimed. Parent #724 remains open; no #132 closure or release claim.
+
+## Final acceptance — 2026-11-23
+
+Completion Commit: 1745cd3c4d29dd375e680822ffc86f9cc6a3379e
+
+Implementation #1009 merged after CI4564/run45154117894 passed all eight jobs, including release preflight and native Windows workspace validation, for cc14d769c2c7457f4c49b9faba7fd186225e4074. Independent Agent technical and security review passed on that head. Merge CAS verified current ownership, main compatibility and the reviewed head. Controlled HTTP Agent rounds exercised signed reasoning and permission-gated read_image in Native, Compat and TalosStrict. Local fixture and lint failures remain historical. No live AWS validation, release or general credential-chain completion is claimed.
+
+The parent closes through independently delivered A (#806), B (#838/#913), C (#978/#984) and D (#1009). The linked owners retain their protocol-specific evidence and limitations. Optional long-tail providers and #132 retain separate scope.
