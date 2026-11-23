@@ -1,12 +1,12 @@
 # GIT-ENV-001 — Scoop installation environment and prepared Git writes
 
-Status: Active / Claimed proposed, effective only on main. Source Issue: [#1004](https://github.com/wjhuang88/talos/issues/1004).
+Status: Complete / Closed for Scoop environment admission. Source Issue: [#1004](https://github.com/wjhuang88/talos/issues/1004).
 
 ## Collaboration Claim
 
 | Field | Value |
 |---|---|
-| Claim State | Claimed |
+| Claim State | Closed |
 | Responsible Actor | @wjhuang88 |
 | Executing Agent | Codex / GPT-6.2 Astra |
 | Work Slice | GIT-ENV-001 Windows Scoop installation-root admission for prepared Checkout and Commit under ADR-089, including native execution and refusal evidence. I324 owns unsupported host queries. |
@@ -15,7 +15,7 @@ Status: Active / Claimed proposed, effective only on main. Source Issue: [#1004]
 | Governance Claim PR | #1006 |
 | Authorization Mode | Independent review |
 | Authorization Evidence | Maintainer requested dedicated handling. Independent approval and CI required before main activation. |
-| Implementation PR | Pending effective main claim |
+| Implementation PR | #1007 (merged) |
 | Last Updated | 2026-11-23 |
 | Handoff / Release Condition | Reviewed permission decision, native default Scoop approval/denial/stale tests and implementation merge evidence. |
 
@@ -49,3 +49,9 @@ On Windows x64 with Rust 1.99.0 MSVC, the installed Scoop launcher and a workspa
 ## Required Reads
 
 [ADR-089](../../decisions/089-structured-git-effect-authorization.md), [I324 owner](GIT-COMPAT-001-gix-preflight-host-git-compatibility.md), [collaboration SOP](../../sop/AGENT-COLLABORATION.md). A target-branch claim and reviewed authorization decision precede production changes.
+
+## Completion evidence
+
+Completion Commit: f4eb947c2f77e8d8ed124b16fdb21e177a692561
+
+[Product PR #1007](https://github.com/wjhuang88/talos/pull/1007) merged after [all eight checks](https://github.com/wjhuang88/talos/actions/runs/45132476825) passed and [independent permission review](https://github.com/wjhuang88/talos/pull/1007#issuecomment-7095678188) approved c1b0e952. Final native coverage includes index preservation and Runtime denial. On the installed Git 2.36.1 the remaining unsupported attribute query belongs to #919.

@@ -1,6 +1,6 @@
-## GIT-ENV-001 / #1004 — proposed Scoop Git environment claim
+## GIT-ENV-001 / #1004 — Scoop Git environment admission
 
-[Owner](backlog/active/GIT-ENV-001-scoop-install-root.md). Active / Claimed proposed via #1006, effective only on main. Native acceptance and permission review pending.
+[Owner](backlog/active/GIT-ENV-001-scoop-install-root.md). Complete / Closed via #1007, f4eb947c. Git 2.36.1 query support remains with #919.
 
 ## SEARCH-001-D3-T5 / I335 — proposed real Bing dual-host implementation (no production admission)
 
