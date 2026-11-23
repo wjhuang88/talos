@@ -247,6 +247,7 @@ async fn dropping_receiver_closes_incomplete_http_response() {
                 "example",
                 "us-east-1".into(),
                 None,
+                true,
                 Default::default(),
             )
             .unwrap()
@@ -277,6 +278,7 @@ async fn textual_modes_reject_orphan_results_before_dispatch() {
         "example",
         "us-east-1".into(),
         None,
+        true,
         Default::default(),
     )
     .unwrap();
@@ -294,5 +296,67 @@ async fn textual_modes_reject_orphan_results_before_dispatch() {
             .await
             .unwrap_err();
         assert!(error.to_string().contains("no matching call"));
+    }
+}
+
+#[tokio::test]
+async fn signed_history_requires_live_custody_and_enabled_replay_before_http() {
+    use crate::bedrock_provider::BedrockProvider;
+    use talos_core::{
+        message::{AssistantReasoning, Message as History, ReasoningBlock},
+        provider::{LanguageModel, TransientReplay},
+    };
+    let public = History::Assistant {
+        content: "visible".into(),
+        tool_calls: vec![],
+        reasoning: None,
+    };
+    let mut private = public.clone();
+    if let History::Assistant { reasoning, .. } = &mut private {
+        *reasoning = Some(AssistantReasoning {
+            provider: "p".into(),
+            model: "m".into(),
+            blocks: vec![ReasoningBlock::Redacted {
+                data: "private-signature".into(),
+            }],
+        });
+    }
+    let attachment = Arc::new(TransientReplay::new(public, private).unwrap());
+    let history = [attachment.projected_message().clone()];
+    assert!(
+        !serde_json::to_string(&history)
+            .unwrap()
+            .contains("private-signature")
+    );
+    for (enabled, custody) in [(false, vec![attachment]), (true, vec![])] {
+        let provider = BedrockProvider::new(
+            "p",
+            "m",
+            "us-east-1".into(),
+            None,
+            enabled,
+            Default::default(),
+        )
+        .unwrap();
+        let (progress, _) = tokio::sync::mpsc::unbounded_channel();
+        let result = provider
+            .stream_with_replay_context(
+                &history,
+                &[],
+                ToolProtocol::Native,
+                progress,
+                &[],
+                vec![],
+                custody,
+            )
+            .await;
+        let Err(error) = result else {
+            panic!("accepted unavailable signed history")
+        };
+        assert!(error.to_string().contains(if enabled {
+            "private replay context"
+        } else {
+            "replay disabled"
+        }));
     }
 }

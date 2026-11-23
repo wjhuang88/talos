@@ -116,6 +116,7 @@ fn build_with_connection(
                 &config.model,
                 region,
                 output_limit,
+                !replay_disabled && !reasoning_disabled,
                 timeout,
             )?))
         }

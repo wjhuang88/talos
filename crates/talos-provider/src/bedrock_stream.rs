@@ -105,6 +105,9 @@ impl ConverseStream {
             .as_u64()
             .and_then(|i| u32::try_from(i).ok())
             .ok_or_else(|| invalid("missing Bedrock content block index"))?;
+        if !self.open.contains_key(&index) && self.open.len() + self.closed.len() >= 1024 {
+            return Err(invalid("Bedrock response exceeds content block limit"));
+        }
         if self.closed.contains(&index) {
             return Err(invalid("Bedrock content block already closed"));
         }
@@ -240,6 +243,16 @@ impl ConverseStream {
         use talos_core::message::{AssistantReasoning, Message, ReasoningBlock};
         if self.signed.is_empty() {
             return Ok((None, self.finish()?));
+        }
+        if !self
+            .text_blocks
+            .values()
+            .flat_map(|s| s.bytes())
+            .eq(self.public_text.bytes())
+        {
+            return Err(invalid(
+                "Bedrock signed text order differs from streamed text",
+            ));
         }
         let mut blocks = BTreeMap::new();
         for (index, text) in std::mem::take(&mut self.text_blocks) {
@@ -441,6 +454,53 @@ mod tests {
             .accept("messageStop", json!({"stopReason":"end_turn"}))
             .unwrap();
         assert!(stream.finish().is_err());
+    }
+
+    #[test]
+    fn signed_turn_refuses_reordered_text_and_excess_empty_blocks() {
+        let mut stream = started();
+        for (index, text) in [(2, "first"), (1, "second")] {
+            stream
+                .accept(
+                    "contentBlockDelta",
+                    json!({"contentBlockIndex":index,"delta":{"text":text}}),
+                )
+                .unwrap();
+            stream
+                .accept("contentBlockStop", json!({"contentBlockIndex":index}))
+                .unwrap();
+        }
+        stream
+            .accept(
+                "contentBlockDelta",
+                json!({"contentBlockIndex":0,"delta":{"reasoningContent":{"signature":"sig"}}}),
+            )
+            .unwrap();
+        stream
+            .accept("contentBlockStop", json!({"contentBlockIndex":0}))
+            .unwrap();
+        stream
+            .accept("messageStop", json!({"stopReason":"end_turn"}))
+            .unwrap();
+        assert!(stream.finish_bound("p", "m", "route").is_err());
+
+        let mut stream = started();
+        for index in 0..1024 {
+            stream
+                .accept(
+                    "contentBlockDelta",
+                    json!({"contentBlockIndex":index,"delta":{"text":""}}),
+                )
+                .unwrap();
+        }
+        assert!(
+            stream
+                .accept(
+                    "contentBlockDelta",
+                    json!({"contentBlockIndex":1024,"delta":{"text":""}})
+                )
+                .is_err()
+        );
     }
 
     #[test]

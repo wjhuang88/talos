@@ -26,6 +26,7 @@ pub(crate) struct BedrockProvider {
     model: String,
     region: String,
     limit: Option<u32>,
+    allow_replay: bool,
     timeout: ProviderTimeoutConfig,
 }
 
@@ -35,6 +36,7 @@ impl BedrockProvider {
         model: &str,
         region: String,
         limit: Option<u32>,
+        allow_replay: bool,
         timeout: ProviderTimeoutConfig,
     ) -> ProviderResult<Self> {
         bedrock_endpoint::converse_stream(&region, model)
@@ -46,6 +48,7 @@ impl BedrockProvider {
             model: model.into(),
             region,
             limit,
+            allow_replay,
             timeout,
         })
     }
@@ -91,7 +94,7 @@ impl LanguageModel for BedrockProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
         protocol: ToolProtocol,
-        _progress: mpsc::UnboundedSender<ProviderProgress>,
+        progress: mpsc::UnboundedSender<ProviderProgress>,
         browser_tools: &[String],
         images: Vec<EphemeralImage>,
         replay: Vec<Arc<TransientReplay>>,
@@ -114,6 +117,27 @@ impl LanguageModel for BedrockProvider {
                     "unverified Bedrock reasoning history".into(),
                 ));
             }
+        }
+        if !self.allow_replay {
+            if !replay.is_empty()
+                || messages.iter().any(|m| {
+                    matches!(
+                        m,
+                        Message::Assistant {
+                            reasoning: Some(_),
+                            ..
+                        }
+                    )
+                })
+            {
+                return Err(ProviderError::InvalidResponse(
+                    "Bedrock reasoning replay disabled".into(),
+                ));
+            }
+            return self
+                .stream_with_protocol(messages, tools, protocol, progress)
+                .await
+                .map(ProviderInvocationStream::legacy);
         }
         let restored =
             TransientReplay::restore_history(messages, &self.provider, &self.model, &replay)?;

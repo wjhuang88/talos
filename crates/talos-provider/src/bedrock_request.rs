@@ -104,6 +104,7 @@ pub(crate) fn build_bound(
         .collect();
     let system_value = json!(system);
     let mut turns = Vec::<Turn>::new();
+    let mut signed_tail = false;
     for message in messages {
         let (role, blocks) = match message {
             Message::System { .. } => {
@@ -139,6 +140,7 @@ pub(crate) fn build_bound(
                     {
                         return Err(mismatch());
                     }
+                    signed_tail = true;
                     turns.push(Turn {
                         role: "assistant",
                         content: blocks,
@@ -164,6 +166,10 @@ pub(crate) fn build_bound(
                 )
             }
         };
+        if signed_tail && role == "assistant" {
+            return Err(invalid("cannot append to a signed Bedrock assistant turn"));
+        }
+        signed_tail = false;
         if blocks.is_empty() {
             return Err(invalid("empty Bedrock message"));
         }
@@ -194,6 +200,45 @@ pub(crate) fn build_bound(
 mod tests {
     use super::*;
     use talos_core::message::{MessageToolResult, ToolCall};
+
+    #[test]
+    fn signed_turn_binds_system_history_route_and_assistant_boundary() {
+        use talos_core::message::{AssistantReasoning, ReasoningBlock};
+        let user = Message::User {
+            content: "before".into(),
+        };
+        let wire = build(std::slice::from_ref(&user), &[], None).unwrap();
+        let digest = fingerprint(&json!([]), &wire["messages"], "route");
+        let signed = Message::Assistant {
+            content: "answer".into(),
+            tool_calls: vec![],
+            reasoning: Some(AssistantReasoning {
+                provider: "p".into(),
+                model: "m".into(),
+                blocks: vec![ReasoningBlock::Redacted {
+                    data: json!([digest,[{"text":"answer"}]]).to_string(),
+                }],
+            }),
+        };
+        let mut history = vec![user, signed];
+        assert!(build_bound(&history, &[], None, Some("route")).is_ok());
+        assert!(build_bound(&history, &[], None, Some("other region")).is_err());
+        history.push(Message::Assistant {
+            content: "extra".into(),
+            tool_calls: vec![],
+            reasoning: None,
+        });
+        assert!(build_bound(&history, &[], None, Some("route")).is_err());
+        history.pop();
+        history[0] = Message::User {
+            content: "changed".into(),
+        };
+        assert!(build_bound(&history, &[], None, Some("route")).is_err());
+        assert_ne!(
+            digest,
+            fingerprint(&json!([{"text":"changed"}]), &wire["messages"], "route")
+        );
+    }
 
     #[test]
     fn associates_reversed_results_in_one_user_turn() {
