@@ -214,10 +214,16 @@ pub(super) fn select_captured_target_filter(
     // A supplied snapshot is incomplete if its tree index lists a regular
     // .gitattributes blob whose bytes are absent. Do not silently treat that
     // absence as "no filter" or accept invented extra rule sources.
-    // This checks internal consistency only; object Read authority and
-    // snapshot authenticity must be proven at the caller's admitted frontier.
+    // Also bind each supplied byte buffer to its recorded Git blob OID:
+    // syntactically valid, substituted rules must not become trusted evidence.
+    // This only proves snapshot-internal object identity; the caller still
+    // must separately authorize every object/metadata Read and authenticate
+    // the captured tree, repository, writer and stale-plan evidence.
+    let hash_kind = gix::ObjectId::from_hex(target.commit.as_bytes())
+        .map_err(|_| GitToolError::InvalidInput("Invalid target commit OID".into()))?
+        .kind();
     let mut expected_sources = 0usize;
-    for (source, (mode, _)) in &target.entries {
+    for (source, (mode, object_id)) in &target.entries {
         if source == ".gitattributes" || source.ends_with("/.gitattributes") {
             if !matches!(*mode, 0o100644 | 0o100755) {
                 return Err(GitToolError::InvalidInput(
@@ -225,9 +231,28 @@ pub(super) fn select_captured_target_filter(
                 ));
             }
             expected_sources += 1;
-            if !target.attributes.contains_key(source) {
+            let Some(bytes) = target.attributes.get(source) else {
                 return Err(GitToolError::InvalidInput(
                     "Target attribute blob bytes missing from captured tree".into(),
+                ));
+            };
+            if bytes.len() > 4 * 1024 * 1024 {
+                return Err(GitToolError::InvalidInput(
+                    "Target attribute source exceeds byte limit".into(),
+                ));
+            }
+            let recorded = gix::ObjectId::from_hex(object_id.as_bytes())
+                .map_err(|_| GitToolError::InvalidInput("Invalid target attribute OID".into()))?;
+            if recorded.kind() != hash_kind {
+                return Err(GitToolError::InvalidInput(
+                    "Target attribute OID hash kind differs from target commit".into(),
+                ));
+            }
+            let actual = gix::objs::compute_hash(hash_kind, gix::objs::Kind::Blob, bytes)
+                .map_err(|_| GitToolError::InvalidInput("Target attribute OID hash failed".into()))?;
+            if actual != recorded {
+                return Err(GitToolError::InvalidInput(
+                    "Target attribute bytes do not match the recorded blob OID".into(),
                 ));
             }
         }
