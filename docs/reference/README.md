@@ -18,6 +18,8 @@ Stable technical facts about the project. Not procedures or status — those liv
 | `SQLITE-CONSUMER-POLICY.json` | ADR-008 normative machine-readable SQLite consumer allowlist and classification policy |
 | `TUI-NATIVE-SELECTION-MATRIX.md` | I184 baseline causal observations and TUI-046-B exact-head terminal acceptance schema |
 | `DOCS-SYNC-CHECKLIST.md` | Surfaces that must stay in sync when behavior/install/tools change |
+| `WINDOWS-VALIDATION-2026-11-17-I324.md` | #919 exact-candidate native Windows results, failure classification and remaining acceptance |
+| `WINDOWS-VALIDATION-2026-11-21-I324.md` | #928 native query matrix, Windows fixture cleanup repair and optional Rust results |
 | `RELEASE-NOTES-DRAFT-2026-07-02.md` | Draft post-v0.2.0 release notes and known gaps |
 | `I090-I093-HIGH-RISK-CLOSEOUT-2026-07-04.md` | Closeout and residual owner matrix for the direct senior-agent high-risk execution track |
 | `PERMISSION-EXPERIENCE-REFERENCE-STUDY-2026-07-05.md` | Permission UX reference comparison and Talos permission taxonomy for PERM-003 |

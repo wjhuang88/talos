@@ -10205,6 +10205,7 @@ dependencies = [
  "cap-std",
  "flate2",
  "gix",
+ "gix-attributes",
  "glob",
  "grep-matcher",
  "grep-regex",
