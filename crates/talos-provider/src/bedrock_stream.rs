@@ -32,6 +32,7 @@ pub(crate) struct ConverseStream {
     ids: HashSet<String>,
     signed: BTreeMap<u32, (String, String)>,
     reasoning_bytes: usize,
+    tool_bytes: usize,
     text_blocks: BTreeMap<u32, String>,
     public_text: String,
     calls: BTreeMap<u32, ToolCall>,
@@ -125,6 +126,7 @@ impl ConverseStream {
                     .as_str()
                     .filter(|s| !s.is_empty())
                     .ok_or_else(|| invalid("missing Bedrock tool name"))?;
+                self.reserve_tool_bytes(id.len().saturating_add(name.len()))?;
                 if self.open.contains_key(&index) || !self.ids.insert(id.into()) {
                     return Err(invalid("duplicate Bedrock tool start"));
                 }
@@ -193,12 +195,10 @@ impl ConverseStream {
                 let fragment = delta["toolUse"]["input"]
                     .as_str()
                     .ok_or_else(|| invalid("unsupported Bedrock content delta"))?;
+                self.reserve_tool_bytes(fragment.len())?;
                 let Some(Block::Tool { input, .. }) = self.open.get_mut(&index) else {
                     return Err(invalid("missing Bedrock tool start"));
                 };
-                if input.len().saturating_add(fragment.len()) > 16 * 1024 * 1024 {
-                    return Err(invalid("Bedrock tool input too large"));
-                }
                 input.push_str(fragment);
             }
             "contentBlockStop" => {
@@ -228,6 +228,15 @@ impl ConverseStream {
             _ => return Err(invalid("unexpected Bedrock conversation event")),
         }
         Ok(None)
+    }
+
+    fn reserve_tool_bytes(&mut self, bytes: usize) -> ProviderResult<()> {
+        self.tool_bytes = self
+            .tool_bytes
+            .checked_add(bytes)
+            .filter(|total| *total <= 16 * 1024 * 1024)
+            .ok_or_else(|| invalid("Bedrock tool data exceeds turn limit"))?;
+        Ok(())
     }
 
     pub(crate) fn finish_bound(
@@ -454,6 +463,35 @@ mod tests {
             .accept("messageStop", json!({"stopReason":"end_turn"}))
             .unwrap();
         assert!(stream.finish().is_err());
+    }
+
+    #[test]
+    fn closed_tools_continue_to_count_towards_turn_budget() {
+        let mut stream = started();
+        stream.tool_bytes = 16 * 1024 * 1024 - 4;
+        stream
+            .accept(
+                "contentBlockStart",
+                json!({"contentBlockIndex":0,"start":{"toolUse":{"toolUseId":"a","name":"b"}}}),
+            )
+            .unwrap();
+        stream
+            .accept(
+                "contentBlockDelta",
+                json!({"contentBlockIndex":0,"delta":{"toolUse":{"input":"{}"}}}),
+            )
+            .unwrap();
+        stream
+            .accept("contentBlockStop", json!({"contentBlockIndex":0}))
+            .unwrap();
+        assert!(
+            stream
+                .accept(
+                    "contentBlockStart",
+                    json!({"contentBlockIndex":1,"start":{"toolUse":{"toolUseId":"c","name":"d"}}})
+                )
+                .is_err()
+        );
     }
 
     #[test]
