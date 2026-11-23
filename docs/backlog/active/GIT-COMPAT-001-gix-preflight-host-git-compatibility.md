@@ -101,3 +101,17 @@ exit 0. Format passes; 15/15 gix candidates pass including Windows gitdir identi
 17 MiB actual Checkout/Commit still fails preparation in the original environment
 on the Git-variable guard (101). Raw logs remain local TEMP. Scope stays targeted;
 no product acceptance, production authority change, ADR acceptance or Complete.
+
+## Maintainer decision — 2026-11-23: implementation direction approved in principle
+
+The maintainer explicitly decided in the I324 handoff conversation:
+
+> 原则同意 ADR-089 I324 局部兼容替换技术方案，仅授权在现有安全边界内继续开发与验证，不代表最终 ADR 接受、生产启用或 PR 合并。
+
+**Authorization classification:** technical direction and continued **development/verification** only. This does **not** change the effective Accepted ADR-089 contract or authorize any production policy/permission expansion. The requested design is the 2026-11-19 narrowly scoped correction, **not** a whole-preflight CLI removal. Retain supported fixed-argv CLI inspections under their existing authority; investigate/review only the six forms demonstrated unsupported in native Git 2.36.1: `git var GIT_ATTR_SYSTEM`, `GIT_ATTR_GLOBAL`, `GIT_CONFIG_SYSTEM`, `GIT_CONFIG_GLOBAL`, `GIT_SHELL_PATH`, and target-tree `git check-attr --source`. Configuration-root, attribute-root, shell and tree attribute replacements require independent source/effect/identity review, not one blanket approval.
+
+**No new authority:** selected system Git remains the final bound writer. Preserve exact Path/ancestor/link metadata and object Read admission, negative-source and compiled-default provenance, explicit Command/Remote facets, hooks/filters/receiver effects, one-use approval and stale-plan rejection. Unknown defaults fail closed per operation; no unapproved gix I/O/process, guessed Git installation root, blanket `GIT_*` exception or new CLI command may be inferred. The inherited Scoop `GIT_INSTALL_ROOT` investigation is separate.
+
+**Status and gates:** ADR-089 amendment [Draft #931](https://github.com/wjhuang88/talos/pull/931) stays **PROPOSED / NOT ACCEPTED**; implementation [Draft #928](https://github.com/wjhuang88/talos/pull/928) remains unmerged and #919 remains Open. As of this checkpoint, [exact-head CI #4542](https://github.com/wjhuang88/talos/actions/runs/45116883372) and [ADR CI #4543](https://github.com/wjhuang88/talos/actions/runs/45116887147) are green on their then-current heads, but neither CI nor approval-in-principle substitutes for independent Git authorization/security/API review, trustworthy operation-specific source provenance, native Windows Git 2.36.1 original-environment >16 MiB Prepared Checkout/Commit acceptance, subsequent exact-head CI/governance checks, or the maintainer's separate final acceptance. Do not activate or merge implementation until those gates are satisfied.
+
+Decision receipt: [#919](https://github.com/wjhuang88/talos/issues/919#issuecomment-7093132593), [#928](https://github.com/wjhuang88/talos/pull/928#issuecomment-7093133239), [#931](https://github.com/wjhuang88/talos/pull/931#issuecomment-7093131969).
