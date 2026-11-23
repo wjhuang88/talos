@@ -889,3 +889,50 @@ remaining blocker after correcting the rebound invocation/canonical distinction.
 MSVC xwin checking and the host Unix shell regression pass. This candidate does
 not prove DLL loading, MSYS startup effects or real Windows prepared Push;
 these runtime/trust limitations remain activation prerequisites.
+
+
+## I324 old-Git targeted-query compatibility amendment — **PROPOSED, NOT ACCEPTED (2026-11-19)**
+
+**Current maintainer scope (supersedes the 2026-11-12/13 whole-preflight-gix proposal):** I324 does **not** prohibit all Git CLI preflight. Preserve the previously approved fixed Git CLI discovery and inspection steps whenever they work on supported Git. Replace **only individual query forms verified unsupported on an older supported Git** with bounded gix/Talos-owned alternatives. The final mutation still runs the selected, approved system Git. See [Issue #919](https://github.com/wjhuang88/talos/issues/919) and the [revised compatibility proposal](../proposals/gix-preflight-system-git-compatibility.md).
+
+**Authority status:** This amendment is for independent security/API review and maintainer acceptance, **not** a grant to modify production Git effects or read arbitrary files. Every previously accepted ADR-089 fixed-command authorization remains binding unless a separately accepted change identifies that exact operation. Existing GIT-SNAPSHOT-001, one-use capability, denial and stale-evidence invariants are unchanged.
+
+### Verified problem and minimal replacement set
+
+| Existing preflight operation | Native Git 2.36.1 evidence | I324 treatment |
+|---|---|---|
+| `git var GIT_ATTR_SYSTEM`, `git var GIT_ATTR_GLOBAL` | **Both unsupported, exit 129** in native Windows Scoop and pinned MinGit 2.36.1 (2026-11-21) | **Replacement candidates:** derive the exact selected-writer system/global attribute source roots through proven, separately admitted evidence; never infer installation paths or silently omit missing sources |
+| `git var GIT_CONFIG_SYSTEM`, `git var GIT_CONFIG_GLOBAL` | **Both unsupported, exit 129** on the same native Windows 2.36.1 binaries (2026-11-21) | **Replacement candidates:** preserve system→XDG→HOME configuration source order, absent-source evidence, includes/includeIf and exact authorized Read; no guessed installation default |
+| `git var GIT_SHELL_PATH` | **Unsupported, exit 129** on native Windows 2.36.1 in both modes (2026-11-21) | **Replacement candidate only for the shell-path discovery call**; preserve selected writer shell identity and startup/receiver effect approval; do not guess from exec-path or PATH |
+| `git config --show-origin --null --list --includes`, `git --exec-path` | The six targeted failures are **not evidence** that these independently authorized CLI calls are unavailable | Retain these unchanged approved bounded CLI operations unless separately disproven |
+| `git check-attr -z --source=<target.commit> filter -- ...` | **Unsupported-option, exit 129** in native Windows 2.36.1; Git 2.40 [release notes](https://github.com/git/git/blob/master/Documentation/RelNotes/2.40.0.adoc) introduced `--source` | **Replacement candidate:** target-tree attributes must use admitted tree/object bytes and exact gix/Talos interpretation; `--cached` is **not** equivalent to target commit |
+| `git check-attr` (ordinary/`--cached`), `git rev-parse`, `git check-ref-format`, receiver/child inspections | Independent semantics, permission and fixture failures exist; they are not evidence that every command is unavailable | Retain unchanged approved CLI operations until a specific unsupported query is proven |
+
+**Evidence boundary (2026-11-21):** [native Windows report](https://github.com/wjhuang88/talos/blob/374df343ed4c089e636676a23cc14ac0ff60278f/docs/reference/WINDOWS-VALIDATION-2026-11-21-I324.md), tested against #928 `2bbd3c3441ea14e3ac853ced8101de6424463cf8`. Both the pinned upstream Git for Windows **2.36.1.windows.1** binary (SHA-256 verified) and the selected Scoop Git binary yielded the same **six unsupported command/option results**, ordinary and `--cached` attributes worked, and the test-only matrix exited 0 after a strictly bounded Windows read-only fixture cleanup fix. This evidence is from **child-isolated HOME/configuration**, not a proof of original inherited environment semantics, system compiled attribute-root provenance or an admitted Checkout/Commit implementation. The focused native Rust suite passed **15/15** candidate tests; the original inherited environment still rejected the **17 MiB** prepared Checkout at its `GIT_INSTALL_ROOT` guard before mutation (exit 101). Do **not** allowlist `GIT_INSTALL_ROOT` from this result. ADR remains Proposed / NOT ACCEPTED, without any independent security/API approval or production implementation. Config-root and shell-query *command incompatibility* are now confirmed, but the earlier aggregated fixture/config/receiver failure roots are **not all proven** by this command result.
+
+The replacement for an unsupported *operation* may be used consistently across supported Git versions if its semantics are proven equivalent; avoid brittle Git-version/Scoop-prefix guesses, unbounded trial-and-error retries or generalized fallback probes.
+
+### Bounded proposed authority delta
+
+1. **Retain existing approved CLI discovery.** The accepted ADR-089 fixed-command `git:configuration-chain` stage, executable identity, one-use proof, time/output/source budgets and separately admitted read effects remain valid for the *unchanged* CLI queries. Do not silently route additional queries through that capability.
+2. **Replace only unsupported calls.** A named unsupported query may use Talos/gix pure lexical and supplied-buffer primitives, or a separately reviewed bounded substitute. Naming a candidate attribute source performs no file open, stat, readlink or child execution; its bytes, ancestor identity, links and negative existence evidence require the existing exact admission before capture and revalidation. No gix convenience API may implicitly open unauthorized paths, discover PATH, spawn an unbound child or cache process-global environment as invocation evidence.
+3. **Preserve selected-writer source equivalence for replacements.** Compiled system/global attribute defaults must match the **particular selected system Git writer**. A binary hash alone, Git version, a Scoop/Windows path guess or gix's guessed installation prefix is not sufficient. An independently trusted attribute-source basis is required **only where the replacement needs it**. Missing provenance yields a precise Unsupported outcome for that operation, not a blanket requirement to provide an external trust profile for other already-working CLI inspections.
+4. **No scope or policy expansion.** No new generic filesystem Read/Execute, broader `GIT_*` exemption, automatic fallback to shell, suppression of hooks/filters/maintenance/transport effects, replay, hidden unadmitted source, or mutation after stale evidence. `GIT_INSTALL_ROOT` remains a separate environment-semantics investigation.
+5. **Preserve Git behavior.** Configuration include/includeIf/hasconfig, attributes, macro/filter precedence, refs, tracking, URL rewrite, signing, receiver/child effects and final writer process still use the same reviewed authorization and revalidation semantics. A replacement must not silently omit sources or claim equivalence merely because gix can parse bytes.
+6. **Explicit command additions require review.** If a substitute needs an additional Git CLI command or a different use of existing authority, propose that command, exact effects and permission carrier before production wiring; today's issue clarification is not preauthorization.
+
+### Review evidence and acceptance ledger
+
+| Review class | Required proof | Failure behavior |
+|---|---|---|
+| Unsupported-command classification | Native original Git 2.36.1 and newer-Git results for each selected command with exit code, stderr and environment | Do not widen the replacement set based on aggregated unrelated failures |
+| Retained CLI | Unchanged reviewed fixed argv, selected executable identity, permission facets, bounded output/timeout, source and stale-plan revalidation | Existing fail-closed behavior |
+| Alternative attribute-root source | Accepted, operation-specific provenance binding system/global attributes and executable, including missing/empty paths and HOME/XDG variations | Typed unsupported operation; never assume missing/empty from unverified defaults |
+| gix/native byte parsing | Exact Path Read and ancestor/link metadata admission, strict attribute parsing, full relevant source-order/selection semantics | Deny or refuse malformed/unsupported sources |
+| Child-process evidence | Instrument **replaced** operations for zero **unapproved** Git/tool child process; unchanged approved CLI preflight may and will launch Git | Reject new hidden commands, not all already-authorized Git CLI calls |
+| Operation effects and correctness | Hooks/filters, change-before-execution, one-use approvals and the selected final system Git writer; 17 MiB prepared Checkout/Commit | Fail closed on unsupported or stale operation; no partial-write success claim |
+| Cross-platform and review | Native Windows Git 2.36.1 original environment and newer Git, exact-head CI, independent Git security/API review and named maintainer scope decision | Draft until acceptance, no production switch or #919 closure |
+
+**Previous I324 whole-preflight zero-child language is withdrawn as a requirement by the maintainer's 2026-11-19 correction.** Its pure-gix tests and source audits remain useful, but they are not a prerequisite for retaining already-authorized CLI operations.
+
+**Acceptance gate:** This proposed limited amendment remains **NOT ACCEPTED** until independent security/API review, explicit maintainer acceptance of the exact changed authority, proven replacement-source provenance and relevant native Windows acceptance. The previously accepted ADR-089 rules continue to govern production in the meantime.
