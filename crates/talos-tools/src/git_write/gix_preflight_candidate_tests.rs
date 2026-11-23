@@ -1208,5 +1208,40 @@ fn gix_pure_candidate_no_child_fixture() {
         .map(|value| value.assignment.to_string())
         .collect::<Vec<_>>();
     assert_eq!(values, vec!["filter=lfs".to_owned()]);
+
+    // Exercise the actual I324 supplied-tree candidate under the hostile
+    // PATH sentinel, not only its underlying gix matcher. These are
+    // synthetic TEST-ONLY bytes; neither repository-object Read admission
+    // nor target-tree authenticity is implied by a matching blob hash.
+    // Both Git object hash families must bind the captured rule bytes.
+    for commit in ["0".repeat(40), "0".repeat(64)] {
+        let commit_id =
+            gix::ObjectId::from_hex(commit.as_bytes()).expect("synthetic hash-kind fixture");
+        let blob_id = gix::objs::compute_hash(
+            commit_id.kind(),
+            gix::objs::Kind::Blob,
+            attrs,
+        )
+        .expect("pure in-memory Git blob hashing");
+        let target = super::checkout_state::TargetTree {
+            commit,
+            tree: String::new(),
+            entries: BTreeMap::from([(
+                ".gitattributes".to_owned(),
+                (0o100644, blob_id.to_string()),
+            )]),
+            attributes: BTreeMap::from([(".gitattributes".to_owned(), attrs.to_vec())]),
+        };
+        assert_eq!(
+            super::checkout_state::select_captured_target_filter(
+                &target,
+                "sample.txt",
+                gix_attributes::glob::pattern::Case::Sensitive,
+            )
+            .expect("test-only supplied target tree lookup")
+            .as_deref(),
+            Some("filter=lfs")
+        );
+    }
     println!("I324_PURE_CANDIDATE_CHILD_OK");
 }
