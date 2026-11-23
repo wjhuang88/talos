@@ -1098,23 +1098,23 @@ fn gix_target_filter_distinguishes_unmatched_from_explicit_reset_and_non_utf8() 
     };
 
     assert_eq!(lookup(&target).expect("empty attribute tree"), None);
-    set_rules(&mut target, b"*.md filter=markdown\\n");
+    set_rules(&mut target, b"*.md filter=markdown\n");
     assert_eq!(lookup(&target).expect("nonmatching source"), None);
-    set_rules(&mut target, b"*.txt text\\n");
+    set_rules(&mut target, b"*.txt text\n");
     assert_eq!(lookup(&target).expect("matched rule without filter"), None);
 
-    set_rules(&mut target, b"*.txt !filter\\n");
+    set_rules(&mut target, b"*.txt !filter\n");
     assert_eq!(
         lookup(&target).expect("explicit filter reset"),
         Some("!filter".to_owned()),
         "an explicit !filter must remain different from no assignment"
     );
-    set_rules(&mut target, b"*.txt -filter\\n");
+    set_rules(&mut target, b"*.txt -filter\n");
     assert_eq!(lookup(&target).expect("explicit filter unset"), Some("-filter".into()));
 
     // Parser permits arbitrary bytes in values. A matched, correctly hashed
     // non-UTF-8 value must fail closed instead of to_string() replacing bytes.
-    set_rules(&mut target, b"*.txt filter=\\xff\\n");
+    set_rules(&mut target, b"*.txt filter=\xff\n");
     let error = lookup(&target).expect_err("invalid UTF-8 filter driver must be refused");
     assert!(
         matches!(&error, super::GitToolError::InvalidInput(reason)
