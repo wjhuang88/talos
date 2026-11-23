@@ -307,10 +307,25 @@ pub(super) fn select_captured_target_filter(
     let mut outcome = gix_attributes::search::Outcome::default();
     outcome.initialize_with_selection(&metadata, ["filter"]);
     search.pattern_matching_relative_path(path.into(), case, Some(false), &mut outcome);
+    // iter_selected() fabricates an unspecified !filter match even when no
+    // source assigned filter. An absent rule must *not* clear inherited
+    // system/global attributes; only a real matching source can override.
     let selected = outcome
         .iter_selected()
-        .map(|attribute| attribute.assignment.to_string())
-        .collect::<Vec<_>>();
+        .filter(|attribute| attribute.location.source.is_some())
+        .map(|attribute| {
+            // AssignmentRef's Display uses lossy UTF-8 for Value. Since the
+            // preflight candidate returns String, reject non-UTF-8 values
+            // rather than silently authorizing a different filter driver.
+            if let gix_attributes::StateRef::Value(value) = attribute.assignment.state {
+                let raw: &[u8] = value.as_bstr().as_ref();
+                std::str::from_utf8(raw).map_err(|_| {
+                    GitToolError::InvalidInput("Non-UTF-8 target filter value".into())
+                })?;
+            }
+            Ok(attribute.assignment.to_string())
+        })
+        .collect::<Result<Vec<_>, GitToolError>>()?;
     match selected.as_slice() {
         [] => Ok(None),
         [value] => Ok(Some(value.clone())),

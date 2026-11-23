@@ -1066,6 +1066,64 @@ fn gix_supplied_target_tree_nested_attributes_respect_git_precedence() {
 }
 
 #[test]
+fn gix_target_filter_distinguishes_unmatched_from_explicit_reset_and_non_utf8() {
+    fn set_rules(target: &mut super::checkout_state::TargetTree, rules: &[u8]) {
+        let commit_id = gix::ObjectId::from_hex(target.commit.as_bytes())
+            .expect("test-only synthetic commit kind");
+        let blob_id = gix::objs::compute_hash(
+            commit_id.kind(),
+            gix::objs::Kind::Blob,
+            rules,
+        )
+        .expect("test-only byte hash");
+        target.entries.insert(
+            ".gitattributes".into(),
+            (0o100644, blob_id.to_string()),
+        );
+        target.attributes.insert(".gitattributes".into(), rules.to_vec());
+    }
+
+    let mut target = super::checkout_state::TargetTree {
+        commit: "0".repeat(40),
+        tree: String::new(),
+        entries: BTreeMap::new(),
+        attributes: BTreeMap::new(),
+    };
+    let lookup = |target: &super::checkout_state::TargetTree| {
+        super::checkout_state::select_captured_target_filter(
+            target,
+            "sample.txt",
+            gix_attributes::glob::pattern::Case::Sensitive,
+        )
+    };
+
+    assert_eq!(lookup(&target).expect("empty attribute tree"), None);
+    set_rules(&mut target, b"*.md filter=markdown\\n");
+    assert_eq!(lookup(&target).expect("nonmatching source"), None);
+    set_rules(&mut target, b"*.txt text\\n");
+    assert_eq!(lookup(&target).expect("matched rule without filter"), None);
+
+    set_rules(&mut target, b"*.txt !filter\\n");
+    assert_eq!(
+        lookup(&target).expect("explicit filter reset"),
+        Some("!filter".to_owned()),
+        "an explicit !filter must remain different from no assignment"
+    );
+    set_rules(&mut target, b"*.txt -filter\\n");
+    assert_eq!(lookup(&target).expect("explicit filter unset"), Some("-filter".into()));
+
+    // Parser permits arbitrary bytes in values. A matched, correctly hashed
+    // non-UTF-8 value must fail closed instead of to_string() replacing bytes.
+    set_rules(&mut target, b"*.txt filter=\\xff\\n");
+    let error = lookup(&target).expect_err("invalid UTF-8 filter driver must be refused");
+    assert!(
+        matches!(&error, super::GitToolError::InvalidInput(reason)
+            if reason.contains("Non-UTF-8 target filter value")),
+        "non-UTF-8 value must not be serialized with replacement characters: {error:?}"
+    );
+}
+
+#[test]
 fn gix_target_attribute_depth_and_nested_macro_match_native_frozen_index() {
     // After commit the index and target tree contain exactly the same
     // attribute blobs. The test-only --cached oracle also runs on Git 2.36,
