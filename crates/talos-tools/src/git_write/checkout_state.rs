@@ -182,6 +182,113 @@ impl TargetTree {
     }
 }
 
+/// I324 candidate primitive: interpret only caller-supplied, already captured
+/// target-tree attribute bytes. The result is ONE source layer's selection,
+/// not a final Git filter-effect approval: external system/global/info sources,
+/// configured filter drivers, executable identity, Read authority, absence
+/// witnesses and stale-plan revalidation are separate obligations.
+///
+/// This function does not discover repositories, open files or invoke Git and
+/// is deliberately not wired to the production checkout dispatcher.
+#[cfg(test)]
+pub(super) fn select_captured_target_filter(
+    target: &TargetTree,
+    path: &str,
+    case: gix_attributes::glob::pattern::Case,
+) -> Result<Option<String>, GitToolError> {
+    fn safe_relative_path(path: &str) -> bool {
+        !path.is_empty()
+            && path.len() <= 4096
+            && !path.contains(['\\', '\0'])
+            && path
+                .split('/')
+                .all(|component| !matches!(component, "" | "." | ".."))
+    }
+
+    if !safe_relative_path(path) {
+        return Err(GitToolError::InvalidInput(
+            "Invalid target attribute lookup path".into(),
+        ));
+    }
+
+    // A supplied snapshot is incomplete if its tree index lists a regular
+    // .gitattributes blob whose bytes are absent. Do not silently treat that
+    // absence as "no filter" or accept invented extra rule sources.
+    // This checks internal consistency only; object Read authority and
+    // snapshot authenticity must be proven at the caller's admitted frontier.
+    let mut expected_sources = 0usize;
+    for (source, (mode, _)) in &target.entries {
+        if source == ".gitattributes" || source.ends_with("/.gitattributes") {
+            if !matches!(*mode, 0o100644 | 0o100755) {
+                return Err(GitToolError::InvalidInput(
+                    "Unsupported target attribute entry mode".into(),
+                ));
+            }
+            expected_sources += 1;
+            if !target.attributes.contains_key(source) {
+                return Err(GitToolError::InvalidInput(
+                    "Target attribute blob bytes missing from captured tree".into(),
+                ));
+            }
+        }
+    }
+    if expected_sources != target.attributes.len() {
+        return Err(GitToolError::InvalidInput(
+            "Target attribute source set does not match captured tree".into(),
+        ));
+    }
+
+    let mut search = gix_attributes::Search::default();
+    let mut metadata = gix_attributes::search::MetadataCollection::default();
+    for (source, bytes) in &target.attributes {
+        let valid_source = source == ".gitattributes"
+            || source
+                .strip_suffix("/.gitattributes")
+                .is_some_and(safe_relative_path);
+        if !valid_source || bytes.len() > 4 * 1024 * 1024 {
+            return Err(GitToolError::InvalidInput(
+                "Invalid supplied target attribute source".into(),
+            ));
+        }
+        if !gix_attributes::parse(bytes).all(|line| {
+            let Ok((_, assignments, _)) = line else {
+                return false;
+            };
+            assignments.into_iter().all(|assignment| assignment.is_ok())
+        }) {
+            return Err(GitToolError::InvalidInput(
+                "Malformed supplied target attributes".into(),
+            ));
+        }
+        search
+            .add_patterns_buffer(
+                bytes,
+                source.as_str().into(),
+                Some(std::path::Path::new("")),
+                &mut metadata,
+                true,
+            )
+            .map_err(|_| {
+                GitToolError::InvalidInput("Target attribute interpretation failed".into())
+            })?;
+    }
+
+    let mut outcome = gix_attributes::search::Outcome::default();
+    outcome.initialize_with_selection(&metadata, ["filter"]);
+    search.pattern_matching_relative_path(path.into(), case, Some(false), &mut outcome);
+    let selected = outcome
+        .iter_selected()
+        .map(|attribute| attribute.assignment.to_string())
+        .collect::<Vec<_>>();
+    match selected.as_slice() {
+        [] => Ok(None),
+        [value] => Ok(Some(value.clone())),
+        _ => Err(GitToolError::InvalidInput(
+            "Ambiguous target attribute filter selection".into(),
+        )),
+    }
+}
+
 /// Ancestors are evidence even when a target file does not yet exist. Never
 /// follow an ancestor link during capture; the final entry remains a Git entry.
 #[derive(Debug, PartialEq, Eq)]
