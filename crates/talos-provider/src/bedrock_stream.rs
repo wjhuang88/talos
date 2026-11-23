@@ -12,6 +12,10 @@ fn invalid(message: &'static str) -> ProviderError {
 
 enum Block {
     Text,
+    Reasoning {
+        text: String,
+        signature: String,
+    },
     Tool {
         id: String,
         name: String,
@@ -26,6 +30,8 @@ pub(crate) struct ConverseStream {
     open: BTreeMap<u32, Block>,
     closed: HashSet<u32>,
     ids: HashSet<String>,
+    signed: BTreeMap<u32, (String, String)>,
+    reasoning_bytes: usize,
     calls: BTreeMap<u32, ToolCall>,
     stop: Option<StopReason>,
     usage: Option<Usage>,
@@ -143,6 +149,37 @@ impl ConverseStream {
                     }
                     return Ok(Some(AgentEvent::TextDelta { delta: text.into() }));
                 }
+                if let Some(reasoning) = delta.get("reasoningContent") {
+                    let fields = reasoning
+                        .as_object()
+                        .filter(|fields| fields.len() == 1)
+                        .ok_or_else(|| invalid("invalid Bedrock reasoning delta"))?;
+                    let (key, value) = fields
+                        .iter()
+                        .next()
+                        .ok_or_else(|| invalid("empty Bedrock reasoning delta"))?;
+                    let fragment = value
+                        .as_str()
+                        .ok_or_else(|| invalid("invalid Bedrock reasoning fragment"))?;
+                    self.reasoning_bytes = self.reasoning_bytes.saturating_add(fragment.len());
+                    if self.reasoning_bytes > 8 * 1024 * 1024 {
+                        return Err(invalid("Bedrock reasoning exceeds turn limit"));
+                    }
+                    let Block::Reasoning { text, signature } =
+                        self.open.entry(index).or_insert_with(|| Block::Reasoning {
+                            text: String::new(),
+                            signature: String::new(),
+                        })
+                    else {
+                        return Err(invalid("Bedrock block kind changed"));
+                    };
+                    match key.as_str() {
+                        "text" => text.push_str(fragment),
+                        "signature" => signature.push_str(fragment),
+                        _ => return Err(invalid("unsupported Bedrock reasoning fragment")),
+                    }
+                    return Ok(None);
+                }
                 let fragment = delta["toolUse"]["input"]
                     .as_str()
                     .ok_or_else(|| invalid("unsupported Bedrock content delta"))?;
@@ -161,6 +198,12 @@ impl ConverseStream {
                     .ok_or_else(|| invalid("unknown Bedrock content block"))?
                 {
                     Block::Text => {}
+                    Block::Reasoning { text, signature } => {
+                        if signature.is_empty() {
+                            return Err(invalid("missing Bedrock reasoning signature"));
+                        }
+                        self.signed.insert(index, (text, signature));
+                    }
                     Block::Tool { id, name, input } => {
                         let input: Value = serde_json::from_str(&input)
                             .map_err(|_| invalid("invalid Bedrock tool JSON"))?;
@@ -178,6 +221,11 @@ impl ConverseStream {
     }
 
     pub(crate) fn finish(self) -> ProviderResult<Vec<AgentEvent>> {
+        if !self.signed.is_empty() {
+            return Err(invalid(
+                "Bedrock signed reasoning requires a verified replay binding",
+            ));
+        }
         let mut stop_reason = self
             .stop
             .ok_or_else(|| invalid("Bedrock stream ended before messageStop"))?;
@@ -295,6 +343,37 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn signed_fragments_preserve_bytes_without_emitting_private_text() {
+        let mut stream = started();
+        for fragment in [
+            json!({"text":" thought "}),
+            json!({"signature":" A"}),
+            json!({"signature":"B "}),
+        ] {
+            assert!(
+                stream
+                    .accept(
+                        "contentBlockDelta",
+                        json!({"contentBlockIndex":0,"delta":{"reasoningContent":fragment}})
+                    )
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        stream
+            .accept("contentBlockStop", json!({"contentBlockIndex":0}))
+            .unwrap();
+        assert_eq!(
+            stream.signed.get(&0),
+            Some(&(" thought ".into(), " AB ".into()))
+        );
+        stream
+            .accept("messageStop", json!({"stopReason":"end_turn"}))
+            .unwrap();
+        assert!(stream.finish().is_err());
     }
 
     #[test]
