@@ -274,23 +274,32 @@ async fn proxy_dns_failure_is_shared_infrastructure_and_must_not_rotate_bing_hos
     .expect("both hosts plus proxy approved before query");
     let manifest = ToolNetworkManifest::new(scope);
     let plan = PreparedBingDualHost::prepare_with(
-        &manifest, "proxy secret query", 2, || "Local-Fixture/1"
-    ).expect("both query-bearing requests frozen");
+        &manifest,
+        "proxy secret query",
+        2,
+        || "Local-Fixture/1",
+    )
+    .expect("both query-bearing requests frozen");
     let dns = Arc::new(SharedProxyDnsFailure {
         calls: AtomicUsize::new(0),
     });
-    let budget = Arc::new(
-        TransportBudget::new(Duration::from_secs(5), 4, 4096).expect("two proxy sends")
-    );
+    let budget =
+        Arc::new(TransportBudget::new(Duration::from_secs(5), 4, 4096).expect("two proxy sends"));
     let t = SearchTransport::new_with_proxy(
         manifest.clone(),
-        Arc::new(LocalAuthority { manifest, deny_cn: false }),
+        Arc::new(LocalAuthority {
+            manifest,
+            deny_cn: false,
+        }),
         budget.clone(),
         dns.clone(),
         Some(proxy),
-    ).expect("prepared proxy transport");
+    )
+    .expect("prepared proxy transport");
     assert_eq!(
-        plan.execute(&t).await.expect_err("proxy DNS cannot authorize CN rotation"),
+        plan.execute(&t)
+            .await
+            .expect_err("proxy DNS cannot authorize CN rotation"),
         CompatibilityError::Transport(TransportError::Dns),
     );
     assert_eq!(dns.calls.load(Ordering::Relaxed), 1);
