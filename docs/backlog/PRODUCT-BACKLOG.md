@@ -1,6 +1,6 @@
 ## GIT-ENV-001 / #1004 — Scoop Git environment admission
 
-Intake / Unclaimed. [Story, acceptance and required reads](active/GIT-ENV-001-scoop-install-root.md).
+Active / Claimed proposed via #1006, effective only on main. [Story, acceptance and required reads](active/GIT-ENV-001-scoop-install-root.md).
 
 ## SEARCH-001-D3-T5 / I335 / #1001 — proposed bounded real Bing transport
 

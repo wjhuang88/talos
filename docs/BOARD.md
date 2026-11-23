@@ -1,3 +1,7 @@
+## GIT-ENV-001 / #1004 — proposed Scoop Git environment claim
+
+[Owner](backlog/active/GIT-ENV-001-scoop-install-root.md). Active / Claimed proposed via #1006, effective only on main. Native acceptance and permission review pending.
+
 ## SEARCH-001-D3-T5 / I335 — proposed real Bing dual-host implementation (no production admission)
 
 [Owner](backlog/active/SEARCH-001-D3-T5-bing-dual-runtime.md) / [I335](iterations/I335-search-bing-dual-runtime.md) / [Issue #1001](https://github.com/wjhuang88/talos/issues/1001): **Active / Claimed PROPOSED under governance PR #1002**; ineffective until main merge. Real approved opt-in `SearchTransport` WWW→CN code and deterministic offline fixtures; default DDG-first/CN-only unchanged. External rights [#1000](https://github.com/wjhuang88/talos/issues/1000) and T3b/#957 live/default admission remain blocked.
