@@ -65,8 +65,13 @@ impl LanguageModel for BedrockProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
-        self.dispatch(messages, tools, talos_core::tool::ToolProtocol::Native)
-            .await
+        self.dispatch(
+            messages,
+            tools,
+            talos_core::tool::ToolProtocol::Native,
+            None,
+        )
+        .await
     }
 
     async fn stream_with_protocol(
@@ -74,20 +79,44 @@ impl LanguageModel for BedrockProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
         protocol: talos_core::tool::ToolProtocol,
-        _progress: mpsc::UnboundedSender<talos_core::provider::ProviderProgress>,
+        progress: mpsc::UnboundedSender<talos_core::provider::ProviderProgress>,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         use talos_core::tool::ToolProtocol;
         match protocol {
-            ToolProtocol::Native => self.stream_with_tools(messages, tools).await,
+            ToolProtocol::Native => {
+                self.dispatch(messages, tools, protocol, Some(&progress))
+                    .await
+            }
             ToolProtocol::Compat | ToolProtocol::TalosStrict => {
                 bedrock_request::validate_tool_history(messages)?;
                 let projected = crate::compatibility_messages(messages);
-                self.dispatch(&projected, &[], protocol).await
+                self.dispatch(&projected, &[], protocol, Some(&progress))
+                    .await
             }
             ToolProtocol::Auto => Err(ProviderError::InvalidResponse(
                 "resolve the Bedrock tool protocol before dispatch".into(),
             )),
         }
+    }
+    async fn stream_with_ephemeral_images(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        protocol: ToolProtocol,
+        progress: mpsc::UnboundedSender<ProviderProgress>,
+        browser_tools: &[String],
+        images: Vec<EphemeralImage>,
+    ) -> ProviderResult<ProviderInvocationStream> {
+        self.stream_with_replay_context(
+            messages,
+            tools,
+            protocol,
+            progress,
+            browser_tools,
+            images,
+            vec![],
+        )
+        .await
     }
     async fn stream_with_replay_context(
         &self,
@@ -99,7 +128,7 @@ impl LanguageModel for BedrockProvider {
         images: Vec<EphemeralImage>,
         replay: Vec<Arc<TransientReplay>>,
     ) -> ProviderResult<ProviderInvocationStream> {
-        if !browser_tools.is_empty() || !images.is_empty() || protocol == ToolProtocol::Auto {
+        if !browser_tools.is_empty() || protocol == ToolProtocol::Auto {
             return Err(ProviderError::InvalidResponse(
                 "unsupported Bedrock invocation context".into(),
             ));
@@ -118,8 +147,8 @@ impl LanguageModel for BedrockProvider {
                 ));
             }
         }
-        if !self.allow_replay {
-            if !replay.is_empty()
+        if !self.allow_replay
+            && (!replay.is_empty()
                 || messages.iter().any(|m| {
                     matches!(
                         m,
@@ -128,16 +157,11 @@ impl LanguageModel for BedrockProvider {
                             ..
                         }
                     )
-                })
-            {
-                return Err(ProviderError::InvalidResponse(
-                    "Bedrock reasoning replay disabled".into(),
-                ));
-            }
-            return self
-                .stream_with_protocol(messages, tools, protocol, progress)
-                .await
-                .map(ProviderInvocationStream::legacy);
+                }))
+        {
+            return Err(ProviderError::InvalidResponse(
+                "Bedrock reasoning replay disabled".into(),
+            ));
         }
         let restored =
             TransientReplay::restore_history(messages, &self.provider, &self.model, &replay)?;
@@ -151,7 +175,14 @@ impl LanguageModel for BedrockProvider {
         };
         let route =
             serde_json::json!([self.provider, self.model, self.region, protocol]).to_string();
-        let body = bedrock_request::build_bound(messages, tools, self.limit, Some(&route))?;
+        let mut body = bedrock_request::build_bound(messages, tools, self.limit, Some(&route))?;
+        let expires = crate::image_io::append_bedrock_ephemeral_images(&mut body, images)?;
+        if !self.allow_replay {
+            let (tx, rx) = mpsc::channel(32);
+            self.run(body, protocol, Sink::Legacy(tx), Some(&progress), expires)
+                .await?;
+            return Ok(ProviderInvocationStream::legacy(rx));
+        }
         let binding = bedrock_request::fingerprint(
             body.get("system").unwrap_or(&serde_json::json!([])),
             &body["messages"],
@@ -162,6 +193,8 @@ impl LanguageModel for BedrockProvider {
             body,
             protocol,
             Sink::Private(tx, self.provider.clone(), self.model.clone(), binding),
+            Some(&progress),
+            expires,
         )
         .await?;
         Ok(ProviderInvocationStream::original(rx))
@@ -174,10 +207,12 @@ impl BedrockProvider {
         messages: &[Message],
         tools: &[ToolDefinition],
         protocol: talos_core::tool::ToolProtocol,
+        progress: Option<&mpsc::UnboundedSender<ProviderProgress>>,
     ) -> ProviderResult<mpsc::Receiver<AgentEvent>> {
         let body = bedrock_request::build(messages, tools, self.limit)?;
         let (tx, rx) = mpsc::channel(32);
-        self.run(body, protocol, Sink::Legacy(tx)).await?;
+        self.run(body, protocol, Sink::Legacy(tx), progress, None)
+            .await?;
         Ok(rx)
     }
 
@@ -186,24 +221,88 @@ impl BedrockProvider {
         body: serde_json::Value,
         protocol: ToolProtocol,
         sender: Sink,
+        progress: Option<&mpsc::UnboundedSender<ProviderProgress>>,
+        expires: Option<std::time::Instant>,
     ) -> ProviderResult<()> {
         let payload = serde_json::to_vec(&body)
             .map_err(|_| ProviderError::InvalidResponse("invalid Bedrock request body".into()))?;
-        let response = tokio::time::timeout(
-            Duration::from_secs(self.timeout.dispatch_timeout_secs),
-            bedrock_transport::dispatch(
-                &self.region,
-                &self.model,
-                payload,
-                #[cfg(test)]
-                self.fixture.as_ref(),
-            ),
-        )
+        let deadline =
+            tokio::time::Instant::now() + Duration::from_secs(self.timeout.dispatch_timeout_secs);
+        let deadline = expires.map_or(deadline, |t| deadline.min(t.into()));
+        let max_attempts = self.timeout.max_attempts;
+        let mut attempt = 0;
+        let payload = bytes::Bytes::from(payload);
+        let (mut reader, started) = tokio::time::timeout_at(deadline, async {
+            loop {
+                if tokio::time::Instant::now() >= deadline {
+                    return Err(ProviderError::InvalidResponse(
+                        "Bedrock dispatch deadline exceeded".into(),
+                    ));
+                }
+                let started = tokio::time::Instant::now();
+                if let Some(tx) = progress {
+                    let _ = tx.send(if attempt == 0 {
+                        ProviderProgress::InitialDispatch {
+                            attempt,
+                            max_attempts,
+                        }
+                    } else {
+                        ProviderProgress::RetryDispatch {
+                            attempt,
+                            max_attempts,
+                        }
+                    });
+                }
+                let response = bedrock_transport::dispatch(
+                    &self.region,
+                    &self.model,
+                    payload.clone(),
+                    expires,
+                    #[cfg(test)]
+                    self.fixture.as_ref(),
+                )
+                .await
+                .and_then(ResponseReader::new);
+                match response {
+                    Ok(reader) => return Ok((reader, started)),
+                    Err(error) => match crate::retry::classify_retry_with_backoff(
+                        &error,
+                        attempt,
+                        max_attempts,
+                        self.timeout.backoff_base_ms,
+                        self.timeout.backoff_max_ms,
+                    ) {
+                        crate::retry::RetryDecision::DoNotRetry => return Err(error),
+                        crate::retry::RetryDecision::Retry {
+                            attempt: next,
+                            delay_ms,
+                        } => {
+                            if let Some(tx) = progress {
+                                let _ = tx.send(ProviderProgress::ScheduledBackoff {
+                                    attempt: next,
+                                    max_attempts,
+                                    delay_ms,
+                                });
+                            }
+                            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                            attempt = next;
+                        }
+                    },
+                }
+            }
+        })
         .await
-        .map_err(|_| ProviderError::InvalidResponse("Bedrock dispatch timed out".into()))??;
-        let mut reader = ResponseReader::new(response)?;
-
-        let first = Duration::from_secs(self.timeout.first_packet_timeout_secs);
+        .map_err(|_| {
+            ProviderError::InvalidResponse("Bedrock dispatch deadline exceeded".into())
+        })??;
+        if let Some(tx) = progress {
+            let _ = tx.send(ProviderProgress::FirstPacketWait {
+                attempt,
+                max_attempts,
+            });
+        }
+        let first = (started + Duration::from_secs(self.timeout.first_packet_timeout_secs))
+            .saturating_duration_since(tokio::time::Instant::now());
         let idle = Duration::from_secs(self.timeout.stream_idle_timeout_secs);
         tokio::spawn(async move {
             let mut stream = ConverseStream::new(protocol);

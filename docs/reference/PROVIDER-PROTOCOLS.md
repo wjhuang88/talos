@@ -385,6 +385,8 @@ Explicit model and provider protocols take precedence. Inference reads no
 credentials and uses the same regional destination as explicit configuration.
 
 The Bedrock Agent tests cover ordinary registered tools and conversation images.
-A plan containing protected browser tools or a follow-up with a private
-temporary image currently fails before dispatch through the shared SDK replay
-guard. These paths require provider support for private invocation context.
+Request-local PNGs use the ADR-051 size limits and the producer's original
+expiry. Dispatch and pre-stream retries share the earliest expiry and dispatch
+deadline. A signed turn that depended on a temporary image can only continue if
+its exact wire prefix can be restored. Protected browser tool plans still fail
+before dispatch.

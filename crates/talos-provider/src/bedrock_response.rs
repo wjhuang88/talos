@@ -48,10 +48,10 @@ pub(crate) struct ResponseReader {
 impl ResponseReader {
     pub(crate) fn new(response: reqwest::Response) -> ProviderResult<Self> {
         if !response.status().is_success() {
-            return Err(ProviderError::InvalidResponse(format!(
-                "Bedrock HTTP {}",
-                response.status().as_u16()
-            )));
+            return Err(crate::status_to_error(
+                response.status(),
+                format!("Bedrock HTTP {}", response.status().as_u16()),
+            ));
         }
         let mime = response
             .headers()

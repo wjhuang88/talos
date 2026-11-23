@@ -35,7 +35,8 @@ fn env_credentials() -> ProviderResult<Credentials> {
 pub(crate) async fn dispatch(
     region: &str,
     model: &str,
-    payload: Vec<u8>,
+    payload: bytes::Bytes,
+    expires: Option<std::time::Instant>,
     #[cfg(test)] fixture: Option<&reqwest::Url>,
 ) -> ProviderResult<reqwest::Response> {
     let url = crate::bedrock_endpoint::converse_stream(region, model).map_err(invalid)?;
@@ -79,10 +80,13 @@ pub(crate) async fn dispatch(
         credentials,
         SystemTime::now(),
     )?;
+    if expires.is_some_and(|deadline| std::time::Instant::now() >= deadline) {
+        return Err(invalid("Bedrock ephemeral image expired before dispatch"));
+    }
     client
         .execute(request)
         .await
-        .map_err(|_| invalid("Bedrock dispatch failed"))
+        .map_err(|_| ProviderError::NetworkError("Bedrock dispatch failed".into()))
 }
 
 fn sign_request(

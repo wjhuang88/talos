@@ -360,3 +360,80 @@ async fn signed_history_requires_live_custody_and_enabled_replay_before_http() {
         }));
     }
 }
+
+#[tokio::test]
+async fn ephemeral_image_retries_before_stream_and_reports_progress() {
+    use super::bedrock_provider::{BedrockProvider, FIXTURE};
+    use std::time::{Duration, Instant};
+    use talos_core::{
+        message::Message as History,
+        provider::{EphemeralImage, LanguageModel, ProviderProgress},
+    };
+    let mut server = mockito::Server::new_async().await;
+    let path = "/model/example/converse-stream";
+    let first = server
+        .mock("POST", path)
+        .with_status(503)
+        .expect(1)
+        .create_async()
+        .await;
+    let second = server.mock("POST",path).match_request(|request| {
+        let body:Value = serde_json::from_slice(request.body().expect("request bytes")).expect("JSON request");
+        body["messages"][0]["content"] == json!([{"text":"observe"},{"image":{"format":"png","source":{"bytes":"iVBORw0KGgo="}}}])
+    }).with_body(response(false,"done")).with_header("content-type","application/vnd.amazon.eventstream").expect(1).create_async().await;
+    let provider = FIXTURE
+        .scope(server.url().parse().expect("fixture URL"), async {
+            BedrockProvider::new(
+                "p",
+                "example",
+                "us-east-1".into(),
+                None,
+                true,
+                talos_config::ProviderTimeoutConfig {
+                    backoff_base_ms: 0,
+                    backoff_max_ms: 0,
+                    ..Default::default()
+                },
+            )
+            .expect("provider")
+        })
+        .await;
+    let image = EphemeralImage::png(
+        b"\x89PNG\r\n\x1a\n".to_vec(),
+        Instant::now() + Duration::from_secs(10),
+    )
+    .expect("image");
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut stream = provider
+        .stream_with_ephemeral_images(
+            &[History::User {
+                content: "observe".into(),
+            }],
+            &[],
+            ToolProtocol::Native,
+            tx,
+            &[],
+            vec![image],
+        )
+        .await
+        .expect("successful retry");
+    while stream.recv().await.is_some() {}
+    assert!(matches!(
+        rx.recv().await,
+        Some(ProviderProgress::InitialDispatch { attempt: 0, .. })
+    ));
+    assert!(matches!(
+        rx.recv().await,
+        Some(ProviderProgress::ScheduledBackoff { attempt: 1, .. })
+    ));
+    assert!(matches!(
+        rx.recv().await,
+        Some(ProviderProgress::RetryDispatch { attempt: 1, .. })
+    ));
+    assert!(matches!(
+        rx.recv().await,
+        Some(ProviderProgress::FirstPacketWait { attempt: 1, .. })
+    ));
+    first.assert_async().await;
+    second.assert_async().await;
+}
