@@ -79,13 +79,34 @@ pub(crate) fn build(
     tools: &[ToolDefinition],
     max_tokens: Option<u32>,
 ) -> ProviderResult<Value> {
+    build_bound(messages, tools, max_tokens, None)
+}
+
+pub(crate) fn fingerprint(system: &Value, messages: &Value, route: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let encoded = json!([route, system, messages]).to_string();
+    base64::engine::general_purpose::STANDARD.encode(Sha256::digest(encoded.as_bytes()))
+}
+
+pub(crate) fn build_bound(
+    messages: &[Message],
+    tools: &[ToolDefinition],
+    max_tokens: Option<u32>,
+    route: Option<&str>,
+) -> ProviderResult<Value> {
     validate_tool_history(messages)?;
-    let mut system = Vec::new();
+    let system: Vec<_> = messages
+        .iter()
+        .filter_map(|message| match message {
+            Message::System { content, .. } => Some(json!({"text":content})),
+            _ => None,
+        })
+        .collect();
+    let system_value = json!(system);
     let mut turns = Vec::<Turn>::new();
     for message in messages {
         let (role, blocks) = match message {
-            Message::System { content, .. } => {
-                system.push(json!({"text":content}));
+            Message::System { .. } => {
                 continue;
             }
             Message::User { content } | Message::Context { content } => {
@@ -103,10 +124,26 @@ pub(crate) fn build(
                 tool_calls,
                 reasoning,
             } => {
-                if reasoning.is_some() {
-                    return Err(invalid(
-                        "Bedrock reasoning replay requires a verified conversation binding",
-                    ));
+                if let Some(reasoning) = reasoning {
+                    let mismatch = || invalid("Bedrock signed history binding mismatch");
+                    let route = route.ok_or_else(mismatch)?;
+                    let [talos_core::message::ReasoningBlock::Redacted { data }] =
+                        reasoning.blocks.as_slice()
+                    else {
+                        return Err(mismatch());
+                    };
+                    let (expected, blocks): (String, Vec<Value>) =
+                        serde_json::from_str(data).map_err(|_| mismatch())?;
+                    if expected != fingerprint(&system_value, &json!(turns), route)
+                        || turns.last().is_some_and(|turn| turn.role == "assistant")
+                    {
+                        return Err(mismatch());
+                    }
+                    turns.push(Turn {
+                        role: "assistant",
+                        content: blocks,
+                    });
+                    continue;
                 }
                 let mut blocks = Vec::new();
                 if !content.is_empty() {

@@ -112,6 +112,7 @@ fn build_with_connection(
                 ProviderError::InvalidResponse("Bedrock requires AWS_REGION".into())
             })?;
             Ok(Arc::new(crate::bedrock_provider::BedrockProvider::new(
+                &config.provider,
                 &config.model,
                 region,
                 output_limit,

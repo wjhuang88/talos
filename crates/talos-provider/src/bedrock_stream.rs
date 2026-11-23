@@ -32,6 +32,8 @@ pub(crate) struct ConverseStream {
     ids: HashSet<String>,
     signed: BTreeMap<u32, (String, String)>,
     reasoning_bytes: usize,
+    text_blocks: BTreeMap<u32, String>,
+    public_text: String,
     calls: BTreeMap<u32, ToolCall>,
     stop: Option<StopReason>,
     usage: Option<Usage>,
@@ -141,6 +143,11 @@ impl ConverseStream {
                     if !matches!(self.open.entry(index).or_insert(Block::Text), Block::Text) {
                         return Err(invalid("Bedrock block kind changed"));
                     }
+                    if self.public_text.len().saturating_add(text.len()) > 8 * 1024 * 1024 {
+                        return Err(invalid("Bedrock response text exceeds turn limit"));
+                    }
+                    self.public_text.push_str(text);
+                    self.text_blocks.entry(index).or_default().push_str(text);
                     if let Some((_, buffer)) = &mut self.textual {
                         if buffer.len().saturating_add(text.len()) > 8 * 1024 * 1024 {
                             return Err(invalid("Bedrock textual tool response too large"));
@@ -218,6 +225,66 @@ impl ConverseStream {
             _ => return Err(invalid("unexpected Bedrock conversation event")),
         }
         Ok(None)
+    }
+
+    pub(crate) fn finish_bound(
+        mut self,
+        provider: &str,
+        model: &str,
+        binding: &str,
+    ) -> ProviderResult<(
+        Option<talos_core::provider::TransientReplay>,
+        Vec<AgentEvent>,
+    )> {
+        use serde_json::json;
+        use talos_core::message::{AssistantReasoning, Message, ReasoningBlock};
+        if self.signed.is_empty() {
+            return Ok((None, self.finish()?));
+        }
+        let mut blocks = BTreeMap::new();
+        for (index, text) in std::mem::take(&mut self.text_blocks) {
+            blocks.insert(index, json!({"text":text}));
+        }
+        for (index, (text, signature)) in std::mem::take(&mut self.signed) {
+            blocks.insert(
+                index,
+                json!({"reasoningContent":{"reasoningText":{"text":text,"signature":signature}}}),
+            );
+        }
+        for (index, call) in &self.calls {
+            blocks.insert(
+                *index,
+                json!({"toolUse":{"toolUseId":call.id,"name":call.name,"input":call.input}}),
+            );
+        }
+        let content = std::mem::take(&mut self.public_text);
+        let events = self.finish()?;
+        let calls = events
+            .iter()
+            .filter_map(|event| match event {
+                AgentEvent::ToolCall { call, .. } => Some(call.clone()),
+                _ => None,
+            })
+            .collect();
+        let public = Message::Assistant {
+            content,
+            tool_calls: calls,
+            reasoning: None,
+        };
+        let mut private = public.clone();
+        if let Message::Assistant { reasoning, .. } = &mut private {
+            *reasoning = Some(AssistantReasoning {
+                provider: provider.into(),
+                model: model.into(),
+                blocks: vec![ReasoningBlock::Redacted {
+                    data: json!([binding, blocks.into_values().collect::<Vec<_>>()]).to_string(),
+                }],
+            });
+        }
+        Ok((
+            Some(talos_core::provider::TransientReplay::new(public, private)?),
+            events,
+        ))
     }
 
     pub(crate) fn finish(self) -> ProviderResult<Vec<AgentEvent>> {

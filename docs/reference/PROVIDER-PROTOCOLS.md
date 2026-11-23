@@ -361,7 +361,12 @@ Native tool requests use Converse tool specifications. Compat and TalosStrict
 use textual calls over the same signed transport. Tool execution follows the
 Agent permission policy. The adapter drains trailing usage and checks for stream
 errors before delivering calls. Controlled local HTTP tests exercise all three
-modes with ordered PNGs and a file-read round trip.
+modes with ordered PNGs and a file-read round trip. On the Agent replay path,
+signed reasoning stays in private session memory. The next request restores the
+original assistant blocks only when the public message, preceding wire messages,
+system instructions, provider, region, model and tool protocol match. Reopening
+durable history without that private attachment refuses continuation. Legacy
+event-only SDK streams report an error on signed reasoning.
 
 ### Frozen Bedrock catalog evidence
 

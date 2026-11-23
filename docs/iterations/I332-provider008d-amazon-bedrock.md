@@ -57,3 +57,11 @@ provider tests passed, including both textual protocols rejecting orphan results
 At f4c14075 the fresh Bedrock CLI catalog selection regression passed. Standard
 preflight stopped in Clippy at the nested unmatched-result check in
 bedrock_request.rs (collapsible_match) before workspace tests.
+
+Subsequent local preflight attempts stopped at the talos-mcp git_prepared
+case04 Unix socket fixture with PermissionDenied. These attempts did not
+establish a passing full preflight. During signed continuation development,
+the first focused builds caught a digest formatting error and a fixture API
+argument mismatch. After correction, all 15 locked Bedrock library tests
+passed, including signed ordinary tool continuation in Native, Compat and
+TalosStrict against local HTTP.

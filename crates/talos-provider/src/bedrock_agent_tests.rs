@@ -19,6 +19,18 @@ fn response(native: bool, text: &str) -> Vec<u8> {
         write_message_to(&frame, &mut bytes).unwrap();
     };
     add("messageStart", json!({"role":"assistant"}));
+    if native || text.starts_with("<tool_call>") {
+        for delta in [
+            json!({"text":"private thought"}),
+            json!({"signature":" sig "}),
+        ] {
+            add(
+                "contentBlockDelta",
+                json!({"contentBlockIndex":1,"delta":{"reasoningContent":delta}}),
+            );
+        }
+        add("contentBlockStop", json!({"contentBlockIndex":1}));
+    }
     if native {
         add(
             "contentBlockStart",
@@ -127,7 +139,14 @@ async fn round(protocol: ToolProtocol) {
         .await;
     let second = server
         .mock("POST", path)
-        .match_request(|r| String::from_utf8_lossy(r.body().unwrap()).contains("BEDROCK_READ_OK"))
+        .match_request(|r| {
+            let body: Value = serde_json::from_slice(r.body().unwrap()).unwrap();
+            body.to_string().contains("BEDROCK_READ_OK")
+                && body["messages"].as_array().unwrap().iter().any(|m| {
+                    m["content"][1]["reasoningContent"]["reasoningText"]
+                        == json!({"text":"private thought","signature":" sig "})
+                })
+        })
         .with_header("content-type", "application/vnd.amazon.eventstream")
         .with_body(response(false, "done"))
         .create_async()
@@ -165,7 +184,9 @@ async fn round(protocol: ToolProtocol) {
         None,
         root,
     );
-    agent = agent.with_image_input_supported(true);
+    agent = agent
+        .with_image_input_supported(true)
+        .with_reasoning_identity(Some("fixture".into()), Some("example".into()), true);
     agent.set_tool_protocol(protocol);
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
     let (answer, _) = tokio::time::timeout(
@@ -221,7 +242,14 @@ async fn dropping_receiver_closes_incomplete_http_response() {
     });
     let provider = FIXTURE
         .scope(endpoint, async {
-            BedrockProvider::new("example", "us-east-1".into(), None, Default::default()).unwrap()
+            BedrockProvider::new(
+                "bedrock",
+                "example",
+                "us-east-1".into(),
+                None,
+                Default::default(),
+            )
+            .unwrap()
         })
         .await;
     let receiver = provider
@@ -244,8 +272,14 @@ async fn textual_modes_reject_orphan_results_before_dispatch() {
         message::{Message as History, MessageToolResult},
         provider::LanguageModel,
     };
-    let provider =
-        BedrockProvider::new("example", "us-east-1".into(), None, Default::default()).unwrap();
+    let provider = BedrockProvider::new(
+        "bedrock",
+        "example",
+        "us-east-1".into(),
+        None,
+        Default::default(),
+    )
+    .unwrap();
     let history = [History::Tool {
         result: MessageToolResult {
             tool_use_id: "orphan".into(),
