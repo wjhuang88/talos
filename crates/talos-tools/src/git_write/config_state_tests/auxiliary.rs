@@ -68,3 +68,71 @@ fn checkout_protected_paths_overlap_across_windows_prefix_spellings() {
     assert!(!potential_path_prefix(Path::new(r"C:\repo"), Path::new(r"\\?\C:\repository\rules")));
     assert!(!potential_path_prefix(Path::new(r"C:\Users\RUNNER~1\repo"), Path::new(r"\\?\C:\Users\runneradmin\other\rules")));
 }
+
+#[test]
+fn global_attribute_default_uses_frozen_xdg_and_home_evidence_without_git_var() {
+    // I324: older Git cannot answer GIT_ATTR_GLOBAL. The existing host
+    // configuration model already names the default global attribute source
+    // from frozen XDG/HOME input; this does not establish compiled SYSTEM
+    // attribute defaults or grant any new filesystem-read authority.
+    let root = tempfile::tempdir().expect("fixture");
+    assert!(
+        std::process::Command::new("git")
+            .arg("init")
+            .arg(root.path())
+            .output()
+            .expect("repository")
+            .status
+            .success()
+    );
+    let repository = RepositoryState::capture(root.path()).expect("repository");
+    let home = root.path().join("home");
+    let xdg = root.path().join("explicit-xdg");
+    let mut environment = BTreeMap::new();
+    environment.insert(OsString::from("HOME"), home.as_os_str().to_os_string());
+    environment.insert(
+        OsString::from("XDG_CONFIG_HOME"),
+        xdg.as_os_str().to_os_string(),
+    );
+
+    let config =
+        ConfigState::capture_host(b"", &repository, &environment).expect("empty host config");
+    let xdg_attrs = xdg.join("git/attributes");
+    assert!(
+        config.stable_auxiliary.contains(&xdg_attrs),
+        "frozen explicit XDG global attributes must remain in source evidence"
+    );
+    assert!(
+        !config.stable_auxiliary.contains(&home.join(".config/git/attributes")),
+        "HOME fallback must not replace explicit XDG selection"
+    );
+
+    // Capture follows existing approved continuation code paths; this test
+    // only exercises its evidence behavior, not a new pre-admission reader.
+    std::fs::create_dir_all(xdg_attrs.parent().expect("attribute parent"))
+        .expect("create source parent");
+    std::fs::write(&xdg_attrs, b"*.txt filter=reviewed\n").expect("attribute fixture");
+    let evidence = config.capture_auxiliary().expect("fixture evidence");
+    config
+        .revalidate_auxiliary(&evidence)
+        .expect("unchanged admitted source");
+    std::fs::write(&xdg_attrs, b"*.txt filter=changed\n").expect("replace source bytes");
+    assert!(
+        config.revalidate_auxiliary(&evidence).is_err(),
+        "a changed global attributes source must invalidate preparation"
+    );
+
+    environment.remove(std::ffi::OsStr::new("XDG_CONFIG_HOME"));
+    let home_config =
+        ConfigState::capture_host(b"", &repository, &environment).expect("HOME fallback config");
+    assert!(
+        home_config
+            .stable_auxiliary
+            .contains(&home.join(".config/git/attributes")),
+        "HOME fallback remains a named source even when the file is missing"
+    );
+    assert!(
+        !home_config.stable_auxiliary.contains(&xdg_attrs),
+        "a changed frozen environment must produce a different source set"
+    );
+}

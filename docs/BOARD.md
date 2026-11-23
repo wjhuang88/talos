@@ -61,9 +61,16 @@ Recovery PR #917, approval history, edit locations and background retain separat
 
 [SEARCH-001-D3-T1](backlog/active/SEARCH-001-D3-T1-bing-synthetic-negative-conformance.md) / [I326](iterations/I326-search-bing-synthetic-negative-conformance.md) / [#941](https://github.com/wjhuang88/talos/issues/941): claim [#943](https://github.com/wjhuang88/talos/pull/943) merged; bounded test implementation [#944](https://github.com/wjhuang88/talos/pull/944) merged at Completion Commit `9cbc615cebb119ead9706a4d00159d7151639606` after exact-head CI43428872719 8/8, independent review and CAS. Five synthetic-only cases characterize ad/organic false positive, DOM drift, unadmitted new Bing hosts and root-reachability/query-403 distinction. Parser false-positive **not fixed**; new Bing hosts, real regional reachability or provider rights not admitted. #937/#624 remain Open; #941 close only after owner-first record merges.
 
-## GIT-COMPAT-001 / I324 — gix-native Git preflight (claim proposed)
+## GIT-COMPAT-001 / I324 — targeted old-Git query compatibility (Active; native acceptance failed)
 
-[GIT-COMPAT-001](backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](iterations/I324-git-236-preflight-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): proposed governance-only [claim #920](https://github.com/wjhuang88/talos/pull/920) and activation, **ineffective until merge**. The November 10 design is not implementation. No change to ADR-089 permission admission or to GIT-SNAPSHOT-001 / TUI-APPROVAL-001 Review status; Git 2.36 Windows validation and independent security review remain mandatory.
+[November 21 native handoff](reference/WINDOWS-VALIDATION-2026-11-21-I324.md), tested
+`2bbd3c34`: official MinGit and installed Scoop Git 2.36.1 confirm five unsupported
+var forms and unsupported target-tree source option. Fixed test-fixture read-only
+cleanup; both matrix reruns exit 0. Format and 15 candidate tests pass; original
+17 MiB Checkout/Commit preparation still fails on environment guard. Product
+acceptance remains failed; no permission change or Complete claim.
+
+[GIT-COMPAT-001](backlog/active/GIT-COMPAT-001-gix-preflight-host-git-compatibility.md) / [I324](iterations/I324-git-236-preflight-compatibility.md) / [#919](https://github.com/wjhuang88/talos/issues/919): [claim #920](https://github.com/wjhuang88/talos/pull/920) effective at `067dd3d4`; Draft #928 and Proposed ADR review #931 remain unmerged. **2026-11-19 maintainer correction:** retain compatible approved Git CLI and replace only unsupported query forms (initially `git var GIT_ATTR_SYSTEM/GLOBAL`), not the entire preflight; the older all-gix/zero-CLI design is superseded. [November 17 native Windows evidence](reference/WINDOWS-VALIDATION-2026-11-17-I324.md), exact candidate `71c923b9`: 12 candidate tests pass, original Git 2.36 suite 272 pass / 113 fail; controlled environment 305 pass / 80 fail. Actual prepared large Checkout/Commit acceptance failed; The Windows gitdir conditional candidate was added and passed remote CI #4415 8/8, but real 2.36.1 full Checkout/Commit, new substitute-path child evidence and independent security review remain open. ADR-089 authority and separate snapshot/TUI Review owners are unchanged.
 
 Native Windows follow-up (2026-11-10, source `c065236a`):
 [validation evidence](reference/WINDOWS-VALIDATION-2026-11-10.md) records TUI 652,
