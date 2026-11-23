@@ -71,6 +71,33 @@ mod tests {
         bytes
     }
 
+    proptest::proptest! {
+        #[test]
+        fn arbitrary_fragmentation_preserves_every_frame(
+            widths in proptest::collection::vec(1usize..64, 1..32),
+            count in 1usize..32
+        ) {
+            let bytes = frame().repeat(count);
+            let mut reader = FrameReader::default();
+            let mut offset = 0;
+            let mut decoded = 0;
+            for width in widths.into_iter().cycle() {
+                let end = (offset + width).min(bytes.len());
+                let mut chunk = &bytes[offset..end];
+                while !chunk.is_empty() {
+                    if let Some(message) = reader.next(&mut chunk).expect("valid frames") {
+                        proptest::prop_assert_eq!(message.payload().as_ref(), b"event");
+                        decoded += 1;
+                    }
+                }
+                offset = end;
+                if end == bytes.len() { break; }
+            }
+            proptest::prop_assert!(reader.finish().is_ok());
+            proptest::prop_assert_eq!(decoded,count);
+        }
+    }
+
     #[test]
     fn fragmented_and_adjacent_frames() {
         let bytes = frame();
