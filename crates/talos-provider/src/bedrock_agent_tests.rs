@@ -34,11 +34,11 @@ fn response(native: bool, text: &str) -> Vec<u8> {
     if native {
         add(
             "contentBlockStart",
-            json!({"contentBlockIndex":0,"start":{"toolUse":{"toolUseId":"r","name":"read"}}}),
+            json!({"contentBlockIndex":0,"start":{"toolUse":{"toolUseId":"r","name":"read_image"}}}),
         );
         add(
             "contentBlockDelta",
-            json!({"contentBlockIndex":0,"delta":{"toolUse":{"input":r#"{"path":"note"}"#}}}),
+            json!({"contentBlockIndex":0,"delta":{"toolUse":{"input":r#"{"path":"tool.png"}"#}}}),
         );
     } else {
         add(
@@ -89,7 +89,13 @@ fn bedrock_factory_agent_rounds() {
 async fn round(protocol: ToolProtocol) {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().canonicalize().unwrap();
-    std::fs::write(root.join("note"), "BEDROCK_READ_OK").unwrap();
+    let tool_image = root.join("tool.png");
+    image::RgbaImage::from_pixel(1, 1, image::Rgba([0u8, 255, 0, 255]))
+        .save(&tool_image)
+        .unwrap();
+    let tool_bytes =
+        base64::engine::general_purpose::STANDARD.encode(std::fs::read(tool_image).unwrap());
+    let first_image = tool_bytes.clone();
     let mut server = mockito::Server::new_async().await;
     let native = protocol == ToolProtocol::Native;
     use base64::Engine;
@@ -128,20 +134,32 @@ async fn round(protocol: ToolProtocol) {
             });
             ordered
                 && body.get("toolConfig").is_some() == native
-                && !body.to_string().contains("BEDROCK_READ_OK")
+                && !body.to_string().contains(&first_image)
         })
         .with_header("content-type", "application/vnd.amazon.eventstream")
         .with_body(response(
             native,
-            r#"<tool_call>{"name":"read","id":"r","args":{"path":"note"}}</tool_call>"#,
+            r#"<tool_call>{"name":"read_image","id":"r","args":{"path":"tool.png"}}</tool_call>"#,
         ))
         .create_async()
         .await;
     let second = server
         .mock("POST", path)
-        .match_request(|r| {
+        .match_request(move |r| {
             let body: Value = serde_json::from_slice(r.body().unwrap()).unwrap();
-            body.to_string().contains("BEDROCK_READ_OK")
+            body["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .flat_map(|m| m["content"].as_array().into_iter().flatten())
+                .filter(|block| {
+                    block["image"]["source"]["bytes"].as_str() == Some(tool_bytes.as_str())
+                })
+                .count()
+                == 1
+                && body
+                    .to_string()
+                    .contains("attached to next provider request")
                 && body["messages"].as_array().unwrap().iter().any(|m| {
                     m["content"][1]["reasoningContent"]["reasoningText"]
                         == json!({"text":"private thought","signature":" sig "})
@@ -173,7 +191,7 @@ async fn round(protocol: ToolProtocol) {
         })
         .await;
     let mut registry = ToolRegistry::new();
-    registry.register(Arc::new(talos_tools::file_tools::ReadTool::new(
+    registry.register(Arc::new(talos_tools::read_image_tool::ReadImageTool::new(
         root.clone(),
     )));
     let permission = talos_permission::PermissionEngine::with_workspace_root(root.clone());
@@ -191,7 +209,11 @@ async fn round(protocol: ToolProtocol) {
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
     let (answer, _) = tokio::time::timeout(
         std::time::Duration::from_secs(15),
-        agent.run_streaming("Read note".into(), vec![History::Multimodal { parts }], tx),
+        agent.run_streaming(
+            "Inspect tool.png".into(),
+            vec![History::Multimodal { parts }],
+            tx,
+        ),
     )
     .await
     .unwrap()
